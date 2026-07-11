@@ -1,0 +1,31 @@
+title: "Adın Soyadın"
+description: "Akademik portfolyo ve blog"
+baseurl: ""
+url: "https://KULLANICI-ADIN.github.io"
+
+# ---- BURAYI DOLDUR ----
+github_username: "KULLANICI-ADIN"
+kutuphane_repo: "KULLANICI-ADIN/kutuphane"   # izlediklerim/okuduklarım issue repo'sun
+substack_url: "https://SENIN-ADIN.substack.com"
+substack_feed: "https://SENIN-ADIN.substack.com/feed"
+formspree_id: "YOUR_FORM_ID"                 # formspree.io'dan alacaksın
+
+social:
+  twitter: "https://twitter.com/kullanici_adin"
+  linkedin: "https://linkedin.com/in/kullanici-adin"
+  github: "https://github.com/KULLANICI-ADIN"
+  instagram: ""
+  orcid: ""
+  googlescholar: ""
+# ------------------------
+
+markdown: kramdown
+plugins:
+  - jekyll-feed
+
+defaults:
+  - scope:
+      path: ""
+      type: "posts"
+    values:
+      layout: "post"
