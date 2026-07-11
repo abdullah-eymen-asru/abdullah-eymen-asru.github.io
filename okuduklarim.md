@@ -6,7 +6,7 @@ title: Okuduklarım
 <h1>Okuduklarım</h1>
 <p>
   Okuduğum kitapları GitHub üzerinde
-  <a href="https://github.com/{{ site.kutuphane_repo }}/issues?q=is%3Aissue+label%3Aokudum" target="_blank">issue olarak</a>
+  <a href="https://github.com/{{ site.kutuphane_repo }}/issues?q=is%3Aissue+label%3Aokuma" target="_blank">issue olarak</a>
   not alıyorum. Liste aşağıda otomatik güncelleniyor.
 </p>
 
