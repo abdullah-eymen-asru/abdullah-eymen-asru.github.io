@@ -12,7 +12,7 @@ title: İletişim
   width/height değerlerini formunun soru sayısına göre ayarlayabilirsin.
 -->
 <iframe
-  src="[FORM-EMBED-LINKINI-BURAYA-YAPISTIR](https://docs.google.com/forms/d/e/1FAIpQLSfAwtYtnRfCk0k1F4g6VXULi53fsQn4hw62IeBobQajiqJx8g/viewform?embedded=true)"
+  src="https://docs.google.com/forms/d/e/1FAIpQLSfAwtYtnRfCk0k1F4g6VXULi53fsQn4hw62IeBobQajiqJx8g/viewform?embedded=true"
   width="100%"
   height="800"
   frameborder="0"
