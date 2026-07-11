@@ -6,7 +6,7 @@ title: İzlediklerim
 <h1>İzlediklerim</h1>
 <p>
   İzlediğim film ve dizileri GitHub üzerinde
-  <a href="https://github.com/{{ site.kutuphane_repo }}/issues?q=is%3Aissue+label%3Aizledim" target="_blank">issue olarak</a>
+  <a href="https://github.com/{{ site.kutuphane_repo }}/issues?q=is%3Aissue+label%3Aizleme" target="_blank">issue olarak</a>
   not alıyorum. Liste aşağıda otomatik güncelleniyor.
 </p>
 
