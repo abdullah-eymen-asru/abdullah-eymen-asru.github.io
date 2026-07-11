@@ -20,7 +20,7 @@ title: Blog
   const container = document.getElementById("substack-posts");
 
   // BURAYA Substack'teki section adını birebir yaz (büyük/küçük harf önemli değil)
-  const ISTENEN_SECTION = "Blog";
+  const ISTENEN_SECTION = "Türkçe";
 
   try {
     const res = await fetch(proxyUrl);
