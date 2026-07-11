@@ -4,7 +4,7 @@ title: Anasayfa
 ---
 
 <div class="hero">
-  <h1>Merhaba, ben Adın Soyadın 👋</h1>
+  <h1>Merhaba, ben Abdullah Eymen Asru 👋</h1>
   <p class="subtitle">Kısa unvan / bölüm bilgin (örn: Doktora Öğrencisi, XYZ Üniversitesi)</p>
 
   <div class="social-links">
