@@ -4,16 +4,18 @@ title: İletişim
 ---
 
 <h1>İletişim</h1>
-<p>Bana aşağıdaki formu kullanarak mesaj gönderebilirsin, direkt e-postama düşer.</p>
+<p>Aşağıdaki formu doldurarak bana mesaj gönderebilirsin.</p>
 
-<form class="contact-form" action="https://formspree.io/f/{{ site.formspree_id }}" method="POST">
-  <input type="text" name="name" placeholder="İsminiz" required>
-  <input type="email" name="email" placeholder="E-posta adresiniz" required>
-  <textarea name="message" rows="6" placeholder="Mesajınız" required></textarea>
-  <button type="submit">Gönder</button>
-</form>
-
-<p style="margin-top:2em; color:var(--muted); font-size:0.9rem;">
-  Alternatif olarak bana <a href="mailto:seninmail@ornek.com">seninmail@ornek.com</a>
-  adresinden de ulaşabilirsin.
-</p>
+<!--
+  BURAYA Google Forms'tan aldığın <iframe> kodunu yapıştır.
+  Google Forms > Gönder (Send) > <> ikonu > kodu kopyala.
+  width/height değerlerini formunun soru sayısına göre ayarlayabilirsin.
+-->
+<iframe
+  src="FORM-EMBED-LINKINI-BURAYA-YAPISTIR"
+  width="100%"
+  height="800"
+  frameborder="0"
+  style="border:1px solid var(--border); border-radius:10px;">
+  Yükleniyor…
+</iframe>
