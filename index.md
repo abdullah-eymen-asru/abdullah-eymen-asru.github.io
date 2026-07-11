@@ -8,12 +8,16 @@ title: Anasayfa
   <p class="subtitle">Kısa unvan / bölüm bilgin (örn: Doktora Öğrencisi, XYZ Üniversitesi)</p>
 
   <div class="social-links">
-    {% if site.social.github %}<a href="{{ site.social.github }}" target="_blank">GitHub</a>{% endif %}
-    {% if site.social.linkedin %}<a href="{{ site.social.linkedin }}" target="_blank">LinkedIn</a>{% endif %}
-    {% if site.social.twitter %}<a href="{{ site.social.twitter }}" target="_blank">Twitter / X</a>{% endif %}
-    {% if site.social.instagram and site.social.instagram != "" %}<a href="{{ site.social.instagram }}" target="_blank">Instagram</a>{% endif %}
-    {% if site.social.orcid and site.social.orcid != "" %}<a href="{{ site.social.orcid }}" target="_blank">ORCID</a>{% endif %}
-    {% if site.social.googlescholar and site.social.googlescholar != "" %}<a href="{{ site.social.googlescholar }}" target="_blank">Google Scholar</a>{% endif %}
+    {% assign labels = "github:GitHub|linkedin:LinkedIn|twitter:X (Twitter)|instagram:Instagram|youtube:YouTube|nsosyal:nsosyal|orcid:ORCID|academia:Academia.edu|researchgate:ResearchGate|kitap1000:1000Kitap|playstore:Uygulama (Play Store)" | split: "|" %}
+    {% for pair in labels %}
+      {% assign parts = pair | split: ":" %}
+      {% assign key = parts[0] %}
+      {% assign label = parts[1] %}
+      {% assign link = site.social[key] %}
+      {% if link and link != "" %}
+        <a href="{{ link }}" target="_blank">{{ label }}</a>
+      {% endif %}
+    {% endfor %}
     <a href="{{ site.substack_url }}" target="_blank">Substack</a>
   </div>
 </div>
