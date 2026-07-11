@@ -1,22 +1,28 @@
-title: "Adın Soyadın"
+title: "Abdullah Eymen Asru"
 description: "Akademik portfolyo ve blog"
 baseurl: ""
-url: "https://KULLANICI-ADIN.github.io"
+url: "https://abdullah-eymen-asru.github.io"
 
 # ---- BURAYI DOLDUR ----
-github_username: "KULLANICI-ADIN"
-kutuphane_repo: "KULLANICI-ADIN/kutuphane"   # izlediklerim/okuduklarım issue repo'sun
-substack_url: "https://SENIN-ADIN.substack.com"
-substack_feed: "https://SENIN-ADIN.substack.com/feed"
+github_username: "abdullah-eymen-asru"
+kutuphane_repo: "abdullah-eymen-asru/izleme-okuma-listem"   # izlediklerim/okuduklarım issue repo'sun
+substack_url: "https://Sabdullaheymenasru.substack.com"
+substack_feed: "https://abdullaheymenasru.substack.com/feed"
 formspree_id: "YOUR_FORM_ID"                 # formspree.io'dan alacaksın
 
 social:
-  twitter: "https://twitter.com/kullanici_adin"
-  linkedin: "https://linkedin.com/in/kullanici-adin"
-  github: "https://github.com/KULLANICI-ADIN"
-  instagram: ""
-  orcid: ""
-  googlescholar: ""
+  instagram: "https://www.instagram.com/abdullah_eymen_asru/"
+  youtube: "https://www.youtube.com/@abdullah_eymen_asru"
+  X (Twitter): "https://x.com/abdullaheymena"
+  linkedin: "https://linkedin.com/in/abdullah-eymen-asru"
+  substack: "https://abdullaheymenasru.substack.com/"
+  nsosyal: "https://nsosyal.com/abdullah_eymen_asru"
+  github: "https://github.com/abdullah-eymen-asru"
+  orcid: "https://orcid.org/0009-0006-8670-4317"
+  academia: "https://29mayis.academia.edu/AbdullahEymenAsru"
+  researchgate: "https://www.researchgate.net/profile/Abdullah-Eymen-Asru"
+  1000 Kitap: "https://1000kitap.com/Abdullah_Eymen_Asru"
+  Google Play Store Uygulaması: "https://play.google.com/store/apps/details?id=com.aeymena.blog"
 # ------------------------
 
 markdown: kramdown
