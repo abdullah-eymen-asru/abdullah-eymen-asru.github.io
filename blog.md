@@ -19,6 +19,9 @@ title: Blog
   const proxyUrl = "https://api.rss2json.com/v1/api.json?rss_url=" + encodeURIComponent(feedUrl);
   const container = document.getElementById("substack-posts");
 
+  // BURAYA Substack'teki section adını birebir yaz (büyük/küçük harf önemli değil)
+  const ISTENEN_SECTION = "Blog";
+
   try {
     const res = await fetch(proxyUrl);
     const data = await res.json();
@@ -27,8 +30,23 @@ title: Blog
       throw new Error("Feed boş veya erişilemedi");
     }
 
+    // Sadece istenen section'a ait postları bırak, gerisini ele
+    const filtered = data.items.filter(item => {
+      const categories = item.categories || [];
+      return categories.some(
+        cat => cat.toLowerCase() === ISTENEN_SECTION.toLowerCase()
+      );
+    });
+
+    if (filtered.length === 0) {
+      container.innerHTML =
+        '<p class="loading">Bu bölümde henüz yazı yok, ya da section adı eşleşmiyor. ' +
+        'Kod içindeki ISTENEN_SECTION değerini kontrol et.</p>';
+      return;
+    }
+
     container.innerHTML = "";
-    data.items.slice(0, 15).forEach(item => {
+    filtered.slice(0, 15).forEach(item => {
       const date = new Date(item.pubDate).toLocaleDateString("tr-TR", {
         year: "numeric", month: "long", day: "numeric"
       });
