@@ -17,7 +17,7 @@ title: İzlediklerim
 <script>
 (async function () {
   const repo = "{{ site.kutuphane_repo }}";
-  const label = "izledim";
+  const label = "izleme";
   const url = `https://api.github.com/repos/${repo}/issues?labels=${label}&state=all&per_page=100`;
   const container = document.getElementById("izlenenler-tablo");
 
@@ -38,7 +38,7 @@ title: İzlediklerim
       });
       const otherLabels = issue.labels
         .map(l => l.name)
-        .filter(n => n !== "izledim")
+        .filter(n => n !== "izleme")
         .map(n => `<span class="tag">${n}</span>`)
         .join(" ");
 
