@@ -17,7 +17,7 @@ title: Okuduklarım
 <script>
 (async function () {
   const repo = "{{ site.kutuphane_repo }}";
-  const label = "okudum";
+  const label = "okuma";
   const url = `https://api.github.com/repos/${repo}/issues?labels=${label}&state=all&per_page=100`;
   const container = document.getElementById("okunanlar-tablo");
 
@@ -38,7 +38,7 @@ title: Okuduklarım
       });
       const otherLabels = issue.labels
         .map(l => l.name)
-        .filter(n => n !== "okudum")
+        .filter(n => n !== "okuma")
         .map(n => `<span class="tag">${n}</span>`)
         .join(" ");
 
