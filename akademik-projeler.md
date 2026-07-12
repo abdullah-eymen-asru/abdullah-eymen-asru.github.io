@@ -6,21 +6,26 @@ title: Akademik Projeler
 <h1>Akademik Projeler</h1>
 <p>Yayınlarım, projelerim ve devam eden çalışmalarım.</p>
 
-<div class="project-card">
-  <h3>Proje / Makale Başlığı</h3>
-  <div class="meta">2025 · Dergi / Konferans Adı</div>
-  <p>Kısa açıklama: bu çalışmanın ne hakkında olduğu, katkın ne oldu.</p>
-  <a href="#" target="_blank">→ Makaleyi görüntüle / PDF</a>
-</div>
+{% assign sorted_projects = site.projects | sort: "date" | reverse %}
 
+{% if sorted_projects.size == 0 %}
+  <p class="loading">Henüz proje eklenmedi.</p>
+{% endif %}
+
+{% for project in sorted_projects %}
 <div class="project-card">
-  <h3>İkinci Proje Başlığı</h3>
-  <div class="meta">2024 · Devam ediyor</div>
-  <p>Kısa açıklama buraya gelecek.</p>
-  <a href="#" target="_blank">→ GitHub reposu</a>
+  <h3><a href="{{ project.url | relative_url }}">{{ project.title }}</a></h3>
+  <div class="meta">
+    {% if project.venue %}{{ project.venue }}{% endif %}
+    {% if project.date %} · {{ project.date | date: "%Y" }}{% endif %}
+    {% if project.status %} · <span class="tag">{{ project.status }}</span>{% endif %}
+  </div>
+  <p>{{ project.summary }}</p>
 </div>
+{% endfor %}
 
 <!--
-  Yeni proje eklemek için yukarıdaki <div class="project-card">...</div>
-  bloklarından birini kopyalayıp yapıştır, içeriğini değiştir.
+  Yeni bir proje eklemek için: _projects/ klasörüne yeni bir .md dosyası ekle
+  (örn: _projects/2026-yeni-proje.md). Bu sayfaya hiç dokunmana gerek yok,
+  yeni dosya otomatik olarak burada listelenir.
 -->
