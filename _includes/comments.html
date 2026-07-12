@@ -1,0 +1,25 @@
+{% if site.giscus.repo_id and site.giscus.repo_id != "GISCUS_REPO_ID_BURAYA" %}
+<div class="comments-section">
+  <h2>Yorumlar</h2>
+  <p class="format-hint">
+    Yorum yapabilmek için GitHub hesabınla giriş yapman gerekiyor. Hiçbir
+    ek kayıt/üyelik yok, sadece GitHub yetkilendirmesi yeterli.
+  </p>
+  <script src="https://giscus.app/client.js"
+    data-repo="{{ site.giscus.repo }}"
+    data-repo-id="{{ site.giscus.repo_id }}"
+    data-category="{{ site.giscus.category }}"
+    data-category-id="{{ site.giscus.category_id }}"
+    data-mapping="pathname"
+    data-strict="0"
+    data-reactions-enabled="1"
+    data-emit-metadata="0"
+    data-input-position="top"
+    data-theme="preferred_color_scheme"
+    data-lang="tr"
+    data-loading="lazy"
+    crossorigin="anonymous"
+    async>
+  </script>
+</div>
+{% endif %}
