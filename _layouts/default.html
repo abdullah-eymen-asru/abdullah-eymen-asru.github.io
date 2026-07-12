@@ -44,12 +44,12 @@
     <div class="wrap">
       <a class="brand" href="{{ '/' | relative_url }}">{{ site.title }}</a>
       <nav>
-        <a href="{{ '/' | relative_url }}">Anasayfa</a>
-        <a href="{{ '/blog.html' | relative_url }}">Blog</a>
-        <a href="{{ '/iletisim.html' | relative_url }}">İletişim</a>
-        <a href="{{ '/akademik-projeler.html' | relative_url }}">Akademik Projeler</a>
-        <a href="{{ '/izlediklerim.html' | relative_url }}">İzlediklerim</a>
-        <a href="{{ '/okuduklarim.html' | relative_url }}">Okuduklarım</a>
+        <a href="{{ '/' | relative_url }}" {% if page.url == '/' or page.url == '/index.html' %}class="active"{% endif %}>Anasayfa</a>
+        <a href="{{ '/blog.html' | relative_url }}" {% if page.url contains 'blog' %}class="active"{% endif %}>Blog</a>
+        <a href="{{ '/iletisim.html' | relative_url }}" {% if page.url contains 'iletisim' %}class="active"{% endif %}>İletişim</a>
+        <a href="{{ '/akademik-projeler.html' | relative_url }}" {% if page.url contains 'akademik-projeler' or page.url contains '/projects/' %}class="active"{% endif %}>Akademik Projeler</a>
+        <a href="{{ '/izlediklerim.html' | relative_url }}" {% if page.url contains 'izlediklerim' %}class="active"{% endif %}>İzlediklerim</a>
+        <a href="{{ '/okuduklarim.html' | relative_url }}" {% if page.url contains 'okuduklarim' %}class="active"{% endif %}>Okuduklarım</a>
       </nav>
       <button id="theme-toggle" class="theme-toggle" aria-label="Temayı değiştir" title="Temayı değiştir">🌙</button>
     </div>
