@@ -149,3 +149,23 @@ form.contact-form button {
   color: var(--muted);
   font-size: 0.85rem;
 }
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 1.2em;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.back-link:hover { color: var(--accent); }
+
+.project-detail .meta {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-bottom: 1.5em;
+}
+
+.project-body { line-height: 1.75; }
+.project-body h2 { font-size: 1.15rem; }
+
