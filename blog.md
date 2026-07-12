@@ -6,26 +6,61 @@ title: Blog
 <h1>Blog</h1>
 <p>
   Yazılarımı <a href="{{ site.substack_url }}" target="_blank">Substack</a> üzerinde
-  yayınlıyorum. Son yazılar aşağıda otomatik listeleniyor.
+  yayınlıyorum.
 </p>
 
-<div id="substack-posts">
-  <p class="loading">Yazılar yükleniyor…</p>
+<div class="blog-columns">
+
+  <div class="blog-column">
+    <h2>Substack Yazıları</h2>
+    <input
+      type="text"
+      id="substack-search"
+      class="search-box"
+      placeholder="Yazı ara…"
+      disabled>
+
+    <div id="substack-posts" class="scroll-list">
+      <p class="loading">Yazılar yükleniyor…</p>
+    </div>
+  </div>
+
+  <div class="blog-column">
+    <h2>Notlarım</h2>
+    <input
+      type="text"
+      id="notes-search"
+      class="search-box"
+      placeholder="Notlarımda ara…">
+
+    <div id="notes-posts" class="scroll-list">
+      {% for post in site.posts %}
+      <div class="post-card searchable" data-search="{{ post.title | downcase }} {{ post.excerpt | strip_html | downcase }}">
+        <h3><a href="{{ post.url | relative_url }}">{{ post.title }}</a></h3>
+        <div class="meta">{{ post.date | date: "%d %B %Y" }}</div>
+        <p>{{ post.excerpt }}</p>
+      </div>
+      {% endfor %}
+      {% if site.posts.size == 0 %}
+        <p class="loading">Henüz not eklenmedi.</p>
+      {% endif %}
+    </div>
+  </div>
+
 </div>
 
 <script>
 (async function () {
   const feedUrl = "{{ site.substack_feed }}";
-  // allorigins.win: ham XML'i olduğu gibi getirir, biz kendimiz ayrıştırırız
   const proxyUrl = "https://api.allorigins.win/raw?url=" + encodeURIComponent(feedUrl);
   const container = document.getElementById("substack-posts");
+  const searchBox = document.getElementById("substack-search");
 
   try {
     const res = await fetch(proxyUrl);
     if (!res.ok) throw new Error("Proxy isteği başarısız: " + res.status);
     const xmlText = await res.text();
 
-    // Tarayıcının kendi XML ayrıştırıcısı ile metni gerçek bir belgeye çeviriyoruz
     const parser = new DOMParser();
     const xml = parser.parseFromString(xmlText, "application/xml");
     const items = Array.from(xml.querySelectorAll("item"));
@@ -35,7 +70,7 @@ title: Blog
     }
 
     container.innerHTML = "";
-    items.slice(0, 15).forEach(item => {
+    items.forEach(item => {
       const title = item.querySelector("title")?.textContent?.trim() || "(başlıksız)";
       const link = item.querySelector("link")?.textContent?.trim() || "#";
       const pubDateRaw = item.querySelector("pubDate")?.textContent;
@@ -44,11 +79,12 @@ title: Blog
       const date = pubDateRaw
         ? new Date(pubDateRaw).toLocaleDateString("tr-TR", { year: "numeric", month: "long", day: "numeric" })
         : "";
-      // description'dan HTML etiketlerini temizleyip kısa özet çıkar
       const plain = descRaw.replace(/<[^>]*>/g, "").slice(0, 180);
 
       const card = document.createElement("div");
-      card.className = "post-card";
+      card.className = "post-card searchable";
+      // arama için başlık+özet küçük harfe çevrilip veri olarak saklanıyor
+      card.dataset.search = (title + " " + plain).toLowerCase();
       card.innerHTML = `
         <h3><a href="${link}" target="_blank">${title}</a></h3>
         <div class="meta">${date}</div>
@@ -56,6 +92,11 @@ title: Blog
       `;
       container.appendChild(card);
     });
+
+    // Veri geldikten sonra arama kutusunu aktif hale getiriyoruz
+    searchBox.disabled = false;
+    searchBox.placeholder = "Yazı ara…";
+
   } catch (err) {
     container.innerHTML =
       '<p class="error">Yazılar otomatik yüklenemedi. ' +
@@ -63,17 +104,40 @@ title: Blog
     console.error(err);
   }
 })();
+
+// Genel arama mantığı: bir arama kutusu + bir liste kutusunu birbirine bağlar.
+// Hem Substack hem Notlarım sütunu bu aynı fonksiyonu kullanır.
+function baglaArama(inputId, listId) {
+  const input = document.getElementById(inputId);
+  const list = document.getElementById(listId);
+
+  input.addEventListener("input", () => {
+    const q = input.value.trim().toLowerCase();
+    const cards = list.querySelectorAll(".searchable");
+    let visibleCount = 0;
+
+    cards.forEach(card => {
+      const match = card.dataset.search.includes(q);
+      card.style.display = match ? "" : "none";
+      if (match) visibleCount++;
+    });
+
+    // "sonuç yok" mesajını yönet
+    let emptyMsg = list.querySelector(".no-results");
+    if (visibleCount === 0 && q !== "") {
+      if (!emptyMsg) {
+        emptyMsg = document.createElement("p");
+        emptyMsg.className = "loading no-results";
+        emptyMsg.textContent = "Eşleşen sonuç bulunamadı.";
+        list.appendChild(emptyMsg);
+      }
+    } else if (emptyMsg) {
+      emptyMsg.remove();
+    }
+  });
+}
+
+baglaArama("substack-search", "substack-posts");
+baglaArama("notes-search", "notes-posts");
 </script>
 
-<hr style="margin:3em 0; border:none; border-top:1px solid var(--border);">
-
-<h2>Notlarım</h2>
-<p>Bazı yazılara kendi notlarımı/eklerimi burada da tutuyorum:</p>
-
-{% for post in site.posts %}
-<div class="post-card">
-  <h3><a href="{{ post.url | relative_url }}">{{ post.title }}</a></h3>
-  <div class="meta">{{ post.date | date: "%d %B %Y" }}</div>
-  <p>{{ post.excerpt }}</p>
-</div>
-{% endfor %}
