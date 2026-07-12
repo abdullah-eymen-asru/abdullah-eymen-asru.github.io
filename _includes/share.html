@@ -1,0 +1,30 @@
+<div class="share-buttons">
+  <span class="share-label">Paylaş:</span>
+  <a class="share-btn" target="_blank" rel="noopener"
+     href="https://wa.me/?text={{ page.title | url_encode }}%20{{ page.url | absolute_url | url_encode }}">
+    WhatsApp
+  </a>
+  <a class="share-btn" target="_blank" rel="noopener"
+     href="https://twitter.com/intent/tweet?text={{ page.title | url_encode }}&url={{ page.url | absolute_url | url_encode }}">
+    X
+  </a>
+  <a class="share-btn" target="_blank" rel="noopener"
+     href="https://www.linkedin.com/sharing/share-offsite/?url={{ page.url | absolute_url | url_encode }}">
+    LinkedIn
+  </a>
+  <button class="share-btn" id="copy-link-btn" type="button">Linki Kopyala</button>
+</div>
+
+<script>
+  (function () {
+    const btn = document.getElementById("copy-link-btn");
+    if (!btn) return;
+    btn.addEventListener("click", () => {
+      navigator.clipboard.writeText(window.location.href).then(() => {
+        const original = btn.textContent;
+        btn.textContent = "Kopyalandı ✓";
+        setTimeout(() => { btn.textContent = original; }, 1800);
+      });
+    });
+  })();
+</script>
