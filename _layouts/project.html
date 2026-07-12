@@ -1,0 +1,25 @@
+---
+layout: default
+---
+
+<article class="project-detail">
+  <a href="{{ '/akademik-projeler.html' | relative_url }}" class="back-link">← Tüm projeler</a>
+
+  <h1>{{ page.title }}</h1>
+
+  <div class="meta">
+    {% if page.venue %}{{ page.venue }}{% endif %}
+    {% if page.date %} · {{ page.date | date: "%Y" }}{% endif %}
+    {% if page.status %} · <span class="tag">{{ page.status }}</span>{% endif %}
+  </div>
+
+  <div class="project-body">
+    {{ content }}
+  </div>
+
+  {% if page.link %}
+  <p style="margin-top:2em;">
+    <a href="{{ page.link }}" target="_blank">→ {{ page.link_label | default: "Bağlantıyı görüntüle" }}</a>
+  </p>
+  {% endif %}
+</article>
