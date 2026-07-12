@@ -5,6 +5,18 @@
   --accent: #2b5797;
   --border: #e5e5e5;
   --card-bg: #fafafa;
+  --tag-bg: #eef2f7;
+}
+
+/* Koyu tema: [data-theme="dark"] html elemanına eklendiğinde bu değerler geçerli olur */
+[data-theme="dark"] {
+  --text: #e8e8e8;
+  --muted: #9a9a9a;
+  --bg: #14161a;
+  --accent: #6ea8ff;
+  --border: #2c2f36;
+  --card-bg: #1c1f25;
+  --tag-bg: #22262e;
 }
 
 * { box-sizing: border-box; }
@@ -15,6 +27,7 @@ body {
   color: var(--text);
   background: var(--bg);
   line-height: 1.6;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .wrap {
@@ -131,7 +144,7 @@ th { color: var(--muted); font-weight: 600; }
   display: inline-block;
   padding: 2px 8px;
   border-radius: 12px;
-  background: #eef2f7;
+  background: var(--tag-bg);
   font-size: 0.78rem;
   color: var(--accent);
 }
@@ -247,7 +260,7 @@ form.contact-form button {
   cursor: pointer;
 }
 
-.load-more-btn:hover { background: #eef2f7; }
+.load-more-btn:hover { background: var(--tag-bg); }
 
 .format-hint {
   background: var(--card-bg);
@@ -260,7 +273,7 @@ form.contact-form button {
 }
 
 .format-hint code {
-  background: #eef2f7;
+  background: var(--tag-bg);
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 0.82rem;
@@ -278,6 +291,24 @@ form.contact-form button {
 .scroll-list td, .scroll-list th {
   white-space: nowrap;
 }
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-left: 18px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--card-bg);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--text);
+}
+
+.theme-toggle:hover { border-color: var(--accent); }
 
 
 
