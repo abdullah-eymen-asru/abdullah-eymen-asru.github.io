@@ -12,7 +12,7 @@ Bu depo, YouTube kanalımda yayınladığım jeopolitik analizler, açık kaynak
 
 Bu kısım sadece bu projenin kendi sayfasında görünür, liste sayfasında görünmez.
 
-**Video 01: Grönland'ın Arktik Bölgesi'ndeki Jeopolitik Önemi** - *(Uranyum Yasası, Nükleer Strateji ve Kaynak Güvenliği Analizi)* [Kaynakçaları görmek için tıkla](https://github.com/abdullah-eymen-asru/Akademik-Kaynaklar) kullanabilirsin.
+**Video 01: Grönland'ın Arktik Bölgesi'ndeki Jeopolitik Önemi** - *(Uranyum Yasası, Nükleer Strateji ve Kaynak Güvenliği Analizi)* [Kaynakçaları görmek için tıkla](https://github.com/abdullah-eymen-asru/Akademik-Kaynaklar/blob/main/Grönland'ın-Arktik-Bölgesi'ndeki-Jeopolitik-Önemi/Grönland-Kaynakça.md) kullanabilirsin.
 
 ## Not
 
