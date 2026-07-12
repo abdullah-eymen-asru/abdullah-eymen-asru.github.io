@@ -11,7 +11,14 @@ okuma_projects_url: "https://github.com/users/abdullah-eymen-asru/projects/3/vie
 substack_url: "https://abdullaheymenasru.substack.com"
 substack_feed: "https://abdullaheymenasru.substack.com/feed"
 google_analytics_id: "G-DJ4M58RB0P"   # Google Analytics'ten alacağın Measurement ID
+profile_image: ""   # örn: "/assets/profil.jpg" - fotoğrafı assets/ klasörüne yükleyip yolunu buraya yaz
 
+giscus:
+  repo: "abdullah-eymen-asru/abdullah-eymen-asru.github.io"
+  repo_id: "GISCUS_REPO_ID_BURAYA"       # giscus.app'ten alacaksın
+  category: "GISCUS_CATEGORY_ADI_BURAYA"
+  category_id: "GISCUS_CATEGORY_ID_BURAYA"
+  
 social:
   github: "https://github.com/abdullah-eymen-asru"
   linkedin: "https://linkedin.com/in/abdullah-eymen-asru"
@@ -29,6 +36,7 @@ social:
 markdown: kramdown
 plugins:
   - jekyll-feed
+  - jekyll-sitemap
 
 collections:
   projects:
