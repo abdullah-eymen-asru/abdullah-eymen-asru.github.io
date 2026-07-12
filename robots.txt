@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://abdullah-eymen-asru.github.io/sitemap.xml
