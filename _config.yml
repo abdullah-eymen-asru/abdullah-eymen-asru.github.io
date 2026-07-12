@@ -27,9 +27,20 @@ markdown: kramdown
 plugins:
   - jekyll-feed
 
+collections:
+  projects:
+    output: true
+    sort_by: date
+    permalink: /projects/:name/
+
 defaults:
   - scope:
       path: ""
       type: "posts"
     values:
       layout: "post"
+  - scope:
+      path: ""
+      type: "projects"
+    values:
+      layout: "project"
