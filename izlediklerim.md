@@ -20,6 +20,7 @@ title: İzlediklerim
   Bu repodaki issue'ları <a href="{{ site.izleme_projects_url }}" target="_blank">GitHub Projects panosu</a>
   üzerinden Kanban veya tablo formatında da görüntüleyebilirsin — ama buradaki tablo
   daha güncel ve aranabilir olduğu için doğrudan site üzerinden takip etmeni öneririm.
+  Repo'nun kendisine <a href="https://github.com/abdullah-eymen-asru/izleme-okuma-listem" target="_blank">buradan</a> ulaşabilirsin.
 </p>
 
 <input
