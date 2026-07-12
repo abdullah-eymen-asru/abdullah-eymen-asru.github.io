@@ -28,6 +28,32 @@ body {
   padding: 18px 0;
 }
 
+.lang-notice {
+  background: #fff8e6;
+  border-bottom: 1px solid #f0dca0;
+  color: #6b5a1e;
+  font-size: 0.85rem;
+  padding: 10px 44px 10px 16px;
+  text-align: center;
+  position: relative;
+}
+
+.lang-notice #lang-notice-close {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #6b5a1e;
+  padding: 4px 8px;
+}
+
+.lang-notice #lang-notice-close:hover { color: #1a1a1a; }
+
 .site-header .wrap {
   display: flex;
   justify-content: space-between;
