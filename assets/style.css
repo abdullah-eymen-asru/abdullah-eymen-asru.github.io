@@ -139,6 +139,17 @@ h1 { font-size: 1.9rem; margin-bottom: 0.3em; }
 h2 { font-size: 1.3rem; margin-top: 2em; }
 
 .hero { margin-bottom: 2.5em; }
+
+.profile-photo {
+  width: 108px;
+  height: 108px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  margin-bottom: 20px;
+  border: 3px solid var(--card-bg);
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.12);
+}
 .hero .subtitle { color: var(--muted); font-size: 1.05rem; }
 
 .social-links {
@@ -231,6 +242,9 @@ form.contact-form button {
   font-size: 0.85rem;
 }
 
+.site-footer a { color: var(--muted); text-decoration: underline; }
+.site-footer a:hover { color: var(--accent); }
+
 .back-link {
   display: inline-block;
   margin-bottom: 1.2em;
@@ -249,6 +263,40 @@ form.contact-form button {
 
 .project-body { line-height: 1.75; }
 .project-body h2 { font-size: 1.15rem; }
+
+.comments-section {
+  margin-top: 3em;
+  padding-top: 2em;
+  border-top: 1px solid var(--border);
+}
+
+.comments-section h2 { margin-top: 0; }
+
+.share-buttons {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2.5em;
+  padding-top: 1.5em;
+  border-top: 1px solid var(--border);
+}
+
+.share-label { color: var(--muted); font-size: 0.88rem; margin-right: 4px; }
+
+.share-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--card-bg);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.share-btn:hover { border-color: var(--accent); color: var(--accent); }
 
 /* Blog sayfası: 2 sütunlu düzen */
 .blog-columns {
@@ -351,46 +399,6 @@ form.contact-form button {
 }
 
 .theme-toggle:hover { border-color: var(--accent); background: var(--tag-bg); }
-
-.quick-links {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  margin: 1.5em 0 2.2em;
-}
-
-@media (max-width: 500px) {
-  .quick-links { grid-template-columns: 1fr; }
-}
-
-.quick-link-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 18px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--card-bg);
-  text-decoration: none;
-  color: var(--text);
-  transition: border-color 0.15s ease, transform 0.15s ease;
-}
-
-.quick-link-card:hover {
-  border-color: var(--accent);
-  transform: translateY(-1px);
-}
-
-.quick-link-icon { font-size: 1.6rem; }
-
-.quick-link-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.quick-link-text strong { font-size: 0.98rem; }
-.quick-link-text span:last-child { font-size: 0.82rem; color: var(--muted); }
 
 
 
