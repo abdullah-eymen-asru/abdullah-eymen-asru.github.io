@@ -16,6 +16,12 @@ title: Okuduklarım
   <code>Sayfa Sayısı: 320</code> · <code>Başlama Tarihi: 2026-07-07</code> · <code>Bitiş Tarihi: 2026-08-01</code>
 </p>
 
+<p class="format-hint">
+  Bu repodaki issue'ları <a href="{{ site.okuma_projects_url }}" target="_blank">GitHub Projects panosu</a>
+  üzerinden Kanban veya tablo formatında da görüntüleyebilirsin — ama buradaki tablo
+  daha güncel ve aranabilir olduğu için doğrudan site üzerinden takip etmeni öneririm.
+</p>
+
 <input
   type="text"
   id="okuma-search"
