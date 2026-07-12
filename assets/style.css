@@ -6,6 +6,9 @@
   --border: #e5e5e5;
   --card-bg: #fafafa;
   --tag-bg: #eef2f7;
+  --lang-notice-bg: #fff8e6;
+  --lang-notice-border: #f0dca0;
+  --lang-notice-text: #6b5a1e;
 }
 
 /* Koyu tema: [data-theme="dark"] html elemanına eklendiğinde bu değerler geçerli olur */
@@ -17,6 +20,9 @@
   --border: #2c2f36;
   --card-bg: #1c1f25;
   --tag-bg: #22262e;
+  --lang-notice-bg: #2e2810;
+  --lang-notice-border: #4a3f18;
+  --lang-notice-text: #d8c274;
 }
 
 * { box-sizing: border-box; }
@@ -36,15 +42,29 @@ body {
   padding: 0 20px;
 }
 
+/* Sınıfsız her link (post/proje başlıkları, tablo linkleri vs.) için
+   tarayıcı varsayılanı yerine temaya uygun renk kullanıyoruz.
+   Bu olmadan koyu temada linkler tarayıcının kendi mavisiyle
+   düşük kontrastla kalıyordu. */
+a { color: var(--accent); }
+a:visited { color: var(--accent); }
+
 .site-header {
   border-bottom: 1px solid var(--border);
-  padding: 18px 0;
+  padding: 16px 0;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--bg);   /* color-mix desteklemeyen eski tarayıcılar için düz renk */
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .lang-notice {
-  background: #fff8e6;
-  border-bottom: 1px solid #f0dca0;
-  color: #6b5a1e;
+  background: var(--lang-notice-bg);
+  border-bottom: 1px solid var(--lang-notice-border);
+  color: var(--lang-notice-text);
   font-size: 0.85rem;
   padding: 10px 44px 10px 16px;
   text-align: center;
@@ -61,11 +81,11 @@ body {
   font-size: 1.2rem;
   line-height: 1;
   cursor: pointer;
-  color: #6b5a1e;
+  color: var(--lang-notice-text);
   padding: 4px 8px;
 }
 
-.lang-notice #lang-notice-close:hover { color: #1a1a1a; }
+.lang-notice #lang-notice-close:hover { color: var(--text); }
 
 .site-header .wrap {
   display: flex;
@@ -77,11 +97,15 @@ body {
 
 .brand {
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 1.15rem;
   text-decoration: none;
   color: var(--text);
   flex-shrink: 0;
+  letter-spacing: -0.01em;
+  transition: color 0.15s ease;
 }
+
+.brand:hover { color: var(--accent); }
 
 nav {
   display: flex;
@@ -91,13 +115,23 @@ nav {
 }
 
 nav a {
-  margin-left: 18px;
+  margin-left: 4px;
+  padding: 7px 12px;
+  border-radius: 7px;
   text-decoration: none;
   color: var(--muted);
-  font-size: 0.95rem;
+  font-size: 0.93rem;
+  font-weight: 500;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-nav a:hover, nav a:first-child { color: var(--accent); }
+nav a:hover { color: var(--text); background: var(--tag-bg); }
+
+nav a.active {
+  color: var(--accent);
+  background: var(--tag-bg);
+  font-weight: 600;
+}
 
 .content { padding: 40px 20px 60px; min-height: 60vh; }
 
@@ -317,6 +351,46 @@ form.contact-form button {
 }
 
 .theme-toggle:hover { border-color: var(--accent); background: var(--tag-bg); }
+
+.quick-links {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin: 1.5em 0 2.2em;
+}
+
+@media (max-width: 500px) {
+  .quick-links { grid-template-columns: 1fr; }
+}
+
+.quick-link-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card-bg);
+  text-decoration: none;
+  color: var(--text);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.quick-link-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.quick-link-icon { font-size: 1.6rem; }
+
+.quick-link-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.quick-link-text strong { font-size: 0.98rem; }
+.quick-link-text span:last-child { font-size: 0.82rem; color: var(--muted); }
 
 
 
