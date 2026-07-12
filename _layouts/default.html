@@ -4,6 +4,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ page.title | default: site.title }}</title>
+
+  <script>
+    // Sayfa çizilmeden ÖNCE tema kararını veriyoruz ki beyazdan koyuya
+    // "zıplama" (flash) olmasın. Sıra: kullanıcının kayıtlı tercihi >
+    // yoksa cihazın sistem teması > o da yoksa varsayılan (açık).
+    (function () {
+      const saved = localStorage.getItem("theme");
+      const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const theme = saved || (systemDark ? "dark" : "light");
+      if (theme === "dark") {
+        document.documentElement.setAttribute("data-theme", "dark");
+      }
+    })();
+  </script>
+
   <link rel="stylesheet" href="{{ '/assets/style.css' | relative_url }}">
 
   {% if site.google_analytics_id and site.google_analytics_id != "" %}
@@ -35,6 +50,7 @@
         <a href="{{ '/akademik-projeler.html' | relative_url }}">Akademik Projeler</a>
         <a href="{{ '/izlediklerim.html' | relative_url }}">İzlediklerim</a>
         <a href="{{ '/okuduklarim.html' | relative_url }}">Okuduklarım</a>
+        <button id="theme-toggle" class="theme-toggle" aria-label="Temayı değiştir" title="Temayı değiştir">🌙</button>
       </nav>
     </div>
   </header>
@@ -65,6 +81,30 @@
           localStorage.setItem("lang-notice-dismissed", "true");
         });
       }
+    })();
+
+    // Tema değiştirme butonu
+    (function () {
+      const toggleBtn = document.getElementById("theme-toggle");
+
+      function guncelIkon() {
+        const aktifKoyu = document.documentElement.getAttribute("data-theme") === "dark";
+        toggleBtn.textContent = aktifKoyu ? "☀️" : "🌙";
+      }
+
+      guncelIkon(); // sayfa açılışında mevcut duruma göre doğru ikonu göster
+
+      toggleBtn.addEventListener("click", () => {
+        const aktifKoyu = document.documentElement.getAttribute("data-theme") === "dark";
+        if (aktifKoyu) {
+          document.documentElement.removeAttribute("data-theme");
+          localStorage.setItem("theme", "light");
+        } else {
+          document.documentElement.setAttribute("data-theme", "dark");
+          localStorage.setItem("theme", "dark");
+        }
+        guncelIkon();
+      });
     })();
   </script>
 </body>
