@@ -18,6 +18,13 @@
   {% endif %}
 </head>
 <body>
+  <div id="lang-notice" style="display:none;" class="lang-notice">
+    This site is in Turkish. Use your browser's translate feature (usually a
+    globe/translate icon in the address bar, or right-click → Translate) to
+    read it in your language.
+    <button id="lang-notice-close" aria-label="Kapat">&times;</button>
+  </div>
+
   <header class="site-header">
     <div class="wrap">
       <a class="brand" href="{{ '/' | relative_url }}">{{ site.title }}</a>
@@ -41,5 +48,24 @@
       <p>&copy; {{ 'now' | date: "%Y" }} {{ site.title }}</p>
     </div>
   </footer>
+
+  <script>
+    (function () {
+      // Ziyaretçi daha önce şeridi kapattıysa bir daha gösterme
+      if (localStorage.getItem("lang-notice-dismissed") === "true") return;
+
+      // Tarayıcının dil ayarı Türkçe ile başlamıyorsa (örn. "en", "de", "fr") şeridi göster
+      const browserLang = (navigator.language || "").toLowerCase();
+      if (!browserLang.startsWith("tr")) {
+        const notice = document.getElementById("lang-notice");
+        notice.style.display = "block";
+
+        document.getElementById("lang-notice-close").addEventListener("click", () => {
+          notice.style.display = "none";
+          localStorage.setItem("lang-notice-dismissed", "true");
+        });
+      }
+    })();
+  </script>
 </body>
 </html>
