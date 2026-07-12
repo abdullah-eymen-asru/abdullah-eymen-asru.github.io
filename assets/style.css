@@ -223,4 +223,35 @@ form.contact-form button {
 
 .load-more-btn:hover { background: #eef2f7; }
 
+.format-hint {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 1em;
+}
+
+.format-hint code {
+  background: #eef2f7;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.82rem;
+  color: var(--accent);
+}
+
+/* Tablolu sayfalarda (izlediklerim/okuduklarım) sütun sayısı fazla,
+   dar ekranlarda tablo kendi içinde yatay kaysın, sayfa bozulmasın */
+.scroll-list table {
+  display: block;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.scroll-list td, .scroll-list th {
+  white-space: nowrap;
+}
+
+
 
