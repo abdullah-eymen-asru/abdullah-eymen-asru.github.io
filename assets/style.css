@@ -169,3 +169,58 @@ form.contact-form button {
 .project-body { line-height: 1.75; }
 .project-body h2 { font-size: 1.15rem; }
 
+/* Blog sayfası: 2 sütunlu düzen */
+.blog-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  margin-top: 1.5em;
+}
+
+@media (max-width: 720px) {
+  .blog-columns {
+    grid-template-columns: 1fr;   /* mobilde alt alta düşer */
+  }
+}
+
+.blog-column h2 { margin-top: 0; }
+
+.search-box {
+  width: 100%;
+  padding: 9px 12px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.92rem;
+}
+
+.search-box:disabled { background: var(--card-bg); color: var(--muted); }
+
+/* Liste taştıkça kutunun içinde kaydırılsın, sayfa sonsuz uzamasın */
+.scroll-list {
+  max-height: 65vh;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.scroll-list .post-card:last-child { margin-bottom: 0; }
+
+.no-results { padding: 8px 0; }
+
+.load-more-btn {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--accent);
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+
+.load-more-btn:hover { background: #eef2f7; }
+
+
