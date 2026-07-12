@@ -22,4 +22,7 @@ layout: default
     <a href="{{ page.link }}" target="_blank">→ {{ page.link_label | default: "Bağlantıyı görüntüle" }}</a>
   </p>
   {% endif %}
+
+  {% include share.html %}
+  {% include comments.html %}
 </article>
