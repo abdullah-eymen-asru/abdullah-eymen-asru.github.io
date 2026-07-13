@@ -15,9 +15,9 @@ profile_image: "/assets/profil.jpg"   # örn: "/assets/profil.jpg" - fotoğrafı
 
 giscus:
   repo: "abdullah-eymen-asru/abdullah-eymen-asru.github.io"
-  repo_id: "GISCUS_REPO_ID_BURAYA"       # giscus.app'ten alacaksın
-  category: "GISCUS_CATEGORY_ADI_BURAYA"
-  category_id: "GISCUS_CATEGORY_ID_BURAYA"
+  repo_id: "R_kgDOTVoWUg"       # giscus.app'ten alacaksın
+  category: "Announcements"
+  category_id: "DIC_kwDOTVoWUs4DBEO0"
   
 social:
   github: "https://github.com/abdullah-eymen-asru"
