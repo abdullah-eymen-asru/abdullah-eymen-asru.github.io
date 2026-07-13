@@ -89,6 +89,12 @@ title: Blog
       return el.textContent;
     }
 
+    // Ekstra savunma katmanı: bir link "http(s)://" ile başlamıyorsa reddediyoruz.
+    function guvenliLink(url) {
+      if (typeof url === "string" && /^https?:\/\//i.test(url)) return url;
+      return "#";
+    }
+
     container.innerHTML = "";
     items.forEach(item => {
       const titleRaw = item.querySelector("title")?.textContent?.trim() || "(başlıksız)";
@@ -109,7 +115,7 @@ title: Blog
       // arama için başlık+özet küçük harfe çevrilip veri olarak saklanıyor
       card.dataset.search = (title + " " + plain).toLowerCase();
       card.innerHTML = `
-        <h3><a href="${escapeHtml(link)}" target="_blank">${escapeHtml(title)}</a></h3>
+        <h3><a href="${escapeHtml(guvenliLink(link))}" target="_blank">${escapeHtml(title)}</a></h3>
         <div class="meta">${escapeHtml(date)}</div>
         <p>${escapeHtml(plain)}…</p>
       `;
