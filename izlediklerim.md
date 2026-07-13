@@ -73,6 +73,15 @@ title: İzlediklerim
     return div.innerHTML;
   }
 
+  // Ekstra savunma katmanı: bir link "http(s)://" ile başlamıyorsa reddediyoruz.
+  // Normalde issue.html_url GitHub'ın kendi ürettiği güvenli bir adres, ama
+  // ileride bu alan başka bir kaynaktan (örn. issue açıklamasından) besleniyor
+  // hale gelirse "javascript:..." gibi tehlikeli linkler süzülmüş olur.
+  function guvenliLink(url) {
+    if (typeof url === "string" && /^https?:\/\//i.test(url)) return url;
+    return "#";
+  }
+
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error("API isteği başarısız: " + res.status);
@@ -97,7 +106,7 @@ title: İzlediklerim
 
       rows += `
         <tr class="searchable" data-search="${escapeHtml(searchText)}" data-tur="${escapeHtml(tur.toLowerCase())}">
-          <td><a href="${escapeHtml(issue.html_url)}" target="_blank">${escapeHtml(issue.title)}</a></td>
+          <td><a href="${escapeHtml(guvenliLink(issue.html_url))}" target="_blank">${escapeHtml(issue.title)}</a></td>
           <td>${escapeHtml(tur)}</td>
           <td>${escapeHtml(puan)}</td>
           <td>${escapeHtml(sezonBolum)}</td>
