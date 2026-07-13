@@ -5,30 +5,37 @@
     Yorum yapabilmek için GitHub hesabınla giriş yapman gerekiyor. Hiçbir
     ek kayıt/üyelik yok, sadece GitHub yetkilendirmesi yeterli.
   </p>
+  <div id="giscus-container"></div>
   <script>
-    // Sitenin o anki gerçek temasını kullanıyoruz, sabit değer değil.
-    // Bu sayede iframe ilk yüklendiğinde bile doğru renkte başlıyor,
-    // sonradan "flaşlamıyor".
-    window.giscusTheme = document.documentElement.getAttribute("data-theme") === "dark"
-      ? "dark"
-      : "light";
-    document.write(
-      '<script src="https://giscus.app/client.js"' +
-      ' data-repo="{{ site.giscus.repo }}"' +
-      ' data-repo-id="{{ site.giscus.repo_id }}"' +
-      ' data-category="{{ site.giscus.category }}"' +
-      ' data-category-id="{{ site.giscus.category_id }}"' +
-      ' data-mapping="pathname"' +
-      ' data-strict="0"' +
-      ' data-reactions-enabled="1"' +
-      ' data-emit-metadata="0"' +
-      ' data-input-position="top"' +
-      ' data-theme="' + window.giscusTheme + '"' +
-      ' data-lang="tr"' +
-      ' data-loading="lazy"' +
-      ' crossorigin="anonymous"' +
-      ' async><\/script>'
-    );
+    (function () {
+      // Sitenin o anki gerçek temasını kullanıyoruz, sabit değer değil.
+      // Bu sayede iframe ilk yüklendiğinde bile doğru renkte başlıyor,
+      // sonradan "flaşlamıyor". document.write yerine gerçek bir DOM
+      // elemanı oluşturuyoruz — bazı tarayıcılar async script'lerle
+      // birlikte document.write'ı kısıtlayabiliyor.
+      window.giscusTheme = document.documentElement.getAttribute("data-theme") === "dark"
+        ? "dark"
+        : "light";
+
+      const script = document.createElement("script");
+      script.src = "https://giscus.app/client.js";
+      script.setAttribute("data-repo", "{{ site.giscus.repo }}");
+      script.setAttribute("data-repo-id", "{{ site.giscus.repo_id }}");
+      script.setAttribute("data-category", "{{ site.giscus.category }}");
+      script.setAttribute("data-category-id", "{{ site.giscus.category_id }}");
+      script.setAttribute("data-mapping", "pathname");
+      script.setAttribute("data-strict", "0");
+      script.setAttribute("data-reactions-enabled", "1");
+      script.setAttribute("data-emit-metadata", "0");
+      script.setAttribute("data-input-position", "top");
+      script.setAttribute("data-theme", window.giscusTheme);
+      script.setAttribute("data-lang", "tr");
+      script.setAttribute("data-loading", "lazy");
+      script.setAttribute("crossorigin", "anonymous");
+      script.async = true;
+
+      document.getElementById("giscus-container").appendChild(script);
+    })();
   </script>
 </div>
 {% endif %}
