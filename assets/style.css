@@ -321,33 +321,34 @@ th { color: var(--muted); font-weight: 600; }
 
 .search-box:disabled { background: var(--card-bg); color: var(--muted); }
 
-.filter-chips {
+/* İzlediklerim/Okuduklarım'da arama kutusu + tür dropdown'u yan yana.
+   Chip butonları yerine dropdown kullanıyoruz çünkü tür sayısı arttıkça
+   (20-30+) chip'ler ekranı doldurup dağınıklaşırdı; dropdown sabit yer kaplar. */
+.filter-row {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
   margin-bottom: 16px;
+  flex-wrap: wrap;
 }
 
-.filter-chip {
-  padding: 6px 14px;
+.filter-row .search-box {
+  flex: 1 1 240px;
+  margin-bottom: 0;
+}
+
+.tur-select {
+  flex: 0 1 180px;
+  padding: 9px 12px;
   border: 1px solid var(--border);
-  border-radius: 20px;
-  background: var(--card-bg);
-  color: var(--muted);
-  font-size: 0.85rem;
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
   font-family: inherit;
+  font-size: 0.92rem;
   cursor: pointer;
-  transition: all 0.15s ease;
 }
 
-.filter-chip:hover { border-color: var(--accent); color: var(--text); }
-
-.filter-chip.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: white;
-  font-weight: 600;
-}
+.tur-select:disabled { background: var(--card-bg); color: var(--muted); cursor: default; }
 
 /* Liste taştıkça kutunun içinde kaydırılsın, sayfa sonsuz uzamasın */
 .scroll-list {
