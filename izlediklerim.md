@@ -57,6 +57,16 @@ title: İzlediklerim
     return alanlar;
   }
 
+  // GitHub'dan gelen metinler (başlık, açıklama alanları) kullanıcı tarafından
+  // yazılabildiği için doğrudan innerHTML'e basmıyoruz — HTML özel karakterlerini
+  // (< > & " ') zararsız hale getirip öyle ekliyoruz. Bu, kötü niyetli bir issue
+  // başlığının (örn. <script> içeren) tarayıcıda çalıştırılmasını engeller.
+  function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text == null ? "" : String(text);
+    return div.innerHTML;
+  }
+
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error("API isteği başarısız: " + res.status);
@@ -80,13 +90,13 @@ title: İzlediklerim
       const searchText = [issue.title, tur, sezonBolum].join(" ").toLowerCase();
 
       rows += `
-        <tr class="searchable" data-search="${searchText}">
-          <td><a href="${issue.html_url}" target="_blank">${issue.title}</a></td>
-          <td>${tur}</td>
-          <td>${puan}</td>
-          <td>${sezonBolum}</td>
-          <td>${baslamaTarihi}</td>
-          <td>${bitisTarihi}</td>
+        <tr class="searchable" data-search="${escapeHtml(searchText)}">
+          <td><a href="${escapeHtml(issue.html_url)}" target="_blank">${escapeHtml(issue.title)}</a></td>
+          <td>${escapeHtml(tur)}</td>
+          <td>${escapeHtml(puan)}</td>
+          <td>${escapeHtml(sezonBolum)}</td>
+          <td>${escapeHtml(baslamaTarihi)}</td>
+          <td>${escapeHtml(bitisTarihi)}</td>
         </tr>`;
     });
 
