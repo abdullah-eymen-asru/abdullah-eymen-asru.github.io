@@ -30,6 +30,8 @@ title: Okuduklarım
   placeholder="Kitap/yazar ara…"
   disabled>
 
+<div id="tur-filtreleri" class="filter-chips"></div>
+
 <div id="okunanlar-tablo" class="scroll-list">
   <p class="loading">Yükleniyor…</p>
 </div>
@@ -88,7 +90,7 @@ title: Okuduklarım
       const searchText = [issue.title, yazar, tur].join(" ").toLowerCase();
 
       rows += `
-        <tr class="searchable" data-search="${escapeHtml(searchText)}">
+        <tr class="searchable" data-search="${escapeHtml(searchText)}" data-tur="${escapeHtml(tur.toLowerCase())}">
           <td><a href="${escapeHtml(issue.html_url)}" target="_blank">${escapeHtml(issue.title)}</a></td>
           <td>${escapeHtml(yazar)}</td>
           <td>${escapeHtml(tur)}</td>
@@ -110,14 +112,58 @@ title: Okuduklarım
         <tbody id="okuma-tbody">${rows}</tbody>
       </table>`;
 
-    searchBox.disabled = false;
-    searchBox.addEventListener("input", () => {
-      const q = searchBox.value.trim().toLowerCase();
-      const trs = document.querySelectorAll("#okuma-tbody .searchable");
-      trs.forEach(tr => {
-        tr.style.display = tr.dataset.search.includes(q) ? "" : "none";
+    // Tablodaki satırlardan benzersiz türleri topla, her biri için tıklanabilir
+    // bir "chip" butonu oluştur. Yeni bir tür (örn. "Şiir") eklediğinde bu liste
+    // otomatik güncellenir, elle hiçbir şey değiştirmene gerek yok.
+    const tumSatirlar = Array.from(document.querySelectorAll("#okuma-tbody .searchable"));
+    const benzersizTurler = [...new Set(
+      tumSatirlar.map(tr => tr.dataset.tur).filter(t => t !== "")
+    )].sort();
+
+    const chipContainer = document.getElementById("tur-filtreleri");
+    let aktifTur = null;
+
+    if (benzersizTurler.length > 0) {
+      const tumuChip = document.createElement("button");
+      tumuChip.className = "filter-chip active";
+      tumuChip.type = "button";
+      tumuChip.textContent = "Tümü";
+      chipContainer.appendChild(tumuChip);
+
+      benzersizTurler.forEach(tur => {
+        const chip = document.createElement("button");
+        chip.className = "filter-chip";
+        chip.type = "button";
+        // orijinal (küçük harfe çevrilmemiş) görünümü tablo satırından bulup gösteriyoruz
+        const ornekSatir = tumSatirlar.find(tr => tr.dataset.tur === tur);
+        chip.textContent = ornekSatir.querySelector("td:nth-child(3)").textContent;
+        chip.dataset.tur = tur;
+        chipContainer.appendChild(chip);
       });
-    });
+
+      chipContainer.addEventListener("click", (e) => {
+        const chip = e.target.closest(".filter-chip");
+        if (!chip) return;
+
+        chipContainer.querySelectorAll(".filter-chip").forEach(c => c.classList.remove("active"));
+        chip.classList.add("active");
+        aktifTur = chip.dataset.tur || null; // "Tümü" chip'inin dataset.tur'u yok, o yüzden null olur
+
+        uygulaFiltre();
+      });
+    }
+
+    function uygulaFiltre() {
+      const q = searchBox.value.trim().toLowerCase();
+      tumSatirlar.forEach(tr => {
+        const metinEslesiyor = tr.dataset.search.includes(q);
+        const turEslesiyor = !aktifTur || tr.dataset.tur === aktifTur;
+        tr.style.display = (metinEslesiyor && turEslesiyor) ? "" : "none";
+      });
+    }
+
+    searchBox.disabled = false;
+    searchBox.addEventListener("input", uygulaFiltre);
 
   } catch (err) {
     container.innerHTML = '<p class="error">Liste yüklenemedi. Lütfen daha sonra tekrar dene.</p>';
