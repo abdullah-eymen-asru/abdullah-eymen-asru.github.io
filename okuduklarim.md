@@ -71,6 +71,12 @@ title: Okuduklarım
     return div.innerHTML;
   }
 
+  // Ekstra savunma katmanı: bir link "http(s)://" ile başlamıyorsa reddediyoruz.
+  function guvenliLink(url) {
+    if (typeof url === "string" && /^https?:\/\//i.test(url)) return url;
+    return "#";
+  }
+
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error("API isteği başarısız: " + res.status);
@@ -95,7 +101,7 @@ title: Okuduklarım
 
       rows += `
         <tr class="searchable" data-search="${escapeHtml(searchText)}" data-tur="${escapeHtml(tur.toLowerCase())}">
-          <td><a href="${escapeHtml(issue.html_url)}" target="_blank">${escapeHtml(issue.title)}</a></td>
+          <td><a href="${escapeHtml(guvenliLink(issue.html_url))}" target="_blank">${escapeHtml(issue.title)}</a></td>
           <td>${escapeHtml(yazar)}</td>
           <td>${escapeHtml(tur)}</td>
           <td>${escapeHtml(puan)}</td>
