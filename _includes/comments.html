@@ -5,6 +5,12 @@
     Yorum yapabilmek için GitHub hesabınla giriş yapman gerekiyor. Hiçbir
     ek kayıt/üyelik yok, sadece GitHub yetkilendirmesi yeterli.
   </p>
+  <script>
+    // Giscus'a, sistem tercihi yerine sitenin O AN kullandığı temayı söylüyoruz
+    window.giscusTheme = document.documentElement.getAttribute("data-theme") === "dark"
+      ? "dark"
+      : "light";
+  </script>
   <script src="https://giscus.app/client.js"
     data-repo="{{ site.giscus.repo }}"
     data-repo-id="{{ site.giscus.repo_id }}"
@@ -15,11 +21,26 @@
     data-reactions-enabled="1"
     data-emit-metadata="0"
     data-input-position="top"
-    data-theme="preferred_color_scheme"
+    data-theme="light"
     data-lang="tr"
     data-loading="lazy"
     crossorigin="anonymous"
-    async>
+    async
+    id="giscus-script">
+  </script>
+  <script>
+    // Script yüklenir yüklenmez doğru temayı uygula (ilk yüklemede doğru gelsin diye)
+    document.getElementById("giscus-script").addEventListener("load", function () {
+      function sendTheme() {
+        const iframe = document.querySelector("iframe.giscus-frame");
+        if (!iframe) { setTimeout(sendTheme, 200); return; }
+        iframe.contentWindow.postMessage(
+          { giscus: { setConfig: { theme: window.giscusTheme } } },
+          "https://giscus.app"
+        );
+      }
+      sendTheme();
+    });
   </script>
 </div>
 {% endif %}
