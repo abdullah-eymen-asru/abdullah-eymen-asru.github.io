@@ -23,14 +23,18 @@ title: İzlediklerim
   Repo'nun kendisine <a href="https://github.com/abdullah-eymen-asru/izleme-okuma-listem" target="_blank">buradan</a> ulaşabilirsin.
 </p>
 
-<input
-  type="text"
-  id="izleme-search"
-  class="search-box"
-  placeholder="Film/dizi ara…"
-  disabled>
+<div class="filter-row">
+  <input
+    type="text"
+    id="izleme-search"
+    class="search-box"
+    placeholder="Film/dizi ara…"
+    disabled>
 
-<div id="tur-filtreleri" class="filter-chips"></div>
+  <select id="tur-filtresi" class="tur-select" disabled>
+    <option value="">Tüm türler</option>
+  </select>
+</div>
 
 <div id="izlenenler-tablo" class="scroll-list">
   <p class="loading">Yükleniyor…</p>
@@ -113,51 +117,37 @@ title: İzlediklerim
         <tbody id="izleme-tbody">${rows}</tbody>
       </table>`;
 
-    // Tablodaki satırlardan benzersiz türleri topla, her biri için tıklanabilir
-    // bir "chip" butonu oluştur. Yeni bir tür eklediğinde bu liste otomatik
-    // güncellenir, elle hiçbir şey değiştirmene gerek yok.
+    // Tablodaki satırlardan benzersiz türleri topla, açılır listeye (dropdown)
+    // seçenek olarak ekle. Yeni bir tür eklediğinde bu liste otomatik güncellenir,
+    // elle hiçbir şey değiştirmene gerek yok — 20-30 tür olsa bile ekranı doldurmaz.
     const tumSatirlar = Array.from(document.querySelectorAll("#izleme-tbody .searchable"));
     const benzersizTurler = [...new Set(
       tumSatirlar.map(tr => tr.dataset.tur).filter(t => t !== "")
     )].sort();
 
-    const chipContainer = document.getElementById("tur-filtreleri");
-    let aktifTur = null;
+    const turSelect = document.getElementById("tur-filtresi");
 
     if (benzersizTurler.length > 0) {
-      const tumuChip = document.createElement("button");
-      tumuChip.className = "filter-chip active";
-      tumuChip.type = "button";
-      tumuChip.textContent = "Tümü";
-      chipContainer.appendChild(tumuChip);
-
       benzersizTurler.forEach(tur => {
-        const chip = document.createElement("button");
-        chip.className = "filter-chip";
-        chip.type = "button";
         const ornekSatir = tumSatirlar.find(tr => tr.dataset.tur === tur);
-        chip.textContent = ornekSatir.querySelector("td:nth-child(2)").textContent;
-        chip.dataset.tur = tur;
-        chipContainer.appendChild(chip);
+        const gorunenAd = ornekSatir.querySelector("td:nth-child(2)").textContent;
+
+        const option = document.createElement("option");
+        option.value = tur;
+        option.textContent = gorunenAd;
+        turSelect.appendChild(option);
       });
 
-      chipContainer.addEventListener("click", (e) => {
-        const chip = e.target.closest(".filter-chip");
-        if (!chip) return;
-
-        chipContainer.querySelectorAll(".filter-chip").forEach(c => c.classList.remove("active"));
-        chip.classList.add("active");
-        aktifTur = chip.dataset.tur || null;
-
-        uygulaFiltre();
-      });
+      turSelect.disabled = false;
+      turSelect.addEventListener("change", uygulaFiltre);
     }
 
     function uygulaFiltre() {
       const q = searchBox.value.trim().toLowerCase();
+      const secilenTur = turSelect.value;
       tumSatirlar.forEach(tr => {
         const metinEslesiyor = tr.dataset.search.includes(q);
-        const turEslesiyor = !aktifTur || tr.dataset.tur === aktifTur;
+        const turEslesiyor = !secilenTur || tr.dataset.tur === secilenTur;
         tr.style.display = (metinEslesiyor && turEslesiyor) ? "" : "none";
       });
     }
