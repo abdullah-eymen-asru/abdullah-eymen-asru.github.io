@@ -77,17 +77,32 @@ title: Blog
       return div.innerHTML;
     }
 
+    // Substack'in RSS'i açıklamaları "&#252;" gibi HTML entity kodlarıyla
+    // gönderiyor (ü, ', " gibi karakterler için). Bunları gerçek karaktere
+    // çevirmek için tarayıcının kendi HTML ayrıştırıcısını kullanıyoruz.
+    // ÖNEMLİ: Bu adım entity'leri çözer ama aynı zamanda metni geçici olarak
+    // gerçek HTML'e çevirdiği için, sonucu SADECE .textContent ile okuyoruz
+    // (asla innerHTML olarak geri basmıyoruz) — bu yüzden güvenlik açığı oluşturmaz.
+    function decodeEntities(text) {
+      const el = document.createElement("textarea");
+      el.innerHTML = text;
+      return el.textContent;
+    }
+
     container.innerHTML = "";
     items.forEach(item => {
-      const title = item.querySelector("title")?.textContent?.trim() || "(başlıksız)";
+      const titleRaw = item.querySelector("title")?.textContent?.trim() || "(başlıksız)";
       const link = item.querySelector("link")?.textContent?.trim() || "#";
       const pubDateRaw = item.querySelector("pubDate")?.textContent;
       const descRaw = item.querySelector("description")?.textContent || "";
 
+      const title = decodeEntities(titleRaw);
       const date = pubDateRaw
         ? new Date(pubDateRaw).toLocaleDateString("tr-TR", { year: "numeric", month: "long", day: "numeric" })
         : "";
-      const plain = descRaw.replace(/<[^>]*>/g, "").slice(0, 180);
+      // önce HTML etiketlerini temizle, sonra entity'leri çöz
+      const withoutTags = descRaw.replace(/<[^>]*>/g, "");
+      const plain = decodeEntities(withoutTags).slice(0, 180);
 
       const card = document.createElement("div");
       card.className = "post-card searchable";
