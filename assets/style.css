@@ -321,6 +321,34 @@ th { color: var(--muted); font-weight: 600; }
 
 .search-box:disabled { background: var(--card-bg); color: var(--muted); }
 
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.filter-chip {
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--card-bg);
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.filter-chip:hover { border-color: var(--accent); color: var(--text); }
+
+.filter-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  font-weight: 600;
+}
+
 /* Liste taştıkça kutunun içinde kaydırılsın, sayfa sonsuz uzamasın */
 .scroll-list {
   max-height: 65vh;
@@ -394,3 +422,6 @@ th { color: var(--muted); font-weight: 600; }
 }
 
 .theme-toggle:hover { border-color: var(--accent); background: var(--tag-bg); }
+
+
+
