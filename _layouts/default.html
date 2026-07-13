@@ -113,14 +113,27 @@
 
       toggleBtn.addEventListener("click", () => {
         const aktifKoyu = document.documentElement.getAttribute("data-theme") === "dark";
+        let yeniTema;
         if (aktifKoyu) {
           document.documentElement.removeAttribute("data-theme");
           localStorage.setItem("theme", "light");
+          yeniTema = "light";
         } else {
           document.documentElement.setAttribute("data-theme", "dark");
           localStorage.setItem("theme", "dark");
+          yeniTema = "dark";
         }
         guncelIkon();
+
+        // Sayfada Giscus yorum widget'ı varsa, onun temasını da eşitle
+        const giscusIframe = document.querySelector("iframe.giscus-frame");
+        if (giscusIframe) {
+          window.giscusTheme = yeniTema;
+          giscusIframe.contentWindow.postMessage(
+            { giscus: { setConfig: { theme: yeniTema } } },
+            "https://giscus.app"
+          );
+        }
       });
     })();
   </script>
