@@ -214,25 +214,20 @@ th { color: var(--muted); font-weight: 600; }
 
 .loading, .error { color: var(--muted); font-style: italic; }
 
-form.contact-form input,
-form.contact-form textarea {
-  width: 100%;
+/* Google Form her zaman kendi (açık) renginde geliyor — bunu değiştiremeyiz,
+   ama etrafına yumuşak bir çerçeve/padding vererek koyu temada geçişi
+   daha kontrollü ve göz yormayan hale getiriyoruz. */
+.gform-wrap {
+  background: #ffffff;
+  border-radius: 14px;
   padding: 10px;
-  margin-bottom: 12px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-family: inherit;
-  font-size: 1rem;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
 }
 
-form.contact-form button {
-  background: var(--accent);
-  color: white;
+.gform-wrap iframe {
+  display: block;
+  border-radius: 8px;
   border: none;
-  padding: 10px 22px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 1rem;
 }
 
 .site-footer {
@@ -399,6 +394,3 @@ form.contact-form button {
 }
 
 .theme-toggle:hover { border-color: var(--accent); background: var(--tag-bg); }
-
-
-
