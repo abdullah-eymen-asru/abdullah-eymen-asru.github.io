@@ -69,6 +69,14 @@ title: Blog
       throw new Error("Feed boş veya ayrıştırılamadı");
     }
 
+    // RSS'ten gelen metinler innerHTML'e basılmadan önce HTML özel
+    // karakterlerinden arındırılıyor (XSS koruması).
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text == null ? "" : String(text);
+      return div.innerHTML;
+    }
+
     container.innerHTML = "";
     items.forEach(item => {
       const title = item.querySelector("title")?.textContent?.trim() || "(başlıksız)";
@@ -86,9 +94,9 @@ title: Blog
       // arama için başlık+özet küçük harfe çevrilip veri olarak saklanıyor
       card.dataset.search = (title + " " + plain).toLowerCase();
       card.innerHTML = `
-        <h3><a href="${link}" target="_blank">${title}</a></h3>
-        <div class="meta">${date}</div>
-        <p>${plain}…</p>
+        <h3><a href="${escapeHtml(link)}" target="_blank">${escapeHtml(title)}</a></h3>
+        <div class="meta">${escapeHtml(date)}</div>
+        <p>${escapeHtml(plain)}…</p>
       `;
       container.appendChild(card);
     });
