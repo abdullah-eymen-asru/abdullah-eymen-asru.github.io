@@ -27,13 +27,20 @@
 
 * { box-sizing: border-box; }
 
+/* Tema değişiminde renk/arka plan geçişleri tüm elemanlarda tutarlı ve
+   hızlı olsun diye genel bir kural tanımlıyoruz — tek tek her bileşene
+   ayrı ayrı transition eklemek yerine, kısa ve tekdüze bir geçiş süresi
+   kullanıyoruz ki "bazı yerler geç kalıyor" hissi oluşmasın. */
+*, *::before, *::after {
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   color: var(--text);
   background: var(--bg);
   line-height: 1.6;
-  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .wrap {
@@ -315,6 +322,8 @@ th { color: var(--muted); font-weight: 600; }
   margin-bottom: 14px;
   border: 1px solid var(--border);
   border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
   font-family: inherit;
   font-size: 0.92rem;
 }
