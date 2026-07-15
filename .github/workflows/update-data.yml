@@ -1,0 +1,54 @@
+name: Update Projects Data
+
+# Bu workflow, GitHub Projects panolarındaki (İzleme/Okuma) verileri çekip
+# assets/data/*.json dosyalarına yazar, sonra bu dosyaları repoya commit eder.
+# Site bu JSON'ları statik dosya olarak okur — hiçbir ziyaretçi API'ye
+# doğrudan istek atmaz, token hiçbir zaman tarayıcıya gitmez.
+
+on:
+  # 1) Günlük otomatik çalışma — sabah 06:00 UTC
+  schedule:
+    - cron: "0 6 * * *"
+
+  # 2) Manuel tetikleme — Actions sekmesinde "Run workflow" butonu belirir.
+  #    Projects'e yeni bir kayıt ekleyip hemen görmek istediğinde kullanılır.
+  workflow_dispatch: {}
+
+permissions:
+  contents: write   # değişen JSON dosyalarını commit/push edebilmek için
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repoyu indir
+        uses: actions/checkout@v4
+
+      - name: Node.js kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Projects verisini çek ve JSON üret
+        env:
+          PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          GITHUB_LOGIN: abdullah-eymen-asru
+        run: node scripts/fetch-projects.js
+
+      - name: Değişiklik var mı kontrol et
+        id: check_changes
+        run: |
+          if git diff --quiet -- assets/data/; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Değişiklikleri commit et ve push et
+        if: steps.check_changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add assets/data/
+          git commit -m "chore: Projects verisini güncelle [otomatik]"
+          git push
