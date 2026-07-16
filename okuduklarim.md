@@ -7,9 +7,9 @@ title: Okuduklarım
 <p>
   Okuduğum kitapları
   <a href="{{ site.okuma_projects_url }}" target="_blank">GitHub Projects panosunda</a>
-  kayıt altına alıyorum. Bu tablo, o panodan otomatik olarak (günde 1 kez veya
-  manuel tetiklemeyle) güncellenen statik bir veriyle besleniyor — sayfa açıldığında
-  hiçbir GitHub API isteği yapılmaz, sadece hazır bir JSON dosyası okunur.
+  kayıt altına alıyorum. Bu tablo, panoya her yeni kayıt eklendiğinde
+  <strong>anlık olarak</strong> güncellenir — sayfayı her açtığında en güncel
+  veriyi görürsün.
 </p>
 
 <div class="filter-row">
@@ -32,7 +32,7 @@ title: Okuduklarım
 <script src="{{ '/assets/js/koleksiyon-tablo.js' | relative_url }}"></script>
 <script>
   koleksiyonTablosuOlustur({
-    jsonUrl: "{{ '/assets/data/okunanlar.json' | relative_url }}",
+    jsonUrl: "{{ site.cloudflare_worker_url }}?project=okuma",
     containerId: "okunanlar-tablo",
     searchInputId: "okuma-search",
     turSelectId: "tur-filtresi",
