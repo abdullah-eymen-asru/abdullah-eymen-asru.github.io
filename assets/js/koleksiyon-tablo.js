@@ -53,7 +53,11 @@ async function koleksiyonTablosuOlustur(config) {
   const sayfaBasinaKayit = config.sayfaBasinaKayit || 50;
 
   try {
-    const res = await fetch(config.jsonUrl);
+    // cache: "no-store" -> tarayıcı bu isteği kendi önbelleğinden ASLA
+    // karşılamaz, her sayfa yenilemesinde gerçekten taze veri ister.
+    // Worker tarafında zaten kısa süreli (60sn) bir Cloudflare önbelleği
+    // var, o yeterli hız/güvenlik dengesini sağlıyor.
+    const res = await fetch(config.jsonUrl, { cache: "no-store" });
     if (!res.ok) throw new Error("JSON yüklenemedi: " + res.status);
     const data = await res.json();
     const items = Array.isArray(data.items) ? data.items : [];
