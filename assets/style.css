@@ -404,7 +404,14 @@ th { color: var(--muted); font-weight: 600; }
 }
 
 /* Tablolu sayfalarda (izlediklerim/okuduklarım) sütun sayısı fazla,
-   dar ekranlarda tablo kendi içinde yatay kaysın, sayfa bozulmasın */
+   dar ekranlarda tablo kendi içinde yatay kaysın, sayfa bozulmasın.
+   Bu sayfalarda artık sayfalama (pagination) uzunluğu zaten kontrol
+   ettiği için dikey kaydırmayı (max-height) burada devre dışı bırakıyoruz. */
+.scroll-list:has(table) {
+  max-height: none;
+  overflow-y: visible;
+}
+
 .scroll-list table {
   display: block;
   overflow-x: auto;
@@ -413,6 +420,60 @@ th { color: var(--muted); font-weight: 600; }
 
 .scroll-list td, .scroll-list th {
   white-space: nowrap;
+}
+
+.col-index {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  width: 44px;
+  text-align: right;
+}
+
+.no-results-row td {
+  text-align: center;
+  padding: 20px 0 !important;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.page-numbers {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.page-btn, .page-nav {
+  padding: 6px 11px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.page-btn:hover, .page-nav:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+
+.page-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  font-weight: 600;
+}
+
+.page-nav:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .theme-toggle {
