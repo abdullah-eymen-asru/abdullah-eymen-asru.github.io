@@ -37,7 +37,8 @@ title: İzlediklerim
     searchInputId: "izleme-search",
     turSelectId: "tur-filtresi",
     turFieldName: "Tür",
-    aramaAlanlari: ["Tür", "Sezon/Bölüm"],
-    gizliAlanlar: ["Durum"]
+    aramaAlanlari: ["Tür", "Sezon/Bölüm", "Durum"],
+    gizliAlanlar: [],
+    sayfaBasinaKayit: 50
   });
 </script>
