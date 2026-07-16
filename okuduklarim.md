@@ -37,7 +37,8 @@ title: Okuduklarım
     searchInputId: "okuma-search",
     turSelectId: "tur-filtresi",
     turFieldName: "Tür",
-    aramaAlanlari: ["Yazar", "Tür"],
-    gizliAlanlar: ["Durum"]
+    aramaAlanlari: ["Yazar", "Tür", "Durum"],
+    gizliAlanlar: [],
+    sayfaBasinaKayit: 50
   });
 </script>
