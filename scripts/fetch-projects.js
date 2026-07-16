@@ -103,11 +103,20 @@ async function graphqlRequest(variables) {
 // şeklinde düz bir objeye çevirir. Field tipine göre doğru değeri seçer.
 // Bu fonksiyon hangi field isimlerinin var olduğunu HİÇ bilmiyor — GraphQL'den
 // ne gelirse onu işliyor. Yeni bir sütun eklediğinde otomatik yakalanır.
+//
+// "Title" ve "Status" alanlarını dışarıda bırakıyoruz: GitHub Projects'te
+// her item'ın yerleşik "Title" ve "Status" (Todo/In Progress/Done gibi)
+// field'ları vardır. "Title" bizim zaten ayrı tuttuğumuz content.title ile
+// aynı bilgiyi tekrarlar. "Status" da GitHub'ın kendi iş akışı alanı —
+// senin kendi tanımladığın "Durum" custom field'ından FARKLI bir şeydir.
+const YERLESIK_ALANLAR = new Set(["Title", "Status"]);
+
 function fieldValuesToObject(fieldValues) {
   const obj = {};
   for (const fv of fieldValues.nodes) {
     if (!fv || !fv.field || !fv.field.name) continue;
     const key = fv.field.name;
+    if (YERLESIK_ALANLAR.has(key)) continue;
 
     if (fv.text !== undefined) obj[key] = fv.text;
     else if (fv.number !== undefined) obj[key] = fv.number;
