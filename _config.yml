@@ -12,6 +12,7 @@ substack_url: "https://abdullaheymenasru.substack.com"
 substack_feed: "https://abdullaheymenasru.substack.com/feed"
 google_analytics_id: "G-DJ4M58RB0P"   # Google Analytics'ten alacağın Measurement ID
 profile_image: "/assets/profil.jpg"   # örn: "/assets/profil.jpg" - fotoğrafı assets/ klasörüne yükleyip yolunu buraya yaz
+cloudflare_worker_url: "https://izleme-okuma-api.aeymena.workers.dev"   # Cloudflare Worker'ı deploy edince buraya yapıştır
 
 giscus:
   repo: "abdullah-eymen-asru/abdullah-eymen-asru.github.io"
