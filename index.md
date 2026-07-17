@@ -37,6 +37,8 @@ title: Anasayfa
   </p>
 </div>
 
+<iframe src="https://abdullaheymenasru.substack.com/embed?transparent=1&light=1" width="480" height="150" style="border: 0; background: transparent" frameborder="0" scrolling="no"></iframe>
+
 {% if site.mirror_site_url and site.mirror_site_url != "" %}
 <p class="format-hint" style="margin-top: 1.2em;">
   Bu site iki adreste eşzamanlı olarak yayınlanıyor:
