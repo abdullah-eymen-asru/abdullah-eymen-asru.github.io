@@ -1,7 +1,7 @@
 title: "Abdullah Eymen Asru"
 description: "Akademik portfolyo ve blog"
 baseurl: ""
-url: "https://abdullah-eymen-asru.github.io"
+url: "https://abdullah-eymen-asru.pages.dev"   # Birincil site - Google bu adresi indeksler
 
 # ---- BURAYI DOLDUR ----
 github_username: "abdullah-eymen-asru"
@@ -13,7 +13,7 @@ substack_feed: "https://abdullaheymenasru.substack.com/feed"
 google_analytics_id: "G-DJ4M58RB0P"   # Google Analytics'ten alacağın Measurement ID
 profile_image: "/assets/profil.jpg"   # örn: "/assets/profil.jpg" - fotoğrafı assets/ klasörüne yükleyip yolunu buraya yaz
 cloudflare_worker_url: "https://izleme-okuma-api.aeymena.workers.dev"   # Cloudflare Worker'ı deploy edince buraya yapıştır
-mirror_site_url: "https://abdullah-eymen-asru.pages.dev"   # Aynı sitenin Cloudflare Pages'teki yedek kopyası
+mirror_site_url: "https://abdullah-eymen-asru.github.io"   # İkincil/yedek kopya   # Aynı sitenin Cloudflare Pages'teki yedek kopyası
 
 giscus:
   repo: "abdullah-eymen-asru/abdullah-eymen-asru.github.io"
