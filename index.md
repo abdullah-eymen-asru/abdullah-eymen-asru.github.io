@@ -8,9 +8,7 @@ title: Anasayfa
   <img src="{{ site.profile_image | relative_url }}" alt="{{ site.title }}" class="profile-photo">
   {% endif %}
 
-{{ site.includes_load | default: "" }}
-{% capture hakkimda_icerik %}{% include hakkimda-kutusu.md %}{% endcapture %}
-{{ hakkimda_icerik | markdownify }}
+  {% include hakkimda-kutusu.md %}
 
   <div class="social-links">
     {% assign labels = "github:GitHub|linkedin:LinkedIn|twitter:X (Twitter)|instagram:Instagram|youtube:YouTube|nsosyal:NSosyal|orcid:ORCID|academia:Academia.edu|researchgate:ResearchGate|kitap1000:1000Kitap|playstore:Uygulama (Play Store)" | split: "|" %}
@@ -25,6 +23,11 @@ title: Anasayfa
     {% endfor %}
     <a href="{{ site.substack_url }}" target="_blank">Substack</a>
   </div>
+</div>
+
+<div class="about-box">
+  <h2 style="margin-top:0">Hakkımda</h2>
+  {% include hakkimda-icerik.md %}
 </div>
 
 {% if site.mirror_site_url and site.mirror_site_url != "" %}
