@@ -67,21 +67,27 @@ async function koleksiyonTablosuOlustur(config) {
       return;
     }
 
-    // Tüm item'larda geçen alan isimlerini topla (title/url hariç), bunlar
-    // otomatik olarak tablo sütunları olacak. Sıralamayı ilk item'ın alan
-    // sırasına göre belirliyoruz ki tutarlı bir sütun düzeni olsun.
-    const sutunlar = [];
-    const gorulenler = new Set();
-    items.forEach(item => {
-      Object.keys(item).forEach(key => {
-        if (key === "title" || key === "url") return;
-        if (gizliAlanlar.has(key)) return;
-        if (!gorulenler.has(key)) {
-          gorulenler.add(key);
-          sutunlar.push(key);
-        }
+    // Sütun sırası: Worker'dan gelen "fieldOrder" varsa GitHub Projects'teki
+    // GERÇEK sütun sırasını birebir kullanıyoruz (senin panondaki düzenle
+    // aynı görünsün diye). fieldOrder yoksa (eski/farklı bir kaynak
+    // kullanılıyorsa) verideki alanları keşfederek eski davranışa dönüyoruz.
+    let sutunlar;
+    if (Array.isArray(data.fieldOrder) && data.fieldOrder.length > 0) {
+      sutunlar = data.fieldOrder.filter(key => !gizliAlanlar.has(key));
+    } else {
+      sutunlar = [];
+      const gorulenler = new Set();
+      items.forEach(item => {
+        Object.keys(item).forEach(key => {
+          if (key === "id" || key === "title" || key === "url" || key === "state") return;
+          if (gizliAlanlar.has(key)) return;
+          if (!gorulenler.has(key)) {
+            gorulenler.add(key);
+            sutunlar.push(key);
+          }
+        });
       });
-    });
+    }
 
     // Tablo başlıkları — "#" sırayı gösteren ilk sütun
     const theadHtml = `
