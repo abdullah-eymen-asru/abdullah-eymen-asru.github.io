@@ -1,3 +1,10 @@
+# Bu dosya SADECE Cloudflare Pages build'inde kullanılır (build command'da
+# --config _config.yml,_config_cloudflare.yml ile birlikte çağrılır).
+# Jekyll, iki config dosyası verildiğinde SONRAKİ dosyadaki değerler,
+# ÖNCEKİ dosyadaki aynı anahtarların üzerine yazar. Anahtar adları
+# _config.yml'dekiyle BİREBİR aynı olmalı, yoksa üzerine yazmaz, ayrı
+# ve kullanılmayan bir alan olarak kalır.
+
 url: "https://abdullah-eymen-asru.pages.dev"
 baseurl: ""
-google_analytics: "G-MZE4HHHH04"
+google_analytics_id: "G-MZE4HHHH04"
