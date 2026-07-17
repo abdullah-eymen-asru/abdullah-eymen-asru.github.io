@@ -12,6 +12,10 @@ title: Okuduklarım
   veriyi görürsün.
 </p>
 
+<p class="format-hint">
+  Repo'nun kendisine <a href="https://github.com/abdullah-eymen-asru/izleme-okuma-listem" target="_blank">buradan</a> ulaşabilirsin.
+</p>
+
 <div class="filter-row">
   <input
     type="text"
