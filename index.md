@@ -8,11 +8,11 @@ title: Anasayfa
   <img src="{{ site.profile_image | relative_url }}" alt="{{ site.title }}" class="profile-photo">
   {% endif %}
 
-  <h1>Merhaba, ben Abdullah Eymen Asru 👋</h1>
+ <h1>Merhaba, ben Abdullah Eymen Asru 👋</h1>
   <p class="subtitle">Siyaset Bilimi ve Uluslararası İlişkiler Lisans Öğrencisi - İstanbul 29 Mayıs Üniversitesi</p>
 
   <div class="social-links">
-    {% assign labels = "github:GitHub|linkedin:LinkedIn|twitter:X (Twitter)|instagram:Instagram|youtube:YouTube|nsosyal:nsosyal|orcid:ORCID|academia:Academia.edu|researchgate:ResearchGate|kitap1000:1000Kitap|playstore:Uygulama (Google Play Store)" | split: "|" %}
+    {% assign labels = "github:GitHub|linkedin:LinkedIn|twitter:X (Twitter)|instagram:Instagram|youtube:YouTube|nsosyal:nsosyal|orcid:ORCID|academia:Academia.edu|researchgate:ResearchGate|kitap1000:1000Kitap|playstore:Uygulama (Play Store)" | split: "|" %}
     {% for pair in labels %}
       {% assign parts = pair | split: ":" %}
       {% assign key = parts[0] %}
@@ -36,3 +36,10 @@ title: Anasayfa
     okumayı seviyorum — bunları da sitenin ilgili sekmelerinde paylaşıyorum."
   </p>
 </div>
+
+{% if site.mirror_site_url and site.mirror_site_url != "" %}
+<p class="format-hint" style="margin-top: 1.2em;">
+  Bu site aynı içerikle <a href="{{ site.mirror_site_url }}" target="_blank">{{ site.mirror_site_url }}</a>
+  adresinde de yayınlanıyor (yedek kopya).
+</p>
+{% endif %}
