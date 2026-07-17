@@ -8,7 +8,7 @@ title: Anasayfa
   <img src="{{ site.profile_image | relative_url }}" alt="{{ site.title }}" class="profile-photo">
   {% endif %}
 
-{{ include.hakkimda-kutusu.md | markdownify }}
+{% include hakkimda-kutusu.md %}
 
   <div class="social-links">
     {% assign labels = "github:GitHub|linkedin:LinkedIn|twitter:X (Twitter)|instagram:Instagram|youtube:YouTube|nsosyal:NSosyal|orcid:ORCID|academia:Academia.edu|researchgate:ResearchGate|kitap1000:1000Kitap|playstore:Uygulama (Play Store)" | split: "|" %}
