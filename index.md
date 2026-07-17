@@ -37,8 +37,15 @@ title: Anasayfa
   </p>
 </div>
 
-<div style="width: 100%; text-align: center; margin: 2em 0;">
-  <iframe src="https://abdullaheymenasru.substack.com/embed" width="100%" height="200" style="max-width: 480px; border: 1px solid #eee; border-radius: 8px; background: white; margin: 0 auto; display: block;" frameborder="0" scrolling="no"></iframe>
+<div class="substack-embed-container" style="width: 100%; display: flex; justify-content: center; margin: 2.5em 0;">
+  <iframe 
+    src="https://abdullaheymenasru.substack.com/embed" 
+    width="100%" 
+    height="180" 
+    style="max-width: 500px; width: 100%; border: 1px solid var(--border-color, #e2e8f0); border-radius: 12px; background: var(--bg-color, #ffffff); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); color-scheme: light dark;" 
+    frameborder="0" 
+    scrolling="no">
+  </iframe>
 </div>
 
 {% if site.mirror_site_url and site.mirror_site_url != "" %}
