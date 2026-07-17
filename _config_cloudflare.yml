@@ -4,7 +4,10 @@
 # ÖNCEKİ dosyadaki aynı anahtarların üzerine yazar. Anahtar adları
 # _config.yml'dekiyle BİREBİR aynı olmalı, yoksa üzerine yazmaz, ayrı
 # ve kullanılmayan bir alan olarak kalır.
+#
+# url/baseurl artık burada YOK çünkü _config.yml zaten pages.dev'i
+# birincil adres olarak gösteriyor — iki dosyada aynı değeri tekrar
+# yazmaya gerek kalmadı. Sadece Cloudflare'e özel Analytics ID farklı
+# olduğu için burada kalıyor.
 
-url: "https://abdullah-eymen-asru.pages.dev"
-baseurl: ""
 google_analytics_id: "G-MZE4HHHH04"
