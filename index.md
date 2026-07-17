@@ -8,7 +8,7 @@ title: Anasayfa
   <img src="{{ site.profile_image | relative_url }}" alt="{{ site.title }}" class="profile-photo">
   {% endif %}
 
- <h1>Merhaba, ben Abdullah Eymen Asru 👋</h1>
+  <h1>Merhaba, ben Abdullah Eymen Asru 👋</h1>
   <p class="subtitle">Siyaset Bilimi ve Uluslararası İlişkiler Lisans Öğrencisi - İstanbul 29 Mayıs Üniversitesi</p>
 
   <div class="social-links">
@@ -39,7 +39,8 @@ title: Anasayfa
 
 {% if site.mirror_site_url and site.mirror_site_url != "" %}
 <p class="format-hint" style="margin-top: 1.2em;">
-  Bu site aynı içerikle <a href="{{ site.mirror_site_url }}" target="_blank">{{ site.mirror_site_url }}</a>
-  adresinde de yayınlanıyor (yedek kopya).
+  Bu site iki adreste eşzamanlı olarak yayınlanıyor:
+  <a href="{{ site.url }}" target="_blank">{{ site.url }}</a> ·
+  <a href="{{ site.mirror_site_url }}" target="_blank">{{ site.mirror_site_url }}</a>
 </p>
 {% endif %}
