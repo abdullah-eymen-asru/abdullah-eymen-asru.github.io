@@ -13,9 +13,13 @@
       // sonradan "flaşlamıyor". document.write yerine gerçek bir DOM
       // elemanı oluşturuyoruz — bazı tarayıcılar async script'lerle
       // birlikte document.write'ı kısıtlayabiliyor.
-      window.giscusTheme = document.documentElement.getAttribute("data-theme") === "dark"
-        ? "dark"
-        : "light";
+      function guncelTema() {
+        return document.documentElement.getAttribute("data-theme") === "dark"
+          ? "dark"
+          : "light";
+      }
+
+      window.giscusTheme = guncelTema();
 
       const script = document.createElement("script");
       script.src = "https://giscus.app/client.js";
@@ -35,6 +39,45 @@
       script.async = true;
 
       document.getElementById("giscus-container").appendChild(script);
+
+      // SORUN: "data-loading: lazy" yüzünden giscus'un iframe'i script
+      // eklendiği anda değil, kullanıcı yorumlara kaydırdığında DOM'a
+      // giriyor. Script tag'ine gömdüğümüz data-theme, script eklenirken
+      // ANLIK olan temayı yansıtıyor — ama (a) kullanıcı o siteye ilk
+      // geldiğinde tema henüz kararsız bir anda yakalanmışsa veya
+      // (b) giscus'un kendi iframe'i, dışarıdan gelen ilk postMessage'ı
+      // henüz hazır olmadığı için kaçırırsa (bilinen bir giscus/tarayıcı
+      // yarış durumu — bkz. giscus/giscus#1200), iframe yanlış temada
+      // "donuk" kalabiliyor. Çözüm: iframe DOM'a GERÇEKTEN girdiği anı
+      // bir MutationObserver ile yakalayıp, o anki güncel temayı bir kez
+      // daha postMessage ile gönderiyoruz. Bu, "geç gelen mesaj" ile
+      // "henüz hazır olmayan alıcı" arasındaki yarışı ortadan kaldırıyor.
+      const containerGozlemci = new MutationObserver(function (mutations, obs) {
+        const iframe = document.querySelector("#giscus-container iframe.giscus-frame");
+        if (!iframe) return;
+
+        function senkronizeEt() {
+          iframe.contentWindow.postMessage(
+            { giscus: { setConfig: { theme: guncelTema() } } },
+            "https://giscus.app"
+          );
+        }
+
+        // iframe DOM'a girdiği anda giscus'un kendi uygulaması henüz
+        // mesaj dinleyicisini kaydetmemiş olabilir, bu yüzden birkaç kez
+        // kısa aralıklarla tekrar gönderiyoruz (giscus tarafında bunu
+        // görmezden gelmek zararsız, sadece aynı temayı tekrar uygular).
+        senkronizeEt();
+        setTimeout(senkronizeEt, 300);
+        setTimeout(senkronizeEt, 1000);
+
+        obs.disconnect();
+      });
+
+      containerGozlemci.observe(document.getElementById("giscus-container"), {
+        childList: true,
+        subtree: true,
+      });
     })();
   </script>
 </div>
