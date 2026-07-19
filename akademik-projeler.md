@@ -6,7 +6,7 @@ title: Akademik Projeler
 <h1>Akademik Projeler</h1>
 <p>Yayınlarım, projelerim ve devam eden çalışmalarım.</p>
 
-{% assign sorted_projects = site.projects | where_exp: "p", "p.yayinda != false" | sort: "date" | reverse %}
+{% assign sorted_projects = site.projects | where_exp: "p", "p.yayinda != false and p.date <= site.time" | sort: "date" | reverse %}
 
 {% if sorted_projects.size == 0 %}
   <p class="loading">Henüz proje eklenmedi.</p>
