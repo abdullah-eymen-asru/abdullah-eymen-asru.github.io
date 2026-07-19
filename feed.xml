@@ -18,7 +18,7 @@ layout: none
   <title type="html">{{ site.title | smartify }}</title>
   {% if site.description %}<subtitle>{{ site.description }}</subtitle>{% endif %}
 
-  {% assign yayindaki_yazilar = site.posts | where_exp: "p", "p.yayinda != false and p.date <= site.time" %}
+  {% assign yayindaki_yazilar = site.posts | where_exp: "p", "p.yayinda != false" | where_exp: "p", "p.date <= site.time" %}
   {% for post in yayindaki_yazilar limit:20 %}
     <entry>
       <title type="html">{{ post.title | smartify | xml_escape }}</title>
