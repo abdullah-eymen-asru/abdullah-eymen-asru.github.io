@@ -89,9 +89,15 @@ title: Blog
       return el.textContent;
     }
 
-    // Ekstra savunma katmanı: bir link "http(s)://" ile başlamıyorsa reddediyoruz.
+    // Ekstra savunma katmanı: link http(s):// ile başlamalı VE içinde
+    // boşluk/kontrol karakteri olmamalı. Bu özellikle burada önemli çünkü
+    // RSS içeriği bir ÜÇÜNCÜ PARTİ proxy'den (api.allorigins.win) geçiyor —
+    // proxy'ye veya Substack'e güvenmek yerine, gelen link'i kendi
+    // tarafımızda da doğruluyoruz.
     function guvenliLink(url) {
-      if (typeof url === "string" && /^https?:\/\//i.test(url)) return url;
+      if (typeof url !== "string") return "#";
+      const trimmed = url.trim();
+      if (/^https?:\/\/[^\s<>"']+$/i.test(trimmed)) return trimmed;
       return "#";
     }
 
