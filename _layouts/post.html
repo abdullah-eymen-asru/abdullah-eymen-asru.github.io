@@ -10,6 +10,13 @@ layout: default
     🔒 Bu yazı henüz yayında değil, sadece bu özel linke sahip olanlar
     görebilir. Arama motorları indekslemiyor, blog listesinde görünmüyor.
   </p>
+  {% elsif page.date and page.date > site.time %}
+  <p class="format-hint">
+    🔒 Bu yazı {{ page.date | date: "%d %B %Y" }} tarihine zamanlanmış,
+    o tarihe kadar sadece bu özel linke sahip olanlar görebilir. Arama
+    motorları indekslemiyor, blog listesinde görünmüyor. Tarih gelince
+    otomatik olarak yayına girer.
+  </p>
   {% endif %}
 
   <h1>{{ page.title }}</h1>
