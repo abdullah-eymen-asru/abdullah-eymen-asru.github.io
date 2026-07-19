@@ -278,3 +278,4 @@ ayarı oluşturup `_includes/comments.html` içindeki ilgili
   ham RSS çekmeye (CORS) izin vermiyor. Bu servis kontrolün dışında —
   ileride kendi Worker'ın üzerinden proxy'lemek istersen (daha güvenli
   ama kurulumu daha uzun), ayrı bir adım olarak yapılabilir.
+  
