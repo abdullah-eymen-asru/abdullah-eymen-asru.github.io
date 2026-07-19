@@ -1,6 +1,7 @@
 ---
 title: "Örnek Zamanlanmış / Gizli Yazı"
-yayinda: false            # zamanlanmış/gizli proje için — bkz. README.md
+date: 2026-09-19
+yayinda: true            # zamanlanmış/gizli proje için — bkz. README.md
 sitemap: false             # yayinda:false ile BİRLİKTE yazılmalı — bkz. README.md
 permalink: /blog/on-izleme-x7k2p9qz/   # gizli linkin adresi — bkz. README.md
 ---
