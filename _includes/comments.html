@@ -69,9 +69,16 @@
         script.setAttribute("data-input-position", "top");
         script.setAttribute("data-theme", guncelTema());
         script.setAttribute("data-lang", "tr");
-        // Kullanıcı yorumlara kaydırana kadar gerçekten yüklenmesin diye
-        // "lazy" bırakıyoruz — sayfa açılışında gereksiz ağ isteği yok.
-        script.setAttribute("data-loading", "lazy");
+        // NOT: Burada "lazy" DEĞİL "eager" kullanıyoruz. Script zaten
+        // sadece container görünür alana girdiğinde (aşağıdaki
+        // IntersectionObserver ile) DOM'a ekleniyor — yani "ne zaman
+        // yükleneceği" kontrolü zaten bizde. "lazy" verirsek giscus'un
+        // KENDİ dahili lazy-load mekanizması da devreye girip bizim
+        // observer'ımızla ÇAKIŞIYOR ve iframe bazı durumlarda yarım/
+        // eksik bir state'te (örn. sadece reactions barı render olmuş,
+        // asıl yorum formu henüz gelmemiş) takılı kalabiliyor — ekran
+        // görüntülerindeki koyu/boş dikdörtgenin olası bir nedeni budur.
+        script.setAttribute("data-loading", "eager");
         script.setAttribute("crossorigin", "anonymous");
         script.async = true;
 
