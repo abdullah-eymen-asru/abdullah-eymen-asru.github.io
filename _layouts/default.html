@@ -170,21 +170,18 @@
 
       guncelIkon(); // sayfa açılışında mevcut duruma göre doğru duruma getir
 
-      // Giscus'un iframe'i "data-loading: lazy" olduğu için sayfa açılışında
-      // henüz DOM'da olmayabilir. Ayrıca giscus'un KENDİ bilinen bir
-      // sınırlaması var (bkz. giscus/giscus#1418): iframe'e postMessage
-      // ile "setConfig: { theme }" göndermek, iframe içindeki React
-      // uygulamasının HER parçasını güvenilir şekilde yeniden render
-      // etmiyor — "reactions" (tepki) barı gibi bazı bölümler eski
-      // temada takılı kalabiliyor. Bu yüzden postMessage ile "güncelle"
-      // demek yerine, tema değiştiğinde giscus'u TAMAMEN yok edip YENİ
-      // temayla SIFIRDAN yeniden oluşturuyoruz — bunu yapan fonksiyon
-      // (window.girisusYenidenOlustur) _includes/comments.html içinde
-      // tanımlı. Bu, iframe içinde hiçbir eski/yanlış temada state
-      // kalmamasını garanti ediyor.
+      // DÜZELTME (v2): Artık giscus'u tema değişince YOK EDİP YENİDEN
+      // KURMUYORUZ — bu, kullanıcı zaten oturum açmışken kısa süreli boş/
+      // koyu bir dikdörtgen görünmesine yol açıyordu (bkz. kullanıcı
+      // ekran görüntüleri). Bunun yerine iframe hep aynı kalır, sadece
+      // giscus'un resmi postMessage API'siyle temasını GÜNCELLERİZ —
+      // bunu yapan fonksiyon (window.girisusTemaGuncelle)
+      // _includes/comments.html içinde tanımlı. Bu, olabilecek en hızlı
+      // ve en kesintisiz geçişi sağlar: tek bir mesaj, DOM'da hiçbir
+      // yıkım/yeniden kurulum yok.
       new MutationObserver(() => {
-        if (typeof window.girisusYenidenOlustur === "function") {
-          window.girisusYenidenOlustur();
+        if (typeof window.girisusTemaGuncelle === "function") {
+          window.girisusTemaGuncelle();
         }
       }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
@@ -199,8 +196,9 @@
         }
         guncelIkon();
         // data-theme değişimi yukarıdaki MutationObserver tarafından
-        // otomatik yakalanıp giscus'un yeniden oluşturulmasını
-        // tetikliyor, burada tekrar bir şey yapmaya gerek yok.
+        // otomatik yakalanıp giscus'un temasının postMessage ile
+        // güncellenmesini tetikliyor, burada tekrar bir şey yapmaya
+        // gerek yok.
       });
     })();
   </script>
