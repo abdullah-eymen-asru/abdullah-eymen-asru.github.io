@@ -21,7 +21,7 @@ dosya sadece "hangi alan hangi dosyada" sorusuna cevap.
 | `profile_image` | Profil fotoğrafın (`assets/` klasörüne yükleyip yolunu buraya yaz) |
 | `cloudflare_worker_url` | İzleme/okuma verisini çeken Cloudflare Worker'ının adresi |
 | `mirror_site_url` | Yedek/ikincil site adresin (GitHub Pages) |
-| `giscus:` altındaki 3 alan | Yorum sistemi (giscus.app üzerinden alınır) |
+| `giscus:` altındaki 3 alan | Yorum sistemi (giscus.app üzerinden alınır) — **güvenlik notu:** `category` için GitHub'ın önerdiği gibi "Announcements" tipinde bir kategori seç, böylece yeni tartışma (discussion) başlığını sadece sen/giscus botu oluşturabilir, ziyaretçiler oluşturamaz |
 | `social:` altındaki tüm linkler | GitHub, LinkedIn, X/Twitter, Instagram, YouTube, n-sosyal, ORCID, Academia, ResearchGate, 1000Kitap, Play Store |
 
 ## 2. `_config_cloudflare.yml` — Sadece Cloudflare build'ine özel
