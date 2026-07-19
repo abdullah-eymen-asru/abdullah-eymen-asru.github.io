@@ -37,14 +37,31 @@ social:
 
 markdown: kramdown
 plugins:
-  - jekyll-feed
   - jekyll-sitemap
+
+# NOT: jekyll-feed plugin'i BİLEREK kullanılmıyor. Bunun yerine kökte
+# elle yazılmış bir feed.xml var (bkz. o dosyanın başındaki açıklama) —
+# çünkü jekyll-feed'in "published: false" alanı sayfayı build'den TAMAMEN
+# siler ve bu, zamanlanmış/gizli yazılar için gereken önizleme linkini
+# kırar. Kendi feed.xml'imiz bunun yerine "yayinda: false" alanına bakıyor.
 
 collections:
   projects:
     output: true
     sort_by: date
     permalink: /projects/:name/
+
+# ÖNEMLİ: future: true olmalı. Zamanlanmış/gizli yazılar (bkz. README'deki
+# "Zamanlanmış ve gizli yazılar" bölümü) gelecek tarihli olsa da HTML
+# sayfaları build edilmeye devam etmeli — yoksa gizli önizleme linki hiç
+# çalışmaz, çünkü linkin gideceği sayfa var olmaz. Görünürlük (listede
+# çıkıp çıkmaması, RSS/sitemap'e girip girmemesi) bunun yerine blog.md,
+# akademik-projeler.md ve feed/sitemap ayarları tarafında front-matter'daki
+# "yayinda: false" alanına bakılarak ELLE filtreleniyor. Jekyll'in kendi
+# "published: false" alanı KASITLI OLARAK kullanılmıyor — o alan sayfayı
+# build'den TAMAMEN çıkarır, gizli önizleme linkinin çalışması için sayfanın
+# build edilmiş olması (sadece listelerden gizlenmiş olması) gerekiyor.
+future: true
 
 defaults:
   - scope:
