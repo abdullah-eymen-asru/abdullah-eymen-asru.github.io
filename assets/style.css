@@ -297,18 +297,9 @@ th { color: var(--muted); font-weight: 600; }
      bir alan gösterip site ile uyuşmayan bir "yama" oluşturuyordu. */
   background: var(--bg);
   min-height: 150px;
-  /* DÜZELTME: Tema değiştiğinde comments.html içindeki JS, giscus'u
-     container.innerHTML = "" ile TAMAMEN silip yeniden kuruyor. Bu silme
-     ile yeni iframe'in tekrar yüklenip görünür olması arasında kısa bir
-     an var — o anda konteyner boş kalıyordu ve sayfanın genel
-     "* { transition: background-color ... }" kuralıyla birleşince bu,
-     ekran görüntülerinde görülen "donuk/karışık renkte boşluk" hissini
-     yaratıyordu (bkz. kullanıcı ekran görüntüleri). overflow:hidden +
-     kendi geçiş süremiz, bu ara karede konteynerin sıçramadan/taşmadan
-     sabit ve sitenin --bg rengiyle düzgün görünmesini sağlıyor. */
-  overflow: hidden;
   border-radius: 10px;
-  transition: background-color 0.12s ease, opacity 0.2s ease;
+  overflow: hidden;
+  transition: background-color 0.12s ease;
 }
 
 #giscus-container iframe.giscus-frame {
@@ -316,11 +307,6 @@ th { color: var(--muted); font-weight: 600; }
   min-height: 150px;
   border: none;
   display: block;
-  /* Iframe her yeniden oluşturulduğunda tarayıcının kendi varsayılan
-     (genelde beyaz) arka planıyla bir kare göstermesini engellemek için;
-     giscus kendi içeriğini render edip postMessage ile height
-     bildirdiğinde bu zaten görünmez hale geliyor ama ilk anki "beyaz/koyu
-     çakışma" karesini burada baştan engelliyoruz. */
   background: var(--bg);
   /* ÖNEMLİ: "color-scheme: normal" YANLIŞTI ve koyu/açık tema
      uyuşmazlığının asıl sebeplerinden biriydi. "normal" değeri,
