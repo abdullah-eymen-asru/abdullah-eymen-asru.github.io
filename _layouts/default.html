@@ -33,9 +33,16 @@
   ">
   <title>{{ page.title | default: site.title }}{% unless page.url == '/' or page.url == '/index.html' %} · {{ site.title }}{% endunless %}</title>
 
+  {% assign henuz_yayinlanmadi = false %}
   {% if page.yayinda == false %}
+    {% assign henuz_yayinlanmadi = true %}
+  {% elsif page.date and page.date > site.time %}
+    {% assign henuz_yayinlanmadi = true %}
+  {% endif %}
+  {% if henuz_yayinlanmadi %}
   <!--
-    ZAMANLANMIŞ/GİZLİ İÇERİK: Bu sayfa "yayinda: false" olarak işaretli.
+    ZAMANLANMIŞ/GİZLİ İÇERİK: Bu sayfa "yayinda: false" olarak işaretli
+    YA DA "date" alanı henüz gelmemiş (ileri tarihli/zamanlanmış).
     Arama motorlarının bu sayfayı indekslememesi için noindex ekleniyor.
     Sayfanın kendisi yine de build ediliyor (bkz. _config.yml'deki
     "future: true" notu) — bilinçli bir tercih, çünkü gizli önizleme
