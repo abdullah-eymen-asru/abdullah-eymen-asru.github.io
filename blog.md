@@ -34,7 +34,7 @@ title: Blog
       placeholder="Notlarımda ara…">
 
     <div id="notes-posts" class="scroll-list">
-      {% assign yayindaki_yazilar = site.posts | where_exp: "p", "p.yayinda != false" %}
+      {% assign yayindaki_yazilar = site.posts | where_exp: "p", "p.yayinda != false and p.date <= site.time" %}
       {% for post in yayindaki_yazilar %}
       <div class="post-card searchable" data-search="{{ post.title | downcase }} {{ post.excerpt | strip_html | downcase }}">
         <h3><a href="{{ post.url | relative_url }}">{{ post.title }}</a></h3>
@@ -176,4 +176,3 @@ function baglaArama(inputId, listId) {
 baglaArama("substack-search", "substack-posts");
 baglaArama("notes-search", "notes-posts");
 </script>
-
