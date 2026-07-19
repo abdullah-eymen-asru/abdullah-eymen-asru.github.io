@@ -476,23 +476,79 @@ th { color: var(--muted); font-weight: 600; }
   cursor: default;
 }
 
+/* Koyu/açık tema anahtarı: kayan (slider) switch + yanında durumu
+   açıklayan küçük bir etiket. Salt ikonla "bu ne işe yarıyor" belirsizdi;
+   etiket + hareketli topuz görsel olarak daha net bir "aç/kapa" anahtarı
+   hissi veriyor. */
 .theme-toggle {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
+  gap: 8px;
   flex-shrink: 0;
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  background: var(--card-bg);
+  border: none;
+  background: transparent;
   cursor: pointer;
-  font-size: 1.05rem;
-  line-height: 1;
-  color: var(--text);
+  padding: 4px 6px;
+  border-radius: 999px;
+  color: var(--muted);
 }
 
-.theme-toggle:hover { border-color: var(--accent); background: var(--tag-bg); }
+.theme-toggle:hover { color: var(--text); }
+.theme-toggle:hover .theme-toggle-track { border-color: var(--accent); }
+
+.theme-toggle-track {
+  position: relative;
+  width: 52px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--tag-bg);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.theme-toggle-icon {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.75rem;
+  line-height: 1;
+  opacity: 0.75;
+}
+
+.theme-toggle-icon--sun { left: 6px; }
+.theme-toggle-icon--moon { right: 6px; }
+
+.theme-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: transform 0.18s ease, background-color 0.12s ease, border-color 0.12s ease;
+}
+
+/* Koyu tema aktifken topuz sağa kayar ve vurgu rengini alır */
+[data-theme="dark"] .theme-toggle-thumb {
+  transform: translateX(24px);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.theme-toggle-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+/* Küçük ekranlarda yer kazanmak için sadece anahtarı göster, metni gizle */
+@media (max-width: 640px) {
+  .theme-toggle-label { display: none; }
+}
 
 
 
