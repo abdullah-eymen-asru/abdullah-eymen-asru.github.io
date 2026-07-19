@@ -15,49 +15,46 @@
           : "light";
       }
 
-      // ÖNEMLİ NOT (koyu/açık tema geçişinde giscus'un bir kısmının eski
-      // temada "donuk" kalması sorunu): Denenen ilk yaklaşım, tema
-      // değiştiğinde giscus'un iframe'ine postMessage ile
-      // "setConfig: { theme }" göndermekti. Bu, çoğu durumda çalışıyor
-      // ama giscus'un KENDİ bilinen bir sınırlaması var (bkz.
-      // giscus/giscus#1418): postMessage her zaman iframe içindeki React
-      // uygulamasının TÜM parçalarını yeniden render etmiyor — özellikle
-      // "reactions" (tepki) barı gibi bazı bölümler ilk yüklendiği
-      // temada takılı kalabiliyor, sayfa yenilenene kadar düzelmiyor.
-      // Yani bu sadece bizim kodumuzdaki bir eksiklik değil, giscus'un
-      // kendi davranışından kaynaklanan bir kısıt.
+      // DÜZELTME (v2): Önceki iki yaklaşım da (postMessage-only, sonra
+      // "her tema değişiminde iframe'i tamamen yık ve yeniden kur") görsel
+      // bir bozulmaya yol açıyordu — ikinci yaklaşımda özellikle, iframe
+      // kullanıcı GITHUB İLE GİRİŞ YAPMIŞKEN yeniden kurulduğunda, giscus
+      // kısa bir an için oturumu/yüksekliği yeniden hesaplarken container
+      // koyu/boş bir dikdörtgen olarak donuk kalıyordu (bkz. kullanıcı
+      // ekran görüntüleri) — bu his "en hızlı ve kesintisiz" geçişin tam
+      // tersiydi.
       //
-      // ÇÖZÜM: postMessage ile "güncellemeye çalışmak" yerine, tema
-      // değiştiğinde giscus'un TÜMÜNÜ (script + iframe) yok edip, YENİ
-      // temayla SIFIRDAN yeniden oluşturuyoruz. Bu, iframe içinde hiçbir
-      // eski/yanlış temada state kalmamasını garanti ediyor çünkü her
-      // şey en baştan, doğru temayla inşa ediliyor.
-      // HATA DÜZELTMESİ: Önceden bu fonksiyon her çağrıldığında (yani her
-      // "data-theme" değişiminde) container'ı koşulsuz sıfırdan kuruyordu.
-      // Ama tema-toggle butonuna art arda hızlı tıklanırsa ya da başka bir
-      // sebeple aynı tema için ikinci kez tetiklenirse, gereksiz yere
-      // iframe yeniden yükleniyor ve tam o sırada ekran görüntüsü alınırsa
-      // (bkz. kullanıcı ekran görüntüleri) konteyner boş/karışık renkte
-      // görünüyordu. Şimdi son kurulan temayı hatırlayıp, tema GERÇEKTEN
-      // değişmediyse yeniden kurmuyoruz.
-      window.girisusSonTema = null;
+      // ŞİMDİKİ YAKLAŞIM: iframe'i SADECE BİR KEZ oluşturuyoruz. Tema her
+      // değiştiğinde iframe'i YOK ETMİYORUZ; bunun yerine giscus'un resmi
+      // olarak desteklediği postMessage API'siyle iframe'in İÇİNDEKİ
+      // React uygulamasına "setConfig: { theme }" gönderiyoruz
+      // (bkz. https://giscus.app/tr#h-mesaj-ile-i̇letişim). Bu, iframe'i
+      // hiç yeniden yaratmadığı için: (1) oturum/scroll pozisyonu
+      // korunur, (2) hiçbir ara karede boş/koyu blok görünmez, (3) geçiş
+      // olabilecek en hızlı şekilde (tek bir postMessage, DOM yeniden
+      // kurulumu yok) gerçekleşir.
+      let iframeKuruldu = false;
 
-      window.girisusYenidenOlustur = function () {
+      function girisusIframeAl() {
+        return document.querySelector("#giscus-container iframe.giscus-frame");
+      }
+
+      function girisusTemaGonder(tema) {
+        const iframe = girisusIframeAl();
+        if (!iframe || !iframe.contentWindow) return false;
+        iframe.contentWindow.postMessage(
+          { giscus: { setConfig: { theme: tema } } },
+          "https://giscus.app"
+        );
+        return true;
+      }
+
+      function girisusKur() {
+        if (iframeKuruldu) return;
+        iframeKuruldu = true;
+
         const container = document.getElementById("giscus-container");
         if (!container) return;
-
-        const yeniTema = guncelTema();
-        if (window.girisusSonTema === yeniTema && container.querySelector("iframe.giscus-frame")) {
-          return; // Tema zaten aynı ve iframe hâlihazırda yüklü — tekrar kurmaya gerek yok.
-        }
-        window.girisusSonTema = yeniTema;
-
-        // Yeniden kurulurken konteynerin görünür kalması ve "boş kare"
-        // hissi vermemesi için kısa bir opacity geçişi kullanıyoruz.
-        container.style.opacity = "0.4";
-
-        // Önce konteyneri tamamen boşalt (eski script + eski iframe dahil).
-        container.innerHTML = "";
 
         const script = document.createElement("script");
         script.src = "https://giscus.app/client.js";
@@ -70,43 +67,43 @@
         script.setAttribute("data-reactions-enabled", "1");
         script.setAttribute("data-emit-metadata", "0");
         script.setAttribute("data-input-position", "top");
-        script.setAttribute("data-theme", yeniTema);
+        script.setAttribute("data-theme", guncelTema());
         script.setAttribute("data-lang", "tr");
-        // İlk yüklemede "lazy" kalsın (kullanıcı henüz yorumlara
-        // kaydırmadıysa gereksiz yere hemen yüklemeyelim). Tema
-        // DEĞİŞİRKEN yeniden oluşturuyorsak, kullanıcı zaten yorumlara
-        // kaydırmış demektir (giscus daha önce görünür olmuştu) — o
-        // durumda "eager" yükleyip flash'ı engelliyoruz.
-        script.setAttribute("data-loading", window.giscusDahaOnceYuklendi ? "eager" : "lazy");
+        // Kullanıcı yorumlara kaydırana kadar gerçekten yüklenmesin diye
+        // "lazy" bırakıyoruz — sayfa açılışında gereksiz ağ isteği yok.
+        script.setAttribute("data-loading", "lazy");
         script.setAttribute("crossorigin", "anonymous");
         script.async = true;
 
         container.appendChild(script);
+      }
+
+      // Tema değiştiğinde: iframe zaten kurulmuşsa sadece postMessage ile
+      // GÜNCELLE (yıkıp yeniden kurma YOK). Henüz hiç kurulmadıysa
+      // (kullanıcı daha yorumlara hiç kaydırmadı, "lazy" nedeniyle iframe
+      // yok) yapacak bir şey yok — kurulduğunda zaten guncelTema()
+      // GÜNCEL değeri okuyup doğru temayla açılacak.
+      window.girisusTemaGuncelle = function () {
+        if (!iframeKuruldu) return;
+        girisusTemaGonder(guncelTema());
       };
 
-      // giscus'un iframe'i gerçekten DOM'a girdiğinde (lazy-load
-      // tetiklendiğinde ya da yeniden kurulduğunda), konteyneri tekrar
-      // tam görünür yapıyoruz ve "daha önce yüklendi" işaretini koyuyoruz
-      // (obs.disconnect() ÇAĞIRMIYORUZ artık — çünkü tema her
-      // değiştiğinde container.innerHTML sıfırlanıp yeni bir iframe
-      // geliyor, gözlemcinin sadece ilk seferde çalışıp kendini
-      // kapatması sonraki tema değişimlerinde opacity'nin geri
-      // açılmamasına, yani container'ın donuk kalmasına yol açıyordu —
-      // bu da ekran görüntülerindeki "karışık/donuk görünüm" sorununun
-      // bir parçasıydı).
-      new MutationObserver(function () {
-        const iframe = document.querySelector("#giscus-container iframe.giscus-frame");
-        if (iframe) {
-          window.giscusDahaOnceYuklendi = true;
-          const container = document.getElementById("giscus-container");
-          if (container) container.style.opacity = "1";
-        }
-      }).observe(document.getElementById("giscus-container"), {
-        childList: true,
-        subtree: true,
-      });
-
-      window.girisusYenidenOlustur();
+      // "lazy" nedeniyle iframe ilk anda DOM'da olmayabilir. IntersectionObserver
+      // ile container görünür alana girdiğinde script'i ekliyoruz — bu,
+      // giscus'un kendi "lazy" mekanizmasıyla aynı tetikleyiciyi bizim
+      // tarafımızdan da bilinçli şekilde başlatmamızı sağlıyor, böylece
+      // iframeKuruldu bayrağını doğru anda true yapabiliyoruz.
+      const container = document.getElementById("giscus-container");
+      if (container) {
+        new IntersectionObserver(function (entries, obs) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting) {
+              girisusKur();
+              obs.disconnect();
+            }
+          });
+        }, { rootMargin: "200px" }).observe(container);
+      }
     })();
   </script>
 </div>
