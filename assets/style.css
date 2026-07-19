@@ -280,6 +280,12 @@ th { color: var(--muted); font-weight: 600; }
    dar kalıp sonradan büyüyormuş gibi bir görünüm oluşabiliyor. */
 #giscus-container {
   width: 100%;
+  /* iframe henüz yüklenmemişken (lazy-load) veya tema senkronizasyonu
+     tamamlanmadan önceki kısa anda, konteynerin sitenin kendi temasıyla
+     uyumlu görünmesi için. Aksi halde tarayıcı varsayılan (genelde beyaz)
+     bir alan gösterip site ile uyuşmayan bir "yama" oluşturuyordu. */
+  background: var(--bg);
+  min-height: 150px;
 }
 
 #giscus-container iframe.giscus-frame {
@@ -565,6 +571,3 @@ th { color: var(--muted); font-weight: 600; }
 @media (max-width: 640px) {
   .theme-toggle-label { display: none; }
 }
-
-
-
