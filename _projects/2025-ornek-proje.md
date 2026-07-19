@@ -6,9 +6,9 @@ status: "Yayınlandı"   # ya da "Devam Ediyor", "İnceleme Aşamasında" vs.
 summary: "Bu çalışmanın 1-2 cümlelik kısa özeti. Listeleme sayfasında bu görünür."
 link: "https://ornek-makale-linki.com"
 link_label: "Makaleyi görüntüle"
-# yayinda: false            # zamanlanmış/gizli proje için — bkz. README.md
-# sitemap: false             # yayinda:false ile BİRLİKTE yazılmalı — bkz. README.md
-# permalink: /projects/on-izleme-XXXXXXXX/   # gizli linkin adresi — bkz. README.md
+yayinda: false            # zamanlanmış/gizli proje için — bkz. README.md
+sitemap: false             # yayinda:false ile BİRLİKTE yazılmalı — bkz. README.md
+permalink: /projects/on-izleme-XXXXXXXX/   # gizli linkin adresi — bkz. README.md
 ---
 
 Buraya projenin/makalenin **tam açıklamasını** yaz. Bu kısım sadece bu
