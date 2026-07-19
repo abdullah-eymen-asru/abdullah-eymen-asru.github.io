@@ -32,6 +32,20 @@
     frame-ancestors 'self';
   ">
   <title>{{ page.title | default: site.title }}{% unless page.url == '/' or page.url == '/index.html' %} · {{ site.title }}{% endunless %}</title>
+
+  {% if page.yayinda == false %}
+  <!--
+    ZAMANLANMIŞ/GİZLİ İÇERİK: Bu sayfa "yayinda: false" olarak işaretli.
+    Arama motorlarının bu sayfayı indekslememesi için noindex ekleniyor.
+    Sayfanın kendisi yine de build ediliyor (bkz. _config.yml'deki
+    "future: true" notu) — bilinçli bir tercih, çünkü gizli önizleme
+    linkinin çalışabilmesi için sayfanın var olması gerekiyor. Gerçek
+    gizlilik, sayfanın normal listelerden/feed'den/sitemap'ten çıkarılmış
+    olmasından ve URL'in tahmin edilemez olmasından geliyor — bkz.
+    README'deki "Zamanlanmış ve gizli yazılar" bölümü.
+  -->
+  <meta name="robots" content="noindex, nofollow">
+  {% endif %}
   <meta name="description" content="{{ page.summary | default: site.description }}">
   <link rel="canonical" href="{{ page.url | absolute_url }}">
 
