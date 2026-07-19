@@ -274,6 +274,22 @@ th { color: var(--muted); font-weight: 600; }
 
 .comments-section h2 { margin-top: 0; }
 
+/* Giscus, kendi <iframe>'ini #giscus-container'ın İÇİNE ekliyor. Konteynerin
+   ve iframe'in tam genişliği kullanması için burada açıkça belirtiyoruz —
+   yoksa bazı durumlarda (özellikle iframe henüz yüklenirken) içerik kadar
+   dar kalıp sonradan büyüyormuş gibi bir görünüm oluşabiliyor. */
+#giscus-container {
+  width: 100%;
+}
+
+#giscus-container iframe.giscus-frame {
+  width: 100% !important;
+  min-height: 150px;
+  border: none;
+  color-scheme: normal; /* giscus'un kendi iframe'inin, sayfanın koyu/açık
+    renk şemasından etkilenip kendi temasıyla çakışmasını önler */
+}
+
 .share-buttons {
   display: flex;
   align-items: center;
