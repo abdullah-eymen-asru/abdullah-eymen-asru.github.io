@@ -30,7 +30,7 @@
       script.setAttribute("data-mapping", "pathname");
       script.setAttribute("data-strict", "0");
       script.setAttribute("data-reactions-enabled", "1");
-      script.setAttribute("data-emit-metadata", "0");
+      script.setAttribute("data-emit-metadata", "1");
       script.setAttribute("data-input-position", "top");
       script.setAttribute("data-theme", window.giscusTheme);
       script.setAttribute("data-lang", "tr");
@@ -42,34 +42,59 @@
 
       // SORUN: "data-loading: lazy" yüzünden giscus'un iframe'i script
       // eklendiği anda değil, kullanıcı yorumlara kaydırdığında DOM'a
-      // giriyor. Script tag'ine gömdüğümüz data-theme, script eklenirken
-      // ANLIK olan temayı yansıtıyor — ama (a) kullanıcı o siteye ilk
-      // geldiğinde tema henüz kararsız bir anda yakalanmışsa veya
-      // (b) giscus'un kendi iframe'i, dışarıdan gelen ilk postMessage'ı
-      // henüz hazır olmadığı için kaçırırsa (bilinen bir giscus/tarayıcı
-      // yarış durumu — bkz. giscus/giscus#1200), iframe yanlış temada
-      // "donuk" kalabiliyor. Çözüm: iframe DOM'a GERÇEKTEN girdiği anı
-      // bir MutationObserver ile yakalayıp, o anki güncel temayı bir kez
-      // daha postMessage ile gönderiyoruz. Bu, "geç gelen mesaj" ile
-      // "henüz hazır olmayan alıcı" arasındaki yarışı ortadan kaldırıyor.
+      // giriyor. Ayrıca iframe DOM'a girmiş olsa bile, giscus'un içindeki
+      // uygulama kendi "message" dinleyicisini kaydedene kadar kısa bir
+      // an var — bu arada gönderilen bir postMessage sessizce kayboluyor
+      // (bilinen bir giscus/tarayıcı yarış durumu, bkz. giscus/giscus#1200).
+      // Zamanlamayı TAHMİN ETMEK (sabit setTimeout) yerine, giscus'un
+      // KENDİSİNİN gönderdiği ilk mesajı dinleyip, o mesajı aldığımız anda
+      // temamızı gönderiyoruz. Bunun güvenilir çalışması için
+      // "data-emit-metadata: 1" ŞART — "0" iken giscus parent'a hiç mesaj
+      // göndermeyebiliyor, bu da "hazır" olduğunu asla öğrenemememize ve
+      // temanın hiç senkronize olmamasına yol açabiliyordu. "1" yaptığımızda
+      // giscus discussion verisini her yüklediğinde/güncellediğinde bize
+      // mesaj yolluyor; biz bu mesajın İÇERİĞİYLE ilgilenmiyoruz (yorum
+      // sayısı göstermiyoruz), sadece "artık kesin hazır" sinyali olarak
+      // kullanıyoruz.
+      let temaGonderildi = false;
+      window.giscusHazir = window.giscusHazir || false;
+
+      function iframeyeGonder(iframe) {
+        iframe.contentWindow.postMessage(
+          { giscus: { setConfig: { theme: guncelTema() } } },
+          "https://giscus.app"
+        );
+      }
+
+      window.addEventListener("message", function (event) {
+        if (event.origin !== "https://giscus.app") return;
+        if (!(event.data && typeof event.data === "object" && event.data.giscus)) return;
+
+        window.giscusHazir = true;
+
+        const iframe = document.querySelector("#giscus-container iframe.giscus-frame");
+        if (!iframe) return;
+
+        // giscus'tan HERHANGİ bir mesaj geldiyse (ready sinyali, metadata,
+        // tema onayı vs.) iframe kesinlikle mesaj dinlemeye hazır demektir.
+        // Temamızı bu noktada göndermek, tahmine dayalı gecikmelerden
+        // çok daha güvenilir.
+        iframeyeGonder(iframe);
+        temaGonderildi = true;
+      });
+
       const containerGozlemci = new MutationObserver(function (mutations, obs) {
         const iframe = document.querySelector("#giscus-container iframe.giscus-frame");
         if (!iframe) return;
 
-        function senkronizeEt() {
-          iframe.contentWindow.postMessage(
-            { giscus: { setConfig: { theme: guncelTema() } } },
-            "https://giscus.app"
-          );
-        }
-
-        // iframe DOM'a girdiği anda giscus'un kendi uygulaması henüz
-        // mesaj dinleyicisini kaydetmemiş olabilir, bu yüzden birkaç kez
-        // kısa aralıklarla tekrar gönderiyoruz (giscus tarafında bunu
-        // görmezden gelmek zararsız, sadece aynı temayı tekrar uygular).
-        senkronizeEt();
-        setTimeout(senkronizeEt, 300);
-        setTimeout(senkronizeEt, 1000);
+        // Güvenlik ağı: yukarıdaki "message" event'i her tarayıcıda /
+        // her senaryoda beklendiği gibi tetiklenmeyebilir diye, iframe
+        // DOM'a girdikten kısa bir süre sonra da (event gelmediyse) bir
+        // deneme daha yapıyoruz. Event tabanlı senkronizasyon zaten
+        // gerçekleştiyse (temaGonderildi true), tekrar göndermek zararsız.
+        setTimeout(function () {
+          if (!temaGonderildi) iframeyeGonder(iframe);
+        }, 600);
 
         obs.disconnect();
       });
