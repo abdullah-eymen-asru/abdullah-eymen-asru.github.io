@@ -65,7 +65,14 @@
         <a href="{{ '/izlediklerim.html' | relative_url }}" {% if page.url contains 'izlediklerim' %}class="active"{% endif %}>İzlediklerim</a>
         <a href="{{ '/okuduklarim.html' | relative_url }}" {% if page.url contains 'okuduklarim' %}class="active"{% endif %}>Okuduklarım</a>
       </nav>
-      <button id="theme-toggle" class="theme-toggle" aria-label="Temayı değiştir" title="Temayı değiştir">🌙</button>
+      <button id="theme-toggle" class="theme-toggle" type="button" role="switch" aria-checked="false" aria-label="Koyu temaya geç" title="Koyu / açık tema">
+        <span class="theme-toggle-track">
+          <span class="theme-toggle-icon theme-toggle-icon--sun" aria-hidden="true">☀️</span>
+          <span class="theme-toggle-icon theme-toggle-icon--moon" aria-hidden="true">🌙</span>
+          <span class="theme-toggle-thumb"></span>
+        </span>
+        <span class="theme-toggle-label">Açık mod</span>
+      </button>
     </div>
   </header>
 
@@ -100,16 +107,19 @@
       }
     })();
 
-    // Tema değiştirme butonu
+    // Tema değiştirme anahtarı (kayan switch)
     (function () {
       const toggleBtn = document.getElementById("theme-toggle");
+      const label = toggleBtn.querySelector(".theme-toggle-label");
 
       function guncelIkon() {
         const aktifKoyu = document.documentElement.getAttribute("data-theme") === "dark";
-        toggleBtn.textContent = aktifKoyu ? "☀️" : "🌙";
+        toggleBtn.setAttribute("aria-checked", aktifKoyu ? "true" : "false");
+        toggleBtn.setAttribute("aria-label", aktifKoyu ? "Açık temaya geç" : "Koyu temaya geç");
+        label.textContent = aktifKoyu ? "Koyu mod" : "Açık mod";
       }
 
-      guncelIkon(); // sayfa açılışında mevcut duruma göre doğru ikonu göster
+      guncelIkon(); // sayfa açılışında mevcut duruma göre doğru duruma getir
 
       toggleBtn.addEventListener("click", () => {
         const aktifKoyu = document.documentElement.getAttribute("data-theme") === "dark";
