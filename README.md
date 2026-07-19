@@ -194,8 +194,12 @@ permalink: /blog/on-izleme-RASTGELE-BIR-DIZI/
 - `_config.yml` → `future: true` — sayfanın gelecek tarihli olsa da
   build edilmesini sağlıyor (linkin çalışabilmesi için şart).
 - `blog.md`, `akademik-projeler.md`, `feed.xml` → listeleme
-  döngülerinde `where_exp: "p", "p.yayinda != false and p.date <= site.time"`
-  filtresi — hem `yayinda` hem `date` şartını birlikte kontrol ediyor.
+  döngülerinde `where_exp: "p", "p.yayinda != false" | where_exp: "p", "p.date <= site.time"`
+  filtre zinciri — `yayinda` ve `date` şartlarını art arda iki ayrı
+  `where_exp` ile kontrol ediyor (GitHub Pages'in kullandığı Liquid
+  sürümü, tek bir `where_exp` içine `and` ile yazılmış birleşik
+  ifadeleri her zaman doğru parse edemiyor; iki ayrı filtre zincirlemek
+  hem GitHub Pages hem Cloudflare/yerel Jekyll'de güvenilir çalışıyor).
 - `sitemap.xml` → `jekyll-sitemap` eklentisi tarafından otomatik
   üretiliyor, front-matter'daki resmi `sitemap: false` alanına kendisi
   bakıyor (bizim `yayinda`/`date` mantığımızdan habersiz, o yüzden ayrı
@@ -278,4 +282,3 @@ ayarı oluşturup `_includes/comments.html` içindeki ilgili
   ham RSS çekmeye (CORS) izin vermiyor. Bu servis kontrolün dışında —
   ileride kendi Worker'ın üzerinden proxy'lemek istersen (daha güvenli
   ama kurulumu daha uzun), ayrı bir adım olarak yapılabilir.
-  
