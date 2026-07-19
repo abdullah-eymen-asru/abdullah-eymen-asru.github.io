@@ -32,10 +32,11 @@ name: Zamanlanmış İçerik İçin Günlük Build
 
 on:
   schedule:
-    # Her gün UTC 00:05'te çalışır (Türkiye saatiyle yaz saatinde 03:05,
-    # kış saatinde 02:05 civarı). İstersen dakika/saat değerini
-    # değiştirebilirsin — https://crontab.guru üzerinden kontrol edebilirsin.
-    - cron: "5 0 * * *"
+    # değiştirebilirsin — https://crontab.guru üzerinden kontrol edebilirsin. 
+    # Sabah tetiklemesi: UTC 06:05 (Türkiye Saati ile 09:05)
+    - cron: "5 6 * * *"
+    # Akşam tetiklemesi: UTC 18:05 (Türkiye Saati ile 21:05)
+    - cron: "5 18 * * *"
   workflow_dispatch: {}
     # Actions sekmesinden elle "Run workflow" ile de tetiklenebilsin diye.
 
