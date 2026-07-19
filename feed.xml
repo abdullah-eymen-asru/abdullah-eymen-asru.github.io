@@ -1,10 +1,11 @@
 ---
 # Bu dosya, jekyll-feed plugin'inin OTOMATİK ürettiği feed.xml'in yerine
 # geçer (plugin, kökte kendi adıyla bir dosya varsa onu kullanmayı
-# bırakıp bunu kullanır). Tek farkı: "yayinda: false" olan (zamanlanmış/
-# gizli) yazıları feed'e HİÇ eklemiyor — jekyll-feed'in kendi
-# "published: false" alanı işimize yaramıyor çünkü o, sayfayı build'den
-# tamamen siliyor ve gizli önizleme linkinin çalışmasını engelliyor.
+# bırakıp bunu kullanır). Tek farkı: "yayinda: false" olan (gizli) ya da
+# "date" alanı henüz gelmemiş (zamanlanmış) yazıları feed'e HİÇ
+# eklemiyor — jekyll-feed'in kendi "published: false" alanı işimize
+# yaramıyor çünkü o, sayfayı build'den tamamen siliyor ve gizli önizleme
+# linkinin çalışmasını engelliyor.
 layout: none
 ---
 <?xml version="1.0" encoding="UTF-8"?>
@@ -17,7 +18,7 @@ layout: none
   <title type="html">{{ site.title | smartify }}</title>
   {% if site.description %}<subtitle>{{ site.description }}</subtitle>{% endif %}
 
-  {% assign yayindaki_yazilar = site.posts | where_exp: "p", "p.yayinda != false" %}
+  {% assign yayindaki_yazilar = site.posts | where_exp: "p", "p.yayinda != false and p.date <= site.time" %}
   {% for post in yayindaki_yazilar limit:20 %}
     <entry>
       <title type="html">{{ post.title | smartify | xml_escape }}</title>
