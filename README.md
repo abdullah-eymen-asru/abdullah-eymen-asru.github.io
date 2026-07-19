@@ -99,28 +99,47 @@ tarihe kadar veya sen izin verene kadar** görünmemesini sağlayabilirsin.
 
 ### Nasıl çalışır?
 
+**"yayinda" ve "date" artık birbirine bağlı çalışıyor.** Bir yazı/proje
+sitede görünmek için **iki şartı BİRDEN** sağlamalı:
+
+1. `yayinda: false` YAZILMAMIŞ olmalı (alan yoksa veya `true` ise sorun yok).
+2. `date` alanındaki tarih **gelmiş veya geçmiş** olmalı (gelecekteyse gösterilmez).
+
+Yani:
+
+- `yayinda: true` + `date` **ileri bir tarih** → tarih gelene kadar
+  **gösterilmez**, tarih geldiği an (bir sonraki build'de) otomatik görünür.
+- `yayinda: true` + `date` **bugün veya geçmiş** → hemen görünür.
+- `yayinda: false` + `date` **geçmiş bir tarih olsa bile** → yine de
+  **gösterilmez**, sen elle `yayinda: true` yapmadan asla görünmez.
+- `yayinda: false` her zaman `yayinda: true`'dan **önceliklidir** —
+  yani `date` ne olursa olsun `yayinda: false` varsa sayfa gizlidir.
+
 Front-matter'a şu iki alanı ekle:
 
 ```yaml
 ---
 title: "Yazı Başlığı"
 date: 2026-09-01
-yayinda: false
+yayinda: true
 sitemap: false
 permalink: /blog/on-izleme-RASTGELE-BIR-DIZI/
 ---
 ```
 
-- **`sitemap: false`**, `yayinda: false` ile HER ZAMAN birlikte yazılmalı.
+- **`sitemap: false`**, gizli/zamanlanmış her yazıyla HER ZAMAN birlikte
+  yazılmalı (`yayinda: false` olsun ya da ileri tarihli olsun fark etmez).
   Bu, `jekyll-sitemap` eklentisinin kendi tanıdığı resmi bir alan — sadece
   bunu görürse sayfayı `sitemap.xml`'den çıkarıyor, bizim uydurduğumuz
-  `yayinda` alanını tanımıyor. İkisini birlikte yazmazsan sayfa blog
-  listesinde görünmez ama sitemap'te görünmeye devam eder.
-- **`yayinda: false`** olduğu sürece yazı: blog listesinde (`blog.md`),
-  akademik projeler listesinde (`akademik-projeler.md`) ve RSS feed'inde
-  (`feed.xml`) **görünmez**. `sitemap: false` de site haritasından
-  (sitemap.xml) çıkarır. Arama motorlarına ayrıca `noindex` sinyali
-  gönderilir (sayfa ziyaret edilse bile indekslenmez).
+  `yayinda`/`date` mantığını tanımıyor. Yazmazsan sayfa blog listesinde
+  görünmez ama sitemap'te görünmeye devam eder.
+- **Görünürlük şartları sağlanmadığı sürece** yazı: blog listesinde
+  (`blog.md`), akademik projeler listesinde (`akademik-projeler.md`) ve
+  RSS feed'inde (`feed.xml`) **görünmez**. `sitemap: false` de site
+  haritasından (sitemap.xml) çıkarır. Arama motorlarına ayrıca `noindex`
+  sinyali gönderilir (sayfa ziyaret edilse bile indekslenmez) — bu artık
+  hem `yayinda: false` hem de "date henüz gelmedi" durumunda otomatik
+  devreye giriyor.
 - **Sayfanın kendisi yine de var olur** — `permalink` alanında yazdığın
   adresi bilen biri doğrudan girip okuyabilir. Bu senin "manuel paylaşım"
   yöntemin: linki kimseyle paylaşmazsan kimse bulamaz; paylaştığın anda o
@@ -133,31 +152,39 @@ permalink: /blog/on-izleme-RASTGELE-BIR-DIZI/
     yazıp Enter'a basabilirsin (bazı tarayıcılar `javascript:` yapıştırmayı
     engeller, o zaman DevTools > Console'a `crypto.randomUUID()` yaz).
   - Ya da terminalde: `openssl rand -hex 8`
-- **`sitemap: false`, `date` alanından TAMAMEN bağımsız çalışır.** Yani
-  `date` gelecekte olsa da olmasa da, `sitemap: false` yazmadığın sürece
-  sayfa sitemap.xml'e girer. İleri tarihli bir yazı için bunu unutursan,
-  sayfa blog listesinde görünmez ama sitemap üzerinden URL'i "keşfedilebilir"
-  hale gelir — `noindex` yine indekslenmesini engeller, ama URL'in kendisi
-  gizli kalmaz.
+- **`sitemap: false`, görünürlük şartlarından TAMAMEN bağımsız çalışır.**
+  Yani front-matter'a elle `sitemap: false` yazmazsan, `yayinda`/`date`
+  ne olursa olsun sayfa sitemap.xml'e girer. Zamanlanmış/gizli her yazıda
+  bunu yazmayı unutma — `noindex` yine indekslenmesini engeller, ama
+  URL'in kendisi sitemap üzerinden "keşfedilebilir" hale gelir.
 - **`permalink` alanını silersen** Jekyll dosya adından otomatik bir adres
   üretir (örn. `/blog/2026/09/01/yazi-basligi.html`) — bu tahmin
   edilebilir bir adres olduğu için SADECE normal, açık yazılarda
   `permalink`'i silmelisin. Gizli/zamanlanmış bir yazıda `permalink`'i
   silmek, gizlilik amacını tamamen ortadan kaldırır.
-- **Yayınlamaya hazır olduğunda:** `yayinda: false` ve `sitemap: false`
-  satırlarını sil (ya da `yayinda: true`, `sitemap: true` yap) ve
-  `git push` yap. Anında blog listesine, RSS'e ve
-  sitemap'e girer — normal bir yazı gibi görünür hale gelir. `permalink`
-  alanını istersen bu noktada normal, okunaklı bir adrese çevirebilirsin
-  (eski linke giren biri artık 404 alır, istersen ayrı bir yönlendirme
-  kurman gerekir — bu README'nin kapsamı dışında).
-- **"Belirli bir tarihte otomatik yayınlansın" istersen:** `date:` alanını
-  istediğin tarihe ayarlaman **tek başına yeterli değil** — Cloudflare
-  Pages sadece sen `git push` yaptığında (veya repo'da bir değişiklik
-  olduğunda) yeniden build alır. Yani `yayinda: false`'ı elle kaldırıp
-  push yapman gerekiyor; otomatik/zamanlanmış bir tetikleyici (örn.
-  GitHub Actions ile günlük otomatik build) şu an kurulu değil. İstersen
-  bunu ayrı bir adım olarak ekleyebiliriz.
+- **Erken yayınlamak istersen** (tarih gelmeden görünsün istersen):
+  `date`'i geçmişe çek ya da bugüne eşitle.
+- **Bir yazıyı süresiz gizli tutmak istersen:** `yayinda: false` yaz,
+  `date`'i hiç düşünme — `yayinda: false` her zaman kazanır.
+- **"Belirli bir tarihte otomatik yayınlansın" istersen:** `date:`
+  alanını istediğin tarihe ayarlaman ve `yayinda: true` (ya da alanı hiç
+  yazmaman) **artık tek başına yeterli** — ama bunun gerçekten
+  "otomatik" olması için Cloudflare Pages'in o tarihte YENİ BİR BUILD
+  alması gerekiyor, çünkü statik site build zamanındaki tarihe göre
+  üretiliyor. Bunun için repo'ya bir GitHub Actions workflow'u eklendi:
+  `.github/workflows/zamanlanmis-yayin.yml`. Bu workflow her gün otomatik
+  çalışıp Cloudflare Pages'te yeni bir build tetikliyor. **Kurulumu
+  (bir kereye mahsus):**
+  1. Cloudflare Pages projenin ayarlarından **Deploy Hooks** (Dağıtım
+     Kancaları) bölümüne git, yeni bir **Deploy Hook URL** oluştur.
+  2. GitHub reponda **Settings → Secrets and variables → Actions →
+     New repository secret** ile `CLOUDFLARE_DEPLOY_HOOK_URL` adında bir
+     secret oluştur, değerine az önce kopyaladığın URL'i yapıştır.
+  3. Bu kadar — workflow her gün otomatik çalışacak. İstersen GitHub'da
+     **Actions** sekmesinden **"Run workflow"** ile elle de tetikleyebilirsin
+     (örneğin tarihi tam geçtiği an hemen yayınlanmasını istiyorsan).
+  4. Cron saatini değiştirmek istersen workflow dosyasındaki `cron:`
+     satırını düzenle (yorum satırında açıklama var).
 - Örnek bir taslak dosya için `_posts/2026-08-15-ornek-zamanlanmis-yazi.md`
   dosyasına bak — aynı desen `_projects/` için de birebir çalışır (örnek
   alanlar `_projects/2025-ornek-proje.md` içinde yorum satırı olarak var).
@@ -167,19 +194,24 @@ permalink: /blog/on-izleme-RASTGELE-BIR-DIZI/
 - `_config.yml` → `future: true` — sayfanın gelecek tarihli olsa da
   build edilmesini sağlıyor (linkin çalışabilmesi için şart).
 - `blog.md`, `akademik-projeler.md`, `feed.xml` → listeleme
-  döngülerinde `where_exp: "p", "p.yayinda != false"` filtresi.
+  döngülerinde `where_exp: "p", "p.yayinda != false and p.date <= site.time"`
+  filtresi — hem `yayinda` hem `date` şartını birlikte kontrol ediyor.
 - `sitemap.xml` → `jekyll-sitemap` eklentisi tarafından otomatik
   üretiliyor, front-matter'daki resmi `sitemap: false` alanına kendisi
-  bakıyor (bizim `yayinda` alanımızdan habersiz, o yüzden ayrı yazılması
-  gerekiyor).
+  bakıyor (bizim `yayinda`/`date` mantığımızdan habersiz, o yüzden ayrı
+  yazılması gerekiyor).
 - `feed.xml` dosyasının kendisi kökte elle yazılmış durumda — Jekyll'in
   otomatik `jekyll-feed` eklentisi BİLEREK kapatıldı (`_config.yml` ve
   `Gemfile`'den çıkarıldı) çünkü o eklentinin kendi "published: false"
   alanı sayfayı build'den tamamen siliyor, bu da gizli linki kırıyordu.
-- `_layouts/default.html` → `page.yayinda == false` ise `<meta
-  name="robots" content="noindex, nofollow">` ekliyor.
-- `_layouts/post.html`, `_layouts/project.html` → `page.yayinda == false`
-  ise sayfanın üstünde "henüz yayında değil" uyarısı gösteriyor.
+- `_layouts/default.html` → `page.yayinda == false` VEYA `page.date`
+  henüz gelmemişse `<meta name="robots" content="noindex, nofollow">`
+  ekliyor.
+- `_layouts/post.html`, `_layouts/project.html` → aynı iki durumda
+  (gizli ya da henüz zamanı gelmemiş) sayfanın üstünde uygun bir uyarı
+  gösteriyor.
+- `.github/workflows/zamanlanmis-yayin.yml` → günlük otomatik Cloudflare
+  Pages build tetikleyicisi (yukarıdaki kurulum adımlarına bak).
 
 ---
 
