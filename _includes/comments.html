@@ -9,100 +9,76 @@
   <script>
     (function () {
       // Sitenin o anki gerçek temasını kullanıyoruz, sabit değer değil.
-      // Bu sayede iframe ilk yüklendiğinde bile doğru renkte başlıyor,
-      // sonradan "flaşlamıyor". document.write yerine gerçek bir DOM
-      // elemanı oluşturuyoruz — bazı tarayıcılar async script'lerle
-      // birlikte document.write'ı kısıtlayabiliyor.
       function guncelTema() {
         return document.documentElement.getAttribute("data-theme") === "dark"
           ? "dark"
           : "light";
       }
 
-      window.giscusTheme = guncelTema();
+      // ÖNEMLİ NOT (koyu/açık tema geçişinde giscus'un bir kısmının eski
+      // temada "donuk" kalması sorunu): Denenen ilk yaklaşım, tema
+      // değiştiğinde giscus'un iframe'ine postMessage ile
+      // "setConfig: { theme }" göndermekti. Bu, çoğu durumda çalışıyor
+      // ama giscus'un KENDİ bilinen bir sınırlaması var (bkz.
+      // giscus/giscus#1418): postMessage her zaman iframe içindeki React
+      // uygulamasının TÜM parçalarını yeniden render etmiyor — özellikle
+      // "reactions" (tepki) barı gibi bazı bölümler ilk yüklendiği
+      // temada takılı kalabiliyor, sayfa yenilenene kadar düzelmiyor.
+      // Yani bu sadece bizim kodumuzdaki bir eksiklik değil, giscus'un
+      // kendi davranışından kaynaklanan bir kısıt.
+      //
+      // ÇÖZÜM: postMessage ile "güncellemeye çalışmak" yerine, tema
+      // değiştiğinde giscus'un TÜMÜNÜ (script + iframe) yok edip, YENİ
+      // temayla SIFIRDAN yeniden oluşturuyoruz. Bu, iframe içinde hiçbir
+      // eski/yanlış temada state kalmamasını garanti ediyor çünkü her
+      // şey en baştan, doğru temayla inşa ediliyor.
+      window.girisusYenidenOlustur = function () {
+        const container = document.getElementById("giscus-container");
+        if (!container) return;
 
-      const script = document.createElement("script");
-      script.src = "https://giscus.app/client.js";
-      script.setAttribute("data-repo", "{{ site.giscus.repo }}");
-      script.setAttribute("data-repo-id", "{{ site.giscus.repo_id }}");
-      script.setAttribute("data-category", "{{ site.giscus.category }}");
-      script.setAttribute("data-category-id", "{{ site.giscus.category_id }}");
-      script.setAttribute("data-mapping", "pathname");
-      script.setAttribute("data-strict", "0");
-      script.setAttribute("data-reactions-enabled", "1");
-      script.setAttribute("data-emit-metadata", "1");
-      script.setAttribute("data-input-position", "top");
-      script.setAttribute("data-theme", window.giscusTheme);
-      script.setAttribute("data-lang", "tr");
-      script.setAttribute("data-loading", "lazy");
-      script.setAttribute("crossorigin", "anonymous");
-      script.async = true;
+        // Önce konteyneri tamamen boşalt (eski script + eski iframe dahil).
+        container.innerHTML = "";
 
-      document.getElementById("giscus-container").appendChild(script);
+        const script = document.createElement("script");
+        script.src = "https://giscus.app/client.js";
+        script.setAttribute("data-repo", "{{ site.giscus.repo }}");
+        script.setAttribute("data-repo-id", "{{ site.giscus.repo_id }}");
+        script.setAttribute("data-category", "{{ site.giscus.category }}");
+        script.setAttribute("data-category-id", "{{ site.giscus.category_id }}");
+        script.setAttribute("data-mapping", "pathname");
+        script.setAttribute("data-strict", "0");
+        script.setAttribute("data-reactions-enabled", "1");
+        script.setAttribute("data-emit-metadata", "0");
+        script.setAttribute("data-input-position", "top");
+        script.setAttribute("data-theme", guncelTema());
+        script.setAttribute("data-lang", "tr");
+        // İlk yüklemede "lazy" kalsın (kullanıcı henüz yorumlara
+        // kaydırmadıysa gereksiz yere hemen yüklemeyelim). Tema
+        // DEĞİŞİRKEN yeniden oluşturuyorsak, kullanıcı zaten yorumlara
+        // kaydırmış demektir (giscus daha önce görünür olmuştu) — o
+        // durumda "eager" yükleyip flash'ı engelliyoruz.
+        script.setAttribute("data-loading", window.giscusDahaOnceYuklendi ? "eager" : "lazy");
+        script.setAttribute("crossorigin", "anonymous");
+        script.async = true;
 
-      // SORUN: "data-loading: lazy" yüzünden giscus'un iframe'i script
-      // eklendiği anda değil, kullanıcı yorumlara kaydırdığında DOM'a
-      // giriyor. Ayrıca iframe DOM'a girmiş olsa bile, giscus'un içindeki
-      // uygulama kendi "message" dinleyicisini kaydedene kadar kısa bir
-      // an var — bu arada gönderilen bir postMessage sessizce kayboluyor
-      // (bilinen bir giscus/tarayıcı yarış durumu, bkz. giscus/giscus#1200).
-      // Zamanlamayı TAHMİN ETMEK (sabit setTimeout) yerine, giscus'un
-      // KENDİSİNİN gönderdiği ilk mesajı dinleyip, o mesajı aldığımız anda
-      // temamızı gönderiyoruz. Bunun güvenilir çalışması için
-      // "data-emit-metadata: 1" ŞART — "0" iken giscus parent'a hiç mesaj
-      // göndermeyebiliyor, bu da "hazır" olduğunu asla öğrenemememize ve
-      // temanın hiç senkronize olmamasına yol açabiliyordu. "1" yaptığımızda
-      // giscus discussion verisini her yüklediğinde/güncellediğinde bize
-      // mesaj yolluyor; biz bu mesajın İÇERİĞİYLE ilgilenmiyoruz (yorum
-      // sayısı göstermiyoruz), sadece "artık kesin hazır" sinyali olarak
-      // kullanıyoruz.
-      let temaGonderildi = false;
-      window.giscusHazir = window.giscusHazir || false;
+        container.appendChild(script);
+      };
 
-      function iframeyeGonder(iframe) {
-        iframe.contentWindow.postMessage(
-          { giscus: { setConfig: { theme: guncelTema() } } },
-          "https://giscus.app"
-        );
-      }
-
-      window.addEventListener("message", function (event) {
-        if (event.origin !== "https://giscus.app") return;
-        if (!(event.data && typeof event.data === "object" && event.data.giscus)) return;
-
-        window.giscusHazir = true;
-
+      // giscus'un iframe'i gerçekten DOM'a girdiğinde (lazy-load
+      // tetiklendiğinde), bir sonraki tema değişiminde "eager" moda
+      // geçebilmemiz için bunu işaretliyoruz.
+      new MutationObserver(function (mutations, obs) {
         const iframe = document.querySelector("#giscus-container iframe.giscus-frame");
-        if (!iframe) return;
-
-        // giscus'tan HERHANGİ bir mesaj geldiyse (ready sinyali, metadata,
-        // tema onayı vs.) iframe kesinlikle mesaj dinlemeye hazır demektir.
-        // Temamızı bu noktada göndermek, tahmine dayalı gecikmelerden
-        // çok daha güvenilir.
-        iframeyeGonder(iframe);
-        temaGonderildi = true;
-      });
-
-      const containerGozlemci = new MutationObserver(function (mutations, obs) {
-        const iframe = document.querySelector("#giscus-container iframe.giscus-frame");
-        if (!iframe) return;
-
-        // Güvenlik ağı: yukarıdaki "message" event'i her tarayıcıda /
-        // her senaryoda beklendiği gibi tetiklenmeyebilir diye, iframe
-        // DOM'a girdikten kısa bir süre sonra da (event gelmediyse) bir
-        // deneme daha yapıyoruz. Event tabanlı senkronizasyon zaten
-        // gerçekleştiyse (temaGonderildi true), tekrar göndermek zararsız.
-        setTimeout(function () {
-          if (!temaGonderildi) iframeyeGonder(iframe);
-        }, 600);
-
-        obs.disconnect();
-      });
-
-      containerGozlemci.observe(document.getElementById("giscus-container"), {
+        if (iframe) {
+          window.giscusDahaOnceYuklendi = true;
+          obs.disconnect();
+        }
+      }).observe(document.getElementById("giscus-container"), {
         childList: true,
         subtree: true,
       });
+
+      window.girisusYenidenOlustur();
     })();
   </script>
 </div>
