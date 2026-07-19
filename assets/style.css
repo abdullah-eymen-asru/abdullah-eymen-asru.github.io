@@ -292,8 +292,21 @@ th { color: var(--muted); font-weight: 600; }
   width: 100% !important;
   min-height: 150px;
   border: none;
-  color-scheme: normal; /* giscus'un kendi iframe'inin, sayfanın koyu/açık
-    renk şemasından etkilenip kendi temasıyla çakışmasını önler */
+  /* ÖNEMLİ: "color-scheme: normal" YANLIŞTI ve koyu/açık tema
+     uyuşmazlığının asıl sebeplerinden biriydi. "normal" değeri,
+     tarayıcıya bu iframe'in rengi konusunda "haberim yok" demesini
+     söylüyor — bu da tarayıcının, iframe içindeki form elemanları
+     (yorum kutusu, scrollbar vs.) gibi kendi native arayüz parçalarını
+     SİTENİN o anki temasından bağımsız, kendi varsayılan (genelde açık)
+     rengiyle çizmesine yol açıyordu. Sonuç: giscus'un kendi CSS'i doğru
+     temada gelse bile, tarayıcının native öğeleri yanlış/karışık
+     görünüyordu. Çözüm: color-scheme'i site ile SENKRON tutmak. Bu
+     kural [data-theme="dark"] altında ayrıca override ediliyor. */
+  color-scheme: light;
+}
+
+[data-theme="dark"] #giscus-container iframe.giscus-frame {
+  color-scheme: dark;
 }
 
 .share-buttons {
@@ -571,3 +584,4 @@ th { color: var(--muted); font-weight: 600; }
 @media (max-width: 640px) {
   .theme-toggle-label { display: none; }
 }
+
