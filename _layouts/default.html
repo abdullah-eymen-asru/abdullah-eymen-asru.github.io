@@ -163,29 +163,45 @@
 
       guncelIkon(); // sayfa açılışında mevcut duruma göre doğru duruma getir
 
-      toggleBtn.addEventListener("click", () => {
-        const aktifKoyu = document.documentElement.getAttribute("data-theme") === "dark";
-        let yeniTema;
-        if (aktifKoyu) {
-          document.documentElement.removeAttribute("data-theme");
-          localStorage.setItem("theme", "light");
-          yeniTema = "light";
-        } else {
-          document.documentElement.setAttribute("data-theme", "dark");
-          localStorage.setItem("theme", "dark");
-          yeniTema = "dark";
-        }
-        guncelIkon();
-
-        // Sayfada Giscus yorum widget'ı varsa, onun temasını da eşitle
+      // Giscus'un iframe'i "data-loading: lazy" olduğu için sayfa açılışında
+      // henüz DOM'da olmayabilir (kullanıcı yorumlara doğru kaydırana kadar
+      // yüklenmiyor). Bu yüzden temayı SADECE toggle'a tıklandığı anda
+      // senkronize etmek yetersiz kalabiliyordu — o an iframe yoksa mesaj
+      // kimseye gitmiyordu. Bunun yerine data-theme özniteliğini bir
+      // MutationObserver ile izliyoruz: değiştiği her an, o anda DOM'da
+      // gerçekten bir giscus-frame varsa ona postMessage gönderiyoruz. Bu,
+      // iframe geç yüklense bile (kullanıcı temayı değiştirip SONRA
+      // yorumlara kaydırsa bile) her zaman doğru temayla senkron kalmasını
+      // sağlıyor.
+      function giscusTemasiniSenkronize(yeniTema) {
         const giscusIframe = document.querySelector("iframe.giscus-frame");
         if (giscusIframe) {
-          window.giscusTheme = yeniTema;
           giscusIframe.contentWindow.postMessage(
             { giscus: { setConfig: { theme: yeniTema } } },
             "https://giscus.app"
           );
         }
+      }
+
+      new MutationObserver(() => {
+        const aktifKoyu = document.documentElement.getAttribute("data-theme") === "dark";
+        window.giscusTheme = aktifKoyu ? "dark" : "light";
+        giscusTemasiniSenkronize(window.giscusTheme);
+      }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+      toggleBtn.addEventListener("click", () => {
+        const aktifKoyu = document.documentElement.getAttribute("data-theme") === "dark";
+        if (aktifKoyu) {
+          document.documentElement.removeAttribute("data-theme");
+          localStorage.setItem("theme", "light");
+        } else {
+          document.documentElement.setAttribute("data-theme", "dark");
+          localStorage.setItem("theme", "dark");
+        }
+        guncelIkon();
+        // data-theme değişimi yukarıdaki MutationObserver tarafından
+        // otomatik yakalanıp giscus'a iletiliyor, burada tekrar
+        // göndermeye gerek yok.
       });
     })();
   </script>
