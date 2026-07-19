@@ -4,6 +4,35 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <!--
+    SAMSUNG INTERNET / ANDROID CHROME "ZORLA KARARTMA" SORUNU:
+    Bazı mobil tarayıcılarda (özellikle Samsung Internet'in kendi "Gece
+    Modu" / "Karanlık web siteleri" ayarı, ve Chrome Android'in
+    "deneysel" force-dark özelliği) tarayıcı, sitenin CSS'ine hiç
+    bakmadan sayfanın renklerini KENDİ HEURİSTİK algoritmasıyla tersine
+    çevirip zorla karartabiliyor — bu, işletim sistemi koyu moddayken
+    devreye giriyor ve site kendi içinde açık temada olsa bile koyu
+    görünmesine yol açıyor. Bunu önlemenin bilinen yolu, tarayıcıya HEM
+    <meta name="color-scheme"> HEM DE CSS'teki "color-scheme" ile "bu
+    sayfa hangi şemaları destekliyorum, kendi renklerimi BEN kontrol
+    ediyorum" sinyalini açıkça vermek. Sadece CSS'teki color-scheme
+    kuralı (assets/style.css) bazı Samsung Internet sürümlerinde tek
+    başına yeterli gelmiyor; <meta> etiketi ekstra bir garanti katmanı.
+  -->
+  <meta name="color-scheme" content="light dark">
+  <!--
+    theme-color: tarayıcının adres çubuğu/durum çubuğu rengini VE bazı
+    "sayfa aslında koyu mu açık mı" sezgilerini bu değere göre ayarlıyor.
+    Sabit tek bir renk yerine media query ile HEM açık HEM koyu için ayrı
+    değer veriyoruz ki tarayıcı, sitenin o an HANGİ data-theme'de
+    olduğundan bağımsız olarak (bu meta etiketi statik HTML'de, JS
+    çalışmadan önce de okunuyor) en azından OS şemasına uygun bir ilk
+    tahminle başlasın; sayfa yüklenince aşağıdaki inline script zaten
+    gerçek durumu (kullanıcının kayıtlı tercihini) uygulayıp
+    document.documentElement üzerindeki data-theme'i buna göre düzeltiyor.
+  -->
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#14161a" media="(prefers-color-scheme: dark)">
+  <!--
     GÜVENLİK: Content-Security-Policy (CSP) — savunma derinliği katmanı.
     Site zaten kullanıcı girdisini innerHTML'e basmadan önce escape ediyor
     (bkz. assets/js/koleksiyon-tablo.js), ama CSP; ileride bir yerde bir
@@ -72,13 +101,21 @@
     // Sayfa çizilmeden ÖNCE tema kararını veriyoruz ki beyazdan koyuya
     // "zıplama" (flash) olmasın. Sıra: kullanıcının kayıtlı tercihi >
     // yoksa cihazın sistem teması > o da yoksa varsayılan (açık).
+    //
+    // DÜZELTME: Önceden "light" durumu için data-theme HİÇ set
+    // edilmiyordu (attribute'un yokluğu = açık tema varsayılıyordu).
+    // Bazı mobil tarayıcılarda (Samsung Internet'in "Gece Modu" gibi
+    // heuristik karartma özellikleri) bu belirsizlik — yani sayfanın
+    // "ben KESİNLİKLE açık temayım" diye açıkça bir işaret vermemesi —
+    // tarayıcının OS koyu modda kendi karartma sezgisini devreye
+    // sokmasına zemin hazırlıyordu. Şimdi HER İKİ durumda da
+    // data-theme'i açıkça yazıyoruz ("light" değeri de dahil), böylece
+    // sayfa "kararsız" bir durumda hiç kalmıyor.
     (function () {
       const saved = localStorage.getItem("theme");
       const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
       const theme = saved || (systemDark ? "dark" : "light");
-      if (theme === "dark") {
-        document.documentElement.setAttribute("data-theme", "dark");
-      }
+      document.documentElement.setAttribute("data-theme", theme);
     })();
   </script>
 
@@ -168,7 +205,27 @@
         label.textContent = aktifKoyu ? "Koyu mod" : "Açık mod";
       }
 
+      // DÜZELTME (Samsung Internet / mobil "zorla karartma" sorunu):
+      // theme-color meta etiketlerini <head>'de "prefers-color-scheme"
+      // media query'sine bağlı statik olarak tanımlamıştık — bu, sayfa
+      // İLK açıldığında iyi bir tahmin sağlıyor ama kullanıcı toggle'a
+      // basıp OS temasından FARKLI bir seçim yaptığında (örn. OS koyu
+      // ama kullanıcı siteyi elle açık moda almışsa) o statik meta
+      // etiketleri artık YANLIŞ kalıyordu. Şimdi tema her değiştiğinde
+      // bu fonksiyon iki meta etiketinin media query'sini geçersiz kılıp
+      // GERÇEK/GÜNCEL rengi zorla yazıyor, böylece tarayıcının UI'ı
+      // (adres çubuğu vs.) VE karartma sezgisi her zaman sitenin kendi
+      // seçtiği temayla senkron kalıyor.
+      function guncelThemeColor(aktifKoyu) {
+        const renk = aktifKoyu ? "#14161a" : "#ffffff";
+        document.querySelectorAll('meta[name="theme-color"]').forEach(function (etiket) {
+          etiket.setAttribute("content", renk);
+          etiket.removeAttribute("media");
+        });
+      }
+
       guncelIkon(); // sayfa açılışında mevcut duruma göre doğru duruma getir
+      guncelThemeColor(document.documentElement.getAttribute("data-theme") === "dark");
 
       // DÜZELTME (v2): Artık giscus'u tema değişince YOK EDİP YENİDEN
       // KURMUYORUZ — bu, kullanıcı zaten oturum açmışken kısa süreli boş/
@@ -187,14 +244,23 @@
 
       toggleBtn.addEventListener("click", () => {
         const aktifKoyu = document.documentElement.getAttribute("data-theme") === "dark";
+        // DÜZELTME: Açık moda geçerken önceden data-theme attribute'u
+        // TAMAMEN KALDIRILIYORDU (removeAttribute). Artık <head>'deki
+        // ilk yükleme scripti her zaman "light" değerini AÇIKÇA
+        // yazdığı için, burada da tutarlı kalmak adına attribute'u
+        // silmek yerine "light" olarak set ediyoruz — sayfanın hiçbir
+        // anda "temasız/belirsiz" bir durumda kalmaması, bazı mobil
+        // tarayıcıların (Samsung Internet gibi) bu belirsizliği kendi
+        // karartma sezgisiyle doldurmaya çalışmasını önlüyor.
         if (aktifKoyu) {
-          document.documentElement.removeAttribute("data-theme");
+          document.documentElement.setAttribute("data-theme", "light");
           localStorage.setItem("theme", "light");
         } else {
           document.documentElement.setAttribute("data-theme", "dark");
           localStorage.setItem("theme", "dark");
         }
         guncelIkon();
+        guncelThemeColor(!aktifKoyu);
         // data-theme değişimi yukarıdaki MutationObserver tarafından
         // otomatik yakalanıp giscus'un temasının postMessage ile
         // güncellenmesini tetikliyor, burada tekrar bir şey yapmaya
