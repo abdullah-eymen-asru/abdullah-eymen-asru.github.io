@@ -180,6 +180,18 @@
       // iframe geç yüklense bile (kullanıcı temayı değiştirip SONRA
       // yorumlara kaydırsa bile) her zaman doğru temayla senkron kalmasını
       // sağlıyor.
+      // Giscus'tan gelen HERHANGİ bir mesaj (comments.html'deki dinleyici
+      // tarafından da paylaşılan) iframe'in artık kesin olarak mesaj
+      // dinlemeye hazır olduğunu gösteriyor. Bu bayrağı burada da takip
+      // ediyoruz ki toggle anında iframe henüz "ready" olmadıysa, hazır
+      // olduğu an otomatik olarak güncel temayı gönderelim.
+      window.giscusHazir = window.giscusHazir || false;
+      window.addEventListener("message", (event) => {
+        if (event.origin !== "https://giscus.app") return;
+        if (!(event.data && typeof event.data === "object" && event.data.giscus)) return;
+        window.giscusHazir = true;
+      });
+
       function giscusTemasiniSenkronize(yeniTema) {
         const giscusIframe = document.querySelector("iframe.giscus-frame");
         if (!giscusIframe) return;
@@ -191,12 +203,23 @@
           );
         }
 
-        // giscus'un iframe'i DOM'da olsa bile, mesaj dinleyicisini henüz
-        // kaydetmemiş olabileceği kısa bir an var (özellikle iframe yeni
-        // yüklendiyse). Tek seferlik gönderim bu yarışta kaybedebiliyor,
-        // bu yüzden kısa bir gecikmeyle bir kez daha deniyoruz.
         gonder();
-        setTimeout(gonder, 300);
+
+        // giscus henüz "hazır" sinyalini vermediyse (mesaj dinleyicisini
+        // kaydetmeden önceki kısa an), bu ilk gönderim kaybolmuş olabilir.
+        // Hazır olduğu anı bekleyip o zaman bir kez daha gönderiyoruz —
+        // sabit bir gecikme tahmin etmek yerine gerçek olayı bekliyoruz.
+        if (!window.giscusHazir) {
+          const tekSeferlikDinleyici = (event) => {
+            if (event.origin !== "https://giscus.app") return;
+            if (!(event.data && typeof event.data === "object" && event.data.giscus)) return;
+            gonder();
+            window.removeEventListener("message", tekSeferlikDinleyici);
+          };
+          window.addEventListener("message", tekSeferlikDinleyici);
+          // Güvenlik ağı: event hiç gelmezse diye kısa bir gecikmeyle de deniyoruz.
+          setTimeout(gonder, 600);
+        }
       }
 
       new MutationObserver(() => {
