@@ -133,8 +133,20 @@ permalink: /blog/on-izleme-RASTGELE-BIR-DIZI/
     yazıp Enter'a basabilirsin (bazı tarayıcılar `javascript:` yapıştırmayı
     engeller, o zaman DevTools > Console'a `crypto.randomUUID()` yaz).
   - Ya da terminalde: `openssl rand -hex 8`
-- **Yayınlamaya hazır olduğunda:** `yayinda: false` satırını sil (ya da
-  `yayinda: true` yap) ve `git push` yap. Anında blog listesine, RSS'e ve
+- **`sitemap: false`, `date` alanından TAMAMEN bağımsız çalışır.** Yani
+  `date` gelecekte olsa da olmasa da, `sitemap: false` yazmadığın sürece
+  sayfa sitemap.xml'e girer. İleri tarihli bir yazı için bunu unutursan,
+  sayfa blog listesinde görünmez ama sitemap üzerinden URL'i "keşfedilebilir"
+  hale gelir — `noindex` yine indekslenmesini engeller, ama URL'in kendisi
+  gizli kalmaz.
+- **`permalink` alanını silersen** Jekyll dosya adından otomatik bir adres
+  üretir (örn. `/blog/2026/09/01/yazi-basligi.html`) — bu tahmin
+  edilebilir bir adres olduğu için SADECE normal, açık yazılarda
+  `permalink`'i silmelisin. Gizli/zamanlanmış bir yazıda `permalink`'i
+  silmek, gizlilik amacını tamamen ortadan kaldırır.
+- **Yayınlamaya hazır olduğunda:** `yayinda: false` ve `sitemap: false`
+  satırlarını sil (ya da `yayinda: true`, `sitemap: true` yap) ve
+  `git push` yap. Anında blog listesine, RSS'e ve
   sitemap'e girer — normal bir yazı gibi görünür hale gelir. `permalink`
   alanını istersen bu noktada normal, okunaklı bir adrese çevirebilirsin
   (eski linke giren biri artık 404 alır, istersen ayrı bir yönlendirme
@@ -183,6 +195,23 @@ var.
 | Davranış (JS) | Aynı dosyanın altındaki `<script>` bloğu — `data-theme` özniteliğini değiştirip `localStorage`'a kaydediyor |
 | Görünüm (CSS) | `assets/style.css` içinde `.theme-toggle`, `.theme-toggle-track`, `.theme-toggle-thumb`, `.theme-toggle-icon`, `.theme-toggle-label` sınıfları |
 | Mobil davranış | 640px altında metin etiketi gizleniyor, sadece anahtar+ikonlar kalıyor (bkz. `style.css`'teki `@media` bloğu) |
+| Giscus (yorumlar) senkronizasyonu | `_layouts/default.html`'deki aynı script bloğunda bir `MutationObserver` — `data-theme` her değiştiğinde, o an DOM'da bir giscus yorum kutusu varsa ona `postMessage` ile "temanı değiştir" mesajı gönderiyor. Giscus'un iframe'i geç yüklendiği (`data-loading="lazy"`, kullanıcı yorumlara kaydırana kadar açılmıyor) için bunu tek seferlik değil, sürekli izleyerek yapıyoruz. |
+
+---
+
+# 💬 Yorumlar (Giscus)
+
+| Dosya | Ne işe yarar |
+|---|---|
+| `_includes/comments.html` | Giscus widget'ını yükleyen kod. `site.giscus.*` ayarları `_config.yml`'den geliyor (bkz. bölüm 1). |
+| `assets/style.css` içinde `#giscus-container` / `iframe.giscus-frame` | Yorum kutusunun tam genişlik kullanmasını sağlayan kurallar. Kutu daralmış/küçülmüş görünürse önce burayı kontrol et. |
+| Tema senkronizasyonu | Yukarıdaki "Tema Anahtarı" bölümüne bak — giscus'un koyu/açık modu sitenin temasıyla senkron kalması bu mekanizmaya bağlı. |
+
+Giscus'un kendi ayarları (repo, kategori, tema rengi vb.) [giscus.app](https://giscus.app)
+üzerinden alınıp `_config.yml`'e yapıştırılıyor — orta bir değişiklik
+yapmak istersen (örn. tepki emojilerini kapatmak) giscus.app'te yeni
+ayarı oluşturup `_includes/comments.html` içindeki ilgili
+`data-*` satırını güncellemen yeterli.
 
 ---
 
