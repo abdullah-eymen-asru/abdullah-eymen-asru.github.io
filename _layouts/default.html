@@ -3,6 +3,34 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!--
+    GÜVENLİK: Content-Security-Policy (CSP) — savunma derinliği katmanı.
+    Site zaten kullanıcı girdisini innerHTML'e basmadan önce escape ediyor
+    (bkz. assets/js/koleksiyon-tablo.js), ama CSP; ileride bir yerde bir
+    kaçış hatası olursa bile tarayıcının çalıştırabileceği script/frame/
+    bağlantı kaynaklarını SADECE bu sitenin gerçekten ihtiyaç duyduğu
+    adreslerle sınırlar. 'unsafe-inline' script-src'de var çünkü sayfada
+    (tema anahtarı, dil şeridi, giscus yükleyici gibi) inline <script>
+    blokları kullanılıyor — statik bir Jekyll sitesinde nonce/hash tabanlı
+    CSP kurmak build sistemi gerektirir, bu basit kurulumla uyumlu değil.
+    object-src 'none' ve base-uri 'self' yine de önemli iki ekstra kilit:
+    biri eski plugin/Flash tarzı içerik yüklenmesini, diğeri sayfaya
+    enjekte edilebilecek bir <base> etiketiyle tüm göreli linklerin
+    başka bir siteye yönlendirilmesini engeller.
+  -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://giscus.app;
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' data: https:;
+    font-src 'self' data:;
+    connect-src 'self' {{ site.cloudflare_worker_url }} https://www.google-analytics.com https://giscus.app https://api.allorigins.win;
+    frame-src https://giscus.app https://docs.google.com;
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self' https://docs.google.com;
+    frame-ancestors 'self';
+  ">
   <title>{{ page.title | default: site.title }}{% unless page.url == '/' or page.url == '/index.html' %} · {{ site.title }}{% endunless %}</title>
   <meta name="description" content="{{ page.summary | default: site.description }}">
   <link rel="canonical" href="{{ page.url | absolute_url }}">
