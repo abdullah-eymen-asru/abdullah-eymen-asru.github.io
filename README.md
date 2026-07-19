@@ -46,6 +46,7 @@ dosya sadece "hangi alan hangi dosyada" sorusuna cevap.
 |---|---|
 | `GITHUB_LOGIN` | GitHub kullanıcı adın (worker'ın hangi hesaba ait Projects verisini çekeceğini belirler) |
 | `PROJECTS` içindeki `number` değerleri | İzleme ve okuma GitHub Projects panolarının proje numaraları |
+| `PROJECTS` içindeki `sutunSirasi` dizileri | Sitede sütunların hangi sırayla görüneceği — panoda sütunları sürükleyip yer değiştirdiğinde, aynı sırayı burada da elle güncellemen gerekir (bkz. aşağıdaki "Sütun sırası" bölümü) |
 | `GITHUB_TOKEN` | **Kodun içinde değil**, Cloudflare Dashboard > Settings > Variables and Secrets kısmından secret olarak eklenir. Asla dosyaya yazma. |
 
 ## 5. `robots.txt`
@@ -54,12 +55,37 @@ dosya sadece "hangi alan hangi dosyada" sorusuna cevap.
 |---|---|
 | `Sitemap:` satırındaki adres | `_config.yml`'deki `url` ile aynı domaini göstermeli |
 
-## 6. `_includes/hakkimda-icerik.md` ve `_includes/hakkimda-kutusu.md`
+## 6. Sütun sırası — `cloudflare-worker/worker.js` içindeki `sutunSirasi`
+
+GitHub Projects panosunda bir view'daki sütunları sürükleyip yer
+değiştirmek, sitedeki sırayı **otomatik değiştirmez** (bkz. değişiklik
+günlüğündeki teknik açıklama). Panodaki sırayla site arasında birebir
+eşleşme istiyorsan, sütunları panoda düzenledikten sonra bu diziyi elle
+güncellemen gerekir:
+
+```js
+const PROJECTS = {
+  izleme: { number: 2, sutunSirasi: ["Durum", "New field 7", "Tür", "Puan", "Sezon/Bölüm", "Başlama Tarihi", "Bitiş Tarihi"] },
+  okuma: { number: 3, sutunSirasi: [] },
+};
+```
+
+- Sütun adlarını, panoda göründükleri **BİREBİR yazımla** (büyük/küçük
+  harf dahil), soldan sağa istediğin sırayla yaz.
+- `okuma` projesi için şu an `sutunSirasi: []` (boş) — bu, eski davranışı
+  (GitHub'daki field oluşturma sırası) kullanmaya devam ettiği anlamına
+  gelir. İstersen aynı şekilde doldurabilirsin.
+- Listede unuttuğun ya da sonradan panoya eklediğin bir field varsa, o
+  otomatik olarak listenin sonuna eklenir — hiçbir veri kaybolmaz.
+- Bu dosyayı düzenledikten sonra Cloudflare Dashboard'da Worker'ı yeniden
+  deploy etmen (Save and Deploy) gerekir.
+
+## 7. `_includes/hakkimda-icerik.md` ve `_includes/hakkimda-kutusu.md`
 
 Anasayfada görünen "hakkımda" metni ve kutusu — kendi biyografini, unvanını,
 akademik/kişisel tanıtım yazını buraya serbest metin olarak yazabilirsin.
 
-## 7. İçerik dosyaları (isteğe bağlı, örnek olarak geliyor)
+## 8. İçerik dosyaları (isteğe bağlı, örnek olarak geliyor)
 
 - `_posts/2026-07-11-ornek-yazi.md` → örnek blog yazısı, silip kendi
   yazılarını `_posts/YYYY-MM-DD-baslik.md` formatında ekleyebilirsin.
