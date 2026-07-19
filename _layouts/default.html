@@ -175,12 +175,21 @@
       // sağlıyor.
       function giscusTemasiniSenkronize(yeniTema) {
         const giscusIframe = document.querySelector("iframe.giscus-frame");
-        if (giscusIframe) {
+        if (!giscusIframe) return;
+
+        function gonder() {
           giscusIframe.contentWindow.postMessage(
             { giscus: { setConfig: { theme: yeniTema } } },
             "https://giscus.app"
           );
         }
+
+        // giscus'un iframe'i DOM'da olsa bile, mesaj dinleyicisini henüz
+        // kaydetmemiş olabileceği kısa bir an var (özellikle iframe yeni
+        // yüklendiyse). Tek seferlik gönderim bu yarışta kaybedebiliyor,
+        // bu yüzden kısa bir gecikmeyle bir kez daha deniyoruz.
+        gonder();
+        setTimeout(gonder, 300);
       }
 
       new MutationObserver(() => {
