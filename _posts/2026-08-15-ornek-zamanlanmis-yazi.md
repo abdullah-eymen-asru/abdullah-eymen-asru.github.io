@@ -1,8 +1,8 @@
 ---
 title: "Örnek Zamanlanmış / Gizli Yazı"
-yayinda: false
-sitemap: false
-permalink: /blog/on-izleme-x7k2p9qz/
+yayinda: false            # zamanlanmış/gizli proje için — bkz. README.md
+sitemap: false             # yayinda:false ile BİRLİKTE yazılmalı — bkz. README.md
+permalink: /blog/on-izleme-x7k2p9qz/   # gizli linkin adresi — bkz. README.md
 ---
 
 Bu, "yayinda: false" ile işaretlenmiş ÖRNEK bir taslak yazı. Blog
