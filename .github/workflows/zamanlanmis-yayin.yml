@@ -1,0 +1,52 @@
+# Bu workflow'un TEK amacı: her gün belirli bir saatte Cloudflare Pages'te
+# YENİ BİR BUILD tetiklemek. Neden gerekli?
+#
+# _layouts, blog.md, akademik-projeler.md ve feed.xml artık "date" alanını
+# "yayinda" ile birlikte kontrol ediyor (bkz. README § 9). Yani bir yazı
+# "yayinda: true" olsa bile "date" ileri bir tarihse listelerde/feed'de
+# görünmüyor, tarih geldiğinde otomatik görünmesi gerekiyor.
+#
+# SORUN: Jekyll/Cloudflare Pages statik bir site üretir. Bu üretim
+# (build) SADECE repo'da bir push/değişiklik olduğunda çalışır. Yani
+# "date" alanı bugün gelmiş olsa bile, kimse yeni bir push yapmadığı
+# sürece site ESKİ HALİYLE kalır — çünkü hiçbir yeni build tetiklenmedi.
+#
+# ÇÖZÜM: Bu workflow her gün (aşağıdaki "cron" saatinde) çalışıp
+# Cloudflare Pages'e "yeniden build al" komutu gönderiyor. Böylece
+# "date" alanı geçmiş olan ama daha önce ileri tarihli olduğu için
+# gizli kalan yazılar/projeler, bir sonraki otomatik build'de kendiliğinden
+# görünür hale geliyor — SENİN elle bir şey yapmana gerek kalmadan.
+#
+# KURULUM (bir kereye mahsus, README'deki "Otomatik Zamanlanmış Yayın"
+# bölümüne bak):
+#   1. Cloudflare Pages projenin "Deploy Hooks" (Dağıtım Kancaları)
+#      ayarından bir "Deploy Hook URL" oluştur.
+#   2. GitHub repo'nda Settings → Secrets and variables → Actions →
+#      "New repository secret" ile CLOUDFLARE_DEPLOY_HOOK_URL adında
+#      bir secret oluşturup o URL'i yapıştır.
+#   3. Bu dosyayı push'ladıktan sonra Actions sekmesinde günlük olarak
+#      otomatik çalıştığını göreceksin (istersen "Run workflow" ile
+#      elle de tetikleyebilirsin).
+
+name: Zamanlanmış İçerik İçin Günlük Build
+
+on:
+  schedule:
+    # Her gün UTC 00:05'te çalışır (Türkiye saatiyle yaz saatinde 03:05,
+    # kış saatinde 02:05 civarı). İstersen dakika/saat değerini
+    # değiştirebilirsin — https://crontab.guru üzerinden kontrol edebilirsin.
+    - cron: "5 0 * * *"
+  workflow_dispatch: {}
+    # Actions sekmesinden elle "Run workflow" ile de tetiklenebilsin diye.
+
+jobs:
+  tetikle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cloudflare Pages'te yeni bir build tetikle
+        run: |
+          if [ -z "${{ secrets.CLOUDFLARE_DEPLOY_HOOK_URL }}" ]; then
+            echo "::error::CLOUDFLARE_DEPLOY_HOOK_URL secret'ı tanımlı değil. README § 9'daki kurulum adımlarına bak."
+            exit 1
+          fi
+          curl -X POST "${{ secrets.CLOUDFLARE_DEPLOY_HOOK_URL }}" --fail --silent --show-error
