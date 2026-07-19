@@ -1,0 +1,19 @@
+# GÜVENLİK: Cloudflare Pages, bu dosyadaki kuralları OKUYUP her sayfaya
+# gerçek HTTP response header'ları olarak ekler. Bu, _layouts/default.html
+# içindeki <meta http-equiv="..."> ile ayarlanan CSP'nin TAMAMLAYICISIdır —
+# bazı güvenlik header'ları (özellikle X-Frame-Options ve CSP'nin
+# frame-ancestors direktifi) sadece gerçek bir HTTP header olarak
+# gönderildiğinde tarayıcı tarafından dikkate alınır; <meta> etiketi
+# üzerinden ayarlandığında bu ikisi SESSİZCE YOK SAYILIR. Bu yüzden
+# clickjacking koruması burada, header seviyesinde de tanımlanıyor.
+#
+# NOT: Bu dosya sadece Cloudflare Pages build'inde çalışır. GitHub Pages
+# (mirror_site_url) tarafında bu header'lar uygulanmaz — GitHub Pages özel
+# HTTP header ayarlamayı desteklemiyor, bu platformun bir kısıtlaması.
+
+/*
+  X-Frame-Options: SAMEORIGIN
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
