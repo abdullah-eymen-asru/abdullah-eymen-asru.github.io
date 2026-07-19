@@ -23,9 +23,15 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// Ekstra savunma katmanı: bir link http(s):// ile başlamıyorsa reddet.
+// Ekstra savunma katmanı: link http(s):// ile başlamalı VE içinde boşluk/
+// kontrol karakteri (satır sonu dahil) olmamalı — sadece baştaki şemayı
+// kontrol edip sonuna bir şey eklenebilmesine izin vermiyoruz. escapeHtml
+// zaten attribute'tan çıkışı (örn. " ile kapatıp yeni attribute açmayı)
+// engelliyor, bu ekstra bir kilit.
 function guvenliLink(url) {
-  if (typeof url === "string" && /^https?:\/\//i.test(url)) return url;
+  if (typeof url !== "string") return "#";
+  const trimmed = url.trim();
+  if (/^https?:\/\/[^\s<>"']+$/i.test(trimmed)) return trimmed;
   return "#";
 }
 
