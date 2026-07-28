@@ -1,3 +1,4 @@
+
 :root {
   --text: #1a1a1a;
   --muted: #6b6b6b;
@@ -194,6 +195,49 @@ h2 { font-size: 1.3rem; margin-top: 2em; }
   border-radius: 10px;
   padding: 24px;
   margin-top: 1.5em;
+}
+
+.about-box h2 {
+  font-size: 1.15rem;
+  margin: 1.6em 0 0.6em;
+  padding-bottom: 0.4em;
+  border-bottom: 2px solid var(--accent);
+}
+
+.about-box h2:first-child { margin-top: 0; }
+
+.about-box h3 {
+  font-size: 1rem;
+  margin: 1.2em 0 0.5em;
+  color: var(--accent);
+}
+
+.about-box hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.8em 0;
+}
+
+.about-box ul {
+  margin: 0.4em 0 1em;
+  padding-left: 1.3em;
+}
+
+.about-box li {
+  margin-bottom: 0.5em;
+  line-height: 1.5;
+}
+
+.about-box p {
+  line-height: 1.6;
+  margin: 0 0 1em;
+}
+
+.about-box code {
+  background: var(--tag-bg);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
 }
 
 table {
