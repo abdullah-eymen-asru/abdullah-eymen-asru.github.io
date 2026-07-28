@@ -23,17 +23,16 @@ title: Anasayfa
     {% endfor %}
     <a href="{{ site.substack_url }}" target="_blank">Substack</a>
   </div>
+
+  {% if site.mirror_site_url and site.mirror_site_url != "" %}
+  <p class="format-hint" style="margin-top: 1.2em;">
+    Bu site iki adreste eşzamanlı olarak yayınlanıyor:
+    <a href="{{ site.url }}" target="_blank">{{ site.url }}</a> ·
+    <a href="{{ site.mirror_site_url }}" target="_blank">{{ site.mirror_site_url }}</a>
+  </p>
+  {% endif %}
 </div>
 
 <div class="about-box">
-  <h2 style="margin-top:0">Hakkımda</h2>
   {% include hakkimda-icerik.md %}
 </div>
-
-{% if site.mirror_site_url and site.mirror_site_url != "" %}
-<p class="format-hint" style="margin-top: 1.2em;">
-  Bu site iki adreste eşzamanlı olarak yayınlanıyor:
-  <a href="{{ site.url }}" target="_blank">{{ site.url }}</a> ·
-  <a href="{{ site.mirror_site_url }}" target="_blank">{{ site.mirror_site_url }}</a>
-</p>
-{% endif %}
