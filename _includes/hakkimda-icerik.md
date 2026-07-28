@@ -10,7 +10,7 @@
   <h3>💻 Technical Background &amp; Skills</h3>
   <ul>
     <li>🌐 <strong>Technical Interests:</strong> Enthusiastic about open-source technologies (<code>Linux</code>, <code>Open WebUI</code>) and leveraging open-source applications for academic research.</li>
-    <li>🛠️ <strong>Background:</strong> My technical journey began with Scratch, basic Arduino, and Unity projects, which laid the foundation for my interest in technical methodologies in social sciences.</li>
+    <li>🛠️ <strong>Background:</strong> My technical journey began with Scratch, basic Arduino, Android Studio and Unity projects, which laid the foundation for my interest in technical methodologies in social sciences.</li>
   </ul>
 
   <h3>📚 Research &amp; Content Creation</h3>
@@ -27,7 +27,7 @@
   <h3>💻 Teknik Geçmiş ve İlgi Alanları</h3>
   <ul>
     <li>🌐 <strong>Teknik İlgi Alanları:</strong> Açık kaynaklı teknolojilere (<code>Linux</code>, <code>Open WebUI</code>) ve akademik araştırmalarda açık kaynaklı uygulamalardan yararlanmaya ilgi duyuyorum.</li>
-    <li>🛠️ <strong>Geçmiş:</strong> Teknik yolculuğum Scratch, temel Arduino ve Unity projeleriyle başladı; bu süreç sosyal bilimlerdeki teknik metodolojilere olan ilgimin temelini oluşturdu.</li>
+    <li>🛠️ <strong>Geçmiş:</strong> Teknik yolculuğum Scratch, temel Arduino, Android Studio ve Unity projeleriyle başladı; bu süreç sosyal bilimlerdeki teknik metodolojilere olan ilgimin temelini oluşturdu.</li>
   </ul>
 
   <h3>📚 Araştırma ve İçerik Üretimi</h3>
