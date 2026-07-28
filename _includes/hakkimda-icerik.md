@@ -1,3 +1,5 @@
+## 🇬🇧 English
+
 ## 🎯 About Me
 
 I am an International Relations student with a keen interest in **geostrategic resource competition and great power dynamics**, particularly in regions like the Arctic. My goal is to combine traditional qualitative analysis with data-driven research tools to explore how resource scarcity and strategic chokepoints shape global politics.
@@ -15,3 +17,7 @@ I am an International Relations student with a keen interest in **geostrategic r
 
 - 📝 **Blog:** I write analytical blog posts on **strategic competition, resource geopolitics, and geoeconomic trends**.
 - 🎥 **YouTube:** I create educational content and analysis videos on **strategic studies, geopolitics, and international security**.
+
+## 🇹🇷 Türkçe
+
+### 🎯 Hakkımda
