@@ -1,5 +1,17 @@
-Burada kendinle ilgili 3-5 cümlelik kısa bir tanıtım yazacaksın: akademik ilgi
-alanların, şu an üzerinde çalıştığın konu, ve varsa kısa bir kişisel not.
-Örnek: "İlgi alanlarım X ve Y üzerine yoğunlaşıyor. Şu anda Z Üniversitesi'nde
-... konusunda araştırma yapıyorum. Boş zamanlarımda film izlemeyi ve kitap
-okumayı seviyorum — bunları da sitenin ilgili sekmelerinde paylaşıyorum."
+## 🎯 About Me
+
+I am an International Relations student with a keen interest in **geostrategic resource competition and great power dynamics**, particularly in regions like the Arctic. My goal is to combine traditional qualitative analysis with data-driven research tools to explore how resource scarcity and strategic chokepoints shape global politics.
+
+---
+
+## 💻 Technical Background & Skills
+
+- 🌐 **Technical Interests:** Enthusiastic about open-source technologies (`Linux`, `Open WebUI`) and leveraging open-source applications for academic research.
+- 🛠️ **Background:** My technical journey began with Scratch, basic Arduino, and Unity projects, which laid the foundation for my interest in technical methodologies in social sciences.
+
+---
+
+## 📚 Research & Content Creation
+
+- 📝 **Blog:** I write analytical blog posts on **strategic competition, resource geopolitics, and geoeconomic trends**.
+- 🎥 **YouTube:** I create educational content and analysis videos on **strategic studies, geopolitics, and international security**.
