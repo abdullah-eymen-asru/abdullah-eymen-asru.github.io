@@ -15,7 +15,7 @@
 
   <h3>📚 Research &amp; Content Creation</h3>
   <ul>
-    <li>📝 <strong>Policy Briefs &amp; Blog:</strong> I write analytical policy briefs on <strong>strategic competition, resource geopolitics, and geoeconomic trends</strong>.</li>
+    <li>📝 <strong>Blog:</strong> I write analytical blog posts on <strong>strategic competition, resource geopolitics, and geoeconomic trends</strong>.</li>
     <li>🎥 <strong>YouTube:</strong> I create educational content and analysis videos on <strong>strategic studies, geopolitics, and international security</strong>.</li>
   </ul>
 </div>
@@ -32,7 +32,7 @@
 
   <h3>📚 Araştırma ve İçerik Üretimi</h3>
   <ul>
-    <li>📝 <strong>Politika Notları ve Blog:</strong> <strong>Stratejik rekabet, kaynak jeopolitiği ve jeoekonomik eğilimler</strong> üzerine analitik politika notları yazıyorum.</li>
+    <li>📝 <strong>Blog:</strong> <strong>Stratejik rekabet, kaynak jeopolitiği ve jeoekonomik eğilimler</strong> üzerine analitik blog gönderileri yazıyorum.</li>
     <li>🎥 <strong>YouTube:</strong> <strong>Stratejik çalışmalar, jeopolitik ve uluslararası güvenlik</strong> konularında eğitici içerikler ve analiz videoları üretiyorum.</li>
   </ul>
 </div>
