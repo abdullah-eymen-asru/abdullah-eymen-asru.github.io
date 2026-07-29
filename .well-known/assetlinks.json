@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.aeymena.blog",
+      "sha256_cert_fingerprints": [
+        "23:C5:3D:7D:B2:F6:56:C5:B3:7F:59:AD:C6:02:BB:60:B7:20:87:D4:D1:72:88:8C:8F:CB:66:12:8F:70:EF:99"
+      ]
+    }
+  }
+]
