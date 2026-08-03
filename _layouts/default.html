@@ -53,13 +53,12 @@
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: https:;
     font-src 'self' data:;
-    connect-src 'self' {{ site.cloudflare_worker_url }} https://www.google-analytics.com https://giscus.app https://api.allorigins.win;
+    connect-src 'self' {{ site.cloudflare_worker_url }} https://www.google-analytics.com https://analytics.google.com https://www.google.com https://stats.g.doubleclick.net https://giscus.app https://api.allorigins.win;
     frame-src https://giscus.app https://docs.google.com;
     object-src 'none';
     base-uri 'self';
     form-action 'self' https://docs.google.com;
-    frame-ancestors 'self';
-  ">
+">
   <title>{{ page.title | default: site.title }}{% unless page.url == '/' or page.url == '/index.html' %} · {{ site.title }}{% endunless %}</title>
 
   {% if site.profile_image and site.profile_image != "" %}
