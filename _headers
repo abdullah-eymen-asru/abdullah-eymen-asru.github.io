@@ -11,10 +11,12 @@
 # (mirror_site_url) tarafında bu header'lar uygulanmaz — GitHub Pages özel
 # HTTP header ayarlamayı desteklemiyor, bu platformun bir kısıtlaması.
 
+# Cloudflare Pages HTTP Header Configuration
+
 /*
   X-Frame-Options: SAMEORIGIN
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
   Strict-Transport-Security: max-age=31536000; includeSubDomains
-  Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data:; connect-src 'self' https://izleme-okuma-api.aeymena.workers.dev https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://www.google.com https://giscus.app https://api.allorigins.win; frame-ancestors 'self';
+  Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data:; connect-src 'self' https://izleme-okuma-api.aeymena.workers.dev https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://www.google.com https://www.google.com.tr https://giscus.app https://api.allorigins.win; frame-ancestors 'self';
