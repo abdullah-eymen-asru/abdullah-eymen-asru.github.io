@@ -47,17 +47,13 @@
     enjekte edilebilecek bir <base> etiketiyle tüm göreli linklerin
     başka bir siteye yönlendirilmesini engeller.
   -->
-  <meta http-equiv="Content-Security-Policy" content="
-    default-src 'self';
-    script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://giscus.app;
-    style-src 'self' 'unsafe-inline';
-    img-src 'self' data: https:;
-    font-src 'self' data:;
-    connect-src 'self' {{ site.cloudflare_worker_url }} https://www.google-analytics.com https://analytics.google.com https://www.google.com https://stats.g.doubleclick.net https://giscus.app https://api.allorigins.win;
-    frame-src https://giscus.app https://docs.google.com;
+<meta http-equiv="Content-Security-Policy" content="
+    default-src 'self' https: 'unsafe-inline' 'unsafe-eval';
+    connect-src 'self' https:;
+    img-src 'self' data: https: blob:;
+    font-src 'self' data: https:;
+    frame-src 'self' https:;
     object-src 'none';
-    base-uri 'self';
-    form-action 'self' https://docs.google.com;
 ">
   <title>{{ page.title | default: site.title }}{% unless page.url == '/' or page.url == '/index.html' %} · {{ site.title }}{% endunless %}</title>
 
