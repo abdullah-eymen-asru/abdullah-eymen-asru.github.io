@@ -1,11 +1,13 @@
+# Site Rehberi — Hangi Dosya Ne İşe Yarar, Neyi Nerede Değiştiririm?
+
+---
+
 ![Jekyll](https://img.shields.io/badge/Jekyll-4.4-CC0000?style=flat&logo=jekyll&logoColor=white)
 ![Ruby](https://img.shields.io/badge/Ruby-CC342D?style=flat&logo=ruby&logoColor=white)
 ![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-222222?style=flat&logo=github&logoColor=white)
 ![Cloudflare Pages](https://img.shields.io/badge/Cloudflare%20Pages-F38020?style=flat&logo=cloudflare&logoColor=white)
 ![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=flat&logo=githubactions&logoColor=white)
 ![AI](https://img.shields.io/badge/Kod-Yapay%20Zeka%20ile%20Üretilmiştir-8A2BE2)
-
-# Site Rehberi — Hangi Dosya Ne İşe Yarar, Neyi Nerede Değiştiririm?
 
 ---
 
@@ -295,3 +297,100 @@ ayarı oluşturup `_includes/comments.html` içindeki ilgili
   ham RSS çekmeye (CORS) izin vermiyor. Bu servis kontrolün dışında —
   ileride kendi Worker'ın üzerinden proxy'lemek istersen (daha güvenli
   ama kurulumu daha uzun), ayrı bir adım olarak yapılabilir.
+
+---
+
+## 🍴 Bu Projeyi Fork Edenler İçin Kurulum Rehberi
+
+Bu site tamamen bana (Abdullah Eymen Asru) özel kişisel bilgiler, hesaplar ve
+API anahtarları içeriyor. Fork'ladıysan **canlıya almadan önce** aşağıdaki
+adımları sırayla uygulaman gerekiyor.
+
+### 1. Zorunlu Değişiklikler — `_config.yml`
+
+Bu dosyadaki `# ---- BURAYI DOLDUR ----` ile başlayan blok içindeki
+**her satırı kendine göre değiştir**:
+
+| Alan | Ne yapmalısın |
+|---|---|
+| `title`, `description` | Kendi adın/site açıklaman |
+| `url` | Kendi Cloudflare Pages adresin (örn. `https://kullaniciadin.pages.dev`) |
+| `github_username` | Kendi GitHub kullanıcı adın |
+| `kutuphane_repo` | Kendi izleme/okuma verisini tutacağın repo (bu özelliği kullanmayacaksan bkz. "Bölüm 3 — Silme") |
+| `izleme_projects_url` / `okuma_projects_url` | Kendi GitHub Projects panolarının linki |
+| `substack_url` / `substack_feed` | Kendi Substack adresin (kullanmıyorsan bkz. "Bölüm 3") |
+| `google_analytics_id` | Kendi Google Analytics Measurement ID'in (G-XXXXXXX) |
+| `profile_image` | `assets/` klasörüne kendi fotoğrafını yükleyip yolunu yaz |
+| `cloudflare_worker_url` | Kendi Cloudflare Worker adresin (kullanmıyorsan bkz. "Bölüm 3") |
+| `mirror_site_url` | Kendi GitHub Pages yedek adresin (`kullaniciadin.github.io`) |
+| `giscus:` bloğu | [giscus.app](https://giscus.app) adresine git, KENDİ repo'nu bağlayıp `repo`, `repo_id`, `category`, `category_id` değerlerini oradan kopyala |
+| `social:` altındaki tüm linkler | Kendi sosyal medya/akademik profil linklerin — kullanmadığın satırları sil |
+
+### 2. Zorunlu Değişiklikler — `_config_cloudflare.yml`
+
+Buradaki `google_analytics_id`'yi de kendi Analytics ID'in ile değiştir
+(veya `_config.yml`'dekiyle aynısını kullanacaksan bu dosyayı tamamen silebilirsin).
+
+### 3. Kullanmak İstemediğin Özellikleri Silme
+
+Aşağıdaki her blok bağımsızdır — sadece istemediğini sil, geri kalanına dokunma.
+
+**Yorum sistemini (giscus) kaldırmak istersen:**
+- `_includes/comments.html` dosyasını sil
+- `_layouts/post.html` içinde `{% include comments.html %}` satırını bul ve sil
+- `_config.yml` içindeki `giscus:` bloğunu sil
+
+**İletişim formunu kaldırmak istersen:**
+- `iletisim.md` dosyasını sil
+- `_layouts/default.html` içindeki menüde iletişim linkine giden satırı bul ve sil
+
+**İzlediklerim/Okuduklarım (Cloudflare Worker) özelliğini kaldırmak istersen:**
+- `izlediklerim.md` ve `okuduklarim.md` dosyalarını sil
+- `_config.yml` içinden `kutuphane_repo`, `izleme_projects_url`, `okuma_projects_url`, `cloudflare_worker_url` satırlarını sil
+- `_layouts/default.html` içindeki menüden bu sayfalara giden linkleri sil
+
+**Akademik projeler / Substack blog bağlantısını kaldırmak istersen:**
+- `akademik-projeler.md` dosyasını sil (ya da içeriğini kendi projelerinle doldur)
+- `substack_url` / `substack_feed` satırlarını `_config.yml`'den sil
+- `_layouts/default.html` menüsündeki ilgili linki sil
+
+**Zamanlanmış/gizli yazı otomasyonunu (GitHub Actions) kaldırmak istersen:**
+- `.github/workflows/zamanlanmis-yayin.yml` dosyasını sil
+- GitHub repo ayarlarından eklediysen `CLOUDFLARE_DEPLOY_HOOK_URL` secret'ını da silebilirsin
+- Not: Bunu silersen, gelecek tarihli/gizli yazılar sadece SEN elle bir push yaptığında görünür hale gelir, otomatik gelmez
+
+**Cloudflare Pages'i hiç kullanmayıp sadece GitHub Pages'te barındıracaksan:**
+- `_config_cloudflare.yml` dosyasını sil
+- `_headers` dosyasını sil (bu dosya sadece Cloudflare Pages'te işe yarar, GitHub Pages'te zaten görmezden gelinir ama gereksizse silebilirsin)
+- `.github/workflows/zamanlanmis-yayin.yml` dosyasını sil (Cloudflare'e özel)
+- `_config.yml` içindeki `mirror_site_url` satırını sil, `url` alanına GitHub Pages adresini yaz
+
+**Android uygulama bağlantısını (App Links) kullanmıyorsan:**
+- `.well-known/assetlinks.json` dosyasını sil
+- `_config.yml` içindeki `include: - .well-known` satırını silebilirsin
+
+### 4. Secret / Gizli Anahtarlar — Nerede, Nasıl Tanımlanır
+
+Bu projede kod içine **asla düz yazılmaması gereken** tek secret,
+Cloudflare Pages'i otomatik build tetikleyen deploy hook URL'idir.
+(Google Analytics ID ve giscus ayarları secret değildir, herkese açık
+görünebilir bilgilerdir, bu yüzden `_config.yml` içinde düz yazılıdır.)
+
+| Secret adı | Nerede kullanılır | Nasıl oluşturulur | Nereye eklenir |
+|---|---|---|---|
+| `CLOUDFLARE_DEPLOY_HOOK_URL` | `.github/workflows/zamanlanmis-yayin.yml` | Cloudflare Pages projeni aç → **Settings → Builds & deployments → Deploy Hooks** → yeni bir hook oluştur, verdiği URL'i kopyala | GitHub repo'nda **Settings → Secrets and variables → Actions → New repository secret** → isim: `CLOUDFLARE_DEPLOY_HOOK_URL`, değer: kopyaladığın URL |
+
+Bu projede kullanılan diğer üçüncü parti servisler (Google Analytics,
+giscus, Google Forms) API anahtarı değil, herkese açık/genel amaçlı ID'ler
+kullanır; bunları `_config.yml` veya ilgili `.md` dosyasına doğrudan
+yazman güvenlidir, GitHub Secrets'a eklemene gerek yoktur.
+
+### 5. Yayına Alma Sırası (Özet)
+
+1. Yukarıdaki `_config.yml` ve `_config_cloudflare.yml` alanlarını doldur
+2. İstemediğin özellikleri "Bölüm 3"e göre sil
+3. Cloudflare Pages'te yeni bir proje oluştur, bu repo'yu bağla
+   - Build command: `bundle exec jekyll build --config _config.yml,_config_cloudflare.yml`
+   - Build output directory: `_site`
+4. Zamanlanmış yayın özelliğini kullanacaksan `CLOUDFLARE_DEPLOY_HOOK_URL` secret'ını ekle (Bölüm 4)
+5. GitHub Pages'i de yedek olarak kullanacaksan repo **Settings → Pages** üzerinden aktif et
