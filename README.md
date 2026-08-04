@@ -1,9 +1,11 @@
 # Site Rehberi — Hangi Dosya Ne İşe Yarar, Neyi Nerede Değiştiririm?
+
 ---
 
 > 🤖 **Not:** Bu projenin kodu büyük ölçüde **yapay zeka** yardımıyla üretilmiş/geliştirilmiştir. Mimari kararlar ve yapılandırma insan gözetiminde yapılsa da, kaynak kodun tamamını kullanmadan/gözden geçirmeden production ortamına almanız önerilmez.
 
 ---
+
 Bu dosya, siteyi bir daha açtığında ("bunu nereye koymuştum?") hızlıca
 yön bulman için var. Her bölüm bir dosyayı/özelliği anlatıyor: ne işe
 yarıyor, hangi satırı değiştirirsen ne olur.
