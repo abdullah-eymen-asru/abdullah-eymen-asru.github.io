@@ -1,5 +1,7 @@
 # Site Rehberi — Hangi Dosya Ne İşe Yarar, Neyi Nerede Değiştiririm?
 
+![AI](https://img.shields.io/badge/Kod-Yapay%20Zeka%20ile%20Üretilmiştir-8A2BE2)
+
 ---
 
 > 🤖 **Not:** Bu projenin kodu büyük ölçüde **yapay zeka** yardımıyla üretilmiş/geliştirilmiştir. Mimari kararlar ve yapılandırma insan gözetiminde yapılsa da, kaynak kodun tamamını kullanmadan/gözden geçirmeden production ortamına almanız önerilmez.
