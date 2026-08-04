@@ -1,7 +1,3 @@
-# Site Rehberi — Hangi Dosya Ne İşe Yarar, Neyi Nerede Değiştiririm?
-
----
-
 ![Jekyll](https://img.shields.io/badge/Jekyll-4.4-CC0000?style=flat&logo=jekyll&logoColor=white)
 ![Ruby](https://img.shields.io/badge/Ruby-CC342D?style=flat&logo=ruby&logoColor=white)
 ![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-222222?style=flat&logo=github&logoColor=white)
@@ -9,11 +5,12 @@
 ![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=flat&logo=githubactions&logoColor=white)
 ![AI](https://img.shields.io/badge/Kod-Yapay%20Zeka%20ile%20Üretilmiştir-8A2BE2)
 
----
-
 > 🤖 **Not:** Bu projenin kodu büyük ölçüde **yapay zeka** yardımıyla üretilmiş/geliştirilmiştir. Mimari kararlar ve yapılandırma insan gözetiminde yapılsa da, kaynak kodun tamamını kullanmadan/gözden geçirmeden production ortamına almanız önerilmez.
 
----
+> 📌 Aşağıdaki iki bölüm katlanabilir/genişletilebilir — başlığa tıklayarak açıp kapatabilirsin.
+
+<details>
+<summary><h1>📖 Site Rehberi — Hangi Dosya Ne İşe Yarar, Neyi Nerede Değiştiririm? (tıkla, aç/kapat)</h1></summary>
 
 Bu dosya, siteyi bir daha açtığında ("bunu nereye koymuştum?") hızlıca
 yön bulman için var. Her bölüm bir dosyayı/özelliği anlatıyor: ne işe
@@ -298,9 +295,10 @@ ayarı oluşturup `_includes/comments.html` içindeki ilgili
   ileride kendi Worker'ın üzerinden proxy'lemek istersen (daha güvenli
   ama kurulumu daha uzun), ayrı bir adım olarak yapılabilir.
 
----
+</details>
 
-## 🍴 Bu Projeyi Fork Edenler İçin Kurulum Rehberi
+<details>
+<summary><h1>🍴 Bu Projeyi Fork Edenler İçin Kurulum Rehberi (tıkla, aç/kapat)</h1></summary>
 
 Bu site tamamen bana (Abdullah Eymen Asru) özel kişisel bilgiler, hesaplar ve
 API anahtarları içeriyor. Fork'ladıysan **canlıya almadan önce** aşağıdaki
@@ -394,3 +392,5 @@ yazman güvenlidir, GitHub Secrets'a eklemene gerek yoktur.
    - Build output directory: `_site`
 4. Zamanlanmış yayın özelliğini kullanacaksan `CLOUDFLARE_DEPLOY_HOOK_URL` secret'ını ekle (Bölüm 4)
 5. GitHub Pages'i de yedek olarak kullanacaksan repo **Settings → Pages** üzerinden aktif et
+
+</details>
