@@ -7,10 +7,13 @@
 
 > 🤖 **Not:** Bu projenin kodu büyük ölçüde **yapay zeka** yardımıyla üretilmiş/geliştirilmiştir. Mimari kararlar ve yapılandırma insan gözetiminde yapılsa da, kaynak kodun tamamını kullanmadan/gözden geçirmeden production ortamına almanız önerilmez.
 
-> 📌 Aşağıdaki iki bölüm katlanabilir/genişletilebilir — başlığa tıklayarak açıp kapatabilirsin.
+> 📌 Aşağıdaki iki rozete tıklayarak ilgili bölümü açıp kapatabilirsin.
 
 <details>
-<summary><h1>📖 Site Rehberi — Hangi Dosya Ne İşe Yarar, Neyi Nerede Değiştiririm? (tıkla, aç/kapat)</h1></summary>
+<summary>
+<img src="https://img.shields.io/badge/📖_Site_Rehberi-Hangi_Dosya_Ne_İşe_Yarar%3F-4C8BF5?style=for-the-badge" alt="Site Rehberi" />
+<sub>&nbsp;tıkla, aç/kapat</sub>
+</summary>
 
 Bu dosya, siteyi bir daha açtığında ("bunu nereye koymuştum?") hızlıca
 yön bulman için var. Her bölüm bir dosyayı/özelliği anlatıyor: ne işe
@@ -298,7 +301,10 @@ ayarı oluşturup `_includes/comments.html` içindeki ilgili
 </details>
 
 <details>
-<summary><h1>🍴 Bu Projeyi Fork Edenler İçin Kurulum Rehberi (tıkla, aç/kapat)</h1></summary>
+<summary>
+<img src="https://img.shields.io/badge/🍴_Fork_Rehberi-Kurulum_%26_Ayarlar-F5A623?style=for-the-badge" alt="Fork Rehberi" />
+<sub>&nbsp;tıkla, aç/kapat</sub>
+</summary>
 
 Bu site tamamen bana (Abdullah Eymen Asru) özel kişisel bilgiler, hesaplar ve
 API anahtarları içeriyor. Fork'ladıysan **canlıya almadan önce** aşağıdaki
