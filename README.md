@@ -1,6 +1,11 @@
-# Site Rehberi — Hangi Dosya Ne İşe Yarar, Neyi Nerede Değiştiririm?
-
+![Jekyll](https://img.shields.io/badge/Jekyll-4.4-CC0000?style=flat&logo=jekyll&logoColor=white)
+![Ruby](https://img.shields.io/badge/Ruby-CC342D?style=flat&logo=ruby&logoColor=white)
+![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-222222?style=flat&logo=github&logoColor=white)
+![Cloudflare Pages](https://img.shields.io/badge/Cloudflare%20Pages-F38020?style=flat&logo=cloudflare&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=flat&logo=githubactions&logoColor=white)
 ![AI](https://img.shields.io/badge/Kod-Yapay%20Zeka%20ile%20Üretilmiştir-8A2BE2)
+
+# Site Rehberi — Hangi Dosya Ne İşe Yarar, Neyi Nerede Değiştiririm?
 
 ---
 
