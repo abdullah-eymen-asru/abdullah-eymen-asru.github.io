@@ -8,7 +8,7 @@ import { requireAuth } from "./auth-guard.js";
 
 // ---- BURAYI DOLDUR: delete-account Edge Function URL'in ----
 const DELETE_ACCOUNT_FUNCTION_URL =
-  "https://XXXXXXXXXXXX.supabase.co/functions/v1/delete-account";
+  "https://eahvcirspmvntffzphye.supabase.co/functions/v1/delete-account";
 
 async function init() {
   const { session, profile } = await requireAuth({ role: null });
