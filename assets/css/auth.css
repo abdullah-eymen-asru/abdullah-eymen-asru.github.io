@@ -1,0 +1,173 @@
+/*
+ * assets/css/auth.css
+ * giris/kayit/panel/admin sayfalarına özel stiller. assets/style.css'in
+ * ÜZERİNE eklenir (o dosya değiştirilmiyor), aynı CSS değişkenlerini
+ * (--text, --muted, --bg, --accent, --border, --card-bg) kullanarak
+ * açık/koyu temayla otomatik uyumlu çalışır.
+ */
+
+.auth-box {
+  max-width: 420px;
+  margin: 40px auto;
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card-bg);
+}
+
+.auth-box h1 {
+  margin-top: 0;
+  font-size: 1.4rem;
+}
+
+.form-field {
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-field label {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.form-field input,
+.form-field textarea,
+.form-field select {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.form-field textarea {
+  min-height: 140px;
+  resize: vertical;
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 11px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-primary:disabled { opacity: 0.6; cursor: default; }
+.btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
+
+.btn-google {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.btn-google:hover { border-color: var(--accent); }
+
+.auth-divider {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 12px 0;
+}
+
+.auth-links {
+  margin-top: 16px;
+  font-size: 0.9rem;
+  display: flex;
+  justify-content: space-between;
+}
+
+.auth-message {
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+}
+.auth-message--error   { background: #fdecea; color: #a13327; border: 1px solid #f3b7ae; }
+.auth-message--success { background: #eaf7ee; color: #1e6b3a; border: 1px solid #b7e3c4; }
+[data-theme="dark"] .auth-message--error   { background: #3a1f1c; color: #f3a89c; border-color: #5a2f29; }
+[data-theme="dark"] .auth-message--success { background: #123a22; color: #9ee3b6; border-color: #1f5a37; }
+
+/* Panel / Admin */
+.panel-grid {
+  display: grid;
+  gap: 24px;
+}
+.panel-section {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card-bg);
+}
+.panel-section h2 {
+  margin-top: 0;
+  font-size: 1.1rem;
+}
+
+.avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.avatar-preview {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  background: var(--tag-bg);
+}
+
+.danger-zone {
+  border-color: #c0392b;
+}
+.danger-zone h2 { color: #c0392b; }
+.btn-danger {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  background: #c0392b;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-danger:hover { filter: brightness(1.1); }
+.btn-danger:disabled { opacity: 0.6; cursor: default; }
+
+.rol-tablo {
+  width: 100%;
+  border-collapse: collapse;
+}
+.rol-tablo th, .rol-tablo td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+.rol-durum--ok { color: #1e6b3a; }
+.rol-durum--hata { color: #a13327; }
+
+.muted { color: var(--muted); }
+
+[hidden] { display: none !important; }
+
+.loading-overlay {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--muted);
+}
