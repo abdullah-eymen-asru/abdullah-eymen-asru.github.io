@@ -18,6 +18,7 @@
 import { supabase, showMessage, escapeHtml } from "./supabase-client.js";
 import { requireAuth } from "./auth-guard.js";
 import { wireAdminChat } from "./chat.js";
+import { imzaliLinkUret } from "./dosya-paylasim.js";
 
 const DELETE_ACCOUNT_FUNCTION_URL =
   "https://eahvcirspmvntffzphye.supabase.co/functions/v1/delete-account";
@@ -42,6 +43,7 @@ async function init() {
   wireIcerikAtamaArama();
   wireContentForm();
   wireCurrentAdminSelfDelete(session);
+  wireR2DosyaPaylasim();
   await wireAdminChat(session.user.id);
 }
 
@@ -288,14 +290,28 @@ function atamaListesiCiz(hedefKullanicilar) {
     return;
   }
 
+  // BUG FİX ("Süresiz" butonuna tıklanamıyordu): satırın tamamı önceden
+  // TEK BİR <label> elemanıydı ve checkbox + datetime-local input + buton
+  // hepsi bu <label>'ın İÇİNDEYDİ. HTML spesifikasyonuna göre bir
+  // <label>'a (veya onun herhangi bir alt elemanına) yapılan tıklama,
+  // etiketlenen kontrole (buradaki ilk form elemanı olan checkbox'a) da
+  // otomatik olarak "sentetik" bir tıklama yönlendirir. Bazı tarayıcılarda
+  // (özellikle mobil Safari) bu, butonun kendi click handler'ıyla YARIŞIYOR
+  // ve buton bazen hiç tepki vermiyormuş gibi görünüyordu — çünkü tıklama
+  // önce/asıl checkbox'a yönlendiriliyordu. Çözüm: satırı bir <label>
+  // yerine sade bir <div> yapıp, sadece checkbox+isim metnini SARAN küçük
+  // bir iç <label> kullanmak (buton ve tarih inputu artık hiçbir <label>
+  // içinde değil, dolayısıyla tıklamaları asla checkbox'a yönlendirilmiyor).
   atamaWrap.innerHTML = hedefKullanicilar
     .map((u) => {
       const durum = ATAMA_DURUMU.get(u.id) || { checked: false, tarih: "" };
       const suresiz = !durum.tarih;
       return `
-      <label class="atama-satiri">
-        <input type="checkbox" class="atama-checkbox" value="${u.id}" ${durum.checked ? "checked" : ""}>
-        <span>${escapeHtml(u.full_name || u.email)} <span class="muted">(${escapeHtml(u.email)})</span></span>
+      <div class="atama-satiri">
+        <label class="atama-satiri-secim">
+          <input type="checkbox" class="atama-checkbox" value="${u.id}" ${durum.checked ? "checked" : ""}>
+          <span>${escapeHtml(u.full_name || u.email)} <span class="muted">(${escapeHtml(u.email)})</span></span>
+        </label>
         <span class="atama-tarih-alani">
           <input
             type="datetime-local"
@@ -307,7 +323,7 @@ function atamaListesiCiz(hedefKullanicilar) {
             ${suresiz ? "✓ Süresiz" : "Süresiz Yap"}
           </button>
         </span>
-      </label>`;
+      </div>`;
     })
     .join("");
 
@@ -655,6 +671,45 @@ async function icerikDetaylariniYukle(contentId, alan, btn) {
         .eq("user_id", kbtn.dataset.userId);
       await icerikDetaylariniYukle(contentId, alan, btn);
     });
+  });
+}
+
+/* ---------------------------------------------------------------------- */
+/* R2 DOSYA PAYLAŞIMI: herhangi bir R2 key için tek tıkla imzalı link      */
+/* ---------------------------------------------------------------------- */
+function wireR2DosyaPaylasim() {
+  const btn = document.getElementById("r2-link-uret-btn");
+  if (!btn) return; // Worker URL'i henüz ayarlanmadıysa bile bölüm sayfada durur
+
+  const keyInput = document.getElementById("r2-dosya-key");
+  const sureInput = document.getElementById("r2-gecerlilik-saniye");
+  const msg = document.getElementById("r2-link-sonuc");
+
+  btn.addEventListener("click", async () => {
+    const dosyaAdi = keyInput.value.trim();
+    if (!dosyaAdi) {
+      showMessage(msg, "Önce bir dosya yolu (R2 key) gir.");
+      return;
+    }
+    const expiresIn = Math.max(60, parseInt(sureInput.value, 10) || 3600);
+
+    btn.disabled = true;
+    btn.textContent = "Üretiliyor...";
+
+    try {
+      const sonuc = await imzaliLinkUret(dosyaAdi, { expiresIn });
+      const bitisSaati = new Date(sonuc.expiresAt).toLocaleString("tr-TR");
+      showMessage(
+        msg,
+        `Link panoya kopyalandı. Geçerlilik sonu: ${bitisSaati}. (Panoya kopyalanmadıysa: ${sonuc.url})`,
+        "success"
+      );
+    } catch (err) {
+      showMessage(msg, "Link üretilemedi: " + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "İmzalı Link Üret ve Kopyala";
+    }
   });
 }
 
