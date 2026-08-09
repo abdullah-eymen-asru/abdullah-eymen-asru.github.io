@@ -1,0 +1,175 @@
+/*
+ * assets/css/github-yonetim.css
+ * Sadece github-yonetim.html sayfasına özel stiller. assets/css/auth.css
+ * ve assets/style.css'in ÜZERİNE eklenir (o dosyalar değiştirilmiyor),
+ * aynı CSS değişkenlerini (--text, --muted, --bg, --accent, --border,
+ * --card-bg, --tag-bg) kullanarak açık/koyu temayla otomatik uyumlu çalışır.
+ */
+
+/* İçerik türü seçimi (Blog / Proje) */
+.gy-tip-secim {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.gy-radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.92rem;
+  background: var(--bg);
+}
+.gy-radio:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--tag-bg);
+  font-weight: 600;
+}
+
+.gy-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.92rem;
+  cursor: pointer;
+  color: var(--text);
+}
+.gy-checkbox input { margin-top: 3px; }
+
+/* Markdown editör araç çubuğu */
+.gy-editor-toolbar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.gy-editor-toolbar button {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.gy-editor-toolbar button:hover {
+  background: var(--tag-bg);
+  border-color: var(--accent);
+}
+
+/* Gizli/ön izleme linki kutusu */
+.gy-link-kutu {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+.gy-link-kutu input {
+  flex: 1;
+  min-width: 200px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: monospace;
+  font-size: 0.85rem;
+}
+
+/* Mevcut içerikler listesi */
+.gy-icerik-kart {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 10px;
+  background: var(--card-bg);
+}
+.gy-icerik-kart-bilgi { min-width: 0; }
+.gy-icerik-kart-baslik {
+  font-weight: 600;
+  word-break: break-word;
+}
+.gy-icerik-kart-meta {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.gy-rozet {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin-left: 6px;
+}
+.gy-rozet--yayinda { background: #eaf7ee; color: #1e6b3a; }
+.gy-rozet--gizli   { background: #fdecea; color: #a13327; }
+[data-theme="dark"] .gy-rozet--yayinda { background: #123a22; color: #9ee3b6; }
+[data-theme="dark"] .gy-rozet--gizli   { background: #3a1f1c; color: #f3a89c; }
+
+.gy-icerik-kart-aksiyonlar {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.gy-icerik-kart-aksiyonlar button {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.gy-icerik-kart-aksiyonlar button:hover { border-color: var(--accent); }
+.gy-icerik-kart-aksiyonlar button.gy-sil-btn:hover {
+  border-color: #c0392b;
+  color: #c0392b;
+}
+
+.gy-liste-baslik {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: 18px 0 8px;
+}
+.gy-liste-baslik:first-child { margin-top: 0; }
+
+/* Profil fotoğrafı önizleme */
+.gy-profil-onizleme {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.gy-profil-onizleme img {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+}
+
+/* Bağlantı durumu rozeti */
+.gy-baglanti-durum {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-left: 8px;
+}
+.gy-baglanti-durum--ok { color: #1e6b3a; }
+[data-theme="dark"] .gy-baglanti-durum--ok { color: #9ee3b6; }
