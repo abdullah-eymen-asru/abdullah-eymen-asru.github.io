@@ -39,6 +39,65 @@
 }
 .gy-checkbox input { margin-top: 3px; }
 
+/* Modern "Yayında" toggle switch */
+.gy-toggle-satir {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card-bg);
+  transition: border-color 0.15s ease;
+}
+.gy-toggle-satir:has(input:checked) { border-color: var(--accent); }
+.gy-toggle {
+  position: relative;
+  flex-shrink: 0;
+  width: 44px;
+  height: 26px;
+  margin-top: 1px;
+}
+.gy-toggle input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+.gy-toggle-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: #c0392b;
+  transition: background-color 0.2s ease;
+}
+.gy-toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: transform 0.2s ease;
+}
+.gy-toggle input:checked ~ .gy-toggle-track { background: #1e6b3a; }
+.gy-toggle input:checked ~ .gy-toggle-track .gy-toggle-thumb { transform: translateX(18px); }
+.gy-toggle input:focus-visible ~ .gy-toggle-track { box-shadow: 0 0 0 3px var(--tag-bg), 0 0 0 4px var(--accent); }
+
+.gy-toggle-metin {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 0.92rem;
+  color: var(--text);
+}
+.gy-toggle-metin .muted { font-size: 0.82rem; line-height: 1.45; }
+
 /* Markdown editör araç çubuğu */
 .gy-editor-toolbar {
   display: flex;
@@ -80,6 +139,17 @@
   font-family: monospace;
   font-size: 0.85rem;
 }
+.gy-link-kopyala-btn {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.gy-link-kopyala-btn:hover { border-color: var(--accent); }
 
 /* Mevcut içerikler listesi */
 .gy-icerik-kart {
