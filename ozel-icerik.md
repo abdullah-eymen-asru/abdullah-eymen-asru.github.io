@@ -9,6 +9,9 @@ yayinda: true
 <div class="loading-overlay" id="loading">Yükleniyor...</div>
 
 <div id="app" hidden>
+  <div id="okundu-manuel-wrap" class="okundu-manuel-wrap" hidden>
+    <button id="okundu-manuel-btn" type="button" class="okundu-manuel-btn">✓ Okundum olarak işaretle</button>
+  </div>
   <div id="icerik-govde"></div>
 
   <div id="dosya-indir-alani" hidden style="margin-top:24px;">
