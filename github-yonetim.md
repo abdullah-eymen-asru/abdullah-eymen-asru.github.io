@@ -145,15 +145,33 @@ yayinda: true
                 <strong>Yayında</strong>
                 <span class="muted">
                   Kapatırsan içerik blog/proje listesinden ve arama motorlarından
-                  gizlenir; yalnızca kalıcı bir ön izleme linkine sahip olanlar
-                  görebilir. Link her zaman burada görüntülenebilir, içeriği
-                  görüntülerken de erişilebilir kalır; istediğin an tekrar
-                  düzenleyip yayına alabilirsin.
+                  gizlenir; yalnızca aşağıdaki ön izleme linkine sahip olanlar
+                  görebilir. Link her zaman burada görüntülenebilir ve
+                  düzenlenebilir, içeriği görüntülerken de erişilebilir kalır;
+                  istediğin an tekrar düzenleyip yayına alabilirsin.
                 </span>
               </span>
             </label>
           </div>
-          <div id="ic-onizleme-kutusu" class="auth-message" hidden></div>
+          <div id="ic-onizleme-kutusu" class="gy-onizleme-kutusu" hidden>
+            <div class="gy-onizleme-baslik">🔒 Gizli ön izleme linki</div>
+            <p class="muted">
+              Sadece bu linki bilenler görebilir. Kod otomatik üretilir;
+              istersen aşağıdan kendi kodunu yazabilir ya da zar butonuyla
+              yeni bir tane üretebilirsin — link, sayfayı yayına alana kadar
+              her an burada görüntülenebilir ve değiştirilebilir.
+            </p>
+            <div class="gy-link-kutu">
+              <span class="gy-onizleme-onek" id="ic-onizleme-onek"></span>
+              <input type="text" id="ic-onizleme-kod" class="gy-onizleme-kod-girdi"
+                     placeholder="ozel-kod" autocomplete="off" spellcheck="false">
+              <button type="button" id="ic-onizleme-yenile-btn" class="gy-link-kopyala-btn" title="Yeni rastgele kod üret">🎲 Yenile</button>
+            </div>
+            <div class="gy-link-kutu">
+              <input type="text" id="ic-onizleme-link" readonly onclick="this.select()">
+              <button type="button" id="ic-onizleme-kopyala-btn" class="gy-link-kopyala-btn">Kopyala</button>
+            </div>
+          </div>
 
           <div style="display:flex; gap:10px; flex-wrap: wrap;">
             <button type="submit" id="ic-submit-btn" class="btn-primary" style="width:auto;">GitHub'a Yayınla</button>
@@ -167,7 +185,27 @@ yayinda: true
         <h2>Mevcut İçerikler</h2>
         <p class="muted">Önce "GitHub Bağlantısı" sekmesinden bağlantını doğrula, sonra listeyi yükle.</p>
         <button id="ic-liste-yenile-btn" type="button" class="btn-primary" style="width:auto; margin-bottom:12px;">Listeyi Yükle / Yenile</button>
+
+        <div class="gy-liste-araclar">
+          <div class="gy-arama-kutu">
+            <span class="gy-arama-ikon" aria-hidden="true">🔎</span>
+            <input id="ic-liste-arama" type="search" placeholder="Başlık, dosya adı veya özet içinde ara..." autocomplete="off">
+            <button type="button" id="ic-liste-arama-temizle" class="gy-arama-temizle" hidden aria-label="Aramayı temizle">✕</button>
+          </div>
+          <div class="gy-tur-sekmeleri" role="tablist" aria-label="İçerik türüne göre filtrele">
+            <button type="button" class="gy-tur-sekme active" data-filtre-tur="tum" role="tab" aria-selected="true">Tümü</button>
+            <button type="button" class="gy-tur-sekme" data-filtre-tur="blog" role="tab" aria-selected="false">📰 Blog</button>
+            <button type="button" class="gy-tur-sekme" data-filtre-tur="proje" role="tab" aria-selected="false">🎓 Projeler</button>
+          </div>
+          <div class="gy-durum-sekmeleri" role="tablist" aria-label="Yayın durumuna göre filtrele">
+            <button type="button" class="gy-durum-sekme active" data-filtre-durum="tum" role="tab" aria-selected="true">Tümü</button>
+            <button type="button" class="gy-durum-sekme" data-filtre-durum="yayinda" role="tab" aria-selected="false">Yayında</button>
+            <button type="button" class="gy-durum-sekme" data-filtre-durum="gizli" role="tab" aria-selected="false">Gizli</button>
+          </div>
+        </div>
+
         <div id="ic-liste"><p class="muted">Henüz yüklenmedi.</p></div>
+        <p id="ic-liste-sonuc-yok" class="muted" hidden>Aramanla/filtrenle eşleşen içerik bulunamadı.</p>
       </section>
 
       <section id="profil-foto" class="panel-section">
