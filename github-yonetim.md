@@ -136,10 +136,21 @@ yayinda: true
           </div>
 
           <div class="form-field">
-            <label class="gy-checkbox">
-              <input id="ic-yayinda" type="checkbox" checked>
-              Yayında (işareti kaldırırsan içerik gizlenir; sadece rastgele
-              üretilen bir ön izleme linkiyle erişilebilir olur)
+            <label class="gy-toggle-satir" for="ic-yayinda">
+              <span class="gy-toggle">
+                <input id="ic-yayinda" type="checkbox" checked role="switch">
+                <span class="gy-toggle-track"><span class="gy-toggle-thumb"></span></span>
+              </span>
+              <span class="gy-toggle-metin">
+                <strong>Yayında</strong>
+                <span class="muted">
+                  Kapatırsan içerik blog/proje listesinden ve arama motorlarından
+                  gizlenir; yalnızca kalıcı bir ön izleme linkine sahip olanlar
+                  görebilir. Link her zaman burada görüntülenebilir, içeriği
+                  görüntülerken de erişilebilir kalır; istediğin an tekrar
+                  düzenleyip yayına alabilirsin.
+                </span>
+              </span>
             </label>
           </div>
           <div id="ic-onizleme-kutusu" class="auth-message" hidden></div>
