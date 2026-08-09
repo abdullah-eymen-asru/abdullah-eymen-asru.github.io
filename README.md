@@ -229,6 +229,108 @@ permalink: /blog/on-izleme-RASTGELE-BIR-DIZI/
 - `.github/workflows/zamanlanmis-yayin.yml` → günlük otomatik Cloudflare
   Pages build tetikleyicisi (yukarıdaki kurulum adımlarına bak).
 
+## 10. `github-yonetim.md` — GitHub Pages için tarayıcı içi içerik yönetim paneli (mini CMS)
+
+Bölüm 8 ve 9'da anlatılan işi (yeni `_posts/`/`_projects/` dosyası
+oluşturma, `yayinda`/`sitemap`/`permalink` alanlarını elle yazma) artık
+elle dosya oluşturup GitHub'a push etmeden, doğrudan tarayıcıdan
+yapabileceğin bir panel var: **`/github-yonetim.html`**. Netlify/Decap CMS
+gibi 3. parti bir servise ihtiyaç duymaz — doğrudan GitHub REST API'sine
+(`contents` endpoint'i) istek atıp commit oluşturur, tamamen GitHub
+Pages'in kendisiyle çalışır.
+
+**Bu panel, sitenin Supabase tabanlı `/admin.html` panelinden TAMAMEN
+BAĞIMSIZDIR.** `/admin.html` Supabase'teki üye/rol/özel içerik sistemini
+yönetir; `/github-yonetim.html` ise bu deponun kendi statik Jekyll
+içeriğini (blog yazıları, akademik projeler, profil fotoğrafı) yönetir.
+Aralarındaki tek ortak nokta: bu sayfaya erişim de aynı
+`requireAuth({ role: 'admin' })` mekanizmasıyla korunur (bkz.
+`assets/js/auth-guard.js`), yani sadece Supabase'te `role: 'admin'` olan
+hesaplar görebilir. Header'daki **"Hesabım ▾"** menüsünde, adminsen
+"Admin Paneli" linkinin hemen altında **"GitHub İçerik Yönetimi"** olarak
+görünür (bkz. `assets/js/nav-auth.js`).
+
+### Paketteki dosyalar
+
+```
+github-yonetim.md              <- Jekyll sayfası (_layouts/default.html'i kullanır, admin-only)
+assets/js/github-yonetim.js    <- Panelin tüm mantığı
+assets/css/github-yonetim.css  <- Bu sayfaya özel ek stiller (auth.css'in üzerine eklenir)
+```
+
+### Neler yapabilirsin
+
+- **Blog yazısı / Akademik proje ekle veya düzenle** — içerik türünü
+  seçtiğinde form alanları otomatik değişir (proje seçilince `venue`,
+  `status`, `summary`, `link`, `link_label` alanları da görünür). Dosya
+  adı (slug) boş bırakılırsa başlıktan otomatik üretilir (Türkçe
+  karakterler sadeleştirilir).
+- **"Yayında" kutusunu işaretlemezsen** panel otomatik olarak
+  `yayinda: false`, `sitemap: false` yazar ve 8 karakterlik rastgele bir
+  kodla (`crypto.getRandomValues` ile üretilir, tahmin edilemez) gizli bir
+  ön izleme linki oluşturur (`/blog/on-izleme-XXXXXXXX/` veya
+  `/projects/on-izleme-XXXXXXXX/`) — bkz. yukarıdaki Bölüm 9'daki mantığın
+  aynısı, sadece elle yazmak yerine panel yazıyor. Yayınladıktan sonra bu
+  link ekranda gösterilir, kopyalayıp saklaman gerekir (panel bir daha
+  göstermez, ama "Mevcut İçerikler" listesinden dosyayı tekrar açıp
+  içeriği görebilirsin).
+- **Hafif bir Markdown editörü** — kalın, italik, başlık ve bağlantı
+  eklemek için metin alanının üstünde küçük araç çubuğu butonları var.
+- **Mevcut İçerikler** sekmesi — `_posts/` ve `_projects/` klasörlerindeki
+  tüm dosyaları listeler (yayında/gizli durumunu rozetle gösterir),
+  "Düzenle" ile formu doldurup güncelleyebilir, "Sil" ile GitHub'dan
+  kalıcı olarak silebilirsin.
+- **Profil Fotoğrafı Yönetimi** sekmesi — `assets/profil.jpg` dosyasının
+  var olup olmadığını GitHub API üzerinden kontrol edip önizlemesini
+  gösterir; yeni bir görsel seçip "Yükle/Değiştir" ile değiştirebilir,
+  "Profil Fotoğrafını Sil" ile tamamen kaldırabilirsin.
+
+### GitHub bağlantısı ve token güvenliği
+
+Panelin üstündeki "GitHub Bağlantısı" sekmesinden şunları girmen gerekir:
+
+- **GitHub Kullanıcı Adı** ve **Repository Adı** — gizli bilgi olmadığı
+  için kolaylık amacıyla tarayıcının `localStorage`'ında hatırlanır.
+- **Branch** (opsiyonel) — boş bırakırsan reponun varsayılan branch'i
+  kullanılır.
+- **GitHub Personal Access Token (PAT)** — **SADECE sekme açıkken
+  tarayıcı belleğinde tutulur, hiçbir yerde (localStorage dahil)
+  kalıcı olarak saklanmaz.** Sayfayı yenilediğinde veya sekmeyi
+  kapattığında token kaybolur, bir sonraki girişte yeniden yapıştırman
+  gerekir. Bu bilinçli bir tercih: localStorage'a yazmak daha
+  kullanışlı olurdu ama bir XSS açığında token'ın kalıcı olarak
+  sızdırılması riskini taşır.
+- **Fine-grained bir token oluştur** ve **sadece bu repo** için
+  `Contents: Read and write` iznini ver — tüm hesaba erişen "classic"
+  bir token kullanmaktan çok daha güvenlidir.
+  ([token oluşturma sayfası](https://github.com/settings/personal-access-tokens/new))
+- "Bağlantıyı Doğrula" butonu, token'ın gerçekten yazma iznine sahip
+  olup olmadığını (`permissions.push`) kontrol eder ve sonucu gösterir.
+
+### Teknik detay (dokunmana gerek yok ama bilgi için)
+
+- İçerik, GitHub'ın `contents` API'siyle (`PUT`/`DELETE
+  /repos/{owner}/{repo}/contents/{path}`) base64 kodlanmış olarak
+  gönderilir; Türkçe karakterler için `encodeURIComponent` +
+  `btoa`/`atob` tabanlı bir UTF-8 güvenli base64 dönüşümü kullanılır.
+  Profil fotoğrafı gibi ikili (binary) dosyalar için `FileReader.
+  readAsDataURL` ile üretilen base64 doğrudan kullanılır.
+- Var olan bir dosyayı güncellerken GitHub API'nin zorunlu kıldığı `sha`
+  parametresi otomatik olarak önce bir `GET` isteğiyle alınır. Düzenleme
+  sırasında dosya adını/tarihini değiştirirsen (dosya yolu değişirse)
+  panel önce yeni yola yazar, sonra eski dosyayı siler (yeniden
+  adlandırma simülasyonu) — GitHub API'de doğrudan bir "rename" uç
+  noktası yoktur.
+- "Mevcut İçerikler" listesi front-matter'ı panelin kendi ürettiği sınırlı
+  alan setine göre basit bir regex ile okur; elle çok farklı bir YAML
+  yapısı yazılmış dosyalarda (örn. çok satırlı değerler) güvenilir
+  çalışmayabilir — bu durumda dosyayı GitHub üzerinden elle düzenlemen
+  daha güvenlidir.
+- Bu panel de, tıpkı Bölüm 9'daki gibi, sitenin görünürlük mantığına
+  (`yayinda`/`date`/`sitemap`) aynen uyar — ürettiği dosyalar mevcut
+  `blog.md`, `akademik-projeler.md`, `feed.xml` ve `sitemap.xml` ile
+  sorunsuz çalışır.
+
 ---
 
 # 🎨 Tema Anahtarı (Koyu/Açık Mod)
@@ -278,7 +380,7 @@ ayarı oluşturup `_includes/comments.html` içindeki ilgili
 | Dosya | Ne işe yarar |
 |---|---|
 | `_layouts/default.html` içinde `#auth-nav` | Nav'daki tek kapsayıcı — JS yüklenmeden önce görünen statik "Giriş Yap" linkini içerir (progressive enhancement / no-JS yedeği). |
-| `assets/js/nav-auth.js` | Sayfa açılışında oturumu kontrol edip `#auth-nav`'ın içeriğini dolduran script. Çıkış yapmışken tek bir "Giriş Yap" linki, giriş yapmışken "Hesabım ▾" açılır menüsü (Panelim, adminse Admin Paneli, Çıkış Yap) gösterir. Başka bir sekmede oturum açılıp kapandığında `onAuthStateChange` ile kendini günceller. |
+| `assets/js/nav-auth.js` | Sayfa açılışında oturumu kontrol edip `#auth-nav`'ın içeriğini dolduran script. Çıkış yapmışken tek bir "Giriş Yap" linki, giriş yapmışken "Hesabım ▾" açılır menüsü (Panelim, adminse Admin Paneli ve GitHub İçerik Yönetimi, Çıkış Yap) gösterir. Başka bir sekmede oturum açılıp kapandığında `onAuthStateChange` ile kendini günceller. |
 | `assets/style.css` içinde `.auth-nav*` sınıfları | Açılır menünün görünümü — mevcut `nav a` stiliyle aynı renk değişkenlerini kullanır, açık/koyu temayla otomatik uyumludur. |
 
 Bu menü, sitenin Supabase kullanıcı sistemine bağlıdır — bkz. aşağıdaki
