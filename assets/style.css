@@ -192,6 +192,13 @@ nav a.active {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
   z-index: 60;
 }
+/* BUG FİX: ".auth-nav-menu" kuralı "display: flex" verdiği için, tarayıcının
+   [hidden] özniteliğine normalde uyguladığı "display: none" bu kural
+   tarafından EZİLİYORDU (aynı özgüllükte bir sınıf seçicisi geldiği için
+   dosyada SONRA gelen bu kural kazanıyordu). Sonuç: nav-auth.js menu.hidden
+   = true dese bile "Panelim / Admin Paneli / Çıkış Yap" menüsü sayfa
+   açılır açılmaz görünüyordu. Bunu açıkça geri kazandırıyoruz. */
+.auth-nav-menu[hidden] { display: none; }
 
 .auth-nav-menu a,
 .auth-nav-menu-cikis {
