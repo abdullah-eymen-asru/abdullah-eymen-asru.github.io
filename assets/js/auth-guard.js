@@ -40,9 +40,13 @@ export async function requireAuth({ role = null, redirectTo = "/giris.html" } = 
     return new Promise(() => {});
   }
 
+  // NOT: "avatar_url" ve "bio" kolonları artık hiçbir arayüzde
+  // kullanılmıyor (profil fotoğrafı yükleme ve kişisel bio düzenleme
+  // özellikleri kaldırıldı) — o yüzden burada da seçilmiyor, gereksiz veri
+  // çekilmiyor.
   const { data: profile, error } = await supabase
     .from("profiles")
-    .select("id, email, full_name, avatar_url, bio, role")
+    .select("id, email, full_name, role")
     .eq("id", session.user.id)
     .single();
 
