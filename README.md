@@ -272,23 +272,34 @@ assets/css/github-yonetim.css  <- Bu sayfaya özel ek stiller (auth.css'in üzer
   izleme linki oluşturur (`/blog/on-izleme-XXXXXXXX/` veya
   `/projects/on-izleme-XXXXXXXX/`) — bkz. yukarıdaki Bölüm 9'daki mantığın
   aynısı, sadece elle yazmak yerine panel yazıyor.
-  **Bu link tek seferlik değildir:** kaydettikten sonra ekranda kalır,
-  "Yayında" anahtarını kapatıp açtığında anında görünür/gizlenir, "Mevcut
-  İçerikler" listesinden aynı yazıyı tekrar "Düzenle"ye açtığında da aynı
-  link otomatik olarak yeniden gösterilir — panel bunu dosyanın
-  `permalink` alanından okur. Link ayrıca her düzenlemede **değişmez**:
-  aynı gizli kod korunur, böylece daha önce birine gönderdiğin bir ön
-  izleme linki içeriği güncellesen bile kırılmaz. Kod yalnızca "Yayında"yı
-  açıp tekrar kapatırsan yenilenir. Yazının/projenin kendi sayfasında da
-  (görüntülerken) "henüz yayında değil" uyarısı görünür (bkz.
-  `_layouts/post.html` / `_layouts/project.html`), böylece linke sahip
-  olan biri içeriği görüntülerken durumundan haberdar olur.
+  **Bu link tek seferlik değildir ve düzenlenebilir:** anahtarı kapatır
+  kapatmaz, dosyayı hiç kaydetmeden önce bile ekranda görünür — kodu
+  olduğu gibi kullanabilir, kutuya kendi kodunu elle yazabilir (örn.
+  `/blog/on-izleme-taslak-v2/`) veya "🎲 Yenile" butonuyla yeni bir
+  rastgele kod üretebilirsin. Kaydettikten sonra da ekranda kalır,
+  anahtarı kapatıp açtığında anında görünür/gizlenir, "Mevcut İçerikler"
+  listesinden aynı yazıyı tekrar "Düzenle"ye açtığında da aynı link
+  otomatik olarak yeniden gösterilir — panel bunu dosyanın `permalink`
+  alanından okur. Link, sen bilerek değiştirmediğin sürece her
+  düzenlemede **aynı kalır**, böylece daha önce birine gönderdiğin bir ön
+  izleme linki içeriği güncellesen bile kırılmaz. Panel, aynı türde
+  (blog/proje) başka bir içeriğin zaten kullandığı bir kodu tekrar
+  kaydetmene izin vermez (çakışma kontrolü) — böyle bir durumda hata
+  mesajıyla uyarır. Yazının/projenin kendi sayfasında da (görüntülerken)
+  "henüz yayında değil" uyarısı görünür (bkz. `_layouts/post.html` /
+  `_layouts/project.html`), böylece linke sahip olan biri içeriği
+  görüntülerken durumundan haberdar olur.
 - **Hafif bir Markdown editörü** — kalın, italik, başlık ve bağlantı
   eklemek için metin alanının üstünde küçük araç çubuğu butonları var.
 - **Mevcut İçerikler** sekmesi — `_posts/` ve `_projects/` klasörlerindeki
   tüm dosyaları listeler (yayında/gizli durumunu rozetle gösterir),
   "Düzenle" ile formu doldurup güncelleyebilir, "Sil" ile GitHub'dan
-  kalıcı olarak silebilirsin.
+  kalıcı olarak silebilirsin. İçerik sayısı arttıkça listede kaybolmamak
+  için üstte bir **arama kutusu** (başlık, dosya yolu ve özet içinde arar,
+  eşleşen kısmı vurgular) ve iki grup **filtre sekmesi** var: içerik
+  türüne göre (Tümü / Blog / Projeler) ve yayın durumuna göre (Tümü /
+  Yayında / Gizli) — ikisi birlikte kullanılabilir, sonuç yoksa bunu
+  ayrıca belirten bir mesaj gösterilir.
 - **Profil Fotoğrafı Yönetimi** sekmesi — `assets/profil.jpg` dosyasının
   var olup olmadığını GitHub API üzerinden kontrol edip önizlemesini
   gösterir; yeni bir görsel seçip "Yükle/Değiştir" ile değiştirebilir,
