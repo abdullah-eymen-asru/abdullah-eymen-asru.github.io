@@ -41,6 +41,7 @@ async function init() {
   let html = `
     <h1>${escapeHtml(content.title)}</h1>
     <p class="meta">${new Date(content.created_at).toLocaleDateString("tr-TR")}</p>
+    <div id="okundu-durum" class="muted" style="margin-bottom:16px;"></div>
   `;
 
   if (content.body_md) {
@@ -58,6 +59,37 @@ async function init() {
   }
   if (content.harici_dosya_url) {
     renderHariciDosyaButonu(content.harici_dosya_url);
+  }
+
+  await okunduIsaretleVeGoster(content.id);
+}
+
+/**
+ * İçerik açıldığı an OTOMATİK olarak "okundu" işaretlenir (admin'e ait
+ * içeriklerde content_access satırı olmayabilir — bu durumda RPC sessizce
+ * hiçbir şey yapmaz, hata vermez). Üye ayrıca "Okundum" butonuyla manuel
+ * de teyit edebilir (zaten okunmuşsa bunun bir etkisi olmaz, sadece
+ * tarihi tazeler değil — okundu_tarihi ilk işaretlenen anı korur).
+ */
+async function okunduIsaretleVeGoster(contentId) {
+  const durumEl = document.getElementById("okundu-durum");
+  if (!durumEl) return;
+
+  await supabase.rpc("icerik_okundu_isaretle", { p_content_id: contentId });
+
+  const { data } = await supabase
+    .from("content_access")
+    .select("okundu_mu, okundu_tarihi")
+    .eq("content_id", contentId)
+    .eq("user_id", (await supabase.auth.getUser()).data.user.id)
+    .maybeSingle();
+
+  if (data?.okundu_mu) {
+    durumEl.innerHTML = `✓ Okundu olarak işaretlendi (${new Date(data.okundu_tarihi).toLocaleString("tr-TR")})`;
+  } else {
+    // Admin kendi eklediği içeriği görüntülüyor olabilir (content_access
+    // satırı hiç yok) — bu durumda okundu bilgisi gösterilmez, sorun değil.
+    durumEl.innerHTML = "";
   }
 }
 
