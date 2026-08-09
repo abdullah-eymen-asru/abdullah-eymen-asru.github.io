@@ -4,7 +4,7 @@
  * tarafından ortak kullanılan fonksiyonlar. Her sayfa sadece ihtiyacı
  * olan init fonksiyonunu çağırır (aşağıya bkz).
  */
-import { supabase, showMessage } from "./supabase-client.js";
+import { supabase, showMessage, KVKK_METIN_SURUMU } from "./supabase-client.js";
 
 const REDIRECT_AFTER_LOGIN = "/panel.html";
 // Google OAuth ve "şifre sıfırlama" e-postası kullanıcıyı bu sayfaya
@@ -73,6 +73,7 @@ export function initKayitPage() {
     const password = form.password.value;
     const passwordAgain = form.password_again.value;
     const fullName = form.full_name.value.trim();
+    const kvkkOnay = form.kvkk_onay?.checked ?? false;
 
     if (password !== passwordAgain) {
       showMessage(msg, "Şifreler birbiriyle eşleşmiyor.");
@@ -82,13 +83,21 @@ export function initKayitPage() {
       showMessage(msg, "Şifre en az 8 karakter olmalı.");
       return;
     }
+    if (!kvkkOnay) {
+      showMessage(msg, "Kayıt olmak için KVKK Aydınlatma Metni ve Açık Rıza onayını işaretlemelisin.");
+      return;
+    }
 
     submitBtn.disabled = true;
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { full_name: fullName }, // handle_new_user() trigger'ı bunu profiles.full_name'e kopyalar
+        data: {
+          full_name: fullName, // handle_new_user() trigger'ı bunu profiles.full_name'e kopyalar
+          kvkk_onay: true,
+          kvkk_versiyon: KVKK_METIN_SURUMU,
+        },
         emailRedirectTo: `${SITE_ORIGIN}/giris.html`,
       },
     });
