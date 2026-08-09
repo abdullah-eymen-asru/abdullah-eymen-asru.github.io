@@ -44,9 +44,22 @@ export async function requireAuth({ role = null, redirectTo = "/giris.html" } = 
   // kullanılmıyor (profil fotoğrafı yükleme ve kişisel bio düzenleme
   // özellikleri kaldırıldı) — o yüzden burada da seçilmiyor, gereksiz veri
   // çekilmiyor.
+  //
+  // BUG FİX (KVKK onayı "her zaman onaylanmamış" görünüyordu): bu sorgu
+  // kvkk_onay_verildi / kvkk_onay_versiyonu / kvkk_onay_tarihi kolonlarını
+  // SEÇMİYORDU. panel.js -> wireKvkk(profile) bu alanları okuyup onay
+  // durumunu çiziyor; alanlar seçilmediği için profile.kvkk_onay_verildi
+  // HER ZAMAN undefined (yani "falsy") geliyordu, dolayısıyla kullanıcı
+  // az önce onay verse bile (onay panel.js içinde ayrıca DB'den taze
+  // profille güncelleniyordu, ama panel her açıldığında/yenilendiğinde
+  // requireAuth() BAŞTAN çağrıldığı için o taze veri kayboluyor ve
+  // "Henüz KVKK onayı vermemişsin" tekrar görünüyordu). Şimdi bu
+  // kolonları da seçiyoruz.
   const { data: profile, error } = await supabase
     .from("profiles")
-    .select("id, email, full_name, role")
+    .select(
+      "id, email, full_name, role, kvkk_onay_verildi, kvkk_onay_versiyonu, kvkk_onay_tarihi"
+    )
     .eq("id", session.user.id)
     .single();
 
