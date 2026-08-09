@@ -17,6 +17,7 @@ yayinda: true
       <a href="#kullanicilar" data-section="kullanicilar" class="active">👤 Kullanıcılar &amp; Roller</a>
       <a href="#icerik-ekle" data-section="icerik-ekle">📝 Özel İçerik Ekle/Düzenle</a>
       <a href="#icerikler" data-section="icerikler">📚 Mevcut Özel İçerikler</a>
+      <a href="#dosya-paylasim" data-section="dosya-paylasim">🔗 R2 Dosya Paylaşımı</a>
       <a href="#mesajlar" data-section="mesajlar">💬 Mesajlar</a>
       <a href="#hesabim" data-section="hesabim">⚙️ Hesabım</a>
     </nav>
@@ -98,6 +99,29 @@ yayinda: true
         <h2>Mevcut Özel İçerikler</h2>
         <p class="muted">Bir içeriği yayınladıktan sonra da "Düzenle" ile geri dönüp değiştirebilirsin.</p>
         <div id="icerik-liste"><p class="muted">Yükleniyor...</p></div>
+      </section>
+
+      <section id="dosya-paylasim" class="panel-section">
+        <h2>R2 Dosya Paylaşımı</h2>
+        <p class="muted">
+          Cloudflare R2 bucket'ındaki (<code>abdullah-eymen-asru-site-ozel-dosyalar</code>)
+          HERHANGİ BİR dosya yolu (key) için tek tıkla süreli (presigned)
+          indirme linki üret ve panoya kopyala. Dosya yolunu R2 Dashboard'dan
+          veya yukarıdaki "Özel İçerik" formunda yüklediğin dosyaların
+          yolundan (<code>içerik-id/dosya-adi</code>) alabilirsin.
+        </p>
+        <div class="form-field">
+          <label for="r2-dosya-key">Dosya Yolu (R2 key)</label>
+          <input id="r2-dosya-key" type="text" placeholder="ör. 3f2504e0-4f89-.../rapor.pdf">
+        </div>
+        <div class="form-field">
+          <label for="r2-gecerlilik-saniye">Geçerlilik Süresi (saniye)</label>
+          <input id="r2-gecerlilik-saniye" type="number" min="60" step="60" value="3600">
+        </div>
+        <button id="r2-link-uret-btn" type="button" class="btn-primary" style="width:auto;">
+          İmzalı Link Üret ve Kopyala
+        </button>
+        <div id="r2-link-sonuc" class="auth-message" hidden></div>
       </section>
 
       <section id="mesajlar" class="panel-section">
