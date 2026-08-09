@@ -28,7 +28,7 @@ import { supabase } from "./supabase-client.js";
 // ---- BURAYI DOLDUR: Worker deploy edildikten sonra aldığın URL ----
 // ör. "https://r2-imza-worker.KULLANICI-ADIN.workers.dev"
 // veya kendi domainine bağladıysan (Custom Domain) o adres.
-const WORKER_URL = "https://r2-imza-worker.BURAYA-KENDI-SUBDOMAININI-YAZ.workers.dev";
+const WORKER_URL = "https://r2-imza-worker.aeymena.workers.dev";
 // ---------------------------------------------------------------------
 
 const VARSAYILAN_GECERLILIK_SANIYE = 3600; // 1 saat
