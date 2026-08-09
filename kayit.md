@@ -32,6 +32,16 @@ yayinda: true
       <label for="password_again">Şifre (Tekrar)</label>
       <input id="password_again" name="password_again" type="password" autocomplete="new-password" minlength="8" required>
     </div>
+    <div class="form-field">
+      <label style="display:flex; gap:8px; align-items:flex-start; flex-direction:row; font-size:0.9rem; color:var(--text);">
+        <input id="kvkk_onay" name="kvkk_onay" type="checkbox" required style="margin-top:3px;">
+        <span>
+          <a href="{{ '/gizlilik-politikasi.html' | relative_url }}" target="_blank">KVKK Aydınlatma Metni ve Gizlilik Politikası</a>'nı
+          okudum, 6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında kişisel
+          verilerimin belirtilen şekilde işlenmesine açık rıza gösteriyorum.
+        </span>
+      </label>
+    </div>
     <button type="submit" class="btn-primary">Kayıt Ol</button>
   </form>
 
