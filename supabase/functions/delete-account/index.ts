@@ -2,15 +2,19 @@
 // supabase/functions/delete-account/index.ts
 //
 // NEDEN BİR EDGE FUNCTION GEREKİYOR?
-// Supabase'te bir kullanıcının auth.users tablosundaki KENDİ satırını
-// silebilmesi için "service_role" yetkisi gerekir; normal (anon/authenticated)
-// istemci anahtarı bunu YAPAMAZ (bilinçli bir güvenlik kısıtı, yoksa herkes
-// başkasının hesabını silebilirdi). Bu yüzden:
-//   1) Kullanıcı kendi tarayıcısından bu fonksiyonu KENDİ oturum token'ıyla
-//      çağırır ("Authorization: Bearer <access_token>").
-//   2) Fonksiyon önce bu token'ın GERÇEKTEN o kullanıcıya ait olduğunu
-//      doğrular (service_role ile başka bir kullanıcıyı silmesin diye).
-//   3) Doğrulama geçerse, YALNIZCA o kullanıcının kendi id'sini siler.
+// Supabase'te bir kullanıcının auth.users tablosundaki KENDİ (veya başka
+// birinin) satırını silebilmesi için "service_role" yetkisi gerekir; normal
+// (anon/authenticated) istemci anahtarı bunu YAPAMAZ (bilinçli bir güvenlik
+// kısıtı, yoksa herkes başkasının hesabını silebilirdi). Bu yüzden:
+//   1) Kullanıcı (veya admin) kendi tarayıcısından bu fonksiyonu KENDİ
+//      oturum token'ıyla çağırır ("Authorization: Bearer <access_token>").
+//   2) Fonksiyon önce bu token'ın GERÇEKTEN kime ait olduğunu doğrular.
+//   3) İstek gövdesinde "hedef_kullanici_id" YOKSA -> çağıran kendi hesabını
+//      siler (eski davranış, herkes kullanabilir).
+//      "hedef_kullanici_id" VARSA -> sadece çağıran ADMİN ise, o hedefi
+//      siler (admin panelindeki "Üyeyi Sil" butonu bunu kullanır). Admin
+//      kendi id'sini hedef olarak gönderirse bu da "kendini sil" ile aynı
+//      sonucu verir — yani admin de KENDİ hesabını bu yoldan silebilir.
 //
 // Deploy:  supabase functions deploy delete-account
 // Secrets: SUPABASE_URL ve SUPABASE_SERVICE_ROLE_KEY, Supabase projelerinde
@@ -57,6 +61,18 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: "Oturum token'ı eksik." }), { status: 401, headers });
   }
 
+  // İsteğe bağlı gövde: { "hedef_kullanici_id": "uuid" }. Boş/geçersiz JSON
+  // gövde de kabul edilir (eski istemciler hiç gövde göndermiyordu).
+  let hedefKullaniciId: string | null = null;
+  try {
+    const body = await req.json();
+    if (body && typeof body.hedef_kullanici_id === "string" && body.hedef_kullanici_id.trim()) {
+      hedefKullaniciId = body.hedef_kullanici_id.trim();
+    }
+  } catch {
+    // Gövde yok veya JSON değil -> sorun değil, "kendini sil" varsayılan davranış.
+  }
+
   // service_role client: yönetimsel işlemler için (auth.admin.*)
   const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -72,44 +88,65 @@ Deno.serve(async (req) => {
   }
   const callerId = userData.user.id;
 
-  try {
-    // 2) Önce ilişkili verileri (özel içerik erişim atamaları vb.) temizle.
-    //    profiles satırı zaten auth.users -> ON DELETE CASCADE ile silinecek,
-    //    ama açıkça da çağırıyoruz (idempotent, zarar vermez).
-    await adminClient.rpc("delete_own_profile_data_as", { p_user_id: callerId }).catch(() => {
-      // Bu RPC yoksa (aşağıdaki NOTA bak) sorun değil, cascade zaten halledecek.
-    });
+  // 2) Silinecek hedef kimliği belirle + yetki kontrolü.
+  let targetId = callerId;
+  if (hedefKullaniciId && hedefKullaniciId !== callerId) {
+    // Başkasını silmeye çalışıyor -> çağıran GERÇEKTEN admin mi diye
+    // veritabanından (service_role ile, RLS'i atlayarak ama biz burada
+    // sadece OKUYORUZ) doğrula. Çağıranın kendi beyanına asla güvenmiyoruz.
+    const { data: callerProfile, error: profileErr } = await adminClient
+      .from("profiles")
+      .select("role")
+      .eq("id", callerId)
+      .single();
 
-    // 3) Kendi kullanıcı verilerini (avatar dosyası) storage'dan sil.
-    const { data: files } = await adminClient.storage.from("avatarlar").list(callerId);
+    if (profileErr || callerProfile?.role !== "admin") {
+      return new Response(
+        JSON.stringify({ error: "Yetkisiz işlem: sadece admin başka bir kullanıcıyı silebilir." }),
+        { status: 403, headers }
+      );
+    }
+    targetId = hedefKullaniciId;
+  }
+
+  try {
+    // 3) Önce ilişkili verileri (özel içerik erişim atamaları, profil vb.)
+    //    temizle. auth.users satırı zaten ON DELETE CASCADE ile bunları
+    //    otomatik temizleyecek olsa da, admin_delete_user_data() ile
+    //    açıkça de çağırıyoruz (idempotent, zarar vermez, ve auth.users
+    //    silme adımı herhangi bir sebeple başarısız olursa bile veri
+    //    tutarlılığını erken sağlar).
+    try {
+      const { error: rpcErr } = await adminClient.rpc("admin_delete_user_data", { p_user_id: targetId });
+      if (rpcErr) {
+        console.warn("admin_delete_user_data RPC uyarısı (cascade zaten halledecek):", rpcErr);
+      }
+    } catch (e) {
+      console.warn("admin_delete_user_data RPC uyarısı (cascade zaten halledecek):", e);
+    }
+
+    // 4) Hedef kullanıcının storage'daki dosyalarını (varsa eski avatarlar,
+    //    vb.) temizle.
+    const { data: files } = await adminClient.storage.from("avatarlar").list(targetId);
     if (files && files.length > 0) {
-      const paths = files.map((f) => `${callerId}/${f.name}`);
+      const paths = files.map((f) => `${targetId}/${f.name}`);
       await adminClient.storage.from("avatarlar").remove(paths);
     }
 
-    // 4) Asıl Auth hesabını sil. profiles, content_access vb. FK'lerdeki
+    // 5) Asıl Auth hesabını sil. profiles, content_access vb. FK'lerdeki
     //    ON DELETE CASCADE sayesinde ilişkili TÜM veriler otomatik gider.
-    const { error: delErr } = await adminClient.auth.admin.deleteUser(callerId);
+    const { error: delErr } = await adminClient.auth.admin.deleteUser(targetId);
     if (delErr) throw delErr;
 
-    return new Response(JSON.stringify({ success: true }), { status: 200, headers });
-  } catch (err) {
-    console.error("delete-account error:", err);
-    return new Response(JSON.stringify({ error: "Hesap silinirken bir hata oluştu." }), {
-      status: 500,
+    return new Response(JSON.stringify({ success: true, silinen_id: targetId }), {
+      status: 200,
       headers,
     });
+  } catch (err: any) {
+    console.error("delete-account error:", err);
+    return new Response(
+      JSON.stringify({ error: "Hesap silinirken bir hata oluştu: " + (err?.message ?? String(err)) }),
+      { status: 500, headers }
+    );
   }
 });
-
-// NOT: adım 2'deki "delete_own_profile_data_as" RPC'si isteğe bağlıdır ve
-// migration dosyasında yer almıyor — çünkü zaten auth.users silindiğinde
-// CASCADE ile aynı iş yapılıyor. İstersen migration'a şunu ekleyip
-// service_role'e EXECUTE izni verebilirsin, tamamen opsiyonel:
-//
-//   create or replace function public.delete_own_profile_data_as(p_user_id uuid)
-//   returns void language plpgsql security definer set search_path = public as $$
-//   begin
-//     delete from public.content_access where user_id = p_user_id;
-//     delete from public.profiles where id = p_user_id;
-//   end; $$;
