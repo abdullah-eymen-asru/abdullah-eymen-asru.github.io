@@ -61,6 +61,19 @@ yayinda: true
       <div id="ozel-icerik-list"><p class="muted">Yükleniyor...</p></div>
     </section>
 
+    <section class="panel-section" id="chat-kullanici">
+      <h2>Mesajlar</h2>
+      <p class="muted">Sadece site yöneticisiyle yazışabilirsin.</p>
+      <div class="chat-box">
+        <div id="chat-mesaj-liste" class="chat-mesaj-liste"><p class="chat-bos">Yükleniyor...</p></div>
+        <form id="chat-form" class="chat-form" novalidate>
+          <textarea id="chat-metin" placeholder="Mesajını yaz..." required></textarea>
+          <button type="submit">Gönder</button>
+        </form>
+      </div>
+      <div id="chat-message" class="auth-message" hidden></div>
+    </section>
+
     <section class="panel-section danger-zone">
       <h2>Tehlikeli Bölge</h2>
       <p>Hesabını sildiğinde profilin ve özel içerik erişimlerin dahil TÜM
