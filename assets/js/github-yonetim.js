@@ -1,0 +1,754 @@
+/*
+ * assets/js/github-yonetim.js — /github-yonetim.html
+ *
+ * Jekyll/GitHub Pages için, 3. parti bir servise (Netlify vb.) ihtiyaç
+ * duymadan çalışan tek sayfalık bir "mini CMS". Doğrudan GitHub REST
+ * API'sine (repos/{owner}/{repo}/contents/{path}) istek atarak _posts/ ve
+ * _projects/ klasörlerine commit atar, assets/profil.jpg dosyasını yönetir.
+ *
+ * ÖNEMLİ — BU SAYFA SİTENİN SUPABASE TABANLI "ADMİN PANELİ"NDEN (admin.md /
+ * admin.js) TAMAMEN BAĞIMSIZDIR. O panel Supabase'teki kullanıcı/rol/özel
+ * içerik sistemini yönetir; bu sayfa ise GitHub Pages'in kendi statik
+ * Jekyll içeriğini (blog yazıları, akademik projeler, profil fotoğrafı)
+ * yönetir. Aralarındaki TEK ortak nokta: bu sayfaya erişim de aynı
+ * requireAuth({ role: 'admin' }) mekanizmasıyla (bkz. auth-guard.js),
+ * yani sadece Supabase'te role='admin' olan kullanıcılar görebilir.
+ *
+ * GÜVENLİK NOTU — GitHub Personal Access Token (PAT):
+ *   Token SADECE bu modülün belleğinde (PAT_BELLEK değişkeni) tutulur.
+ *   localStorage/sessionStorage'a KASITLI OLARAK yazılmıyor — sayfa
+ *   yenilendiğinde veya sekme kapatıldığında token kaybolur, bir dahaki
+ *   girişte yeniden yapıştırman gerekir. Bu, kullanışlılıktan ziyade
+ *   güvenliği önceliklendiren bilinçli bir tercih: tarayıcı depolaması
+ *   (özellikle localStorage) bir XSS açığında kalıcı olarak sızdırılabilir,
+ *   bellekteki bir değişken ise sayfa hayatta olduğu sürece de risklidir
+ *   ama en azından hiçbir yerde KALICI olarak durmaz. Buna karşın GitHub
+ *   kullanıcı adı ve repo adı gizli bilgi olmadığından, kolaylık için
+ *   localStorage'da hatırlanır (bkz. ghAyarlariniYukle).
+ *
+ *   Fine-grained bir PAT oluşturup SADECE bu repo için "Contents: Read and
+ *   write" iznini vermen hem yeterli hem de tüm hesaba erişen "classic"
+ *   bir token kullanmaktan çok daha güvenli.
+ */
+import { requireAuth } from "./auth-guard.js";
+import { escapeHtml, showMessage } from "./supabase-client.js";
+
+const GITHUB_API = "https://api.github.com";
+const PROFIL_YOLU = "assets/profil.jpg";
+
+// Token SADECE bellekte — bkz. dosya başındaki güvenlik notu.
+let PAT_BELLEK = "";
+
+// null: yeni içerik ekleniyor, doluysa mevcut bir dosya düzenleniyor.
+let DUZENLENEN_YOL = null;
+let DUZENLENEN_SHA = null;
+
+let PROFIL_SHA = null;
+
+async function init() {
+  await requireAuth({ role: "admin" });
+  document.getElementById("loading")?.setAttribute("hidden", "");
+  document.getElementById("app").hidden = false;
+
+  ghAyarlariniYukle();
+  wireSectionNav();
+  wireIcerikTuruToggle();
+  wireEditorToolbar();
+  wireBaglantiDogrula();
+  wireIcerikForm();
+  wireIcerikListe();
+  wireProfilFoto();
+
+  document.getElementById("ic-date").value = new Date().toISOString().slice(0, 10);
+}
+
+/* ---------------------------------------------------------------------- */
+/* BÖLÜM (SECTION) BAZLI GEZİNME — admin.js ile aynı desen                */
+/* ---------------------------------------------------------------------- */
+function wireSectionNav() {
+  const nav = document.getElementById("gy-nav");
+  if (!nav) return;
+
+  nav.querySelectorAll("a[data-section]").forEach((link) => {
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      const id = link.dataset.section;
+      const hedef = document.getElementById(id);
+      if (!hedef) return;
+      hedef.scrollIntoView({ behavior: "smooth", block: "start" });
+      nav.querySelectorAll("a").forEach((a) => a.classList.remove("active"));
+      link.classList.add("active");
+      history.replaceState(null, "", `#${id}`);
+    });
+  });
+
+  if (window.location.hash) {
+    const link = nav.querySelector(`a[data-section="${window.location.hash.slice(1)}"]`);
+    link?.click();
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* GITHUB BAĞLANTI AYARLARI                                               */
+/* ---------------------------------------------------------------------- */
+function ghAyarlariniYukle() {
+  const app = document.getElementById("app");
+  document.getElementById("gh-owner").value =
+    localStorage.getItem("gy_owner") || app.dataset.defaultOwner || "";
+  document.getElementById("gh-repo").value =
+    localStorage.getItem("gy_repo") || app.dataset.defaultRepo || "";
+  document.getElementById("gh-branch").value = localStorage.getItem("gy_branch") || "";
+}
+
+function ghAyarlari() {
+  return {
+    owner: document.getElementById("gh-owner").value.trim(),
+    repo: document.getElementById("gh-repo").value.trim(),
+    branch: document.getElementById("gh-branch").value.trim(),
+  };
+}
+
+function wireBaglantiDogrula() {
+  document.getElementById("gh-baglan-btn").addEventListener("click", async () => {
+    const msgEl = document.getElementById("gh-baglanti-message");
+    const { owner, repo, branch } = ghAyarlari();
+    const pat = document.getElementById("gh-pat").value.trim();
+
+    if (!owner || !repo || !pat) {
+      showMessage(msgEl, "Kullanıcı adı, repo adı ve token gerekli.", "error");
+      return;
+    }
+
+    PAT_BELLEK = pat;
+    localStorage.setItem("gy_owner", owner);
+    localStorage.setItem("gy_repo", repo);
+    localStorage.setItem("gy_branch", branch);
+
+    const btn = document.getElementById("gh-baglan-btn");
+    btn.disabled = true;
+    btn.textContent = "Kontrol ediliyor...";
+    try {
+      const res = await ghRequest("");
+      if (!res.ok) throw new Error(await ghHataMesaji(res));
+      const repoData = await res.json();
+      const yazmaYetkisi = repoData.permissions?.push;
+      showMessage(
+        msgEl,
+        `Bağlantı doğrulandı — "${repoData.full_name}" (varsayılan branch: ${repoData.default_branch})` +
+          (yazmaYetkisi ? "" : " — UYARI: bu token ile yazma izniniz yok gibi görünüyor."),
+        yazmaYetkisi ? "success" : "error"
+      );
+      await profilFotoDurumYukle();
+    } catch (err) {
+      PAT_BELLEK = "";
+      showMessage(msgEl, `Bağlantı doğrulanamadı: ${err.message}`, "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Bağlantıyı Doğrula";
+    }
+  });
+}
+
+/* ---------------------------------------------------------------------- */
+/* GITHUB REST API YARDIMCILARI                                           */
+/* ---------------------------------------------------------------------- */
+function encodePath(yol) {
+  return yol.split("/").map(encodeURIComponent).join("/");
+}
+
+async function ghRequest(path, options = {}) {
+  if (!PAT_BELLEK) throw new Error("Önce GitHub bağlantısını doğrula (PAT gerekli).");
+  const { owner, repo } = ghAyarlari();
+  if (!owner || !repo) throw new Error("GitHub kullanıcı adı ve repo adı gerekli.");
+  return fetch(`${GITHUB_API}/repos/${owner}/${repo}${path}`, {
+    ...options,
+    headers: {
+      Authorization: `token ${PAT_BELLEK}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      ...(options.headers || {}),
+    },
+  });
+}
+
+async function ghHataMesaji(res) {
+  try {
+    const j = await res.json();
+    return `${res.status} ${j.message || res.statusText}`;
+  } catch {
+    return `${res.status} ${res.statusText}`;
+  }
+}
+
+/** Dosya VEYA klasör içeriği okur. 404 ise null döner (var olmadığı anlamına gelir). */
+async function ghGetContents(path) {
+  const { branch } = ghAyarlari();
+  const q = branch ? `?ref=${encodeURIComponent(branch)}` : "";
+  const res = await ghRequest(`/contents/${encodePath(path)}${q}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(await ghHataMesaji(res));
+  return res.json();
+}
+
+async function ghPutFile(path, icerikBase64, mesaj, sha = null) {
+  const { branch } = ghAyarlari();
+  const govde = { message: mesaj, content: icerikBase64 };
+  if (sha) govde.sha = sha;
+  if (branch) govde.branch = branch;
+  const res = await ghRequest(`/contents/${encodePath(path)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(govde),
+  });
+  if (!res.ok) throw new Error(await ghHataMesaji(res));
+  return res.json();
+}
+
+async function ghDeleteFile(path, sha, mesaj) {
+  const { branch } = ghAyarlari();
+  const govde = { message: mesaj, sha };
+  if (branch) govde.branch = branch;
+  const res = await ghRequest(`/contents/${encodePath(path)}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(govde),
+  });
+  if (!res.ok) throw new Error(await ghHataMesaji(res));
+  return res.json();
+}
+
+/* Base64 <-> UTF-8 metin dönüşümü (GitHub API içeriği hep base64 bekler/döner). */
+function b64Encode(str) {
+  return btoa(
+    encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode(parseInt(p1, 16)))
+  );
+}
+function b64Decode(str) {
+  return decodeURIComponent(
+    atob(str)
+      .split("")
+      .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+      .join("")
+  );
+}
+
+/* ---------------------------------------------------------------------- */
+/* İÇERİK TÜRÜ SEÇİMİ (Blog / Proje) — FORM ALANLARININ DİNAMİK DEĞİŞİMİ   */
+/* ---------------------------------------------------------------------- */
+function icerikTuru() {
+  return document.querySelector('input[name="icerik-turu"]:checked')?.value || "blog";
+}
+
+function wireIcerikTuruToggle() {
+  document.querySelectorAll('input[name="icerik-turu"]').forEach((r) => {
+    r.addEventListener("change", guncelleIcerikTuru);
+  });
+  guncelleIcerikTuru();
+}
+
+function guncelleIcerikTuru() {
+  const proje = icerikTuru() === "proje";
+  document.getElementById("ic-proje-alanlar").hidden = !proje;
+  document.getElementById("ic-yil-oneki-wrap").hidden = !proje;
+  document.getElementById("ic-form-baslik").textContent = DUZENLENEN_YOL
+    ? proje
+      ? "Akademik Projeyi Düzenle"
+      : "Blog Yazısını Düzenle"
+    : proje
+    ? "Yeni Akademik Proje Ekle"
+    : "Yeni Blog Yazısı Ekle";
+}
+
+/* ---------------------------------------------------------------------- */
+/* HAFİF MARKDOWN EDİTÖR ARAÇ ÇUBUĞU                                      */
+/* ---------------------------------------------------------------------- */
+function wireEditorToolbar() {
+  document.querySelectorAll(".gy-editor-toolbar button").forEach((btn) => {
+    btn.addEventListener("click", () => markdownUygula(btn.dataset.md));
+  });
+}
+
+function markdownUygula(tur) {
+  const ta = document.getElementById("ic-body");
+  const start = ta.selectionStart;
+  const end = ta.selectionEnd;
+  const secili = ta.value.slice(start, end);
+  let yeni;
+
+  switch (tur) {
+    case "bold":
+      yeni = `**${secili || "kalın metin"}**`;
+      break;
+    case "italic":
+      yeni = `*${secili || "italik metin"}*`;
+      break;
+    case "h2":
+      yeni = `\n## ${secili || "Başlık"}\n`;
+      break;
+    case "list":
+      yeni = (secili || "liste maddesi")
+        .split("\n")
+        .map((s) => `- ${s}`)
+        .join("\n");
+      break;
+    case "link": {
+      const url = window.prompt("Bağlantı URL'si:", "https://");
+      if (!url) return;
+      yeni = `[${secili || "bağlantı metni"}](${url})`;
+      break;
+    }
+    default:
+      return;
+  }
+
+  ta.focus();
+  ta.setRangeText(yeni, start, end, "end");
+}
+
+/* ---------------------------------------------------------------------- */
+/* SLUG / RASTGELE ÖN İZLEME KODU ÜRETİMİ                                 */
+/* ---------------------------------------------------------------------- */
+function rastgeleKod(uzunluk = 8) {
+  const alfabe = "abcdefghijklmnopqrstuvwxyz0123456789";
+  const rastgeleBaytlar = new Uint8Array(uzunluk);
+  crypto.getRandomValues(rastgeleBaytlar);
+  return Array.from(rastgeleBaytlar, (b) => alfabe[b % alfabe.length]).join("");
+}
+
+const TR_HARF_ESLESTIRME = {
+  ç: "c", Ç: "c", ğ: "g", Ğ: "g", ı: "i", İ: "i",
+  ö: "o", Ö: "o", ş: "s", Ş: "s", ü: "u", Ü: "u",
+};
+
+function slugOlustur(metin) {
+  return metin
+    .split("")
+    .map((ch) => TR_HARF_ESLESTIRME[ch] ?? ch)
+    .join("")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+/* ---------------------------------------------------------------------- */
+/* FRONT MATTER OLUŞTURMA / OKUMA                                         */
+/* ---------------------------------------------------------------------- */
+function fmSatiri(anahtar, deger, ciplak = false) {
+  if (deger === undefined || deger === null || deger === "") return null;
+  if (ciplak) return `${anahtar}: ${deger}`;
+  return `${anahtar}: "${String(deger).replace(/"/g, '\\"')}"`;
+}
+
+/**
+ * Front matter + gövdeden tam Markdown dosya içeriğini üretir.
+ * "Yayında" işaretliyse: yayinda:true, sitemap:true, permalink YOK.
+ * İşaretli değilse: yayinda:false, sitemap:false + rastgele gizli permalink.
+ */
+function dosyaIcerigiOlustur(tur, alan, yayinda, gizliKod, govde) {
+  const satirlar = ["---"];
+  satirlar.push(fmSatiri("title", alan.title));
+  satirlar.push(fmSatiri("date", alan.date, true));
+
+  if (tur === "proje") {
+    satirlar.push(fmSatiri("venue", alan.venue));
+    satirlar.push(fmSatiri("status", alan.status));
+    satirlar.push(fmSatiri("summary", alan.summary));
+    satirlar.push(fmSatiri("link", alan.link));
+    satirlar.push(fmSatiri("link_label", alan.link_label));
+  }
+
+  satirlar.push(fmSatiri("yayinda", yayinda, true));
+  satirlar.push(fmSatiri("sitemap", yayinda, true));
+
+  if (!yayinda) {
+    const onEk = tur === "proje" ? "/projects/" : "/blog/";
+    satirlar.push(fmSatiri("permalink", `${onEk}on-izleme-${gizliKod}/`, true));
+  }
+
+  satirlar.push("---");
+  const frontMatter = satirlar.filter(Boolean).join("\n");
+  return `${frontMatter}\n\n${govde.trim()}\n`;
+}
+
+/** Basit front-matter okuyucu — bu panelin ürettiği sınırlı alan setiyle çalışacak şekilde tasarlandı. */
+function frontMatterOku(ham) {
+  const eslesme = ham.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+  if (!eslesme) return { data: {}, body: ham };
+
+  const data = {};
+  eslesme[1].split(/\r?\n/).forEach((satir) => {
+    const m = satir.match(/^([a-zA-Z_]+):\s?(.*)$/);
+    if (!m) return;
+    const anahtar = m[1];
+    let deger = m[2].trim();
+    if (!deger.startsWith('"')) {
+      const yorumIndex = deger.indexOf("#");
+      if (yorumIndex !== -1) deger = deger.slice(0, yorumIndex).trim();
+    }
+    if (deger.startsWith('"') && deger.endsWith('"') && deger.length >= 2) {
+      deger = deger.slice(1, -1).replace(/\\"/g, '"');
+    }
+    if (deger === "true") data[anahtar] = true;
+    else if (deger === "false") data[anahtar] = false;
+    else data[anahtar] = deger;
+  });
+
+  return { data, body: (eslesme[2] || "").replace(/^\n+/, "") };
+}
+
+function dosyaYoluHesapla(tur, tarih, slug, yilOneki) {
+  if (tur === "blog") return `_posts/${tarih}-${slug}.md`;
+  const yil = tarih.slice(0, 4);
+  return `_projects/${yilOneki ? yil + "-" : ""}${slug}.md`;
+}
+
+/* ---------------------------------------------------------------------- */
+/* İÇERİK EKLE / DÜZENLE FORMU                                            */
+/* ---------------------------------------------------------------------- */
+function wireIcerikForm() {
+  document.getElementById("icerik-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await icerikKaydet();
+  });
+  document.getElementById("ic-iptal-btn").addEventListener("click", duzenlemeyiIptalEt);
+}
+
+function duzenlemeyiKapat() {
+  DUZENLENEN_YOL = null;
+  DUZENLENEN_SHA = null;
+  document.getElementById("ic-iptal-btn").hidden = true;
+  document.getElementById("ic-submit-btn").textContent = "GitHub'a Yayınla";
+  guncelleIcerikTuru();
+}
+
+function duzenlemeyiIptalEt() {
+  duzenlemeyiKapat();
+  document.getElementById("icerik-form").reset();
+  document.getElementById("ic-date").value = new Date().toISOString().slice(0, 10);
+  document.getElementById("ic-onizleme-kutusu").hidden = true;
+  guncelleIcerikTuru();
+}
+
+async function icerikKaydet() {
+  const msgEl = document.getElementById("ic-message");
+  const submitBtn = document.getElementById("ic-submit-btn");
+  msgEl.hidden = true;
+
+  const tur = icerikTuru();
+  const title = document.getElementById("ic-title").value.trim();
+  const date = document.getElementById("ic-date").value;
+
+  if (!title || !date) {
+    showMessage(msgEl, "Başlık ve tarih zorunludur.", "error");
+    return;
+  }
+
+  const slugGirdi = document.getElementById("ic-slug").value.trim();
+  const slug = slugOlustur(slugGirdi || title);
+  if (!slug) {
+    showMessage(msgEl, "Geçerli bir dosya adı/slug üretilemedi, başlığı kontrol et.", "error");
+    return;
+  }
+
+  const yayinda = document.getElementById("ic-yayinda").checked;
+  const yilOneki = tur === "proje" && document.getElementById("ic-yil-oneki").checked;
+
+  const alan = { title, date };
+  if (tur === "proje") {
+    alan.venue = document.getElementById("ic-venue").value.trim();
+    alan.status = document.getElementById("ic-status").value;
+    alan.summary = document.getElementById("ic-summary").value.trim();
+    alan.link = document.getElementById("ic-link").value.trim();
+    alan.link_label = document.getElementById("ic-link-label").value.trim();
+  }
+
+  const govde = document.getElementById("ic-body").value;
+  const gizliKod = !yayinda ? rastgeleKod(8) : null;
+  const dosyaIcerigi = dosyaIcerigiOlustur(tur, alan, yayinda, gizliKod, govde);
+  const yeniYol = dosyaYoluHesapla(tur, date, slug, yilOneki);
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Gönderiliyor...";
+  try {
+    const icerikB64 = b64Encode(dosyaIcerigi);
+    const commitMesaji = DUZENLENEN_YOL ? `İçerik güncellendi: ${yeniYol}` : `Yeni içerik eklendi: ${yeniYol}`;
+
+    if (DUZENLENEN_YOL && DUZENLENEN_YOL === yeniYol) {
+      // Dosya yolu değişmedi -> doğrudan güncelle.
+      await ghPutFile(yeniYol, icerikB64, commitMesaji, DUZENLENEN_SHA);
+    } else {
+      // Yeni dosya, ya da düzenleme sırasında dosya adı/tarih değiştiği
+      // için yol değişti -> önce hedef yolda dosya var mı diye bak (sha
+      // gerekiyorsa al), sonra yaz.
+      const mevcutHedef = await ghGetContents(yeniYol).catch(() => null);
+      await ghPutFile(yeniYol, icerikB64, commitMesaji, mevcutHedef?.sha || null);
+
+      // Düzenleme sırasında yol değiştiyse eski dosyayı sil (yeniden adlandırma).
+      if (DUZENLENEN_YOL && DUZENLENEN_YOL !== yeniYol && DUZENLENEN_SHA) {
+        await ghDeleteFile(
+          DUZENLENEN_YOL,
+          DUZENLENEN_SHA,
+          `Yeniden adlandırıldı: ${DUZENLENEN_YOL} -> ${yeniYol}`
+        );
+      }
+    }
+
+    if (!yayinda) {
+      const onizlemeYolu = tur === "proje" ? `/projects/on-izleme-${gizliKod}/` : `/blog/on-izleme-${gizliKod}/`;
+      const onizlemeEl = document.getElementById("ic-onizleme-kutusu");
+      onizlemeEl.className = "auth-message auth-message--success";
+      onizlemeEl.innerHTML =
+        `Gizli ön izleme linki (sadece bu linki bilen görebilir):` +
+        `<div class="gy-link-kutu"><input type="text" readonly value="${escapeHtml(
+          location.origin + onizlemeYolu
+        )}" onclick="this.select()"></div>`;
+      onizlemeEl.hidden = false;
+    } else {
+      document.getElementById("ic-onizleme-kutusu").hidden = true;
+    }
+
+    showMessage(msgEl, "İşlem başarıyla GitHub'a iletildi, 1-2 dakika içinde sitede güncellenecektir.", "success");
+    duzenlemeyiKapat();
+    await icerikListesiYukle();
+  } catch (err) {
+    showMessage(msgEl, `Hata: ${err.message}`, "error");
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "GitHub'a Yayınla";
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* MEVCUT İÇERİKLER LİSTESİ                                               */
+/* ---------------------------------------------------------------------- */
+function wireIcerikListe() {
+  document.getElementById("ic-liste-yenile-btn").addEventListener("click", icerikListesiYukle);
+}
+
+async function icerikListesiYukle() {
+  const el = document.getElementById("ic-liste");
+  if (!PAT_BELLEK) {
+    el.innerHTML = '<p class="muted">Önce "GitHub Bağlantısı" sekmesinden bağlantını doğrula.</p>';
+    return;
+  }
+
+  el.innerHTML = '<p class="muted">Yükleniyor...</p>';
+  try {
+    const [postlar, projeler] = await Promise.all([
+      ghGetContents("_posts").catch(() => []),
+      ghGetContents("_projects").catch(() => []),
+    ]);
+
+    const postDosyalari = (postlar || []).filter((f) => f.type === "file" && f.name.endsWith(".md"));
+    const projeDosyalari = (projeler || []).filter((f) => f.type === "file" && f.name.endsWith(".md"));
+
+    const [postDetaylari, projeDetaylari] = await Promise.all([
+      Promise.all(postDosyalari.map((f) => icerikOzetiGetir(f, "blog"))),
+      Promise.all(projeDosyalari.map((f) => icerikOzetiGetir(f, "proje"))),
+    ]);
+
+    postDetaylari.sort((a, b) => (b.data.date || "").localeCompare(a.data.date || ""));
+    projeDetaylari.sort((a, b) => (b.data.date || "").localeCompare(a.data.date || ""));
+
+    el.innerHTML = "";
+    el.appendChild(icerikListesiCiz("Blog Yazıları", postDetaylari, "blog"));
+    el.appendChild(icerikListesiCiz("Akademik Projeler", projeDetaylari, "proje"));
+  } catch (err) {
+    el.innerHTML = `<p class="muted">Liste yüklenemedi: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+async function icerikOzetiGetir(dosya, tur) {
+  const detay = await ghGetContents(dosya.path);
+  const ham = b64Decode(detay.content.replace(/\n/g, ""));
+  const { data, body } = frontMatterOku(ham);
+  return { path: dosya.path, sha: detay.sha, tur, data, body };
+}
+
+function icerikListesiCiz(baslik, liste, tur) {
+  const wrap = document.createElement("div");
+  const h = document.createElement("div");
+  h.className = "gy-liste-baslik";
+  h.textContent = `${baslik} (${liste.length})`;
+  wrap.appendChild(h);
+
+  if (liste.length === 0) {
+    const p = document.createElement("p");
+    p.className = "muted";
+    p.textContent = "Henüz içerik yok.";
+    wrap.appendChild(p);
+    return wrap;
+  }
+
+  liste.forEach((item) => wrap.appendChild(icerikKartiCiz(item, tur)));
+  return wrap;
+}
+
+function icerikKartiCiz(item, tur) {
+  const kart = document.createElement("div");
+  kart.className = "gy-icerik-kart";
+  const yayinda = item.data.yayinda !== false; // alan hiç yoksa yayında sayılır
+  const rozet = yayinda
+    ? '<span class="gy-rozet gy-rozet--yayinda">Yayında</span>'
+    : '<span class="gy-rozet gy-rozet--gizli">Gizli</span>';
+
+  kart.innerHTML = `
+    <div class="gy-icerik-kart-bilgi">
+      <div class="gy-icerik-kart-baslik">${escapeHtml(item.data.title || item.path)}${rozet}</div>
+      <div class="gy-icerik-kart-meta">${escapeHtml(item.data.date || "")} · ${escapeHtml(item.path)}</div>
+    </div>
+    <div class="gy-icerik-kart-aksiyonlar">
+      <button type="button" class="gy-duzenle-btn">Düzenle</button>
+      <button type="button" class="gy-sil-btn">Sil</button>
+    </div>
+  `;
+  kart.querySelector(".gy-duzenle-btn").addEventListener("click", () => icerikDuzenlemeyeYukle(item, tur));
+  kart.querySelector(".gy-sil-btn").addEventListener("click", () => icerikSil(item));
+  return kart;
+}
+
+async function icerikSil(item) {
+  if (!confirm(`"${item.data.title || item.path}" silinsin mi? Bu işlem geri alınamaz.`)) return;
+  try {
+    await ghDeleteFile(item.path, item.sha, `İçerik silindi: ${item.path}`);
+    await icerikListesiYukle();
+  } catch (err) {
+    alert(`Silinemedi: ${err.message}`);
+  }
+}
+
+function icerikDuzenlemeyeYukle(item, tur) {
+  DUZENLENEN_YOL = item.path;
+  DUZENLENEN_SHA = item.sha;
+
+  document.querySelector(`input[name="icerik-turu"][value="${tur}"]`).checked = true;
+  guncelleIcerikTuru();
+
+  document.getElementById("ic-title").value = item.data.title || "";
+  document.getElementById("ic-date").value = item.data.date || "";
+
+  const dosyaAdi = item.path.split("/").pop().replace(/\.md$/, "");
+  document.getElementById("ic-slug").value =
+    tur === "blog" ? dosyaAdi.replace(/^\d{4}-\d{2}-\d{2}-/, "") : dosyaAdi.replace(/^\d{4}-/, "");
+  document.getElementById("ic-yil-oneki").checked = tur === "proje" && /^\d{4}-/.test(dosyaAdi);
+
+  if (tur === "proje") {
+    document.getElementById("ic-venue").value = item.data.venue || "";
+    document.getElementById("ic-status").value = item.data.status || "Yayınlandı";
+    document.getElementById("ic-summary").value = item.data.summary || "";
+    document.getElementById("ic-link").value = item.data.link || "";
+    document.getElementById("ic-link-label").value = item.data.link_label || "";
+  }
+
+  document.getElementById("ic-body").value = item.body || "";
+  document.getElementById("ic-yayinda").checked = item.data.yayinda !== false;
+  document.getElementById("ic-onizleme-kutusu").hidden = true;
+
+  document.getElementById("ic-iptal-btn").hidden = false;
+  document.getElementById("ic-submit-btn").textContent = "Güncelle";
+  document.getElementById("icerik-ekle").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+/* ---------------------------------------------------------------------- */
+/* PROFİL FOTOĞRAFI YÖNETİMİ (assets/profil.jpg)                          */
+/* ---------------------------------------------------------------------- */
+function wireProfilFoto() {
+  document.getElementById("pf-yukle-btn").addEventListener("click", profilFotoYukle);
+  document.getElementById("pf-sil-btn").addEventListener("click", profilFotoSil);
+}
+
+async function profilFotoDurumYukle() {
+  const el = document.getElementById("pf-mevcut");
+  el.innerHTML = '<p class="muted">Yükleniyor...</p>';
+  try {
+    const dosya = await ghGetContents(PROFIL_YOLU);
+    if (!dosya) {
+      PROFIL_SHA = null;
+      el.innerHTML = '<p class="muted">Şu anda bir profil fotoğrafı yok.</p>';
+      return;
+    }
+    PROFIL_SHA = dosya.sha;
+    const src = dosya.download_url || `data:image/jpeg;base64,${dosya.content.replace(/\n/g, "")}`;
+    el.innerHTML = `<img src="${src}" alt="Mevcut profil fotoğrafı"><span class="muted">Mevcut fotoğraf (sha: ${escapeHtml(
+      dosya.sha.slice(0, 8)
+    )}...)</span>`;
+  } catch (err) {
+    el.innerHTML = `<p class="muted">Durum okunamadı: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+function dosyayiBase64eCevir(dosya) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(",")[1]);
+    reader.onerror = () => reject(new Error("Dosya okunamadı"));
+    reader.readAsDataURL(dosya);
+  });
+}
+
+async function profilFotoYukle() {
+  const msgEl = document.getElementById("pf-message");
+  const dosyaInput = document.getElementById("pf-dosya");
+  const dosya = dosyaInput.files[0];
+
+  if (!dosya) {
+    showMessage(msgEl, "Önce bir görsel seç.", "error");
+    return;
+  }
+  if (!PAT_BELLEK) {
+    showMessage(msgEl, 'Önce "GitHub Bağlantısı" sekmesinden bağlantını doğrula.', "error");
+    return;
+  }
+
+  const btn = document.getElementById("pf-yukle-btn");
+  btn.disabled = true;
+  btn.textContent = "Yükleniyor...";
+  try {
+    const base64 = await dosyayiBase64eCevir(dosya);
+    await ghPutFile(
+      PROFIL_YOLU,
+      base64,
+      PROFIL_SHA ? "Profil fotoğrafı güncellendi" : "Profil fotoğrafı eklendi",
+      PROFIL_SHA
+    );
+    showMessage(msgEl, "İşlem başarıyla GitHub'a iletildi, 1-2 dakika içinde sitede güncellenecektir.", "success");
+    dosyaInput.value = "";
+    await profilFotoDurumYukle();
+  } catch (err) {
+    showMessage(msgEl, `Yüklenemedi: ${err.message}`, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Yükle / Değiştir";
+  }
+}
+
+async function profilFotoSil() {
+  const msgEl = document.getElementById("pf-message");
+
+  if (!PAT_BELLEK) {
+    showMessage(msgEl, 'Önce "GitHub Bağlantısı" sekmesinden bağlantını doğrula.', "error");
+    return;
+  }
+  if (!PROFIL_SHA) {
+    showMessage(msgEl, "Silinecek bir profil fotoğrafı yok.", "error");
+    return;
+  }
+  if (!confirm("Profil fotoğrafını silmek istediğine emin misin?")) return;
+
+  const btn = document.getElementById("pf-sil-btn");
+  btn.disabled = true;
+  try {
+    await ghDeleteFile(PROFIL_YOLU, PROFIL_SHA, "Profil fotoğrafı silindi");
+    showMessage(msgEl, "İşlem başarıyla GitHub'a iletildi, 1-2 dakika içinde sitede güncellenecektir.", "success");
+    await profilFotoDurumYukle();
+  } catch (err) {
+    showMessage(msgEl, `Silinemedi: ${err.message}`, "error");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+init();
