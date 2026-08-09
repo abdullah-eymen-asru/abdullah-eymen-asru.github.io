@@ -710,9 +710,12 @@ async function icerikListesiYukle() {
     const postDosyalari = (postlar || []).filter((f) => f.type === "file" && f.name.endsWith(".md"));
     const projeDosyalari = (projeler || []).filter((f) => f.type === "file" && f.name.endsWith(".md"));
 
+    // Promise.allSettled: tek bir dosyanın okunması başarısız olursa
+    // (silinmiş, geçici ağ hatası, vb.) diğer tüm liste elemanlarını
+    // düşürmeden devam eder — sadece o öğe "okunamadı" olarak işaretlenir.
     const [postDetaylari, projeDetaylari] = await Promise.all([
-      Promise.all(postDosyalari.map((f) => icerikOzetiGetir(f, "blog"))),
-      Promise.all(projeDosyalari.map((f) => icerikOzetiGetir(f, "proje"))),
+      icerikOzetleriGuvenliGetir(postDosyalari, "blog"),
+      icerikOzetleriGuvenliGetir(projeDosyalari, "proje"),
     ]);
 
     postDetaylari.sort((a, b) => (b.data.date || "").localeCompare(a.data.date || ""));
@@ -725,8 +728,44 @@ async function icerikListesiYukle() {
   }
 }
 
+/**
+ * Bir dosya listesindeki her dosyanın front-matter özetini getirir.
+ * Promise.allSettled kullanır: tek bir dosyanın okunması (silinmiş,
+ * geçici ağ hatası vb. yüzünden) başarısız olsa bile diğer dosyalar
+ * etkilenmez — başarısız olan öğe "okunamadı" rozetiyle listede kalır.
+ */
+async function icerikOzetleriGuvenliGetir(dosyalar, tur) {
+  const sonuclar = await Promise.allSettled(dosyalar.map((f) => icerikOzetiGetir(f, tur)));
+  return sonuclar.map((sonuc, i) => {
+    if (sonuc.status === "fulfilled") return sonuc.value;
+    const dosya = dosyalar[i];
+    return {
+      path: dosya.path,
+      sha: dosya.sha,
+      tur,
+      data: { title: `${dosya.name} (okunamadı: ${sonuc.reason?.message || "bilinmeyen hata"})` },
+      body: "",
+      okunamadi: true,
+    };
+  });
+}
+
 async function icerikOzetiGetir(dosya, tur) {
   const detay = await ghGetContents(dosya.path);
+  if (!detay || typeof detay.content !== "string") {
+    // Beklenmedik durum: dosya listede vardı ama tekil GET'te içerik
+    // dönmedi (silinmiş/taşınmış olabilir, ya da GitHub API'nin o an
+    // "content" alanını atladığı nadir bir durum). Tüm listeyi
+    // düşürmek yerine bu öğeyi "okunamadı" olarak işaretleyip devam ediyoruz.
+    return {
+      path: dosya.path,
+      sha: dosya.sha,
+      tur,
+      data: { title: `${dosya.name} (okunamadı)` },
+      body: "",
+      okunamadi: true,
+    };
+  }
   const ham = b64Decode(detay.content.replace(/\n/g, ""));
   const { data, body } = frontMatterOku(ham);
   return { path: dosya.path, sha: detay.sha, tur, data, body };
@@ -812,6 +851,24 @@ function icerikListesiCiz(baslik, liste, tur) {
 function icerikKartiCiz(item, tur) {
   const kart = document.createElement("div");
   kart.className = "gy-icerik-kart";
+
+  if (item.okunamadi) {
+    // Dosya içeriği okunamadı (silinmiş/ağ hatası) — sadece dosya yolunu
+    // ve "Sil" seçeneğini gösteriyoruz; "Düzenle" anlamsız olur çünkü
+    // form doldurulacak içerik/başlık verisi yok.
+    kart.innerHTML = `
+      <div class="gy-icerik-kart-bilgi">
+        <div class="gy-icerik-kart-baslik">${metniVurgula(item.data.title)}<span class="gy-rozet gy-rozet--gizli">Hata</span></div>
+        <div class="gy-icerik-kart-meta">${metniVurgula(item.path)}</div>
+      </div>
+      <div class="gy-icerik-kart-aksiyonlar">
+        <button type="button" class="gy-sil-btn">Sil</button>
+      </div>
+    `;
+    kart.querySelector(".gy-sil-btn").addEventListener("click", () => icerikSil(item));
+    return kart;
+  }
+
   const yayinda = item.data.yayinda !== false; // alan hiç yoksa yayında sayılır
   const rozet = yayinda
     ? '<span class="gy-rozet gy-rozet--yayinda">Yayında</span>'
