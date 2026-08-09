@@ -11,6 +11,7 @@
  */
 import { supabase, showMessage, escapeHtml, KVKK_METIN_SURUMU } from "./supabase-client.js";
 import { requireAuth } from "./auth-guard.js";
+import { wireUserChat } from "./chat.js";
 
 const DELETE_ACCOUNT_FUNCTION_URL =
   "https://eahvcirspmvntffzphye.supabase.co/functions/v1/delete-account";
@@ -27,6 +28,7 @@ async function init() {
   wireKvkk(profile);
   await wireMfa();
   await loadOzelIcerikler();
+  await wireUserChat(profile);
   wireLogout();
 }
 
@@ -131,9 +133,23 @@ function wireKvkk(profile) {
       alert("Onay kaydedilemedi: " + error.message);
       return;
     }
-    profile.kvkk_onay_verildi = true;
-    profile.kvkk_onay_versiyonu = KVKK_METIN_SURUMU;
-    profile.kvkk_onay_tarihi = new Date().toISOString();
+    // İYİLEŞTİRME: optimistik (yerel) güncelleme yerine profili VERİTABANINDAN
+    // yeniden çekiyoruz — "onayladım ama her yerde onaylı görünmüyor"
+    // şikayetinin bir sebebi, yazma işlemi sessizce başarısız olsa bile
+    // (ör. oturum/RLS kenar durumu) arayüzün hep "başarılı" göstermesiydi.
+    // Artık gerçek DB durumunu okuyup ona göre çiziyoruz.
+    const { data: guncelProfil, error: fetchErr } = await supabase
+      .from("profiles")
+      .select("kvkk_onay_verildi, kvkk_onay_versiyonu, kvkk_onay_tarihi")
+      .eq("id", profile.id)
+      .single();
+    if (!fetchErr && guncelProfil) {
+      Object.assign(profile, guncelProfil);
+    } else {
+      profile.kvkk_onay_verildi = true;
+      profile.kvkk_onay_versiyonu = KVKK_METIN_SURUMU;
+      profile.kvkk_onay_tarihi = new Date().toISOString();
+    }
     wireKvkk(profile);
   });
 }
@@ -204,30 +220,107 @@ async function renderMfaDurumu(box) {
 
   document.getElementById("mfa-baslat-btn").addEventListener("click", async () => {
     const msg = document.getElementById("mfa-message");
+    const baslatBtn = document.getElementById("mfa-baslat-btn");
+    baslatBtn.disabled = true;
 
-    // Yarım kalmış (doğrulanmamış) önceden oluşmuş 2FA kaydı varsa temizle
+    try {
+      const enrollData = await mfaBaslatTemizVeTekrarDene();
+      if (!enrollData) {
+        showMessage(msg, "2FA başlatılamadı, lütfen sayfayı yenileyip tekrar dene.");
+        baslatBtn.disabled = false;
+        return;
+      }
+
+      document.getElementById("mfa-kurulum-alani").hidden = false;
+      document.getElementById("mfa-baslat-btn").hidden = true;
+
+      // BUG FİX: enrollData.totp.qr_code bir data-URI SVG string'idir ve
+      // İÇİNDE ÇOK SAYIDA çift tırnak (") karakteri barındırır (SVG
+      // özniteliklerinin kendi tırnakları). Bunu `<img src="${...}">`
+      // şeklinde bir HTML string'ine gömmek, o iç tırnaklardan biri src
+      // özniteliğini ERKEN kapatıp geri kalanının (alt=... style=...) düz
+      // METİN olarak sayfada görünmesine yol açıyordu (ekran görüntüsündeki
+      // "bozuk yazı" tam olarak buydu). Çözüm: img elemanını innerHTML
+      // string birleştirmesiyle DEĞİL, DOM API'siyle oluşturup src'yi bir
+      // JS ÖZELLİĞİ (property) olarak atamak — bu şekilde tırnak/HTML
+      // özel karakterleri hiç parse edilmez, olduğu gibi kullanılır.
+      const qrWrap = document.getElementById("mfa-qr-wrap");
+      qrWrap.innerHTML = "";
+      const img = document.createElement("img");
+      img.src = enrollData.totp.qr_code;
+      img.alt = "2FA QR kodu";
+      img.style.background = "#fff";
+      img.style.padding = "8px";
+      img.style.borderRadius = "8px";
+      img.style.maxWidth = "220px";
+      qrWrap.appendChild(img);
+
+      document.getElementById("mfa-secret").textContent = enrollData.totp.secret;
+      mfaDogrulamayiBagla(enrollData, msg, box);
+    } catch (err) {
+      showMessage(msg, "Başlatılamadı: " + err.message);
+      baslatBtn.disabled = false;
+    }
+  });
+}
+
+/**
+ * BUG FİX: "A factor with the friendly name "" for this user already
+ * exists" hatası — kullanıcı 2FA kurulumunu yarıda bırakıp (QR'ı okutmadan
+ * sayfadan ayrılıp) tekrar denediğinde, önceki denemeden kalan
+ * DOĞRULANMAMIŞ ("unverified") kayıt, aynı (boş) friendly name ile
+ * çakışıyordu. Eski kod bu temizliği deniyordu ama (a) unenroll'un kendi
+ * hatasını YOK SAYIYORDU (silme başarısız olsa bile fark edilmiyordu) ve
+ * (b) her seferinde AYNI (boş) friendly name ile enroll ediyordu, yani
+ * temizlik bir sebeple başarısız olursa çakışma KESİN tekrarlıyordu.
+ * Burada: 1) tüm eski "unverified" kayıtları silmeyi DENE (hata olsa bile
+ * devam et), 2) HER ZAMAN benzersiz bir friendly name kullan (aynı isimle
+ * çakışma ihtimalini baştan ortadan kaldırır), 3) yine de "already exists"
+ * hatası gelirse bir kez daha agresif temizlik yapıp TEKRAR dene.
+ */
+async function mfaBaslatTemizVeTekrarDene() {
+  async function eskiKayitlariTemizle() {
     const { data: factorList } = await supabase.auth.mfa.listFactors();
-    if (factorList && factorList.totp) {
-      const unverifiedFactors = factorList.totp.filter((f) => f.status === "unverified");
-      for (const factor of unverifiedFactors) {
-        await supabase.auth.mfa.unenroll({ factorId: factor.id });
+    const factors = factorList?.totp || factorList?.all || [];
+    for (const factor of factors) {
+      if (factor.status === "unverified") {
+        try {
+          await supabase.auth.mfa.unenroll({ factorId: factor.id });
+        } catch (_e) {
+          // Sessizce geç — aşağıdaki benzersiz friendly name zaten
+          // çakışmayı büyük ölçüde engelliyor, bu sadece ek bir temizlik.
+        }
       }
     }
+  }
 
-    const { data: enrollData, error: enrollErr } = await supabase.auth.mfa.enroll({
+  function benzersizIsim() {
+    return `totp-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  }
+
+  await eskiKayitlariTemizle();
+
+  let { data: enrollData, error: enrollErr } = await supabase.auth.mfa.enroll({
+    factorType: "totp",
+    friendlyName: benzersizIsim(),
+  });
+
+  if (enrollErr && /already exists/i.test(enrollErr.message)) {
+    // Bir kez daha, daha agresif temizlik + yeni bir isimle tekrar dene.
+    await eskiKayitlariTemizle();
+    const tekrar = await supabase.auth.mfa.enroll({
       factorType: "totp",
+      friendlyName: benzersizIsim(),
     });
+    enrollData = tekrar.data;
+    enrollErr = tekrar.error;
+  }
 
-    if (enrollErr) {
-      showMessage(msg, "Başlatılamadı: " + enrollErr.message);
-      return;
-    }
+  if (enrollErr) throw enrollErr;
+  return enrollData;
+}
 
-    document.getElementById("mfa-kurulum-alani").hidden = false;
-    document.getElementById("mfa-baslat-btn").hidden = true;
-    document.getElementById("mfa-qr-wrap").innerHTML =
-      `<img src="${enrollData.totp.qr_code}" alt="2FA QR kodu" style="background:#fff;padding:8px;border-radius:8px;max-width:220px;">`;
-    document.getElementById("mfa-secret").textContent = enrollData.totp.secret;
+function mfaDogrulamayiBagla(enrollData, msg, box) {
 
     document.getElementById("mfa-dogrula-btn").addEventListener("click", async () => {
       const kod = document.getElementById("mfa-kod-input").value.trim();
@@ -257,7 +350,6 @@ async function renderMfaDurumu(box) {
       showMessage(msg, "2FA başarıyla etkinleştirildi.", "success");
       await renderMfaDurumu(box);
     });
-  });
 }
 
 /* ---------------------------------------------------------------------- */
