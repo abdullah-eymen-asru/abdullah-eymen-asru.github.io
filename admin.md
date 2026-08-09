@@ -11,87 +11,127 @@ yayinda: true
 <div id="app" hidden>
   <h1>Admin Paneli</h1>
 
-  <div class="panel-grid">
+  <div class="admin-layout">
 
-    <section class="panel-section">
-      <h2>Kullanıcılar &amp; Roller</h2>
-      <p class="muted">Bir kullanıcının rolünü değiştirmek için aşağıdaki listeden seç — anında kaydedilir.</p>
-      <table class="rol-tablo">
-        <thead>
-          <tr><th>Kullanıcı</th><th>Kayıt</th><th>Rol</th><th></th></tr>
-        </thead>
-        <tbody id="kullanici-tablo-govde">
-          <tr><td colspan="4">Yükleniyor...</td></tr>
-        </tbody>
-      </table>
-    </section>
+    <nav id="admin-nav" class="admin-nav">
+      <a href="#kullanicilar" data-section="kullanicilar" class="active">👤 Kullanıcılar &amp; Roller</a>
+      <a href="#icerik-ekle" data-section="icerik-ekle">📝 Özel İçerik Ekle/Düzenle</a>
+      <a href="#icerikler" data-section="icerikler">📚 Mevcut Özel İçerikler</a>
+      <a href="#hakkimda" data-section="hakkimda">ℹ️ "Hakkımda" Metni</a>
+      <a href="#hesabim" data-section="hesabim">⚙️ Hesabım</a>
+    </nav>
 
-    <section class="panel-section">
-      <h2>Yeni Özel İçerik / Makale Ekle</h2>
-      <p class="muted">
-        Aşağıya gizli bir makale yazabilir ve/veya bir dosya ekleyebilirsin.
-        Alttaki listeden hangi özel üyelerin erişebileceğini seç.
-      </p>
-      <form id="icerik-form" novalidate>
-        <div class="form-field">
-          <label for="title">Başlık</label>
-          <input id="title" name="title" type="text" required>
-        </div>
-        <div class="form-field">
-          <label for="slug">Slug (boş bırakılırsa başlıktan otomatik üretilir)</label>
-          <input id="slug" name="slug" type="text" placeholder="ozel-makale-1">
-        </div>
-        <div class="form-field">
-          <label for="summary">Kısa Özet</label>
-          <input id="summary" name="summary" type="text">
-        </div>
-        <div class="form-field">
-          <label for="body_md">Makale İçeriği (Markdown)</label>
-          <textarea id="body_md" name="body_md" rows="10"></textarea>
-        </div>
-        <div class="form-field">
-          <label for="dosya">Ek Dosya (opsiyonel, küçük/orta boy dosyalar için)</label>
-          <input id="dosya" name="dosya" type="file">
-        </div>
-        <div class="form-field">
-          <label for="harici_dosya_url">50GB gibi çok büyük dosya için harici link (opsiyonel)</label>
-          <input id="harici_dosya_url" name="harici_dosya_url" type="url" placeholder="https://pub-xxxx.r2.dev/dosya-adi.zip">
-          <p class="muted" style="margin:2px 0 0;font-size:0.85rem;">
-            Dosyayı Supabase yerine Cloudflare R2'ye yüklediysen oradan aldığın linki buraya yapıştır.
-            Bkz. README &gt; "Çok Büyük Dosyalar (Cloudflare R2)". Yukarıdaki "Ek Dosya" alanıyla
-            aynı anda kullanma — ikisi farklı senaryolar için, karışıklık olmasın diye sadece birini doldur.
-          </p>
-        </div>
-        <div class="form-field">
-          <label for="icerik-atama-kullanici">Erişim Verilecek Özel Üyeler (Ctrl/Cmd basılı tut, birden çok seç)</label>
-          <select id="icerik-atama-kullanici" multiple size="6"></select>
-        </div>
-        <button type="submit" class="btn-primary">Yayınla ve Ata</button>
-      </form>
-      <div id="icerik-message" class="auth-message" hidden></div>
-    </section>
+    <div class="admin-content">
 
-    <section class="panel-section">
-      <h2>Mevcut Özel İçerikler</h2>
-      <div id="icerik-liste"><p class="muted">Yükleniyor...</p></div>
-    </section>
-
-    <section class="panel-section">
-      <h2>"Hakkımda" Metni</h2>
-      <p class="muted">
-        Buradaki metin anasayfadaki statik "Hakkımda" kutusunun üzerine
-        gelir (JS ile). Değişiklik, sayfa yeniden yüklendiğinde herkese görünür.
-      </p>
-      <form id="ayarlar-form" novalidate>
+      <section id="kullanicilar" class="panel-section">
+        <h2>Kullanıcılar &amp; Roller</h2>
+        <p class="muted">Bir kullanıcının rolünü değiştirmek için aşağıdaki listeden seç — anında kaydedilir. İsim veya e-posta ile arayabilirsin.</p>
         <div class="form-field">
-          <label for="hakkimda-textarea">Hakkımda (Markdown)</label>
-          <textarea id="hakkimda-textarea" rows="8"></textarea>
+          <label for="kullanici-arama">Ara (isim veya e-posta)</label>
+          <input id="kullanici-arama" type="search" placeholder="ör. ayse@ornek.com veya Ayşe">
         </div>
-        <button type="submit" class="btn-primary">Kaydet</button>
-      </form>
-      <div id="ayarlar-message" class="auth-message" hidden></div>
-    </section>
+        <div style="overflow-x:auto;">
+        <table class="rol-tablo">
+          <thead>
+            <tr><th>Kullanıcı</th><th>Kayıt</th><th>Rol</th><th>KVKK</th><th></th></tr>
+          </thead>
+          <tbody id="kullanici-tablo-govde">
+            <tr><td colspan="5">Yükleniyor...</td></tr>
+          </tbody>
+        </table>
+        </div>
+      </section>
 
+      <section id="icerik-ekle" class="panel-section">
+        <h2 id="icerik-form-baslik">Yeni Özel İçerik / Makale Ekle</h2>
+        <p class="muted">
+          Aşağıya gizli bir makale yazabilir ve/veya bir dosya ekleyebilirsin.
+          Alttaki listeden hangi özel üyelerin erişebileceğini ve (istersen)
+          o üye için erişimin ne zaman sona ereceğini seç. Tarih boş
+          bırakılırsa erişim sınırsızdır.
+        </p>
+        <form id="icerik-form" novalidate>
+          <div class="form-field">
+            <label for="title">Başlık</label>
+            <input id="title" name="title" type="text" required>
+          </div>
+          <div class="form-field">
+            <label for="slug">Slug (boş bırakılırsa başlıktan otomatik üretilir)</label>
+            <input id="slug" name="slug" type="text" placeholder="ozel-makale-1">
+          </div>
+          <div class="form-field">
+            <label for="summary">Kısa Özet</label>
+            <input id="summary" name="summary" type="text">
+          </div>
+          <div class="form-field">
+            <label for="body_md">Makale İçeriği (Markdown)</label>
+            <textarea id="body_md" name="body_md" rows="10"></textarea>
+          </div>
+          <div class="form-field">
+            <label for="dosya">Ek Dosya (opsiyonel, küçük/orta boy dosyalar için)</label>
+            <input id="dosya" name="dosya" type="file">
+          </div>
+          <div class="form-field">
+            <label for="harici_dosya_url">50GB gibi çok büyük dosya için harici link (opsiyonel)</label>
+            <input id="harici_dosya_url" name="harici_dosya_url" type="url" placeholder="https://pub-xxxx.r2.dev/dosya-adi.zip">
+            <p class="muted" style="margin:2px 0 0;font-size:0.85rem;">
+              Dosyayı Supabase yerine Cloudflare R2'ye yüklediysen oradan aldığın linki buraya yapıştır.
+              Yukarıdaki "Ek Dosya" alanıyla aynı anda kullanma.
+            </p>
+          </div>
+          <div class="form-field">
+            <label>Erişim Verilecek Özel Üyeler / Yöneticiler (isteğe bağlı son geçerlilik tarihiyle)</label>
+            <div id="icerik-atama-liste" class="atama-liste"><p class="muted">Yükleniyor...</p></div>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button type="submit" id="icerik-form-submit-btn" class="btn-primary" style="width:auto;">Yayınla ve Ata</button>
+            <button type="button" id="icerik-duzenle-iptal-btn" class="btn-danger" style="width:auto;" hidden>Düzenlemeyi İptal Et</button>
+          </div>
+        </form>
+        <div id="icerik-message" class="auth-message" hidden></div>
+      </section>
+
+      <section id="icerikler" class="panel-section">
+        <h2>Mevcut Özel İçerikler</h2>
+        <p class="muted">Bir içeriği yayınladıktan sonra da "Düzenle" ile geri dönüp değiştirebilirsin.</p>
+        <div id="icerik-liste"><p class="muted">Yükleniyor...</p></div>
+      </section>
+
+      <section id="hakkimda" class="panel-section">
+        <h2>"Hakkımda" Metni</h2>
+        <p class="muted">
+          Buradaki metin anasayfadaki statik "Hakkımda" kutusunun üzerine
+          gelir (JS ile). Değişiklik, sayfa yeniden yüklendiğinde herkese görünür.
+        </p>
+        <form id="ayarlar-form" novalidate>
+          <div class="form-field">
+            <label for="hakkimda-textarea">Hakkımda (Markdown)</label>
+            <textarea id="hakkimda-textarea" rows="8"></textarea>
+          </div>
+          <button type="submit" class="btn-primary" style="width:auto;">Kaydet</button>
+        </form>
+        <div id="ayarlar-message" class="auth-message" hidden></div>
+      </section>
+
+      <section id="hesabim" class="panel-section danger-zone">
+        <h2>Hesabım — Tehlikeli Bölge</h2>
+        <p>
+          Kendi yönetici hesabını da buradan silebilirsin. Diğer üyelerin
+          hesaplarını silmek için "Kullanıcılar &amp; Roller" bölümündeki
+          <strong>Sil</strong> butonunu kullan.
+        </p>
+        <p>Hesabını sildiğinde profilin ve özel içerik erişimlerin dahil TÜM
+        verilerin kalıcı olarak silinir. Bu işlem geri alınamaz.</p>
+        <div class="form-field">
+          <label for="admin-kendi-hesap-sil-onay">Onaylamak için kutuya büyük harflerle <strong>SİL</strong> yaz</label>
+          <input id="admin-kendi-hesap-sil-onay" type="text" autocomplete="off">
+        </div>
+        <button id="admin-kendi-hesap-sil-btn" type="button" class="btn-danger">Hesabımı Kalıcı Olarak Sil</button>
+        <div id="admin-kendi-hesap-sil-message" class="auth-message" hidden></div>
+        <p style="margin-top:16px;"><a href="{{ '/panel.html' | relative_url }}">← Panelim sayfasına git (şifre değiştir, 2FA, KVKK)</a></p>
+      </section>
+
+    </div>
   </div>
 </div>
 
