@@ -19,27 +19,11 @@ yayinda: true
   <div class="panel-grid">
 
     <section class="panel-section">
-      <h2>Profil Fotoğrafı</h2>
-      <div class="avatar-row">
-        <img id="avatar-preview" class="avatar-preview" src="{{ '/assets/profil.jpg' | relative_url }}" alt="Profil fotoğrafı">
-        <label class="btn-primary" style="width:auto; display:inline-block; cursor:pointer;">
-          Fotoğraf Seç
-          <input id="avatar-input" type="file" accept="image/*" hidden>
-        </label>
-      </div>
-      <div id="avatar-message" class="auth-message" hidden></div>
-    </section>
-
-    <section class="panel-section">
       <h2>Profil Bilgileri</h2>
       <form id="profil-form" novalidate>
         <div class="form-field">
           <label for="full_name">Ad Soyad</label>
           <input id="full_name" name="full_name" type="text">
-        </div>
-        <div class="form-field">
-          <label for="bio">Hakkımda (kısa)</label>
-          <textarea id="bio" name="bio"></textarea>
         </div>
         <button type="submit" class="btn-primary">Kaydet</button>
       </form>
@@ -63,15 +47,24 @@ yayinda: true
     </section>
 
     <section class="panel-section">
+      <h2>İki Faktörlü Doğrulama (2FA)</h2>
+      <div id="mfa-alani"><p class="muted">Yükleniyor...</p></div>
+    </section>
+
+    <section class="panel-section">
+      <h2>KVKK Onayı</h2>
+      <div id="kvkk-durum"><p class="muted">Yükleniyor...</p></div>
+    </section>
+
+    <section class="panel-section">
       <h2>Özel İçeriklerim</h2>
       <div id="ozel-icerik-list"><p class="muted">Yükleniyor...</p></div>
     </section>
 
     <section class="panel-section danger-zone">
       <h2>Tehlikeli Bölge</h2>
-      <p>Hesabını sildiğinde profilin, özel içerik erişimlerin ve yüklediğin
-      profil fotoğrafı dahil TÜM verilerin kalıcı olarak silinir. Bu işlem
-      geri alınamaz.</p>
+      <p>Hesabını sildiğinde profilin ve özel içerik erişimlerin dahil TÜM
+      verilerin kalıcı olarak silinir. Bu işlem geri alınamaz.</p>
       <div class="form-field">
         <label for="hesap-sil-onay">Onaylamak için kutuya büyük harflerle <strong>SİL</strong> yaz</label>
         <input id="hesap-sil-onay" type="text" autocomplete="off">
