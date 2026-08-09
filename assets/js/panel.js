@@ -90,7 +90,7 @@ function wirePasswordChange() {
 }
 
 /* ---------------------------------------------------------------------- */
-/* KVKK ONAYI                                                              */
+/* KVKK ONAYI                                                             */
 /* ---------------------------------------------------------------------- */
 function wireKvkk(profile) {
   const box = document.getElementById("kvkk-durum");
