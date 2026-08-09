@@ -17,7 +17,7 @@ yayinda: true
       <a href="#kullanicilar" data-section="kullanicilar" class="active">👤 Kullanıcılar &amp; Roller</a>
       <a href="#icerik-ekle" data-section="icerik-ekle">📝 Özel İçerik Ekle/Düzenle</a>
       <a href="#icerikler" data-section="icerikler">📚 Mevcut Özel İçerikler</a>
-      <a href="#hakkimda" data-section="hakkimda">ℹ️ "Hakkımda" Metni</a>
+      <a href="#mesajlar" data-section="mesajlar">💬 Mesajlar</a>
       <a href="#hesabim" data-section="hesabim">⚙️ Hesabım</a>
     </nav>
 
@@ -80,7 +80,10 @@ yayinda: true
             </p>
           </div>
           <div class="form-field">
-            <label>Erişim Verilecek Özel Üyeler / Yöneticiler (isteğe bağlı son geçerlilik tarihiyle)</label>
+            <label>Erişim Verilecek Özel Üyeler / Yöneticiler (isteğe bağlı son geçerlilik tarih &amp; saatiyle, Türkiye saati)</label>
+            <div class="form-field atama-arama">
+              <input id="icerik-atama-arama" type="search" placeholder="Üye ara (isim veya e-posta)...">
+            </div>
             <div id="icerik-atama-liste" class="atama-liste"><p class="muted">Yükleniyor...</p></div>
           </div>
           <div style="display:flex; gap:10px;">
@@ -97,20 +100,21 @@ yayinda: true
         <div id="icerik-liste"><p class="muted">Yükleniyor...</p></div>
       </section>
 
-      <section id="hakkimda" class="panel-section">
-        <h2>"Hakkımda" Metni</h2>
-        <p class="muted">
-          Buradaki metin anasayfadaki statik "Hakkımda" kutusunun üzerine
-          gelir (JS ile). Değişiklik, sayfa yeniden yüklendiğinde herkese görünür.
-        </p>
-        <form id="ayarlar-form" novalidate>
-          <div class="form-field">
-            <label for="hakkimda-textarea">Hakkımda (Markdown)</label>
-            <textarea id="hakkimda-textarea" rows="8"></textarea>
+      <section id="mesajlar" class="panel-section">
+        <h2>Mesajlar</h2>
+        <p class="muted">Üyelerin sana gönderdiği mesajlar. Soldan bir konuşma seç.</p>
+        <div id="chat-admin" class="chat-admin-layout">
+          <div id="chat-konusma-liste" class="chat-konusma-liste"><p class="chat-bos">Yükleniyor...</p></div>
+          <div class="chat-box">
+            <p id="chat-secili-kullanici" class="muted" style="padding:10px 12px 0;">Bir konuşma seç.</p>
+            <div id="chat-mesaj-liste-admin" class="chat-mesaj-liste"></div>
+            <form id="chat-form-admin" class="chat-form" novalidate hidden>
+              <textarea id="chat-metin-admin" placeholder="Yanıtını yaz..." required></textarea>
+              <button type="submit">Gönder</button>
+            </form>
           </div>
-          <button type="submit" class="btn-primary" style="width:auto;">Kaydet</button>
-        </form>
-        <div id="ayarlar-message" class="auth-message" hidden></div>
+        </div>
+        <div id="chat-message-admin" class="auth-message" hidden></div>
       </section>
 
       <section id="hesabim" class="panel-section danger-zone">
