@@ -7,7 +7,7 @@
 
 > 🤖 **Not:** Bu projenin kodu büyük ölçüde **yapay zeka** yardımıyla üretilmiş/geliştirilmiştir. Mimari kararlar ve yapılandırma insan gözetiminde yapılsa da, kaynak kodun tamamını kullanmadan/gözden geçirmeden production ortamına almanız önerilmez.
 
-> 📌 Aşağıdaki iki bölüm katlanabilir/genişletilebilir — başlığa tıklayarak açıp kapatabilirsin.
+> 📌 Aşağıdaki üç bölüm katlanabilir/genişletilebilir — başlığa tıklayarak açıp kapatabilirsin.
 
 <details>
 <summary><h1>📖 Site Rehberi — Hangi Dosya Ne İşe Yarar, Neyi Nerede Değiştiririm? (tıkla, aç/kapat)</h1></summary>
@@ -273,6 +273,21 @@ ayarı oluşturup `_includes/comments.html` içindeki ilgili
 
 ---
 
+# 👤 Header'daki "Hesabım" Menüsü
+
+| Dosya | Ne işe yarar |
+|---|---|
+| `_layouts/default.html` içinde `#auth-nav` | Nav'daki tek kapsayıcı — JS yüklenmeden önce görünen statik "Giriş Yap" linkini içerir (progressive enhancement / no-JS yedeği). |
+| `assets/js/nav-auth.js` | Sayfa açılışında oturumu kontrol edip `#auth-nav`'ın içeriğini dolduran script. Çıkış yapmışken tek bir "Giriş Yap" linki, giriş yapmışken "Hesabım ▾" açılır menüsü (Panelim, adminse Admin Paneli, Çıkış Yap) gösterir. Başka bir sekmede oturum açılıp kapandığında `onAuthStateChange` ile kendini günceller. |
+| `assets/style.css` içinde `.auth-nav*` sınıfları | Açılır menünün görünümü — mevcut `nav a` stiliyle aynı renk değişkenlerini kullanır, açık/koyu temayla otomatik uyumludur. |
+
+Bu menü, sitenin Supabase kullanıcı sistemine bağlıdır — bkz. aşağıdaki
+"🔐 Supabase Kullanıcı Sistemi" bölümü. O sistemi tamamen kaldırırsan
+(bkz. "Bölüm 3 — Silme" altındaki "Supabase kullanıcı sistemini kaldırmak
+istersen"), bu menüyü de kaldırman gerekir.
+
+---
+
 # 🔒 Güvenlik Notları (bilmen faydalı olur)
 
 - **CSP (`_layouts/default.html`, `<meta http-equiv="Content-Security-Policy">`):**
@@ -294,6 +309,418 @@ ayarı oluşturup `_includes/comments.html` içindeki ilgili
   ham RSS çekmeye (CORS) izin vermiyor. Bu servis kontrolün dışında —
   ileride kendi Worker'ın üzerinden proxy'lemek istersen (daha güvenli
   ama kurulumu daha uzun), ayrı bir adım olarak yapılabilir.
+
+</details>
+
+<details>
+<summary><h1>🔐 Supabase Kullanıcı Sistemi — Kurulum, Güvenlik ve Sorun Giderme (tıkla, aç/kapat)</h1></summary>
+
+Bu bölüm, siteye eklenen **Supabase (PostgreSQL + Auth + Storage)** tabanlı
+kullanıcı kayıt/giriş, rol yönetimi ve gizli içerik sistemini anlatıyor.
+Eskiden ayrı bir `KURULUM-REHBERI-supabase.md` dosyasındaydı, artık
+karışıklık olmasın diye buraya taşındı — tek doğruluk kaynağı burası.
+
+Sistem şunları sağlıyor:
+
+- Google OAuth + E-posta/Şifre ile kayıt-giriş, e-posta doğrulama, şifre sıfırlama
+- `user` / `special_user` / `admin` rolleri, veritabanı seviyesinde **RLS** ile korunan
+- Gizli makaleler ve dosyalar (10 saniyelik Signed URL ile indirme)
+- `/panel.html`: profil düzenleme, avatar değiştirme, şifre değiştirme, **Hesabımı Sil**
+- `/admin.html`: kullanıcı rol yönetimi, özel içerik/dosya yükleme + üyelere atama, "Hakkımda" metni düzenleme
+- Header'daki tek **"Hesabım"** menüsü: çıkış yapmışken "Giriş Yap", giriş
+  yapmışken Panelim / (adminse) Admin Paneli / Çıkış Yap seçenekleri
+
+Mimari notu: Sitene **hiçbir zaman** sunucu eklemiyoruz. Her şey statik
+kalıyor (GitHub Pages / Cloudflare Pages ile tam uyumlu); tüm kullanıcı
+işlemleri tarayıcıdan doğrudan Supabase'e gider. Gerçek güvenlik, tarayıcıdaki
+JavaScript'te değil, **veritabanındaki RLS politikalarında** yaşar — istemci
+tarafı kontroller (`auth-guard.js` gibi) sadece kullanıcı deneyimi (UX)
+içindir.
+
+---
+
+## Paketteki Dosyalar
+
+```
+supabase/
+  migrations/0001_schema_rbac_rls.sql      <- Adım 1: SQL Editor'de çalıştır (ilk kurulum)
+  migrations/0002_guvenlik_sikilastirma.sql <- Adım 1b: SQL Editor'de çalıştır (güvenlik sıkılaştırma + büyük dosya linki)
+  functions/delete-account/index.ts        <- Adım 5: Edge Function (hesap silme)
+assets/
+  js/supabase-client.js                    <- Ortak Supabase istemcisi (URL/KEY burada)
+  js/auth-guard.js                         <- Korumalı sayfa mantığı
+  js/auth-pages.js                         <- Giriş/Kayıt/Şifre sayfaları mantığı
+  js/panel.js                              <- /panel.html mantığı
+  js/admin.js                              <- /admin.html mantığı
+  js/ozel-icerik.js                        <- Tekil gizli içerik sayfası
+  js/nav-auth.js                           <- Header'daki "Hesabım" menüsü
+  css/auth.css                             <- Bu sayfalara özel stiller
+giris.md / kayit.md / sifremi-unuttum.md / sifre-guncelle.md
+panel.md / admin.md / ozel-icerik.md       <- Jekyll sayfaları (_layouts/default.html'i kullanır)
+```
+
+---
+
+## Adım 1 — Supabase Projesi ve SQL Şeması
+
+1. [supabase.com](https://supabase.com) üzerinden ücretsiz bir proje oluştur
+   (bölge olarak Frankfurt/eu-central-1 seçmen Türkiye'den erişim için
+   gecikmeyi azaltır).
+2. Dashboard'da **SQL Editor** sekmesine git, **New query**.
+3. `supabase/migrations/0001_schema_rbac_rls.sql` dosyasının TAMAMINI
+   yapıştır ve **Run**'a bas. Bu dosya şunları kurar:
+   - `profiles` tablosu (rol dahil) + yeni kullanıcıda otomatik profil açan trigger
+   - Rol yükseltme saldırısına karşı trigger (kullanıcı kendi rolünü değiştiremez)
+   - `special_content` ve `content_access` tabloları (gizli makale/dosya + atama)
+   - `site_settings` tablosu ("Hakkımda" metni için)
+   - **Tüm tablolarda RLS'i açan `alter table ... enable row level security;`
+     satırları** (bkz. aşağıdaki "RLS Hakkında Sık Sorulan Sorular" — RLS'i
+     ayrıca bir yerden "aç"man GEREKMİYOR, bu dosya zaten açıyor)
+   - `ozel-dosyalar` (private) ve `avatarlar` (public-read) Storage bucket'ları + politikaları
+   - `admin_set_user_role()` ve `delete_own_profile_data()` güvenli RPC fonksiyonları
+4. Ardından **yeni bir query** aç, `supabase/migrations/0002_guvenlik_sikilastirma.sql`
+   dosyasının TAMAMINI yapıştır ve **Run**'a bas. Bu dosya 0001'i bozmadan
+   üzerine ekleme yapar: Security Advisor'ın "Warnings" sekmesinde çıkan
+   uyarıları giderir ve büyük-dosya-linki kolonunu ekler (aşağıda ayrı
+   başlıkta anlatılıyor).
+5. Dosyanın en altındaki talimatla **kendini admin yap**:
+   - Önce siteden normal şekilde kayıt ol (Adım 6'dan sonra, anahtarları girdikten sonra).
+   - **E-postanı doğrulamayı unutma** (aşağıdaki "Giriş Yapamıyorum" bölümüne bak).
+   - Sonra SQL Editor'de:
+     ```sql
+     update public.profiles set role = 'admin' where email = 'SENIN_EPOSTAN@ornek.com';
+     ```
+   - Bundan sonraki tüm rol atamaları `/admin.html` üzerinden yapılabilir.
+
+---
+
+## RLS Hakkında Sık Sorulan Sorular
+
+**"Proje oluştururken RLS'i aktif etmeyi unuttum, şimdi nasıl açarım?"**
+
+Endişelenmene gerek yok — Supabase projesi **oluşturulurken** işaretlenecek
+genel bir "RLS'i aç" seçeneği (checkbox) YOKTUR. RLS, tablo bazında,
+`alter table <tablo> enable row level security;` komutuyla açılır — ve bu
+komutlar zaten `0001_schema_rbac_rls.sql` dosyasının içinde, senin için
+hazır halde duruyor (dosyada "6) RLS'İ AKTİF ET" başlığını ara). Yani
+**yukarıdaki Adım 1'de bu dosyayı çalıştırdıysan RLS zaten açık.**
+
+Bunu doğrulamanın yolu: Dashboard → **Advisors → Security Advisor →
+Errors** sekmesine bak. Ekran görüntünde bu sekme **"0 errors"**
+gösteriyordu — eğer herhangi bir tabloda RLS kapalı olsaydı, Supabase bunu
+tam olarak burada, **"Errors"** (uyarı değil, hata) olarak listelerdi.
+Gördüğün 15 madde **"Warnings"** (uyarı) sekmesindeydi — bunlar RLS'in kapalı
+olmasıyla ilgili değil, ek sıkılaştırma önerileriydi; `0002_guvenlik_sikilastirma.sql`
+dosyası tam olarak bunları gideriyor.
+
+**"Yeni bir proje oluştursam mı, olmayacak mı diye?"**
+
+Hayır, gerek yok. Mevcut projendeki anahtarlar zaten `assets/js/supabase-client.js`
+ve `assets/js/panel.js` içine işlenmiş durumda; yeniden başlarsan bu iki
+dosyayı, Google OAuth ayarlarını, e-posta şablonlarını ve Edge Function'ı
+BAŞTAN kurman gerekir. Önce aşağıdaki "Giriş Yapamıyorum" bölümündeki
+kontrol listesini dene — büyük ihtimalle proje değil, tek bir ayar (en sık:
+e-posta doğrulama) sorunun kaynağı.
+
+---
+
+## "Giriş Yapamıyorum / Panele Giremiyorum" — Sorun Giderme
+
+Admin rolünü SQL ile verdiğin halde ne admin ne de normal bir kullanıcı
+olarak giriş yapamıyorsan, sırayla şunları kontrol et:
+
+1. **E-posta doğrulanmamış olabilir (en sık neden).** Supabase'de
+   varsayılan olarak "Confirm email" açıktır — kullanıcı, gelen doğrulama
+   linkine tıklamadan `signInWithPassword` ile giriş yapamaz
+   (`auth-pages.js` bu durumda zaten "E-posta adresini henüz doğrulamadın"
+   mesajını gösterir, ama e-posta hiç gelmediyse bu mesajı görmeden takılırsın).
+   - Dashboard → **Authentication → Users** kısmına git, kendi hesabını bul.
+     "Email Confirmed At" sütunu boşsa henüz doğrulanmamış demektir.
+   - Aynı satırdaki **⋯ menüsünden "Confirm email"** ile elle doğrulayabilirsin
+     (test için hızlı çözüm).
+   - Kalıcı çözüm: Supabase'in ücretsiz katmandaki kendi SMTP'si **saatte
+     sadece birkaç e-postayla sınırlıdır** — çok deneme yaptıysan e-postalar
+     hiç gelmemiş olabilir (spam/gereksiz klasörünü de kontrol et). Gerçek
+     kullanıcı trafiği bekliyorsan **Project Settings → Auth → SMTP Settings**
+     kısmından kendi SMTP'ni (ör. Resend, Brevo'nun ücretsiz katmanları)
+     bağlaman önerilir.
+   - Alternatif: "Google ile Giriş Yap" e-posta doğrulaması gerektirmez —
+     test için onu deneyebilirsin.
+2. **Site URL / Redirect URLs eksik olabilir.** Dashboard →
+   **Authentication → URL Configuration**:
+   - **Site URL**, sitenin gerçekte yayında olduğu adresle BİREBİR aynı
+     olmalı (`https://abdullah-eymen-asru.pages.dev`).
+   - **Redirect URLs** listesinde en azından şunlar olmalı:
+     ```
+     https://abdullah-eymen-asru.pages.dev/panel.html
+     https://abdullah-eymen-asru.github.io/panel.html
+     http://localhost:4000/panel.html
+     ```
+   Bu liste eksikse OAuth/e-posta linkleri tıklandığında "redirect not
+   allowed" hatası alırsın, giriş formu kendisi çalışsa bile.
+3. **Anahtarlar güncel projeyle eşleşiyor mu?** `assets/js/supabase-client.js`
+   içindeki `SUPABASE_URL` ve `SUPABASE_ANON_KEY`, Dashboard → **Project
+   Settings → API** kısmındaki DEĞERLERLE birebir aynı olmalı. Farklı bir
+   proje oluşturup denediysen ve eski anahtarlar hâlâ dosyada duruyorsa,
+   tarayıcı hâlâ eski (artık var olmayan) projeye bağlanmaya çalışır.
+4. **Tarayıcı konsoluna bak.** F12 (veya sağ tık → İncele) → **Console**
+   ve **Network** sekmeleri, gerçek hata mesajını gösterir (örn.
+   "Invalid API key", "fetch failed", CORS hatası vb.) — bu mesaj sorunu
+   kesinleştirir, README'deki genel ihtimalleri tek tek denemek yerine
+   doğrudan asıl nedene gider.
+5. **RLS bu sorunun nedeni DEĞİLDİR.** Yukarıdaki "RLS Hakkında Sık Sorulan
+   Sorular" bölümünde açıklandığı gibi RLS zaten açık ve giriş/kayıt akışını
+   (Supabase Auth) hiç etkilemez — RLS sadece `profiles`, `special_content`
+   gibi TABLOLARA erişimi kontrol eder, kimlik doğrulamanın (login) kendisini
+   değil.
+
+---
+
+## Adım 2 — Google OAuth Kurulumu (kısa özet)
+
+1. **Google Cloud Console** → yeni proje (veya mevcut) → *APIs & Services →
+   Credentials* → **Create Credentials → OAuth client ID** → Application
+   type: **Web application**.
+2. **Authorized redirect URIs** kısmına Supabase'in sana Dashboard'da
+   (Authentication → Providers → Google) gösterdiği callback URL'ini ekle —
+   formatı şuna benzer:
+   `https://XXXXXXXXXXXX.supabase.co/auth/v1/callback`
+3. Oluşan **Client ID** ve **Client Secret**'ı Supabase Dashboard →
+   **Authentication → Providers → Google** sayfasına yapıştır, provider'ı
+   **Enable** yap.
+4. Yukarıdaki "Giriş Yapamıyorum" bölümünün 2. maddesindeki **Site URL /
+   Redirect URLs** ayarını yap — bu adım olmadan Google girişi de
+   "redirect not allowed" hatası verir.
+
+---
+
+## Adım 3 — E-posta Şablonları (Doğrulama / Şifre Sıfırlama)
+
+Supabase varsayılan e-posta şablonları İngilizce gelir. Dashboard →
+**Authentication → Email Templates** kısmından "Confirm signup" ve
+"Reset password" şablonlarını Türkçeleştirebilirsin. Ücretsiz katmanda
+Supabase'in kendi SMTP'si saatte birkaç e-postayla sınırlıdır; gerçek
+kullanıcı trafiği bekliyorsan **Project Settings → Auth → SMTP Settings**
+kısmından kendi SMTP'ni (ör. Resend, Brevo ücretsiz katmanları) bağlaman
+önerilir — aksi halde doğrulama e-postaları gecikebilir ya da hiç gelmez
+(bkz. yukarıdaki "Giriş Yapamıyorum" bölümü, madde 1).
+
+---
+
+## Adım 4 — Dosyaları Siteye Kopyala ve Anahtarları Gir
+
+1. `assets/`, `giris.md`, `kayit.md`, `sifremi-unuttum.md`,
+   `sifre-guncelle.md`, `panel.md`, `admin.md`, `ozel-icerik.md`
+   dosyaları zaten repo kökünde — fork'ladıysan bunları olduğu gibi koru.
+2. `assets/js/supabase-client.js` içindeki iki değeri doldur (Dashboard →
+   **Project Settings → API**):
+   ```js
+   const SUPABASE_URL = "https://XXXXXXXXXXXX.supabase.co";
+   const SUPABASE_ANON_KEY = "eyJhbGciOi...";  // "anon public" anahtarı — GİZLİ DEĞİL
+   ```
+   > `anon` anahtar tarayıcıda açıkta olacak şekilde tasarlanmıştır, sorun
+   > değil. **ASLA** `service_role` anahtarını buraya veya herhangi bir
+   > frontend dosyasına yazma — o anahtar RLS'i tamamen by-pass eder.
+3. `assets/js/panel.js` içindeki `DELETE_ACCOUNT_FUNCTION_URL` değerini
+   Adım 5'te deploy ettiğin Edge Function URL'iyle güncelle.
+4. Header menüsü (`_layouts/default.html` içindeki `#auth-nav`) zaten
+   otomatik — ayrıca link eklemene gerek yok, `assets/js/nav-auth.js`
+   oturum durumuna göre kendisi dolduruyor (bkz. "Header'daki Hesap Menüsü"
+   bölümü, README'nin "Site Rehberi" kısmında).
+
+---
+
+## Adım 5 — `delete-account` Edge Function'ını Deploy Et
+
+Bu fonksiyon **zorunludur**: bir kullanıcının kendi Auth hesabını gerçekten
+silebilmesi için `service_role` yetkisi gerekir ve bu yetki asla tarayıcıya
+verilemez — bu yüzden bu işlemi Supabase'in sunucusuz Edge Function'ı
+üstlenir.
+
+```bash
+# Supabase CLI kurulu değilse:
+npm install -g supabase
+
+# Proje köküne git, login ol ve projeyi bağla:
+supabase login
+supabase link --project-ref XXXXXXXXXXXX   # Dashboard URL'indeki proje id'si
+
+# Fonksiyonu deploy et:
+supabase functions deploy delete-account
+```
+
+Deploy sonrası Dashboard → **Edge Functions → delete-account** kısmında
+görünen URL'i kopyala (`.../functions/v1/delete-account`) ve Adım 4.3'te
+`panel.js` içine yapıştır. `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`
+ortam değişkenleri Supabase tarafından otomatik sağlanır, elle bir şey
+eklemene gerek yok.
+
+`supabase/functions/delete-account/index.ts` içindeki `ALLOWED_ORIGINS`
+listesini kendi domainlerinle güncellemeyi unutma (CORS koruması).
+
+---
+
+## Adım 6 — CSP / `_headers` Kontrolü
+
+Mevcut `_headers` dosyandaki CSP zaten şunu içeriyor:
+
+```
+connect-src 'self' https:; ...
+```
+
+`https:` joker değeri tüm HTTPS kaynaklarına (Supabase API'si, `esm.sh`
+üzerinden yüklenen Supabase JS SDK dahil) izin verdiği için **hiçbir
+değişiklik yapmana gerek yok**.
+
+---
+
+## Gizli Dosya Nasıl Gönderilir? (Admin → Kullanıcıya Özel Dosya Paylaşımı)
+
+Bu, "gizli dosyayı nasıl göndereceğim" sorusunun cevabı — hazır bir akış
+zaten var, ekstra bir araca gerek yok:
+
+1. `/admin.html` sayfasını aç (sadece admin rolündeki hesap görebilir).
+2. **"Yeni Özel İçerik / Makale Ekle"** formunu doldur: başlık, özet,
+   (istersen) makale metni.
+3. **"Ek Dosya"** alanından dosyayı seç — bu, formu gönderdiğinde otomatik
+   olarak `ozel-dosyalar` adlı **private** Storage bucket'ına yüklenir
+   (bucket herkese kapalı, sadece admin ve içeriğe erişimi olan kullanıcılar
+   görebilir — bkz. `0001_schema_rbac_rls.sql` içindeki storage politikaları).
+4. **"Erişim Verilecek Özel Üyeler"** listesinden dosyayı görmesini
+   istediğin `special_user`/`admin` rolündeki hesapları seç (Ctrl/Cmd basılı
+   tutarak birden fazla seçebilirsin).
+5. **"Yayınla ve Ata"**'ya bas. Seçtiğin kullanıcılar `/panel.html`
+   üzerinden içeriği görüp `/ozel-icerik.html?id=...` sayfasından **"Eki
+   İndir"** butonuyla indirebilir — bu buton her tıklandığında sadece
+   **10 saniye geçerli**, tek seferlik bir Signed URL üretir (bkz.
+   `ozel-icerik.js`), yani link kopyalanıp başkasıyla paylaşılsa bile işe
+   yaramaz.
+
+Bu akış küçük/orta boy dosyalar (Supabase Storage sınırları içinde) için
+tasarlandı. Çok büyük dosyalar (örn. 50GB) için aşağıdaki bölüme bak.
+
+---
+
+## Çok Büyük Dosyalar (Cloudflare R2)
+
+Supabase Storage, ücretsiz ve düşük katmanlarda tek dosya boyutunu
+sınırlar (ücretsiz katmanda varsayılan üst sınır 50MB'tır; Pro planla bile
+tek dosya varsayılan 5GB'a kadar yükseltilebilir ama otomatik olarak 50GB
+gibi bir boyutu desteklemez). 50GB gibi devasa bir dosyayı paylaşman
+gerekiyorsa, `0002_guvenlik_sikilastirma.sql` migration'ı ile eklenen
+**"harici dosya linki"** özelliğini kullan:
+
+1. [Cloudflare Dashboard](https://dash.cloudflare.com) → **R2 Object
+   Storage** → yeni bir bucket oluştur (R2, tek dosyada 5TB'a kadar
+   destekler, GB başına Supabase'ten çok daha ucuzdur ve **egress/indirme
+   ücreti almaz**).
+2. Büyük dosyayı bucket'a yükle (Dashboard'dan sürükle-bırak ile; büyük
+   dosyalarda `wrangler` CLI veya `rclone` kullanmak daha güvenilir olur).
+3. Dosyanın herkese açık bir linkle erişilebilir olmasını istiyorsan,
+   bucket ayarlarından **"Public access"**'i aç (R2.dev alt domaini verir,
+   `https://pub-xxxx.r2.dev/dosya-adi.zip` gibi) — ya da kendi domainini
+   bağlayabilirsin (Cloudflare, "custom domain" bağlama seçeneği sunar).
+4. Aldığın linki, `/admin.html`'deki içerik formunda **"50GB gibi çok
+   büyük dosya için harici link"** alanına yapıştır, "Ek Dosya" alanını
+   BOŞ bırak (ikisini aynı anda kullanma).
+5. Kullanıcı `/ozel-icerik.html` sayfasında artık **"Büyük Dosyayı İndir
+   (harici bağlantı)"** butonunu görür, tıklayınca doğrudan R2 linkine
+   gider.
+
+**Dürüstçe belirtmem gereken güvenlik farkı:** Supabase'teki normal "Eki
+İndir" akışı, her indirmede RLS kontrolünden geçen 10 saniyelik tek
+kullanımlık bir link üretir — yani erişimi olmayan biri linki ele geçirse
+bile işe yaramaz. R2'deki harici link ise (public açtıysan) **sabit ve
+süresiz**dir; linki bilen HERKES indirebilir, RLS'in bir koruması yoktur.
+Bu yüzden bu özelliği sadece "gerçekten gizli değil ama boyutu yüzden
+Supabase'e sığmayan" dosyalar için kullan. Gerçekten hassas/gizli, 50GB
+gibi büyük bir dosyayı erişim kontrollü paylaşmak istiyorsan, R2 bucket'ını
+**private** bırakıp süreli imzalı linkleri (presigned URL) üreten bir
+Cloudflare Worker yazmak gerekir — bu, mevcut "sunucusuz statik site"
+mimarisinin ötesinde ayrı bir entegrasyondur, istersen ayrı bir adım olarak
+kurabiliriz.
+
+---
+
+## Adım 8 — Test Kontrol Listesi
+
+- [ ] `/kayit.html`'den e-posta ile kayıt ol → doğrulama e-postası geldi mi?
+- [ ] E-postadaki linke tıkla → `/giris.html`'den giriş yapabiliyor musun?
+- [ ] `/giris.html`'de "Google ile Giriş Yap" çalışıyor mu?
+- [ ] `/sifremi-unuttum.html` → e-posta geldi mi → `/sifre-guncelle.html`'de
+      yeni şifre belirleyip giriş yapabiliyor musun?
+- [ ] `/panel.html`: profil adı/bio kaydediliyor mu? Avatar yükleniyor mu?
+- [ ] Header'daki "Hesabım" menüsü giriş/çıkışa göre doğru içeriği gösteriyor mu?
+- [ ] Kendini admin yaptıktan sonra `/admin.html` açılıyor mu? Normal bir
+      `user` hesabıyla `/admin.html`'e gidince `panel.html?hata=yetkisiz`'e
+      yönlendiriliyor musun? (İKİNCİ bir tarayıcı/gizli sekme ile test et.)
+- [ ] Admin panelinden bir kullanıcıyı `special_user` yap, bir özel içerik
+      oluştur, o kullanıcıya ata. O kullanıcıyla giriş yapıp `/panel.html`
+      üzerinden içeriği görebiliyor musun?
+- [ ] Aynı içeriğin linkini (`/ozel-icerik.html?id=...`) **yetkisi olmayan**
+      bir hesapla (veya çıkış yapıp anonim olarak) açmayı dene — "Erişim
+      yok" mesajı görmelisin.
+- [ ] Dosya ekli bir içerikte "Eki İndir" butonuna bas, indirme başlıyor mu?
+      10 saniye sonra aynı linki tekrar kullanmayı dene (ör. tarayıcı
+      geçmişinden) — artık çalışmamalı.
+- [ ] Harici (Cloudflare R2) link eklediğin bir içerikte "Büyük Dosyayı
+      İndir" butonu doğru adrese gidiyor mu?
+- [ ] `/panel.html`'de "Hesabımı Sil" akışını **test hesabıyla** dene:
+      onay kutusuna "SİL" yaz → onayla → Supabase Dashboard →
+      Authentication → Users listesinde hesabın gerçekten silindiğini
+      doğrula.
+- [ ] Dashboard → Advisors → Security Advisor → "Rerun linter" ile
+      `0002_guvenlik_sikilastirma.sql`'den sonra uyarıların azaldığını
+      doğrula ("Public Bucket Allows Listing" ve SECURITY DEFINER
+      uyarılarının gitmiş olması gerekiyor).
+
+---
+
+## Güvenlik Özeti — Neden Güvenli?
+
+- **RLS her yerde açık.** `profiles`, `special_content`, `content_access`,
+  `site_settings` ve iki storage bucket'ının hepsinde satır bazlı politika
+  var; hiçbir tabloda "RLS kapalı, sadece frontend kontrolü var" durumu yok.
+- **Rol yükseltme engellenmiş.** Kullanıcı kendi `role` kolonunu ne RLS'in
+  `WITH CHECK`'i ne de ekstra bir `BEFORE UPDATE` trigger'ı üzerinden
+  değiştiremez; sadece `admin_set_user_role()` RPC'si (admin kontrolü
+  içeren) rol değiştirebilir.
+- **Signed URL'ler kısa ömürlü ve yetki kontrollüdür.** `createSignedUrl`
+  çağrısının kendisi, çağıran kullanıcının o dosya üzerinde SELECT RLS
+  yetkisi var mı diye kontrol eder — yetkisi yoksa link üretilmez; üretilse
+  bile 10 saniye sonra geçersizleşir. (İstisna: yukarıda anlatılan,
+  opsiyonel Cloudflare R2 "harici link" özelliği — bunun kendi güvenlik
+  ödünleşimi ayrı başlıkta anlatıldı.)
+- **`service_role` anahtarı hiçbir yerde frontend'de yok.** Sadece
+  hesap-silme Edge Function'ının sunucu tarafında, Supabase'in kendi
+  ortam değişkeni olarak durur.
+- **Girdi enjeksiyonuna karşı önlem.** Gizli makale metni önce
+  `escapeHtml` ile kaçırılır, sonra çok basit bir markdown dönüştürücüden
+  geçer — kullanıcı/admin girdisine ham `<script>` yazılsa bile çalışmaz.
+- **SECURITY DEFINER fonksiyonlarında en az yetki ilkesi.**
+  `0002_guvenlik_sikilastirma.sql` ile her fonksiyon SADECE gerçekten
+  ihtiyacı olan role'e (anon/authenticated) açık, PUBLIC'e değil; trigger
+  fonksiyonlarında (`handle_new_user`, `prevent_role_self_escalation`,
+  `set_updated_at`) hiçbir role'e EXECUTE izni verilmiyor çünkü trigger'lar
+  buna ihtiyaç duymuyor.
+- **Avatar bucket'ı listelemeye kapalı.** `avatarlar` bucket'ı public
+  (herkese görünür profil fotoğrafları) olsa da, bucket içeriğini TOPLU
+  listeleyip tüm kullanıcı ID'lerini görme izni kaldırıldı.
+
+---
+
+## Kapsam Dışı Bıraktığım Bir Nokta (dürüstçe belirtmek isterim)
+
+Sitenin **herkese açık** blog yazıların (`_posts/*.md`) ve akademik proje
+sayfaların hâlâ Git deposundaki Markdown dosyaları — bunları tarayıcıdan
+doğrudan düzenleyebilmek (dosyayı repoya commit'leyip Jekyll'in yeniden
+build etmesini tetiklemek) Supabase'in değil, **GitHub API + OAuth**
+("headless CMS") işidir; örneğin [Decap CMS](https://decapcms.org) (eski
+adıyla Netlify CMS) tam bu iş için var ve mevcut Jekyll yapını bozmadan
+`/admin`'e benzer bir arayüz ekleyebilir. İstersen bunu ayrı bir adım
+olarak da kurabiliriz — ama bu, Supabase'ten bağımsız, tamamen farklı bir
+entegrasyon olduğu için bu bölümün kapsamı dışında tuttum, karıştırmak
+istemedim.
 
 </details>
 
@@ -366,6 +793,20 @@ Aşağıdaki her blok bağımsızdır — sadece istemediğini sil, geri kalanı
 **Android uygulama bağlantısını (App Links) kullanmıyorsan:**
 - `.well-known/assetlinks.json` dosyasını sil
 - `_config.yml` içindeki `include: - .well-known` satırını silebilirsin
+
+**Supabase kullanıcı sistemini (kayıt/giriş/panel/admin) kaldırmak istersen:**
+- `giris.md`, `kayit.md`, `sifremi-unuttum.md`, `sifre-guncelle.md`,
+  `panel.md`, `admin.md`, `ozel-icerik.md` dosyalarını sil
+- `assets/js/supabase-client.js`, `auth-guard.js`, `auth-pages.js`,
+  `panel.js`, `admin.js`, `ozel-icerik.js`, `nav-auth.js` ve
+  `assets/css/auth.css` dosyalarını sil
+- `supabase/` klasörünü (migrations + functions) tamamen sil
+- `_layouts/default.html` içindeki `#auth-nav` bloğunu ve onu başlatan
+  `<script type="module">...initAuthNav()...</script>` satırını sil
+- `assets/style.css` içindeki `.auth-nav*` sınıflarını sil
+- Supabase Dashboard'dan projeyi de silmek istersen **Project Settings →
+  General → Delete Project** üzerinden yapabilirsin (bu, koddan bağımsız,
+  ayrı bir adım)
 
 ### 4. Secret / Gizli Anahtarlar — Nerede, Nasıl Tanımlanır
 
