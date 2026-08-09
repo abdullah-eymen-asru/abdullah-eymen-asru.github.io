@@ -171,3 +171,91 @@
   padding: 60px 20px;
   color: var(--muted);
 }
+
+/* ------------------------------------------------------------------------
+ * ADMİN PANELİ: bölüm (section) bazlı düzen. Sayfa artık tek bir uzun
+ * kaydırma değil — solda sabit (sticky) bir menü var, tıklanan bölüme
+ * kayar. Mobilde menü üstte yatay bir şerit olarak görünür.
+ * ---------------------------------------------------------------------- */
+.admin-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+.admin-nav {
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card-bg);
+}
+.admin-nav a {
+  padding: 10px 12px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--text);
+  font-size: 0.92rem;
+  transition: background 0.15s ease;
+}
+.admin-nav a:hover { background: var(--tag-bg); }
+.admin-nav a.active {
+  background: var(--accent);
+  color: #fff;
+}
+.admin-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+.admin-content .panel-section {
+  scroll-margin-top: 16px;
+}
+
+@media (max-width: 760px) {
+  .admin-layout { grid-template-columns: 1fr; }
+  .admin-nav {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 6px;
+  }
+  .admin-nav a { white-space: nowrap; }
+}
+
+/* Üye arama kutusu ve atama listesi (özel içerik erişimi + son geçerlilik) */
+.atama-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+}
+.atama-satiri {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 4px;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.atama-satiri:hover { background: var(--tag-bg); }
+.atama-tarih {
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.82rem;
+  width: 140px;
+}
