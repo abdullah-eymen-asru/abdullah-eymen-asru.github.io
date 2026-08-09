@@ -73,23 +73,58 @@ async function init() {
  */
 async function okunduIsaretleVeGoster(contentId) {
   const durumEl = document.getElementById("okundu-durum");
+  const kosedeAlan = document.getElementById("okundu-manuel-wrap");
   if (!durumEl) return;
 
   await supabase.rpc("icerik_okundu_isaretle", { p_content_id: contentId });
+  await durumuYenile(contentId, durumEl, kosedeAlan);
+}
+
+/**
+ * Okundu durumunu DB'den okuyup hem üstteki metni hem köşedeki yedek
+ * "Okundum" düğmesini günceller. Otomatik işaretleme (yukarıdaki RPC çağrısı,
+ * sayfa açılır açılmaz çalışır) normalde yeterlidir — köşedeki düğme SADECE
+ * bağlantı sorunu/gecikme gibi bir sebeple otomatik işaretleme
+ * uygulanmadıysa diye duran bir YEDEKTİR ("otomatik sistem kaydetsin ama
+ * yedek olarak köşede bir yerde dursun" isteği).
+ */
+async function durumuYenile(contentId, durumEl, kosedeAlan) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
 
   const { data } = await supabase
     .from("content_access")
     .select("okundu_mu, okundu_tarihi")
     .eq("content_id", contentId)
-    .eq("user_id", (await supabase.auth.getUser()).data.user.id)
+    .eq("user_id", user.id)
     .maybeSingle();
 
   if (data?.okundu_mu) {
     durumEl.innerHTML = `✓ Okundu olarak işaretlendi (${new Date(data.okundu_tarihi).toLocaleString("tr-TR")})`;
-  } else {
-    // Admin kendi eklediği içeriği görüntülüyor olabilir (content_access
-    // satırı hiç yok) — bu durumda okundu bilgisi gösterilmez, sorun değil.
-    durumEl.innerHTML = "";
+    if (kosedeAlan) kosedeAlan.hidden = true;
+    return;
+  }
+
+  // Admin kendi eklediği içeriği görüntülüyor olabilir (content_access
+  // satırı hiç yok) — bu durumda okundu bilgisi/düğmesi hiç gösterilmez.
+  durumEl.innerHTML = "";
+  if (!kosedeAlan) return;
+  if (data === null) {
+    kosedeAlan.hidden = true;
+    return;
+  }
+  kosedeAlan.hidden = false;
+  const btn = document.getElementById("okundu-manuel-btn");
+  if (btn && !btn.dataset.bagli) {
+    btn.dataset.bagli = "1";
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      await supabase.rpc("icerik_okundu_isaretle", { p_content_id: contentId });
+      await durumuYenile(contentId, durumEl, kosedeAlan);
+      btn.disabled = false;
+    });
   }
 }
 
