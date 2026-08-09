@@ -42,6 +42,10 @@ let PAT_BELLEK = "";
 // null: yeni içerik ekleniyor, doluysa mevcut bir dosya düzenleniyor.
 let DUZENLENEN_YOL = null;
 let DUZENLENEN_SHA = null;
+// Düzenlenen içeriğin daha önce üretilmiş gizli ön izleme kodu (varsa).
+// Formda "Yayında değil" seçiliyken tekrar kaydedilirse bu kod KORUNUR,
+// böylece link değişmez. Yeni içerikte veya kod hiç üretilmemişse null.
+let DUZENLENEN_GIZLI_KOD = null;
 
 let PROFIL_SHA = null;
 
@@ -56,6 +60,7 @@ async function init() {
   wireEditorToolbar();
   wireBaglantiDogrula();
   wireIcerikForm();
+  wireYayindaCanliOnizleme();
   wireIcerikListe();
   wireProfilFoto();
 
@@ -345,7 +350,15 @@ function fmSatiri(anahtar, deger, ciplak = false) {
 /**
  * Front matter + gövdeden tam Markdown dosya içeriğini üretir.
  * "Yayında" işaretliyse: yayinda:true, sitemap:true, permalink YOK.
- * İşaretli değilse: yayinda:false, sitemap:false + rastgele gizli permalink.
+ * İşaretli değilse: yayinda:false, sitemap:false + gizli ön izleme permalink'i.
+ *
+ * gizliKod, çağıran taraftan (icerikKaydet) gelir: içerik ilk kez "yayında
+ * değil" olarak kaydediliyorsa yeni üretilir, daha önce zaten bir ön izleme
+ * kodu varsa (düzenleme sırasında) AYNI kod korunur — böylece link, panelde
+ * her açılışta/düzenlemede DEĞİŞMEZ ve daha önce paylaşılmış olabilecek bir
+ * link kırılmaz. Kod yalnızca "Yayında değil" iken "Yayında"ya çevrilip
+ * tekrar "Yayında değil"e alınırsa ya da kullanıcı bilinçli olarak
+ * yenilerse değişir.
  */
 function dosyaIcerigiOlustur(tur, alan, yayinda, gizliKod, govde) {
   const satirlar = ["---"];
@@ -371,6 +384,13 @@ function dosyaIcerigiOlustur(tur, alan, yayinda, gizliKod, govde) {
   satirlar.push("---");
   const frontMatter = satirlar.filter(Boolean).join("\n");
   return `${frontMatter}\n\n${govde.trim()}\n`;
+}
+
+/** Bir permalink değerinden ("/blog/on-izleme-abc123/" gibi) gizli kodu çıkarır, yoksa null döner. */
+function permalinktenGizliKoduCikar(permalink) {
+  if (!permalink) return null;
+  const m = String(permalink).match(/on-izleme-([a-z0-9]+)\/?$/);
+  return m ? m[1] : null;
 }
 
 /** Basit front-matter okuyucu — bu panelin ürettiği sınırlı alan setiyle çalışacak şekilde tasarlandı. */
@@ -405,6 +425,62 @@ function dosyaYoluHesapla(tur, tarih, slug, yilOneki) {
   return `_projects/${yilOneki ? yil + "-" : ""}${slug}.md`;
 }
 
+/**
+ * Ön izleme linki kutusunu doldurup gösterir. Hem yeni kaydetme sonrası
+ * hem de mevcut bir "yayında değil" içeriği düzenlemeye açarken kullanılır
+ * — yani link tek seferlik değil, ihtiyaç oldukça her zaman görüntülenebilir.
+ */
+function onizlemeKutusunuGoster(tur, gizliKod) {
+  const onEk = tur === "proje" ? "/projects/" : "/blog/";
+  const onizlemeYolu = `${onEk}on-izleme-${gizliKod}/`;
+  const onizlemeEl = document.getElementById("ic-onizleme-kutusu");
+  onizlemeEl.className = "auth-message auth-message--success";
+  onizlemeEl.innerHTML =
+    `🔒 Gizli ön izleme linki (sadece bu linki bilenler görebilir — sayfa yayına
+    alınana kadar her zaman burada, panelden görüntülenebilir):` +
+    `<div class="gy-link-kutu">
+      <input type="text" id="ic-onizleme-link" readonly value="${escapeHtml(
+        location.origin + onizlemeYolu
+      )}" onclick="this.select()">
+      <button type="button" id="ic-onizleme-kopyala-btn" class="gy-link-kopyala-btn">Kopyala</button>
+    </div>`;
+  onizlemeEl.hidden = false;
+
+  const kopyalaBtn = document.getElementById("ic-onizleme-kopyala-btn");
+  kopyalaBtn?.addEventListener("click", async () => {
+    const input = document.getElementById("ic-onizleme-link");
+    try {
+      await navigator.clipboard.writeText(input.value);
+      kopyalaBtn.textContent = "Kopyalandı ✓";
+    } catch {
+      input.select();
+      document.execCommand("copy");
+      kopyalaBtn.textContent = "Kopyalandı ✓";
+    }
+    setTimeout(() => (kopyalaBtn.textContent = "Kopyala"), 1600);
+  });
+}
+
+function onizlemeKutusunuGizle() {
+  document.getElementById("ic-onizleme-kutusu").hidden = true;
+}
+
+/**
+ * "Yayında" anahtarına canlı olarak bağlanır: formda düzenlenen içeriğin
+ * zaten bir gizli kodu varsa, kutucuk her açılıp kapandığında ön izleme
+ * linki de otomatik gösterilip gizlenir — kaydetmeyi beklemeye gerek kalmaz.
+ */
+function wireYayindaCanliOnizleme() {
+  document.getElementById("ic-yayinda").addEventListener("change", (e) => {
+    if (!DUZENLENEN_GIZLI_KOD) return; // henüz üretilmiş bir kod yoksa (yeni içerik) kaydedilene kadar gösterilecek bir şey yok.
+    if (e.target.checked) {
+      onizlemeKutusunuGizle();
+    } else {
+      onizlemeKutusunuGoster(icerikTuru(), DUZENLENEN_GIZLI_KOD);
+    }
+  });
+}
+
 /* ---------------------------------------------------------------------- */
 /* İÇERİK EKLE / DÜZENLE FORMU                                            */
 /* ---------------------------------------------------------------------- */
@@ -419,6 +495,7 @@ function wireIcerikForm() {
 function duzenlemeyiKapat() {
   DUZENLENEN_YOL = null;
   DUZENLENEN_SHA = null;
+  DUZENLENEN_GIZLI_KOD = null;
   document.getElementById("ic-iptal-btn").hidden = true;
   document.getElementById("ic-submit-btn").textContent = "GitHub'a Yayınla";
   guncelleIcerikTuru();
@@ -428,7 +505,7 @@ function duzenlemeyiIptalEt() {
   duzenlemeyiKapat();
   document.getElementById("icerik-form").reset();
   document.getElementById("ic-date").value = new Date().toISOString().slice(0, 10);
-  document.getElementById("ic-onizleme-kutusu").hidden = true;
+  onizlemeKutusunuGizle();
   guncelleIcerikTuru();
 }
 
@@ -466,7 +543,10 @@ async function icerikKaydet() {
   }
 
   const govde = document.getElementById("ic-body").value;
-  const gizliKod = !yayinda ? rastgeleKod(8) : null;
+  // "Yayında değil" ise: daha önce üretilmiş bir kod varsa (düzenleme) onu
+  // KORU, yoksa (ilk kez gizleniyor) yeni bir kod üret. Bu sayede ön izleme
+  // linki her kaydedişte değişmez.
+  const gizliKod = !yayinda ? DUZENLENEN_GIZLI_KOD || rastgeleKod(8) : null;
   const dosyaIcerigi = dosyaIcerigiOlustur(tur, alan, yayinda, gizliKod, govde);
   const yeniYol = dosyaYoluHesapla(tur, date, slug, yilOneki);
 
@@ -496,22 +576,24 @@ async function icerikKaydet() {
       }
     }
 
+    DUZENLENEN_GIZLI_KOD = gizliKod;
     if (!yayinda) {
-      const onizlemeYolu = tur === "proje" ? `/projects/on-izleme-${gizliKod}/` : `/blog/on-izleme-${gizliKod}/`;
-      const onizlemeEl = document.getElementById("ic-onizleme-kutusu");
-      onizlemeEl.className = "auth-message auth-message--success";
-      onizlemeEl.innerHTML =
-        `Gizli ön izleme linki (sadece bu linki bilen görebilir):` +
-        `<div class="gy-link-kutu"><input type="text" readonly value="${escapeHtml(
-          location.origin + onizlemeYolu
-        )}" onclick="this.select()"></div>`;
-      onizlemeEl.hidden = false;
+      onizlemeKutusunuGoster(tur, gizliKod);
     } else {
-      document.getElementById("ic-onizleme-kutusu").hidden = true;
+      onizlemeKutusunuGizle();
     }
 
     showMessage(msgEl, "İşlem başarıyla GitHub'a iletildi, 1-2 dakika içinde sitede güncellenecektir.", "success");
-    duzenlemeyiKapat();
+    // Not: duzenlemeyiKapat() burada ÇAĞRILMIYOR — kapatılırsa ön izleme
+    // kutusu ve DUZENLENEN_GIZLI_KOD sıfırlanır, kullanıcı linki kaybeder.
+    // Form "düzenleme modunda" kalır ki içerik hemen yayına alınabilsin ya
+    // da link tekrar görüntülenebilsin. Kart listesindeki "Düzenle" veya
+    // "Yeni İçerik Ekle"ye geçiş formu zaten normal şekilde sıfırlayacaktır.
+    DUZENLENEN_YOL = yeniYol;
+    DUZENLENEN_SHA = (await ghGetContents(yeniYol))?.sha || DUZENLENEN_SHA;
+    document.getElementById("ic-iptal-btn").hidden = false;
+    document.getElementById("ic-submit-btn").textContent = "Güncelle";
+    guncelleIcerikTuru();
     await icerikListesiYukle();
   } catch (err) {
     showMessage(msgEl, `Hata: ${err.message}`, "error");
@@ -644,8 +726,19 @@ function icerikDuzenlemeyeYukle(item, tur) {
   }
 
   document.getElementById("ic-body").value = item.body || "";
-  document.getElementById("ic-yayinda").checked = item.data.yayinda !== false;
-  document.getElementById("ic-onizleme-kutusu").hidden = true;
+  const yayinda = item.data.yayinda !== false;
+  document.getElementById("ic-yayinda").checked = yayinda;
+
+  // İçeriğin daha önce üretilmiş bir gizli ön izleme kodu varsa (permalink
+  // alanından çıkar) hatırla ve göster — "yayında değil" içerikler artık
+  // düzenlemeye her açıldığında linkini yeniden görebilir, kod da kaydetme
+  // sırasında DEĞİŞMEDEN korunur.
+  DUZENLENEN_GIZLI_KOD = permalinktenGizliKoduCikar(item.data.permalink);
+  if (!yayinda && DUZENLENEN_GIZLI_KOD) {
+    onizlemeKutusunuGoster(tur, DUZENLENEN_GIZLI_KOD);
+  } else {
+    onizlemeKutusunuGizle();
+  }
 
   document.getElementById("ic-iptal-btn").hidden = false;
   document.getElementById("ic-submit-btn").textContent = "Güncelle";
