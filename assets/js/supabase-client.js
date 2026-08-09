@@ -44,3 +44,12 @@ export function showMessage(el, text, type = "error") {
   el.className = `auth-message auth-message--${type}`;
   el.hidden = false;
 }
+
+/**
+ * Bugünün Gizlilik Politikası / KVKK metni sürüm etiketi. Metni
+ * (gizlilik-politikasi.md) gerçekten değiştirdiğinde bu değeri de
+ * güncelle — o andan itibaren yeni kayıt olanlar bu sürüme onay verir ve
+ * eski üyeler panelde "güncellenmiş metni onaylaman gerekiyor" uyarısı
+ * görür (bkz. panel.js).
+ */
+export const KVKK_METIN_SURUMU = "2026-08";
