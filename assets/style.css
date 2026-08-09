@@ -151,6 +151,78 @@ nav a.active {
   font-weight: 600;
 }
 
+/* HESAP MENÜSÜ (auth-nav) — bkz. _layouts/default.html ve assets/js/nav-auth.js
+   Giriş yapmışken/yapmamışken tek bir sekmede toplanan Giriş/Panelim/Admin/
+   Çıkış linkleri. .auth-nav içindeki düz <a> (çıkış yapmışken "Giriş Yap")
+   zaten yukarıdaki "nav a" kuralından stilini alıyor, ekstra bir şey
+   gerekmiyor — burada sadece dropdown (Hesabım ▾) durumunu stilliyoruz. */
+.auth-nav { position: relative; margin-left: 4px; }
+
+.auth-nav-dropdown { position: relative; }
+
+.auth-nav-btn {
+  margin-left: 4px;
+  padding: 7px 12px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: var(--muted);
+  font-size: 0.93rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+}
+.auth-nav-btn:hover,
+.auth-nav-btn[aria-expanded="true"] {
+  color: var(--text);
+  background: var(--tag-bg);
+}
+
+.auth-nav-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 170px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card-bg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  z-index: 60;
+}
+
+.auth-nav-menu a,
+.auth-nav-menu-cikis {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-family: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.auth-nav-menu a:hover,
+.auth-nav-menu-cikis:hover { background: var(--tag-bg); }
+
+.auth-nav-menu-cikis {
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 7px 7px;
+  padding-top: 10px;
+  color: #d64545;
+}
+
+@media (max-width: 640px) {
+  .auth-nav-menu { right: auto; left: 0; }
+}
+
 .content { padding: 40px 20px 60px; min-height: 60vh; }
 
 h1 { font-size: 1.9rem; margin-bottom: 0.3em; }
@@ -678,6 +750,13 @@ th { color: var(--muted); font-weight: 600; }
   }
 
   nav a {
+    margin-left: 0;
+    padding: 6px 9px;
+    font-size: 0.87rem;
+  }
+
+  .auth-nav { margin-left: 0; }
+  .auth-nav-btn {
     margin-left: 0;
     padding: 6px 9px;
     font-size: 0.87rem;
