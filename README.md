@@ -265,15 +265,24 @@ assets/css/github-yonetim.css  <- Bu sayfaya özel ek stiller (auth.css'in üzer
   `status`, `summary`, `link`, `link_label` alanları da görünür). Dosya
   adı (slug) boş bırakılırsa başlıktan otomatik üretilir (Türkçe
   karakterler sadeleştirilir).
-- **"Yayında" kutusunu işaretlemezsen** panel otomatik olarak
-  `yayinda: false`, `sitemap: false` yazar ve 8 karakterlik rastgele bir
-  kodla (`crypto.getRandomValues` ile üretilir, tahmin edilemez) gizli bir
-  ön izleme linki oluşturur (`/blog/on-izleme-XXXXXXXX/` veya
+- **"Yayında" anahtarını kapatırsan** (modern bir toggle switch; klasik
+  onay kutusu değil) panel otomatik olarak `yayinda: false`,
+  `sitemap: false` yazar ve 8 karakterlik rastgele bir kodla
+  (`crypto.getRandomValues` ile üretilir, tahmin edilemez) gizli bir ön
+  izleme linki oluşturur (`/blog/on-izleme-XXXXXXXX/` veya
   `/projects/on-izleme-XXXXXXXX/`) — bkz. yukarıdaki Bölüm 9'daki mantığın
-  aynısı, sadece elle yazmak yerine panel yazıyor. Yayınladıktan sonra bu
-  link ekranda gösterilir, kopyalayıp saklaman gerekir (panel bir daha
-  göstermez, ama "Mevcut İçerikler" listesinden dosyayı tekrar açıp
-  içeriği görebilirsin).
+  aynısı, sadece elle yazmak yerine panel yazıyor.
+  **Bu link tek seferlik değildir:** kaydettikten sonra ekranda kalır,
+  "Yayında" anahtarını kapatıp açtığında anında görünür/gizlenir, "Mevcut
+  İçerikler" listesinden aynı yazıyı tekrar "Düzenle"ye açtığında da aynı
+  link otomatik olarak yeniden gösterilir — panel bunu dosyanın
+  `permalink` alanından okur. Link ayrıca her düzenlemede **değişmez**:
+  aynı gizli kod korunur, böylece daha önce birine gönderdiğin bir ön
+  izleme linki içeriği güncellesen bile kırılmaz. Kod yalnızca "Yayında"yı
+  açıp tekrar kapatırsan yenilenir. Yazının/projenin kendi sayfasında da
+  (görüntülerken) "henüz yayında değil" uyarısı görünür (bkz.
+  `_layouts/post.html` / `_layouts/project.html`), böylece linke sahip
+  olan biri içeriği görüntülerken durumundan haberdar olur.
 - **Hafif bir Markdown editörü** — kalın, italik, başlık ve bağlantı
   eklemek için metin alanının üstünde küçük araç çubuğu butonları var.
 - **Mevcut İçerikler** sekmesi — `_posts/` ve `_projects/` klasörlerindeki
