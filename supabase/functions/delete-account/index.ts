@@ -125,16 +125,11 @@ Deno.serve(async (req) => {
       console.warn("admin_delete_user_data RPC uyarısı (cascade zaten halledecek):", e);
     }
 
-    // 4) Hedef kullanıcının storage'daki dosyalarını (varsa eski avatarlar,
-    //    vb.) temizle.
-    const { data: files } = await adminClient.storage.from("avatarlar").list(targetId);
-    if (files && files.length > 0) {
-      const paths = files.map((f) => `${targetId}/${f.name}`);
-      await adminClient.storage.from("avatarlar").remove(paths);
-    }
-
-    // 5) Asıl Auth hesabını sil. profiles, content_access vb. FK'lerdeki
-    //    ON DELETE CASCADE sayesinde ilişkili TÜM veriler otomatik gider.
+    // 4) Asıl Auth hesabını sil. profiles, content_access, messages vb.
+    //    FK'lerdeki ON DELETE CASCADE sayesinde ilişkili TÜM veriler
+    //    otomatik gider. (Eski "avatarlar" bucket'ı ve temizlik adımı
+    //    kaldırıldı — profil fotoğrafı özelliği ve bucket'ın kendisi artık
+    //    hiç kullanılmıyor, bkz. migration 0004.)
     const { error: delErr } = await adminClient.auth.admin.deleteUser(targetId);
     if (delErr) throw delErr;
 
