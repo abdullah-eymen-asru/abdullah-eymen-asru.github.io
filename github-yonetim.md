@@ -1,0 +1,187 @@
+---
+layout: default
+title: "GitHub İçerik Yönetimi"
+yayinda: true
+---
+
+<link rel="stylesheet" href="{{ '/assets/css/auth.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/css/github-yonetim.css' | relative_url }}">
+
+<div class="loading-overlay" id="loading">Yükleniyor...</div>
+
+<div id="app" hidden
+     data-default-owner="{{ site.github_username }}"
+     data-default-repo="{{ site.github_username }}.github.io">
+  <h1>GitHub İçerik Yönetimi</h1>
+  <p class="muted">
+    Bu panel, blog yazılarını ve akademik projeleri doğrudan bu GitHub deponuza
+    (<code>_posts/</code> ve <code>_projects/</code>) commit ederek yayınlamanı
+    sağlar — 3. parti bir servis gerektirmez, doğrudan GitHub REST API'sini
+    kullanır. Üstteki Supabase tabanlı "Admin Paneli"nden tamamen bağımsız
+    çalışır; sadece sana (yöneticiye) özeldir.
+  </p>
+
+  <div class="admin-layout">
+
+    <nav id="gy-nav" class="admin-nav">
+      <a href="#baglanti" data-section="baglanti" class="active">🔑 GitHub Bağlantısı</a>
+      <a href="#icerik-ekle" data-section="icerik-ekle">📝 İçerik Ekle / Düzenle</a>
+      <a href="#icerikler" data-section="icerikler">📚 Mevcut İçerikler</a>
+      <a href="#profil-foto" data-section="profil-foto">🖼️ Profil Fotoğrafı</a>
+    </nav>
+
+    <div class="admin-content">
+
+      <section id="baglanti" class="panel-section">
+        <h2>GitHub Bağlantısı</h2>
+        <p class="muted">
+          Token yalnızca bu sekme açıkken tarayıcının belleğinde tutulur;
+          sayfayı yenilediğinde veya sekmeyi kapattığında otomatik olarak
+          silinir — hiçbir yerde (localStorage dahil) saklanmaz, bu yüzden
+          panele her girişte yeniden yapıştırman gerekir. Kullanıcı adı ve
+          repo adı gizli olmadığından, kolaylık için tarayıcında hatırlanır.
+        </p>
+        <div class="form-field">
+          <label for="gh-owner">GitHub Kullanıcı Adı</label>
+          <input id="gh-owner" type="text" placeholder="kullanici-adi" autocomplete="off">
+        </div>
+        <div class="form-field">
+          <label for="gh-repo">Repository Adı</label>
+          <input id="gh-repo" type="text" placeholder="kullanici-adi.github.io" autocomplete="off">
+        </div>
+        <div class="form-field">
+          <label for="gh-branch">Branch (opsiyonel — boş bırakılırsa reponun varsayılan branch'i kullanılır)</label>
+          <input id="gh-branch" type="text" placeholder="main" autocomplete="off">
+        </div>
+        <div class="form-field">
+          <label for="gh-pat">GitHub Personal Access Token (PAT)</label>
+          <input id="gh-pat" type="password" autocomplete="off" placeholder="github_pat_xxxxxxxxxxxx">
+          <p class="muted" style="margin:4px 0 0;font-size:0.85rem;">
+            Fine-grained bir token oluşturup <strong>sadece bu repo</strong>
+            için <code>Contents: Read and write</code> iznini vermen yeterli
+            ve daha güvenli — tüm hesaba erişen "classic" token yerine bunu
+            tercih et.
+            <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Token oluştur →</a>
+          </p>
+        </div>
+        <button id="gh-baglan-btn" type="button" class="btn-primary" style="width:auto;">Bağlantıyı Doğrula</button>
+        <div id="gh-baglanti-message" class="auth-message" hidden></div>
+      </section>
+
+      <section id="icerik-ekle" class="panel-section">
+        <h2 id="ic-form-baslik">Yeni İçerik Ekle</h2>
+
+        <div class="form-field">
+          <label>İçerik Türü</label>
+          <div class="gy-tip-secim">
+            <label class="gy-radio"><input type="radio" name="icerik-turu" value="blog" checked> 📰 Blog Yazısı</label>
+            <label class="gy-radio"><input type="radio" name="icerik-turu" value="proje"> 🎓 Akademik Proje</label>
+          </div>
+        </div>
+
+        <form id="icerik-form" novalidate>
+          <div class="form-field">
+            <label for="ic-title">Başlık</label>
+            <input id="ic-title" type="text" required>
+          </div>
+          <div class="form-field">
+            <label for="ic-date">Tarih</label>
+            <input id="ic-date" type="date" required>
+          </div>
+          <div class="form-field">
+            <label for="ic-slug">Dosya adı / slug (boş bırakılırsa başlıktan otomatik üretilir)</label>
+            <input id="ic-slug" type="text" placeholder="ornek-yazi-basligi" autocomplete="off">
+          </div>
+          <div class="form-field" id="ic-yil-oneki-wrap" hidden>
+            <label class="gy-checkbox"><input id="ic-yil-oneki" type="checkbox"> Dosya adına yıl önekini ekle (<code>YYYY-slug.md</code>)</label>
+          </div>
+
+          <div id="ic-proje-alanlar" hidden>
+            <div class="form-field">
+              <label for="ic-venue">Venue (Mekan / Mecra)</label>
+              <input id="ic-venue" type="text" placeholder="Dergi / Konferans Adı veya Kaynakça">
+            </div>
+            <div class="form-field">
+              <label for="ic-status">Durum</label>
+              <select id="ic-status">
+                <option value="Yayınlandı">Yayınlandı</option>
+                <option value="Devam Ediyor">Devam Ediyor</option>
+                <option value="İnceleme Aşamasında">İnceleme Aşamasında</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="ic-summary">Özet (listeleme sayfasında görünür, 1-2 cümle)</label>
+              <input id="ic-summary" type="text">
+            </div>
+            <div class="form-field">
+              <label for="ic-link">Dış Bağlantı URL (opsiyonel)</label>
+              <input id="ic-link" type="url" placeholder="https://...">
+            </div>
+            <div class="form-field">
+              <label for="ic-link-label">Bağlantı Etiketi (opsiyonel)</label>
+              <input id="ic-link-label" type="text" placeholder="Makaleyi Oku">
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label for="ic-body">İçerik (Markdown)</label>
+            <div class="gy-editor-toolbar" role="toolbar" aria-label="Markdown biçimlendirme">
+              <button type="button" data-md="bold" title="Kalın (**metin**)"><strong>K</strong></button>
+              <button type="button" data-md="italic" title="İtalik (*metin*)"><em>İ</em></button>
+              <button type="button" data-md="h2" title="Başlık (## metin)">H</button>
+              <button type="button" data-md="link" title="Bağlantı ([metin](url))">🔗</button>
+              <button type="button" data-md="list" title="Liste (- madde)">≡</button>
+            </div>
+            <textarea id="ic-body" rows="14" placeholder="Markdown formatında içeriğini buraya yaz..."></textarea>
+          </div>
+
+          <div class="form-field">
+            <label class="gy-checkbox">
+              <input id="ic-yayinda" type="checkbox" checked>
+              Yayında (işareti kaldırırsan içerik gizlenir; sadece rastgele
+              üretilen bir ön izleme linkiyle erişilebilir olur)
+            </label>
+          </div>
+          <div id="ic-onizleme-kutusu" class="auth-message" hidden></div>
+
+          <div style="display:flex; gap:10px; flex-wrap: wrap;">
+            <button type="submit" id="ic-submit-btn" class="btn-primary" style="width:auto;">GitHub'a Yayınla</button>
+            <button type="button" id="ic-iptal-btn" class="btn-danger" style="width:auto;" hidden>Düzenlemeyi İptal Et</button>
+          </div>
+        </form>
+        <div id="ic-message" class="auth-message" hidden></div>
+      </section>
+
+      <section id="icerikler" class="panel-section">
+        <h2>Mevcut İçerikler</h2>
+        <p class="muted">Önce "GitHub Bağlantısı" sekmesinden bağlantını doğrula, sonra listeyi yükle.</p>
+        <button id="ic-liste-yenile-btn" type="button" class="btn-primary" style="width:auto; margin-bottom:12px;">Listeyi Yükle / Yenile</button>
+        <div id="ic-liste"><p class="muted">Henüz yüklenmedi.</p></div>
+      </section>
+
+      <section id="profil-foto" class="panel-section">
+        <h2>Profil Fotoğrafı Yönetimi</h2>
+        <p class="muted">
+          <code>assets/profil.jpg</code> dosyasını buradan görüntüle,
+          değiştir veya sil (site genelinde favicon ve profil resmi olarak
+          kullanılır, bkz. <code>_config.yml → profile_image</code>).
+        </p>
+        <div id="pf-mevcut" class="gy-profil-onizleme">
+          <p class="muted">Görüntülemek için önce bağlantıyı doğrula.</p>
+        </div>
+        <div class="form-field">
+          <label for="pf-dosya">Yeni Fotoğraf Seç</label>
+          <input id="pf-dosya" type="file" accept="image/*">
+        </div>
+        <div style="display:flex; gap:10px; flex-wrap: wrap;">
+          <button id="pf-yukle-btn" type="button" class="btn-primary" style="width:auto;">Yükle / Değiştir</button>
+          <button id="pf-sil-btn" type="button" class="btn-danger" style="width:auto;">Profil Fotoğrafını Sil</button>
+        </div>
+        <div id="pf-message" class="auth-message" hidden></div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<script type="module" src="{{ '/assets/js/github-yonetim.js' | relative_url }}"></script>
