@@ -426,29 +426,72 @@ function dosyaYoluHesapla(tur, tarih, slug, yilOneki) {
 }
 
 /**
- * Ön izleme linki kutusunu doldurup gösterir. Hem yeni kaydetme sonrası
- * hem de mevcut bir "yayında değil" içeriği düzenlemeye açarken kullanılır
- * — yani link tek seferlik değil, ihtiyaç oldukça her zaman görüntülenebilir.
+ * Ön izleme linki kutusunu doldurup gösterir. Hem yeni kaydetme sonrası,
+ * hem mevcut bir "yayında değil" içeriği düzenlemeye açarken, hem de
+ * "Yayında" kapatıldığı anda (kaydetmeden ÖNCE) kullanılır — yani link
+ * tek seferlik/salt-okunur değildir: kullanıcı kodu elle değiştirebilir
+ * veya zar butonuyla yenileyebilir, her değişiklik input alanına yansır
+ * ve bir sonraki kayıtta o kod kalıcı hale gelir.
  */
 function onizlemeKutusunuGoster(tur, gizliKod) {
   const onEk = tur === "proje" ? "/projects/" : "/blog/";
-  const onizlemeYolu = `${onEk}on-izleme-${gizliKod}/`;
-  const onizlemeEl = document.getElementById("ic-onizleme-kutusu");
-  onizlemeEl.className = "auth-message auth-message--success";
-  onizlemeEl.innerHTML =
-    `🔒 Gizli ön izleme linki (sadece bu linki bilenler görebilir — sayfa yayına
-    alınana kadar her zaman burada, panelden görüntülenebilir):` +
-    `<div class="gy-link-kutu">
-      <input type="text" id="ic-onizleme-link" readonly value="${escapeHtml(
-        location.origin + onizlemeYolu
-      )}" onclick="this.select()">
-      <button type="button" id="ic-onizleme-kopyala-btn" class="gy-link-kopyala-btn">Kopyala</button>
-    </div>`;
-  onizlemeEl.hidden = false;
+  document.getElementById("ic-onizleme-onek").textContent = `${location.origin}${onEk}on-izleme-`;
+  document.getElementById("ic-onizleme-kod").value = gizliKod;
+  document.getElementById("ic-onizleme-kutusu").hidden = false;
+  onizlemeLinkGuncelle();
+}
+
+function onizlemeKutusunuGizle() {
+  document.getElementById("ic-onizleme-kutusu").hidden = true;
+}
+
+/** Kod girdisinden geçerli bir slug üretir (boşsa/temizse rastgele kod üretir), salt-okunur link kutusunu tazeler. */
+function onizlemeLinkGuncelle() {
+  const kodEl = document.getElementById("ic-onizleme-kod");
+  const linkEl = document.getElementById("ic-onizleme-link");
+  const onek = document.getElementById("ic-onizleme-onek").textContent;
+
+  const temizKod = slugOlustur(kodEl.value);
+  const gecerli = temizKod.length >= 3;
+  kodEl.classList.toggle("gy-kod-gecersiz", kodEl.value.trim() !== "" && !gecerli);
+
+  linkEl.value = gecerli ? `${onek}${temizKod}/` : "Geçerli bir kod gir (en az 3 karakter, harf/rakam/tire)";
+}
+
+/** Formda o an geçerli olan (kaydedilecek) ön izleme kodunu döner; boş/geçersizse null. */
+function onizlemedenGecerliKoduAl() {
+  const kodEl = document.getElementById("ic-onizleme-kod");
+  if (!kodEl || document.getElementById("ic-onizleme-kutusu").hidden) return null;
+  const temizKod = slugOlustur(kodEl.value);
+  return temizKod.length >= 3 ? temizKod : null;
+}
+
+/**
+ * "Yayında" anahtarına canlı olarak bağlanır: kapatıldığı anda — daha önce
+ * kaydedilmiş bir kod olsun ya da olmasın — hemen bir ön izleme linki
+ * gösterilir (kod yoksa yeni bir tane üretilir), böylece "yayında değil"e
+ * çevrilen bir içerik daha kaydedilmeden bile linkini görüp paylaşabilir.
+ * Tekrar açılırsa kutu gizlenir.
+ */
+function wireYayindaCanliOnizleme() {
+  document.getElementById("ic-yayinda").addEventListener("change", (e) => {
+    if (e.target.checked) {
+      onizlemeKutusunuGizle();
+    } else {
+      onizlemeKutusunuGoster(icerikTuru(), DUZENLENEN_GIZLI_KOD || rastgeleKod(8));
+    }
+  });
+
+  document.getElementById("ic-onizleme-kod").addEventListener("input", onizlemeLinkGuncelle);
+  document.getElementById("ic-onizleme-yenile-btn").addEventListener("click", () => {
+    document.getElementById("ic-onizleme-kod").value = rastgeleKod(8);
+    onizlemeLinkGuncelle();
+  });
 
   const kopyalaBtn = document.getElementById("ic-onizleme-kopyala-btn");
-  kopyalaBtn?.addEventListener("click", async () => {
+  kopyalaBtn.addEventListener("click", async () => {
     const input = document.getElementById("ic-onizleme-link");
+    if (!input.value || input.value.startsWith("Geçerli bir kod")) return;
     try {
       await navigator.clipboard.writeText(input.value);
       kopyalaBtn.textContent = "Kopyalandı ✓";
@@ -458,26 +501,6 @@ function onizlemeKutusunuGoster(tur, gizliKod) {
       kopyalaBtn.textContent = "Kopyalandı ✓";
     }
     setTimeout(() => (kopyalaBtn.textContent = "Kopyala"), 1600);
-  });
-}
-
-function onizlemeKutusunuGizle() {
-  document.getElementById("ic-onizleme-kutusu").hidden = true;
-}
-
-/**
- * "Yayında" anahtarına canlı olarak bağlanır: formda düzenlenen içeriğin
- * zaten bir gizli kodu varsa, kutucuk her açılıp kapandığında ön izleme
- * linki de otomatik gösterilip gizlenir — kaydetmeyi beklemeye gerek kalmaz.
- */
-function wireYayindaCanliOnizleme() {
-  document.getElementById("ic-yayinda").addEventListener("change", (e) => {
-    if (!DUZENLENEN_GIZLI_KOD) return; // henüz üretilmiş bir kod yoksa (yeni içerik) kaydedilene kadar gösterilecek bir şey yok.
-    if (e.target.checked) {
-      onizlemeKutusunuGizle();
-    } else {
-      onizlemeKutusunuGoster(icerikTuru(), DUZENLENEN_GIZLI_KOD);
-    }
   });
 }
 
@@ -543,10 +566,24 @@ async function icerikKaydet() {
   }
 
   const govde = document.getElementById("ic-body").value;
-  // "Yayında değil" ise: daha önce üretilmiş bir kod varsa (düzenleme) onu
-  // KORU, yoksa (ilk kez gizleniyor) yeni bir kod üret. Bu sayede ön izleme
-  // linki her kaydedişte değişmez.
-  const gizliKod = !yayinda ? DUZENLENEN_GIZLI_KOD || rastgeleKod(8) : null;
+  // "Yayında değil" ise: kullanıcı ön izleme kutusundaki kodu elle
+  // değiştirmiş olabilir (onizlemedenGecerliKoduAl bunu okur); geçerli bir
+  // şey girilmemişse daha önce üretilmiş kod korunur, o da yoksa yeni bir
+  // kod üretilir. Bu sayede kod hem düzenlenebilir hem de kaydetmeden
+  // önce (Yayında kapatılır kapatılmaz) zaten görüntülenebilir durumda.
+  const gizliKod = !yayinda
+    ? onizlemedenGecerliKoduAl() || DUZENLENEN_GIZLI_KOD || rastgeleKod(8)
+    : null;
+
+  if (gizliKod && onizlemeKoduCakisiyorMu(tur, gizliKod, DUZENLENEN_YOL)) {
+    showMessage(
+      msgEl,
+      `Bu ön izleme kodu ("${gizliKod}") aynı türde başka bir içerik tarafından zaten kullanılıyor. Lütfen "🎲 Yenile" ile yeni bir kod üret ya da elle farklı bir kod yaz.`,
+      "error"
+    );
+    return;
+  }
+
   const dosyaIcerigi = dosyaIcerigiOlustur(tur, alan, yayinda, gizliKod, govde);
   const yeniYol = dosyaYoluHesapla(tur, date, slug, yilOneki);
 
@@ -604,10 +641,56 @@ async function icerikKaydet() {
 }
 
 /* ---------------------------------------------------------------------- */
-/* MEVCUT İÇERİKLER LİSTESİ                                               */
+/* MEVCUT İÇERİKLER LİSTESİ — YÜKLEME, ARAMA, FİLTRELEME                  */
 /* ---------------------------------------------------------------------- */
+// Son yüklenen tüm içerikler (blog + proje) burada önbelleğe alınır;
+// arama/filtre değiştikçe GitHub'a tekrar istek atmadan anında yeniden
+// çizilir. Ayrıca kayıt sırasında permalink/kod çakışması kontrolü için
+// de kullanılır (bkz. onizlemeKoduCakisiyorMu).
+let TUM_ICERIKLER = [];
+let LISTE_ARAMA = "";
+let LISTE_FILTRE_TUR = "tum"; // 'tum' | 'blog' | 'proje'
+let LISTE_FILTRE_DURUM = "tum"; // 'tum' | 'yayinda' | 'gizli'
+
 function wireIcerikListe() {
   document.getElementById("ic-liste-yenile-btn").addEventListener("click", icerikListesiYukle);
+
+  const aramaEl = document.getElementById("ic-liste-arama");
+  const temizleBtn = document.getElementById("ic-liste-arama-temizle");
+  aramaEl.addEventListener("input", () => {
+    LISTE_ARAMA = aramaEl.value.trim().toLocaleLowerCase("tr");
+    temizleBtn.hidden = aramaEl.value === "";
+    listeyiYenidenCiz();
+  });
+  temizleBtn.addEventListener("click", () => {
+    aramaEl.value = "";
+    LISTE_ARAMA = "";
+    temizleBtn.hidden = true;
+    listeyiYenidenCiz();
+    aramaEl.focus();
+  });
+
+  document.querySelectorAll(".gy-tur-sekme").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      LISTE_FILTRE_TUR = btn.dataset.filtreTur;
+      document.querySelectorAll(".gy-tur-sekme").forEach((b) => {
+        b.classList.toggle("active", b === btn);
+        b.setAttribute("aria-selected", String(b === btn));
+      });
+      listeyiYenidenCiz();
+    });
+  });
+
+  document.querySelectorAll(".gy-durum-sekme").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      LISTE_FILTRE_DURUM = btn.dataset.filtreDurum;
+      document.querySelectorAll(".gy-durum-sekme").forEach((b) => {
+        b.classList.toggle("active", b === btn);
+        b.setAttribute("aria-selected", String(b === btn));
+      });
+      listeyiYenidenCiz();
+    });
+  });
 }
 
 async function icerikListesiYukle() {
@@ -635,9 +718,8 @@ async function icerikListesiYukle() {
     postDetaylari.sort((a, b) => (b.data.date || "").localeCompare(a.data.date || ""));
     projeDetaylari.sort((a, b) => (b.data.date || "").localeCompare(a.data.date || ""));
 
-    el.innerHTML = "";
-    el.appendChild(icerikListesiCiz("Blog Yazıları", postDetaylari, "blog"));
-    el.appendChild(icerikListesiCiz("Akademik Projeler", projeDetaylari, "proje"));
+    TUM_ICERIKLER = [...postDetaylari, ...projeDetaylari];
+    listeyiYenidenCiz();
   } catch (err) {
     el.innerHTML = `<p class="muted">Liste yüklenemedi: ${escapeHtml(err.message)}</p>`;
   }
@@ -650,20 +732,78 @@ async function icerikOzetiGetir(dosya, tur) {
   return { path: dosya.path, sha: detay.sha, tur, data, body };
 }
 
+/** Bir içerik öğesinin arama kutusu, tür sekmesi ve durum sekmesiyle eşleşip eşleşmediğini kontrol eder. */
+function icerikFiltreyeUyuyorMu(item) {
+  if (LISTE_FILTRE_TUR !== "tum" && item.tur !== LISTE_FILTRE_TUR) return false;
+
+  const yayinda = item.data.yayinda !== false;
+  if (LISTE_FILTRE_DURUM === "yayinda" && !yayinda) return false;
+  if (LISTE_FILTRE_DURUM === "gizli" && yayinda) return false;
+
+  if (LISTE_ARAMA) {
+    const aranan = [item.data.title, item.path, item.data.summary, item.data.venue]
+      .filter(Boolean)
+      .join(" ")
+      .toLocaleLowerCase("tr");
+    if (!aranan.includes(LISTE_ARAMA)) return false;
+  }
+
+  return true;
+}
+
+/** Arama kutusuyla eşleşen kısmı vurgular. Vurgulama ham metin üzerinde bulunur, HTML'e yazılacak parçalar ayrı ayrı escape edilir. */
+function metniVurgula(metin) {
+  const ham = metin || "";
+  if (!LISTE_ARAMA) return escapeHtml(ham);
+
+  const idx = ham.toLocaleLowerCase("tr").indexOf(LISTE_ARAMA);
+  if (idx === -1) return escapeHtml(ham);
+
+  const once = ham.slice(0, idx);
+  const eslesen = ham.slice(idx, idx + LISTE_ARAMA.length);
+  const sonra = ham.slice(idx + LISTE_ARAMA.length);
+  return `${escapeHtml(once)}<span class="gy-vurgu">${escapeHtml(eslesen)}</span>${escapeHtml(sonra)}`;
+}
+
+/** Kaydedilecek gizli kodun, aynı türde BAŞKA bir içerikte zaten kullanılıp kullanılmadığını kontrol eder. */
+function onizlemeKoduCakisiyorMu(tur, gizliKod, haricTutulacakYol) {
+  return TUM_ICERIKLER.some(
+    (item) =>
+      item.tur === tur &&
+      item.path !== haricTutulacakYol &&
+      permalinktenGizliKoduCikar(item.data.permalink) === gizliKod
+  );
+}
+
+function listeyiYenidenCiz() {
+  const el = document.getElementById("ic-liste");
+  const sonucYokEl = document.getElementById("ic-liste-sonuc-yok");
+
+  if (TUM_ICERIKLER.length === 0) {
+    el.innerHTML = '<p class="muted">Henüz yüklenmedi.</p>';
+    sonucYokEl.hidden = true;
+    return;
+  }
+
+  const filtrelenmis = TUM_ICERIKLER.filter(icerikFiltreyeUyuyorMu);
+  const postlar = filtrelenmis.filter((i) => i.tur === "blog");
+  const projeler = filtrelenmis.filter((i) => i.tur === "proje");
+
+  el.innerHTML = "";
+  sonucYokEl.hidden = filtrelenmis.length !== 0;
+
+  if (LISTE_FILTRE_TUR !== "proje") el.appendChild(icerikListesiCiz("Blog Yazıları", postlar, "blog"));
+  if (LISTE_FILTRE_TUR !== "blog") el.appendChild(icerikListesiCiz("Akademik Projeler", projeler, "proje"));
+}
+
 function icerikListesiCiz(baslik, liste, tur) {
   const wrap = document.createElement("div");
+  if (liste.length === 0) return wrap; // filtre bu türde sonuç bırakmadıysa başlığı bile gösterme.
+
   const h = document.createElement("div");
   h.className = "gy-liste-baslik";
-  h.textContent = `${baslik} (${liste.length})`;
+  h.innerHTML = `${escapeHtml(baslik)} <span class="gy-liste-baslik-sayac">${liste.length}</span>`;
   wrap.appendChild(h);
-
-  if (liste.length === 0) {
-    const p = document.createElement("p");
-    p.className = "muted";
-    p.textContent = "Henüz içerik yok.";
-    wrap.appendChild(p);
-    return wrap;
-  }
 
   liste.forEach((item) => wrap.appendChild(icerikKartiCiz(item, tur)));
   return wrap;
@@ -676,11 +816,15 @@ function icerikKartiCiz(item, tur) {
   const rozet = yayinda
     ? '<span class="gy-rozet gy-rozet--yayinda">Yayında</span>'
     : '<span class="gy-rozet gy-rozet--gizli">Gizli</span>';
+  const ozet = item.data.summary
+    ? `<div class="gy-icerik-kart-ozet">${metniVurgula(item.data.summary)}</div>`
+    : "";
 
   kart.innerHTML = `
     <div class="gy-icerik-kart-bilgi">
-      <div class="gy-icerik-kart-baslik">${escapeHtml(item.data.title || item.path)}${rozet}</div>
-      <div class="gy-icerik-kart-meta">${escapeHtml(item.data.date || "")} · ${escapeHtml(item.path)}</div>
+      <div class="gy-icerik-kart-baslik">${metniVurgula(item.data.title || item.path)}${rozet}</div>
+      <div class="gy-icerik-kart-meta">${escapeHtml(item.data.date || "")} · ${metniVurgula(item.path)}</div>
+      ${ozet}
     </div>
     <div class="gy-icerik-kart-aksiyonlar">
       <button type="button" class="gy-duzenle-btn">Düzenle</button>
@@ -732,10 +876,11 @@ function icerikDuzenlemeyeYukle(item, tur) {
   // İçeriğin daha önce üretilmiş bir gizli ön izleme kodu varsa (permalink
   // alanından çıkar) hatırla ve göster — "yayında değil" içerikler artık
   // düzenlemeye her açıldığında linkini yeniden görebilir, kod da kaydetme
-  // sırasında DEĞİŞMEDEN korunur.
+  // sırasında DEĞİŞMEDEN korunur. Permalink herhangi bir sebeple eksikse
+  // (elle düzenlenmiş dosya vb.) yeni bir kod üretip gösteriyoruz.
   DUZENLENEN_GIZLI_KOD = permalinktenGizliKoduCikar(item.data.permalink);
-  if (!yayinda && DUZENLENEN_GIZLI_KOD) {
-    onizlemeKutusunuGoster(tur, DUZENLENEN_GIZLI_KOD);
+  if (!yayinda) {
+    onizlemeKutusunuGoster(tur, DUZENLENEN_GIZLI_KOD || rastgeleKod(8));
   } else {
     onizlemeKutusunuGizle();
   }
