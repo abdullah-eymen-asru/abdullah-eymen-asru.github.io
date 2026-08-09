@@ -345,7 +345,8 @@ içindir.
 supabase/
   migrations/0001_schema_rbac_rls.sql      <- Adım 1: SQL Editor'de çalıştır (ilk kurulum)
   migrations/0002_guvenlik_sikilastirma.sql <- Adım 1b: SQL Editor'de çalıştır (güvenlik sıkılaştırma + büyük dosya linki)
-  functions/delete-account/index.ts        <- Adım 5: Edge Function (hesap silme)
+  migrations/0003_yeni_ozellikler_ve_guvenlik.sql <- Adım 1c: SQL Editor'de çalıştır (KVKK onayı, okundu/son geçerlilik, admin üye silme, arama indeksi, kalan Advisor uyarıları)
+  functions/delete-account/index.ts        <- Adım 5: Edge Function (hesap silme — artık admin başkasını da silebiliyor)
 assets/
   js/supabase-client.js                    <- Ortak Supabase istemcisi (URL/KEY burada)
   js/auth-guard.js                         <- Korumalı sayfa mantığı
@@ -383,7 +384,22 @@ panel.md / admin.md / ozel-icerik.md       <- Jekyll sayfaları (_layouts/defaul
    üzerine ekleme yapar: Security Advisor'ın "Warnings" sekmesinde çıkan
    uyarıları giderir ve büyük-dosya-linki kolonunu ekler (aşağıda ayrı
    başlıkta anlatılıyor).
-5. Dosyanın en altındaki talimatla **kendini admin yap**:
+4b. Ardından **bir query daha** aç, `supabase/migrations/0003_yeni_ozellikler_ve_guvenlik.sql`
+   dosyasının TAMAMINI yapıştır ve **Run**'a bas. Bu dosya şunları ekler:
+   - KVKK onay alanları (`profiles.kvkk_onay_verildi` vb.) + `kvkk_onayini_ver()` RPC'si
+   - Özel içerik "okundu" bilgisi ve üye başına isteğe bağlı son geçerlilik
+     tarihi (`content_access` tablosuna yeni kolonlar) + otomatik/temizlik RPC'leri
+   - Admin'in başka bir üyeyi (veya kendini) silebilmesi için `admin_delete_user_data()`
+     (Edge Function tarafından kullanılır, doğrudan çağrılamaz)
+   - Üye arama için `pg_trgm` indeksleri
+   - `avatarlar` bucket'ına kullanıcı yükleme izinlerinin kaldırılması (panel
+     artık profil fotoğrafı yüklemiyor, Supabase Storage kullanmıyor)
+   - Kalan tüm "Signed-In Users Can Execute" uyarılarını gidermek için izin normalizasyonu
+5. **Dashboard → Authentication → Auth Settings (veya Policies) → Password
+   Security** kısmına git ve **"Leaked password protection"** seçeneğini
+   **aç**. Bu, SQL ile yapılamayan tek ayardır ve Security Advisor'daki
+   "Leaked Password Protection Disabled" uyarısını giderir.
+6. Dosyanın en altındaki talimatla **kendini admin yap**:
    - Önce siteden normal şekilde kayıt ol (Adım 6'dan sonra, anahtarları girdikten sonra).
    - **E-postanı doğrulamayı unutma** (aşağıdaki "Giriş Yapamıyorum" bölümüne bak).
    - Sonra SQL Editor'de:
@@ -558,6 +574,29 @@ eklemene gerek yok.
 `supabase/functions/delete-account/index.ts` içindeki `ALLOWED_ORIGINS`
 listesini kendi domainlerinle güncellemeyi unutma (CORS koruması).
 
+**Güncelleme notu:** Bu fonksiyon artık isteğe bağlı bir
+`hedef_kullanici_id` parametresi kabul ediyor — admin panelindeki
+"Kullanıcılar & Roller" bölümünde bir üyenin yanındaki **Sil** butonuna
+basıldığında bu parametre gönderilir ve (çağıran gerçekten admin ise)
+o üyenin hesabı silinir. Parametre gönderilmezse (panelim sayfasındaki
+"Hesabımı Kalıcı Olarak Sil" gibi) çağıran her zaman **kendi** hesabını
+siler — admin de dahil, kendi hesabını aynı şekilde silebilir. Eğer
+daha önce bu fonksiyonu deploy ettiysen, güncellenmiş `index.ts`'i
+tekrar deploy etmen gerekir (`supabase functions deploy delete-account`),
+yoksa admin panelindeki üye silme butonu çalışmaz.
+
+---
+
+## Adım 5b — İki Faktörlü Doğrulama (2FA / TOTP)
+
+Panelim sayfasındaki "İki Faktörlü Doğrulama" bölümü, Supabase Auth'un
+**yerleşik** TOTP MFA desteğini kullanır (`supabase.auth.mfa.*` — ekstra
+bir tablo veya paket kurmana gerek yok). Varsayılan olarak Supabase
+projelerinde bu özellik zaten açıktır; kapalıysa Dashboard →
+**Authentication → Providers** sayfasının altındaki **"Multi-Factor
+Authentication"** bölümünden **"Authenticator App (TOTP)"** seçeneğini aç.
+Üyeler kendi isteğiyle etkinleştirir/kaldırır, zorunlu değildir.
+
 ---
 
 ## Adım 6 — CSP / `_headers` Kontrolü
@@ -587,14 +626,29 @@ zaten var, ekstra bir araca gerek yok:
    (bucket herkese kapalı, sadece admin ve içeriğe erişimi olan kullanıcılar
    görebilir — bkz. `0001_schema_rbac_rls.sql` içindeki storage politikaları).
 4. **"Erişim Verilecek Özel Üyeler"** listesinden dosyayı görmesini
-   istediğin `special_user`/`admin` rolündeki hesapları seç (Ctrl/Cmd basılı
-   tutarak birden fazla seçebilirsin).
+   istediğin `special_user`/`admin` rolündeki hesapları işaretle. Her
+   satırın sağında isteğe bağlı bir **tarih alanı** var — doldurursan o
+   üyenin erişimi seçtiğin tarihte (gün sonunda) otomatik olarak sona
+   erer; boş bırakırsan erişim **sınırsızdır**.
 5. **"Yayınla ve Ata"**'ya bas. Seçtiğin kullanıcılar `/panel.html`
    üzerinden içeriği görüp `/ozel-icerik.html?id=...` sayfasından **"Eki
    İndir"** butonuyla indirebilir — bu buton her tıklandığında sadece
    **10 saniye geçerli**, tek seferlik bir Signed URL üretir (bkz.
    `ozel-icerik.js`), yani link kopyalanıp başkasıyla paylaşılsa bile işe
    yaramaz.
+
+**İçeriği yayınladıktan sonra düzenleme:** "Mevcut Özel İçerikler"
+bölümündeki **Düzenle** butonuyla başlık, özet, makale metni ve harici
+dosya linkini istediğin zaman değiştirebilirsin — form otomatik olarak
+"düzenleme moduna" geçer, değişikliklerini kaydettiğinde aynı içerik
+güncellenir (yeni bir kopya oluşmaz).
+
+**Okundu bilgisi ve son geçerlilik:** Üye, kendisine atanan bir içeriği
+`/ozel-icerik.html` üzerinden açtığı an içerik otomatik "okundu"
+işaretlenir; bu bilgi hem üyenin kendi panelinde hem (istersen)
+`content_access` tablosunda görünür. Bir üyeye tarih verdiysen, o tarih
+geçtiğinde erişimi **anında** kesilir (veritabanı seviyesinde), ilgili
+kayıt da en geç bir sonraki admin paneli ziyaretinde otomatik temizlenir.
 
 Bu akış küçük/orta boy dosyalar (Supabase Storage sınırları içinde) için
 tasarlandı. Çok büyük dosyalar (örn. 50GB) için aşağıdaki bölüme bak.
@@ -649,17 +703,35 @@ kurabiliriz.
 - [ ] `/giris.html`'de "Google ile Giriş Yap" çalışıyor mu?
 - [ ] `/sifremi-unuttum.html` → e-posta geldi mi → `/sifre-guncelle.html`'de
       yeni şifre belirleyip giriş yapabiliyor musun?
-- [ ] `/panel.html`: profil adı/bio kaydediliyor mu? Avatar yükleniyor mu?
+- [ ] `/panel.html`: profil adı (Ad Soyad) kaydediliyor mu? (Avatar/bio
+      alanları artık YOK — Supabase Storage kullanılmıyor, bkz. 0003 migration.)
+- [ ] Kayıt formunda KVKK onay kutusunu işaretlemeden kayıt olmaya çalış —
+      engellenmeli. İşaretleyip kayıt ol, `/panel.html` → "KVKK Onayı"
+      bölümünde onay tarihinin göründüğünü doğrula.
+- [ ] `/panel.html` → "İki Faktörlü Doğrulama" bölümünden 2FA'yı
+      etkinleştir (Google Authenticator ile QR kodu okut, 6 haneli kodu
+      doğrula) → tekrar sayfayı aç, "aktif" göründüğünü ve istersen
+      kaldırabildiğini doğrula.
 - [ ] Header'daki "Hesabım" menüsü giriş/çıkışa göre doğru içeriği gösteriyor mu?
 - [ ] Kendini admin yaptıktan sonra `/admin.html` açılıyor mu? Normal bir
       `user` hesabıyla `/admin.html`'e gidince `panel.html?hata=yetkisiz`'e
       yönlendiriliyor musun? (İKİNCİ bir tarayıcı/gizli sekme ile test et.)
+- [ ] Admin panelindeki sol menüden her bölüme tıklayıp doğru alana
+      kaydığını (sayfanın tek parça kaydırma olmadığını) doğrula.
+- [ ] Admin panelinde "Kullanıcılar & Roller" arama kutusuna bir isim veya
+      e-posta yaz, listenin filtrelendiğini doğrula.
 - [ ] Admin panelinden bir kullanıcıyı `special_user` yap, bir özel içerik
-      oluştur, o kullanıcıya ata. O kullanıcıyla giriş yapıp `/panel.html`
-      üzerinden içeriği görebiliyor musun?
+      oluştur, o kullanıcıya (isteğe bağlı bir son geçerlilik tarihiyle)
+      ata. O kullanıcıyla giriş yapıp `/panel.html` üzerinden içeriği
+      görebiliyor musun?
 - [ ] Aynı içeriğin linkini (`/ozel-icerik.html?id=...`) **yetkisi olmayan**
       bir hesapla (veya çıkış yapıp anonim olarak) açmayı dene — "Erişim
       yok" mesajı görmelisin.
+- [ ] Özel içeriği üye hesabıyla aç → panelinde "Okundu" olarak
+      işaretlendiğini doğrula. Admin panelinden aynı içeriği **Düzenle**
+      ile değiştir, kaydet, değişikliğin yansıdığını doğrula.
+- [ ] Bir üyeye kısa (ör. yarın) bir son geçerlilik tarihi ver, tarihi
+      geçtikten sonra o üyenin içeriği artık göremediğini doğrula.
 - [ ] Dosya ekli bir içerikte "Eki İndir" butonuna bas, indirme başlıyor mu?
       10 saniye sonra aynı linki tekrar kullanmayı dene (ör. tarayıcı
       geçmişinden) — artık çalışmamalı.
@@ -669,10 +741,19 @@ kurabiliriz.
       onay kutusuna "SİL" yaz → onayla → Supabase Dashboard →
       Authentication → Users listesinde hesabın gerçekten silindiğini
       doğrula.
+- [ ] Admin panelinden **başka bir test üyesini** "Sil" butonuyla sil,
+      gerçekten silindiğini doğrula (eski sürümde bu hata veriyordu).
+- [ ] Admin hesabıyla `/admin.html` → "Hesabım" bölümünden **kendi**
+      admin hesabını silmeyi dene (başka bir admin hesabın olduğundan
+      emin olarak test et, yoksa siteyi yönetecek kimse kalmaz).
+- [ ] `supabase functions deploy delete-account` ile güncel Edge
+      Function'ı deploy ettiğini doğrula — deploy etmezsen yukarıdaki iki
+      madde başarısız olur.
+- [ ] Dashboard → Authentication → Auth Settings → "Leaked password
+      protection" seçeneğini açtığını doğrula.
 - [ ] Dashboard → Advisors → Security Advisor → "Rerun linter" ile
-      `0002_guvenlik_sikilastirma.sql`'den sonra uyarıların azaldığını
-      doğrula ("Public Bucket Allows Listing" ve SECURITY DEFINER
-      uyarılarının gitmiş olması gerekiyor).
+      `0003_yeni_ozellikler_ve_guvenlik.sql`'den sonra uyarı sayısının
+      azaldığını doğrula.
 
 ---
 
