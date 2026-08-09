@@ -442,6 +442,17 @@ th { color: var(--muted); font-weight: 600; }
   color: #fff;
 }
 
+#r2-link-kutu {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: inherit;
+}
+
 /* Google Form her zaman kendi (açık) renginde geliyor — bunu değiştiremeyiz,
    ama etrafına yumuşak bir çerçeve/padding vererek koyu temada geçişi
    daha kontrollü ve göz yormayan hale getiriyoruz. */
