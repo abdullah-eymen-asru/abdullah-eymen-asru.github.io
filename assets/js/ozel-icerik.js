@@ -25,7 +25,7 @@ async function init() {
 
   const { data: content, error } = await supabase
     .from("special_content")
-    .select("id, title, summary, body_md, file_path, created_at")
+    .select("id, title, summary, body_md, file_path, harici_dosya_url, created_at")
     .eq("id", id)
     .single();
 
@@ -56,6 +56,28 @@ async function init() {
   if (content.file_path) {
     await renderDownloadButton(content.id, content.file_path);
   }
+  if (content.harici_dosya_url) {
+    renderHariciDosyaButonu(content.harici_dosya_url);
+  }
+}
+
+/**
+ * Çok büyük (Cloudflare R2'de barınan) dosyalar için: burada 10 saniyelik
+ * Signed URL YOK, çünkü dosya Supabase'te değil — RLS/erişim kontrolü zaten
+ * bu SAYFANIN kendisinde yapıldı (yukarıdaki special_content sorgusu RLS'ten
+ * geçti). Link doğrudan R2'nin genel adresine gider.
+ */
+function renderHariciDosyaButonu(url) {
+  // koleksiyon-tablo.js'teki guvenliLink ile aynı mantık: sadece http(s)
+  // ile başlayan, boşluk/kontrol karakteri içermeyen linklere izin ver.
+  const guvenli = /^https?:\/\/\S+$/.test(url);
+  if (!guvenli) return;
+
+  const wrap = document.getElementById("harici-dosya-alani");
+  if (!wrap) return;
+  wrap.hidden = false;
+  const a = wrap.querySelector("#harici-dosya-link");
+  a.href = url;
 }
 
 async function renderDownloadButton(contentId, filePath) {
