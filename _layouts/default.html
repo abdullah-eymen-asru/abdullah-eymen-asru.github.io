@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="tr" data-baseurl="{{ site.baseurl }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -150,8 +150,19 @@
         <a href="{{ '/akademik-projeler.html' | relative_url }}" {% if page.url contains 'akademik-projeler' or page.url contains '/projects/' %}class="active"{% endif %}>Akademik Projeler</a>
         <a href="{{ '/izlediklerim.html' | relative_url }}" {% if page.url contains 'izlediklerim' %}class="active"{% endif %}>İzlediklerim</a>
         <a href="{{ '/okuduklarim.html' | relative_url }}" {% if page.url contains 'okuduklarim' %}class="active"{% endif %}>Okuduklarım</a>
-        <a href="{{ '/giris.html' | relative_url }}" {% if page.url contains 'giris' %}class="active"{% endif %}>Giriş</a>
-        <a href="{{ '/panel.html' | relative_url }}" {% if page.url contains 'panel' %}class="active"{% endif %}>Panelim</a>
+        <!--
+          HESAP MENÜSÜ: Eskiden burada her zaman ayrı ayrı görünen sabit
+          "Giriş" ve "Panelim" linkleri vardı (çıkış yapmışken bile "Panelim"
+          görünüyordu). Artık TEK bir kapsayıcı var; assets/js/nav-auth.js
+          oturum durumuna bakıp içini dolduruyor: çıkış yapmışken "Giriş
+          Yap", giriş yapmışken "Hesabım ▾" (Panelim / Admin / Çıkış Yap)
+          menüsü. Aşağıdaki statik link, JS henüz yüklenmeden önceki kısa an
+          için ve JS'siz tarayıcılar için bir yedek (progressive enhancement)
+          — nav-auth.js çalışır çalışmaz üzerine yazılır.
+        -->
+        <div id="auth-nav" class="auth-nav">
+          <a href="{{ '/giris.html' | relative_url }}" {% if page.url contains 'giris' or page.url contains 'kayit' %}class="active"{% endif %}>Giriş Yap</a>
+        </div>
       </nav>
       <button id="theme-toggle" class="theme-toggle" type="button" role="switch" aria-checked="false" aria-label="Koyu temaya geç" title="Koyu / açık tema">
         <span class="theme-toggle-track">
@@ -163,6 +174,11 @@
       </button>
     </div>
   </header>
+
+  <script type="module">
+    import { initAuthNav } from "{{ '/assets/js/nav-auth.js' | relative_url }}";
+    initAuthNav();
+  </script>
 
   <main class="wrap content">
     {{ content }}
