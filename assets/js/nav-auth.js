@@ -12,7 +12,8 @@
  *   - Çıkış yapmışken:  "Giriş Yap"  -> doğrudan /giris.html (kayıt ol linki
  *                        o sayfanın içinde zaten var, bkz. giris.md)
  *   - Giriş yapmışken:  "Hesabım ▾" -> tıklanınca küçük bir menü açılır:
- *                        Panelim, (adminse) Admin Paneli, Çıkış Yap
+ *                        Panelim, (adminse) Admin Paneli, (adminse) GitHub
+ *                        İçerik Yönetimi, Çıkış Yap
  *
  * _layouts/default.html içinde <div id="auth-nav"> boş bir kapsayıcı olarak
  * durur; JS yüklenmeden önce görünen tek bir statik "Giriş" linki (no-JS /
@@ -96,6 +97,12 @@ function renderHesapMenusu(container, role) {
   const linkler = [{ href: "/panel.html", etiket: "Panelim" }];
   if (role === "admin") {
     linkler.push({ href: "/admin.html", etiket: "Admin Paneli" });
+    // GitHub Pages'in kendi statik içeriğini (blog/proje yazıları, profil
+    // fotoğrafı) yönetmek için ayrı, bağımsız bir sayfa — bkz.
+    // github-yonetim.md / assets/js/github-yonetim.js. Supabase admin
+    // panelinin hemen altında görünsün diye buraya, "Admin Paneli"
+    // linkinden sonra eklendi.
+    linkler.push({ href: "/github-yonetim.html", etiket: "GitHub İçerik Yönetimi" });
   }
 
   linkler.forEach(({ href, etiket }) => {
