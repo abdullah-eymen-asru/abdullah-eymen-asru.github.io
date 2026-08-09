@@ -684,31 +684,64 @@ function wireR2DosyaPaylasim() {
   const keyInput = document.getElementById("r2-dosya-key");
   const sureInput = document.getElementById("r2-gecerlilik-saniye");
   const msg = document.getElementById("r2-link-sonuc");
+  const kutuWrap = document.getElementById("r2-link-kutu-wrap");
+  const kutu = document.getElementById("r2-link-kutu");
 
   btn.addEventListener("click", async () => {
     const dosyaAdi = keyInput.value.trim();
     if (!dosyaAdi) {
       showMessage(msg, "Önce bir dosya yolu (R2 key) gir.");
+      kutuWrap.hidden = true;
       return;
     }
     const expiresIn = Math.max(60, parseInt(sureInput.value, 10) || 3600);
 
     btn.disabled = true;
     btn.textContent = "Üretiliyor...";
+    kutuWrap.hidden = true;
 
     try {
       const sonuc = await imzaliLinkUret(dosyaAdi, { expiresIn });
-      const bitisSaati = new Date(sonuc.expiresAt).toLocaleString("tr-TR");
+
+      // Worker'ın döndürdüğü alan adı sürüme göre değişebilir
+      // (url / downloadUrl) — ikisini de kontrol ediyoruz ki eski bir
+      // worker sürümü hâlâ deploy'daysa arayüz "undefined" göstermesin,
+      // bunun yerine ANLAMLI bir hata versin.
+      const link = sonuc?.url || sonuc?.downloadUrl;
+      if (!link) {
+        showMessage(
+          msg,
+          "Worker'dan link alınamadı: yanıtta 'url' veya 'downloadUrl' alanı yok. " +
+            "Worker'da deploy edilen kodun zip'teki cloudflare-worker/r2-imza-worker/src/index.js ile aynı olduğundan emin ol."
+        );
+        return;
+      }
+
+      kutu.value = link;
+      kutuWrap.hidden = false;
+
+      const bitisSaati = sonuc?.expiresAt ? new Date(sonuc.expiresAt).toLocaleString("tr-TR") : null;
       showMessage(
         msg,
-        `Link panoya kopyalandı. Geçerlilik sonu: ${bitisSaati}. (Panoya kopyalanmadıysa: ${sonuc.url})`,
+        bitisSaati
+          ? `Link üretildi (geçerlilik sonu: ${bitisSaati}). Aşağıdaki kutudan kopyalayabilirsin.`
+          : "Link üretildi. Aşağıdaki kutudan kopyalayabilirsin.",
         "success"
       );
+
+      // Panoya otomatik kopyalamayı da DENE — başarısız olursa sessizce
+      // geç, zaten kutu her zaman görünür ve elle kopyalanabilir.
+      try {
+        await navigator.clipboard.writeText(link);
+      } catch (_e) {
+        // yoksay
+      }
     } catch (err) {
       showMessage(msg, "Link üretilemedi: " + err.message);
+      kutuWrap.hidden = true;
     } finally {
       btn.disabled = false;
-      btn.textContent = "İmzalı Link Üret ve Kopyala";
+      btn.textContent = "İmzalı Link Üret";
     }
   });
 }
