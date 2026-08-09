@@ -96,6 +96,11 @@ function wireContentForm() {
     const summary = form.summary.value.trim();
     const body_md = form.body_md.value;
     const file = form.dosya.files?.[0];
+    // 50GB gibi çok büyük dosyalar Supabase Storage'a doğrudan yüklenmek
+    // yerine Cloudflare R2'ye (veya benzeri bir servise) elle yüklenip
+    // buraya sadece LİNKİ yapıştırılır. Boş bırakılırsa özellik kullanılmaz.
+    // Bkz. README > "Çok Büyük Dosyalar (Cloudflare R2)".
+    const harici_dosya_url = form.harici_dosya_url.value.trim() || null;
     const secilenKullanicilar = Array.from(
       form.querySelector("#icerik-atama-kullanici").selectedOptions
     ).map((o) => o.value);
@@ -107,7 +112,7 @@ function wireContentForm() {
     // 1) İçerik satırını oluştur
     const { data: content, error: insertErr } = await supabase
       .from("special_content")
-      .insert({ title, slug, summary, body_md, author_id: user.id })
+      .insert({ title, slug, summary, body_md, harici_dosya_url, author_id: user.id })
       .select()
       .single();
 
