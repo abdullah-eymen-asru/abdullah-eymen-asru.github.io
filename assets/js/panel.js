@@ -225,8 +225,13 @@ async function renderMfaDurumu(box) {
 
     document.getElementById("mfa-kurulum-alani").hidden = false;
     document.getElementById("mfa-baslat-btn").hidden = true;
-    document.getElementById("mfa-qr-wrap").innerHTML =
-      `<img src="${enrollData.totp.qr_code}" alt="2FA QR kodu" style="background:#fff;padding:8px;border-radius:8px;max-width:220px;">`;
+    
+    // YAZIM HATASI DÜZELTİLDİ: Fazladan çift tırnak kaldırıldı
+    const qrWrap = document.getElementById("mfa-qr-wrap");
+    if (qrWrap) {
+      qrWrap.innerHTML = `<img src="${enrollData.totp.qr_code}" alt="2FA QR kodu" style="background:#fff;padding:8px;border-radius:8px;max-width:220px;">`;
+    }
+    
     document.getElementById("mfa-secret").textContent = enrollData.totp.secret;
 
     document.getElementById("mfa-dogrula-btn").addEventListener("click", async () => {
