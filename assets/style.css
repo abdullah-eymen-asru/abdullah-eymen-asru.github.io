@@ -369,6 +369,79 @@ th { color: var(--muted); font-weight: 600; }
 
 .loading, .error { color: var(--muted); font-style: italic; }
 
+/* --------------------------------------------------------------------- */
+/* Admin paneli: özel içerik atama listesi ("Süresiz" butonu düzeltmesiyle
+   birlikte eklendi — önceden bu satırın hiç CSS'i yoktu, tarayıcı
+   varsayılanlarına bırakılmıştı). */
+/* --------------------------------------------------------------------- */
+.atama-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px;
+}
+
+.atama-satiri {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+
+.atama-satiri:hover { background: var(--card-bg); }
+
+.atama-satiri-secim {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.atama-satiri-secim span { overflow-wrap: anywhere; }
+
+.atama-tarih-alani {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.atama-tarih {
+  background: transparent;
+  color: inherit;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 6px;
+  font: inherit;
+}
+
+.atama-tarih-suresiz-btn {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: inherit;
+  border-radius: 6px;
+  padding: 5px 10px;
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.atama-tarih-suresiz-btn:hover { filter: brightness(1.1); }
+
+.atama-tarih-suresiz-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 /* Google Form her zaman kendi (açık) renginde geliyor — bunu değiştiremeyiz,
    ama etrafına yumuşak bir çerçeve/padding vererek koyu temada geçişi
    daha kontrollü ve göz yormayan hale getiriyoruz. */
