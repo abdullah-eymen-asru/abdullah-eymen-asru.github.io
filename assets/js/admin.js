@@ -3,20 +3,31 @@
  * Sadece role='admin' olan kullanıcılar bu sayfaya girebilir (requireAuth
  * ile zorlanır, RLS ile de veritabanı seviyesinde garanti edilir).
  *
- * Bu sürüm: bölüm (section) bazlı gezinme (sol menü, tıklayınca o bölüme
- * kayar — sayfa artık tek bir uzun kaydırma değil), üye arama (isim/mail),
- * içerik DÜZENLEME (sadece silme değil), içerik atarken üye başına son
- * geçerlilik tarihi, üye silme (kendi hesabı dahil), ve süresi geçmiş
- * erişimlerin otomatik temizliği.
+ * Bölüm (section) bazlı gezinme (sol menü), üye arama (isim/mail), içerik
+ * DÜZENLEME, içerik atarken üye başına son geçerlilik TARİH+SAAT'i (Türkiye
+ * saatine göre) veya "Süresiz" seçeneği, atama listesinde de isim/e-posta
+ * arama, her içerik için üye bazlı OKUNDU/erişim detayları, üye silme
+ * (kendi hesabı dahil), süresi geçmiş erişimlerin otomatik temizliği ve
+ * üye <-> yönetici mesajlaşma gelen kutusu.
+ *
+ * NOT: "Hakkımda" metni düzenleme özelliği KALDIRILDI (istek üzerine) —
+ * site geneli "Hakkımda" artık sadece repo içindeki
+ * _includes/hakkimda-icerik.md dosyasından, doğrudan koda dokunarak
+ * güncellenir.
  */
 import { supabase, showMessage, escapeHtml } from "./supabase-client.js";
 import { requireAuth } from "./auth-guard.js";
+import { wireAdminChat } from "./chat.js";
 
 const DELETE_ACCOUNT_FUNCTION_URL =
   "https://eahvcirspmvntffzphye.supabase.co/functions/v1/delete-account";
 
 let TUM_KULLANICILAR = [];
 let DUZENLENEN_ICERIK_ID = null; // null: yeni içerik ekleniyor, doluysa düzenleniyor
+
+// Atama listesindeki her üye için { checked, tarih } durumunu, arama
+// kutusuyla filtrelense/DOM'dan kaybolsa bile KORUMAK için burada tutuyoruz.
+let ATAMA_DURUMU = new Map();
 
 async function init() {
   const { session } = await requireAuth({ role: "admin" });
@@ -27,11 +38,11 @@ async function init() {
   await temizleSuresiGecmisErisimler();
   await loadUsers();
   await loadContents();
-  await loadSettings();
   wireUserSearch();
+  wireIcerikAtamaArama();
   wireContentForm();
-  wireSettingsForm();
   wireCurrentAdminSelfDelete(session);
+  await wireAdminChat(session.user.id);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -82,7 +93,7 @@ async function temizleSuresiGecmisErisimler() {
 async function loadUsers() {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, email, full_name, role, created_at, kvkk_onay_verildi")
+    .select("id, email, full_name, role, created_at, kvkk_onay_verildi, kvkk_onay_tarihi")
     .order("created_at", { ascending: false });
 
   const tbody = document.getElementById("kullanici-tablo-govde");
@@ -135,7 +146,11 @@ function renderUserTable(kullanicilar) {
             <option value="admin" ${u.role === "admin" ? "selected" : ""}>Yönetici</option>
           </select>
         </td>
-        <td>${u.kvkk_onay_verildi ? "✓" : '<span class="muted">Yok</span>'}</td>
+        <td>${
+          u.kvkk_onay_verildi
+            ? `✓<br><span class="muted" style="font-size:0.78rem;">${new Date(u.kvkk_onay_tarihi).toLocaleDateString("tr-TR")}</span>`
+            : '<span class="muted">Yok</span>'
+        }</td>
         <td>
           <span class="rol-durum" data-id="${u.id}"></span>
           <button class="btn-danger uye-sil-btn" data-id="${u.id}" data-email="${escapeHtml(u.email)}" style="padding:6px 10px;font-size:0.8rem;">Sil</button>
@@ -246,11 +261,27 @@ function wireCurrentAdminSelfDelete(session) {
   });
 }
 
+/* ---------------------------------------------------------------------- */
+/* ÖZEL İÇERİK ATAMA LİSTESİ: arama + tarih&saat/"Süresiz"                 */
+/* ---------------------------------------------------------------------- */
 function renderContentAssigneeOptions(kullanicilar) {
   const atamaWrap = document.getElementById("icerik-atama-liste");
   if (!atamaWrap) return;
 
   const hedefKullanicilar = kullanicilar.filter((u) => u.role === "special_user" || u.role === "admin");
+
+  // ATAMA_DURUMU'nda artık listede olmayan (rolü değişmiş/silinmiş) üyeleri temizle
+  const gecerliIdler = new Set(hedefKullanicilar.map((u) => u.id));
+  for (const id of ATAMA_DURUMU.keys()) {
+    if (!gecerliIdler.has(id)) ATAMA_DURUMU.delete(id);
+  }
+
+  atamaListesiCiz(hedefKullanicilar);
+}
+
+function atamaListesiCiz(hedefKullanicilar) {
+  const atamaWrap = document.getElementById("icerik-atama-liste");
+  if (!atamaWrap) return;
 
   if (hedefKullanicilar.length === 0) {
     atamaWrap.innerHTML = `<p class="muted">Önce yukarıdan en az bir üyeyi "Özel Üye" veya "Yönetici" yapmalısın.</p>`;
@@ -258,17 +289,100 @@ function renderContentAssigneeOptions(kullanicilar) {
   }
 
   atamaWrap.innerHTML = hedefKullanicilar
-    .map(
-      (u) => `
+    .map((u) => {
+      const durum = ATAMA_DURUMU.get(u.id) || { checked: false, tarih: "" };
+      const suresiz = !durum.tarih;
+      return `
       <label class="atama-satiri">
-        <input type="checkbox" class="atama-checkbox" value="${u.id}">
+        <input type="checkbox" class="atama-checkbox" value="${u.id}" ${durum.checked ? "checked" : ""}>
         <span>${escapeHtml(u.full_name || u.email)} <span class="muted">(${escapeHtml(u.email)})</span></span>
         <span class="atama-tarih-alani">
-          <input type="date" class="atama-tarih" data-user-id="${u.id}" title="Bu üye için erişim son tarihi (boş = sınırsız)">
+          <input
+            type="datetime-local"
+            class="atama-tarih"
+            data-user-id="${u.id}"
+            value="${durum.tarih}"
+            title="Bu üye için erişim son tarihi/saati (Türkiye saati) — boş = sınırsız">
+          <button type="button" class="atama-tarih-suresiz-btn ${suresiz ? "active" : ""}" data-user-id="${u.id}">
+            ${suresiz ? "✓ Süresiz" : "Süresiz Yap"}
+          </button>
         </span>
-      </label>`
-    )
+      </label>`;
+    })
     .join("");
+
+  atamaWrap.querySelectorAll(".atama-checkbox").forEach((cb) => {
+    cb.addEventListener("click", (e) => e.stopPropagation());
+    cb.addEventListener("change", () => {
+      const durum = ATAMA_DURUMU.get(cb.value) || { checked: false, tarih: "" };
+      durum.checked = cb.checked;
+      ATAMA_DURUMU.set(cb.value, durum);
+    });
+  });
+
+  atamaWrap.querySelectorAll(".atama-tarih").forEach((input) => {
+    input.addEventListener("click", (e) => e.stopPropagation());
+    input.addEventListener("change", () => {
+      const id = input.dataset.userId;
+      const durum = ATAMA_DURUMU.get(id) || { checked: false, tarih: "" };
+      durum.tarih = input.value;
+      ATAMA_DURUMU.set(id, durum);
+      // Bir tarih girildiyse "Süresiz" etiketini otomatik güncelle
+      const btn = atamaWrap.querySelector(`.atama-tarih-suresiz-btn[data-user-id="${id}"]`);
+      if (btn) {
+        const suresiz = !input.value;
+        btn.classList.toggle("active", suresiz);
+        btn.textContent = suresiz ? "✓ Süresiz" : "Süresiz Yap";
+      }
+    });
+  });
+
+  atamaWrap.querySelectorAll(".atama-tarih-suresiz-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = btn.dataset.userId;
+      const input = atamaWrap.querySelector(`.atama-tarih[data-user-id="${id}"]`);
+      input.value = "";
+      const durum = ATAMA_DURUMU.get(id) || { checked: false, tarih: "" };
+      durum.tarih = "";
+      ATAMA_DURUMU.set(id, durum);
+      btn.classList.add("active");
+      btn.textContent = "✓ Süresiz";
+    });
+  });
+}
+
+/** İçerik atama listesinde isim/e-posta ile arama — seçim durumu (checkbox +
+ * tarih), ATAMA_DURUMU Map'inde tutulduğu için filtrelense/listeden
+ * kaybolsa bile KAYBOLMAZ. */
+function wireIcerikAtamaArama() {
+  const input = document.getElementById("icerik-atama-arama");
+  if (!input) return;
+  input.addEventListener("input", () => {
+    const q = input.value.trim().toLowerCase();
+    const hedefKullanicilar = TUM_KULLANICILAR.filter((u) => u.role === "special_user" || u.role === "admin");
+    const filtrelenmis = q
+      ? hedefKullanicilar.filter(
+          (u) => (u.email || "").toLowerCase().includes(q) || (u.full_name || "").toLowerCase().includes(q)
+        )
+      : hedefKullanicilar;
+    atamaListesiCiz(filtrelenmis);
+  });
+}
+
+/**
+ * "2026-08-09T23:59" gibi bir datetime-local değerini, kullanıcının
+ * TARAYICI saat dilimi NE OLURSA OLSUN, Türkiye saati (UTC+3, 2016'dan beri
+ * yaz saati uygulanmıyor) olarak yorumlayıp doğru UTC ISO string'e çevirir.
+ * ("ben de sınırlı süre gönderim yaparken saat de seçebileyim, Türkiye
+ * saatine göre" isteği.)
+ */
+function turkiyeSaatindenIsoyeCevir(datetimeLocalDegeri) {
+  if (!datetimeLocalDegeri) return null;
+  // "YYYY-MM-DDTHH:mm" -> ISO 8601 + açık +03:00 ofseti
+  const saniyeli = datetimeLocalDegeri.length === 16 ? datetimeLocalDegeri + ":00" : datetimeLocalDegeri;
+  return new Date(saniyeli + "+03:00").toISOString();
 }
 
 /* ---------------------------------------------------------------------- */
@@ -296,11 +410,15 @@ function wireContentForm() {
     // buraya sadece LİNKİ yapıştırılır. Boş bırakılırsa özellik kullanılmaz.
     const harici_dosya_url = form.harici_dosya_url.value.trim() || null;
 
-    const secilenler = Array.from(form.querySelectorAll(".atama-checkbox:checked")).map((cb) => {
-      const tarihInput = form.querySelector(`.atama-tarih[data-user-id="${cb.value}"]`);
-      const tarih = tarihInput?.value ? new Date(tarihInput.value + "T23:59:59").toISOString() : null;
-      return { userId: cb.value, sonGecerlilik: tarih };
-    });
+    // Seçimler artık DOM'dan değil ATAMA_DURUMU'ndan okunuyor — arama
+    // kutusuyla listeyi filtrelemiş olsan bile seçtiklerin/tarihlerin
+    // kaybolmaması için (bkz. wireIcerikAtamaArama).
+    const secilenler = [...ATAMA_DURUMU.entries()]
+      .filter(([, durum]) => durum.checked)
+      .map(([userId, durum]) => ({
+        userId,
+        sonGecerlilik: turkiyeSaatindenIsoyeCevir(durum.tarih),
+      }));
 
     const {
       data: { user },
@@ -308,7 +426,7 @@ function wireContentForm() {
 
     let content;
     if (DUZENLENEN_ICERIK_ID) {
-      // ---- DÜZENLEME MODU: "Geri düzeltme" isteği ----
+      // ---- DÜZENLEME MODU ----
       const { data: guncellenen, error: updateErr } = await supabase
         .from("special_content")
         .update({ title, slug, summary, body_md, harici_dosya_url })
@@ -324,6 +442,11 @@ function wireContentForm() {
       content = guncellenen;
     } else {
       // ---- YENİ İÇERİK ----
+      // NOT: slug çakışması artık veritabanı tarafında (special_content
+      // tablosundaki "benzersiz_slug_uret" trigger'ı, bkz. migration 0004)
+      // OTOMATİK çözülüyor — aynı başlıkla ikinci bir içerik eklesen bile
+      // slug kendiliğinden "...-2", "...-3" olur, "duplicate key" hatası
+      // artık alınmaz.
       const { data: yeni, error: insertErr } = await supabase
         .from("special_content")
         .insert({ title, slug, summary, body_md, harici_dosya_url, author_id: user.id })
@@ -353,9 +476,9 @@ function wireContentForm() {
     }
 
     // Seçilen özel üyelere erişim ver (düzenleme modunda önceki atamalara
-    // DOKUNMUYORUZ, sadece yeni seçilenleri EKLİYORUZ — mevcut erişimleri
-    // kaldırmak istersen "Mevcut Özel İçerikler" listesindeki "Erişimleri
-    // Yönet" bağlantısını kullan).
+    // DOKUNMUYORUZ, sadece yeni seçilenleri EKLİYORUZ/GÜNCELLİYORUZ —
+    // mevcut bir erişimi tamamen kaldırmak için "Erişimleri Yönet" panelini
+    // kullan).
     if (secilenler.length > 0) {
       const rows = secilenler.map(({ userId, sonGecerlilik }) => ({
         content_id: content.id,
@@ -383,8 +506,9 @@ function wireContentForm() {
 function sifirlaIcerikFormu() {
   const form = document.getElementById("icerik-form");
   form.reset();
-  form.querySelectorAll(".atama-checkbox").forEach((cb) => (cb.checked = false));
-  form.querySelectorAll(".atama-tarih").forEach((input) => (input.value = ""));
+  ATAMA_DURUMU = new Map();
+  document.getElementById("icerik-atama-arama") && (document.getElementById("icerik-atama-arama").value = "");
+  renderContentAssigneeOptions(TUM_KULLANICILAR);
   DUZENLENEN_ICERIK_ID = null;
   document.getElementById("icerik-form-baslik").textContent = "Yeni Özel İçerik / Makale Ekle";
   document.getElementById("icerik-form-submit-btn").textContent = "Yayınla ve Ata";
@@ -413,10 +537,12 @@ async function loadContents() {
           ${c.content_access?.[0]?.count ?? 0} kullanıcıya atanmış ·
           ${c.is_published ? "Yayında" : "Taslak"}
         </p>
-        <div style="display:flex; gap:8px;">
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <button class="btn-primary icerik-duzenle-btn" data-id="${c.id}" style="width:auto;padding:8px 14px;">Düzenle</button>
+          <button class="erisim-detay-ac-btn icerik-detay-btn" data-id="${c.id}">Erişim &amp; Okundu Detayları</button>
           <button class="btn-danger icerik-sil-btn" data-id="${c.id}" style="width:auto;padding:8px 14px;">Sil</button>
         </div>
+        <div class="icerik-detay-alani" data-id="${c.id}" hidden></div>
       </div>`
     )
     .join("");
@@ -439,6 +565,10 @@ async function loadContents() {
     });
   });
 
+  list.querySelectorAll(".icerik-detay-btn").forEach((btn) => {
+    btn.addEventListener("click", () => icerikDetaylariniGosterGizle(btn.dataset.id, btn));
+  });
+
   list.querySelectorAll(".icerik-sil-btn").forEach((btn) => {
     btn.addEventListener("click", async () => {
       if (!confirm("Bu içeriği ve dosyasını kalıcı olarak silmek istediğine emin misin?")) return;
@@ -455,37 +585,85 @@ async function loadContents() {
   });
 }
 
+/**
+ * "Admin bunu göremiyor. Admin saat kaçta açıldı vs kadar görebilsin —
+ * her kullanıcı için ayrı bilgiler görünsün" isteği: bir içeriğin kimlere
+ * atandığını, her biri için okundu mu/ne zaman okundu ve erişim son
+ * tarihini gösteren açılır-kapanır bir tablo. Buradan tek tek erişim de
+ * kaldırılabilir.
+ */
+async function icerikDetaylariniGosterGizle(contentId, btn) {
+  const alan = document.querySelector(`.icerik-detay-alani[data-id="${contentId}"]`);
+  if (!alan) return;
+
+  if (!alan.hidden) {
+    alan.hidden = true;
+    return;
+  }
+
+  alan.hidden = false;
+  await icerikDetaylariniYukle(contentId, alan, btn);
+}
+
+async function icerikDetaylariniYukle(contentId, alan, btn) {
+  alan.innerHTML = `<p class="muted">Yükleniyor...</p>`;
+
+  const { data, error } = await supabase
+    .from("content_access")
+    .select("user_id, okundu_mu, okundu_tarihi, son_gecerlilik_tarihi, profiles(full_name, email)")
+    .eq("content_id", contentId)
+    .order("okundu_mu", { ascending: true });
+
+  if (error) {
+    alan.innerHTML = `<p class="muted">Detaylar yüklenemedi: ${escapeHtml(error.message)}</p>`;
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    alan.innerHTML = `<p class="muted">Bu içerik henüz kimseye atanmamış.</p>`;
+    return;
+  }
+
+  alan.innerHTML = `
+    <table class="erisim-detay-tablo">
+      <thead>
+        <tr><th>Üye</th><th>Okundu mu?</th><th>Ne zaman açıldı</th><th>Erişim sonu</th><th></th></tr>
+      </thead>
+      <tbody>
+        ${data
+          .map(
+            (row) => `
+          <tr data-user-id="${row.user_id}">
+            <td>${escapeHtml(row.profiles?.full_name || row.profiles?.email || "—")}</td>
+            <td>${row.okundu_mu ? "✓ Okudu" : '<span class="muted">Henüz açmadı</span>'}</td>
+            <td>${row.okundu_tarihi ? new Date(row.okundu_tarihi).toLocaleString("tr-TR") : '<span class="muted">—</span>'}</td>
+            <td>${row.son_gecerlilik_tarihi ? new Date(row.son_gecerlilik_tarihi).toLocaleString("tr-TR") : "Süresiz"}</td>
+            <td><button class="btn-danger erisim-kaldir-btn" data-content-id="${contentId}" data-user-id="${row.user_id}" style="padding:4px 8px;font-size:0.76rem;">Erişimi Kaldır</button></td>
+          </tr>`
+          )
+          .join("")}
+      </tbody>
+    </table>`;
+
+  alan.querySelectorAll(".erisim-kaldir-btn").forEach((kbtn) => {
+    kbtn.addEventListener("click", async () => {
+      if (!confirm("Bu üyenin erişimini kaldırmak istediğine emin misin?")) return;
+      await supabase
+        .from("content_access")
+        .delete()
+        .eq("content_id", kbtn.dataset.contentId)
+        .eq("user_id", kbtn.dataset.userId);
+      await icerikDetaylariniYukle(contentId, alan, btn);
+    });
+  });
+}
+
 function slugify(str) {
   return str
     .toLowerCase()
     .replaceAll(/[ığüşöç]/g, (c) => ({ ı: "i", ğ: "g", ü: "u", ş: "s", ö: "o", ç: "c" }[c]))
     .replaceAll(/[^a-z0-9]+/g, "-")
     .replaceAll(/(^-|-$)/g, "");
-}
-
-/* ---------------------------------------------------------------------- */
-/* SİTE AYARLARI ("Hakkımda" metni)                                        */
-/* ---------------------------------------------------------------------- */
-async function loadSettings() {
-  const { data } = await supabase.from("site_settings").select("hakkimda_md").eq("id", 1).single();
-  const textarea = document.getElementById("hakkimda-textarea");
-  if (textarea && data) textarea.value = data.hakkimda_md ?? "";
-}
-
-function wireSettingsForm() {
-  const form = document.getElementById("ayarlar-form");
-  const msg = document.getElementById("ayarlar-message");
-
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const hakkimda_md = document.getElementById("hakkimda-textarea").value;
-    const { error } = await supabase.from("site_settings").update({ hakkimda_md }).eq("id", 1);
-    if (error) {
-      showMessage(msg, "Kaydedilemedi: " + error.message);
-      return;
-    }
-    showMessage(msg, "Hakkımda metni güncellendi. Anasayfada birkaç saniye içinde görünür.", "success");
-  });
 }
 
 init();
