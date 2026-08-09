@@ -119,9 +119,13 @@ yayinda: true
           <input id="r2-gecerlilik-saniye" type="number" min="60" step="60" value="3600">
         </div>
         <button id="r2-link-uret-btn" type="button" class="btn-primary" style="width:auto;">
-          İmzalı Link Üret ve Kopyala
+          İmzalı Link Üret
         </button>
         <div id="r2-link-sonuc" class="auth-message" hidden></div>
+        <div id="r2-link-kutu-wrap" class="form-field" hidden style="margin-top:10px;">
+          <label for="r2-link-kutu">Üretilen Link (seçip kopyalayabilirsin)</label>
+          <input id="r2-link-kutu" type="text" readonly onclick="this.select()">
+        </div>
       </section>
 
       <section id="mesajlar" class="panel-section">
