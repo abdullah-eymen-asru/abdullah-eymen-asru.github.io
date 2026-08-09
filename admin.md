@@ -50,8 +50,17 @@ yayinda: true
           <textarea id="body_md" name="body_md" rows="10"></textarea>
         </div>
         <div class="form-field">
-          <label for="dosya">Ek Dosya (opsiyonel)</label>
+          <label for="dosya">Ek Dosya (opsiyonel, küçük/orta boy dosyalar için)</label>
           <input id="dosya" name="dosya" type="file">
+        </div>
+        <div class="form-field">
+          <label for="harici_dosya_url">50GB gibi çok büyük dosya için harici link (opsiyonel)</label>
+          <input id="harici_dosya_url" name="harici_dosya_url" type="url" placeholder="https://pub-xxxx.r2.dev/dosya-adi.zip">
+          <p class="muted" style="margin:2px 0 0;font-size:0.85rem;">
+            Dosyayı Supabase yerine Cloudflare R2'ye yüklediysen oradan aldığın linki buraya yapıştır.
+            Bkz. README &gt; "Çok Büyük Dosyalar (Cloudflare R2)". Yukarıdaki "Ek Dosya" alanıyla
+            aynı anda kullanma — ikisi farklı senaryolar için, karışıklık olmasın diye sadece birini doldur.
+          </p>
         </div>
         <div class="form-field">
           <label for="icerik-atama-kullanici">Erişim Verilecek Özel Üyeler (Ctrl/Cmd basılı tut, birden çok seç)</label>
