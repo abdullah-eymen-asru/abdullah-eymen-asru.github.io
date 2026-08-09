@@ -16,6 +16,11 @@ yayinda: true
     <p id="dosya-indir-status" class="muted"></p>
   </div>
 
+  <div id="harici-dosya-alani" hidden style="margin-top:24px;">
+    <a id="harici-dosya-link" class="btn-primary" style="width:auto;display:inline-block;text-decoration:none;" target="_blank" rel="noopener">Büyük Dosyayı İndir (harici bağlantı)</a>
+    <p class="muted" style="margin-top:6px;">Bu dosya boyutu nedeniyle harici bir depolama alanında (Cloudflare R2) barındırılıyor.</p>
+  </div>
+
   <p style="margin-top:32px;"><a href="{{ '/panel.html' | relative_url }}">&larr; Panelime dön</a></p>
 </div>
 
