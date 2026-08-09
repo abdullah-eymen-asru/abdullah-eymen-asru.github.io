@@ -1,4 +1,4 @@
--- ============================================================================
+ 
 -- 0003_yeni_ozellikler_ve_guvenlik.sql
 -- Abdullah Eymen Asru — Kalan Security Advisor uyarılarının giderilmesi +
 -- yeni özellikler (KVKK onayı, okundu bilgisi + otomatik silinme, admin
@@ -374,3 +374,21 @@ grant  execute on function public.has_content_access(uuid) to anon, authenticate
 --   3) Dashboard > Advisors > Security Advisor > "Rerun linter" ile
 --      kalan uyarı sayısını doğrula.
 -- ============================================================================
+
+-- Security Advisor (Linter) yetki kısıtlamaları
+REVOKE EXECUTE ON FUNCTION public.kvkk_onayini_ver(text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.prevent_role_self_escalation() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.temizle_suresi_gecmis_erisimleri() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.admin_set_user_role(uuid, text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.delete_own_profile_data() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.has_content_access(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.icerik_okundu_isaretle(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.is_admin() FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION public.kvkk_onayini_ver(text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.delete_own_profile_data() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.has_content_access(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.icerik_okundu_isaretle(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_set_user_role(uuid, text) TO authenticated;
