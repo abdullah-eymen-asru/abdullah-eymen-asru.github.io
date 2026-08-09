@@ -204,9 +204,20 @@ async function renderMfaDurumu(box) {
 
   document.getElementById("mfa-baslat-btn").addEventListener("click", async () => {
     const msg = document.getElementById("mfa-message");
+
+    // Yarım kalmış (doğrulanmamış) önceden oluşmuş 2FA kaydı varsa temizle
+    const { data: factorList } = await supabase.auth.mfa.listFactors();
+    if (factorList && factorList.totp) {
+      const unverifiedFactors = factorList.totp.filter((f) => f.status === "unverified");
+      for (const factor of unverifiedFactors) {
+        await supabase.auth.mfa.unenroll({ factorId: factor.id });
+      }
+    }
+
     const { data: enrollData, error: enrollErr } = await supabase.auth.mfa.enroll({
       factorType: "totp",
     });
+
     if (enrollErr) {
       showMessage(msg, "Başlatılamadı: " + enrollErr.message);
       return;
