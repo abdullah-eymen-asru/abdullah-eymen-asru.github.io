@@ -143,6 +143,49 @@
   border-color: #5a4a1c;
 }
 
+/* Panelde çift onaylı e-posta değiştirme akışı — eski adres / yeni adres
+   için ayrı durum satırları + "kod ile onayla" yedek formu. */
+.eposta-onay-satiri {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+.eposta-onay-baslik {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.92rem;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.eposta-onay-rozet {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--tag-bg);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.eposta-onay-rozet--ok {
+  background: #eaf7ee;
+  color: #1e6b3a;
+}
+[data-theme="dark"] .eposta-onay-rozet--ok {
+  background: #123a22;
+  color: #9ee3b6;
+}
+.eposta-onay-kod-toggle {
+  width: auto;
+  padding: 7px 12px;
+  font-size: 0.82rem;
+}
+.eposta-onay-kod-form {
+  margin-top: 10px;
+}
+
 /* Panel / Admin */
 .panel-grid {
   display: grid;
