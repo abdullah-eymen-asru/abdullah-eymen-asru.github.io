@@ -91,9 +91,66 @@ permalink: "/panel/panel.html"
         <p class="muted" style="font-size:0.85rem; margin-top:8px;">
           Eski adresine artık erişimin yoksa değişikliği tamamlayamazsın —
           bu, hesabının kötüye kullanılmasını önlemek için bilinçli bir
-          kısıtlamadır. Bu durumda site yöneticisiyle iletişime geçmen gerekir.
+          kısıtlamadır. Aşağıdaki "Eski Mailime Erişemiyorum" kutusundan
+          site yöneticisiyle iletişime geçebilirsin.
         </p>
       </div>
+    </section>
+
+    <!-- Eski adresine hiç erişimi kalmamış kullanıcılar için: yukarıdaki
+         çift onaylı akışı tamamlayamazlar, tek çözüm site yöneticisinin
+         admin panelinden TEK onaylı (sadece yeni adrese) değişikliği
+         yapması. Bu kutu her zaman görünür (sadece form gönderildikten
+         sonra değil) çünkü kullanıcı hiç denemeden de doğrudan buraya
+         gelip yardım isteyebilir. -->
+    <section class="panel-section" id="eposta-yardim">
+      <h2>Eski Mailime Erişemiyorum</h2>
+      <p class="muted">
+        Yukarıdaki "E-posta Değiştir" için eski adresine de onay vermen
+        gerekiyor. Eğer o adrese artık erişimin yoksa (şifresini unuttun,
+        hesabı kapattın, vb.) kendi başına tamamlayamazsın — bu durumda
+        site yöneticisinin admin panelinden senin adına <strong>tek
+        onaylı</strong> bir değişiklik yapması gerekir (sadece yeni adresine
+        onay gider, eski adres istenmez). Yöneticiye ulaşmak için:
+      </p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <a href="#chat-kullanici" id="eposta-yardim-mesaj-link" class="btn-primary" style="width:auto; text-decoration:none; display:inline-block; text-align:center;">
+          Yöneticiyle Mesajlaş
+        </a>
+        <a href="{{ '/kurumsal/iletisim.html' | relative_url }}" class="btn-secondary" style="width:auto; text-decoration:none; display:inline-block; text-align:center;">
+          İletişim Formuna Git
+        </a>
+      </div>
+      <p class="muted" style="font-size:0.85rem; margin-top:10px;">
+        Mesajında yeni e-posta adresini ve kimliğini doğrulayacak bilgileri
+        (ör. kayıtlı ad-soyadın) belirtmen, yöneticinin işlemi hızlıca
+        yapabilmesini sağlar.
+      </p>
+
+      <!-- Yönetici admin panelinden değişikliği başlattıktan SONRA
+           kullanıcının dönüp burayı kullanacağı adım: yeni adresine gelen
+           TEK maildeki kodu girerek değişikliği kendisi tamamlayabilir
+           (linke tıklamak da aynı işi görür, bu sadece yedek/hızlı yol).
+           Yukarıdaki çift-onay formundan BİLİNÇLİ OLARAK ayrı ve daha
+           sade tutuldu: burada "eski adres" alanı YOK, çünkü admin'in
+           başlattığı değişiklikte eski adrese zaten hiçbir şey gitmiyor. -->
+      <details style="margin-top:16px;">
+        <summary style="cursor:pointer; font-weight:600; font-size:0.92rem;">
+          Yönetici benim için bir değişiklik başlattı, kodum var — buradan onaylayayım
+        </summary>
+        <form id="eposta-admin-kod-form" novalidate style="margin-top:12px;">
+          <div class="form-field">
+            <label for="eposta-admin-kod-yeni-eposta">Yöneticiye bildirdiğin yeni e-posta</label>
+            <input id="eposta-admin-kod-yeni-eposta" type="email" autocomplete="off" required>
+          </div>
+          <div class="form-field">
+            <label for="eposta-admin-kod-kod">O adrese gelen kod</label>
+            <input id="eposta-admin-kod-kod" type="text" inputmode="numeric" autocomplete="one-time-code" required>
+          </div>
+          <button type="submit" class="btn-primary" style="width:auto;">Kodu Doğrula ve E-postamı Güncelle</button>
+        </form>
+        <div id="eposta-admin-kod-message" class="auth-message" hidden></div>
+      </details>
     </section>
 
     <section class="panel-section">
