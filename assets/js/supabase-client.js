@@ -46,6 +46,26 @@ export function showMessage(el, text, type = "error") {
 }
 
 /**
+ * Standart "SPAM klasörünü kontrol et" uyarısı. Mail gönderilen HER ekranda
+ * (kayıt, şifremi unuttum, hesap onayla, panelde e-posta değiştirme) aynı
+ * metin/mantıkla kullanılır ki kullanıcı her yerde aynı şeyi görsün.
+ * showMessage() ile karışmasın diye AYRI bir kutuda (auth-spam-notice)
+ * gösterilir — başarı/hata mesajı her değiştiğinde bu uyarının kaybolmaması
+ * için showMessage()'dan bağımsız çalışır.
+ */
+export function showSpamNotice(el) {
+  if (!el) return;
+  el.textContent =
+    "Mail birkaç dakika içinde gelmezse SPAM (Gereksiz/Junk) klasörünü de kontrol et.";
+  el.hidden = false;
+}
+
+export function hideSpamNotice(el) {
+  if (!el) return;
+  el.hidden = true;
+}
+
+/**
  * Supabase'in verifyOtp() / OTP doğrulama akışlarından dönen İngilizce hata
  * mesajlarını kullanıcı dostu Türkçeye çevirir. hesap/sifre-guncelle.html
  * (kod ile şifre sıfırlama) ve hesap/hesap-onayla.html (kod ile hesap
