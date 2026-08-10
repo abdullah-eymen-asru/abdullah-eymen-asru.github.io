@@ -117,6 +117,32 @@
 [data-theme="dark"] .auth-message--error   { background: #3a1f1c; color: #f3a89c; border-color: #5a2f29; }
 [data-theme="dark"] .auth-message--success { background: #123a22; color: #9ee3b6; border-color: #1f5a37; }
 
+/* "SPAM klasörünü kontrol et" uyarısı — mail gönderilen her ekranda
+   (kayıt, şifremi unuttum, hesap onayla, e-posta değiştirme) aynı görünüm.
+   auth-message'dan bilinçli olarak farklı stillendi (nötr/bilgi rengi) ki
+   başarı/hata mesajıyla karışmasın, ikisi aynı anda görünebilsin. */
+.auth-spam-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 0.85rem;
+  background: #fff8e6;
+  color: #7a5b06;
+  border: 1px solid #f0dfa3;
+}
+.auth-spam-notice::before {
+  content: "✉";
+  flex-shrink: 0;
+}
+[data-theme="dark"] .auth-spam-notice {
+  background: #3a2f10;
+  color: #f0d98c;
+  border-color: #5a4a1c;
+}
+
 /* Panel / Admin */
 .panel-grid {
   display: grid;
