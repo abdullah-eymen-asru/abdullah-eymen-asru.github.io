@@ -9,7 +9,7 @@
  * genelindeki "Hakkımda" metninin sadece admin panelinden yönetilmesi
  * istendiği için). Ad Soyad hâlâ düzenlenebilir.
  */
-import { supabase, showMessage, showSpamNotice, escapeHtml, KVKK_METIN_SURUMU } from "./supabase-client.js";
+import { supabase, showMessage, showSpamNotice, escapeHtml, turkceOtpHatasi, KVKK_METIN_SURUMU } from "./supabase-client.js";
 import { requireAuth } from "./auth-guard.js";
 import { wireUserChat } from "./chat.js";
 
@@ -65,20 +65,27 @@ function wireProfileForm(profile) {
 }
 
 /* ---------------------------------------------------------------------- */
-/* E-POSTA DEĞİŞTİR                                                        */
-/* Hem e-posta/şifreyle hem Google ile kayıt olmuş kullanıcılar için aynı  */
-/* şekilde çalışır: supabase.auth.updateUser({ email }) çağrıldığında      */
-/* Supabase varsayılan olarak YENİ adrese bir onay linki gönderir; kadın   */
-/* giriş e-postası, kullanıcı o linke tıklayana kadar DEĞİŞMEZ. (Dashboard */
-/* > Authentication > Email > "Secure email change" açıksa eski adrese de */
-/* ayrıca bir onay maili gider — bkz. README, "Çift Onaylı E-posta         */
-/* Değişikliği" bölümü.)                                                   */
+/* E-POSTA DEĞİŞTİR — ÇİFT ONAYLI                                          */
+/* Supabase Dashboard > Authentication > Emails > "Secure email change"    */
+/* AÇIK varsayılıyor: supabase.auth.updateUser({ email }) çağrıldığında    */
+/* Supabase HEM eski (şu anki) HEM yeni adrese ayrı bir onay maili/kodu    */
+/* gönderir; e-posta sadece İKİSİ DE onaylanınca gerçekten değişir. Bu,    */
+/* hesabına izinsiz erişen birinin sessizce e-postayı ele geçirmesini      */
+/* engeller — ama eski adresine erişimi olmayan kullanıcıyı KİLİTLEME      */
+/* riski taşır. Bu riski azaltmak için linkin yanına "kod ile onayla"      */
+/* yedek yolu ekliyoruz: her iki maildeki (link + kod aynı token'ı taşır)  */
+/* kodu burada tek tek girip supabase.auth.verifyOtp({ type:               */
+/* "email_change" }) ile doğrulayabilir — link açılmasa/tıklanamasa bile   */
+/* değişiklik tamamlanabilir.                                              */
 /* ---------------------------------------------------------------------- */
 function wireEmailChange(profile) {
   const form = document.getElementById("eposta-degistir-form");
   const msg = document.getElementById("eposta-message");
   const spamNotice = document.getElementById("eposta-spam-notice");
+  const onayAlani = document.getElementById("eposta-onay-alani");
   if (!form) return;
+
+  let bekleyenYeniEposta = null;
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -97,10 +104,11 @@ function wireEmailChange(profile) {
     }
 
     submitBtn.disabled = true;
-    const { error } = await supabase.auth.updateUser(
-      { email: yeniEposta },
-      { emailRedirectTo: `${window.location.origin}/hesap/giris.html` }
-    );
+    // NOT: emailRedirectTo vermiyoruz — Supabase, "Secure email change"
+    // açıkken linki her iki mailde de aynı token ile üretir; giriş
+    // sayfasına dönüş zaten hesap/giris.md'de varsayılan olarak
+    // ayarlıdır (bkz. Dashboard > URL Configuration > Redirect URLs).
+    const { error } = await supabase.auth.updateUser({ email: yeniEposta });
     submitBtn.disabled = false;
 
     if (error) {
@@ -112,13 +120,87 @@ function wireEmailChange(profile) {
       return;
     }
 
+    bekleyenYeniEposta = yeniEposta;
+
     showMessage(
       msg,
-      `${yeniEposta} adresine bir onay linki gönderdik. Linke tıklayana kadar giriş e-postan (${profile.email}) değişmeden kalır.`,
+      `Onay maillerini gönderdik. Değişikliğin tamamlanması için HEM eski adresine (${profile.email}) HEM de yeni adresine (${yeniEposta}) gelen linke tıklaman (veya aşağıdan kodu girmen) gerekiyor.`,
       "success"
     );
     showSpamNotice(spamNotice);
+    renderEpostaOnayAlani({ eskiEposta: profile.email, yeniEposta });
     form.reset();
+  });
+
+  function renderEpostaOnayAlani({ eskiEposta, yeniEposta }) {
+    if (!onayAlani) return;
+    onayAlani.hidden = false;
+    document.getElementById("eposta-onay-eski-adres").textContent = eskiEposta;
+    document.getElementById("eposta-onay-yeni-adres").textContent = yeniEposta;
+    // Yeni bir istek atıldığında önceki denemeden kalan "onaylandı"
+    // rozetlerini/kapalı formları sıfırlıyoruz.
+    epostaOnayDurumGuncelle("eski", false);
+    epostaOnayDurumGuncelle("yeni", false);
+    onayAlani.querySelectorAll(".eposta-onay-kod-form").forEach((f) => (f.hidden = true));
+  }
+
+  function epostaOnayDurumGuncelle(hedef, onaylandi) {
+    const rozet = document.getElementById(`eposta-onay-${hedef}-durum`);
+    if (!rozet) return;
+    rozet.textContent = onaylandi ? "✓ Onaylandı" : "Bekleniyor";
+    rozet.classList.toggle("eposta-onay-rozet--ok", onaylandi);
+  }
+
+  onayAlani?.querySelectorAll(".eposta-onay-kod-toggle").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const hedef = btn.dataset.hedef;
+      const kodForm = onayAlani.querySelector(`.eposta-onay-kod-form[data-hedef="${hedef}"]`);
+      if (kodForm) kodForm.hidden = !kodForm.hidden;
+    });
+  });
+
+  onayAlani?.querySelectorAll(".eposta-onay-kod-form").forEach((kodForm) => {
+    kodForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const hedef = kodForm.dataset.hedef;
+      const input = kodForm.querySelector("input");
+      const kod = input.value.trim();
+      const submitBtn = kodForm.querySelector('button[type="submit"]');
+      // Kodun hangi adrese gönderildiğini verifyOtp'a söylememiz gerekiyor:
+      // eski adres için mevcut (henüz değişmemiş) e-posta, yeni adres için
+      // kullanıcının az önce girdiği adres.
+      const dogrulanacakEposta = hedef === "eski" ? profile.email : bekleyenYeniEposta;
+
+      if (!dogrulanacakEposta) {
+        showMessage(msg, "Önce yukarıdan yeni e-posta isteği göndermelisin.");
+        return;
+      }
+      if (!kod) return;
+
+      submitBtn.disabled = true;
+      // type: "email_change" → e-posta değiştirme akışı için üretilen kod.
+      // Hem eski hem yeni adrese giden linkler/kodlar bu tiptedir; hangi
+      // adrese ait olduğunu "email" parametresiyle belirtiyoruz.
+      const { error } = await supabase.auth.verifyOtp({
+        email: dogrulanacakEposta,
+        token: kod,
+        type: "email_change",
+      });
+      submitBtn.disabled = false;
+
+      if (error) {
+        showMessage(msg, "Kod doğrulanamadı: " + turkceOtpHatasi(error.message));
+        return;
+      }
+
+      epostaOnayDurumGuncelle(hedef, true);
+      kodForm.hidden = true;
+      showMessage(
+        msg,
+        "Kod doğrulandı. Diğer adrese gelen linke/koda da onay verince değişiklik tamamlanacak.",
+        "success"
+      );
+    });
   });
 }
 
