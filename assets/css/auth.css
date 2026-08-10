@@ -61,6 +61,19 @@
 .btn-primary:disabled { opacity: 0.6; cursor: default; }
 .btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
 
+.btn-secondary {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 500;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.btn-secondary:hover { border-color: var(--accent); }
+
 .btn-google {
   width: 100%;
   padding: 10px;
@@ -89,6 +102,8 @@
   font-size: 0.9rem;
   display: flex;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
 }
 
 .auth-message {
