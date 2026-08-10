@@ -487,8 +487,9 @@ Sistem şunları sağlıyor:
   Gönderilen Ekranlarda SPAM Uyarısı" bölümü
 - `user` / `special_user` / `admin` rolleri, veritabanı seviyesinde **RLS** ile korunan
 - Gizli makaleler ve dosyalar (10 saniyelik Signed URL ile indirme)
-- `/panel/panel.html`: profil düzenleme, **e-posta değiştirme** (mail veya
-  Google ile kayıt olan herkes için), şifre değiştirme, **Hesabımı Sil**
+- `/panel/panel.html`: profil düzenleme, **çift onaylı e-posta değiştirme**
+  (hem eski hem yeni adrese onay + linkin yanında kod ile onaylama yedeği;
+  mail veya Google ile kayıtlı herkes için), şifre değiştirme, **Hesabımı Sil**
 - `/panel/admin.html`: kullanıcı rol yönetimi, özel içerik/dosya yükleme + üyelere atama, "Hakkımda" metni düzenleme
 - Header'daki tek **"Hesabım"** menüsü: çıkış yapmışken "Giriş Yap", giriş
   yapmışken Panelim / (adminse) Admin Paneli / Çıkış Yap seçenekleri
@@ -682,7 +683,7 @@ Supabase varsayılan e-posta şablonları İngilizce gelir. Dashboard →
 |---|---|---|
 | **Confirm signup** | Kayıt olunca | `hesap/kayit.md` → `hesap/hesap-onayla.md` (kod ile) veya linkle |
 | **Reset password** | "Şifremi Unuttum" gönderilince | `hesap/sifremi-unuttum.md` → `hesap/sifre-guncelle.md` |
-| **Change Email Address** | Panelden e-posta değiştirilince | `panel/panel.md` ("E-posta Değiştir") → `hesap/giris.md` |
+| **Change Email Address** | Panelden e-posta değiştirilince — "Secure email change" açıkken hem eski hem yeni adrese ayrı ayrı gider | `panel/panel.md` ("E-posta Değiştir") → `hesap/giris.md` (veya panelden kodla) |
 
 Ücretsiz katmanda Supabase'in kendi SMTP'si **saatte sadece birkaç
 e-postayla sınırlıdır**; gerçek kullanıcı trafiği bekliyorsan
@@ -853,27 +854,72 @@ kayıt olmuş kullanıcılar için aynı şekilde çalışır (Supabase, Google 
 girmiş bir hesaba da e-posta/şifre girişini sonradan ekleyebilir; bu form
 ikisi için de aynı `supabase.auth.updateUser({ email })` çağrısını yapar).
 
-**Akış:**
+### Neden çift onaylı? (ve neden bu bir risk taşıyor)
 
-1. Kullanıcı yeni e-posta adresini girip **"Onay Linki Gönder"**e basar.
-2. Supabase, **yeni** adrese bir onay linki gönderir (`hesap/giris.md`'ye
-   dönecek şekilde ayarlı — `emailRedirectTo`). Bu noktada giriş e-postası
-   **henüz değişmemiştir**; panel ekranı bunu açıkça belirtir ve SPAM
-   uyarısını gösterir.
-3. Kullanıcı yeni adresteki linke tıklar → `hesap/giris.md` sayfasına
-   döner, `initGirisPage()` URL hash'inden değişikliğin tamamlandığını
-   anlar ve "E-posta adresin başarıyla güncellendi" mesajını gösterir.
-4. Kullanıcı artık **yeni** e-posta adresiyle giriş yapabilir.
-
-**Çift Onaylı E-posta Değişikliği (opsiyonel, ekstra güvenlik):**
 Dashboard → **Authentication → Emails → "Secure email change"** ayarı
-**açıksa**, Supabase hem yeni HEM eski adrese onay linki gönderir; e-posta
-sadece HER İKİSİ de onaylanınca değişir. Bu, birinin hesabına erişip sessizce
-e-postayı kendi adresine çevirmesini zorlaştırır (eski adresin sahibi de
-haberdar/onaylı olmadan değişiklik tamamlanmaz). Varsayılan olarak kapalıdır;
-açman **önerilir**. Açtığında panel ekranındaki metni değiştirmene gerek
-yok — "yeni adrese onay linki gönderdik" mesajı her iki durumda da doğru,
-sadece kullanıcı ekstra olarak eski adresine de bir mail görecektir.
+**açık olmalı** (varsayılan olarak zaten açıktır, kapatmamanı öneririm).
+Açıkken Supabase, e-posta değiştirme isteğinde **hem eski (şu anki) HEM
+yeni adrese** ayrı birer onay linki/kod gönderir ve değişiklik **ikisi de**
+onaylanmadan tamamlanmaz. Bunun amacı: birinin hesabına izinsiz erişip
+sessizce e-postayı kendi adresine çevirmesini engellemek — eski adresin
+gerçek sahibi de onay vermeden değişiklik geçerli olmaz.
+
+**Dürüstçe belirtmem gereken risk:** Bu güvenlik, eski adresine artık
+erişimi olmayan (mailini unutmuş, hesabı kapatmış, vb.) meşru bir
+kullanıcıyı da kilitleyebilir — "eski mailime giremiyorum, o yüzden zaten
+yeni mail yazmak istiyorum ama sistem bunu tamamlamama izin vermiyor" gibi
+bir çelişkiye düşebilir. Bunu tamamen ortadan kaldırmanın (yani tek onayla
+değişikliğe izin vermenin) güvenlik bedeli daha büyük olduğu için, bunun
+yerine riski **azaltan** iki önlem ekledik:
+
+1. **Kod ile onaylama yedeği** — her iki mail de sadece bir link değil,
+   aynı token'ı temsil eden bir **kod** da içerir (Supabase varsayılan
+   mail şablonu ikisini de gönderir). Panel ekranındaki her iki durum
+   satırının altında "Linke tıklayamıyor musun? Kod ile onayla" seçeneği
+   var — link açılmasa/tıklanamasa bile (ör. mail istemcisi linki önden
+   tüketmişse, ya da kullanıcı linki farklı bir cihazda/tarayıcıda
+   açtıysa) değişiklik yine tamamlanabilir.
+2. **Açık durum takibi** — panel, "Eski adres: Bekleniyor / ✓ Onaylandı" ve
+   "Yeni adres: Bekleniyor / ✓ Onaylandı" rozetlerini ayrı ayrı gösterir,
+   kullanıcı hangi adımda kaldığını görür; belirsizlik/kafa karışıklığı
+   azalır.
+
+Eski adresine gerçekten hiç erişimi kalmamış bir kullanıcı için tek çözüm
+site yöneticisinin manuel müdahalesidir (Dashboard → Authentication →
+Users → ilgili kullanıcı → e-postayı elle güncelle/doğrula). Bu, bilinçli
+bir ödünleşim: "biri hesabımı ele geçirip mailimi çalabilir" riski, "eski
+mailime erişemiyorum" senaryosundan istatistiksel olarak daha tehlikeli ve
+daha sık istismar edilen bir saldırı olduğu için güvenlik tarafı seçildi.
+
+### Akış (adım adım)
+
+1. Kullanıcı yeni e-posta adresini girip **"Onay Linklerini Gönder"**e basar.
+2. Supabase **hem eski hem yeni** adrese ayrı bir onay maili gönderir. Bu
+   noktada giriş e-postası **henüz değişmemiştir**; panel ekranı bunu
+   açıkça belirtir, SPAM uyarısını gösterir ve iki adres için de ayrı bir
+   durum satırı açar ("Bekleniyor").
+3. Kullanıcı **her iki** maildeki linke tıklar (ya da panelden ilgili
+   satırın altındaki kutuya kodu girer). Linkle onaylananlar
+   `hesap/giris.md`'ye döner ve "Bu e-posta adresi onaylandı, diğer adresi
+   de onaylaman gerekiyor" mesajını görür; kodla onaylananlarda panel
+   ekranındaki rozet anında "✓ Onaylandı"ya döner.
+4. Her iki taraf da onaylanınca Supabase e-postayı gerçekten değiştirir.
+   Kullanıcı artık **yeni** adresiyle giriş yapabilir.
+
+### Teknik detay (dokunmana gerek yok ama bilgi için)
+
+- `assets/js/panel.js` → `wireEmailChange()`: formu gönderir
+  (`updateUser({ email })`), sonra her iki adres için ayrı bir "kod ile
+  onayla" formu render eder. Kod doğrulaması
+  `supabase.auth.verifyOtp({ email, token, type: "email_change" })` ile
+  yapılır — `email` parametresi olarak eski adres için **mevcut**
+  (henüz değişmemiş) e-posta, yeni adres için **kullanıcının az önce
+  girdiği** adres gönderilir; Supabase hangi tarafın onaylandığını buna
+  göre ayırt eder.
+- `assets/js/auth-pages.js` → `initGirisPage()`: linkle gelindiğinde URL
+  hash'indeki `type=email_change` bilgisini okuyup "bu adres onaylandı,
+  diğerini de onayla" mesajını gösterir (kesin "değişti" demez, çünkü tek
+  link her zaman yeterli değildir).
 
 **Not:** Google ile giriş yapan bir kullanıcı e-postasını değiştirirse, bu
 değişiklik sadece Supabase Auth'daki (ve `profiles` tablosundaki, trigger
@@ -975,9 +1021,13 @@ kurabiliriz.
 
 - [ ] `/hesap/kayit.html`'den e-posta ile kayıt ol → doğrulama e-postası geldi mi? → kayıt sonrası SPAM uyarısı göründü mü?
 - [ ] E-postadaki linke tıkla → `/hesap/giris.html`'den giriş yapabiliyor musun?
-- [ ] `/panel/panel.html` → "E-posta Değiştir" ile yeni bir adres gir → onay linki geldi mi
-      (ve SPAM uyarısı göründü mü)? → linke tıklayınca `/hesap/giris.html`'de
-      "güncellendi" mesajı görünüyor mu → yeni adresle giriş yapabiliyor musun?
+- [ ] `/panel/panel.html` → "E-posta Değiştir" ile yeni bir adres gir → hem eski
+      hem yeni adrese mail geldi mi (ve SPAM uyarısı göründü mü)? → sadece
+      BİRİNİ onayla, e-posta hâlâ değişmemiş olmalı → diğerini de onayla
+      (linkle veya kodla) → değişiklik tamamlandı mı, yeni adresle giriş
+      yapabiliyor musun?
+- [ ] Aynı testi "kod ile onayla" yedek yoluyla da dene (linke hiç tıklamadan,
+      sadece panel ekranındaki kod formlarını kullanarak).
 - [ ] `/hesap/giris.html`'de "Google ile Giriş Yap" çalışıyor mu?
 - [ ] `/hesap/sifremi-unuttum.html` → e-posta geldi mi → `/hesap/sifre-guncelle.html`'de
       yeni şifre belirleyip giriş yapabiliyor musun?
