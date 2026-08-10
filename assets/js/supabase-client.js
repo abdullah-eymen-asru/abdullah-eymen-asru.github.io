@@ -46,6 +46,23 @@ export function showMessage(el, text, type = "error") {
 }
 
 /**
+ * Supabase'in verifyOtp() / OTP doğrulama akışlarından dönen İngilizce hata
+ * mesajlarını kullanıcı dostu Türkçeye çevirir. hesap/sifre-guncelle.html
+ * (kod ile şifre sıfırlama) ve hesap/hesap-onayla.html (kod ile hesap
+ * onaylama) tarafından ortak kullanılır.
+ */
+export function turkceOtpHatasi(message) {
+  if (!message) return "Bilinmeyen bir hata oluştu.";
+  if (message.includes("expired") || message.includes("invalid") || message.includes("Token")) {
+    return "Kod hatalı veya süresi dolmuş. Yeni bir link/kod iste.";
+  }
+  if (message.includes("Auth session missing")) {
+    return "Oturum bulunamadı, tekrar dene.";
+  }
+  return message;
+}
+
+/**
  * Bugünün Gizlilik Politikası / KVKK metni sürüm etiketi. Metni
  * (kurumsal/gizlilik-politikasi.md) gerçekten değiştirdiğinde bu değeri de
  * güncelle — o andan itibaren yeni kayıt olanlar bu sürüme onay verir ve
