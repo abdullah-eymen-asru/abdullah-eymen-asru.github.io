@@ -1,18 +1,18 @@
 /*
  * assets/js/auth-pages.js
- * giris.html, kayit.html, sifremi-unuttum.html, sifre-guncelle.html
- * tarafından ortak kullanılan fonksiyonlar. Her sayfa sadece ihtiyacı
- * olan init fonksiyonunu çağırır (aşağıya bkz).
+ * hesap/giris.html, hesap/kayit.html, hesap/sifremi-unuttum.html,
+ * hesap/sifre-guncelle.html tarafından ortak kullanılan fonksiyonlar. Her
+ * sayfa sadece ihtiyacı olan init fonksiyonunu çağırır (aşağıya bkz).
  */
 import { supabase, showMessage, KVKK_METIN_SURUMU } from "./supabase-client.js";
 
-const REDIRECT_AFTER_LOGIN = "/panel.html";
+const REDIRECT_AFTER_LOGIN = "/panel/panel.html";
 // Google OAuth ve "şifre sıfırlama" e-postası kullanıcıyı bu sayfaya
 // geri döndürür; Supabase SDK URL'deki token'ı otomatik yakalar.
 const SITE_ORIGIN = window.location.origin;
 
 /* ---------------------------------------------------------------------- */
-/* GİRİŞ SAYFASI (giris.html)                                             */
+/* GİRİŞ SAYFASI (hesap/giris.html)                                       */
 /* ---------------------------------------------------------------------- */
 export function initGirisPage() {
   const form = document.getElementById("giris-form");
@@ -58,7 +58,7 @@ export function initGirisPage() {
 }
 
 /* ---------------------------------------------------------------------- */
-/* KAYIT SAYFASI (kayit.html)                                             */
+/* KAYIT SAYFASI (hesap/kayit.html)                                       */
 /* ---------------------------------------------------------------------- */
 export function initKayitPage() {
   const form = document.getElementById("kayit-form");
@@ -98,7 +98,7 @@ export function initKayitPage() {
           kvkk_onay: true,
           kvkk_versiyon: KVKK_METIN_SURUMU,
         },
-        emailRedirectTo: `${SITE_ORIGIN}/giris.html`,
+        emailRedirectTo: `${SITE_ORIGIN}/hesap/giris.html`,
       },
     });
     submitBtn.disabled = false;
@@ -129,7 +129,7 @@ export function initKayitPage() {
 }
 
 /* ---------------------------------------------------------------------- */
-/* ŞİFREMİ UNUTTUM (sifremi-unuttum.html)                                 */
+/* ŞİFREMİ UNUTTUM (hesap/sifremi-unuttum.html)                           */
 /* ---------------------------------------------------------------------- */
 export function initSifremiUnuttumPage() {
   const form = document.getElementById("sifremi-unuttum-form");
@@ -142,7 +142,7 @@ export function initSifremiUnuttumPage() {
 
     submitBtn.disabled = true;
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${SITE_ORIGIN}/sifre-guncelle.html`,
+      redirectTo: `${SITE_ORIGIN}/hesap/sifre-guncelle.html`,
     });
     submitBtn.disabled = false;
 
@@ -159,7 +159,7 @@ export function initSifremiUnuttumPage() {
 }
 
 /* ---------------------------------------------------------------------- */
-/* ŞİFRE GÜNCELLE (sifre-guncelle.html) — e-postadaki linkten gelinen sayfa */
+/* ŞİFRE GÜNCELLE (hesap/sifre-guncelle.html) — e-postadaki linkten gelinen sayfa */
 /* ---------------------------------------------------------------------- */
 export function initSifreGuncellePage() {
   const form = document.getElementById("sifre-guncelle-form");
@@ -192,6 +192,6 @@ export function initSifreGuncellePage() {
       return;
     }
     showMessage(msg, "Şifren güncellendi! Panele yönlendiriliyorsun...", "success");
-    setTimeout(() => (window.location.href = "/panel.html"), 1500);
+    setTimeout(() => (window.location.href = "/panel/panel.html"), 1500);
   });
 }
