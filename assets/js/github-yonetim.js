@@ -1,12 +1,12 @@
 /*
- * assets/js/github-yonetim.js — /github-yonetim.html
+ * assets/js/github-yonetim.js — /panel/github-yonetim.html
  *
  * Jekyll/GitHub Pages için, 3. parti bir servise (Netlify vb.) ihtiyaç
  * duymadan çalışan tek sayfalık bir "mini CMS". Doğrudan GitHub REST
  * API'sine (repos/{owner}/{repo}/contents/{path}) istek atarak _posts/ ve
  * _projects/ klasörlerine commit atar, assets/profil.jpg dosyasını yönetir.
  *
- * ÖNEMLİ — BU SAYFA SİTENİN SUPABASE TABANLI "ADMİN PANELİ"NDEN (admin.md /
+ * ÖNEMLİ — BU SAYFA SİTENİN SUPABASE TABANLI "ADMİN PANELİ"NDEN (panel/admin.md /
  * admin.js) TAMAMEN BAĞIMSIZDIR. O panel Supabase'teki kullanıcı/rol/özel
  * içerik sistemini yönetir; bu sayfa ise GitHub Pages'in kendi statik
  * Jekyll içeriğini (blog yazıları, akademik projeler, profil fotoğrafı)
