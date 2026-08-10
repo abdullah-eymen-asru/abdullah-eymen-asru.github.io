@@ -4,7 +4,7 @@
  * hesap/sifre-guncelle.html tarafından ortak kullanılan fonksiyonlar. Her
  * sayfa sadece ihtiyacı olan init fonksiyonunu çağırır (aşağıya bkz).
  */
-import { supabase, showMessage, KVKK_METIN_SURUMU, turkceOtpHatasi } from "./supabase-client.js";
+import { supabase, showMessage, showSpamNotice, KVKK_METIN_SURUMU, turkceOtpHatasi } from "./supabase-client.js";
 
 const REDIRECT_AFTER_LOGIN = "/panel/panel.html";
 // Google OAuth ve "şifre sıfırlama" e-postası kullanıcıyı bu sayfaya
@@ -18,6 +18,17 @@ export function initGirisPage() {
   const form = document.getElementById("giris-form");
   const msg = document.getElementById("auth-message");
   const googleBtn = document.getElementById("google-giris-btn");
+
+  // Panelde "E-posta Değiştir" ile gönderilen onay linkine tıklandığında
+  // Supabase kullanıcıyı buraya "#message=...&type=email_change" (veya
+  // benzeri) hash'iyle geri gönderir. detectSessionInUrl bunu arka planda
+  // otomatik işler; burada sadece kullanıcıya "değişti" bilgisini gösteriyoruz.
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  if (hashParams.get("type") === "email_change" || hashParams.get("message")?.includes("mail")) {
+    showMessage(msg, "E-posta adresin başarıyla güncellendi. Şimdi giriş yapabilirsin.", "success");
+  } else if (hashParams.get("error")) {
+    showMessage(msg, "Linkin süresi dolmuş veya geçersiz. Panelden yeni bir onay linki iste.");
+  }
 
   form?.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -121,6 +132,7 @@ export function initKayitPage() {
       "Kayıt alındı! E-posta adresine gönderdiğimiz doğrulama linkine tıklayıp hesabını aktifleştir. Linke tıklayamıyorsan aşağıdan kodla da onaylayabilirsin.",
       "success"
     );
+    showSpamNotice(document.getElementById("auth-spam-notice"));
     if (kodOnayLink) {
       kodOnayLink.href = kodOnayLink.href.split("?")[0] + "?email=" + encodeURIComponent(email);
     }
@@ -200,6 +212,7 @@ export function initSifremiUnuttumPage() {
       "Eğer bu adres sistemde kayıtlıysa, şifre sıfırlama linki gönderildi.",
       "success"
     );
+    showSpamNotice(document.getElementById("auth-spam-notice"));
     form.reset();
   });
 }
