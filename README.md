@@ -482,9 +482,13 @@ karışıklık olmasın diye buraya taşındı — tek doğruluk kaynağı buras
 Sistem şunları sağlıyor:
 
 - Google OAuth + E-posta/Şifre ile kayıt-giriş, e-posta doğrulama, şifre sıfırlama
+- Mail gönderilen HER ekranda (kayıt, hesabı onayla, şifremi unuttum, e-posta
+  değiştirme) aynı **"SPAM klasörünü kontrol et"** uyarısı — bkz. "E-posta
+  Gönderilen Ekranlarda SPAM Uyarısı" bölümü
 - `user` / `special_user` / `admin` rolleri, veritabanı seviyesinde **RLS** ile korunan
 - Gizli makaleler ve dosyalar (10 saniyelik Signed URL ile indirme)
-- `/panel/panel.html`: profil düzenleme, avatar değiştirme, şifre değiştirme, **Hesabımı Sil**
+- `/panel/panel.html`: profil düzenleme, **e-posta değiştirme** (mail veya
+  Google ile kayıt olan herkes için), şifre değiştirme, **Hesabımı Sil**
 - `/panel/admin.html`: kullanıcı rol yönetimi, özel içerik/dosya yükleme + üyelere atama, "Hakkımda" metni düzenleme
 - Header'daki tek **"Hesabım"** menüsü: çıkış yapmışken "Giriş Yap", giriş
   yapmışken Panelim / (adminse) Admin Paneli / Çıkış Yap seçenekleri
@@ -507,15 +511,15 @@ supabase/
   migrations/0003_yeni_ozellikler_ve_guvenlik.sql <- Adım 1c: SQL Editor'de çalıştır (KVKK onayı, okundu/son geçerlilik, admin üye silme, arama indeksi, kalan Advisor uyarıları)
   functions/delete-account/index.ts        <- Adım 5: Edge Function (hesap silme — artık admin başkasını da silebiliyor)
 assets/
-  js/supabase-client.js                    <- Ortak Supabase istemcisi (URL/KEY burada)
+  js/supabase-client.js                    <- Ortak Supabase istemcisi (URL/KEY burada) + showSpamNotice() yardımcısı
   js/auth-guard.js                         <- Korumalı sayfa mantığı
-  js/auth-pages.js                         <- Giriş/Kayıt/Şifre sayfaları mantığı
-  js/panel.js                              <- /panel/panel.html mantığı
+  js/auth-pages.js                         <- Giriş/Kayıt/Şifre/Hesap Onayla sayfaları mantığı
+  js/panel.js                              <- /panel/panel.html mantığı (e-posta değiştirme dahil)
   js/admin.js                              <- /panel/admin.html mantığı
   js/ozel-icerik.js                        <- Tekil gizli içerik sayfası
   js/nav-auth.js                           <- Header'daki "Hesabım" menüsü
-  css/auth.css                             <- Bu sayfalara özel stiller
-hesap/giris.md / hesap/kayit.md / hesap/sifremi-unuttum.md / hesap/sifre-guncelle.md
+  css/auth.css                             <- Bu sayfalara özel stiller (.auth-spam-notice dahil)
+hesap/giris.md / hesap/kayit.md / hesap/sifremi-unuttum.md / hesap/sifre-guncelle.md / hesap/hesap-onayla.md
 panel/panel.md / panel/admin.md / panel/ozel-icerik.md       <- Jekyll sayfaları (_layouts/default.html'i kullanır)
 ```
 
@@ -669,25 +673,53 @@ olarak giriş yapamıyorsan, sırayla şunları kontrol et:
 
 ---
 
-## Adım 3 — E-posta Şablonları (Doğrulama / Şifre Sıfırlama)
+## Adım 3 — E-posta Şablonları (Doğrulama / Şifre Sıfırlama / E-posta Değiştirme)
 
 Supabase varsayılan e-posta şablonları İngilizce gelir. Dashboard →
-**Authentication → Email Templates** kısmından "Confirm signup" ve
-"Reset password" şablonlarını Türkçeleştirebilirsin. Ücretsiz katmanda
-Supabase'in kendi SMTP'si saatte birkaç e-postayla sınırlıdır; gerçek
-kullanıcı trafiği bekliyorsan **Project Settings → Auth → SMTP Settings**
-kısmından kendi SMTP'ni (ör. Resend, Brevo ücretsiz katmanları) bağlaman
-önerilir — aksi halde doğrulama e-postaları gecikebilir ya da hiç gelmez
-(bkz. yukarıdaki "Giriş Yapamıyorum" bölümü, madde 1).
+**Authentication → Email Templates** kısmından şu şablonları Türkçeleştirebilirsin:
+
+| Şablon | Ne zaman gider | Hangi sayfamız kullanır |
+|---|---|---|
+| **Confirm signup** | Kayıt olunca | `hesap/kayit.md` → `hesap/hesap-onayla.md` (kod ile) veya linkle |
+| **Reset password** | "Şifremi Unuttum" gönderilince | `hesap/sifremi-unuttum.md` → `hesap/sifre-guncelle.md` |
+| **Change Email Address** | Panelden e-posta değiştirilince | `panel/panel.md` ("E-posta Değiştir") → `hesap/giris.md` |
+
+Ücretsiz katmanda Supabase'in kendi SMTP'si **saatte sadece birkaç
+e-postayla sınırlıdır**; gerçek kullanıcı trafiği bekliyorsan
+**Project Settings → Auth → SMTP Settings** kısmından kendi SMTP'ni
+bağlaman önerilir. Ücretsiz/uygun seçenekler:
+
+| Sağlayıcı | Ücretsiz katman | Not |
+|---|---|---|
+| [Resend](https://resend.com) | Ayda 3.000 mail, günde 100 | Kurulumu en basit olanlardan, Supabase dokümanlarında da örnek olarak geçer |
+| [Brevo](https://www.brevo.com) (eski Sendinblue) | Günde 300 mail | Türkiye'den kayıt/onay süreci diğerlerine göre biraz daha sorunsuz |
+| [Amazon SES](https://aws.amazon.com/ses/) | İlk 62.000 mail/ay (EC2 üzerinden) ücretsiz, dışarıdan gönderimde ücretli | Kurulumu daha teknik, "sandbox" modundan çıkmak için AWS'e başvuru gerekir |
+
+SMTP Settings kısmında dolduracağın alanlar tipik olarak: **Sender email**
+(gönderen adresin, ör. `no-reply@siten.com` — sağlayıcıda domain
+doğrulaması yapman gerekir), **Sender name**, **Host**, **Port** (genelde
+587), **Username**, **Password** (sağlayıcının verdiği API anahtarı/SMTP
+şifresi). Kaydettikten sonra Dashboard'daki **"Send test email"** ile
+gerçekten gidip gitmediğini kontrol et — kendi SMTP'ni bağlasan bile mail
+sağlayıcıları (Gmail, Outlook vb.) yeni/az kullanılan bir gönderen
+domainini ilk başta SPAM'e atabilir; bu yüzden site genelinde her mail
+ekranında kullanıcıya SPAM klasörünü kontrol etmesini hatırlatıyoruz (bkz.
+aşağıki "E-posta Gönderilen Ekranlarda SPAM Uyarısı" bölümü) — kendi SMTP'ni
+bağladıktan sonra bile bu uyarıyı kaldırman ÖNERİLMEZ.
+
+Kendi SMTP'ni bağlamazsan bile site çalışır; sadece Supabase'in ücretsiz
+saatlik limitine takılabilirsin (bkz. yukarıdaki "Giriş Yapamıyorum"
+bölümü, madde 1).
 
 ---
 
 ## Adım 4 — Dosyaları Siteye Kopyala ve Anahtarları Gir
 
 1. `assets/`, `hesap/giris.md`, `hesap/kayit.md`, `hesap/sifremi-unuttum.md`,
-   `hesap/sifre-guncelle.md`, `panel/panel.md`, `panel/admin.md`, `panel/ozel-icerik.md`
-   dosyaları zaten kendi klasörlerinde (`hesap/`, `panel/`) hazır geliyor —
-   fork'ladıysan bunları olduğu gibi koru.
+   `hesap/sifre-guncelle.md`, `hesap/hesap-onayla.md`, `panel/panel.md`,
+   `panel/admin.md`, `panel/ozel-icerik.md` dosyaları zaten kendi
+   klasörlerinde (`hesap/`, `panel/`) hazır geliyor — fork'ladıysan bunları
+   olduğu gibi koru.
 2. `assets/js/supabase-client.js` içindeki iki değeri doldur (Dashboard →
    **Project Settings → API**):
    ```js
@@ -770,6 +802,89 @@ connect-src 'self' https:; ...
 `https:` joker değeri tüm HTTPS kaynaklarına (Supabase API'si, `esm.sh`
 üzerinden yüklenen Supabase JS SDK dahil) izin verdiği için **hiçbir
 değişiklik yapmana gerek yok**.
+
+---
+
+## E-posta Gönderilen Ekranlarda SPAM Uyarısı
+
+Supabase'in (kendi SMTP'si veya bağladığın 3. parti SMTP) gönderdiği
+mailler bazen alıcının SPAM/Gereksiz klasörüne düşebiliyor. Kullanıcının
+"mail gelmedi" sanıp takılmasını önlemek için, mail gönderilen **her**
+ekranda aynı uyarı **tutarlı bir şekilde** gösteriliyor:
+
+| Sayfa | Ne zaman görünür |
+|---|---|
+| `hesap/kayit.md` | Kayıt formu başarıyla gönderildikten sonra |
+| `hesap/hesap-onayla.md` | Sayfa açılır açılmaz (kod kayıt mailinde geldiği için) |
+| `hesap/sifremi-unuttum.md` | Sıfırlama linki isteği gönderildikten sonra |
+| `panel/panel.md` ("E-posta Değiştir") | Onay linki isteği gönderildikten sonra |
+
+Teknik olarak:
+
+- Metin ve gösterme/gizleme mantığı **tek bir yerde**, `assets/js/supabase-client.js`
+  içindeki `showSpamNotice(el)` / `hideSpamNotice(el)` fonksiyonlarında
+  toplanıyor — uyarı metnini değiştirmek istersen SADECE bu dosyayı
+  düzenlemen yeterli, dört ayrı sayfada arama yapmana gerek yok.
+- Görünüm `assets/css/auth.css` içindeki `.auth-spam-notice` sınıfıyla
+  geliyor — sarı/bilgi renginde, başarı (yeşil) veya hata (kırmızı)
+  mesajlarıyla karışmaması için bilinçli olarak farklı stillendirildi ve
+  ayrı bir `<div>`'de duruyor (`id="auth-spam-notice"`), böylece ikisi
+  aynı anda görünebiliyor.
+- `hesap/hesap-onayla.md` sayfasında uyarı **statik olarak** HTML'de duruyor
+  (sayfa açılır açılmaz görünür) çünkü o sayfaya zaten "mail gönderildikten
+  sonra" geliniyorsun; diğer üç ekranda ise ilgili JS fonksiyonu (kayıt,
+  şifremi unuttum, e-posta değiştirme) API çağrısı **başarıyla** dönünce
+  uyarıyı JS ile açıyor.
+- `hesap/sifre-guncelle.md` sayfasına bu uyarı **eklenmedi** — o sayfa mail
+  göndermiyor, zaten gönderilmiş bir maildeki linkten geliniyor.
+
+**Yeni bir mail-gönderen ekran eklersen:** aynı deseni kullan —
+`<div id="..." class="auth-spam-notice" hidden></div>` ekle, ilgili JS
+fonksiyonunda başarı durumunda `showSpamNotice(document.getElementById(...))`
+çağır.
+
+---
+
+## E-posta Değiştirme Akışı (`/panel/panel.html`)
+
+Panelde artık "Profil Bilgileri" ile "Şifre Değiştir" arasında bir
+**"E-posta Değiştir"** bölümü var. Hem e-posta/şifre ile hem **Google ile**
+kayıt olmuş kullanıcılar için aynı şekilde çalışır (Supabase, Google ile
+girmiş bir hesaba da e-posta/şifre girişini sonradan ekleyebilir; bu form
+ikisi için de aynı `supabase.auth.updateUser({ email })` çağrısını yapar).
+
+**Akış:**
+
+1. Kullanıcı yeni e-posta adresini girip **"Onay Linki Gönder"**e basar.
+2. Supabase, **yeni** adrese bir onay linki gönderir (`hesap/giris.md`'ye
+   dönecek şekilde ayarlı — `emailRedirectTo`). Bu noktada giriş e-postası
+   **henüz değişmemiştir**; panel ekranı bunu açıkça belirtir ve SPAM
+   uyarısını gösterir.
+3. Kullanıcı yeni adresteki linke tıklar → `hesap/giris.md` sayfasına
+   döner, `initGirisPage()` URL hash'inden değişikliğin tamamlandığını
+   anlar ve "E-posta adresin başarıyla güncellendi" mesajını gösterir.
+4. Kullanıcı artık **yeni** e-posta adresiyle giriş yapabilir.
+
+**Çift Onaylı E-posta Değişikliği (opsiyonel, ekstra güvenlik):**
+Dashboard → **Authentication → Emails → "Secure email change"** ayarı
+**açıksa**, Supabase hem yeni HEM eski adrese onay linki gönderir; e-posta
+sadece HER İKİSİ de onaylanınca değişir. Bu, birinin hesabına erişip sessizce
+e-postayı kendi adresine çevirmesini zorlaştırır (eski adresin sahibi de
+haberdar/onaylı olmadan değişiklik tamamlanmaz). Varsayılan olarak kapalıdır;
+açman **önerilir**. Açtığında panel ekranındaki metni değiştirmene gerek
+yok — "yeni adrese onay linki gönderdik" mesajı her iki durumda da doğru,
+sadece kullanıcı ekstra olarak eski adresine de bir mail görecektir.
+
+**Not:** Google ile giriş yapan bir kullanıcı e-postasını değiştirirse, bu
+değişiklik sadece Supabase Auth'daki (ve `profiles` tablosundaki, trigger
+sayesinde) kayda uygulanır — Google hesabının kendisini etkilemez, bir
+dahaki "Google ile Giriş Yap"ta kullanıcı yine kendi Google e-postasıyla
+oturum açar ama panelde artık kayıtlı olan yeni e-postayı görür. Bu iki
+adresin birbirinden ayrışmasını istemiyorsan (yani Google kullanıcılarının
+e-posta değiştirmesini engellemek istersen), `panel/panel.md`'deki
+"E-posta Değiştir" bölümünü `profile.app_metadata` veya
+`session.user.app_metadata.provider` kontrolüyle koşullu gizleyebilirsin —
+mevcut kod bunu bilinçli olarak KISITLAMIYOR, herkes değiştirebiliyor.
 
 ---
 
@@ -858,8 +973,11 @@ kurabiliriz.
 
 ## Adım 8 — Test Kontrol Listesi
 
-- [ ] `/hesap/kayit.html`'den e-posta ile kayıt ol → doğrulama e-postası geldi mi?
+- [ ] `/hesap/kayit.html`'den e-posta ile kayıt ol → doğrulama e-postası geldi mi? → kayıt sonrası SPAM uyarısı göründü mü?
 - [ ] E-postadaki linke tıkla → `/hesap/giris.html`'den giriş yapabiliyor musun?
+- [ ] `/panel/panel.html` → "E-posta Değiştir" ile yeni bir adres gir → onay linki geldi mi
+      (ve SPAM uyarısı göründü mü)? → linke tıklayınca `/hesap/giris.html`'de
+      "güncellendi" mesajı görünüyor mu → yeni adresle giriş yapabiliyor musun?
 - [ ] `/hesap/giris.html`'de "Google ile Giriş Yap" çalışıyor mu?
 - [ ] `/hesap/sifremi-unuttum.html` → e-posta geldi mi → `/hesap/sifre-guncelle.html`'de
       yeni şifre belirleyip giriş yapabiliyor musun?
@@ -1037,7 +1155,7 @@ Aşağıdaki her blok bağımsızdır — sadece istemediğini sil, geri kalanı
 
 **Supabase kullanıcı sistemini (kayıt/giriş/panel/admin) kaldırmak istersen:**
 - `hesap/giris.md`, `hesap/kayit.md`, `hesap/sifremi-unuttum.md`, `hesap/sifre-guncelle.md`,
-  `panel/panel.md`, `panel/admin.md`, `panel/ozel-icerik.md` dosyalarını sil
+  `hesap/hesap-onayla.md`, `panel/panel.md`, `panel/admin.md`, `panel/ozel-icerik.md` dosyalarını sil
 - `assets/js/supabase-client.js`, `auth-guard.js`, `auth-pages.js`,
   `panel.js`, `admin.js`, `ozel-icerik.js`, `nav-auth.js` ve
   `assets/css/auth.css` dosyalarını sil
