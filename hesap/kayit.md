@@ -2,6 +2,7 @@
 layout: default
 title: "Kayıt Ol"
 yayinda: true
+permalink: "/hesap/kayit.html"
 ---
 
 <link rel="stylesheet" href="{{ '/assets/css/auth.css' | relative_url }}">
@@ -36,7 +37,7 @@ yayinda: true
       <label style="display:flex; gap:8px; align-items:flex-start; flex-direction:row; font-size:0.9rem; color:var(--text);">
         <input id="kvkk_onay" name="kvkk_onay" type="checkbox" required style="margin-top:3px;">
         <span>
-          <a href="{{ '/gizlilik-politikasi.html' | relative_url }}" target="_blank">KVKK Aydınlatma Metni ve Gizlilik Politikası</a>'nı
+          <a href="{{ '/kurumsal/gizlilik-politikasi.html' | relative_url }}" target="_blank">KVKK Aydınlatma Metni ve Gizlilik Politikası</a>'nı
           okudum, 6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında kişisel
           verilerimin belirtilen şekilde işlenmesine açık rıza gösteriyorum.
         </span>
@@ -46,7 +47,7 @@ yayinda: true
   </form>
 
   <div class="auth-links">
-    <a href="{{ '/giris.html' | relative_url }}">Zaten hesabın var mı? Giriş yap</a>
+    <a href="{{ '/hesap/giris.html' | relative_url }}">Zaten hesabın var mı? Giriş yap</a>
   </div>
 </div>
 
