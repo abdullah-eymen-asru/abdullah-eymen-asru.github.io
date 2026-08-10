@@ -22,6 +22,13 @@ permalink: "/hesap/sifre-guncelle.html"
     </div>
     <button type="submit" class="btn-primary">Şifreyi Güncelle</button>
   </form>
+
+  <!-- Sıfırlama linkinin süresi dolmuşsa / link daha önce kullanılmışsa
+       initSifreGuncellePage() formu gizleyip bunu gösterir. -->
+  <div id="auth-expired" hidden>
+    <p class="muted">Bu linkle şifre güncellenemiyor. Yeni bir sıfırlama linki isteyebilirsin.</p>
+    <a class="btn-primary" href="{{ '/hesap/sifremi-unuttum.html' | relative_url }}" style="display:block; text-align:center; text-decoration:none; box-sizing:border-box;">Yeni Sıfırlama Linki İste</a>
+  </div>
 </div>
 
 <script type="module">
