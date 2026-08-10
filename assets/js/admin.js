@@ -15,7 +15,7 @@
  * _includes/hakkimda-icerik.md dosyasından, doğrudan koda dokunarak
  * güncellenir.
  */
-import { supabase, showMessage, showSpamNotice, escapeHtml } from "./supabase-client.js";
+import { supabase, showMessage, escapeHtml } from "./supabase-client.js";
 import { requireAuth } from "./auth-guard.js";
 import { wireAdminChat } from "./chat.js";
 import { imzaliLinkUret } from "./dosya-paylasim.js";
@@ -229,25 +229,24 @@ async function uyeyiSil(userId, email) {
 }
 
 /* ---------------------------------------------------------------------- */
-/* ADMİN'İN BİR ÜYENİN E-POSTASINI DEĞİŞTİRMESİ (TEK ONAYLI — SADECE YENİ  */
-/* ADRES). Kullanıcının kendi panelindeki "E-posta Değiştir" ÇİFT onay     */
-/* ister (bkz. panel.js); eski mailine erişimi kalmamış kullanıcılar için  */
-/* bu, admin panelinden açılan tek onaylı yedek yoldur — Edge Function     */
-/* admin-change-email, service_role ile sadece YENİ adrese onay maili/kodu */
-/* gönderir, eski adrese hiçbir şey gitmez (bkz. o dosyadaki yorum).       */
+/* ADMİN'İN BİR ÜYENİN E-POSTASINI DEĞİŞTİRMESİ (ANINDA — MAİL BEKLEMEDEN) */
+/* Kullanıcının kendi panelindeki "E-posta Değiştir" ÇİFT onay ister (bkz. */
+/* panel.js); eski mailine erişimi kalmamış kullanıcılar için bu, admin    */
+/* panelinden açılan yedek yoldur — Edge Function admin-change-email,      */
+/* service_role ile email_confirm:true göndererek e-postayı HİÇBİR mail    */
+/* göndermeden anında değiştirir (bkz. o dosyadaki "DAVRANIŞ" notu — ilk   */
+/* sürümde "sadece yeni adrese mail gider" varsayılıyordu, bu yanlıştı).   */
 /* ---------------------------------------------------------------------- */
 function adminEpostaKutusunuAc({ id, email, isim }) {
   const kutu = document.getElementById("admin-eposta-degistir-kutu");
   const form = document.getElementById("admin-eposta-degistir-form");
   const msg = document.getElementById("admin-eposta-message");
-  const spamNotice = document.getElementById("admin-eposta-spam-notice");
   if (!kutu) return;
 
   document.getElementById("admin-eposta-hedef-isim").textContent = `${isim} (${email})`;
   document.getElementById("admin-eposta-hedef-id").value = id;
   document.getElementById("admin-eposta-yeni").value = "";
   if (msg) msg.hidden = true;
-  if (spamNotice) spamNotice.hidden = true;
   kutu.hidden = false;
   kutu.scrollIntoView({ behavior: "smooth", block: "center" });
   document.getElementById("admin-eposta-yeni")?.focus();
@@ -258,7 +257,6 @@ function wireAdminEmailChange() {
   const iptalBtn = document.getElementById("admin-eposta-degistir-iptal-btn");
   const kutu = document.getElementById("admin-eposta-degistir-kutu");
   const msg = document.getElementById("admin-eposta-message");
-  const spamNotice = document.getElementById("admin-eposta-spam-notice");
   if (!form) return;
 
   iptalBtn?.addEventListener("click", () => {
@@ -271,7 +269,6 @@ function wireAdminEmailChange() {
     const hedefId = document.getElementById("admin-eposta-hedef-id").value;
     const yeniEposta = document.getElementById("admin-eposta-yeni").value.trim();
 
-    if (spamNotice) spamNotice.hidden = true;
     if (msg) msg.hidden = true;
 
     if (!yeniEposta) {
@@ -298,13 +295,12 @@ function wireAdminEmailChange() {
 
       showMessage(
         msg,
-        `${yeniEposta} adresine bir onay maili/kodu gönderildi. Kullanıcı linke tıklayınca (ya da hesap-onayla.html üzerinden gelen kodu girince) e-postası güncellenmiş olacak. Eski adresine bir şey gitmedi.`,
+        `E-postası güncellendi: ${yeniEposta}. Hiçbir mail gönderilmedi — değişiklik anında uygulandı. Kullanıcı bir sonraki girişte yeni adresini kullanmalı.`,
         "success"
       );
-      showSpamNotice(spamNotice);
 
       const kullanici = TUM_KULLANICILAR.find((u) => u.id === hedefId);
-      if (kullanici) kullanici.email = yeniEposta; // arayüzde geçici olarak güncelle; kesin durum kullanıcı onaylayınca DB'de yansır
+      if (kullanici) kullanici.email = yeniEposta; // arayüzde de yansıt — değişiklik zaten kesinleşti (mail beklemiyor)
     } catch (err) {
       // fetch() Safari'de ağ/CORS hatalarında "Load failed", Chrome'da
       // "Failed to fetch" mesajıyla TypeError fırlatır — bu durumda istek
