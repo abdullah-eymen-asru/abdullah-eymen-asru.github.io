@@ -1,5 +1,5 @@
 /*
- * assets/js/panel.js — /panel.html
+ * assets/js/panel.js — /panel/panel.html
  * Profil görüntüleme (salt bilgi), şifre değiştirme, 2FA (TOTP) kurulumu,
  * KVKK onay durumu/yeniden onay, "Hesabımı Sil" ve kullanıcıya atanmış
  * özel içeriklerin listesi (okundu durumu + son geçerlilik tarihiyle).
@@ -116,7 +116,7 @@ function wireKvkk(profile) {
     <label style="display:flex; gap:8px; align-items:flex-start; margin:10px 0;">
       <input type="checkbox" id="kvkk-checkbox" style="margin-top:3px;">
       <span>
-        <a href="/gizlilik-politikasi.html" target="_blank">KVKK Aydınlatma Metni ve Gizlilik Politikası</a>'nı
+        <a href="/kurumsal/gizlilik-politikasi.html" target="_blank">KVKK Aydınlatma Metni ve Gizlilik Politikası</a>'nı
         okudum, kişisel verilerimin belirtilen şekilde işlenmesine açık rıza gösteriyorum.
       </span>
     </label>
@@ -438,7 +438,7 @@ async function loadOzelIcerikler() {
         ? `<span class="muted"> · Erişim sonu: ${new Date(erisim.son_gecerlilik_tarihi).toLocaleDateString("tr-TR")}</span>`
         : "";
       return `
-      <a class="post-card" href="/ozel-icerik.html?id=${encodeURIComponent(item.id)}">
+      <a class="post-card" href="/panel/ozel-icerik.html?id=${encodeURIComponent(item.id)}">
         <h3>${escapeHtml(item.title)}</h3>
         <p class="meta">${new Date(item.created_at).toLocaleDateString("tr-TR")} · ${okunduEtiketi}${sonGecerlilik}</p>
         <p>${escapeHtml(item.summary ?? "")}</p>
