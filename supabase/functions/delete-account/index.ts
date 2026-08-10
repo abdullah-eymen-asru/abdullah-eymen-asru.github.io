@@ -28,11 +28,21 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 // CORS: sadece kendi sitenin domainlerinden çağrılabilsin.
-// Kendi domainlerinle güncelle.
+// admin-change-email/index.ts ile AYNI listeyi kullan — domain
+// değiştirirsen ikisini birlikte güncellemeyi unutma.
+//
+// ÖNEMLİ: Buradaki listede OLMAYAN bir adresten (ör. kendi özel domainin,
+// "www." önekli/eksiz farklı bir varyant, ya da Cloudflare Pages'in
+// otomatik ürettiği bir preview URL'i) siteyi açıp bu fonksiyonu
+// çağırırsan, tarayıcıda "Load failed" / "Failed to fetch" hatası alırsın
+// — fonksiyon çalışır ama tarayıcı yanıtı CORS nedeniyle bloklar. Siteni
+// hangi adres(ler)den yayınlıyorsan HEPSİNİ buraya ekle.
 const ALLOWED_ORIGINS = [
   "https://abdullah-eymen-asru.pages.dev",
   "https://abdullah-eymen-asru.github.io",
   "http://localhost:4000", // yerel Jekyll geliştirme
+  // "https://kendi-domainim.com",   // özel domain kullanıyorsan yorumdan çıkar
+  // "https://www.kendi-domainim.com",
 ];
 
 function corsHeaders(origin: string | null) {
