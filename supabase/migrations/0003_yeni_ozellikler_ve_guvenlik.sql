@@ -1,4 +1,3 @@
- 
 -- 0003_yeni_ozellikler_ve_guvenlik.sql
 -- Abdullah Eymen Asru — Kalan Security Advisor uyarılarının giderilmesi +
 -- yeni özellikler (KVKK onayı, okundu bilgisi + otomatik silinme, admin
@@ -8,6 +7,17 @@
 -- 0001 ve 0002'yi DEĞİŞTİRMİYORUZ, üzerine ek yapıyoruz — o ikisini tekrar
 -- çalıştırmana gerek yok, sadece bunu çalıştır (sırayla: önce 0001, sonra
 -- 0002 hiç çalıştırmadıysan onları da çalıştırman gerekir).
+--
+-- DÜZELTME NOTU (bu dosyanın bu sürümünde): profiles tablosunda
+-- avatar_url/bio kolonları BİLEREK kaldırılmıştı (özellik olarak
+-- kullanılmıyor). Önceki sürümde bu dosya hâlâ "comment on column
+-- ...avatar_url/bio" ve handle_new_user() içinde "insert into
+-- profiles(..., avatar_url, ...)" satırları içeriyordu — kolonlar
+-- olmadığı için bu, 0001/0002'yi tekrar çalıştırdıktan sonra
+-- "column avatar_url does not exist" hatasına yol açıyordu (0001'deki
+-- CREATE TABLE IF NOT EXISTS, var olan tabloyu değiştirmediği için
+-- kolonlar geri gelmiyor). Bu sürümde o iki nokta düzeltildi, dosyanın
+-- geri kalanı DEĞİŞMEDİ.
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -37,26 +47,18 @@
 -- ----------------------------------------------------------------------------
 
 -- ----------------------------------------------------------------------------
--- 1) PROFİL FOTOĞRAFI VE "HAKKIMDA" KUTUSUNU KALDIRMA
---    İstek: panelde profil fotoğrafı yükleme olmasın (Supabase Storage
---    kullanmasın) ve "Hakkımda" düzenleme alanı olmasın (bu zaten site
---    genelinde site_settings.hakkimda_md üzerinden admin panelinden
---    yönetiliyordu — kullanıcı PROFİLİNDEKİ kişisel "bio" alanını
---    kastediyor, onu kaldırıyoruz). Kolonları SİLMİYORUZ (geriye dönük
---    veri kaybı olmasın diye) — sadece frontend'in artık onları
---    yazmadığından/okumadığından emin oluyoruz (bkz. panel.js, panel.md).
---    Var olan avatar_url / bio verisi DB'de durmaya devam eder, sadece
---    yeni panel arayüzünde düzenleme/yükleme YOK.
+-- 1) PROFİL FOTOĞRAFI VE "HAKKIMDA" KUTUSU
+--    Bu özellikler BİLEREK kaldırıldı: profiles.avatar_url ve
+--    profiles.bio kolonları artık tabloda YOK (Supabase Storage tabanlı
+--    avatar yükleme ve kişisel "bio" alanı kullanılmıyor). Site geneli
+--    "Hakkımda" metni site_settings.hakkimda_md üzerinden admin panelinden
+--    yönetilmeye devam ediyor — o farklı bir alan, buna dokunmuyoruz.
+--
+--    'avatarlar' bucket'ı ve politikaları artık frontend tarafından
+--    kullanılmıyor. Bucket'ı SİLMİYORUZ (elle silmek istersen Dashboard >
+--    Storage'dan yapabilirsin) ama yeni dosya yüklenmesin diye insert/update
+--    politikalarını kaldırıp bucket'ı salt-okunur (sadece admin) bırakıyoruz.
 -- ----------------------------------------------------------------------------
-comment on column public.profiles.avatar_url is
-  'ARTIK PANELDEN YÜKLENEMİYOR (Supabase Storage kullanılmaması istendi). Eski veriler durabilir, yeni yükleme akışı kaldırıldı.';
-comment on column public.profiles.bio is
-  'ARTIK PANELDEN DÜZENLENEMİYOR. Site geneli "Hakkımda" metni site_settings.hakkimda_md üzerinden yönetilir.';
-
--- 'avatarlar' bucket'ı ve politikaları artık frontend tarafından
--- kullanılmıyor. Bucket'ı SİLMİYORUZ (elle silmek istersen Dashboard >
--- Storage'dan yapabilirsin) ama yeni dosya yüklenmesin diye insert/update
--- politikalarını kaldırıp bucket'ı salt-okunur (sadece admin) bırakıyoruz.
 drop policy if exists "avatar_write_own" on storage.objects;
 drop policy if exists "avatar_update_own" on storage.objects;
 drop policy if exists "avatar_delete_own" on storage.objects;
@@ -100,6 +102,7 @@ comment on column public.profiles.kvkk_onay_versiyonu is
 -- güncelliyoruz. Kayıt formu artık signUp() çağrısına
 -- options.data = { full_name, kvkk_onay: true, kvkk_versiyon: "..." }
 -- gönderiyor (bkz. auth-pages.js).
+-- NOT: avatar_url kolonu artık yok, bu yüzden insert listesinde YOK.
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -108,14 +111,13 @@ set search_path = public
 as $$
 begin
   insert into public.profiles (
-    id, email, full_name, avatar_url, role,
+    id, email, full_name, role,
     kvkk_onay_verildi, kvkk_onay_tarihi, kvkk_onay_versiyonu
   )
   values (
     new.id,
     new.email,
     coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name'),
-    new.raw_user_meta_data->>'avatar_url',
     'user',
     coalesce((new.raw_user_meta_data->>'kvkk_onay')::boolean, false),
     case when coalesce((new.raw_user_meta_data->>'kvkk_onay')::boolean, false)
