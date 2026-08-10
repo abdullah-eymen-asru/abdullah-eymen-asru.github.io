@@ -9,8 +9,8 @@
  * atıyordu, kafa karıştırıcıydı) ve "Kayıt Ol" linki hiç nav'da yoktu.
  * Şimdi tek bir buton var, durumuna göre içeriği değişiyor:
  *
- *   - Çıkış yapmışken:  "Giriş Yap"  -> doğrudan /giris.html (kayıt ol linki
- *                        o sayfanın içinde zaten var, bkz. giris.md)
+ *   - Çıkış yapmışken:  "Giriş Yap"  -> doğrudan /hesap/giris.html (kayıt ol
+ *                        linki o sayfanın içinde zaten var, bkz. hesap/giris.md)
  *   - Giriş yapmışken:  "Hesabım ▾" -> tıklanınca küçük bir menü açılır:
  *                        Panelim, (adminse) Admin Paneli, (adminse) GitHub
  *                        İçerik Yönetimi, Çıkış Yap
@@ -70,7 +70,7 @@ function relUrl(path) {
 
 function renderGirisLinki(container) {
   const a = document.createElement("a");
-  a.href = relUrl("/giris.html");
+  a.href = relUrl("/hesap/giris.html");
   a.textContent = "Giriş Yap";
   if (window.location.pathname.includes("giris") || window.location.pathname.includes("kayit")) {
     a.className = "active";
@@ -94,15 +94,15 @@ function renderHesapMenusu(container, role) {
   menu.setAttribute("role", "menu");
   menu.hidden = true;
 
-  const linkler = [{ href: "/panel.html", etiket: "Panelim" }];
+  const linkler = [{ href: "/panel/panel.html", etiket: "Panelim" }];
   if (role === "admin") {
-    linkler.push({ href: "/admin.html", etiket: "Admin Paneli" });
+    linkler.push({ href: "/panel/admin.html", etiket: "Admin Paneli" });
     // GitHub Pages'in kendi statik içeriğini (blog/proje yazıları, profil
     // fotoğrafı) yönetmek için ayrı, bağımsız bir sayfa — bkz.
-    // github-yonetim.md / assets/js/github-yonetim.js. Supabase admin
+    // panel/github-yonetim.md / assets/js/github-yonetim.js. Supabase admin
     // panelinin hemen altında görünsün diye buraya, "Admin Paneli"
     // linkinden sonra eklendi.
-    linkler.push({ href: "/github-yonetim.html", etiket: "GitHub İçerik Yönetimi" });
+    linkler.push({ href: "/panel/github-yonetim.html", etiket: "GitHub İçerik Yönetimi" });
   }
 
   linkler.forEach(({ href, etiket }) => {
