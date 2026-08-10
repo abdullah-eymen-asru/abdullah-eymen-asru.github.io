@@ -9,7 +9,7 @@
  * genelindeki "Hakkımda" metninin sadece admin panelinden yönetilmesi
  * istendiği için). Ad Soyad hâlâ düzenlenebilir.
  */
-import { supabase, showMessage, escapeHtml, KVKK_METIN_SURUMU } from "./supabase-client.js";
+import { supabase, showMessage, showSpamNotice, escapeHtml, KVKK_METIN_SURUMU } from "./supabase-client.js";
 import { requireAuth } from "./auth-guard.js";
 import { wireUserChat } from "./chat.js";
 
@@ -23,6 +23,7 @@ async function init() {
 
   renderProfile(profile);
   wireProfileForm(profile);
+  wireEmailChange(profile);
   wirePasswordChange();
   wireDeleteAccount(session, profile);
   wireKvkk(profile);
@@ -60,6 +61,64 @@ function wireProfileForm(profile) {
       return;
     }
     showMessage(msg, "Profil güncellendi.", "success");
+  });
+}
+
+/* ---------------------------------------------------------------------- */
+/* E-POSTA DEĞİŞTİR                                                        */
+/* Hem e-posta/şifreyle hem Google ile kayıt olmuş kullanıcılar için aynı  */
+/* şekilde çalışır: supabase.auth.updateUser({ email }) çağrıldığında      */
+/* Supabase varsayılan olarak YENİ adrese bir onay linki gönderir; kadın   */
+/* giriş e-postası, kullanıcı o linke tıklayana kadar DEĞİŞMEZ. (Dashboard */
+/* > Authentication > Email > "Secure email change" açıksa eski adrese de */
+/* ayrıca bir onay maili gider — bkz. README, "Çift Onaylı E-posta         */
+/* Değişikliği" bölümü.)                                                   */
+/* ---------------------------------------------------------------------- */
+function wireEmailChange(profile) {
+  const form = document.getElementById("eposta-degistir-form");
+  const msg = document.getElementById("eposta-message");
+  const spamNotice = document.getElementById("eposta-spam-notice");
+  if (!form) return;
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const yeniEposta = form.yeni_eposta.value.trim();
+
+    if (spamNotice) spamNotice.hidden = true;
+
+    if (!yeniEposta) {
+      showMessage(msg, "Yeni e-posta adresini gir.");
+      return;
+    }
+    if (yeniEposta.toLowerCase() === profile.email?.toLowerCase()) {
+      showMessage(msg, "Bu zaten kayıtlı e-posta adresin.");
+      return;
+    }
+
+    submitBtn.disabled = true;
+    const { error } = await supabase.auth.updateUser(
+      { email: yeniEposta },
+      { emailRedirectTo: `${window.location.origin}/hesap/giris.html` }
+    );
+    submitBtn.disabled = false;
+
+    if (error) {
+      if (error.message.includes("already registered") || error.message.includes("already been registered")) {
+        showMessage(msg, "Bu e-posta zaten başka bir hesapta kayıtlı.");
+      } else {
+        showMessage(msg, "E-posta değiştirilemedi: " + error.message);
+      }
+      return;
+    }
+
+    showMessage(
+      msg,
+      `${yeniEposta} adresine bir onay linki gönderdik. Linke tıklayana kadar giriş e-postan (${profile.email}) değişmeden kalır.`,
+      "success"
+    );
+    showSpamNotice(spamNotice);
+    form.reset();
   });
 }
 
