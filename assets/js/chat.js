@@ -11,8 +11,8 @@
  * RLS bunu zaten güvenli hale getiriyor; burada sadece UI var.
  *
  * Bu dosya İKİ farklı sayfa için kullanılıyor:
- *   - wireUserChat()  -> panel.md (normal/özel üye, tek konuşma kutusu)
- *   - wireAdminChat() -> admin.md (konuşma listesi + seçilen konuşma)
+ *   - wireUserChat()  -> panel/panel.md (normal/özel üye, tek konuşma kutusu)
+ *   - wireAdminChat() -> panel/admin.md (konuşma listesi + seçilen konuşma)
  */
 import { supabase, escapeHtml, showMessage } from "./supabase-client.js";
 
@@ -55,7 +55,7 @@ function mesajListesiniCiz(listEl, mesajlar, benimId) {
 }
 
 /* ---------------------------------------------------------------------- */
-/* ÜYE TARAFI — panel.md içindeki tek konuşma kutusu                      */
+/* ÜYE TARAFI — panel/panel.md içindeki tek konuşma kutusu                 */
 /* ---------------------------------------------------------------------- */
 export async function wireUserChat(profile) {
   const box = document.getElementById("chat-kullanici");
@@ -118,7 +118,7 @@ export async function wireUserChat(profile) {
 }
 
 /* ---------------------------------------------------------------------- */
-/* ADMİN TARAFI — admin.md içindeki konuşma listesi + seçili konuşma      */
+/* ADMİN TARAFI — panel/admin.md içindeki konuşma listesi + seçili konuşma */
 /* ---------------------------------------------------------------------- */
 export async function wireAdminChat(adminId) {
   const wrap = document.getElementById("chat-admin");
