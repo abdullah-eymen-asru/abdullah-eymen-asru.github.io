@@ -2,6 +2,7 @@
 layout: default
 title: "Özel İçerik"
 yayinda: true
+permalink: "/panel/ozel-icerik.html"
 ---
 
 <link rel="stylesheet" href="{{ '/assets/css/auth.css' | relative_url }}">
@@ -24,7 +25,7 @@ yayinda: true
     <p class="muted" style="margin-top:6px;">Bu dosya boyutu nedeniyle harici bir depolama alanında (Cloudflare R2) barındırılıyor.</p>
   </div>
 
-  <p style="margin-top:32px;"><a href="{{ '/panel.html' | relative_url }}">&larr; Panelime dön</a></p>
+  <p style="margin-top:32px;"><a href="{{ '/panel/panel.html' | relative_url }}">&larr; Panelime dön</a></p>
 </div>
 
 <script type="module" src="{{ '/assets/js/ozel-icerik.js' | relative_url }}"></script>
