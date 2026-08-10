@@ -24,7 +24,6 @@ async function init() {
   renderProfile(profile);
   wireProfileForm(profile);
   wireEmailChange(profile);
-  wireAdminBaslatilanEpostaKodOnay(profile);
   wirePasswordChange();
   wireDeleteAccount(session, profile);
   wireKvkk(profile);
@@ -203,61 +202,6 @@ function wireEmailChange(profile) {
         "success"
       );
     });
-  });
-}
-
-/* ---------------------------------------------------------------------- */
-/* "EPOSTA-YARDIM" KUTUSUNDAKİ KOD FORMU — admin panelinden BAŞLATILAN     */
-/* (tek onaylı, sadece yeni adrese) e-posta değişikliğini kullanıcının     */
-/* kendisinin kod ile tamamlayabilmesi için. YUKARIDAKİ wireEmailChange()  */
-/* formundan BİLİNÇLİ OLARAK bağımsızdır: o form sadece kullanıcının       */
-/* KENDİ başlattığı istekten hemen sonra (aynı sayfa oturumunda,           */
-/* bekleyenYeniEposta değişkeni doluyken) çalışır — admin'in başlattığı    */
-/* bir değişiklik için kullanıcı panele muhtemelen SONRADAN, farklı bir    */
-/* ziyarette döner ve o değişken artık boştur. Bu yüzden burada e-posta    */
-/* adresini kullanıcıdan tekrar SORUYORUZ ("Yöneticiye bildirdiğin yeni    */
-/* e-posta") ve doğrudan verifyOtp({ type: "email_change" }) çağırıyoruz — */
-/* "eski adres" alanı yok çünkü admin akışında eski adrese hiçbir şey      */
-/* gitmiyor, doğrulanacak tek taraf bu.                                    */
-/* ---------------------------------------------------------------------- */
-function wireAdminBaslatilanEpostaKodOnay(profile) {
-  const form = document.getElementById("eposta-admin-kod-form");
-  const msg = document.getElementById("eposta-admin-kod-message");
-  if (!form) return;
-
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const submitBtn = form.querySelector('button[type="submit"]');
-    const yeniEposta = document.getElementById("eposta-admin-kod-yeni-eposta").value.trim();
-    const kod = document.getElementById("eposta-admin-kod-kod").value.trim();
-
-    if (!yeniEposta || !kod) {
-      showMessage(msg, "Hem yeni e-postanı hem de mailde gelen kodu gir.");
-      return;
-    }
-
-    submitBtn.disabled = true;
-    const { error } = await supabase.auth.verifyOtp({
-      email: yeniEposta,
-      token: kod,
-      type: "email_change",
-    });
-    submitBtn.disabled = false;
-
-    if (error) {
-      showMessage(msg, "Kod doğrulanamadı: " + turkceOtpHatasi(error.message));
-      return;
-    }
-
-    showMessage(
-      msg,
-      "E-posta adresin güncellendi! Bir sonraki girişte yeni adresini kullan.",
-      "success"
-    );
-    form.reset();
-    // Üstteki başlıktaki e-posta gösterimi güncel kalsın diye sayfayı
-    // kısa bir gecikmeyle yeniliyoruz (requireAuth() taze profili çeker).
-    setTimeout(() => window.location.reload(), 1500);
   });
 }
 
