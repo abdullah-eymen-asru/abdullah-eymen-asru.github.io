@@ -59,8 +59,8 @@ collections:
 # "Zamanlanmış ve gizli yazılar" bölümü) gelecek tarihli olsa da HTML
 # sayfaları build edilmeye devam etmeli — yoksa gizli önizleme linki hiç
 # çalışmaz, çünkü linkin gideceği sayfa var olmaz. Görünürlük (listede
-# çıkıp çıkmaması, RSS/sitemap'e girip girmemesi) bunun yerine blog.md,
-# akademik-projeler.md ve feed/sitemap ayarları tarafında front-matter'daki
+# çıkıp çıkmaması, RSS/sitemap'e girip girmemesi) bunun yerine icerik/blog.md,
+# icerik/akademik-projeler.md ve feed/sitemap ayarları tarafında front-matter'daki
 # "yayinda: false" alanına bakılarak ELLE filtreleniyor. Jekyll'in kendi
 # "published: false" alanı KASITLI OLARAK kullanılmıyor — o alan sayfayı
 # build'den TAMAMEN çıkarır, gizli önizleme linkinin çalışması için sayfanın
