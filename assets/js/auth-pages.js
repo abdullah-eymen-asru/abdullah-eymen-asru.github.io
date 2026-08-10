@@ -164,6 +164,52 @@ export function initSifremiUnuttumPage() {
 export function initSifreGuncellePage() {
   const form = document.getElementById("sifre-guncelle-form");
   const msg = document.getElementById("auth-message");
+  const expiredBox = document.getElementById("auth-expired");
+  // "let" ile önceden tanımlıyoruz: suresiDolmusEkraniGoster() aşağıdaki
+  // onAuthStateChange kaydından ÖNCE (hash'te error varsa) çağrılabiliyor;
+  // "const" kullansaydık bu erken çağrıda TDZ (temporal dead zone) hatası
+  // alırdık.
+  let authListener;
+
+  function suresiDolmusEkraniGoster() {
+    authListener?.subscription?.unsubscribe();
+    if (form) form.hidden = true;
+    if (expiredBox) expiredBox.hidden = false;
+    showMessage(
+      msg,
+      "Bu şifre sıfırlama linkinin süresi dolmuş veya link daha önce kullanılmış. Lütfen yeni bir sıfırlama linki iste."
+    );
+  }
+
+  // E-postadaki link süresi dolmuşsa / geçersizse Supabase kullanıcıyı bu
+  // sayfaya "#error=access_denied&error_code=otp_expired&..." hash'iyle
+  // geri gönderir. Bu durumda form hiç işe yaramaz (submit edilince zaten
+  // "Auth session missing!" hatası alınıyordu) — onun yerine direkt yeni
+  // link isteme ekranını gösteriyoruz.
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  if (hashParams.get("error")) {
+    suresiDolmusEkraniGoster();
+    return;
+  }
+
+  // Link geçerliyse detectSessionInUrl sayesinde SDK, URL'deki recovery
+  // token'ını arka planda geçici bir oturuma çeviriyor ve "PASSWORD_RECOVERY"
+  // event'ini tetikliyor. Link bozuk/eski bir formattaysa hiçbir event
+  // gelmeyebilir; bir süre sonra hâlâ oturum yoksa yine süresi dolmuş
+  // ekranını gösteriyoruz (kullanıcı artık sessizce forma yazıp "Auth
+  // session missing!" hatasıyla karşılaşmıyor).
+  let sessionHazir = false;
+  ({ data: authListener } = supabase.auth.onAuthStateChange((event) => {
+    if (event === "PASSWORD_RECOVERY") sessionHazir = true;
+  }));
+
+  setTimeout(async () => {
+    if (sessionHazir) return;
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) suresiDolmusEkraniGoster();
+  }, 2500);
 
   form?.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -188,10 +234,26 @@ export function initSifreGuncellePage() {
     submitBtn.disabled = false;
 
     if (error) {
-      showMessage(msg, "Şifre güncellenemedi: " + error.message);
+      // Link süresi dolmuş/kullanılmışsa updateUser "Auth session missing!"
+      // hatasıyla döner — kullanıcıya ham İngilizce hata yerine anlaşılır
+      // "yeni link iste" ekranını gösteriyoruz.
+      if (error.message.includes("Auth session missing")) {
+        suresiDolmusEkraniGoster();
+      } else {
+        showMessage(msg, "Şifre güncellenemedi: " + error.message);
+      }
       return;
     }
-    showMessage(msg, "Şifren güncellendi! Panele yönlendiriliyorsun...", "success");
+
+    // Şifre başarıyla değiştiğinde, güvenlik amacıyla bu tarayıcı dışındaki
+    // TÜM diğer cihaz/oturumlardan otomatik çıkış yapılır (scope: "others").
+    // Böylece biri hesabı ele geçirmişse şifre değiştirilir değiştirilmez
+    // erişimi kesilir. Bu tarayıcıdaki oturum etkilenmez, kullanıcı panele
+    // yönlendirilmeye devam eder.
+    const { error: signOutError } = await supabase.auth.signOut({ scope: "others" });
+    if (signOutError) console.error("Diğer oturumlardan çıkış yapılamadı:", signOutError);
+
+    showMessage(msg, "Şifren güncellendi! Diğer cihazlardaki oturumların kapatıldı. Panele yönlendiriliyorsun...", "success");
     setTimeout(() => (window.location.href = "/panel/panel.html"), 1500);
   });
 }
