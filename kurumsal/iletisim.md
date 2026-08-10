@@ -1,6 +1,7 @@
 ---
 layout: default
 title: İletişim
+permalink: "/kurumsal/iletisim.html"
 ---
 
 <h1>İletişim</h1>
