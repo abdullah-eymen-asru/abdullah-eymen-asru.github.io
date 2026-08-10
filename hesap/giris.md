@@ -2,6 +2,7 @@
 layout: default
 title: "Giriş Yap"
 yayinda: true
+permalink: "/hesap/giris.html"
 ---
 
 <link rel="stylesheet" href="{{ '/assets/css/auth.css' | relative_url }}">
@@ -28,8 +29,8 @@ yayinda: true
   </form>
 
   <div class="auth-links">
-    <a href="{{ '/kayit.html' | relative_url }}">Hesabın yok mu? Kayıt ol</a>
-    <a href="{{ '/sifremi-unuttum.html' | relative_url }}">Şifremi unuttum</a>
+    <a href="{{ '/hesap/kayit.html' | relative_url }}">Hesabın yok mu? Kayıt ol</a>
+    <a href="{{ '/hesap/sifremi-unuttum.html' | relative_url }}">Şifremi unuttum</a>
   </div>
 </div>
 
