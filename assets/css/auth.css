@@ -225,6 +225,9 @@
 
 .rol-tablo {
   width: 100%;
+  min-width: 640px; /* butonların/son sütunun sıkışıp kırpılmasını önler — dar
+                        ekranlarda .admin-content .rol-tablo-wrap zaten
+                        overflow-x:auto olduğu için yatay kaydırma çıkar */
   border-collapse: collapse;
 }
 .rol-tablo th, .rol-tablo td {
@@ -232,6 +235,15 @@
   padding: 10px 8px;
   border-bottom: 1px solid var(--border);
   font-size: 0.9rem;
+}
+.rol-tablo td:last-child {
+  white-space: nowrap; /* "E-posta Değiştir" + "Sil" butonları yan yana sıkışıp
+                           kelime kırılmasın, hücre gerekirse genişlesin */
+}
+.rol-tablo .eposta-degistir-btn,
+.rol-tablo .uye-sil-btn {
+  display: inline-block;
+  margin-bottom: 4px;
 }
 .rol-durum--ok { color: #1e6b3a; }
 .rol-durum--hata { color: #a13327; }
