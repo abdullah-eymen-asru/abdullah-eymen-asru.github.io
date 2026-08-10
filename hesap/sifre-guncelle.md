@@ -2,6 +2,7 @@
 layout: default
 title: "Şifreni Güncelle"
 yayinda: true
+permalink: "/hesap/sifre-guncelle.html"
 ---
 
 <link rel="stylesheet" href="{{ '/assets/css/auth.css' | relative_url }}">
