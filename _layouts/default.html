@@ -145,11 +145,11 @@
       <a class="brand" href="{{ '/' | relative_url }}">{{ site.title }}</a>
       <nav>
         <a href="{{ '/' | relative_url }}" {% if page.url == '/' or page.url == '/index.html' %}class="active"{% endif %}>Anasayfa</a>
-        <a href="{{ '/blog.html' | relative_url }}" {% if page.url contains 'blog' %}class="active"{% endif %}>Blog</a>
-        <a href="{{ '/iletisim.html' | relative_url }}" {% if page.url contains 'iletisim' %}class="active"{% endif %}>İletişim</a>
-        <a href="{{ '/akademik-projeler.html' | relative_url }}" {% if page.url contains 'akademik-projeler' or page.url contains '/projects/' %}class="active"{% endif %}>Akademik Projeler</a>
-        <a href="{{ '/izlediklerim.html' | relative_url }}" {% if page.url contains 'izlediklerim' %}class="active"{% endif %}>İzlediklerim</a>
-        <a href="{{ '/okuduklarim.html' | relative_url }}" {% if page.url contains 'okuduklarim' %}class="active"{% endif %}>Okuduklarım</a>
+        <a href="{{ '/icerik/blog.html' | relative_url }}" {% if page.url contains 'blog' %}class="active"{% endif %}>Blog</a>
+        <a href="{{ '/kurumsal/iletisim.html' | relative_url }}" {% if page.url contains 'iletisim' %}class="active"{% endif %}>İletişim</a>
+        <a href="{{ '/icerik/akademik-projeler.html' | relative_url }}" {% if page.url contains 'akademik-projeler' or page.url contains '/projects/' %}class="active"{% endif %}>Akademik Projeler</a>
+        <a href="{{ '/icerik/izlediklerim.html' | relative_url }}" {% if page.url contains 'izlediklerim' %}class="active"{% endif %}>İzlediklerim</a>
+        <a href="{{ '/icerik/okuduklarim.html' | relative_url }}" {% if page.url contains 'okuduklarim' %}class="active"{% endif %}>Okuduklarım</a>
         <!--
           HESAP MENÜSÜ: Eskiden burada her zaman ayrı ayrı görünen sabit
           "Giriş" ve "Panelim" linkleri vardı (çıkış yapmışken bile "Panelim"
@@ -161,7 +161,7 @@
           — nav-auth.js çalışır çalışmaz üzerine yazılır.
         -->
         <div id="auth-nav" class="auth-nav">
-          <a href="{{ '/giris.html' | relative_url }}" {% if page.url contains 'giris' or page.url contains 'kayit' %}class="active"{% endif %}>Giriş Yap</a>
+          <a href="{{ '/hesap/giris.html' | relative_url }}" {% if page.url contains 'giris' or page.url contains 'kayit' %}class="active"{% endif %}>Giriş Yap</a>
         </div>
       </nav>
       <button id="theme-toggle" class="theme-toggle" type="button" role="switch" aria-checked="false" aria-label="Koyu temaya geç" title="Koyu / açık tema">
@@ -188,7 +188,7 @@
     <div class="wrap">
       <p>
         &copy; {{ 'now' | date: "%Y" }} {{ site.title }}
-        · <a href="{{ '/gizlilik-politikasi.html' | relative_url }}">Gizlilik Politikası</a>
+        · <a href="{{ '/kurumsal/gizlilik-politikasi.html' | relative_url }}">Gizlilik Politikası</a>
       </p>
     </div>
   </footer>
