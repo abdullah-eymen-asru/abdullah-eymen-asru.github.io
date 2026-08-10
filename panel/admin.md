@@ -2,6 +2,7 @@
 layout: default
 title: "Admin Paneli"
 yayinda: true
+permalink: "/panel/admin.html"
 ---
 
 <link rel="stylesheet" href="{{ '/assets/css/auth.css' | relative_url }}">
@@ -160,7 +161,7 @@ yayinda: true
         </div>
         <button id="admin-kendi-hesap-sil-btn" type="button" class="btn-danger">Hesabımı Kalıcı Olarak Sil</button>
         <div id="admin-kendi-hesap-sil-message" class="auth-message" hidden></div>
-        <p style="margin-top:16px;"><a href="{{ '/panel.html' | relative_url }}">← Panelim sayfasına git (şifre değiştir, 2FA, KVKK)</a></p>
+        <p style="margin-top:16px;"><a href="{{ '/panel/panel.html' | relative_url }}">← Panelim sayfasına git (şifre değiştir, 2FA, KVKK)</a></p>
       </section>
 
     </div>
