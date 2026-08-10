@@ -240,10 +240,19 @@
   white-space: nowrap; /* "E-posta Değiştir" + "Sil" butonları yan yana sıkışıp
                            kelime kırılmasın, hücre gerekirse genişlesin */
 }
-.rol-tablo .eposta-degistir-btn,
-.rol-tablo .uye-sil-btn {
-  display: inline-block;
-  margin-bottom: 4px;
+/* .btn-secondary / .btn-danger genelde width:100% (formlarda tam satır
+   buton) — tablo içindeki küçük aksiyon butonları için bu YANLIŞ, satır
+   içi style="width:auto" ile ezmeye çalışmak yeterince güvenilir değildi
+   (buton alt satıra düşüp görünüm dışına taşıyordu). Bu yüzden ayrı,
+   garantili bir sınıf tanımlıyoruz. */
+.tablo-aksiyon-btn {
+  display: inline-block !important;
+  width: auto !important;
+  padding: 7px 12px !important;
+  font-size: 0.8rem !important;
+  margin: 2px 6px 2px 0 !important;
+  white-space: nowrap;
+  vertical-align: middle;
 }
 .rol-durum--ok { color: #1e6b3a; }
 .rol-durum--hata { color: #a13327; }
@@ -312,6 +321,59 @@
     gap: 6px;
   }
   .admin-nav a { white-space: nowrap; }
+
+  /* Kullanıcı tablosu dar ekranda YATAY KAYDIRMA yerine KART görünümüne
+     geçer — küçük ekranda kaydırarak buton aramak yerine her kullanıcı
+     kendi kartında, tüm bilgi ve butonlar dikey sırayla görünür. Daha
+     "modern" ve dokunmatik ekranda çok daha kolay kullanılır bir yaklaşım. */
+  .rol-tablo-wrap { overflow-x: visible; }
+  .rol-tablo { min-width: 0; }
+  .rol-tablo thead { display: none; }
+  .rol-tablo, .rol-tablo tbody, .rol-tablo tr, .rol-tablo td {
+    display: block;
+    width: 100%;
+  }
+  .rol-tablo tr {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 12px;
+    background: var(--card-bg);
+  }
+  .rol-tablo td {
+    border-bottom: none;
+    padding: 6px 0;
+    white-space: normal !important; /* kart görünümünde nowrap gerekmiyor */
+  }
+  /* Her hücrenin ne olduğunu gösteren küçük etiket — JS her <td>'ye
+     data-label eklemez, bunun yerine sütun sırasına göre CSS ile ekliyoruz. */
+  .rol-tablo td:nth-child(1)::before { content: "Kullanıcı"; }
+  .rol-tablo td:nth-child(2)::before { content: "Kayıt"; }
+  .rol-tablo td:nth-child(3)::before { content: "Rol"; }
+  .rol-tablo td:nth-child(4)::before { content: "KVKK"; }
+  .rol-tablo td:nth-child(1)::before,
+  .rol-tablo td:nth-child(2)::before,
+  .rol-tablo td:nth-child(3)::before,
+  .rol-tablo td:nth-child(4)::before {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--muted);
+    margin-bottom: 2px;
+  }
+  .rol-tablo td:last-child {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border);
+  }
+  .tablo-aksiyon-btn {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 0 8px 0 !important;
+    text-align: center;
+  }
 }
 
 /* Üye arama kutusu ve atama listesi (özel içerik erişimi + son geçerlilik) */
