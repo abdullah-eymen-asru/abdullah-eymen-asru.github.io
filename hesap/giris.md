@@ -32,6 +32,10 @@ permalink: "/hesap/giris.html"
     <a href="{{ '/hesap/kayit.html' | relative_url }}">Hesabın yok mu? Kayıt ol</a>
     <a href="{{ '/hesap/sifremi-unuttum.html' | relative_url }}">Şifremi unuttum</a>
   </div>
+  <div class="auth-links">
+    <a href="{{ '/hesap/hesap-onayla.html' | relative_url }}">Hesabını onaylamadın mı? Kodla onayla</a>
+    <span></span>
+  </div>
 </div>
 
 <script type="module">
