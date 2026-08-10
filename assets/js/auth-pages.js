@@ -4,7 +4,7 @@
  * hesap/sifre-guncelle.html tarafından ortak kullanılan fonksiyonlar. Her
  * sayfa sadece ihtiyacı olan init fonksiyonunu çağırır (aşağıya bkz).
  */
-import { supabase, showMessage, KVKK_METIN_SURUMU } from "./supabase-client.js";
+import { supabase, showMessage, KVKK_METIN_SURUMU, turkceOtpHatasi } from "./supabase-client.js";
 
 const REDIRECT_AFTER_LOGIN = "/panel/panel.html";
 // Google OAuth ve "şifre sıfırlama" e-postası kullanıcıyı bu sayfaya
@@ -64,6 +64,10 @@ export function initKayitPage() {
   const form = document.getElementById("kayit-form");
   const msg = document.getElementById("auth-message");
   const googleBtn = document.getElementById("google-kayit-btn");
+  // "Kod ile onayla" linki: kayıt başarılı olunca bu linkin href'ine
+  // ?email=... ekliyoruz ki hesap-onayla.html açılınca e-posta alanı
+  // otomatik dolu gelsin (kullanıcı tekrar yazmak zorunda kalmasın).
+  const kodOnayLink = document.getElementById("kod-ile-onayla-link");
 
   form?.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -114,9 +118,12 @@ export function initKayitPage() {
 
     showMessage(
       msg,
-      "Kayıt alındı! E-posta adresine gönderdiğimiz doğrulama linkine tıklayıp hesabını aktifleştir.",
+      "Kayıt alındı! E-posta adresine gönderdiğimiz doğrulama linkine tıklayıp hesabını aktifleştir. Linke tıklayamıyorsan aşağıdan kodla da onaylayabilirsin.",
       "success"
     );
+    if (kodOnayLink) {
+      kodOnayLink.href = kodOnayLink.href.split("?")[0] + "?email=" + encodeURIComponent(email);
+    }
     form.reset();
   });
 
@@ -125,6 +132,45 @@ export function initKayitPage() {
       provider: "google",
       options: { redirectTo: `${SITE_ORIGIN}${REDIRECT_AFTER_LOGIN}` },
     });
+  });
+}
+
+/* ---------------------------------------------------------------------- */
+/* HESABI KODLA ONAYLA (hesap/hesap-onayla.html)                          */
+/* Kayıt e-postasındaki linke tıklayamayan kullanıcılar için: e-posta +   */
+/* mailde gelen kodu girerek hesabı doğrudan doğrulama (verifyOtp).       */
+/* ---------------------------------------------------------------------- */
+export function initHesapOnaylaPage() {
+  const form = document.getElementById("hesap-onayla-form");
+  const msg = document.getElementById("auth-message");
+  if (!form) return;
+
+  // Kayıt sayfasından "?email=..." ile gelindiyse e-posta alanını
+  // otomatik dolduruyoruz.
+  const params = new URLSearchParams(window.location.search);
+  const prefillEmail = params.get("email");
+  if (prefillEmail) form.email.value = prefillEmail;
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const email = form.email.value.trim();
+    const token = form.code.value.trim();
+
+    submitBtn.disabled = true;
+    // type: "signup" → bu, kayıt onay maili için üretilen kodun/linkin
+    // doğrulama türüdür. Başarılı olursa hesap doğrulanır VE kullanıcı
+    // otomatik olarak oturum açmış olur (linke tıklamakla aynı sonuç).
+    const { error } = await supabase.auth.verifyOtp({ email, token, type: "signup" });
+    submitBtn.disabled = false;
+
+    if (error) {
+      showMessage(msg, "Hesap onaylanamadı: " + turkceOtpHatasi(error.message));
+      return;
+    }
+
+    showMessage(msg, "Hesabın onaylandı! Panele yönlendiriliyorsun...", "success");
+    setTimeout(() => (window.location.href = REDIRECT_AFTER_LOGIN), 1200);
   });
 }
 
@@ -165,11 +211,18 @@ export function initSifreGuncellePage() {
   const form = document.getElementById("sifre-guncelle-form");
   const msg = document.getElementById("auth-message");
   const expiredBox = document.getElementById("auth-expired");
-  // "let" ile önceden tanımlıyoruz: suresiDolmusEkraniGoster() aşağıdaki
-  // onAuthStateChange kaydından ÖNCE (hash'te error varsa) çağrılabiliyor;
-  // "const" kullansaydık bu erken çağrıda TDZ (temporal dead zone) hatası
+  const otpToggle = document.getElementById("auth-otp-toggle");
+  const otpForm = document.getElementById("auth-otp-form");
+  // İkisini de en başta "let" ile tanımlıyoruz: aşağıda hash'te "error"
+  // varsa fonksiyon erken "return" ediyor — ama otp formu dinleyicileri
+  // (otpForm submit) o return'den ÖNCE bağlandığı için, kullanıcı süresi
+  // dolmuş ekranındayken kodu girip oturumHazirOldu() çağırdığında
+  // sessionHazir'e hâlâ erişebilmesi lazım. Bu değişkenler daha aşağıda
+  // (early return'den SONRA) tanımlansaydı, erken dönüş durumunda hiç
+  // atanmamış olur ve sonraki erişimde TDZ (temporal dead zone) hatası
   // alırdık.
   let authListener;
+  let sessionHazir = false;
 
   function suresiDolmusEkraniGoster() {
     authListener?.subscription?.unsubscribe();
@@ -177,9 +230,47 @@ export function initSifreGuncellePage() {
     if (expiredBox) expiredBox.hidden = false;
     showMessage(
       msg,
-      "Bu şifre sıfırlama linkinin süresi dolmuş veya link daha önce kullanılmış. Lütfen yeni bir sıfırlama linki iste."
+      "Bu şifre sıfırlama linkinin süresi dolmuş veya link daha önce kullanılmış. Aşağıdan yeni link isteyebilir ya da (elindeki kod hâlâ geçerliyse) kodla devam edebilirsin."
     );
   }
+
+  // Link üzerinden VEYA aşağıdaki "kod ile doğrula" formu üzerinden geçici
+  // bir recovery oturumu kurulduğunda ikisi de burayı çağırır: şifre
+  // formunu göster, süresi-dolmuş kutusunu ve kod formunu gizle.
+  function oturumHazirOldu() {
+    sessionHazir = true;
+    if (form) form.hidden = false;
+    if (expiredBox) expiredBox.hidden = true;
+    if (otpForm) otpForm.hidden = true;
+    if (otpToggle) otpToggle.hidden = true;
+  }
+
+  otpToggle?.addEventListener("click", () => {
+    otpForm.hidden = !otpForm.hidden;
+  });
+
+  otpForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const submitBtn = otpForm.querySelector('button[type="submit"]');
+    const email = otpForm.otp_email.value.trim();
+    const token = otpForm.otp_code.value.trim();
+
+    submitBtn.disabled = true;
+    // type: "recovery" → şifre sıfırlama maili için üretilen kod. Bu, aynı
+    // e-postadaki linkin taşıdığı token ile aynı geçerlilik süresine
+    // sahiptir; link süresi dolmuşsa kod da dolmuş olur (ikisi de aynı
+    // "Email OTP expiration" ayarına bağlı).
+    const { error } = await supabase.auth.verifyOtp({ email, token, type: "recovery" });
+    submitBtn.disabled = false;
+
+    if (error) {
+      showMessage(msg, "Kod doğrulanamadı: " + turkceOtpHatasi(error.message));
+      return;
+    }
+
+    showMessage(msg, "Kod doğrulandı! Şimdi yeni şifreni belirleyebilirsin.", "success");
+    oturumHazirOldu();
+  });
 
   // E-postadaki link süresi dolmuşsa / geçersizse Supabase kullanıcıyı bu
   // sayfaya "#error=access_denied&error_code=otp_expired&..." hash'iyle
@@ -198,9 +289,8 @@ export function initSifreGuncellePage() {
   // gelmeyebilir; bir süre sonra hâlâ oturum yoksa yine süresi dolmuş
   // ekranını gösteriyoruz (kullanıcı artık sessizce forma yazıp "Auth
   // session missing!" hatasıyla karşılaşmıyor).
-  let sessionHazir = false;
   ({ data: authListener } = supabase.auth.onAuthStateChange((event) => {
-    if (event === "PASSWORD_RECOVERY") sessionHazir = true;
+    if (event === "PASSWORD_RECOVERY") oturumHazirOldu();
   }));
 
   setTimeout(async () => {
