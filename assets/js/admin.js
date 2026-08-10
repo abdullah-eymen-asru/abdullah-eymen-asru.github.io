@@ -306,7 +306,24 @@ function wireAdminEmailChange() {
       const kullanici = TUM_KULLANICILAR.find((u) => u.id === hedefId);
       if (kullanici) kullanici.email = yeniEposta; // arayüzde geçici olarak güncelle; kesin durum kullanıcı onaylayınca DB'de yansır
     } catch (err) {
-      showMessage(msg, "E-posta değiştirilemedi: " + err.message);
+      // fetch() Safari'de ağ/CORS hatalarında "Load failed", Chrome'da
+      // "Failed to fetch" mesajıyla TypeError fırlatır — bu durumda istek
+      // Edge Function'a HİÇ ULAŞMAMIŞ demektir (fonksiyonun kendi
+      // gövdesindeki hatalar buraya değil, yukarıdaki "body.error" dalına
+      // düşer). En sık nedenler: (1) fonksiyon henüz deploy edilmemiş,
+      // (2) ADMIN_CHANGE_EMAIL_FUNCTION_URL yanlış/eski proje referansını
+      // gösteriyor, (3) sitenin şu anki adresi Edge Function'daki
+      // ALLOWED_ORIGINS listesinde yok. Kullanıcıya (admin'e) genel
+      // "E-posta değiştirilemedi: Load failed" yerine bu üç ihtimali
+      // açıkça anlatıyoruz — bkz. README "admin-change-email 'Load
+      // failed' / CORS Hatası Alıyorum" bölümü.
+      const agHatasiMi = err instanceof TypeError;
+      showMessage(
+        msg,
+        agHatasiMi
+          ? `E-posta değiştirilemedi: sunucuya ulaşılamadı (${err.message}). Olası nedenler: Edge Function henüz deploy edilmemiş olabilir, ya da bu sitenin adresi fonksiyonun izin verilen listesinde olmayabilir (CORS). Bkz. README → "admin-change-email 'Load failed' Hatası Alıyorum".`
+          : "E-posta değiştirilemedi: " + err.message
+      );
     } finally {
       submitBtn.disabled = false;
     }
