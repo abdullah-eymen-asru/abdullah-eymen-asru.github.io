@@ -2,6 +2,7 @@
 layout: default
 title: "GitHub İçerik Yönetimi"
 yayinda: true
+permalink: "/panel/github-yonetim.html"
 ---
 
 <link rel="stylesheet" href="{{ '/assets/css/auth.css' | relative_url }}">
