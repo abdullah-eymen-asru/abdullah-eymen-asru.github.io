@@ -8,7 +8,7 @@
  * RLS politikalarındadır (bkz. migration) — bu script sadece KULLANICI
  * DENEYİMİ için "yetkisiz sayfayı gösterme" katmanıdır.
  *
- * Kullanım (panel.md / admin.md içinde):
+ * Kullanım (panel/panel.md / panel/admin.md içinde):
  *   <body class="auth-guarding">   <!-- CSS ile içerik varsayılan gizli -->
  *     <div id="app" hidden> ... asıl sayfa içeriği ... </div>
  *     <script type="module">
@@ -27,7 +27,7 @@ import { supabase } from "./supabase-client.js";
  *   'admin'         -> sadece admin erişebilir
  * @param {string} opts.redirectTo - yetkisizse gidilecek sayfa
  */
-export async function requireAuth({ role = null, redirectTo = "/giris.html" } = {}) {
+export async function requireAuth({ role = null, redirectTo = "/hesap/giris.html" } = {}) {
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -77,7 +77,7 @@ export async function requireAuth({ role = null, redirectTo = "/giris.html" } = 
 
   if (!roleOk) {
     // Giriş yapmış ama yetkisi yok -> panel sayfasına yolla, giriş sayfasına değil
-    window.location.replace("/panel.html?hata=yetkisiz");
+    window.location.replace("/panel/panel.html?hata=yetkisiz");
     return new Promise(() => {});
   }
 
