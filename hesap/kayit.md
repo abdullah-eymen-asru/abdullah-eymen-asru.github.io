@@ -10,6 +10,7 @@ permalink: "/hesap/kayit.html"
 <div class="auth-box">
   <h1>Kayıt Ol</h1>
   <div id="auth-message" class="auth-message" hidden></div>
+  <div id="auth-spam-notice" class="auth-spam-notice" hidden></div>
 
   <button id="google-kayit-btn" type="button" class="btn-google">
     Google ile Kayıt Ol
