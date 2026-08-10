@@ -33,8 +33,10 @@ permalink: "/panel/admin.html"
           <input id="kullanici-arama" type="search" placeholder="ör. ayse@ornek.com veya Ayşe">
         </div>
         <p class="muted" style="font-size:0.85rem;">
-          Tablo dar ekranlarda yana taşabilir — "E-posta Değiştir" ve "Sil"
-          butonlarını görmek için sağa doğru kaydır (↔).
+          Geniş ekranlarda tablo yana taşarsa "E-posta Değiştir" ve "Sil"
+          butonlarını görmek için sağa doğru kaydır (↔). Telefon gibi dar
+          ekranlarda her kullanıcı otomatik olarak kendi kartında, tüm
+          bilgiler ve butonlarla birlikte görünür.
         </p>
         <div class="rol-tablo-wrap" style="overflow-x:auto;">
         <table class="rol-tablo">
