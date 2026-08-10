@@ -1,6 +1,7 @@
 ---
 layout: default
 title: Blog
+permalink: "/icerik/blog.html"
 ---
 
 <h1>Blog</h1>
