@@ -11,6 +11,7 @@ permalink: "/hesap/hesap-onayla.html"
   <h1>Hesabı Onayla</h1>
   <p class="muted">Kayıt olurken sana gönderdiğimiz mail'deki linke tıklayamadıysan, aynı mailde yer alan kodu buraya girerek hesabını onaylayabilirsin.</p>
   <div id="auth-message" class="auth-message" hidden></div>
+  <div id="auth-spam-notice" class="auth-spam-notice">Maili bulamıyorsan SPAM (Gereksiz/Junk) klasörünü kontrol et.</div>
 
   <form id="hesap-onayla-form" novalidate>
     <div class="form-field">
