@@ -18,6 +18,43 @@ yarıyor, hangi satırı değiştirirsen ne olur.
 
 ---
 
+## 0. Klasör yapısı — sayfalar neden alt klasörlerde?
+
+Kök dizinin GitHub'da (dosya listesinde, commit geçmişinde) karışık
+görünmemesi için tek tek sayfalar (Jekyll'in "pages" dediği `.md`
+dosyaları) konularına göre 4 klasöre ayrılmıştır:
+
+| Klasör | İçerik | Örnek URL |
+|---|---|---|
+| `hesap/` | Giriş, kayıt, şifre sıfırlama akışı | `/hesap/giris.html` |
+| `panel/` | Oturum açmış kullanıcı sayfaları (panel, admin, GitHub içerik yönetimi, özel içerik) | `/panel/panel.html` |
+| `icerik/` | Herkese açık içerik listeleri (blog, akademik projeler, izlediklerim, okuduklarim) | `/icerik/blog.html` |
+| `kurumsal/` | İletişim, gizlilik politikası | `/kurumsal/iletisim.html` |
+
+**Önemli:** Bu, sadece bu sayfaların repo'daki **kaynak dosya konumu**.
+Her sayfanın front-matter'ında (`permalink:` alanı yoksa Jekyll klasör
+yapısından otomatik üretir, buradaki sayfalarda URL klasör adını
+birebir yansıtır — örn. `panel/panel.md` → `/panel/panel.html`) URL'ler
+klasör yapısıyla tutarlıdır. Bir sayfayı bulmak istediğinde: URL'in ilk
+parçası (`/panel/...`, `/hesap/...` vb.) hangi klasörde olduğunu
+doğrudan söyler.
+
+`index.md`, `index-bakim.md`, `_config.yml`, `_headers`, `Gemfile`,
+`README.md`, `robots.txt`, `feed.xml` gibi Jekyll'in kökte durmasını
+beklediği ya da tüm siteyi ilgilendiren dosyalar kökte kalmaya devam
+eder — sadece "tek bir sayfaya ait" `.md` dosyaları klasörlere ayrılmıştır.
+
+**Bir sayfanın URL'ini değiştirmek istersen:** ilgili dosyanın
+front-matter'ındaki `permalink:` satırını değiştirmen yeterli, dosyayı
+taşımana gerek yok. Ama URL'i değiştirirsen, o sayfaya link veren tüm
+yerleri (nav menüsü `_layouts/default.html`, `assets/js/nav-auth.js`,
+`auth-guard.js`, `auth-pages.js` içindeki Supabase redirect URL'leri,
+ilgili diğer `.md` sayfalarındaki iç linkler) da elle güncellemen
+gerekir — aksi halde kırık link veya (giriş/şifre sıfırlama söz konusuysa)
+sessizce çalışmayan bir akış ile karşılaşırsın.
+
+---
+
 ## 1. `_config.yml` — Sitenin ana ayar dosyası
 
 Jekyll build'inde her sayfaya `site.XXX` olarak erişilebilen tüm genel
@@ -62,7 +99,7 @@ Değiştirmek isteyebileceğin tek yer: `Permissions-Policy` satırındaki
 API'lerden birini gerçekten kullanacaksan (örn. bir harita gömersen ve
 konum istersen), ilgili parantezin içine `(self)` yazman gerekir.
 
-## 4. `iletisim.md` — İletişim formu
+## 4. `kurumsal/iletisim.md` — İletişim formu
 
 `src="FORM-EMBED-LINKINI-BURAYA-YAPISTIR"` satırındaki placeholder'ı,
 Google Forms'tan aldığın gerçek embed linkiyle değiştir (Forms'ta
@@ -96,7 +133,7 @@ tanıtım yazını buraya serbest metin olarak yaz.
 ## 8. İçerik ekleme — blog yazıları ve akademik projeler
 
 - **Blog yazısı:** `_posts/` klasörüne `YIL-AY-GUN-baslik.md` formatında
-  yeni bir dosya ekle (örn. `_posts/2026-09-01-yeni-yazi.md`). `blog.md`
+  yeni bir dosya ekle (örn. `_posts/2026-09-01-yeni-yazi.md`). `icerik/blog.md`
   sayfasına hiç dokunmana gerek yok, otomatik listelenir.
 - **Akademik proje:** `_projects/` klasörüne aynı mantıkla yeni bir `.md`
   dosyası ekle (örn. `_projects/2026-yeni-proje.md`). Kullanılabilecek
@@ -146,7 +183,7 @@ permalink: /blog/on-izleme-RASTGELE-BIR-DIZI/
   `yayinda`/`date` mantığını tanımıyor. Yazmazsan sayfa blog listesinde
   görünmez ama sitemap'te görünmeye devam eder.
 - **Görünürlük şartları sağlanmadığı sürece** yazı: blog listesinde
-  (`blog.md`), akademik projeler listesinde (`akademik-projeler.md`) ve
+  (`icerik/blog.md`), akademik projeler listesinde (`icerik/akademik-projeler.md`) ve
   RSS feed'inde (`feed.xml`) **görünmez**. `sitemap: false` de site
   haritasından (sitemap.xml) çıkarır. Arama motorlarına ayrıca `noindex`
   sinyali gönderilir (sayfa ziyaret edilse bile indekslenmez) — bu artık
@@ -205,7 +242,7 @@ permalink: /blog/on-izleme-RASTGELE-BIR-DIZI/
 
 - `_config.yml` → `future: true` — sayfanın gelecek tarihli olsa da
   build edilmesini sağlıyor (linkin çalışabilmesi için şart).
-- `blog.md`, `akademik-projeler.md`, `feed.xml` → listeleme
+- `icerik/blog.md`, `icerik/akademik-projeler.md`, `feed.xml` → listeleme
   döngülerinde `where_exp: "p", "p.yayinda != false" | where_exp: "p", "p.date <= site.time"`
   filtre zinciri — `yayinda` ve `date` şartlarını art arda iki ayrı
   `where_exp` ile kontrol ediyor (GitHub Pages'in kullandığı Liquid
@@ -229,19 +266,19 @@ permalink: /blog/on-izleme-RASTGELE-BIR-DIZI/
 - `.github/workflows/zamanlanmis-yayin.yml` → günlük otomatik Cloudflare
   Pages build tetikleyicisi (yukarıdaki kurulum adımlarına bak).
 
-## 10. `github-yonetim.md` — GitHub Pages için tarayıcı içi içerik yönetim paneli (mini CMS)
+## 10. `panel/github-yonetim.md` — GitHub Pages için tarayıcı içi içerik yönetim paneli (mini CMS)
 
 Bölüm 8 ve 9'da anlatılan işi (yeni `_posts/`/`_projects/` dosyası
 oluşturma, `yayinda`/`sitemap`/`permalink` alanlarını elle yazma) artık
 elle dosya oluşturup GitHub'a push etmeden, doğrudan tarayıcıdan
-yapabileceğin bir panel var: **`/github-yonetim.html`**. Netlify/Decap CMS
+yapabileceğin bir panel var: **`/panel/github-yonetim.html`**. Netlify/Decap CMS
 gibi 3. parti bir servise ihtiyaç duymaz — doğrudan GitHub REST API'sine
 (`contents` endpoint'i) istek atıp commit oluşturur, tamamen GitHub
 Pages'in kendisiyle çalışır.
 
-**Bu panel, sitenin Supabase tabanlı `/admin.html` panelinden TAMAMEN
-BAĞIMSIZDIR.** `/admin.html` Supabase'teki üye/rol/özel içerik sistemini
-yönetir; `/github-yonetim.html` ise bu deponun kendi statik Jekyll
+**Bu panel, sitenin Supabase tabanlı `/panel/admin.html` panelinden TAMAMEN
+BAĞIMSIZDIR.** `/panel/admin.html` Supabase'teki üye/rol/özel içerik sistemini
+yönetir; `/panel/github-yonetim.html` ise bu deponun kendi statik Jekyll
 içeriğini (blog yazıları, akademik projeler, profil fotoğrafı) yönetir.
 Aralarındaki tek ortak nokta: bu sayfaya erişim de aynı
 `requireAuth({ role: 'admin' })` mekanizmasıyla korunur (bkz.
@@ -253,7 +290,7 @@ görünür (bkz. `assets/js/nav-auth.js`).
 ### Paketteki dosyalar
 
 ```
-github-yonetim.md              <- Jekyll sayfası (_layouts/default.html'i kullanır, admin-only)
+panel/github-yonetim.md              <- Jekyll sayfası (_layouts/default.html'i kullanır, admin-only)
 assets/js/github-yonetim.js    <- Panelin tüm mantığı
 assets/css/github-yonetim.css  <- Bu sayfaya özel ek stiller (auth.css'in üzerine eklenir)
 ```
@@ -348,7 +385,7 @@ Panelin üstündeki "GitHub Bağlantısı" sekmesinden şunları girmen gerekir:
   daha güvenlidir.
 - Bu panel de, tıpkı Bölüm 9'daki gibi, sitenin görünürlük mantığına
   (`yayinda`/`date`/`sitemap`) aynen uyar — ürettiği dosyalar mevcut
-  `blog.md`, `akademik-projeler.md`, `feed.xml` ve `sitemap.xml` ile
+  `icerik/blog.md`, `icerik/akademik-projeler.md`, `feed.xml` ve `sitemap.xml` ile
   sorunsuz çalışır.
 
 ---
@@ -389,8 +426,8 @@ ayarı oluşturup `_includes/comments.html` içindeki ilgili
 
 | Dosya | Ne işe yarar |
 |---|---|
-| `assets/js/koleksiyon-tablo.js` | GitHub Projects verisini Worker'dan çekip tabloyu (arama, tür filtresi, sayfalama dahil) oluşturan ortak kod. Hem `izlediklerim.md` hem `okuduklarim.md` bunu kullanıyor. |
-| `izlediklerim.md`, `okuduklarim.md` | Sayfanın kendisi — `koleksiyonTablosuOlustur({...})` çağrısındaki `dataUrl`, `containerId` gibi parametreler hangi projeye (`?project=izleme` / `?project=okuma`) bağlanacağını belirliyor. |
+| `assets/js/koleksiyon-tablo.js` | GitHub Projects verisini Worker'dan çekip tabloyu (arama, tür filtresi, sayfalama dahil) oluşturan ortak kod. Hem `icerik/izlediklerim.md` hem `icerik/okuduklarim.md` bunu kullanıyor. |
+| `icerik/izlediklerim.md`, `icerik/okuduklarim.md` | Sayfanın kendisi — `koleksiyonTablosuOlustur({...})` çağrısındaki `dataUrl`, `containerId` gibi parametreler hangi projeye (`?project=izleme` / `?project=okuma`) bağlanacağını belirliyor. |
 | Sütun sırası/gizlenen sütunlar | Bkz. yukarıdaki bölüm 5 (`cloudflare-worker/worker.js`) — tablonun kendisi değil, worker'ın döndürdüğü veri bu sırayı belirliyor. |
 
 ---
@@ -419,14 +456,14 @@ istersen"), bu menüyü de kaldırman gerekir.
   `connect-src`/`frame-src`/`script-src`'e eklenmesi gerekip gerekmediğine
   bak.
 - **`guvenliLink` fonksiyonu** (`assets/js/koleksiyon-tablo.js` ve
-  `blog.md` içinde, aynı isimle iki ayrı yerde) — GitHub/RSS'ten gelen
+  `icerik/blog.md` içinde, aynı isimle iki ayrı yerde) — GitHub/RSS'ten gelen
   linklerin `http(s)://` ile başladığını ve içinde boşluk/kontrol
   karakteri olmadığını doğruluyor, öyle değilse linki `#`'e çeviriyor.
 - **`escapeHtml` fonksiyonu** — tabloya/listeye basılan her metin
   (başlıklar, alan adları) HTML'e yazılmadan önce buradan geçiyor, bu
   yüzden GitHub tarafında biri kötü niyetli bir field adı/değeri girse
   bile sitede çalışan koda dönüşemiyor.
-- **Substack RSS'i** (`blog.md`) üçüncü parti bir proxy'den
+- **Substack RSS'i** (`icerik/blog.md`) üçüncü parti bir proxy'den
   (`api.allorigins.win`) geçiyor çünkü tarayıcılar farklı bir domain'den
   ham RSS çekmeye (CORS) izin vermiyor. Bu servis kontrolün dışında —
   ileride kendi Worker'ın üzerinden proxy'lemek istersen (daha güvenli
@@ -447,8 +484,8 @@ Sistem şunları sağlıyor:
 - Google OAuth + E-posta/Şifre ile kayıt-giriş, e-posta doğrulama, şifre sıfırlama
 - `user` / `special_user` / `admin` rolleri, veritabanı seviyesinde **RLS** ile korunan
 - Gizli makaleler ve dosyalar (10 saniyelik Signed URL ile indirme)
-- `/panel.html`: profil düzenleme, avatar değiştirme, şifre değiştirme, **Hesabımı Sil**
-- `/admin.html`: kullanıcı rol yönetimi, özel içerik/dosya yükleme + üyelere atama, "Hakkımda" metni düzenleme
+- `/panel/panel.html`: profil düzenleme, avatar değiştirme, şifre değiştirme, **Hesabımı Sil**
+- `/panel/admin.html`: kullanıcı rol yönetimi, özel içerik/dosya yükleme + üyelere atama, "Hakkımda" metni düzenleme
 - Header'daki tek **"Hesabım"** menüsü: çıkış yapmışken "Giriş Yap", giriş
   yapmışken Panelim / (adminse) Admin Paneli / Çıkış Yap seçenekleri
 
@@ -473,13 +510,13 @@ assets/
   js/supabase-client.js                    <- Ortak Supabase istemcisi (URL/KEY burada)
   js/auth-guard.js                         <- Korumalı sayfa mantığı
   js/auth-pages.js                         <- Giriş/Kayıt/Şifre sayfaları mantığı
-  js/panel.js                              <- /panel.html mantığı
-  js/admin.js                              <- /admin.html mantığı
+  js/panel.js                              <- /panel/panel.html mantığı
+  js/admin.js                              <- /panel/admin.html mantığı
   js/ozel-icerik.js                        <- Tekil gizli içerik sayfası
   js/nav-auth.js                           <- Header'daki "Hesabım" menüsü
   css/auth.css                             <- Bu sayfalara özel stiller
-giris.md / kayit.md / sifremi-unuttum.md / sifre-guncelle.md
-panel.md / admin.md / ozel-icerik.md       <- Jekyll sayfaları (_layouts/default.html'i kullanır)
+hesap/giris.md / hesap/kayit.md / hesap/sifremi-unuttum.md / hesap/sifre-guncelle.md
+panel/panel.md / panel/admin.md / panel/ozel-icerik.md       <- Jekyll sayfaları (_layouts/default.html'i kullanır)
 ```
 
 ---
@@ -528,7 +565,7 @@ panel.md / admin.md / ozel-icerik.md       <- Jekyll sayfaları (_layouts/defaul
      ```sql
      update public.profiles set role = 'admin' where email = 'SENIN_EPOSTAN@ornek.com';
      ```
-   - Bundan sonraki tüm rol atamaları `/admin.html` üzerinden yapılabilir.
+   - Bundan sonraki tüm rol atamaları `/panel/admin.html` üzerinden yapılabilir.
 
 ---
 
@@ -590,9 +627,9 @@ olarak giriş yapamıyorsan, sırayla şunları kontrol et:
      olmalı (`https://abdullah-eymen-asru.pages.dev`).
    - **Redirect URLs** listesinde en azından şunlar olmalı:
      ```
-     https://abdullah-eymen-asru.pages.dev/panel.html
-     https://abdullah-eymen-asru.github.io/panel.html
-     http://localhost:4000/panel.html
+     https://abdullah-eymen-asru.pages.dev/panel/panel.html
+     https://abdullah-eymen-asru.github.io/panel/panel.html
+     http://localhost:4000/panel/panel.html
      ```
    Bu liste eksikse OAuth/e-posta linkleri tıklandığında "redirect not
    allowed" hatası alırsın, giriş formu kendisi çalışsa bile.
@@ -647,9 +684,10 @@ kısmından kendi SMTP'ni (ör. Resend, Brevo ücretsiz katmanları) bağlaman
 
 ## Adım 4 — Dosyaları Siteye Kopyala ve Anahtarları Gir
 
-1. `assets/`, `giris.md`, `kayit.md`, `sifremi-unuttum.md`,
-   `sifre-guncelle.md`, `panel.md`, `admin.md`, `ozel-icerik.md`
-   dosyaları zaten repo kökünde — fork'ladıysan bunları olduğu gibi koru.
+1. `assets/`, `hesap/giris.md`, `hesap/kayit.md`, `hesap/sifremi-unuttum.md`,
+   `hesap/sifre-guncelle.md`, `panel/panel.md`, `panel/admin.md`, `panel/ozel-icerik.md`
+   dosyaları zaten kendi klasörlerinde (`hesap/`, `panel/`) hazır geliyor —
+   fork'ladıysan bunları olduğu gibi koru.
 2. `assets/js/supabase-client.js` içindeki iki değeri doldur (Dashboard →
    **Project Settings → API**):
    ```js
@@ -740,7 +778,7 @@ değişiklik yapmana gerek yok**.
 Bu, "gizli dosyayı nasıl göndereceğim" sorusunun cevabı — hazır bir akış
 zaten var, ekstra bir araca gerek yok:
 
-1. `/admin.html` sayfasını aç (sadece admin rolündeki hesap görebilir).
+1. `/panel/admin.html` sayfasını aç (sadece admin rolündeki hesap görebilir).
 2. **"Yeni Özel İçerik / Makale Ekle"** formunu doldur: başlık, özet,
    (istersen) makale metni.
 3. **"Ek Dosya"** alanından dosyayı seç — bu, formu gönderdiğinde otomatik
@@ -752,8 +790,8 @@ zaten var, ekstra bir araca gerek yok:
    satırın sağında isteğe bağlı bir **tarih alanı** var — doldurursan o
    üyenin erişimi seçtiğin tarihte (gün sonunda) otomatik olarak sona
    erer; boş bırakırsan erişim **sınırsızdır**.
-5. **"Yayınla ve Ata"**'ya bas. Seçtiğin kullanıcılar `/panel.html`
-   üzerinden içeriği görüp `/ozel-icerik.html?id=...` sayfasından **"Eki
+5. **"Yayınla ve Ata"**'ya bas. Seçtiğin kullanıcılar `/panel/panel.html`
+   üzerinden içeriği görüp `/panel/ozel-icerik.html?id=...` sayfasından **"Eki
    İndir"** butonuyla indirebilir — bu buton her tıklandığında sadece
    **10 saniye geçerli**, tek seferlik bir Signed URL üretir (bkz.
    `ozel-icerik.js`), yani link kopyalanıp başkasıyla paylaşılsa bile işe
@@ -766,7 +804,7 @@ dosya linkini istediğin zaman değiştirebilirsin — form otomatik olarak
 güncellenir (yeni bir kopya oluşmaz).
 
 **Okundu bilgisi ve son geçerlilik:** Üye, kendisine atanan bir içeriği
-`/ozel-icerik.html` üzerinden açtığı an içerik otomatik "okundu"
+`/panel/ozel-icerik.html` üzerinden açtığı an içerik otomatik "okundu"
 işaretlenir; bu bilgi hem üyenin kendi panelinde hem (istersen)
 `content_access` tablosunda görünür. Bir üyeye tarih verdiysen, o tarih
 geçtiğinde erişimi **anında** kesilir (veritabanı seviyesinde), ilgili
@@ -796,10 +834,10 @@ gerekiyorsa, `0002_guvenlik_sikilastirma.sql` migration'ı ile eklenen
    bucket ayarlarından **"Public access"**'i aç (R2.dev alt domaini verir,
    `https://pub-xxxx.r2.dev/dosya-adi.zip` gibi) — ya da kendi domainini
    bağlayabilirsin (Cloudflare, "custom domain" bağlama seçeneği sunar).
-4. Aldığın linki, `/admin.html`'deki içerik formunda **"50GB gibi çok
+4. Aldığın linki, `/panel/admin.html`'deki içerik formunda **"50GB gibi çok
    büyük dosya için harici link"** alanına yapıştır, "Ek Dosya" alanını
    BOŞ bırak (ikisini aynı anda kullanma).
-5. Kullanıcı `/ozel-icerik.html` sayfasında artık **"Büyük Dosyayı İndir
+5. Kullanıcı `/panel/ozel-icerik.html` sayfasında artık **"Büyük Dosyayı İndir
    (harici bağlantı)"** butonunu görür, tıklayınca doğrudan R2 linkine
    gider.
 
@@ -820,23 +858,23 @@ kurabiliriz.
 
 ## Adım 8 — Test Kontrol Listesi
 
-- [ ] `/kayit.html`'den e-posta ile kayıt ol → doğrulama e-postası geldi mi?
-- [ ] E-postadaki linke tıkla → `/giris.html`'den giriş yapabiliyor musun?
-- [ ] `/giris.html`'de "Google ile Giriş Yap" çalışıyor mu?
-- [ ] `/sifremi-unuttum.html` → e-posta geldi mi → `/sifre-guncelle.html`'de
+- [ ] `/hesap/kayit.html`'den e-posta ile kayıt ol → doğrulama e-postası geldi mi?
+- [ ] E-postadaki linke tıkla → `/hesap/giris.html`'den giriş yapabiliyor musun?
+- [ ] `/hesap/giris.html`'de "Google ile Giriş Yap" çalışıyor mu?
+- [ ] `/hesap/sifremi-unuttum.html` → e-posta geldi mi → `/hesap/sifre-guncelle.html`'de
       yeni şifre belirleyip giriş yapabiliyor musun?
-- [ ] `/panel.html`: profil adı (Ad Soyad) kaydediliyor mu? (Avatar/bio
+- [ ] `/panel/panel.html`: profil adı (Ad Soyad) kaydediliyor mu? (Avatar/bio
       alanları artık YOK — Supabase Storage kullanılmıyor, bkz. 0003 migration.)
 - [ ] Kayıt formunda KVKK onay kutusunu işaretlemeden kayıt olmaya çalış —
-      engellenmeli. İşaretleyip kayıt ol, `/panel.html` → "KVKK Onayı"
+      engellenmeli. İşaretleyip kayıt ol, `/panel/panel.html` → "KVKK Onayı"
       bölümünde onay tarihinin göründüğünü doğrula.
-- [ ] `/panel.html` → "İki Faktörlü Doğrulama" bölümünden 2FA'yı
+- [ ] `/panel/panel.html` → "İki Faktörlü Doğrulama" bölümünden 2FA'yı
       etkinleştir (Google Authenticator ile QR kodu okut, 6 haneli kodu
       doğrula) → tekrar sayfayı aç, "aktif" göründüğünü ve istersen
       kaldırabildiğini doğrula.
 - [ ] Header'daki "Hesabım" menüsü giriş/çıkışa göre doğru içeriği gösteriyor mu?
-- [ ] Kendini admin yaptıktan sonra `/admin.html` açılıyor mu? Normal bir
-      `user` hesabıyla `/admin.html`'e gidince `panel.html?hata=yetkisiz`'e
+- [ ] Kendini admin yaptıktan sonra `/panel/admin.html` açılıyor mu? Normal bir
+      `user` hesabıyla `/panel/admin.html`'e gidince `panel/panel.html?hata=yetkisiz`'e
       yönlendiriliyor musun? (İKİNCİ bir tarayıcı/gizli sekme ile test et.)
 - [ ] Admin panelindeki sol menüden her bölüme tıklayıp doğru alana
       kaydığını (sayfanın tek parça kaydırma olmadığını) doğrula.
@@ -844,9 +882,9 @@ kurabiliriz.
       e-posta yaz, listenin filtrelendiğini doğrula.
 - [ ] Admin panelinden bir kullanıcıyı `special_user` yap, bir özel içerik
       oluştur, o kullanıcıya (isteğe bağlı bir son geçerlilik tarihiyle)
-      ata. O kullanıcıyla giriş yapıp `/panel.html` üzerinden içeriği
+      ata. O kullanıcıyla giriş yapıp `/panel/panel.html` üzerinden içeriği
       görebiliyor musun?
-- [ ] Aynı içeriğin linkini (`/ozel-icerik.html?id=...`) **yetkisi olmayan**
+- [ ] Aynı içeriğin linkini (`/panel/ozel-icerik.html?id=...`) **yetkisi olmayan**
       bir hesapla (veya çıkış yapıp anonim olarak) açmayı dene — "Erişim
       yok" mesajı görmelisin.
 - [ ] Özel içeriği üye hesabıyla aç → panelinde "Okundu" olarak
@@ -859,13 +897,13 @@ kurabiliriz.
       geçmişinden) — artık çalışmamalı.
 - [ ] Harici (Cloudflare R2) link eklediğin bir içerikte "Büyük Dosyayı
       İndir" butonu doğru adrese gidiyor mu?
-- [ ] `/panel.html`'de "Hesabımı Sil" akışını **test hesabıyla** dene:
+- [ ] `/panel/panel.html`'de "Hesabımı Sil" akışını **test hesabıyla** dene:
       onay kutusuna "SİL" yaz → onayla → Supabase Dashboard →
       Authentication → Users listesinde hesabın gerçekten silindiğini
       doğrula.
 - [ ] Admin panelinden **başka bir test üyesini** "Sil" butonuyla sil,
       gerçekten silindiğini doğrula (eski sürümde bu hata veriyordu).
-- [ ] Admin hesabıyla `/admin.html` → "Hesabım" bölümünden **kendi**
+- [ ] Admin hesabıyla `/panel/admin.html` → "Hesabım" bölümünden **kendi**
       admin hesabını silmeyi dene (başka bir admin hesabın olduğundan
       emin olarak test et, yoksa siteyi yönetecek kimse kalmaz).
 - [ ] `supabase functions deploy delete-account` ile güncel Edge
@@ -969,16 +1007,16 @@ Aşağıdaki her blok bağımsızdır — sadece istemediğini sil, geri kalanı
 - `_config.yml` içindeki `giscus:` bloğunu sil
 
 **İletişim formunu kaldırmak istersen:**
-- `iletisim.md` dosyasını sil
+- `kurumsal/iletisim.md` dosyasını sil
 - `_layouts/default.html` içindeki menüde iletişim linkine giden satırı bul ve sil
 
 **İzlediklerim/Okuduklarım (Cloudflare Worker) özelliğini kaldırmak istersen:**
-- `izlediklerim.md` ve `okuduklarim.md` dosyalarını sil
+- `icerik/izlediklerim.md` ve `icerik/okuduklarim.md` dosyalarını sil
 - `_config.yml` içinden `kutuphane_repo`, `izleme_projects_url`, `okuma_projects_url`, `cloudflare_worker_url` satırlarını sil
 - `_layouts/default.html` içindeki menüden bu sayfalara giden linkleri sil
 
 **Akademik projeler / Substack blog bağlantısını kaldırmak istersen:**
-- `akademik-projeler.md` dosyasını sil (ya da içeriğini kendi projelerinle doldur)
+- `icerik/akademik-projeler.md` dosyasını sil (ya da içeriğini kendi projelerinle doldur)
 - `substack_url` / `substack_feed` satırlarını `_config.yml`'den sil
 - `_layouts/default.html` menüsündeki ilgili linki sil
 
@@ -998,8 +1036,8 @@ Aşağıdaki her blok bağımsızdır — sadece istemediğini sil, geri kalanı
 - `_config.yml` içindeki `include: - .well-known` satırını silebilirsin
 
 **Supabase kullanıcı sistemini (kayıt/giriş/panel/admin) kaldırmak istersen:**
-- `giris.md`, `kayit.md`, `sifremi-unuttum.md`, `sifre-guncelle.md`,
-  `panel.md`, `admin.md`, `ozel-icerik.md` dosyalarını sil
+- `hesap/giris.md`, `hesap/kayit.md`, `hesap/sifremi-unuttum.md`, `hesap/sifre-guncelle.md`,
+  `panel/panel.md`, `panel/admin.md`, `panel/ozel-icerik.md` dosyalarını sil
 - `assets/js/supabase-client.js`, `auth-guard.js`, `auth-pages.js`,
   `panel.js`, `admin.js`, `ozel-icerik.js`, `nav-auth.js` ve
   `assets/css/auth.css` dosyalarını sil
