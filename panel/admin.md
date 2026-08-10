@@ -51,18 +51,19 @@ permalink: "/panel/admin.html"
 
         <!-- "E-posta Değiştir" butonuna basılınca renderUserTable() bu alanı
              doldurup gösterir: seçili kullanıcının adı + yeni e-posta formu.
-             Sadece YENİ adrese onay maili/kodu gider, eski adres gerekmez
-             (bkz. admin.js -> wireAdminEmailChange() ve Edge Function
-             admin-change-email). -->
+             E-posta hiçbir mail gönderilmeden ANINDA değişir, eski adres
+             gerekmez (bkz. admin.js -> wireAdminEmailChange() ve Edge
+             Function admin-change-email). -->
         <div id="admin-eposta-degistir-kutu" class="panel-section" hidden style="margin-top:16px; background:var(--bg);">
           <h3 style="margin-top:0;">E-postasını Değiştir: <span id="admin-eposta-hedef-isim"></span></h3>
           <p class="muted">
             Bu, kullanıcının kendi panelinden yaptığı değişiklikten FARKLIDIR:
-            sadece <strong>yeni</strong> adrese bir onay maili/kodu gider, şu
-            anki (eski) adresine hiçbir şey gönderilmez ve eski adrese erişim
-            gerekmez. Bu bölümü SADECE kullanıcı eski mailine erişemediği için
-            seninle iletişime geçtiyse ve kimliğini (ör. panel üzerinden
-            gönderdiği mesajla) doğruladıysan kullan.
+            e-posta <strong>hiçbir mail gönderilmeden, anında</strong> değişir
+            — ne eski ne yeni adrese onay maili gitmez, eski adrese erişim
+            gerekmez. Bu yüzden bu bölümü SADECE kullanıcı eski mailine
+            erişemediği için seninle iletişime geçtiyse ve kimliğini (ör.
+            panel üzerinden gönderdiği mesajla) doğruladıysan kullan — asıl
+            "kimlik doğrulama" adımı burada senin elle yaptığın kontroldür.
           </p>
           <form id="admin-eposta-degistir-form" novalidate>
             <input type="hidden" id="admin-eposta-hedef-id">
@@ -71,11 +72,10 @@ permalink: "/panel/admin.html"
               <input id="admin-eposta-yeni" type="email" autocomplete="off" required>
             </div>
             <div style="display:flex; gap:10px;">
-              <button type="submit" class="btn-primary" style="width:auto;">Onay Maili Gönder</button>
+              <button type="submit" class="btn-primary" style="width:auto;">E-postayı Şimdi Değiştir</button>
               <button type="button" id="admin-eposta-degistir-iptal-btn" class="btn-secondary" style="width:auto;">Vazgeç</button>
             </div>
           </form>
-          <div id="admin-eposta-spam-notice" class="auth-spam-notice" hidden></div>
           <div id="admin-eposta-message" class="auth-message" hidden></div>
         </div>
       </section>
