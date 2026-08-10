@@ -2,6 +2,7 @@
 layout: default
 title: "Panelim"
 yayinda: true
+permalink: "/panel/panel.html"
 ---
 
 <link rel="stylesheet" href="{{ '/assets/css/auth.css' | relative_url }}">
