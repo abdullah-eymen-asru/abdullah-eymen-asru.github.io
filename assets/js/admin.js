@@ -1,5 +1,5 @@
 /*
- * assets/js/admin.js — /admin.html
+ * assets/js/admin.js — /panel/admin.html
  * Sadece role='admin' olan kullanıcılar bu sayfaya girebilir (requireAuth
  * ile zorlanır, RLS ile de veritabanı seviyesinde garanti edilir).
  *
@@ -67,7 +67,7 @@ function wireSectionNav() {
     });
   });
 
-  // Sayfa bir hash ile açıldıysa (ör. admin.html#icerikler) doğrudan oraya git
+  // Sayfa bir hash ile açıldıysa (ör. panel/admin.html#icerikler) doğrudan oraya git
   if (window.location.hash) {
     const link = nav.querySelector(`a[data-section="${window.location.hash.slice(1)}"]`);
     link?.click();
@@ -219,7 +219,7 @@ async function uyeyiSil(userId, email) {
 }
 
 /** Admin, kendi hesabını da (panelim sayfasındaki yolla aynı Edge Function
- * üzerinden) silebilsin diye admin.md içindeki "Hesabım" bölümüne bağlanan
+ * üzerinden) silebilsin diye panel/admin.md içindeki "Hesabım" bölümüne bağlanan
  * ayrı bir buton. */
 function wireCurrentAdminSelfDelete(session) {
   const btn = document.getElementById("admin-kendi-hesap-sil-btn");
