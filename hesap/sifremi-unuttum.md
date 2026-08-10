@@ -11,6 +11,7 @@ permalink: "/hesap/sifremi-unuttum.html"
   <h1>Şifremi Unuttum</h1>
   <p class="muted">E-posta adresini gir, sana bir şifre sıfırlama bağlantısı gönderelim.</p>
   <div id="auth-message" class="auth-message" hidden></div>
+  <div id="auth-spam-notice" class="auth-spam-notice" hidden></div>
 
   <form id="sifremi-unuttum-form" novalidate>
     <div class="form-field">
