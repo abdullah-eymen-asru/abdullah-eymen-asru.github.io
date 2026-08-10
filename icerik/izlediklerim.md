@@ -1,6 +1,7 @@
 ---
 layout: default
 title: İzlediklerim
+permalink: "/icerik/izlediklerim.html"
 ---
 
 <h1>İzlediklerim</h1>
