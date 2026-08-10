@@ -1,6 +1,7 @@
 ---
 layout: default
 title: Akademik Projeler
+permalink: "/icerik/akademik-projeler.html"
 ---
 
 <h1>Akademik Projeler</h1>
