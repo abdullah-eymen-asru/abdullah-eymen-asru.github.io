@@ -1,6 +1,7 @@
 ---
 layout: default
 title: Gizlilik Politikası ve KVKK Aydınlatma Metni
+permalink: "/kurumsal/gizlilik-politikasi.html"
 ---
 
 <h1>Gizlilik Politikası ve KVKK Aydınlatma Metni</h1>
@@ -13,7 +14,7 @@ title: Gizlilik Politikası ve KVKK Aydınlatma Metni
   6698 sayılı Kişisel Verilerin Korunması Kanunu ("<strong>KVKK</strong>")
   uyarınca, bu sitenin sahibi/işleteni olan <strong>Abdullah Eymen Asru</strong>
   veri sorumlusu sıfatıyla hareket etmektedir. Kişisel verilerinize ilişkin
-  sorularınız için <a href="{{ '/iletisim.html' | relative_url }}">iletişim sayfası</a>
+  sorularınız için <a href="{{ '/kurumsal/iletisim.html' | relative_url }}">iletişim sayfası</a>
   üzerinden bana ulaşabilirsiniz.
 </p>
 
@@ -100,7 +101,7 @@ title: Gizlilik Politikası ve KVKK Aydınlatma Metni
     giderilmesini talep etme.</li>
 </ul>
 <p>
-  Bu haklarınızı kullanmak için <a href="{{ '/iletisim.html' | relative_url }}">iletişim sayfası</a>
+  Bu haklarınızı kullanmak için <a href="{{ '/kurumsal/iletisim.html' | relative_url }}">iletişim sayfası</a>
   üzerinden başvurabilir, veya <strong>Panelim</strong> sayfasındaki
   <strong>"Hesabımı Kalıcı Olarak Sil"</strong> seçeneğiyle hesabınızı ve
   tüm ilişkili verilerinizi doğrudan, anında ve kalıcı olarak
@@ -153,7 +154,7 @@ title: Gizlilik Politikası ve KVKK Aydınlatma Metni
 
 <h2>Sorularınız için</h2>
 <p>
-  Bu politika hakkında sorularınız varsa <a href="{{ '/iletisim.html' | relative_url }}">iletişim sayfası</a>
+  Bu politika hakkında sorularınız varsa <a href="{{ '/kurumsal/iletisim.html' | relative_url }}">iletişim sayfası</a>
   üzerinden bana ulaşabilirsiniz.
 </p>
 
