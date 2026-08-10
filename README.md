@@ -829,6 +829,52 @@ bölümündeki "kod ile onayla" formları bu tip için zaten hazır; admin
 tarafından başlatılan bu tek-onaylı değişiklik için de kullanıcı aynı kod
 kutusunu (yeni adres için olanı) kullanabilir.
 
+### "admin-change-email 'Load failed' / CORS Hatası Alıyorum"
+
+Admin panelinde "Onay Maili Gönder"e basınca kırmızı kutuda **"E-posta
+değiştirilemedi: Load failed"** (Safari) veya **"...: Failed to fetch"**
+(Chrome/Edge) görüyorsan, bu istek Edge Function'a **hiç ulaşmadan**
+tarayıcı tarafından engellendiği/başarısız olduğu anlamına gelir — yani
+hata fonksiyonun İÇİNDE değil, fonksiyona ULAŞMADAN ÖNCE oluyor. Sırayla
+kontrol et:
+
+1. **Fonksiyon gerçekten deploy edildi mi?** Dashboard → **Edge Functions**
+   listesinde `admin-change-email` görünüyor mu ve durumu "Deployed" mi?
+   Görünmüyorsa yukarıdaki `supabase functions deploy admin-change-email`
+   komutunu (proje köküne `cd`'lenmiş, `supabase login` yapılmış halde)
+   tekrar çalıştır. Deploy sırasında bir hata çıktıysa (ör. `SUPABASE_URL`
+   env değişkeni tanımsız) terminal çıktısını oku, deploy başarısız olmuş
+   olabilir.
+2. **URL doğru mu?** `assets/js/admin.js` içindeki
+   `ADMIN_CHANGE_EMAIL_FUNCTION_URL` sabiti, Dashboard'daki fonksiyonun
+   gerçek URL'iyle **birebir** eşleşmeli (proje referansı — `https://`
+   ile `.supabase.co` arasındaki rastgele harf/rakam dizisi — dahil).
+   Farklı bir Supabase projesinden kopyalanmış eski bir URL kalmışsa bu
+   hata tam olarak buradan çıkar.
+3. **Sitenin adresi `ALLOWED_ORIGINS` listesinde mi?** (en sık karşılaşılan
+   sebep) `supabase/functions/admin-change-email/index.ts` içindeki
+   `ALLOWED_ORIGINS` dizisi, admin panelini AÇTIĞIN adresin **birebir
+   aynısını** içermeli — protokol (`https://`), `www.` öneki (varsa/yoksa)
+   ve sondaki `/` olmaması dahil tam eşleşmesi gerekir. Örnek: siteyi
+   `https://www.siten.com` üzerinden açıyorsan ama listede sadece
+   `https://siten.com` varsa (başında `www.` yoksa) bu bir CORS engeli
+   olarak sayılır. Listeye eksik olan adresi ekleyip **yeniden deploy et**
+   (`supabase functions deploy admin-change-email`) — dosyayı düzenlemek
+   tek başına yeterli değildir, deploy edilmesi gerekir.
+4. **Tarayıcı konsolunu kontrol et** (F12 / Geliştirici Araçları → Console
+   ve Network sekmesi). Kırmızı bir CORS hatası mesajı (`has been blocked
+   by CORS policy` gibi) görüyorsan bu 3. maddeyi doğrular. `net::ERR_*`
+   ile başlayan bir hata görüyorsan (ör. `ERR_NAME_NOT_RESOLVED`) bu
+   genelde 2. maddedeki URL hatasını doğrular.
+5. **Reklam engelleyici / gizlilik uzantısı** bazı tarayıcı uzantıları
+   `*.supabase.co` gibi adreslere giden istekleri engelleyebilir; farklı
+   bir tarayıcıda/gizli sekmede deneyerek bunu eleyebilirsin.
+
+Bu kontrolleri yaptıktan sonra hâlâ sorun yaşıyorsan, Dashboard →
+**Edge Functions → admin-change-email → Logs** kısmına bak — istek
+fonksiyona ulaştıysa (yani sorun 1-5 değilse) buradaki loglarda gerçek
+hatayı (ör. yetkisiz kullanıcı, geçersiz e-posta biçimi) görürsün.
+
 ---
 
 ## Adım 5b — İki Faktörlü Doğrulama (2FA / TOTP)
