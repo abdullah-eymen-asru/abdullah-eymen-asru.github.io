@@ -19,13 +19,20 @@ export function initGirisPage() {
   const msg = document.getElementById("auth-message");
   const googleBtn = document.getElementById("google-giris-btn");
 
-  // Panelde "E-posta Değiştir" ile gönderilen onay linkine tıklandığında
-  // Supabase kullanıcıyı buraya "#message=...&type=email_change" (veya
-  // benzeri) hash'iyle geri gönderir. detectSessionInUrl bunu arka planda
-  // otomatik işler; burada sadece kullanıcıya "değişti" bilgisini gösteriyoruz.
+  // Panelde "E-posta Değiştir" ile gönderilen onay linklerinden birine
+  // tıklandığında Supabase kullanıcıyı buraya "#message=...&type=email_change"
+  // (veya benzeri) hash'iyle geri gönderir. detectSessionInUrl bunu arka
+  // planda otomatik işler. "Secure email change" açık olduğu için TEK bir
+  // link değişikliği TAMAMLAMAZ — diğer adresteki linkin/kodun da
+  // onaylanması gerekir; o yüzden burada "değişti" değil, "bu adres
+  // onaylandı" diyoruz.
   const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
   if (hashParams.get("type") === "email_change" || hashParams.get("message")?.includes("mail")) {
-    showMessage(msg, "E-posta adresin başarıyla güncellendi. Şimdi giriş yapabilirsin.", "success");
+    showMessage(
+      msg,
+      "Bu e-posta adresi onaylandı. E-posta değişikliğinin tamamlanması için diğer adresine gelen linke de tıklaman (veya panelden kodla onaylaman) gerekiyor.",
+      "success"
+    );
   } else if (hashParams.get("error")) {
     showMessage(msg, "Linkin süresi dolmuş veya geçersiz. Panelden yeni bir onay linki iste.");
   }
