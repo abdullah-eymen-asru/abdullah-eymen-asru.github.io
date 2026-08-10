@@ -490,7 +490,9 @@ Sistem şunları sağlıyor:
 - `/panel/panel.html`: profil düzenleme, **çift onaylı e-posta değiştirme**
   (hem eski hem yeni adrese onay + linkin yanında kod ile onaylama yedeği;
   mail veya Google ile kayıtlı herkes için), şifre değiştirme, **Hesabımı Sil**
-- `/panel/admin.html`: kullanıcı rol yönetimi, özel içerik/dosya yükleme + üyelere atama, "Hakkımda" metni düzenleme
+- `/panel/admin.html`: kullanıcı rol yönetimi, **bir üyenin e-postasını tek
+  onaylı değiştirme** (eski adresine erişimi kalmamış üyeler için), özel
+  içerik/dosya yükleme + üyelere atama, "Hakkımda" metni düzenleme
 - Header'daki tek **"Hesabım"** menüsü: çıkış yapmışken "Giriş Yap", giriş
   yapmışken Panelim / (adminse) Admin Paneli / Çıkış Yap seçenekleri
 
@@ -511,6 +513,7 @@ supabase/
   migrations/0002_guvenlik_sikilastirma.sql <- Adım 1b: SQL Editor'de çalıştır (güvenlik sıkılaştırma + büyük dosya linki)
   migrations/0003_yeni_ozellikler_ve_guvenlik.sql <- Adım 1c: SQL Editor'de çalıştır (KVKK onayı, okundu/son geçerlilik, admin üye silme, arama indeksi, kalan Advisor uyarıları)
   functions/delete-account/index.ts        <- Adım 5: Edge Function (hesap silme — artık admin başkasını da silebiliyor)
+  functions/admin-change-email/index.ts    <- Adım 5c: Edge Function (admin, bir üyenin e-postasını TEK onaylı — sadece yeni adrese — değiştirir)
 assets/
   js/supabase-client.js                    <- Ortak Supabase istemcisi (URL/KEY burada) + showSpamNotice() yardımcısı
   js/auth-guard.js                         <- Korumalı sayfa mantığı
@@ -780,6 +783,54 @@ yoksa admin panelindeki üye silme butonu çalışmaz.
 
 ---
 
+## Adım 5c — `admin-change-email` Edge Function'ını Deploy Et
+
+Bu fonksiyon **zorunludur** eğer admin panelindeki "E-posta Değiştir"
+butonunu kullanacaksan. Kullanıcının kendi panelinden yaptığı e-posta
+değişikliği ("Panelim" → "E-posta Değiştir") **çift onaylıdır** (hem eski
+hem yeni adres onaylanmalı — bkz. yukarıdaki "E-posta Değiştirme Akışı"
+bölümü); bu, eski adresine artık erişimi olmayan bir kullanıcıyı
+kilitleyebilir. Bu fonksiyon, admin panelinden çağrılan **tek onaylı**
+yedek yoldur: sadece **yeni** adrese bir onay maili/kodu gider, eski
+adrese hiçbir şey gitmez ve eski adrese erişim gerekmez. Bunu
+`auth.admin.updateUserById()` (service_role) ile yapıyoruz — bu API,
+client-side `updateUser()`'ın tabi olduğu "Secure email change" kuralına
+tabi DEĞİLDİR.
+
+```bash
+# delete-account'ı zaten deploy ettiysen supabase CLI kurulu ve login'sindir,
+# sadece bu ikinci fonksiyonu deploy etmen yeterli:
+supabase functions deploy admin-change-email
+```
+
+Deploy sonrası Dashboard → **Edge Functions → admin-change-email**
+kısmında görünen URL'i kopyala (`.../functions/v1/admin-change-email`) ve
+`assets/js/admin.js` içindeki `ADMIN_CHANGE_EMAIL_FUNCTION_URL` sabitini
+güncelle (`delete-account` ile aynı Supabase projesindeysen genelde sadece
+fonksiyon adı değişir, `SUPABASE_URL` kısmı aynı kalır).
+
+`supabase/functions/admin-change-email/index.ts` içindeki
+`ALLOWED_ORIGINS` listesini de `delete-account/index.ts` ile **aynı**
+domainlerle güncellemeyi unutma (CORS koruması).
+
+**Nasıl kullanılır:** Admin panelinde "Kullanıcılar & Roller" tablosundaki
+bir üyenin yanındaki **"E-posta Değiştir"** butonuna basınca açılan
+formdan yeni adresi girip **"Onay Maili Gönder"**e basılır. Kullanıcı
+mailindeki linke tıklayınca (veya `/hesap/hesap-onayla.html`'deki gibi bir
+kod akışıyla — bkz. aşağıdaki not) e-postası güncellenmiş olur.
+
+**Not (kod ile onaylama):** Bu fonksiyon `email_confirm` parametresini
+BİLİNÇLİ OLARAK göndermez, bu da Supabase'in normal "Confirm signup"
+davranışına benzer şekilde yeni adrese hem bir link HEM de bir kod
+gönderdiği anlamına gelir. Kullanıcı linke tıklayamıyorsa, aynı kodu
+`supabase.auth.verifyOtp({ email: yeniAdres, token: kod, type:
+"email_change" })` ile doğrulayabilir — panelin kendi "E-posta Değiştir"
+bölümündeki "kod ile onayla" formları bu tip için zaten hazır; admin
+tarafından başlatılan bu tek-onaylı değişiklik için de kullanıcı aynı kod
+kutusunu (yeni adres için olanı) kullanabilir.
+
+---
+
 ## Adım 5b — İki Faktörlü Doğrulama (2FA / TOTP)
 
 Panelim sayfasındaki "İki Faktörlü Doğrulama" bölümü, Supabase Auth'un
@@ -932,6 +983,51 @@ e-posta değiştirmesini engellemek istersen), `panel/panel.md`'deki
 `session.user.app_metadata.provider` kontrolüyle koşullu gizleyebilirsin —
 mevcut kod bunu bilinçli olarak KISITLAMIYOR, herkes değiştirebiliyor.
 
+### Eski Adresine Erişimi Kalmamış Kullanıcılar İçin: Admin'in Tek Onaylı Değişikliği
+
+Yukarıdaki çift onay akışını eski adresine erişemediği için tamamlayamayan
+kullanıcılar için iki parça eklendi:
+
+**1. Kullanıcı tarafı — "Eski Mailime Erişemiyorum" kutusu**
+(`panel/panel.md`, "E-posta Değiştir" bölümünün hemen altında, her zaman
+görünür bir bölüm): kullanıcıya durumu kısaca anlatır ve iki seçenek sunar
+— **"Yöneticiyle Mesajlaş"** (sayfayı zaten var olan "Mesajlar" bölümüne
+kaydırır — `panel/panel.md` içindeki `#chat-kullanici` mesajlaşma kutusu,
+bkz. `assets/js/chat.js` → `wireUserChat()`) veya **"İletişim Formuna
+Git"** (`kurumsal/iletisim.md`'ye, siteye gömülü Google Forms'a yönlendirir).
+Kullanıcı oturum açmış durumda değilse (şifresini de unuttuysa vb.) zaten
+panele giremez — bu durumda tek yol doğrudan `kurumsal/iletisim.html`'den
+ya da sitedeki başka bir iletişim kanalından (bkz. `_config.yml` →
+`social:`) admine ulaşmaktır.
+
+**2. Admin tarafı — Admin panelinde "E-posta Değiştir" butonu**
+(`panel/admin.md`, "Kullanıcılar & Roller" tablosunda her üyenin
+yanında): admin, kullanıcının kimliğini (mesaj/iletişim formu üzerinden)
+doğruladıktan sonra bu butona basar, açılan mini formda yeni adresi girer.
+`assets/js/admin.js` → `wireAdminEmailChange()`, `supabase/functions/
+admin-change-email/index.ts` Edge Function'ını çağırır — bu, `service_role`
+ile `auth.admin.updateUserById()` kullanarak **sadece yeni adrese** bir
+onay maili/kodu gönderir; **eski adrese hiçbir şey gitmez** ve eski adrese
+erişim **gerekmez**. Kullanıcı yeni adresindeki linke tıklayabilir; linke
+erişemiyorsa (farklı cihaz, mail istemcisi sorunu vb.) panelindeki "Eski
+Mailime Erişemiyorum" bölümünün altındaki **"Yönetici benim için bir
+değişiklik başlattı, kodum var"** açılır formuna dönüp yeni e-postasını ve
+mailde gelen kodu girerek de tamamlayabilir (`wireAdminBaslatilanEpostaKodOnay()`
+→ `supabase.auth.verifyOtp({ type: "email_change" })`). Bu form BİLİNÇLİ
+OLARAK yukarıdaki çift-onay formundan ayrıdır — kullanıcının kendi
+başlattığı istekten hemen sonraki oturum durumuna değil, sadece girdiği
+e-posta + koda bağlıdır; kullanıcı panele daha sonra, farklı bir ziyarette
+dönse bile çalışır. Kurulumu için bkz. "Adım 5c" (aşağıda, `delete-account`'ın
+hemen ardından).
+
+**Neden bu ayrım güvenli?** Kullanıcının kendi başına yapabildiği
+değişiklik (panel → "E-posta Değiştir") her zaman ÇİFT onay ister — kimse
+(kullanıcının kendisi dahil, bir saldırgan hesaba girmiş olsa bile) TEK
+onayla e-postayı değiştiremez. Tek onaylı yol SADECE admin'in elle,
+kimlik doğrulaması yaptıktan sonra tetikleyebildiği ayrı bir işlemdir —
+yani "tek onay yeterli" istisnası kullanıcıya değil, güvendiğin bir
+yöneticiye verilmiş oluyor.
+
 ---
 
 ## Gizli Dosya Nasıl Gönderilir? (Admin → Kullanıcıya Özel Dosya Paylaşımı)
@@ -1028,6 +1124,17 @@ kurabiliriz.
       yapabiliyor musun?
 - [ ] Aynı testi "kod ile onayla" yedek yoluyla da dene (linke hiç tıklamadan,
       sadece panel ekranındaki kod formlarını kullanarak).
+- [ ] `/panel/panel.html`'de "Eski Mailime Erişemiyorum" kutusundaki
+      "Yöneticiyle Mesajlaş" linki mesaj bölümüne kaydırıyor mu? "İletişim
+      Formuna Git" linki `/kurumsal/iletisim.html`'e gidiyor mu?
+- [ ] `/panel/admin.html` → "Kullanıcılar & Roller"deki bir üye için
+      "E-posta Değiştir"e bas → yeni adresi gir → SADECE o adrese mail geldi
+      mi (eski adrese hiçbir şey gelmemeli) → linke tıklayınca değişiklik
+      tamamlanıyor mu?
+- [ ] Aynı admin testini kod ile de dene: kullanıcı olarak `/panel/panel.html`'e
+      dön → "Eski Mailime Erişemiyorum" → "Yönetici benim için bir değişiklik
+      başlattı, kodum var" formunu aç → yeni e-postayı ve mailde gelen kodu
+      gir → e-posta güncelleniyor mu, yeni adresle giriş yapabiliyor musun?
 - [ ] `/hesap/giris.html`'de "Google ile Giriş Yap" çalışıyor mu?
 - [ ] `/hesap/sifremi-unuttum.html` → e-posta geldi mi → `/hesap/sifre-guncelle.html`'de
       yeni şifre belirleyip giriş yapabiliyor musun?
