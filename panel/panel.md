@@ -33,17 +33,67 @@ permalink: "/panel/panel.html"
 
     <section class="panel-section">
       <h2>E-posta Değiştir</h2>
-      <p class="muted">Yeni e-posta adresine bir onay linki gönderilir; linke tıklayana kadar
-      giriş e-postan değişmez.</p>
+      <p class="muted">
+        Güvenlik için e-posta değişikliği <strong>çift onaylıdır</strong>: hem şu anki
+        (eski) hem de yeni adresine ayrı ayrı bir onay maili gider ve değişikliğin
+        tamamlanması için <strong>ikisinin de</strong> onaylanması gerekir. Bu sayede
+        hesabına biri izinsiz erişse bile eski adresin sahibi olmadan e-posta
+        değiştirilemez.
+      </p>
       <form id="eposta-degistir-form" novalidate>
         <div class="form-field">
           <label for="yeni_eposta">Yeni E-posta</label>
           <input id="yeni_eposta" name="yeni_eposta" type="email" autocomplete="email" required>
         </div>
-        <button type="submit" class="btn-primary">Onay Linki Gönder</button>
+        <button type="submit" class="btn-primary">Onay Linklerini Gönder</button>
       </form>
       <div id="eposta-spam-notice" class="auth-spam-notice" hidden></div>
       <div id="eposta-message" class="auth-message" hidden></div>
+
+      <!-- İstek gönderildikten sonra initEpostaDegistir() bu alanı doldurup
+           gösterir: hem eski hem yeni adres için ayrı durum satırı + "linke
+           tıklayamıyorsan kodla onayla" formu (yedek yol). -->
+      <div id="eposta-onay-alani" hidden style="margin-top:18px;">
+        <div class="eposta-onay-satiri">
+          <div class="eposta-onay-baslik">
+            <span id="eposta-onay-eski-durum" class="eposta-onay-rozet">Bekleniyor</span>
+            Eski adres (<span id="eposta-onay-eski-adres"></span>)
+          </div>
+          <button type="button" class="btn-secondary eposta-onay-kod-toggle" data-hedef="eski">
+            Linke tıklayamıyor musun? Kod ile onayla
+          </button>
+          <form class="eposta-onay-kod-form" data-hedef="eski" novalidate hidden>
+            <div class="form-field">
+              <label for="eposta-kod-eski">Eski adrese gelen kod</label>
+              <input id="eposta-kod-eski" type="text" inputmode="numeric" autocomplete="one-time-code" required>
+            </div>
+            <button type="submit" class="btn-primary">Kodu Doğrula</button>
+          </form>
+        </div>
+
+        <div class="eposta-onay-satiri">
+          <div class="eposta-onay-baslik">
+            <span id="eposta-onay-yeni-durum" class="eposta-onay-rozet">Bekleniyor</span>
+            Yeni adres (<span id="eposta-onay-yeni-adres"></span>)
+          </div>
+          <button type="button" class="btn-secondary eposta-onay-kod-toggle" data-hedef="yeni">
+            Linke tıklayamıyor musun? Kod ile onayla
+          </button>
+          <form class="eposta-onay-kod-form" data-hedef="yeni" novalidate hidden>
+            <div class="form-field">
+              <label for="eposta-kod-yeni">Yeni adrese gelen kod</label>
+              <input id="eposta-kod-yeni" type="text" inputmode="numeric" autocomplete="one-time-code" required>
+            </div>
+            <button type="submit" class="btn-primary">Kodu Doğrula</button>
+          </form>
+        </div>
+
+        <p class="muted" style="font-size:0.85rem; margin-top:8px;">
+          Eski adresine artık erişimin yoksa değişikliği tamamlayamazsın —
+          bu, hesabının kötüye kullanılmasını önlemek için bilinçli bir
+          kısıtlamadır. Bu durumda site yöneticisiyle iletişime geçmen gerekir.
+        </p>
+      </div>
     </section>
 
     <section class="panel-section">
