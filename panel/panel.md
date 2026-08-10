@@ -32,6 +32,21 @@ permalink: "/panel/panel.html"
     </section>
 
     <section class="panel-section">
+      <h2>E-posta Değiştir</h2>
+      <p class="muted">Yeni e-posta adresine bir onay linki gönderilir; linke tıklayana kadar
+      giriş e-postan değişmez.</p>
+      <form id="eposta-degistir-form" novalidate>
+        <div class="form-field">
+          <label for="yeni_eposta">Yeni E-posta</label>
+          <input id="yeni_eposta" name="yeni_eposta" type="email" autocomplete="email" required>
+        </div>
+        <button type="submit" class="btn-primary">Onay Linki Gönder</button>
+      </form>
+      <div id="eposta-spam-notice" class="auth-spam-notice" hidden></div>
+      <div id="eposta-message" class="auth-message" hidden></div>
+    </section>
+
+    <section class="panel-section">
       <h2>Şifre Değiştir</h2>
       <form id="sifre-degistir-form" novalidate>
         <div class="form-field">
