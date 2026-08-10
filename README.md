@@ -513,7 +513,7 @@ supabase/
   migrations/0002_guvenlik_sikilastirma.sql <- Adım 1b: SQL Editor'de çalıştır (güvenlik sıkılaştırma + büyük dosya linki)
   migrations/0003_yeni_ozellikler_ve_guvenlik.sql <- Adım 1c: SQL Editor'de çalıştır (KVKK onayı, okundu/son geçerlilik, admin üye silme, arama indeksi, kalan Advisor uyarıları)
   functions/delete-account/index.ts        <- Adım 5: Edge Function (hesap silme — artık admin başkasını da silebiliyor)
-  functions/admin-change-email/index.ts    <- Adım 5c: Edge Function (admin, bir üyenin e-postasını TEK onaylı — sadece yeni adrese — değiştirir)
+  functions/admin-change-email/index.ts    <- Adım 5c: Edge Function (admin, bir üyenin e-postasını ANINDA — mail göndermeden — değiştirir)
 assets/
   js/supabase-client.js                    <- Ortak Supabase istemcisi (URL/KEY burada) + showSpamNotice() yardımcısı
   js/auth-guard.js                         <- Korumalı sayfa mantığı
@@ -790,12 +790,12 @@ butonunu kullanacaksan. Kullanıcının kendi panelinden yaptığı e-posta
 değişikliği ("Panelim" → "E-posta Değiştir") **çift onaylıdır** (hem eski
 hem yeni adres onaylanmalı — bkz. yukarıdaki "E-posta Değiştirme Akışı"
 bölümü); bu, eski adresine artık erişimi olmayan bir kullanıcıyı
-kilitleyebilir. Bu fonksiyon, admin panelinden çağrılan **tek onaylı**
-yedek yoldur: sadece **yeni** adrese bir onay maili/kodu gider, eski
-adrese hiçbir şey gitmez ve eski adrese erişim gerekmez. Bunu
-`auth.admin.updateUserById()` (service_role) ile yapıyoruz — bu API,
-client-side `updateUser()`'ın tabi olduğu "Secure email change" kuralına
-tabi DEĞİLDİR.
+kilitleyebilir. Bu fonksiyon, admin panelinden çağrılan yedek yoldur:
+e-posta **hiçbir mail gönderilmeden, anında** değişir — ne eski ne yeni
+adrese hiçbir şey gitmez, eski adrese erişim gerekmez. Bunu
+`auth.admin.updateUserById(id, { email, email_confirm: true })`
+(service_role) ile yapıyoruz; `email_confirm: true`, Supabase'e bu adresi
+zaten doğrulanmış say demektir, bu yüzden onay maili göndermez.
 
 ```bash
 # delete-account'ı zaten deploy ettiysen supabase CLI kurulu ve login'sindir,
@@ -815,28 +815,32 @@ domainlerle güncellemeyi unutma (CORS koruması).
 
 **Nasıl kullanılır:** Admin panelinde "Kullanıcılar & Roller" tablosundaki
 bir üyenin yanındaki **"E-posta Değiştir"** butonuna basınca açılan
-formdan yeni adresi girip **"Onay Maili Gönder"**e basılır. Kullanıcı
-mailindeki linke tıklayınca (veya `/hesap/hesap-onayla.html`'deki gibi bir
-kod akışıyla — bkz. aşağıdaki not) e-postası güncellenmiş olur.
+formdan yeni adresi girip **"E-postayı Şimdi Değiştir"**e basılır.
+İşlem tamamlanır tamamlanmaz (mail beklemeden) kullanıcının e-postası
+değişmiş olur; bir sonraki girişte yeni adresini kullanması yeterlidir.
 
-**Not (kod ile onaylama):** Bu fonksiyon `email_confirm` parametresini
-BİLİNÇLİ OLARAK göndermez, bu da Supabase'in normal "Confirm signup"
-davranışına benzer şekilde yeni adrese hem bir link HEM de bir kod
-gönderdiği anlamına gelir. Kullanıcı linke tıklayamıyorsa, aynı kodu
-`supabase.auth.verifyOtp({ email: yeniAdres, token: kod, type:
-"email_change" })` ile doğrulayabilir — panelin kendi "E-posta Değiştir"
-bölümündeki "kod ile onayla" formları bu tip için zaten hazır; admin
-tarafından başlatılan bu tek-onaylı değişiklik için de kullanıcı aynı kod
-kutusunu (yeni adres için olanı) kullanabilir.
+**Neden mail göndermiyoruz (versiyon geçmişi notu):** İlk sürümde bu
+fonksiyon `email_confirm` parametresini göndermiyordu ve "bu, admin API'yi
+'Secure email change' kuralından muaf tutar, sadece yeni adrese onay
+maili gider" varsayılıyordu. Bu varsayım **yanlıştı** — Supabase'in kendi
+dokümantasyonu, "Secure email change" projede açıkken
+`updateUserById()`'ın da (admin API üzerinden bile) davranışının proje
+ayarına bağlı olduğunu, bazı durumlarda hiç mail göndermediğini belirtiyor.
+Pratikte bu, "onay maili gönderildi" mesajı görünmesine rağmen kullanıcıya
+hiçbir mailin ulaşmamasına yol açıyordu. `email_confirm: true` ile bu
+belirsizlik tamamen ortadan kalkıyor: değişiklik anında, garantili şekilde
+gerçekleşiyor. Bu güvenli çünkü zaten admin, kullanıcının kimliğini (mesaj/
+iletişim formu üzerinden) elle doğrulamış olarak bu işlemi başlatıyor —
+ekstra bir e-posta onayına ihtiyaç yok.
 
 ### "admin-change-email 'Load failed' / CORS Hatası Alıyorum"
 
-Admin panelinde "Onay Maili Gönder"e basınca kırmızı kutuda **"E-posta
-değiştirilemedi: Load failed"** (Safari) veya **"...: Failed to fetch"**
-(Chrome/Edge) görüyorsan, bu istek Edge Function'a **hiç ulaşmadan**
-tarayıcı tarafından engellendiği/başarısız olduğu anlamına gelir — yani
-hata fonksiyonun İÇİNDE değil, fonksiyona ULAŞMADAN ÖNCE oluyor. Sırayla
-kontrol et:
+Admin panelinde "E-postayı Şimdi Değiştir"e basınca kırmızı kutuda
+**"E-posta değiştirilemedi: Load failed"** (Safari) veya **"...: Failed to
+fetch"** (Chrome/Edge) görüyorsan, bu istek Edge Function'a **hiç
+ulaşmadan** tarayıcı tarafından engellendiği/başarısız olduğu anlamına
+gelir — yani hata fonksiyonun İÇİNDE değil, fonksiyona ULAŞMADAN ÖNCE
+oluyor. Sırayla kontrol et:
 
 1. **Fonksiyon gerçekten deploy edildi mi?** Dashboard → **Edge Functions**
    listesinde `admin-change-email` görünüyor mu ve durumu "Deployed" mi?
@@ -874,6 +878,22 @@ Bu kontrolleri yaptıktan sonra hâlâ sorun yaşıyorsan, Dashboard →
 **Edge Functions → admin-change-email → Logs** kısmına bak — istek
 fonksiyona ulaştıysa (yani sorun 1-5 değilse) buradaki loglarda gerçek
 hatayı (ör. yetkisiz kullanıcı, geçersiz e-posta biçimi) görürsün.
+
+### "İşlem Başarılı Görünüyor Ama Kullanıcıya Mail Gelmedi"
+
+Bu senaryoyu yaşadıysan ve fonksiyon şu an (2. sürüm, `email_confirm:
+true` gönderen versiyon) deploy ediliyse endişelenme — bu **artık beklenen
+davranış**: fonksiyon zaten mail göndermiyor, e-postayı **anında** ve
+mailsiz değiştiriyor. "E-postası güncellendi" mesajını gördüysen işlem
+tamamlanmış demektir; kullanıcı bir sonraki girişte yeni adresini
+kullanmalı, mail bekletmesine gerek yok.
+
+Eğer hâlâ eski davranışı (yani "mail gönderildi" mesajını) görüyorsan,
+`supabase/functions/admin-change-email/index.ts` dosyandaki
+`updateUserById()` çağrısında `email_confirm: true` parametresinin olup
+olmadığını kontrol et — yoksa dosyanın eski bir sürümünü kullanıyorsun
+demektir, güncel dosyayla değiştirip **yeniden deploy et**
+(`supabase functions deploy admin-change-email`).
 
 ---
 
