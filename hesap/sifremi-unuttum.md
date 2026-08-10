@@ -2,6 +2,7 @@
 layout: default
 title: "Şifremi Unuttum"
 yayinda: true
+permalink: "/hesap/sifremi-unuttum.html"
 ---
 
 <link rel="stylesheet" href="{{ '/assets/css/auth.css' | relative_url }}">
@@ -20,7 +21,7 @@ yayinda: true
   </form>
 
   <div class="auth-links">
-    <a href="{{ '/giris.html' | relative_url }}">Girişe dön</a>
+    <a href="{{ '/hesap/giris.html' | relative_url }}">Girişe dön</a>
     <span></span>
   </div>
 </div>
