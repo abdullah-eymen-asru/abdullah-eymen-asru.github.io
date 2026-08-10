@@ -1,5 +1,5 @@
 /*
- * assets/js/ozel-icerik.js — /ozel-icerik.html?id=<uuid>
+ * assets/js/ozel-icerik.js — /panel/ozel-icerik.html?id=<uuid>
  * Tek bir gizli makaleyi gösterir + varsa eki için 10 saniyelik Signed URL
  * üretip indirme linki sunar. RLS sayesinde bu sorgu erişimi olmayan bir
  * kullanıcı için otomatik olarak BOŞ döner (403 değil, "satır yok" gibi
