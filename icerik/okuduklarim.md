@@ -1,6 +1,7 @@
 ---
 layout: default
 title: Okuduklarım
+permalink: "/icerik/okuduklarim.html"
 ---
 
 <h1>Okuduklarım</h1>
