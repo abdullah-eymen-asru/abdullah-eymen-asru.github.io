@@ -47,7 +47,7 @@ export function showMessage(el, text, type = "error") {
 
 /**
  * Bugünün Gizlilik Politikası / KVKK metni sürüm etiketi. Metni
- * (gizlilik-politikasi.md) gerçekten değiştirdiğinde bu değeri de
+ * (kurumsal/gizlilik-politikasi.md) gerçekten değiştirdiğinde bu değeri de
  * güncelle — o andan itibaren yeni kayıt olanlar bu sürüme onay verir ve
  * eski üyeler panelde "güncellenmiş metni onaylaman gerekiyor" uyarısı
  * görür (bkz. panel.js).
