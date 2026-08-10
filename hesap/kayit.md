@@ -48,6 +48,7 @@ permalink: "/hesap/kayit.html"
 
   <div class="auth-links">
     <a href="{{ '/hesap/giris.html' | relative_url }}">Zaten hesabın var mı? Giriş yap</a>
+    <a id="kod-ile-onayla-link" href="{{ '/hesap/hesap-onayla.html' | relative_url }}">Linke tıklayamıyor musun? Kodla onayla</a>
   </div>
 </div>
 
