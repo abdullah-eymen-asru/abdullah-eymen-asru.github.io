@@ -54,17 +54,30 @@ async function init() {
   document.getElementById("loading")?.setAttribute("hidden", "");
   document.getElementById("app").hidden = false;
 
-  ghAyarlariniYukle();
-  wireSectionNav();
-  wireIcerikTuruToggle();
-  wireEditorToolbar();
-  wireBaglantiDogrula();
-  wireIcerikForm();
-  wireYayindaCanliOnizleme();
-  wireIcerikListe();
-  wireProfilFoto();
+  // Diğer panellerdeki (panel.js, admin.js) aynı düzeltme: her adım
+  // birbirinden bağımsız kuruluyor, biri hata verirse geri kalanı
+  // etkilenmiyor.
+  const adimlar = [
+    ["ayarları yükle", () => ghAyarlariniYukle()],
+    ["bölüm navigasyonu", () => wireSectionNav()],
+    ["içerik türü", () => wireIcerikTuruToggle()],
+    ["editör araç çubuğu", () => wireEditorToolbar()],
+    ["bağlantı doğrulama", () => wireBaglantiDogrula()],
+    ["içerik formu", () => wireIcerikForm()],
+    ["canlı önizleme", () => wireYayindaCanliOnizleme()],
+    ["içerik listesi", () => wireIcerikListe()],
+    ["profil fotoğrafı", () => wireProfilFoto()],
+  ];
+  for (const [ad, fn] of adimlar) {
+    try {
+      await fn();
+    } catch (err) {
+      console.error(`github-yonetim.js: "${ad}" bölümü başlatılamadı:`, err);
+    }
+  }
 
-  document.getElementById("ic-date").value = new Date().toISOString().slice(0, 10);
+  const tarihEl = document.getElementById("ic-date");
+  if (tarihEl) tarihEl.value = new Date().toISOString().slice(0, 10);
 }
 
 /* ---------------------------------------------------------------------- */
