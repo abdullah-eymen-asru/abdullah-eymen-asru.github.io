@@ -58,7 +58,7 @@ export async function requireAuth({ role = null, redirectTo = "/hesap/giris.html
   const { data: profile, error } = await supabase
     .from("profiles")
     .select(
-      "id, email, full_name, role, kvkk_onay_verildi, kvkk_onay_versiyonu, kvkk_onay_tarihi"
+      "id, email, first_name, last_name, full_name, role, kvkk_onay_verildi, kvkk_onay_versiyonu, kvkk_onay_tarihi"
     )
     .eq("id", session.user.id)
     .single();
