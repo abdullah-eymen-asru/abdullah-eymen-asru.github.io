@@ -38,16 +38,33 @@ async function init() {
   document.getElementById("app").hidden = false;
 
   wireSectionNav();
-  await temizleSuresiGecmisErisimler();
-  await loadUsers();
-  await loadContents();
-  wireUserSearch();
-  wireIcerikAtamaArama();
-  wireContentForm();
-  wireCurrentAdminSelfDelete(session);
-  wireAdminEmailChange();
-  wireR2DosyaPaylasim();
-  await wireAdminChat(session.user.id);
+
+  // Her bölüm birbirinden BAĞIMSIZ kuruluyor — biri hata verirse (ör. bir
+  // Supabase çağrısı beklenmeyen bir istisna fırlatırsa) sadece o bölüm
+  // etkilenir, geri kalan TÜM panel (kullanıcı tablosu, içerik yönetimi,
+  // mesajlaşma vb.) "Yükleniyor..." durumunda asılı kalmaz. Önceden tek
+  // sıralı bir zincirdi; herhangi bir adımdaki hata ondan SONRAKİ HER ŞEYİN
+  // hiç çalışmamasına yol açıyordu.
+  const adimlar = [
+    ["süresi geçmiş erişim temizliği", () => temizleSuresiGecmisErisimler()],
+    ["kullanıcı listesi", () => loadUsers()],
+    ["içerik listesi", () => loadContents()],
+    ["kullanıcı arama", () => wireUserSearch()],
+    ["içerik atama arama", () => wireIcerikAtamaArama()],
+    ["içerik formu", () => wireContentForm()],
+    ["kendi hesabını silme", () => wireCurrentAdminSelfDelete(session)],
+    ["e-posta değiştirme", () => wireAdminEmailChange()],
+    ["dosya paylaşım", () => wireR2DosyaPaylasim()],
+    ["mesajlaşma", () => wireAdminChat(session.user.id)],
+  ];
+
+  for (const [ad, fn] of adimlar) {
+    try {
+      await fn();
+    } catch (err) {
+      console.error(`admin.js: "${ad}" bölümü başlatılamadı:`, err);
+    }
+  }
 }
 
 /* ---------------------------------------------------------------------- */
@@ -110,6 +127,34 @@ async function loadUsers() {
   TUM_KULLANICILAR = data || [];
   renderUserTable(TUM_KULLANICILAR);
   renderContentAssigneeOptions(TUM_KULLANICILAR);
+  wireUserTableRealtime();
+}
+
+// Admin paneli açıkken bir kullanıcı KENDİ panelinden Ad/Soyad ya da
+// e-postasını değiştirirse (ya da başka bir admin sekmesi bir değişiklik
+// yaparsa), bu admin sekmesi otomatik tazelenir. Önceden admin panelini
+// F5 ile YENİLEMEDEN değişiklikler görünmüyordu — bu "kullanıcı
+// güncelleme yaptığı halde sistemde değişmiyor" izlenimine yol açıyordu
+// (aslında veritabanı doğru güncelleniyordu, sadece admin ekranı bunu
+// canlı yansıtmıyordu). Aynı abonelik tekrar tekrar kurulmasın diye bir
+// bayrakla koruyoruz.
+let USER_TABLE_REALTIME_KURULDU = false;
+let USER_TABLE_REALTIME_TIMER = null;
+function wireUserTableRealtime() {
+  if (USER_TABLE_REALTIME_KURULDU) return;
+  USER_TABLE_REALTIME_KURULDU = true;
+  supabase
+    .channel("admin-profiles-degisiklik")
+    .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => {
+      // Admin şu an tablodaki bir ad/soyad kutusuna yazıyor olabilir —
+      // her postgres_changes event'inde ANINDA yeniden çizmek yerine kısa
+      // bir debounce ile bekliyoruz (arka arkaya gelen birden fazla
+      // değişiklik tek bir tazelemeye toplanır, aktif yazma sırasında
+      // focus kaybı riski azalır).
+      clearTimeout(USER_TABLE_REALTIME_TIMER);
+      USER_TABLE_REALTIME_TIMER = setTimeout(() => loadUsers(), 600);
+    })
+    .subscribe();
 }
 
 function wireUserSearch() {
@@ -336,9 +381,16 @@ function wireAdminEmailChange() {
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || "Bilinmeyen hata");
 
+      const oturumNotu = body.eski_oturumlar_sonlandirildi
+        ? "Kullanıcının eski oturumları sonlandırıldı, yeniden giriş yapması gerekecek."
+        : "Not: eski oturumlar sonlandırılamadı (bkz. konsol) — migration 0009'un çalıştırıldığından emin ol.";
+      const mailNotu = body.bildirim_maili_gonderildi
+        ? "Yeni adresine bilgilendirme e-postası gönderildi."
+        : "Not: bilgilendirme e-postası gönderilemedi (kullanıcıyı ayrıca haberdar etmek isteyebilirsin).";
+
       showMessage(
         msg,
-        `E-postası güncellendi: ${yeniEposta}. Hiçbir mail gönderilmedi — değişiklik anında uygulandı. Kullanıcı bir sonraki girişte yeni adresini kullanmalı.`,
+        `E-postası güncellendi: ${yeniEposta}. Hiçbir mail beklenmedi — değişiklik anında uygulandı. ${oturumNotu} ${mailNotu}`,
         "success"
       );
 
@@ -404,7 +456,14 @@ function wireCurrentAdminSelfDelete(session) {
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || "Bilinmeyen hata");
 
-      await supabase.auth.signOut();
+      // bkz. panel.js -> wireDeleteAccount() aynı düzeltme: signOut()
+      // hesap zaten silindiği için hata verirse "Hesap silinemedi" diye
+      // YANLIŞ bir mesaj gösterilmesin diye ayrı try/catch'e alındı.
+      try {
+        await supabase.auth.signOut();
+      } catch (signOutErr) {
+        console.error("Hesap silindi ama signOut() hata verdi (önemli değil):", signOutErr);
+      }
       alert("Hesabın silindi. Anasayfaya yönlendiriliyorsun.");
       window.location.href = "/";
     } catch (err) {
