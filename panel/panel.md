@@ -138,6 +138,18 @@ permalink: "/panel/panel.html"
     </section>
 
     <section class="panel-section">
+      <h2>Bağlı Hesaplar</h2>
+      <p class="muted">
+        Google ile giriş ve e-posta + şifreyle giriş, aynı e-posta adresi
+        için her zaman <strong>tek bir hesaba</strong> bağlanır — ikisini
+        kullanmak ekstra bir hesap açmaz. Google hesabını buradan sonradan
+        bağlayabilir ya da bağlantısını kesebilirsin.
+      </p>
+      <div id="bagli-hesaplar-durum"><p class="muted">Yükleniyor...</p></div>
+      <div id="bagli-hesaplar-message" class="auth-message" hidden></div>
+    </section>
+
+    <section class="panel-section">
       <h2>Şifre Değiştir</h2>
       <form id="sifre-degistir-form" novalidate>
         <div class="form-field">
