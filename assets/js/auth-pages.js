@@ -11,6 +11,38 @@ const REDIRECT_AFTER_LOGIN = "/panel/panel.html";
 // geri döndürür; Supabase SDK URL'deki token'ı otomatik yakalar.
 const SITE_ORIGIN = window.location.origin;
 
+/*
+ * GOOGLE İLE GİRİŞ/KAYIT — KVKK ONAYI SORUNU
+ * ---------------------------------------------------------------------
+ * Eskiden "Google ile Giriş Yap" (giris.html) hiçbir KVKK kontrolü
+ * yapmadan doğrudan oturum açtırıyordu: Supabase, Google ile ilk kez
+ * gelen bir e-postayı otomatik olarak YENİ bir kullanıcı/profil olarak
+ * oluşturuyor (handle_new_user trigger'ı), yani "Giriş Yap" fiilen
+ * "Kayıt Ol" gibi de çalışabiliyordu — üye hiç KVKK Aydınlatma Metni +
+ * Açık Rıza onayı vermeden sisteme girmiş oluyordu.
+ *
+ * Çözüm:
+ *  - "Google ile Kayıt Ol" (kayit.html): SADECE yukarıdaki KVKK
+ *    checkbox'ı işaretliyse OAuth başlatılır; dönüşte kvkk_onayini_ver()
+ *    RPC'siyle onay veritabanına yazılır (kvkk_onay_verildi = true).
+ *  - "Google ile Giriş Yap" (giris.html): OAuth her zaman izin verir
+ *    (Supabase bunu engelleyemeyiz), ama dönüşte profildeki
+ *    kvkk_onay_verildi bayrağına bakarız. Bu bayrak SADECE "Kayıt Ol"
+ *    akışından (e-posta/şifre ya da Google ile kayıt) geçmiş
+ *    kullanıcılarda true olur. Bayrak false ise (üye hiç kayıt olmadan
+ *    doğrudan "Giriş Yap"a tıklamış demektir) oturumu hemen kapatıp
+ *    "kullanıcı bulunamadı, kayıt ol" mesajı gösteririz — erişim
+ *    verilmez.
+ *
+ * Her iki akışta da redirectTo'yu BİLEREK ilgili sayfanın kendisine
+ * (giris.html / kayit.html) sabitliyoruz ki OAuth dönüşünde bu kontrolü
+ * yapabilelim; asıl istenen hedefe (donus / panel) kontrolden SONRA biz
+ * yönlendiriyoruz.
+ */
+const GOOGLE_GIRIS_INTENT_KEY = "aea_google_giris_intent";
+const GOOGLE_GIRIS_DONUS_KEY = "aea_google_giris_donus";
+const GOOGLE_KAYIT_INTENT_KEY = "aea_google_kayit_intent";
+
 /* ---------------------------------------------------------------------- */
 /* GİRİŞ SAYFASI (hesap/giris.html)                                       */
 /* ---------------------------------------------------------------------- */
@@ -35,6 +67,18 @@ export function initGirisPage() {
     );
   } else if (hashParams.get("error")) {
     showMessage(msg, "Linkin süresi dolmuş veya geçersiz. Panelden yeni bir onay linki iste.");
+    // Google girişi sırasında kullanıcı OAuth ekranını iptal ettiyse ya da
+    // bir hata döndüyse, bir sonraki normal ziyarette yanlışlıkla tekrar
+    // "Google dönüşü" sanılmasın diye bekleyen bayrağı temizliyoruz.
+    sessionStorage.removeItem(GOOGLE_GIRIS_INTENT_KEY);
+    sessionStorage.removeItem(GOOGLE_GIRIS_DONUS_KEY);
+  }
+
+  // "Google ile Giriş Yap" butonuna tıklandıktan sonra Supabase bizi buraya
+  // (giris.html) geri gönderdiyse: oturum kurulur kurulmaz kaydın GERÇEKTEN
+  // var olup olmadığını kontrol ediyoruz (bkz. yukarıdaki açıklama).
+  if (sessionStorage.getItem(GOOGLE_GIRIS_INTENT_KEY) === "1") {
+    googleGirisDonusunuIsle(msg);
   }
 
   form?.addEventListener("submit", async (e) => {
@@ -68,11 +112,77 @@ export function initGirisPage() {
   googleBtn?.addEventListener("click", async () => {
     const params = new URLSearchParams(window.location.search);
     const donus = params.get("donus") || REDIRECT_AFTER_LOGIN;
-    await supabase.auth.signInWithOAuth({
+    // Hedefi (donus) hemen kullanmıyoruz — redirectTo'yu bilerek bu sayfaya
+    // sabitliyoruz ki OAuth dönüşünde "kayıtlı mı" kontrolünü yapabilelim;
+    // hedefi sessionStorage'da saklayıp kontrolden SONRA oraya gideceğiz.
+    sessionStorage.setItem(GOOGLE_GIRIS_INTENT_KEY, "1");
+    sessionStorage.setItem(GOOGLE_GIRIS_DONUS_KEY, donus);
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${SITE_ORIGIN}${donus}` },
+      options: { redirectTo: `${SITE_ORIGIN}/hesap/giris.html` },
     });
+    if (error) {
+      sessionStorage.removeItem(GOOGLE_GIRIS_INTENT_KEY);
+      sessionStorage.removeItem(GOOGLE_GIRIS_DONUS_KEY);
+      showMessage(msg, "Google ile giriş başlatılamadı: " + error.message);
+    }
   });
+}
+
+/**
+ * "Google ile Giriş Yap" sonrası bu sayfaya (giris.html) dönüldüğünde
+ * çağrılır. Oturum kurulunca profildeki kvkk_onay_verildi bayrağına bakar:
+ *  - true  -> bu üye gerçekten kayıtlı (bir zamanlar KVKK onayı vererek
+ *             kayıt olmuş), istenen hedefe yönlendirilir.
+ *  - false/yok -> bu Google hesabıyla hiç kayıt olunmamış (handle_new_user
+ *             trigger'ı OAuth ile gelen HERKES için otomatik bir profil
+ *             satırı açar, ama kvkk_onay_verildi varsayılan olarak false'tur)
+ *             -> oturum kapatılır, "kullanıcı bulunamadı" mesajı gösterilir,
+ *             panele erişim VERİLMEZ.
+ */
+function googleGirisDonusunuIsle(msg) {
+  let tamamlandi = false;
+
+  async function kontrolEt() {
+    if (tamamlandi) return;
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) return; // henüz oturum kurulmadı, aşağıdaki dinleyici/yedek tekrar dener
+
+    tamamlandi = true;
+    authListener?.subscription?.unsubscribe();
+    sessionStorage.removeItem(GOOGLE_GIRIS_INTENT_KEY);
+    const donus = sessionStorage.getItem(GOOGLE_GIRIS_DONUS_KEY) || REDIRECT_AFTER_LOGIN;
+    sessionStorage.removeItem(GOOGLE_GIRIS_DONUS_KEY);
+
+    const { data: profile, error } = await supabase
+      .from("profiles")
+      .select("kvkk_onay_verildi")
+      .eq("id", session.user.id)
+      .single();
+
+    if (!error && profile?.kvkk_onay_verildi) {
+      window.location.href = donus;
+      return;
+    }
+
+    await supabase.auth.signOut();
+    showMessage(
+      msg,
+      'Bu Google hesabıyla kayıtlı bir kullanıcı bulunamadı. Lütfen önce "Kayıt Ol" sayfasından Google ile kayıt ol.'
+    );
+  }
+
+  const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+    if (event === "SIGNED_IN") kontrolEt();
+  });
+
+  // Oturum, dinleyici bağlanmadan ÖNCE zaten kurulmuş olabilir — hemen bir
+  // kez de biz deniyoruz. detectSessionInUrl bazen bir sonraki mikro
+  // görevde tamamlandığından, kısa bir yedek gecikmeyle son bir kez daha.
+  kontrolEt();
+  setTimeout(kontrolEt, 1200);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -86,6 +196,19 @@ export function initKayitPage() {
   // ?email=... ekliyoruz ki hesap-onayla.html açılınca e-posta alanı
   // otomatik dolu gelsin (kullanıcı tekrar yazmak zorunda kalmasın).
   const kodOnayLink = document.getElementById("kod-ile-onayla-link");
+  // KVKK checkbox'ı artık HEM e-posta/şifre formunu HEM "Google ile Kayıt
+  // Ol" butonunu birlikte gater — bu yüzden <form>'un dışında, sayfanın en
+  // üstünde duruyor (bkz. kayit.md) ve form="kayit-form" ile forma bağlı.
+  // Doğrudan id ile okuyoruz ki Google butonunun click dinleyicisi de
+  // (form submit olmadan) durumuna bakabilsin.
+  const kvkkCheckbox = document.getElementById("kvkk_onay");
+
+  // Google OAuth dönüşünde (bkz. aşağıdaki googleBtn dinleyicisi) Supabase
+  // bizi buraya (kayit.html) geri gönderdiyse KVKK onayını veritabanına
+  // yaz ve panele yönlendir.
+  if (sessionStorage.getItem(GOOGLE_KAYIT_INTENT_KEY) === "1") {
+    googleKayitDonusunuIsle(msg);
+  }
 
   form?.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -95,7 +218,7 @@ export function initKayitPage() {
     const password = form.password.value;
     const passwordAgain = form.password_again.value;
     const fullName = form.full_name.value.trim();
-    const kvkkOnay = form.kvkk_onay?.checked ?? false;
+    const kvkkOnay = kvkkCheckbox?.checked ?? false;
 
     if (password !== passwordAgain) {
       showMessage(msg, "Şifreler birbiriyle eşleşmiyor.");
@@ -147,11 +270,72 @@ export function initKayitPage() {
   });
 
   googleBtn?.addEventListener("click", async () => {
-    await supabase.auth.signInWithOAuth({
+    // Google OAuth kendi ekranında bir KVKK onayı almıyor — bu yüzden
+    // OAuth'u BAŞLATMADAN ÖNCE checkbox'ın işaretli olmasını zorunlu
+    // tutuyoruz. İşaretli değilse hiç Google penceresi açılmaz.
+    if (!kvkkCheckbox?.checked) {
+      showMessage(
+        msg,
+        "Google ile kayıt olmak için önce yukarıdaki KVKK Aydınlatma Metni ve Açık Rıza onayını işaretlemelisin."
+      );
+      return;
+    }
+    sessionStorage.setItem(GOOGLE_KAYIT_INTENT_KEY, "1");
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${SITE_ORIGIN}${REDIRECT_AFTER_LOGIN}` },
+      options: { redirectTo: `${SITE_ORIGIN}/hesap/kayit.html` },
     });
+    if (error) {
+      sessionStorage.removeItem(GOOGLE_KAYIT_INTENT_KEY);
+      showMessage(msg, "Google ile kayıt başlatılamadı: " + error.message);
+    }
   });
+}
+
+/**
+ * "Google ile Kayıt Ol" sonrası bu sayfaya (kayit.html) dönüldüğünde
+ * çağrılır. Oturum kurulur kurulmaz kvkk_onayini_ver() RPC'siyle KVKK
+ * onayını (checkbox işaretliyken OAuth başlatıldığı için) veritabanına
+ * yazar ve panele yönlendirir. Bu, hem YENİ bir Google hesabı hem de
+ * (nadiren) daha önce "Giriş Yap"tan denenip kvkk_onay_verildi=false
+ * kalmış bir profil için de çalışır — ikisinde de sonuç aynıdır: onay artık
+ * kayıtlıdır.
+ */
+function googleKayitDonusunuIsle(msg) {
+  let tamamlandi = false;
+
+  async function kontrolEt() {
+    if (tamamlandi) return;
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) return;
+
+    tamamlandi = true;
+    authListener?.subscription?.unsubscribe();
+    sessionStorage.removeItem(GOOGLE_KAYIT_INTENT_KEY);
+
+    const { error } = await supabase.rpc("kvkk_onayini_ver", { p_versiyon: KVKK_METIN_SURUMU });
+    if (error) {
+      console.error("Google ile kayıtta KVKK onayı kaydedilemedi:", error);
+      showMessage(
+        msg,
+        "Google ile giriş yapıldı ama KVKK onayın kaydedilemedi. Panele yönlendiriliyorsun, lütfen oradan tekrar onayla.",
+        "success"
+      );
+      setTimeout(() => (window.location.href = REDIRECT_AFTER_LOGIN), 1800);
+      return;
+    }
+
+    window.location.href = REDIRECT_AFTER_LOGIN;
+  }
+
+  const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+    if (event === "SIGNED_IN") kontrolEt();
+  });
+
+  kontrolEt();
+  setTimeout(kontrolEt, 1200);
 }
 
 /* ---------------------------------------------------------------------- */
