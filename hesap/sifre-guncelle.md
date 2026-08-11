@@ -2,10 +2,9 @@
 layout: default
 title: "Şifreni Güncelle"
 yayinda: true
+auth_css: true
 permalink: "/hesap/sifre-guncelle.html"
 ---
-
-<link rel="stylesheet" href="{{ '/assets/css/auth.css' | relative_url }}">
 
 <div class="auth-box">
   <h1>Yeni Şifre Belirle</h1>
