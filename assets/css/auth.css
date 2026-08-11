@@ -188,6 +188,21 @@
   margin-top: 10px;
 }
 
+/* Panelde "Bağlı Hesaplar" (Google bağla / bağlantı kes) satırları —
+   .eposta-onay-satiri ile aynı görsel dilde, tek satırlık kompakt versiyon. */
+.bagli-hesap-satir {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.bagli-hesap-satir:last-of-type {
+  border-bottom: none;
+}
+
 /* Panel / Admin */
 .panel-grid {
   display: grid;
