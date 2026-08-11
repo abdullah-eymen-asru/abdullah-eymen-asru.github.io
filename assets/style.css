@@ -52,6 +52,15 @@ body {
   color: var(--text);
   background: var(--bg);
   line-height: 1.6;
+  /* .panel-section--wide (mesajlaşma paneli) gibi bölümler viewport
+     genişliğine göre kendini ortalıyor (bkz. auth.css). "100vw" tabanlı bu
+     tür teknikler, dikey kaydırma çubuğunun kapladığı alan (scrollbar
+     gutter) yüzünden 1px'lik ölçüm farkına dayalı YATAY bir taşmaya yol
+     açabiliyordu — bu da sayfanın yüklenirken/kaydırılırken hafifçe sağa-
+     sola "kaymış" gibi görünmesine (ve istenmeyen bir yatay scrollbar
+     belirmesine) neden oluyordu. overflow-x:hidden bu taşmayı sayfa
+     seviyesinde güvenli bir şekilde keser. */
+  overflow-x: hidden;
 }
 
 .wrap {
