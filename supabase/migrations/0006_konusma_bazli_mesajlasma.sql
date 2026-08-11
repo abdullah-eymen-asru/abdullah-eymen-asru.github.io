@@ -67,6 +67,12 @@ create table if not exists public.messages (
   created_at      timestamptz not null default now()
 );
 
+-- ÖNEMLİ: "messages" tablosu ZATEN varsa (0004'teki eski şemayla) yukarıdaki
+-- "create table if not exists" hiçbir şey yapmaz — yani conversation_id
+-- kolonu eski tabloda HENÜZ YOK. Bu yüzden burada ayrıca (idempotent
+-- şekilde) ekliyoruz; hem sıfırdan kurulumda hem yükseltmede güvenli.
+alter table public.messages add column if not exists conversation_id uuid references public.conversations(id) on delete cascade;
+
 do $$
 begin
   if exists (
