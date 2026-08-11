@@ -590,12 +590,28 @@ async function loadOzelIcerikler() {
 }
 
 /** "Eski Mailime Erişemiyorum" kutusundaki "Yöneticiyle Mesajlaş" linkine
- * tıklanınca, native anchor scroll'un (href="#chat-kullanici") ardından
- * mesaj yazma kutusuna da otomatik odaklan — kullanıcı direkt yazmaya
- * başlayabilsin. */
+ * tıklanınca, native anchor scroll'un (href="#chat-kullanici") ardından bir
+ * sohbete odaklan — kullanıcı direkt yazmaya başlayabilsin. Artık mesajlar
+ * çok-sohbetli olduğu için tek bir sabit metin kutusu yok: varsa EN SON
+ * konuşmayı otomatik seçip mesaj alanına odaklanıyoruz; hiç sohbeti yoksa
+ * "Yeni Sohbet" formunu açıp konuyu otomatik dolduruyoruz. */
 function wireEpostaYardimMesajLink() {
   document.getElementById("eposta-yardim-mesaj-link")?.addEventListener("click", () => {
-    setTimeout(() => document.getElementById("chat-metin")?.focus(), 400);
+    setTimeout(() => {
+      const ilkKonusma = document.querySelector("#chat-konusma-liste .msg-konusma-item");
+      if (ilkKonusma) {
+        ilkKonusma.click();
+        setTimeout(() => document.getElementById("chat-metin")?.focus(), 250);
+        return;
+      }
+      const yeniBtn = document.getElementById("chat-yeni-sohbet-btn");
+      const konuInput = document.getElementById("chat-yeni-sohbet-konu");
+      if (yeniBtn && konuInput) {
+        yeniBtn.click();
+        if (!konuInput.value) konuInput.value = "Eski e-postama erişemiyorum";
+        konuInput.focus();
+      }
+    }, 400);
   });
 }
 
