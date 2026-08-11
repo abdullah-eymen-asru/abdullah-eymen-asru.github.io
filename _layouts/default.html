@@ -121,6 +121,23 @@
 
   <link rel="stylesheet" href="{{ '/assets/style.css' | relative_url }}">
 
+  {% if page.auth_css %}
+  <!-- auth.css: giris/kayit/panel/admin sayfalarına özel stiller. Önceden
+       her sayfanın KENDİ içeriğinde (Markdown gövdesinde) inline
+       <link rel="stylesheet"> olarak ekleniyordu — bu, HTML olarak
+       geçersizdi (</head>'ten SONRA, <body> içine düşüyordu, çünkü
+       {{ content }} her zaman <body> içinde render edilir) ve bazı
+       tarayıcılarda/uzantılarda (içerik engelleyiciler, okuyucu modları,
+       bazı Safari/Samsung Internet sürümleri) <body> içindeki <link>
+       etiketleri ya HİÇ YÜKLENMİYOR ya da normalden GEÇ/farklı öncelikle
+       yükleniyordu — "buton yazıları görünmüyor", "mesajlaşma modern
+       görünmüyor" gibi tarayıcıya göre değişen görünüm sorunlarının kök
+       nedeni buydu. Şimdi <head> içinde, diğer stillerle aynı güvenilir
+       şekilde yükleniyor. Sayfa bunu front matter'da "auth_css: true" ile
+       ister (bkz. panel/panel.md, panel/admin.md, hesap/giris.md vb.). -->
+  <link rel="stylesheet" href="{{ '/assets/css/auth.css' | relative_url }}">
+  {% endif %}
+
   {% if site.google_analytics_id and site.google_analytics_id != "" %}
   <!-- Google Analytics -->
   <script async src="https://www.googletagmanager.com/gtag/js?id={{ site.google_analytics_id }}"></script>
