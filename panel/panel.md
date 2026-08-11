@@ -164,15 +164,41 @@ permalink: "/panel/panel.html"
       <div id="ozel-icerik-list"><p class="muted">Yükleniyor...</p></div>
     </section>
 
-    <section class="panel-section" id="chat-kullanici">
+    <section class="panel-section panel-section--wide" id="chat-kullanici">
       <h2>Mesajlar</h2>
-      <p class="muted">Sadece site yöneticisiyle yazışabilirsin.</p>
-      <div class="chat-box">
-        <div id="chat-mesaj-liste" class="chat-mesaj-liste"><p class="chat-bos">Yükleniyor...</p></div>
-        <form id="chat-form" class="chat-form" novalidate>
-          <textarea id="chat-metin" placeholder="Mesajını yaz..." required></textarea>
-          <button type="submit">Gönder</button>
-        </form>
+      <p class="muted">
+        Site yöneticisiyle yazışabilirsin — farklı konularda istediğin kadar
+        ayrı sohbet açabilirsin (ör. "Ödeme sorunu", "Şifre yardımı").
+      </p>
+
+      <div id="chat-panel" class="msg-panel">
+        <aside class="msg-list-pane">
+          <div class="msg-list-header">
+            <button type="button" id="chat-yeni-sohbet-btn" class="msg-yeni-btn">+ Yeni Sohbet</button>
+          </div>
+          <div id="chat-yeni-sohbet-form-wrap" class="msg-yeni-form-wrap" hidden>
+            <form id="chat-yeni-sohbet-form" novalidate>
+              <input id="chat-yeni-sohbet-konu" type="text" maxlength="120" placeholder="Konu (ör. Ödeme sorunu)" required>
+              <div class="msg-yeni-form-btnler">
+                <button type="submit" class="btn-primary" style="width:auto;">Başlat</button>
+                <button type="button" id="chat-yeni-sohbet-iptal" class="btn-secondary" style="width:auto;">Vazgeç</button>
+              </div>
+            </form>
+          </div>
+          <div id="chat-konusma-liste" class="msg-konusma-liste"><p class="chat-bos">Yükleniyor...</p></div>
+        </aside>
+
+        <div class="msg-thread-pane">
+          <div class="msg-thread-header">
+            <button type="button" id="chat-geri-btn" class="msg-geri-btn" aria-label="Sohbet listesine dön">←</button>
+            <span id="chat-thread-baslik" class="msg-thread-baslik">Bir sohbet seç veya yeni sohbet başlat.</span>
+          </div>
+          <div id="chat-mesaj-liste" class="chat-mesaj-liste"><p class="chat-bos">Bir sohbet seç.</p></div>
+          <form id="chat-form" class="chat-form" novalidate hidden>
+            <textarea id="chat-metin" placeholder="Mesajını yaz..." required></textarea>
+            <button type="submit">Gönder</button>
+          </form>
+        </div>
       </div>
       <div id="chat-message" class="auth-message" hidden></div>
     </section>
