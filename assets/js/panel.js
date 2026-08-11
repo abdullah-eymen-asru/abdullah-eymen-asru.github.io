@@ -37,7 +37,8 @@ async function init() {
 function renderProfile(profile) {
   document.getElementById("panel-email").textContent = profile.email;
   document.getElementById("panel-rol").textContent = rolEtiketi(profile.role);
-  document.getElementById("full_name").value = profile.full_name ?? "";
+  document.getElementById("first_name").value = profile.first_name ?? "";
+  document.getElementById("last_name").value = profile.last_name ?? "";
 }
 
 function rolEtiketi(role) {
@@ -50,11 +51,12 @@ function wireProfileForm(profile) {
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const full_name = form.full_name.value.trim();
+    const first_name = form.first_name.value.trim();
+    const last_name = form.last_name.value.trim();
 
     const { error } = await supabase
       .from("profiles")
-      .update({ full_name }) // "role" kolonu burada YOK — trigger zaten engeller ama en baştan göndermiyoruz
+      .update({ first_name, last_name }) // "role" ve "full_name" kolonları burada YOK — full_name artık generated, elle yazılamaz; role trigger tarafından zaten engellenir
       .eq("id", profile.id);
 
     if (error) {
@@ -616,9 +618,26 @@ function wireEpostaYardimMesajLink() {
 }
 
 function wireLogout() {
-  document.getElementById("cikis-btn")?.addEventListener("click", async () => {
-    await supabase.auth.signOut();
-    window.location.href = "/";
+  document.getElementById("cikis-btn")?.addEventListener("click", async (e) => {
+    // href="#" olduğu için preventDefault ŞART — yoksa tarayıcı sayfanın en
+    // üstüne atlar ve (bazı durumlarda) aşağıdaki async işlemi de yarım
+    // bırakabilir izlenimi verir.
+    e.preventDefault();
+    const btn = e.currentTarget;
+    btn.style.pointerEvents = "none";
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) console.error("signOut hatası (yine de yönlendiriliyor):", error);
+    } catch (err) {
+      // signOut() bazen (ör. zaten süresi dolmuş/geçersiz oturum) hata
+      // fırlatabilir — önceden bu durumda catch/finally olmadığı için
+      // yönlendirme hiç ÇALIŞMIYORDU ve buton "tepkisiz" görünüyordu.
+      // Oturum zaten geçersizse kullanıcı fiilen çıkmış demektir, yine de
+      // anasayfaya yönlendiriyoruz.
+      console.error("signOut() beklenmedik hata (yine de yönlendiriliyor):", err);
+    } finally {
+      window.location.href = "/";
+    }
   });
 }
 
