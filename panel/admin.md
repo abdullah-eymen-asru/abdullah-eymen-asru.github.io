@@ -11,18 +11,16 @@ permalink: "/panel/admin.html"
 <div id="app" hidden>
   <h1>Admin Paneli</h1>
 
-  <div class="admin-layout">
+  <nav id="admin-nav" class="admin-tabs">
+    <a href="#kullanicilar" data-section="kullanicilar" class="active">👤 Kullanıcılar &amp; Roller</a>
+    <a href="#icerik-ekle" data-section="icerik-ekle">📝 Özel İçerik Ekle/Düzenle</a>
+    <a href="#icerikler" data-section="icerikler">📚 Mevcut Özel İçerikler</a>
+    <a href="#dosya-paylasim" data-section="dosya-paylasim">🔗 R2 Dosya Paylaşımı</a>
+    <a href="#mesajlar" data-section="mesajlar">💬 Mesajlar</a>
+    <a href="#hesabim" data-section="hesabim">⚙️ Hesabım</a>
+  </nav>
 
-    <nav id="admin-nav" class="admin-nav">
-      <a href="#kullanicilar" data-section="kullanicilar" class="active">👤 Kullanıcılar &amp; Roller</a>
-      <a href="#icerik-ekle" data-section="icerik-ekle">📝 Özel İçerik Ekle/Düzenle</a>
-      <a href="#icerikler" data-section="icerikler">📚 Mevcut Özel İçerikler</a>
-      <a href="#dosya-paylasim" data-section="dosya-paylasim">🔗 R2 Dosya Paylaşımı</a>
-      <a href="#mesajlar" data-section="mesajlar">💬 Mesajlar</a>
-      <a href="#hesabim" data-section="hesabim">⚙️ Hesabım</a>
-    </nav>
-
-    <div class="admin-content">
+  <div class="panel-grid">
 
       <section id="kullanicilar" class="panel-section">
         <h2>Kullanıcılar &amp; Roller</h2>
@@ -215,7 +213,6 @@ permalink: "/panel/admin.html"
         <p style="margin-top:16px;"><a href="{{ '/panel/panel.html' | relative_url }}">← Panelim sayfasına git (şifre değiştir, 2FA, KVKK)</a></p>
       </section>
 
-    </div>
   </div>
 </div>
 
