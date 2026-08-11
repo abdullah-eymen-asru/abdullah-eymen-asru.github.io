@@ -12,6 +12,23 @@ permalink: "/hesap/kayit.html"
   <div id="auth-message" class="auth-message" hidden></div>
   <div id="auth-spam-notice" class="auth-spam-notice" hidden></div>
 
+  <!-- KVKK onayı BİLEREK formun dışında, en üstte duruyor: hem e-posta/şifre
+       ile kayıtta hem de aşağıdaki "Google ile Kayıt Ol" butonunda ortak
+       kullanılıyor (Google'ın kendi ekranında KVKK onayı almadığımız için
+       OAuth'u başlatmadan ÖNCE bunun işaretli olması zorunlu tutuluyor —
+       bkz. assets/js/auth-pages.js). form="kayit-form" ile aşağıdaki forma
+       bağlı kaldığı için normal kayıt gönderiminde de değeri okunur. -->
+  <div class="form-field">
+    <label style="display:flex; gap:8px; align-items:flex-start; flex-direction:row; font-size:0.9rem; color:var(--text);">
+      <input id="kvkk_onay" name="kvkk_onay" type="checkbox" form="kayit-form" required style="margin-top:3px;">
+      <span>
+        <a href="{{ '/kurumsal/gizlilik-politikasi.html' | relative_url }}" target="_blank">KVKK Aydınlatma Metni ve Gizlilik Politikası</a>'nı
+        okudum, 6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında kişisel
+        verilerimin belirtilen şekilde işlenmesine açık rıza gösteriyorum.
+      </span>
+    </label>
+  </div>
+
   <button id="google-kayit-btn" type="button" class="btn-google">
     Google ile Kayıt Ol
   </button>
@@ -33,16 +50,6 @@ permalink: "/hesap/kayit.html"
     <div class="form-field">
       <label for="password_again">Şifre (Tekrar)</label>
       <input id="password_again" name="password_again" type="password" autocomplete="new-password" minlength="8" required>
-    </div>
-    <div class="form-field">
-      <label style="display:flex; gap:8px; align-items:flex-start; flex-direction:row; font-size:0.9rem; color:var(--text);">
-        <input id="kvkk_onay" name="kvkk_onay" type="checkbox" required style="margin-top:3px;">
-        <span>
-          <a href="{{ '/kurumsal/gizlilik-politikasi.html' | relative_url }}" target="_blank">KVKK Aydınlatma Metni ve Gizlilik Politikası</a>'nı
-          okudum, 6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında kişisel
-          verilerimin belirtilen şekilde işlenmesine açık rıza gösteriyorum.
-        </span>
-      </label>
     </div>
     <button type="submit" class="btn-primary">Kayıt Ol</button>
   </form>
