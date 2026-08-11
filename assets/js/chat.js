@@ -180,8 +180,10 @@ export async function wireUserChat(profile) {
         }
         await konusmalariYukle();
       });
-    }); (ör. admin sildiyse — şu
-    // an silme özelliği yok ama ileriye dönük güvenlik) seçimi temizle.
+    });
+
+    // Seçili konuşma bir sebeple listeden kalktıysa (ör. az önce SİLİNDİYSE,
+    // ya da admin/başka bir sekmede silindiyse) seçimi temizle.
     if (SECILI_KONUSMA && !KONUSMALAR.some((k) => k.id === SECILI_KONUSMA)) {
       SECILI_KONUSMA = null;
       threadListEl.innerHTML = `<p class="chat-bos">Bir sohbet seç.</p>`;
@@ -392,6 +394,7 @@ export async function wireAdminChat(adminId) {
         await konusmalariYukle();
       });
     });
+    document.getElementById("chat-filtre-temizle")?.addEventListener("click", () => {
       SECILI_UYE = null;
       konusmaListesiniCiz();
     });
