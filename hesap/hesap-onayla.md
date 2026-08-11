@@ -2,10 +2,9 @@
 layout: default
 title: "Hesabı Onayla"
 yayinda: true
+auth_css: true
 permalink: "/hesap/hesap-onayla.html"
 ---
-
-<link rel="stylesheet" href="{{ '/assets/css/auth.css' | relative_url }}">
 
 <div class="auth-box">
   <h1>Hesabı Onayla</h1>
