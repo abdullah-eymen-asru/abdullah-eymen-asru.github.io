@@ -209,6 +209,12 @@
   margin-top: 0;
   font-size: 1.1rem;
 }
+/* Bir bölüme ("#mesajlar" gibi) linkle/anchor ile veya JS'in
+   scrollIntoView'ıyla atlarken, sticky header (.site-header, yüksekliği
+   ~64-70px) başlığın üst kısmını KAPATMASIN diye biraz pay bırakıyoruz. */
+.panel-section {
+  scroll-margin-top: 84px;
+}
 
 /* NOT: profil fotoğrafı yükleme özelliği (avatar-row/avatar-preview)
    kaldırıldığı için buradaki eski stiller de temizlendi — bkz. migration
@@ -234,7 +240,7 @@
 .rol-tablo {
   width: 100%;
   min-width: 640px; /* butonların/son sütunun sıkışıp kırpılmasını önler — dar
-                        ekranlarda .admin-content .rol-tablo-wrap zaten
+                        ekranlarda .rol-tablo-wrap zaten
                         overflow-x:auto olduğu için yatay kaydırma çıkar */
   border-collapse: collapse;
 }
@@ -276,59 +282,59 @@
 }
 
 /* ------------------------------------------------------------------------
- * ADMİN PANELİ: bölüm (section) bazlı düzen. Sayfa artık tek bir uzun
- * kaydırma değil — solda sabit (sticky) bir menü var, tıklanan bölüme
- * kayar. Mobilde menü üstte yatay bir şerit olarak görünür.
+ * ADMİN PANELİ (ve GitHub İçerik Yönetimi) — bölüm bazlı sayfa içi gezinme.
+ *
+ * BUG FİX (düzeltildi): Burada ÖNCEDEN, sayfayı sola sabit (sticky) bir
+ * menü + sağda içerik olacak şekilde İKİ SÜTUNLU bir grid'e (".admin-layout
+ * { grid-template-columns: 220px 1fr }") bölen bir düzen vardı. Sorun:
+ * ".panel-section--wide" (Mesajlar bölümü) bu ikinci sütunun (".admin-
+ * content") İÇİNDE kalıyordu ve ".panel-section--wide" kuralı sayfayı
+ * ".wrap" (860px, ortalanmış) sınırının dışına, VIEWPORT'A göre ortalayarak
+ * taşıracak şekilde tasarlanmıştı (bkz. aşağıdaki kural). Bu hesap sadece
+ * doğrudan ".wrap" içinde, SİMETRİK ortalanmış bir ebeveyn için doğru
+ * çalışır — 220px'lik sol sütun yüzünden ".admin-content" ARTIK simetrik
+ * ortalanmış değildi, bu da "Mesajlar" kutusunun sayfanın çok soluna kayıp
+ * diğer kartlarla hizasız/iç içe geçmiş görünmesine yol açıyordu (ekran
+ * kaydında bildirilen "karışık sayfa" sorununun kök nedeni buydu).
+ *
+ * ÇÖZÜM: İki sütunlu sidebar yerine, normal bir hesap sayfası gibi TEK
+ * sütunlu, üstten alta akan basit bir düzene geçtik — tıpkı panel.md
+ * (Panelim) sayfasındaki gibi. Bölümler arasında hızlı atlama için üstte
+ * yatay, sticky OLMAYAN bir "sekme" şeridi (.admin-tabs) kalıyor, ama artık
+ * hiçbir bölüm ayrı bir sütunun içine "gömülmüyor" — hepsi aynı ".panel-
+ * grid" içinde, panel.md ile birebir aynı şekilde davranıyor.
  * ---------------------------------------------------------------------- */
-.admin-layout {
-  display: grid;
-  grid-template-columns: 220px 1fr;
-  gap: 24px;
-  align-items: start;
-}
-.admin-nav {
-  position: sticky;
-  top: 16px;
+.admin-tabs {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 24px;
+  padding: 10px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--card-bg);
 }
-.admin-nav a {
-  padding: 10px 12px;
+.admin-tabs a {
+  padding: 9px 12px;
   border-radius: 8px;
   text-decoration: none;
   color: var(--text);
-  font-size: 0.92rem;
-  transition: background 0.15s ease;
+  font-size: 0.88rem;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
 }
-.admin-nav a:hover { background: var(--tag-bg); }
-.admin-nav a.active {
+.admin-tabs a:hover { background: var(--tag-bg); }
+.admin-tabs a.active {
   background: var(--accent);
   color: #fff;
 }
-.admin-content {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  min-width: 0;
-}
-.admin-content .panel-section {
-  scroll-margin-top: 16px;
-}
 
 @media (max-width: 760px) {
-  .admin-layout { grid-template-columns: 1fr; }
-  .admin-nav {
-    position: static;
-    flex-direction: row;
+  .admin-tabs {
+    flex-wrap: nowrap;
     overflow-x: auto;
     gap: 6px;
   }
-  .admin-nav a { white-space: nowrap; }
 
   /* Kullanıcı tablosu dar ekranda YATAY KAYDIRMA yerine KART görünümüne
      geçer — küçük ekranda kaydırarak buton aramak yerine her kullanıcı
