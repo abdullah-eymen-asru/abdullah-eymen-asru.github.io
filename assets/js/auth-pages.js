@@ -11,6 +11,46 @@ const REDIRECT_AFTER_LOGIN = "/panel/panel.html";
 // geri döndürür; Supabase SDK URL'deki token'ı otomatik yakalar.
 const SITE_ORIGIN = window.location.origin;
 
+const DELETE_ACCOUNT_FUNCTION_URL =
+  "https://eahvcirspmvntffzphye.supabase.co/functions/v1/delete-account";
+
+/**
+ * KVKK onayı olmadan (ör. "Google ile Giriş Yap"tan, hiç kayıt olmadan)
+ * oluşmuş bir hesabı TAMAMEN siler. Önceden burada sadece signOut()
+ * çağrılıyordu — bu, auth.users + profiles satırının veritabanında
+ * "kvkk_onay_verildi = false" durumunda KALICI olarak kalmasına yol
+ * açıyordu (admin panelinde/Supabase'te "üye" olarak görünmeye devam
+ * ediyordu). delete-account Edge Function'ı hedef id GÖNDERİLMEDEN
+ * çağrıldığında "çağıranın kendi hesabını sil" olarak çalışır — tam
+ * burada ihtiyacımız olan şey bu, çünkü kullanıcı şu an kendi (henüz
+ * KVKK onaylamamış) oturumuyla giriş yapmış durumda.
+ */
+async function kvkkOnaysizHesabiSilVeCikis() {
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      await fetch(DELETE_ACCOUNT_FUNCTION_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({}), // hedef yok -> kendini sil
+      });
+    }
+  } catch (err) {
+    // Silme isteği ağ hatasıyla başarısız olsa bile en azından oturumu
+    // kapatıyoruz — hesap veritabanında kalsa da kullanıcı bu tarayıcıda
+    // giriş yapmış görünmeyecek. (Kalıntı hesap, migration'daki tek
+    // seferlik temizlik betiğiyle veya admin panelinden silinebilir.)
+    console.error("KVKK onaysız hesap silinemedi:", err);
+  } finally {
+    await supabase.auth.signOut();
+  }
+}
+
 /*
  * GOOGLE İLE GİRİŞ/KAYIT — KVKK ONAYI SORUNU
  * ---------------------------------------------------------------------
@@ -167,11 +207,17 @@ function googleGirisDonusunuIsle(msg) {
       return;
     }
 
-    await supabase.auth.signOut();
+    // KVKK onayı yok -> bu Google hesabıyla hiç GERÇEK bir kayıt
+    // yapılmamış demektir. Önceden burada sadece signOut() yapılıyordu ve
+    // handle_new_user trigger'ının oluşturduğu auth.users + profiles
+    // satırı veritabanında KALICI olarak "üye" gibi görünmeye devam
+    // ediyordu (bkz. admin panel / Supabase Table Editor ekran
+    // görüntüleri). Şimdi hesabı gerçekten SİLİYORUZ.
     showMessage(
       msg,
       'Bu Google hesabıyla kayıtlı bir kullanıcı bulunamadı. Lütfen önce "Kayıt Ol" sayfasından Google ile kayıt ol.'
     );
+    await kvkkOnaysizHesabiSilVeCikis();
   }
 
   const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
@@ -217,7 +263,8 @@ export function initKayitPage() {
     const email = form.email.value.trim();
     const password = form.password.value;
     const passwordAgain = form.password_again.value;
-    const fullName = form.full_name.value.trim();
+    const firstName = form.first_name.value.trim();
+    const lastName = form.last_name.value.trim();
     const kvkkOnay = kvkkCheckbox?.checked ?? false;
 
     if (password !== passwordAgain) {
@@ -226,6 +273,10 @@ export function initKayitPage() {
     }
     if (password.length < 8) {
       showMessage(msg, "Şifre en az 8 karakter olmalı.");
+      return;
+    }
+    if (!firstName || !lastName) {
+      showMessage(msg, "Ad ve soyadını gir.");
       return;
     }
     if (!kvkkOnay) {
@@ -239,7 +290,8 @@ export function initKayitPage() {
       password,
       options: {
         data: {
-          full_name: fullName, // handle_new_user() trigger'ı bunu profiles.full_name'e kopyalar
+          first_name: firstName, // handle_new_user() trigger'ı bunu profiles.first_name'e kopyalar
+          last_name: lastName,   // handle_new_user() trigger'ı bunu profiles.last_name'e kopyalar
           kvkk_onay: true,
           kvkk_versiyon: KVKK_METIN_SURUMU,
         },
