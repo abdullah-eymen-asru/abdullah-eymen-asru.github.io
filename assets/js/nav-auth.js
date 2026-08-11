@@ -144,12 +144,34 @@ function renderHesapMenusu(container, role) {
     e.stopPropagation();
     menuyuAcKapa();
   });
-  document.addEventListener("click", (e) => {
+
+  // NOT: document'a eklenen "dışarı tıklayınca kapat" / "Escape ile kapat"
+  // dinleyicileri ÖNCEDEN her renderHesapMenusu() çağrısında (ör. başka
+  // bir sekmede giriş/çıkış yapılınca tetiklenen onAuthStateChange'de)
+  // YENİDEN ekleniyor, hiç kaldırılmıyordu — bu bir memory leak'ti ve
+  // zamanla document'ta onlarca yinelenen dinleyici birikip menü
+  // davranışının (kapatma/Escape) garip şekilde katlanarak tetiklenmesine
+  // yol açabiliyordu. Şimdi menü DOM'dan kaldırıldığında (yeni bir
+  // renderHesapMenusu/renderGirisLinki çağrısı container'ı temizlediğinde)
+  // bu dinleyicileri de KENDİMİZ temizliyoruz.
+  const disariTiklamaDinleyici = (e) => {
+    if (!wrap.isConnected) {
+      document.removeEventListener("click", disariTiklamaDinleyici);
+      document.removeEventListener("keydown", escDinleyici);
+      return;
+    }
     if (!wrap.contains(e.target)) menuyuKapat();
-  });
-  document.addEventListener("keydown", (e) => {
+  };
+  const escDinleyici = (e) => {
+    if (!wrap.isConnected) {
+      document.removeEventListener("click", disariTiklamaDinleyici);
+      document.removeEventListener("keydown", escDinleyici);
+      return;
+    }
     if (e.key === "Escape") menuyuKapat();
-  });
+  };
+  document.addEventListener("click", disariTiklamaDinleyici);
+  document.addEventListener("keydown", escDinleyici);
 
   wrap.appendChild(btn);
   wrap.appendChild(menu);
