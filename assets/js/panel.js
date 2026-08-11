@@ -17,21 +17,46 @@ const DELETE_ACCOUNT_FUNCTION_URL =
   "https://eahvcirspmvntffzphye.supabase.co/functions/v1/delete-account";
 
 async function init() {
+  // "Çıkış Yap" HER KOŞULDA çalışmalı — panelin geri kalanında (mesajlaşma,
+  // 2FA, özel içerikler...) bir hata çıksa bile. Önceden wireLogout() en
+  // SONDA çağrılıyordu; aradaki adımlardan biri (throw eden) tüm init()
+  // zincirini kesince wireLogout() HİÇ ÇALIŞMIYOR, buton tıklanabilir
+  // görünüyor ama hiçbir dinleyicisi olmadığı için sadece href="#" native
+  // davranışı (adres çubuğuna "#" eklenmesi) gerçekleşiyordu. Şimdi ilk iş
+  // bu.
+  wireLogout();
+
   const { session, profile } = await requireAuth({ role: null });
   document.getElementById("loading")?.setAttribute("hidden", "");
   document.getElementById("app").hidden = false;
 
-  renderProfile(profile);
-  wireProfileForm(profile);
-  wireEmailChange(profile);
-  wirePasswordChange();
-  wireDeleteAccount(session, profile);
-  wireKvkk(profile);
-  await wireMfa();
-  await loadOzelIcerikler();
-  await wireUserChat(profile);
-  wireEpostaYardimMesajLink();
-  wireLogout();
+  // Panelin geri kalanındaki HER bölüm birbirinden BAĞIMSIZ olarak
+  // kuruluyor: biri hata verirse (ör. bir DOM elemanı beklenmedik şekilde
+  // eksikse, ya da bir Supabase çağrısı beklenmeyen bir istisna fırlatırsa)
+  // sadece o bölüm "Yüklenemedi" gösterir, DİĞERLERİ etkilenmez. Önceden
+  // hepsi TEK BİR sıralı zincirdeydi — herhangi biri patlayınca ondan
+  // sonraki HER ŞEY (Özel İçerikler, Mesajlar, Çıkış butonu dahil) sonsuza
+  // kadar "Yükleniyor..." durumunda asılı kalıyordu.
+  const adimlar = [
+    ["profil formu", () => renderProfile(profile)],
+    ["profil formu (kaydet)", () => wireProfileForm(profile)],
+    ["e-posta değiştirme", () => wireEmailChange(profile)],
+    ["şifre değiştirme", () => wirePasswordChange()],
+    ["hesap silme", () => wireDeleteAccount(session, profile)],
+    ["KVKK", () => wireKvkk(profile)],
+    ["2FA", () => wireMfa()],
+    ["özel içerikler", () => loadOzelIcerikler()],
+    ["mesajlaşma", () => wireUserChat(profile)],
+    ["yöneticiyle mesajlaş linki", () => wireEpostaYardimMesajLink()],
+  ];
+
+  for (const [ad, fn] of adimlar) {
+    try {
+      await fn();
+    } catch (err) {
+      console.error(`panel.js: "${ad}" bölümü başlatılamadı:`, err);
+    }
+  }
 }
 
 function renderProfile(profile) {
@@ -39,6 +64,19 @@ function renderProfile(profile) {
   document.getElementById("panel-rol").textContent = rolEtiketi(profile.role);
   document.getElementById("first_name").value = profile.first_name ?? "";
   document.getElementById("last_name").value = profile.last_name ?? "";
+  guncelleAdSoyadBasligi(profile);
+}
+
+/** Üstteki "Ad Soyad · e-posta · Rol: ... · Çıkış Yap" satırındaki ad-soyad
+ * kısmını günceller. Ad/soyad hiç girilmemişse (ör. eski Google hesapları,
+ * ya da kullanıcı bilerek boş bırakmışsa) e-postayla tekrar tekrar aynı
+ * bilgiyi göstermemek için o kısmı tamamen gizliyoruz. */
+function guncelleAdSoyadBasligi(profile) {
+  const el = document.getElementById("panel-ad-soyad");
+  if (!el) return;
+  const adSoyad = [profile.first_name, profile.last_name].filter(Boolean).join(" ").trim();
+  el.textContent = adSoyad;
+  el.hidden = !adSoyad;
 }
 
 function rolEtiketi(role) {
@@ -54,15 +92,36 @@ function wireProfileForm(profile) {
     const first_name = form.first_name.value.trim();
     const last_name = form.last_name.value.trim();
 
-    const { error } = await supabase
+    const { data: guncellenen, error } = await supabase
       .from("profiles")
       .update({ first_name, last_name }) // "role" ve "full_name" kolonları burada YOK — full_name artık generated, elle yazılamaz; role trigger tarafından zaten engellenir
-      .eq("id", profile.id);
+      .eq("id", profile.id)
+      .select("id, first_name, last_name")
+      .single();
 
     if (error) {
       showMessage(msg, "Kaydedilemedi: " + error.message);
       return;
     }
+    if (!guncellenen) {
+      // RLS "with check" koşulunu geçemezse ya da satır bulunamazsa
+      // PostgREST bazen açık bir hata DÖNDÜRMadan 0 satır etkiler —
+      // .select().single() eklememizin sebebi tam olarak bu "sessiz
+      // başarısızlık" ihtimalini yakalamak: veri gerçekten dönmediyse
+      // kullanıcıyı "kaydedildi" diye YANILTMIYORUZ.
+      showMessage(msg, "Kaydedilemedi: değişiklik veritabanına yansımadı, lütfen tekrar dene.");
+      return;
+    }
+    // Kaydedilen değerleri hem yerel "profile" nesnesine hem de üstteki
+    // başlık satırına YANSITIYORUZ — önceden bu satır sadece sayfa ilk
+    // açıldığında dolduruluyordu, kullanıcı adını değiştirip kaydedince
+    // sayfayı YENİLEMEDEN üstte hâlâ eski (veya hiç) isim görünüyordu; bu,
+    // "kullanıcı güncelleme yapsa da sistemde değişmiyor" izlenimine yol
+    // açan görsel bir gecikmeydi (veritabanı aslında doğru güncelleniyordu).
+    profile.first_name = first_name || null;
+    profile.last_name = last_name || null;
+    guncelleAdSoyadBasligi(profile);
+
     showMessage(msg, "Profil güncellendi.", "success");
   });
 }
@@ -536,7 +595,18 @@ function wireDeleteAccount(session, profile) {
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || "Bilinmeyen hata");
 
-      await supabase.auth.signOut();
+      // Hesap Edge Function tarafından zaten SİLİNDİ — buradan sonrası
+      // sadece yerel oturum temizliği. signOut() bu noktada hata verirse
+      // (silinen bir kullanıcının oturumunu kapatmaya çalışmak bazı
+      // durumlarda hataya yol açabilir) bunu AYRI bir try/catch'e alıyoruz;
+      // önceden tek bir try bloğunun içindeydi ve signOut() patlarsa kod
+      // catch bloğuna düşüp YANLIŞLIKLA "Hesap silinemedi" mesajı
+      // gösteriyordu — oysa hesap gerçekten silinmiş oluyordu.
+      try {
+        await supabase.auth.signOut();
+      } catch (signOutErr) {
+        console.error("Hesap silindi ama signOut() hata verdi (önemli değil):", signOutErr);
+      }
       alert("Hesabın silindi. Anasayfaya yönlendiriliyorsun.");
       window.location.href = "/";
     } catch (err) {
