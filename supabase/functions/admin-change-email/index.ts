@@ -31,10 +31,18 @@
 //   e-postayı zaten doğrulanmış sayar ve YENİ adrese bile onay maili
 //   GÖNDERMEZ; değişiklik anında (hiçbir mail beklemeden) kesinleşir.
 //   Eski adrese de HİÇBİR mail gitmez. Admin API, client API'nin tabi
-//   olduğu "Secure email change" kuralından muaftır. Ayrıca bu fonksiyon,
-//   auth.users güncellemesinin ardından public.profiles.email'i de
-//   service_role ile senkron eder (migration 0008'deki veritabanı
-//   trigger'ıyla birlikte çift güvence).
+//   olduğu "Secure email change" kuralından muaftır. Ayrıca bu fonksiyon:
+//     - auth.users güncellemesinin ardından public.profiles.email'i de
+//       service_role ile senkron eder (migration 0008'deki veritabanı
+//       trigger'ıyla birlikte çift güvence),
+//     - GÜVENLİK: hesabın (eski adresle açılmış) TÜM oturumlarını
+//       sonlandırır (migration 0009 -> admin_force_signout_user RPC'si),
+//       çünkü e-posta admin tarafından değiştirildiyse eski adrese kimin
+//       eriştiği belirsizdir,
+//     - yeni adrese, e-postasının değiştiğini bildiren GERÇEK bir mail
+//       gönderir (resetPasswordForEmail ile Supabase'in dahili "Reset
+//       Password" mail şablonu üzerinden — ayrı bir SMTP kurulumu
+//       GEREKTİRMEZ).
 //
 // Deploy:  supabase functions deploy admin-change-email
 // Secrets: SUPABASE_URL ve SUPABASE_SERVICE_ROLE_KEY, Edge Function
@@ -196,12 +204,57 @@ Deno.serve(async (req) => {
       console.error("profiles.email senkron güncellemesi başarısız (trigger yine de yakalamış olabilir):", profileUpdateErr);
     }
 
+    // 6) GÜVENLİK: e-posta admin tarafından değiştirildiği için, bu
+    //    hesabın (eski adresle) açık kalmış TÜM oturumlarını sonlandırıyoruz
+    //    — kullanıcı e-postasını kaybettiği için hesabına kimin eriştiği
+    //    belirsizdir; e-posta değiştikten sonra herkesin (gerçek sahibi
+    //    dahil) yeniden giriş yapması gerekir. Migration 0009'daki
+    //    admin_force_signout_user() RPC'sini kullanıyoruz (bkz. o dosya —
+    //    Supabase'in admin API'sinde "şu user_id'yi çıkışa zorla" diye
+    //    doğrudan bir fonksiyon yoktur, bu yüzden refresh token'ları
+    //    veritabanı seviyesinde iptal ediyoruz).
+    const { error: signOutErr } = await adminClient.rpc("admin_force_signout_user", {
+      p_user_id: hedefKullaniciId,
+    });
+    if (signOutErr) {
+      // Kritik değil — e-posta zaten değişti, bu sadece EK bir güvenlik
+      // adımı. Fonksiyon migration 0009 deploy edilmemişse burada hata
+      // alınabilir; isteği yine de başarılı sayıyoruz.
+      console.error("Kullanıcının eski oturumları sonlandırılamadı (RPC bulunamadı olabilir, migration 0009'u çalıştırdığından emin ol):", signOutErr);
+    }
+
+    // 7) BİLGİLENDİRME MAİLİ: yeni adrese, e-postasının site yöneticisi
+    //    tarafından değiştirildiğini bildiren bir mail gönderiyoruz. Ekstra
+    //    bir e-posta servisi/SMTP anahtarı KURULUMU GEREKMİYOR — Supabase'in
+    //    kendi dahili mail sistemini (Dashboard > Authentication > Emails)
+    //    kullanıyoruz.
+    //    ÖNEMLİ DÜZELTME: `auth.admin.generateLink()` bir e-posta
+    //    GÖNDERMEZ — sadece bir link/OTP ÜRETİP DÖNDÜRÜR, gönderme işini
+    //    çağırana bırakır (resmi dokümantasyon: "This will not send links
+    //    or OTPs to the end user"). İlk yazdığımız sürüm yanlışlıkla bunu
+    //    "mail gönderir" sanıyordu — hiçbir mail GİTMİYORDU. Gerçekten mail
+    //    GÖNDEREN ve ekstra kurulum istemeyen resmi yöntem
+    //    `resetPasswordForEmail()`'dir: Supabase bunun için "Reset
+    //    Password" e-posta şablonunu kullanıp GERÇEKTEN postalar. Şablon
+    //    metnini Dashboard'dan "E-postanız güncellendi, giriş yapmak için
+    //    tıkla / şifreni sıfırlamak istersen..." şeklinde özelleştirebilirsin.
+    let bildirimMailiGonderildi = true;
+    try {
+      const { error: mailErr } = await adminClient.auth.resetPasswordForEmail(yeniEposta);
+      if (mailErr) throw mailErr;
+    } catch (mailErr) {
+      bildirimMailiGonderildi = false;
+      console.error("Bildirim maili gönderilemedi (e-posta değişikliği yine de tamamlandı):", mailErr);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         hedef_id: hedefKullaniciId,
         eski_eposta: hedefKullanici.email,
         yeni_eposta: yeniEposta,
+        eski_oturumlar_sonlandirildi: !signOutErr,
+        bildirim_maili_gonderildi: bildirimMailiGonderildi,
       }),
       { status: 200, headers }
     );
