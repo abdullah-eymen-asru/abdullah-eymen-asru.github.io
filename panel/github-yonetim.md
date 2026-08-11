@@ -22,16 +22,14 @@ permalink: "/panel/github-yonetim.html"
     çalışır; sadece sana (yöneticiye) özeldir.
   </p>
 
-  <div class="admin-layout">
+  <nav id="gy-nav" class="admin-tabs">
+    <a href="#baglanti" data-section="baglanti" class="active">🔑 GitHub Bağlantısı</a>
+    <a href="#icerik-ekle" data-section="icerik-ekle">📝 İçerik Ekle / Düzenle</a>
+    <a href="#icerikler" data-section="icerikler">📚 Mevcut İçerikler</a>
+    <a href="#profil-foto" data-section="profil-foto">🖼️ Profil Fotoğrafı</a>
+  </nav>
 
-    <nav id="gy-nav" class="admin-nav">
-      <a href="#baglanti" data-section="baglanti" class="active">🔑 GitHub Bağlantısı</a>
-      <a href="#icerik-ekle" data-section="icerik-ekle">📝 İçerik Ekle / Düzenle</a>
-      <a href="#icerikler" data-section="icerikler">📚 Mevcut İçerikler</a>
-      <a href="#profil-foto" data-section="profil-foto">🖼️ Profil Fotoğrafı</a>
-    </nav>
-
-    <div class="admin-content">
+  <div class="panel-grid">
 
       <section id="baglanti" class="panel-section">
         <h2>GitHub Bağlantısı</h2>
@@ -230,7 +228,6 @@ permalink: "/panel/github-yonetim.html"
         <div id="pf-message" class="auth-message" hidden></div>
       </section>
 
-    </div>
   </div>
 </div>
 
