@@ -98,7 +98,7 @@ async function temizleSuresiGecmisErisimler() {
 async function loadUsers() {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, email, full_name, role, created_at, kvkk_onay_verildi, kvkk_onay_tarihi")
+    .select("id, email, first_name, last_name, full_name, role, created_at, kvkk_onay_verildi, kvkk_onay_tarihi")
     .order("created_at", { ascending: false });
 
   const tbody = document.getElementById("kullanici-tablo-govde");
@@ -142,7 +142,13 @@ function renderUserTable(kullanicilar) {
     .map(
       (u) => `
       <tr data-id="${u.id}">
-        <td>${escapeHtml(u.full_name || "—")}<br><span class="muted">${escapeHtml(u.email)}</span></td>
+        <td>
+          <div class="admin-isim-duzenle" data-id="${u.id}">
+            <input class="admin-isim-input" data-alan="first_name" data-id="${u.id}" type="text" value="${escapeHtml(u.first_name || "")}" placeholder="Ad" style="width:48%;display:inline-block;">
+            <input class="admin-isim-input" data-alan="last_name" data-id="${u.id}" type="text" value="${escapeHtml(u.last_name || "")}" placeholder="Soyad" style="width:48%;display:inline-block;">
+          </div>
+          <span class="muted">${escapeHtml(u.email)}</span>
+        </td>
         <td>${new Date(u.created_at).toLocaleDateString("tr-TR")}</td>
         <td>
           <select class="rol-select" data-id="${u.id}">
@@ -185,6 +191,43 @@ function renderUserTable(kullanicilar) {
         renderContentAssigneeOptions(TUM_KULLANICILAR);
       }
       setTimeout(() => (durum.textContent = ""), 2500);
+    });
+  });
+
+  // Admin, bir üyenin Ad/Soyadını doğrudan tablodan (ayrı ayrı) düzenleyip
+  // kaydedebilir. change/blur'da kaydediyoruz (her tuş vuruşunda değil).
+  // NOT: full_name'e artık hiçbir yerden YAZILMIYOR — o kolon
+  // first_name+last_name'den otomatik (generated) türetiliyor, bu isteğin
+  // dördüncü maddesi ("her yerde otomatik değişsin") tam olarak bunu
+  // sağlıyor: admin burada değiştirsin ya da kullanıcı kendi panelinden
+  // değiştirsin, full_name (ve dolayısıyla arama/gösterim) her yerde aynı
+  // anda güncel olur.
+  tbody.querySelectorAll(".admin-isim-input").forEach((input) => {
+    input.addEventListener("change", async () => {
+      const userId = input.dataset.id;
+      const alan = input.dataset.alan; // "first_name" | "last_name"
+      const deger = input.value.trim();
+      const durum = tbody.querySelector(`.rol-durum[data-id="${userId}"]`);
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({ [alan]: deger || null })
+        .eq("id", userId);
+
+      if (durum) {
+        durum.textContent = error ? "Hata!" : "Kaydedildi ✓";
+        durum.className = error ? "rol-durum rol-durum--hata" : "rol-durum rol-durum--ok";
+        setTimeout(() => (durum.textContent = ""), 2500);
+      }
+      if (error) {
+        console.error("İsim güncellenemedi:", error);
+        return;
+      }
+      const kullanici = TUM_KULLANICILAR.find((u) => u.id === userId);
+      if (kullanici) {
+        kullanici[alan] = deger || null;
+        kullanici.full_name = [kullanici.first_name, kullanici.last_name].filter(Boolean).join(" ");
+      }
     });
   });
 
