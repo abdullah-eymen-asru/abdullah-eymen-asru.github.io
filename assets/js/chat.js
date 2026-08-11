@@ -61,14 +61,36 @@ function mesajListesiniCiz(listEl, mesajlar, benimId) {
   listEl.scrollTop = listEl.scrollHeight;
 }
 
-/** Konuşma listesindeki tek bir satırın HTML'i — hem üye hem admin tarafında ortak. */
+/** Konuşma listesindeki tek bir satırın HTML'i — hem üye hem admin tarafında
+ * ortak. Satır artık İKİ ayrı butondan oluşuyor: soldaki geniş buton
+ * (".msg-konusma-sec") konuşmayı seçer, sağdaki küçük "✕" butonu
+ * (".msg-konusma-sil") konuşmayı SİLER — ikisi kardeş elemanlar (bir
+ * <button> içine başka bir <button> koymak geçersiz HTML olduğu için satırın
+ * dış kabı artık bir <div>). */
 function konusmaOgesiHtml({ id, baslikMetni, konu, sonMesaj, aktif }) {
   return `
-    <button type="button" class="msg-konusma-item ${aktif ? "active" : ""}" data-id="${id}">
-      <span class="msg-konusma-baslik">${escapeHtml(baslikMetni)}</span>
-      <span class="msg-konusma-konu">${escapeHtml(konu)}</span>
-      ${sonMesaj ? `<span class="msg-konusma-onizleme">${escapeHtml(sonMesaj)}</span>` : ""}
-    </button>`;
+    <div class="msg-konusma-item ${aktif ? "active" : ""}" data-id="${id}">
+      <button type="button" class="msg-konusma-sec" data-id="${id}">
+        <span class="msg-konusma-baslik">${escapeHtml(baslikMetni)}</span>
+        <span class="msg-konusma-konu">${escapeHtml(konu)}</span>
+        ${sonMesaj ? `<span class="msg-konusma-onizleme">${escapeHtml(sonMesaj)}</span>` : ""}
+      </button>
+      <button type="button" class="msg-konusma-sil" data-id="${id}" title="Bu sohbeti sil" aria-label="Bu sohbeti sil">✕</button>
+    </div>`;
+}
+
+/** Bir konuşmayı (ve içindeki tüm mesajları — CASCADE ile otomatik) siler.
+ * Onay ister, hata olursa msgEl'de gösterir. Başarılıysa true döner. */
+async function konusmaSil(id, msgEl) {
+  if (!confirm("Bu sohbeti ve içindeki TÜM mesajları kalıcı olarak silmek istediğine emin misin? Bu işlem geri alınamaz.")) {
+    return false;
+  }
+  const { error } = await supabase.from("conversations").delete().eq("id", id);
+  if (error) {
+    showMessage(msgEl, "Sohbet silinemedi: " + error.message);
+    return false;
+  }
+  return true;
 }
 
 /** conversation_id listesi için, her konuşmanın SON mesajını (önizleme) tek sorguda getirir. */
@@ -141,11 +163,24 @@ export async function wireUserChat(profile) {
             })
           ).join("");
 
-    listPaneEl.querySelectorAll(".msg-konusma-item").forEach((btn) => {
+    listPaneEl.querySelectorAll(".msg-konusma-sec").forEach((btn) => {
       btn.addEventListener("click", () => konusmaSec(btn.dataset.id));
     });
-
-    // Seçili konuşma bir sebeple listeden kalktıysa (ör. admin sildiyse — şu
+    listPaneEl.querySelectorAll(".msg-konusma-sil").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.id;
+        const basarili = await konusmaSil(id, msg);
+        if (!basarili) return;
+        if (SECILI_KONUSMA === id) {
+          SECILI_KONUSMA = null;
+          threadListEl.innerHTML = `<p class="chat-bos">Bir sohbet seç.</p>`;
+          form.hidden = true;
+          baslikEl.textContent = "Bir sohbet seç veya yeni sohbet başlat.";
+          panelEl.classList.remove("msg-panel--thread-aktif");
+        }
+        await konusmalariYukle();
+      });
+    }); (ör. admin sildiyse — şu
     // an silme özelliği yok ama ileriye dönük güvenlik) seçimi temizle.
     if (SECILI_KONUSMA && !KONUSMALAR.some((k) => k.id === SECILI_KONUSMA)) {
       SECILI_KONUSMA = null;
@@ -339,10 +374,24 @@ export async function wireAdminChat(adminId) {
 
     listPaneEl.innerHTML = ustBar + `<div class="msg-konusma-liste-ic">${listeHtml}</div>`;
 
-    listPaneEl.querySelectorAll(".msg-konusma-item").forEach((btn) => {
+    listPaneEl.querySelectorAll(".msg-konusma-sec").forEach((btn) => {
       btn.addEventListener("click", () => konusmaSec(btn.dataset.id));
     });
-    document.getElementById("chat-filtre-temizle")?.addEventListener("click", () => {
+    listPaneEl.querySelectorAll(".msg-konusma-sil").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.id;
+        const basarili = await konusmaSil(id, msg);
+        if (!basarili) return;
+        if (SECILI_KONUSMA === id) {
+          SECILI_KONUSMA = null;
+          threadListEl.innerHTML = "";
+          form.hidden = true;
+          baslikEl.textContent = "Bir konuşma seç.";
+          panelEl.classList.remove("msg-panel--thread-aktif");
+        }
+        await konusmalariYukle();
+      });
+    });
       SECILI_UYE = null;
       konusmaListesiniCiz();
     });
