@@ -165,18 +165,34 @@ permalink: "/panel/admin.html"
         </div>
       </section>
 
-      <section id="mesajlar" class="panel-section">
+      <section id="mesajlar" class="panel-section panel-section--wide">
         <h2>Mesajlar</h2>
-        <p class="muted">Üyelerin sana gönderdiği mesajlar. Soldan bir konuşma seç.</p>
-        <div id="chat-admin" class="chat-admin-layout">
-          <div id="chat-konusma-liste" class="chat-konusma-liste"><p class="chat-bos">Yükleniyor...</p></div>
-          <div class="chat-box">
-            <p id="chat-secili-kullanici" class="muted" style="padding:10px 12px 0;">Bir konuşma seç.</p>
-            <div id="chat-mesaj-liste-admin" class="chat-mesaj-liste"></div>
-            <form id="chat-form-admin" class="chat-form" novalidate hidden>
-              <textarea id="chat-metin-admin" placeholder="Yanıtını yaz..." required></textarea>
-              <button type="submit">Gönder</button>
-            </form>
+        <p class="muted">
+          Üyelerin sana gönderdiği tüm konuşmalar burada. Soldan bir konuşma
+          seç, ya da yukarıdan isim/e-posta ile üye arayıp onunla yeni bir
+          konuşma başlat.
+        </p>
+        <div id="chat-admin">
+          <div id="chat-panel-admin" class="msg-panel msg-panel--admin">
+            <aside class="msg-list-pane">
+              <div class="msg-list-header">
+                <input id="chat-uye-arama" type="search" class="msg-uye-arama" placeholder="Üye ara (isim veya e-posta)...">
+                <div id="chat-uye-arama-sonuc" class="msg-uye-arama-sonuc" hidden></div>
+              </div>
+              <div id="chat-konusma-liste" class="msg-konusma-liste"><p class="chat-bos">Yükleniyor...</p></div>
+            </aside>
+
+            <div class="msg-thread-pane">
+              <div class="msg-thread-header">
+                <button type="button" id="chat-geri-btn-admin" class="msg-geri-btn" aria-label="Sohbet listesine dön">←</button>
+                <span id="chat-thread-baslik-admin" class="msg-thread-baslik">Bir konuşma seç.</span>
+              </div>
+              <div id="chat-mesaj-liste-admin" class="chat-mesaj-liste"></div>
+              <form id="chat-form-admin" class="chat-form" novalidate hidden>
+                <textarea id="chat-metin-admin" placeholder="Yanıtını yaz..." required></textarea>
+                <button type="submit">Gönder</button>
+              </form>
+            </div>
           </div>
         </div>
         <div id="chat-message-admin" class="auth-message" hidden></div>
