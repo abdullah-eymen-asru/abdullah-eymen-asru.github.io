@@ -285,7 +285,7 @@ export function initKayitPage() {
     }
 
     submitBtn.disabled = true;
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -301,11 +301,25 @@ export function initKayitPage() {
     submitBtn.disabled = false;
 
     if (error) {
-      if (error.message.includes("already registered")) {
-        showMessage(msg, "Bu e-posta zaten kayıtlı. Giriş yapmayı dene.");
+      if (error.message.includes("already registered") || error.message.includes("already been registered")) {
+        showMessage(msg, "Bu e-postayla zaten bir hesabın var, kayıt olmana gerek yok. Giriş yapmayı dene.");
       } else {
         showMessage(msg, "Kayıt olunamadı: " + error.message);
       }
+      return;
+    }
+
+    // NOT: Supabase, "Enable email confirmations" açıkken ve girilen e-posta
+    // zaten ONAYLANMIŞ bir hesaba aitse HATA DÖNDÜRMEZ (e-posta numarası
+    // taraması/enumeration yapılabilmesin diye) — bunun yerine identities
+    // dizisi BOŞ olan, gerçek olmayan ("obfuscated") bir kullanıcı nesnesi
+    // döner. Bu, "hesap zaten var" durumunun tek güvenilir istemci taraflı
+    // göstergesidir; bu kontrol olmadan kullanıcı "kayıt alındı, e-postanı
+    // kontrol et" mesajını görür ama gerçekte hiçbir mail gelmez ve hiçbir
+    // yeni hesap açılmaz (Google ile kayıtta da aynı e-posta zaten kayıtlıysa
+    // aynı otomatik-bağlama davranışı geçerlidir, bkz. googleKayitDonusunuIsle).
+    if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      showMessage(msg, "Bu e-postayla zaten bir hesabın var, kayıt olmana gerek yok. Giriş yapmayı dene.");
       return;
     }
 
@@ -366,6 +380,29 @@ function googleKayitDonusunuIsle(msg) {
     tamamlandi = true;
     authListener?.subscription?.unsubscribe();
     sessionStorage.removeItem(GOOGLE_KAYIT_INTENT_KEY);
+
+    // Supabase, aynı (onaylı) e-postayla gelen bir OAuth girişini OTOMATİK
+    // olarak var olan hesaba bağlar — yeni bir hesap AÇMAZ. Yani bu Google
+    // girişi aslında daha önce e-posta/şifre (ya da başka bir yoldan) zaten
+    // kayıt olmuş birine denk geliyor olabilir. kvkk_onay_verildi=true ise
+    // bu hesap zaten GERÇEKTEN kayıtlı demektir — kullanıcıya "tekrar kayıt
+    // olmana gerek yok" diyoruz ve onun önceden verdiği KVKK onayının
+    // ÜZERİNE YAZMIYORUZ.
+    const { data: mevcutProfil, error: profilHata } = await supabase
+      .from("profiles")
+      .select("kvkk_onay_verildi")
+      .eq("id", session.user.id)
+      .single();
+
+    if (!profilHata && mevcutProfil?.kvkk_onay_verildi) {
+      showMessage(
+        msg,
+        "Bu e-postayla zaten bir hesabın var, kayıt olmana gerek yok. Seni hesabına giriş yaptırdık, panele yönlendiriliyorsun...",
+        "success"
+      );
+      setTimeout(() => (window.location.href = REDIRECT_AFTER_LOGIN), 1500);
+      return;
+    }
 
     const { error } = await supabase.rpc("kvkk_onayini_ver", { p_versiyon: KVKK_METIN_SURUMU });
     if (error) {
