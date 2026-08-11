@@ -41,6 +41,7 @@ async function init() {
     ["profil formu", () => renderProfile(profile)],
     ["profil formu (kaydet)", () => wireProfileForm(profile)],
     ["e-posta değiştirme", () => wireEmailChange(profile)],
+    ["bağlı hesaplar", () => wireBagliHesaplar()],
     ["şifre değiştirme", () => wirePasswordChange()],
     ["hesap silme", () => wireDeleteAccount(session, profile)],
     ["KVKK", () => wireKvkk(profile)],
@@ -257,6 +258,38 @@ function wireEmailChange(profile) {
 
       epostaOnayDurumGuncelle(hedef, true);
       kodForm.hidden = true;
+
+      // İki onaydan biri tamamlandı — ama e-posta SADECE ikisi de
+      // onaylanınca gerçekten değişir ("Secure email change"). Bunu
+      // varsayımla değil, auth.users'tan taze getUser() ile KONTROL
+      // ediyoruz: dönen e-posta hâlâ eskiyse değişiklik henüz tamamlanmamış
+      // demektir (diğer adresin onayı bekleniyor).
+      const {
+        data: { user: guncelUser },
+      } = await supabase.auth.getUser();
+
+      if (guncelUser?.email && guncelUser.email.toLowerCase() !== profile.email.toLowerCase()) {
+        const eskiEposta = profile.email;
+        profile.email = guncelUser.email;
+        document.getElementById("panel-email").textContent = profile.email;
+        onayAlani.hidden = true;
+
+        // Güvenlik: e-posta değişikliği TAMAMLANINCA (her iki adres de
+        // onaylanınca) bu tarayıcı DIŞINDAKİ tüm diğer cihaz/oturumlardan
+        // otomatik çıkış yapılır — hesabına izinsiz erişen biri varsa
+        // e-posta değişir değişmez erişimi kesilir. Bu tarayıcıdaki oturum
+        // etkilenmez.
+        const { error: signOutError } = await supabase.auth.signOut({ scope: "others" });
+        if (signOutError) console.error("Diğer oturumlardan çıkış yapılamadı:", signOutError);
+
+        showMessage(
+          msg,
+          `E-posta değişikliği tamamlandı (${eskiEposta} → ${profile.email}). Diğer cihazlardaki oturumların güvenlik amacıyla kapatıldı.`,
+          "success"
+        );
+        return;
+      }
+
       showMessage(
         msg,
         "Kod doğrulandı. Diğer adrese gelen linke/koda da onay verince değişiklik tamamlanacak.",
@@ -272,6 +305,7 @@ function wirePasswordChange() {
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    const submitBtn = form.querySelector('button[type="submit"]');
     const yeniSifre = form.yeni_sifre.value;
     const yeniSifreTekrar = form.yeni_sifre_tekrar.value;
 
@@ -284,13 +318,151 @@ function wirePasswordChange() {
       return;
     }
 
+    submitBtn.disabled = true;
     const { error } = await supabase.auth.updateUser({ password: yeniSifre });
+    submitBtn.disabled = false;
+
     if (error) {
       showMessage(msg, "Şifre değiştirilemedi: " + error.message);
       return;
     }
-    showMessage(msg, "Şifre değiştirildi.", "success");
+
+    // Sadece Google ile kayıtlı bir hesapta (hiç "email" kimliği yokken) ilk
+    // kez şifre belirleniyor olabilir — Supabase bu durumda auth.identities'e
+    // otomatik bir "email" satırı EKLEMEZ (bilinen bir davranış), bu da
+    // ileride "Bağlı Hesaplar" bölümünden Google bağlantısını kesmeyi imkansız
+    // kılar. Eksik kimliği burada RPC ile tamamlıyoruz (bkz. migration 0010).
+    // Zaten bir "email" kimliği varsa (ör. sıradan şifre değişikliği) RPC
+    // sessizce hiçbir şey yapmadan döner.
+    try {
+      await supabase.rpc("kullanici_email_identity_ekle");
+    } catch (rpcErr) {
+      console.error("email identity RPC hatası (şifre yine de değişti):", rpcErr);
+    }
+
+    // Güvenlik: şifre değişince bu tarayıcı DIŞINDAKİ tüm diğer
+    // cihaz/oturumlardan otomatik çıkış yapılır (scope: "others"). Böylece
+    // biri hesabı ele geçirmişse şifre değiştirilir değiştirilmez erişimi
+    // kesilir. Bu tarayıcıdaki oturum etkilenmez.
+    const { error: signOutError } = await supabase.auth.signOut({ scope: "others" });
+    if (signOutError) console.error("Diğer oturumlardan çıkış yapılamadı:", signOutError);
+
+    showMessage(msg, "Şifre değiştirildi. Diğer cihazlardaki oturumların kapatıldı.", "success");
     form.reset();
+    // "Bağlı Hesaplar" bölümündeki "E-posta + Şifre: ayarlı" rozeti ve
+    // Google "Bağlantıyı Kes" butonunun görünürlüğü, artık şifre var
+    // olduğuna göre güncellensin.
+    renderBagliHesaplar();
+  });
+}
+
+/* ---------------------------------------------------------------------- */
+/* BAĞLI HESAPLAR — Google hesabını sonradan bağlama / bağlantı kesme      */
+/* ---------------------------------------------------------------------- */
+/*
+ * Supabase Auth, aynı (onaylı) e-postayla gelen Google girişini otomatik
+ * olarak mevcut hesaba bağlar (bkz. auth-pages.js) — bu yüzden "Google ile
+ * kayıt" ve "e-posta ile kayıt" hiçbir zaman İKİ AYRI hesap oluşturmaz.
+ * Burası, kullanıcının GİRİŞ YAPMIŞKEN, bu iki kimliği kendi isteğiyle
+ * manuel olarak bağlayıp/koparabildiği yer:
+ *
+ *   - Google bağlı DEĞİLSE  -> "Google Hesabını Bağla" (linkIdentity)
+ *   - Google bağlıYSA       -> "Bağlantıyı Kes" (unlinkIdentity) — ama
+ *     Supabase en az 1 kimlik kalmasını zorunlu kıldığı için, kullanıcının
+ *     ÖNCE bir e-posta+şifre kimliği olması gerekir (aksi hâlde Google'ı
+ *     koparınca hesabına girecek hiçbir yolu kalmaz). "E-posta + Şifre"
+ *     satırı bu yüzden burada salt bilgi amaçlı: gerçek şifre belirleme
+ *     işlemi aşağıdaki "Şifre Değiştir" formundan yapılır.
+ *
+ * NOT: linkIdentity()/unlinkIdentity() çalışabilmesi için Supabase
+ * Dashboard > Authentication > Settings'te "Allow manual linking"in AÇIK
+ * olması gerekir (bkz. migration 0010'daki not).
+ */
+async function wireBagliHesaplar() {
+  await renderBagliHesaplar();
+}
+
+async function renderBagliHesaplar() {
+  const box = document.getElementById("bagli-hesaplar-durum");
+  const msg = document.getElementById("bagli-hesaplar-message");
+  if (!box) return;
+
+  box.innerHTML = `<p class="muted">Yükleniyor...</p>`;
+
+  const { data, error } = await supabase.auth.getUserIdentities();
+  if (error) {
+    box.innerHTML = `<p class="muted">Bağlı hesaplar yüklenemedi: ${escapeHtml(error.message)}</p>`;
+    return;
+  }
+
+  const identities = data?.identities ?? [];
+  const google = identities.find((i) => i.provider === "google");
+  const eposta = identities.find((i) => i.provider === "email");
+
+  box.innerHTML = `
+    <div class="bagli-hesap-satir">
+      <span>
+        <strong>Google</strong> ·
+        ${google ? '<span class="eposta-onay-rozet eposta-onay-rozet--ok">Bağlı</span>' : '<span class="eposta-onay-rozet">Bağlı değil</span>'}
+      </span>
+      ${
+        google
+          ? `<button type="button" id="google-baglanti-kes-btn" class="btn-secondary tablo-aksiyon-btn">Bağlantıyı Kes</button>`
+          : `<button type="button" id="google-bagla-btn" class="btn-secondary tablo-aksiyon-btn">Google Hesabını Bağla</button>`
+      }
+    </div>
+    <div class="bagli-hesap-satir">
+      <span>
+        <strong>E-posta + Şifre</strong> ·
+        ${eposta ? '<span class="eposta-onay-rozet eposta-onay-rozet--ok">Ayarlı</span>' : '<span class="eposta-onay-rozet">Henüz ayarlanmadı</span>'}
+      </span>
+    </div>
+    ${
+      !eposta
+        ? `<p class="muted" style="font-size:0.85rem; margin-top:8px;">Aşağıdaki "Şifre Değiştir" bölümünden bir şifre belirlersen e-posta + şifre ile de giriş yapabilir hâle gelirsin — Google bağlantını ileride kesmek istersen bu gerekli.</p>`
+        : ""
+    }
+  `;
+
+  document.getElementById("google-bagla-btn")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    const { error: linkErr } = await supabase.auth.linkIdentity({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/panel/panel.html` },
+    });
+    if (linkErr) {
+      btn.disabled = false;
+      showMessage(msg, "Google hesabı bağlanamadı: " + linkErr.message);
+    }
+    // Başarılıysa tarayıcı Google'a yönlendirilir; dönüşte panel yeniden
+    // yüklenir ve bu bölüm güncel durumu otomatik gösterir.
+  });
+
+  document.getElementById("google-baglanti-kes-btn")?.addEventListener("click", async () => {
+    if (!eposta) {
+      showMessage(
+        msg,
+        'Google bağlantısını kesmeden önce aşağıdaki "Şifre Değiştir" bölümünden bir şifre belirlemen gerekiyor — aksi hâlde hesabına giriş yapabileceğin hiçbir yol kalmaz.'
+      );
+      return;
+    }
+    const emin = window.confirm(
+      "Google hesabı bağlantısını kesmek istediğine emin misin? Bundan sonra sadece kendi belirlediğin e-posta + şifreyle giriş yapabileceksin."
+    );
+    if (!emin) return;
+
+    const { error: unlinkErr } = await supabase.auth.unlinkIdentity(google);
+    if (unlinkErr) {
+      if (unlinkErr.message?.includes("single_identity_not_deletable")) {
+        showMessage(msg, "Bağlantı kesilemedi: önce bir şifre belirlemen gerekiyor.");
+      } else {
+        showMessage(msg, "Bağlantı kesilemedi: " + unlinkErr.message);
+      }
+      return;
+    }
+    showMessage(msg, "Google bağlantısı kesildi. Bundan sonra e-posta + şifreyle giriş yapabilirsin.", "success");
+    await renderBagliHesaplar();
   });
 }
 
