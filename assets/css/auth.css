@@ -191,13 +191,19 @@
 /* Panel / Admin */
 .panel-grid {
   display: grid;
+  grid-template-columns: 1fr; /* önceden tanımsızdı — tarayıcı varsayılanına
+    (auto) bırakılmıştı; çoğu durumda görsel fark yaratmasa da iç içe
+    geçmiş grid'lerde (ör. .msg-panel) genişlik hesaplamasını belirsiz
+    kılıyordu. Tek sütunlu düzeni artık AÇIKÇA belirtiyoruz. */
   gap: 24px;
+  min-width: 0; /* grid item'ların içerik genişliğine göre taşmasını önler */
 }
 .panel-section {
   padding: 20px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--card-bg);
+  min-width: 0; /* iç içe grid/flex (mesajlaşma paneli) taşmasın diye */
 }
 .panel-section h2 {
   margin-top: 0;
@@ -472,10 +478,20 @@
  * ---------------------------------------------------------------------- */
 @media (min-width: 900px) {
   .panel-section--wide {
-    width: calc(100vw - 40px);
-    max-width: 1180px;
-    margin-left: 50%;
-    transform: translateX(-50%);
+    /* ÖNCEDEN: width: calc(100vw - 40px); margin-left: 50%; transform:
+       translateX(-50%); — bu, elemanı VIEWPORT genişliğine göre ortalıyordu.
+       Sorun: 100vw, dikey scrollbar'ın kapladığı alanı SAYMAZ (scrollbar
+       genişliği genelde ~15-17px) — bu yüzden gerçek kullanılabilir alandan
+       birkaç piksel daha geniş bir kutu oluşuyor, bu da sayfada anlık yatay
+       taşmaya ve "kayma" hissine yol açıyordu.
+       ŞİMDİ: aynı görsel efekti (bölümün 860px'lik .wrap sınırının dışına,
+       geniş ekranlarda daha ferah görünmesini) ebeveynin (.wrap) GERÇEK
+       genişliğine göre negatif margin ile veriyoruz — viewport/scrollbar
+       ölçümüne hiç bağımlı değil, taşma riski yok. */
+    width: min(1180px, 96vw);
+    max-width: 96vw;
+    margin-left: calc(50% - 50vw + 2vw);
+    margin-right: calc(50% - 50vw + 2vw);
   }
 }
 
