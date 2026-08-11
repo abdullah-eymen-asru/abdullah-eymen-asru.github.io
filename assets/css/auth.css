@@ -457,20 +457,229 @@
 }
 
 /* ------------------------------------------------------------------------
- * SOHBET / MESAJLAR (üye <-> yönetici) — bkz. assets/js/chat.js
+ * PANEL BÖLÜMÜNÜ GENİŞLETME
+ *    Panel/admin sayfalarındaki içerik ".wrap" (max-width: 860px) içinde
+ *    duruyor. Mesajlaşma paneli gibi "geniş ve ferah" olması istenen
+ *    bölümler için bu sınıf, bölümü görünür alanın (viewport) ortasına
+ *    hizalayarak 860px sınırının DIŞINA taşırır — böylece daha büyük
+ *    ekranlarda konuşma listesi + mesaj alanı yan yana rahatça sığar.
+ *    "margin-left:50%; transform:translateX(-50%)" tekniği, ebeveyninin
+ *    genişliğinden bağımsız olarak öğeyi VIEWPORT'A göre ortalar ve
+ *    (calc(50vw) tekniklerinin aksine) yatay kaydırma çubuğu riski
+ *    yaratmaz. Dar ekranlarda (mobil) normal tam genişlikte kalır.
  * ---------------------------------------------------------------------- */
-.chat-box {
-  display: flex;
-  flex-direction: column;
+@media (min-width: 900px) {
+  .panel-section--wide {
+    width: calc(100vw - 40px);
+    max-width: 1180px;
+    margin-left: 50%;
+    transform: translateX(-50%);
+  }
+}
+
+/* ------------------------------------------------------------------------
+ * SOHBET / MESAJLAR (üye <-> yönetici) — bkz. assets/js/chat.js
+ *
+ * Tek konuşma kutusu yerine "iki panelli" modern bir mesajlaşma arayüzü:
+ * solda konuşma listesi (üyede: kendi konuları + "Yeni Sohbet"; adminde:
+ * tüm üyelerin konuşmaları + üye arama), sağda seçili konuşmanın mesaj
+ * akışı. Dar ekranlarda (telefon) tek pane görünür — bir konuşma
+ * seçilince mesaj görünümüne geçilir, "← Geri" ile listeye dönülür.
+ * ---------------------------------------------------------------------- */
+.msg-panel {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) 1fr;
+  gap: 0;
+  height: 620px;
+  max-height: 75vh;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
   background: var(--bg);
 }
+
+.msg-list-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--border);
+  background: var(--card-bg);
+}
+.msg-list-header {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+.msg-konusma-liste {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.msg-konusma-liste-ic { display: flex; flex-direction: column; }
+
+.msg-yeni-btn {
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.msg-yeni-btn:hover { filter: brightness(1.08); }
+
+.msg-yeni-form-wrap {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card-bg);
+}
+.msg-yeni-form-wrap form { display: flex; flex-direction: column; gap: 8px; }
+.msg-yeni-form-wrap input[type="text"] {
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+}
+.msg-yeni-form-btnler { display: flex; gap: 8px; }
+.msg-yeni-form-btnler button { font-size: 0.85rem; padding: 8px 14px; }
+
+.msg-filtre-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+  flex-wrap: wrap;
+}
+.msg-filtre-temizle-btn {
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--tag-bg);
+  color: var(--text);
+  font-size: 0.76rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.msg-filtre-temizle-btn:hover { border-color: var(--accent); }
+
+.msg-uye-arama {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+  box-sizing: border-box;
+}
+.msg-uye-arama-sonuc {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: calc(100% - 2px);
+  z-index: 20;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-bg);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+.msg-uye-sonuc-item {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+  gap: 2px;
+}
+.msg-uye-sonuc-item:last-child { border-bottom: none; }
+.msg-uye-sonuc-item:hover { background: var(--tag-bg); }
+.msg-uye-sonuc-isim { font-weight: 600; }
+
+.msg-konusma-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: 12px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+}
+.msg-konusma-item:hover { background: var(--tag-bg); }
+.msg-konusma-item.active { background: var(--accent); color: #fff; }
+.msg-konusma-baslik { font-weight: 600; font-size: 0.9rem; }
+.msg-konusma-konu {
+  font-size: 0.78rem;
+  opacity: 0.75;
+}
+.msg-konusma-onizleme {
+  font-size: 0.8rem;
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.msg-thread-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+.msg-thread-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card-bg);
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.msg-thread-baslik {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.msg-geri-btn {
+  display: none; /* geniş ekranda gizli, sadece dar ekranda görünür (aşağıya bkz) */
+  border: none;
+  background: var(--tag-bg);
+  color: var(--text);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 1rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.msg-geri-btn:hover { background: var(--accent); color: #fff; }
+
 .chat-mesaj-liste {
   flex: 1;
-  min-height: 220px;
-  max-height: 420px;
+  min-height: 0;
   overflow-y: auto;
   padding: 14px;
   display: flex;
@@ -547,45 +756,23 @@
 }
 .chat-form button:disabled { opacity: 0.6; cursor: default; }
 
-.chat-admin-layout {
-  display: grid;
-  grid-template-columns: 260px 1fr;
-  gap: 16px;
-  min-height: 420px;
-}
-.chat-konusma-liste {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  overflow-y: auto;
-  max-height: 500px;
-  background: var(--bg);
-}
-.chat-konusma-item {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 10px 12px;
-  border: none;
-  border-bottom: 1px solid var(--border);
-  background: none;
-  color: var(--text);
-  cursor: pointer;
-  font: inherit;
-}
-.chat-konusma-item:hover { background: var(--tag-bg); }
-.chat-konusma-item.active { background: var(--accent); color: #fff; }
-.chat-konusma-item .isim { font-weight: 600; font-size: 0.9rem; display: block; }
-.chat-konusma-item .onizleme {
-  font-size: 0.8rem;
-  opacity: 0.8;
-  display: block;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+/* Dar ekranlarda (telefon/tablet dikey) iki pane yan yana sığmaz — tek
+   pane görünür (varsayılan: konuşma listesi), bir konuşma seçilince JS
+   ".msg-panel--thread-aktif" sınıfını ekleyip mesaj akışına geçer, "←"
+   butonu tekrar listeye döner. Bu, küçük ekranda yatay kaydırma yerine
+   "modern sohbet uygulaması" hissi veren, her cihazda kullanışlı bir
+   yaklaşımdır. */
 @media (max-width: 760px) {
-  .chat-admin-layout { grid-template-columns: 1fr; }
-  .chat-konusma-liste { max-height: 220px; }
+  .msg-panel {
+    grid-template-columns: 1fr;
+    height: 78vh;
+    max-height: none;
+  }
+  .msg-list-pane { display: flex; border-right: none; }
+  .msg-thread-pane { display: none; }
+  .msg-panel--thread-aktif .msg-list-pane { display: none; }
+  .msg-panel--thread-aktif .msg-thread-pane { display: flex; }
+  .msg-geri-btn { display: inline-flex; align-items: center; justify-content: center; }
 }
 
 /* ------------------------------------------------------------------------
