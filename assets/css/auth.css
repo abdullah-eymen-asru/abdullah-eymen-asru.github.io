@@ -48,7 +48,8 @@
   resize: vertical;
 }
 
-.btn-primary {
+.btn-primary,
+.btn-primary:visited {
   width: 100%;
   padding: 11px;
   border: none;
@@ -61,7 +62,8 @@
 .btn-primary:disabled { opacity: 0.6; cursor: default; }
 .btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
 
-.btn-secondary {
+.btn-secondary,
+.btn-secondary:visited {
   width: 100%;
   padding: 10px;
   border: 1px solid var(--border);
