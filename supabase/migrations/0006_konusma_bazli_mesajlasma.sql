@@ -73,6 +73,14 @@ create table if not exists public.messages (
 -- şekilde) ekliyoruz; hem sıfırdan kurulumda hem yükseltmede güvenli.
 alter table public.messages add column if not exists conversation_id uuid references public.conversations(id) on delete cascade;
 
+-- Eski (conversation_user_id'ye bağlı) RLS politikalarını, aşağıdaki DO
+-- bloğu bu kolonu DROP etmeden ÖNCE kaldırıyoruz — Postgres, bir politika
+-- hâlâ bir kolona bağımlıyken o kolonun silinmesine izin vermez ("2BP01:
+-- ... other objects depend on it" hatası tam olarak buydu). Politikaları
+-- birazdan (aşağıda) yeni/doğru haliyle zaten yeniden oluşturacağız.
+drop policy if exists "messages_select_own_or_admin" on public.messages;
+drop policy if exists "messages_insert_own_or_admin" on public.messages;
+
 do $$
 begin
   if exists (
