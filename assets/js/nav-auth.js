@@ -119,8 +119,14 @@ function renderHesapMenusu(container, role) {
   cikisBtn.setAttribute("role", "menuitem");
   cikisBtn.textContent = "Çıkış Yap";
   cikisBtn.addEventListener("click", async () => {
-    await supabase.auth.signOut();
-    window.location.href = relUrl("/");
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) console.error("signOut hatası (yine de yönlendiriliyor):", error);
+    } catch (err) {
+      console.error("signOut() beklenmedik hata (yine de yönlendiriliyor):", err);
+    } finally {
+      window.location.href = relUrl("/");
+    }
   });
   menu.appendChild(cikisBtn);
 
