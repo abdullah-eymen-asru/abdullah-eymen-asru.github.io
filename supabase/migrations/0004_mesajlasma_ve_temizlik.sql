@@ -159,6 +159,20 @@ $$;
 --    YAZAMAZ, sadece yöneticiyle yazışabilir. Admin tüm konuşmaları görür ve
 --    herhangi birine yanıt verebilir. Mesajlar, gönderen tarafından (veya
 --    admin tarafından, moderasyon amacıyla) istenildiği zaman silinebilir.
+--
+--    BUG FİX: "messages" tablosu, bu dosya yazıldıktan SONRA
+--    0006_konusma_bazli_mesajlasma.sql ile "conversation_id" tabanlı yeni bir
+--    şemaya taşındı ve eski "conversation_user_id" kolonu tamamen SİLİNDİ.
+--    Bu yüzden 0004, veritabanı zaten 0006'ya (veya sonrasına) yükseltilmiş
+--    durumdayken TEK BAŞINA tekrar çalıştırılırsa ("create table if not
+--    exists" mevcut/farklı şemalı tabloyu atladığı için) aşağıdaki index ve
+--    politikalar artık var olmayan "conversation_user_id" kolonunu
+--    referans alıp "column conversation_user_id does not exist" hatasıyla
+--    patlıyordu. Aşağıdaki blok artık önce tablonun HÂLÂ 0006-öncesi (eski)
+--    şemada mı olduğunu kontrol ediyor; sadece o durumda eski index/
+--    politikaları kuruyor. Tablo zaten yeni (conversation_id) şemadaysa bu
+--    bölüm hiçbir şey yapmadan atlanır — 0006 zaten doğru index/politikaları
+--    kurmuş durumdadır, burada tekrar dokunmaya gerek yoktur.
 -- ----------------------------------------------------------------------------
 create table if not exists public.messages (
   id                   uuid primary key default gen_random_uuid(),
@@ -168,43 +182,53 @@ create table if not exists public.messages (
   created_at           timestamptz not null default now()
 );
 
-comment on table public.messages is 'Üye <-> yönetici mesajlaşması. conversation_user_id: konuşmanın admin olmayan tarafı (sahibi). sender_id: mesajı gönderen taraf.';
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'messages' and column_name = 'conversation_id'
+  ) then
+    raise notice '"messages" tablosu zaten 0006''daki conversation_id şemasına yükseltilmiş (conversation_user_id kolonu artık yok) — 0004''ün eski mesajlaşma index/politikaları atlanıyor, 0006 bunları zaten doğru şekilde kurmuş durumda.';
+  else
+    comment on table public.messages is 'Üye <-> yönetici mesajlaşması. conversation_user_id: konuşmanın admin olmayan tarafı (sahibi). sender_id: mesajı gönderen taraf.';
 
-create index if not exists idx_messages_conversation on public.messages (conversation_user_id, created_at);
+    create index if not exists idx_messages_conversation on public.messages (conversation_user_id, created_at);
 
-alter table public.messages enable row level security;
+    alter table public.messages enable row level security;
 
--- SELECT: konuşmanın sahibi, mesajı gönderen (admin) veya herhangi bir admin görebilir.
-drop policy if exists "messages_select_own_or_admin" on public.messages;
-create policy "messages_select_own_or_admin"
-  on public.messages for select
-  using (
-    conversation_user_id = auth.uid()
-    or sender_id = auth.uid()
-    or public.is_admin()
-  );
+    -- SELECT: konuşmanın sahibi, mesajı gönderen (admin) veya herhangi bir admin görebilir.
+    drop policy if exists "messages_select_own_or_admin" on public.messages;
+    create policy "messages_select_own_or_admin"
+      on public.messages for select
+      using (
+        conversation_user_id = auth.uid()
+        or sender_id = auth.uid()
+        or public.is_admin()
+      );
 
--- INSERT: gönderen her zaman kendisi olmalı (sender_id = auth.uid()).
--- Normal/özel üye SADECE kendi konuşmasına (conversation_user_id = kendisi)
--- yazabilir. Admin ise HERHANGİ bir üyenin konuşmasına yazabilir (yanıt).
-drop policy if exists "messages_insert_own_or_admin" on public.messages;
-create policy "messages_insert_own_or_admin"
-  on public.messages for insert
-  with check (
-    sender_id = auth.uid()
-    and (
-      conversation_user_id = auth.uid()
-      or public.is_admin()
-    )
-  );
+    -- INSERT: gönderen her zaman kendisi olmalı (sender_id = auth.uid()).
+    -- Normal/özel üye SADECE kendi konuşmasına (conversation_user_id = kendisi)
+    -- yazabilir. Admin ise HERHANGİ bir üyenin konuşmasına yazabilir (yanıt).
+    drop policy if exists "messages_insert_own_or_admin" on public.messages;
+    create policy "messages_insert_own_or_admin"
+      on public.messages for insert
+      with check (
+        sender_id = auth.uid()
+        and (
+          conversation_user_id = auth.uid()
+          or public.is_admin()
+        )
+      );
 
--- DELETE: "Mesajlar istenildiği zaman silinebilsin kullanıcılar tarafından"
--- -> herkes SADECE KENDİ GÖNDERDİĞİ mesajı silebilir; admin moderasyon için
--- herhangi bir mesajı silebilir.
-drop policy if exists "messages_delete_own_or_admin" on public.messages;
-create policy "messages_delete_own_or_admin"
-  on public.messages for delete
-  using (sender_id = auth.uid() or public.is_admin());
+    -- DELETE: "Mesajlar istenildiği zaman silinebilsin kullanıcılar tarafından"
+    -- -> herkes SADECE KENDİ GÖNDERDİĞİ mesajı silebilir; admin moderasyon için
+    -- herhangi bir mesajı silebilir.
+    drop policy if exists "messages_delete_own_or_admin" on public.messages;
+    create policy "messages_delete_own_or_admin"
+      on public.messages for delete
+      using (sender_id = auth.uid() or public.is_admin());
+  end if;
+end $$;
 
 -- UPDATE yok (mesajlar düzenlenemez, sadece gönderilir/silinir) — RLS
 -- varsayılan olarak kapalı kalır, ayrı bir politika açmıyoruz.
