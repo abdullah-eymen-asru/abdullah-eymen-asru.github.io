@@ -23,8 +23,12 @@ permalink: "/panel/panel.html"
       <h2>Profil Bilgileri</h2>
       <form id="profil-form" novalidate>
         <div class="form-field">
-          <label for="full_name">Ad Soyad</label>
-          <input id="full_name" name="full_name" type="text">
+          <label for="first_name">Ad</label>
+          <input id="first_name" name="first_name" type="text" autocomplete="given-name">
+        </div>
+        <div class="form-field">
+          <label for="last_name">Soyad</label>
+          <input id="last_name" name="last_name" type="text" autocomplete="family-name">
         </div>
         <button type="submit" class="btn-primary">Kaydet</button>
       </form>
