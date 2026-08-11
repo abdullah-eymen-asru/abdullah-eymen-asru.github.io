@@ -36,8 +36,12 @@ permalink: "/hesap/kayit.html"
 
   <form id="kayit-form" novalidate>
     <div class="form-field">
-      <label for="full_name">Ad Soyad</label>
-      <input id="full_name" name="full_name" type="text" autocomplete="name" required>
+      <label for="first_name">Ad</label>
+      <input id="first_name" name="first_name" type="text" autocomplete="given-name" required>
+    </div>
+    <div class="form-field">
+      <label for="last_name">Soyad</label>
+      <input id="last_name" name="last_name" type="text" autocomplete="family-name" required>
     </div>
     <div class="form-field">
       <label for="email">E-posta</label>
