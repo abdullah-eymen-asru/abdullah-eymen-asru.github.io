@@ -10,58 +10,72 @@ import { supabase, escapeHtml } from "./supabase-client.js";
 import { requireAuth } from "./auth-guard.js";
 
 async function init() {
-  await requireAuth({ role: null });
-  document.getElementById("loading")?.setAttribute("hidden", "");
-  document.getElementById("app").hidden = false;
+  try {
+    await requireAuth({ role: null });
+    document.getElementById("loading")?.setAttribute("hidden", "");
+    document.getElementById("app").hidden = false;
 
-  const params = new URLSearchParams(window.location.search);
-  const id = params.get("id");
-  const container = document.getElementById("icerik-govde");
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("id");
+    const container = document.getElementById("icerik-govde");
 
-  if (!id) {
-    container.innerHTML = `<p>Geçersiz bağlantı.</p>`;
-    return;
+    if (!id) {
+      container.innerHTML = `<p>Geçersiz bağlantı.</p>`;
+      return;
+    }
+
+    const { data: content, error } = await supabase
+      .from("special_content")
+      .select("id, title, summary, body_md, file_path, harici_dosya_url, created_at")
+      .eq("id", id)
+      .single();
+
+    if (error || !content) {
+      container.innerHTML = `
+        <h1>Erişim yok</h1>
+        <p>Bu içeriği görüntüleme yetkin yok ya da içerik silinmiş olabilir.
+        Erişim gerekiyorsa site yöneticisiyle iletişime geç.</p>`;
+      return;
+    }
+
+    document.title = content.title + " · Özel İçerik";
+    let html = `
+      <h1>${escapeHtml(content.title)}</h1>
+      <p class="meta">${new Date(content.created_at).toLocaleDateString("tr-TR")}</p>
+      <div id="okundu-durum" class="muted" style="margin-bottom:16px;"></div>
+    `;
+
+    if (content.body_md) {
+      // Basit ve bağımlılıksız bir markdown->HTML dönüşümü. Site zaten
+      // kullanıcı girdisini innerHTML'e escape ETMEDEN basmıyor; burada da
+      // önce escape edip SONRA çok temel markdown kalıplarını uyguluyoruz,
+      // böylece içine kötü amaçlı HTML/script yazılsa bile çalışmaz.
+      html += `<div class="markdown-body">${basitMarkdown(content.body_md)}</div>`;
+    }
+
+    container.innerHTML = html;
+
+    if (content.file_path) {
+      await renderDownloadButton(content.id, content.file_path);
+    }
+    if (content.harici_dosya_url) {
+      renderHariciDosyaButonu(content.harici_dosya_url);
+    }
+
+    await okunduIsaretleVeGoster(content.id);
+  } catch (err) {
+    // Önceden burada bir hata (ör. beklenmeyen bir DOM/veri durumu)
+    // fırlarsa, sayfa sonsuza kadar "Yükleniyor..." ekranında asılı
+    // kalıyordu — kullanıcı ne olduğunu anlayamıyordu.
+    console.error("ozel-icerik.js init hatası:", err);
+    document.getElementById("loading")?.setAttribute("hidden", "");
+    const app = document.getElementById("app");
+    if (app) app.hidden = false;
+    const container = document.getElementById("icerik-govde");
+    if (container) {
+      container.innerHTML = `<p>Bir şeyler ters gitti, sayfayı yenilemeyi dene. Sorun devam ederse site yöneticisiyle iletişime geç.</p>`;
+    }
   }
-
-  const { data: content, error } = await supabase
-    .from("special_content")
-    .select("id, title, summary, body_md, file_path, harici_dosya_url, created_at")
-    .eq("id", id)
-    .single();
-
-  if (error || !content) {
-    container.innerHTML = `
-      <h1>Erişim yok</h1>
-      <p>Bu içeriği görüntüleme yetkin yok ya da içerik silinmiş olabilir.
-      Erişim gerekiyorsa site yöneticisiyle iletişime geç.</p>`;
-    return;
-  }
-
-  document.title = content.title + " · Özel İçerik";
-  let html = `
-    <h1>${escapeHtml(content.title)}</h1>
-    <p class="meta">${new Date(content.created_at).toLocaleDateString("tr-TR")}</p>
-    <div id="okundu-durum" class="muted" style="margin-bottom:16px;"></div>
-  `;
-
-  if (content.body_md) {
-    // Basit ve bağımlılıksız bir markdown->HTML dönüşümü. Site zaten
-    // kullanıcı girdisini innerHTML'e escape ETMEDEN basmıyor; burada da
-    // önce escape edip SONRA çok temel markdown kalıplarını uyguluyoruz,
-    // böylece içine kötü amaçlı HTML/script yazılsa bile çalışmaz.
-    html += `<div class="markdown-body">${basitMarkdown(content.body_md)}</div>`;
-  }
-
-  container.innerHTML = html;
-
-  if (content.file_path) {
-    await renderDownloadButton(content.id, content.file_path);
-  }
-  if (content.harici_dosya_url) {
-    renderHariciDosyaButonu(content.harici_dosya_url);
-  }
-
-  await okunduIsaretleVeGoster(content.id);
 }
 
 /**
