@@ -2,17 +2,17 @@
 layout: default
 title: "Panelim"
 yayinda: true
+auth_css: true
 permalink: "/panel/panel.html"
 ---
-
-<link rel="stylesheet" href="{{ '/assets/css/auth.css' | relative_url }}">
 
 <div class="loading-overlay" id="loading">Yükleniyor...</div>
 
 <div id="app" hidden>
   <h1>Panelim</h1>
   <p>
-    <strong id="panel-email"></strong> ·
+    <strong id="panel-ad-soyad"></strong> ·
+    <span id="panel-email-wrap"><strong id="panel-email"></strong> · </span>
     <span class="muted">Rol: <span id="panel-rol"></span></span> ·
     <a href="#" id="cikis-btn">Çıkış Yap</a>
   </p>
