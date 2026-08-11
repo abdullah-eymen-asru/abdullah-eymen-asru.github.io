@@ -26,14 +26,15 @@
 //   4) Sadece o zaman hedef kullanıcının e-postası değiştirilir.
 //
 // DAVRANIŞ
-//   `auth.admin.updateUserById(hedefId, { email: yeniEmail })` çağrılırken
-//   `email_confirm` parametresi BİLİNÇLİ OLARAK gönderilMİYOR (varsayılanı
-//   kullanıyoruz) — proje ayarlarında "Confirm email" açık olduğu sürece bu,
-//   Supabase'in YENİ adrese bir onay maili/kodu göndermesini VE e-postanın
-//   sadece o mail/kod onaylanınca (kullanıcı linke tıklayınca veya
-//   hesap-onayla.html benzeri bir ekrandan/panelden kodu girince) fiilen
-//   değişmesini sağlar. Eski adrese HİÇBİR mail gitmez — admin API, client
-//   API'nin tabi olduğu "Secure email change" kuralından muaftır.
+//   `auth.admin.updateUserById(hedefId, { email: yeniEmail, email_confirm: true })`
+//   çağrılır. `email_confirm: true` AÇIKÇA gönderilir -> Supabase bu
+//   e-postayı zaten doğrulanmış sayar ve YENİ adrese bile onay maili
+//   GÖNDERMEZ; değişiklik anında (hiçbir mail beklemeden) kesinleşir.
+//   Eski adrese de HİÇBİR mail gitmez. Admin API, client API'nin tabi
+//   olduğu "Secure email change" kuralından muaftır. Ayrıca bu fonksiyon,
+//   auth.users güncellemesinin ardından public.profiles.email'i de
+//   service_role ile senkron eder (migration 0008'deki veritabanı
+//   trigger'ıyla birlikte çift güvence).
 //
 // Deploy:  supabase functions deploy admin-change-email
 // Secrets: SUPABASE_URL ve SUPABASE_SERVICE_ROLE_KEY, Edge Function
@@ -164,16 +165,36 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // 4) Admin API ile e-postayı güncelle. email_confirm KASITLI OLARAK
-    //    gönderilMİYOR -> "Confirm email" projede açık olduğu sürece
-    //    Supabase YENİ adrese bir onay maili/kodu gönderir ve e-posta
-    //    sadece o onaylanınca fiilen değişir. Bu çağrı client-side
-    //    "Secure email change" (çift onay) kuralına TABİ DEĞİLDİR —
-    //    dolayısıyla ESKİ adrese hiçbir mail gitmez.
+    // 4) Admin API ile e-postayı güncelle. email_confirm: true AÇIKÇA
+    //    gönderiliyor -> Supabase'e "bu e-postayı doğrulanmış say, onay
+    //    maili GÖNDERME" diyoruz. Bu, admin panelinden yapılan değişikliğin
+    //    gerçekten "hiçbir mail beklemeden anında" tamamlanmasını sağlar
+    //    (önceki sürümde bu parametre unutulmuştu — kod ile yorum
+    //    çelişiyordu: e-posta bazen sadece YENİ adrese giden bir onay
+    //    maili tıklanınca değişiyordu, "anında" değil).
     const { error: updateErr } = await adminClient.auth.admin.updateUserById(hedefKullaniciId, {
       email: yeniEposta,
+      email_confirm: true,
     });
     if (updateErr) throw updateErr;
+
+    // 5) auth.users güncellenince public.profiles.email'i senkron eden bir
+    //    veritabanı trigger'ı da var (bkz. migration 0008,
+    //    handle_user_update()) — bu, admin panelinden yapılan bu değişikliği
+    //    de OTOMATİK yakalar. Yine de burada AYRICA (ikinci bir güvence
+    //    olarak, trigger deploy edilmemiş olsa bile UI'ın hemen doğru
+    //    veriyi göstermesi için) profiles.email'i service_role ile
+    //    doğrudan da güncelliyoruz.
+    const { error: profileUpdateErr } = await adminClient
+      .from("profiles")
+      .update({ email: yeniEposta })
+      .eq("id", hedefKullaniciId);
+    if (profileUpdateErr) {
+      // Trigger zaten bunu yapmış olabilir ya da geçici bir hata olabilir
+      // — auth.users tarafı zaten başarıyla değişti, bu yüzden isteği
+      // BAŞARISIZ saymıyoruz, sadece logluyoruz.
+      console.error("profiles.email senkron güncellemesi başarısız (trigger yine de yakalamış olabilir):", profileUpdateErr);
+    }
 
     return new Response(
       JSON.stringify({
