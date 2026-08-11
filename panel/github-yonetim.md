@@ -2,10 +2,10 @@
 layout: default
 title: "GitHub İçerik Yönetimi"
 yayinda: true
+auth_css: true
 permalink: "/panel/github-yonetim.html"
 ---
 
-<link rel="stylesheet" href="{{ '/assets/css/auth.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/github-yonetim.css' | relative_url }}">
 
 <div class="loading-overlay" id="loading">Yükleniyor...</div>
