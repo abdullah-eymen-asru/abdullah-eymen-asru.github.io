@@ -2,10 +2,9 @@
 layout: default
 title: "Özel İçerik"
 yayinda: true
+auth_css: true
 permalink: "/panel/ozel-icerik.html"
 ---
-
-<link rel="stylesheet" href="{{ '/assets/css/auth.css' | relative_url }}">
 
 <div class="loading-overlay" id="loading">Yükleniyor...</div>
 
