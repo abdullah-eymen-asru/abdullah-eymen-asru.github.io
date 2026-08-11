@@ -615,20 +615,27 @@
 
 .msg-konusma-item {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  width: 100%;
-  text-align: left;
-  padding: 12px;
-  border: none;
+  align-items: stretch;
   border-bottom: 1px solid var(--border);
-  background: none;
-  color: var(--text);
-  cursor: pointer;
-  font: inherit;
 }
 .msg-konusma-item:hover { background: var(--tag-bg); }
 .msg-konusma-item.active { background: var(--accent); color: #fff; }
+.msg-konusma-item.active .msg-konusma-sil { color: #fff; }
+
+.msg-konusma-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  padding: 12px;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
 .msg-konusma-baslik { font-weight: 600; font-size: 0.9rem; }
 .msg-konusma-konu {
   font-size: 0.78rem;
@@ -641,6 +648,30 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Her konuşma satırının sonundaki "✕" — konuşmayı (ve içindeki tüm
+   mesajları) kalıcı olarak siler. Varsayılan olarak soluk, satıra
+   hover/dokunulunca belirginleşir; küçük dokunmatik hedef sorunu
+   yaşanmaması için min. 40px genişlik bırakıldı. */
+.msg-konusma-sil {
+  flex-shrink: 0;
+  width: 40px;
+  border: none;
+  border-left: 1px solid var(--border);
+  background: none;
+  color: inherit;
+  opacity: 0.45;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+.msg-konusma-sil:hover {
+  opacity: 1;
+  background: #c0392b;
+  color: #fff;
+  border-left-color: #c0392b;
+}
+.msg-konusma-item.active .msg-konusma-sil { border-left-color: rgba(255, 255, 255, 0.35); }
 
 .msg-thread-pane {
   display: flex;
