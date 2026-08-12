@@ -1,4 +1,29 @@
 -- ============================================================================
+-- 0002_guvenlik_sikilastirma.sql
+--
+-- NOT (sonradan eklendi): Bu dosya, tarihsel bir kopyalama hatası sonucu
+-- 0001_schema_rbac_rls.sql ile BİREBİR AYNI içeriğe sahipti. Gerçek/farklı
+-- bir değişiklik İÇERMİYORDU.
+--
+-- BU DOSYAYI SİLMEK YA DA YOK SAYMAK GÜVENLİDİR:
+--   - Bu dosyalar GitHub'a push edilince OTOMATİK ÇALIŞMAZ; sadece Supabase
+--     Dashboard > SQL Editor'e elle yapıştırılıp çalıştırılmak için birer
+--     talimat/kayıt dosyasıdır.
+--   - Canlı veritabanın zaten daha önce çalıştırdığın SQL'i yansıtıyor —
+--     bu dosyanın içeriğini değiştirmek/kısaltmak veritabanına HİÇBİR ŞEY
+--     YAPMAZ.
+--   - 0001'i zaten çalıştırdıysan (ki muhtemelen çalıştırdın), 0002'yi
+--     AYRICA çalıştırmana hiç gerek yok — 0001'deki her şey zaten
+--     idempotent (create table IF NOT EXISTS, drop policy IF EXISTS +
+--     create policy, create OR REPLACE function gibi) olduğu için 0002'yi
+--     bir kez daha çalıştırmış olsan bile zarar vermez, sadece gereksizdi.
+--
+-- Numaralandırma/geçmiş bozulmasın diye dosya SİLİNMEDİ, sadece bu açıklama
+-- ile değiştirildi. Bir sonraki gerçek güvenlik değişikliği için
+-- 0003_yeni_ozellikler_ve_guvenlik.sql dosyasına bak.
+-- ============================================================================
+
+-- ============================================================================
 -- 0001_schema_rbac_rls.sql
 -- Abdullah Eymen Asru — Kullanıcı Yönetimi, RBAC ve Özel İçerik Sistemi
 --
