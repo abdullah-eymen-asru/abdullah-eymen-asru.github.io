@@ -83,6 +83,36 @@ export function turkceOtpHatasi(message) {
 }
 
 /**
+ * Büyük/küçük harf duyarsız arama için Türkçe'ye uygun harf küçültme.
+ * JS'in düz toLowerCase()'i "İ" (noktalı büyük İ) harfini Türkçe kuralına
+ * göre değil, Unicode varsayılanına göre çevirir ("i̇" gibi iki karakterlik
+ * garip bir sonuç verebilir) — bu da "İrem" yazınca "irem" ile eşleşmemesi
+ * gibi görünüşte rastgele arama başarısızlıklarına yol açabiliyordu.
+ * toLocaleLowerCase("tr") bunu Türkçe harf kurallarına göre doğru çevirir.
+ * admin.js (üye tablosu araması, içerik atama araması) ve chat.js (admin
+ * mesajlaşmasında üye arama) ORTAK olarak bu fonksiyonu kullanıyor —
+ * ikisinde de aynı davranış garanti olsun diye tek bir yerde tanımlı.
+ */
+export function kucukHarfeCevirTr(metin) {
+  return (metin || "").toLocaleLowerCase("tr");
+}
+
+/**
+ * Bir kullanıcının ADI, SOYADI, tam adı ve e-postasından HERHANGİ BİRİ,
+ * aranan metni büyük/küçük harften bağımsız olarak İÇERİYOR mu?
+ * first_name ve last_name'e AYRI AYRI bakmak önemli: sadece full_name'e
+ * (ad+soyad birleşimi) bakılsaydı, full_name boş/senkron dışı kalmış eski
+ * bir kayıtta arama çalışmazdı. first_name/last_name'e ayrı ayrı bakmak,
+ * sadece adı ya da sadece soyadı yazan aramaların da kesin çalışmasını
+ * garanti ediyor.
+ */
+export function kullaniciAramayaUyuyorMu(kullanici, aramaKucuk) {
+  if (!aramaKucuk) return true;
+  const alanlar = [kullanici.first_name, kullanici.last_name, kullanici.full_name, kullanici.email];
+  return alanlar.some((alan) => kucukHarfeCevirTr(alan).includes(aramaKucuk));
+}
+
+/**
  * Bugünün Gizlilik Politikası / KVKK metni sürüm etiketi. Metni
  * (kurumsal/gizlilik-politikasi.md) gerçekten değiştirdiğinde bu değeri de
  * güncelle — o andan itibaren yeni kayıt olanlar bu sürüme onay verir ve
