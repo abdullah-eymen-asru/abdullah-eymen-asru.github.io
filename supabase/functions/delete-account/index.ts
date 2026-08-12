@@ -46,9 +46,19 @@ const ALLOWED_ORIGINS = [
 ];
 
 function corsHeaders(origin: string | null) {
-  const allow = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    return {
+      "Access-Control-Allow-Origin": origin,
+      "Access-Control-Allow-Headers": "authorization, content-type",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+    };
+  }
+  // İzin verilmeyen bir origin'den geldiyse Access-Control-Allow-Origin
+  // header'ını HİÇ döndürmüyoruz (sabit bir "varsayılan" adrese düşmek
+  // yerine) — tarayıcı bu durumda yanıtı otomatik olarak engeller. Gerçek
+  // yetki kontrolü zaten aşağıda token doğrulamasıyla yapılıyor, bu sadece
+  // CORS davranışını daha net/beklenen hâle getiriyor.
   return {
-    "Access-Control-Allow-Origin": allow,
     "Access-Control-Allow-Headers": "authorization, content-type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
   };
