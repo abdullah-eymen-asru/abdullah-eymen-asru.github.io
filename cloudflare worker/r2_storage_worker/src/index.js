@@ -5,6 +5,16 @@
  * (yalnızca Web Crypto API kullanarak) AWS Signature V4 ile imzalanmış,
  * süreli (presigned) bir indirme URL'i üretir.
  *
+ * GÜVENLİK: Bu Worker hem KİMLİK DOĞRULAMA (geçerli bir Supabase oturumu
+ * var mı?) HEM DE YETKİLENDİRME (bu KULLANICININ bu DOSYAYA erişim izni
+ * var mı?) yapar — sadece geçerli bir oturum yeterli değildir. objectKey
+ * konvansiyonu "<special_content.id>/<dosya-adı>" olduğu için ilk klasör
+ * segmenti content_id olarak content_access tablosunda aranır (admin her
+ * zaman izinlidir). Bu kontrol olmadan, giriş yapmış HERHANGİ bir üye
+ * (özel içerik ataması olmasa bile) bir objectKey'i bir şekilde öğrenirse
+ * o dosya için süresiz imzalı link alabilirdi — hatta admin erişimini geri
+ * alsa/süresi dolsa bile.
+ *
  * Gerekli ortam değişkenleri (Cloudflare Dashboard > Worker > Settings
  * > Variables and Secrets):
  *   ACCOUNT_ID                 Cloudflare hesap ID'si
@@ -128,6 +138,61 @@ export default {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // 2.5. YETKİ KONTROLÜ (Object-Level Authorization)
+    // ÖNEMLİ GÜVENLİK DÜZELTMESİ: Adım 2 sadece "geçerli bir Supabase
+    // oturumu var mı?" diye bakıyordu — "BU kullanıcının BU dosyaya erişim
+    // izni var mı?" diye HİÇ bakmıyordu. Bu, giriş yapmış HERHANGİ bir
+    // üyenin (özel içerik ataması olmasa bile) objectKey'i bir şekilde
+    // öğrenirse imzalı link alabilmesine, hatta admin erişimi geri alsa
+    // veya süresi dolsa (content_access.son_gecerlilik_tarihi) bile eski
+    // bir objectKey biliniyorsa süresiz erişime devam edilebilmesine yol
+    // açıyordu — yani veritabanındaki gerçek yetkilendirme burada hiç
+    // uygulanmıyordu. Artık service_role anahtarıyla (zaten elimizde var,
+    // aşağıda log yazarken de kullanılıyor) admin panelindeki RLS
+    // mantığının AYNISINI burada da uyguluyoruz:
+    //   - Çağıran admin ise -> her zaman izinli.
+    //   - Değilse -> objectKey'in ilk klasör segmenti (content_id) için
+    //     content_access satırı var mı VE süresi dolmamış mı diye bakılır.
+    const contentId = objectKey.split("/")[0];
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    try {
+      const restHeaders = {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      };
+
+      const profilRes = await fetch(
+        `${env.SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=role`,
+        { headers: restHeaders }
+      );
+      const profilData = profilRes.ok ? await profilRes.json() : [];
+      const isAdmin = profilData?.[0]?.role === "admin";
+
+      if (!isAdmin) {
+        if (!uuidRegex.test(contentId)) {
+          throw new Error("yetkisiz");
+        }
+        const erisimRes = await fetch(
+          `${env.SUPABASE_URL}/rest/v1/content_access?content_id=eq.${contentId}&user_id=eq.${userId}&select=son_gecerlilik_tarihi`,
+          { headers: restHeaders }
+        );
+        const erisimData = erisimRes.ok ? await erisimRes.json() : [];
+        const erisim = erisimData?.[0];
+        const suresiGecmis =
+          erisim?.son_gecerlilik_tarihi && new Date(erisim.son_gecerlilik_tarihi) <= new Date();
+
+        if (!erisim || suresiGecmis) {
+          throw new Error("yetkisiz");
+        }
+      }
+    } catch (_err) {
+      return new Response(
+        JSON.stringify({ error: "Bu dosyaya erişim izniniz yok." }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     try {
