@@ -21,7 +21,7 @@
  * ".msg-panel" bölümü. Dar ekranlarda (telefon) tek pane görünür, bir
  * konuşma seçilince "← Geri" butonuyla listeye dönülür.
  */
-import { supabase, escapeHtml, showMessage } from "./supabase-client.js";
+import { supabase, escapeHtml, showMessage, kucukHarfeCevirTr, kullaniciAramayaUyuyorMu } from "./supabase-client.js";
 
 function formatSaat(iso) {
   return new Date(iso).toLocaleString("tr-TR", {
@@ -464,48 +464,57 @@ export async function wireAdminChat(adminId) {
   geriBtn?.addEventListener("click", () => panelEl.classList.remove("msg-panel--thread-aktif"));
 
   /* ---- Üye arama (isim veya e-posta) ---- */
-  let aramaZamanlayici = null;
-  aramaInput?.addEventListener("input", () => {
-    clearTimeout(aramaZamanlayici);
-    const q = aramaInput.value.trim();
+  // NOT: Önceden bu arama sunucu tarafında Postgres ILIKE ile ve SADECE
+  // email/full_name üzerinden yapılıyordu. İki sorunu vardı: (1) ILIKE
+  // Türkçe'ye özgü harfleri (İ/ı gibi) doğru katlamıyor, (2) full_name boş/
+  // senkron dışı kalmış bir kayıtta (first_name/last_name doluyken bile)
+  // hiç eşleşme bulunamıyordu. Artık admin.js'deki üye tablosu aramasıyla
+  // AYNI ortak mantığı (kucukHarfeCevirTr + kullaniciAramayaUyuyorMu,
+  // ad/soyad'a AYRI AYRI da bakan) kullanıyoruz — tüm profiller bir kez
+  // çekilip her tuş vuruşunda client-side filtreleniyor (ekstra ağ isteği
+  // yok, daha hızlı ve daha tutarlı).
+  let TUM_PROFILLER_ARAMA_ICIN = null;
+  async function aramaAdaylariniGetir() {
+    if (TUM_PROFILLER_ARAMA_ICIN) return TUM_PROFILLER_ARAMA_ICIN;
+    const { data } = await supabase.from("profiles").select("id, first_name, last_name, full_name, email");
+    TUM_PROFILLER_ARAMA_ICIN = data || [];
+    return TUM_PROFILLER_ARAMA_ICIN;
+  }
+
+  aramaInput?.addEventListener("input", async () => {
+    const q = kucukHarfeCevirTr(aramaInput.value.trim());
     if (!q) {
       aramaSonucEl.hidden = true;
       aramaSonucEl.innerHTML = "";
       return;
     }
-    aramaZamanlayici = setTimeout(async () => {
-      const guvenliQ = q.replace(/[%,]/g, "");
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, full_name, email")
-        .or(`email.ilike.%${guvenliQ}%,full_name.ilike.%${guvenliQ}%`)
-        .limit(8);
+    const adaylar = await aramaAdaylariniGetir();
+    const eslesenler = adaylar.filter((u) => kullaniciAramayaUyuyorMu(u, q)).slice(0, 8);
 
-      if (!data || data.length === 0) {
-        aramaSonucEl.innerHTML = `<p class="chat-bos" style="padding:8px 10px;">Eşleşen üye yok.</p>`;
-        aramaSonucEl.hidden = false;
-        return;
-      }
-      aramaSonucEl.innerHTML = data
-        .map(
-          (u) => `
-        <button type="button" class="msg-uye-sonuc-item" data-id="${u.id}" data-isim="${escapeHtml(u.full_name || u.email)}">
-          <span class="msg-uye-sonuc-isim">${escapeHtml(u.full_name || "—")}</span>
-          <span class="muted">${escapeHtml(u.email)}</span>
-        </button>`
-        )
-        .join("");
+    if (eslesenler.length === 0) {
+      aramaSonucEl.innerHTML = `<p class="chat-bos" style="padding:8px 10px;">Eşleşen üye yok.</p>`;
       aramaSonucEl.hidden = false;
-      aramaSonucEl.querySelectorAll(".msg-uye-sonuc-item").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          SECILI_UYE = { id: btn.dataset.id, isim: btn.dataset.isim };
-          aramaSonucEl.hidden = true;
-          aramaSonucEl.innerHTML = "";
-          aramaInput.value = "";
-          konusmaListesiniCiz();
-        });
+      return;
+    }
+    aramaSonucEl.innerHTML = eslesenler
+      .map(
+        (u) => `
+      <button type="button" class="msg-uye-sonuc-item" data-id="${u.id}" data-isim="${escapeHtml(u.full_name || u.email)}">
+        <span class="msg-uye-sonuc-isim">${escapeHtml(u.full_name || "—")}</span>
+        <span class="muted">${escapeHtml(u.email)}</span>
+      </button>`
+      )
+      .join("");
+    aramaSonucEl.hidden = false;
+    aramaSonucEl.querySelectorAll(".msg-uye-sonuc-item").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        SECILI_UYE = { id: btn.dataset.id, isim: btn.dataset.isim };
+        aramaSonucEl.hidden = true;
+        aramaSonucEl.innerHTML = "";
+        aramaInput.value = "";
+        konusmaListesiniCiz();
       });
-    }, 250);
+    });
   });
   document.addEventListener("click", (e) => {
     if (aramaSonucEl && !aramaSonucEl.hidden && !aramaSonucEl.contains(e.target) && e.target !== aramaInput) {
