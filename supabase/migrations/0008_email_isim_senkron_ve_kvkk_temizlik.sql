@@ -210,23 +210,47 @@ revoke execute on function public.handle_user_update() from public;
 --    hesap bu koşula girmez (KVKK onayı olmayan biri zaten role
 --    değiştirilemeyecek kadar erken aşamada kalır), yine de dokunulmaz
 --    bir güvenlik önlemi olarak role='admin' olanları hariç tutuyoruz.
+--
+--    GÜVENLİK PAYI (sonradan eklendi): Bu blok TEK SEFERLİK çalışması
+--    amacıyla yazılmıştı, ama bir "do $$ $$" bloğu olduğu için kendi
+--    başına bunu HATIRLAMIYORDU — bu dosya (0008) bir sebeple (ör. yeni
+--    bir Supabase projesine sıfırdan kurulum yaparken migration'ları
+--    yeniden çalıştırmak, ya da yanlışlıkla ikinci kez yapıştırmak) TEKRAR
+--    çalıştırılırsa, O ANKİ bekleyen gerçek hesapları da (KVKK onayını
+--    henüz vermemiş ama gayet gerçek/aktif kullanıcıları) sessizce
+--    silebilirdi. Aşağıdaki küçük "işaret" tablosu bunu engelliyor: temizlik
+--    sadece HİÇ ÇALIŞMAMIŞSA çalışır, bir daha asla tekrarlanmaz — dosya
+--    kaç kez yapıştırılırsa yapıştırılsın güvenlidir.
 -- ----------------------------------------------------------------------------
+create table if not exists public._tek_seferlik_islemler (
+  anahtar text primary key,
+  calisti_at timestamptz not null default now()
+);
+comment on table public._tek_seferlik_islemler is
+  'Migration dosyalarındaki "tek seferlik" bakım/temizlik işlemlerinin (ör. 0008''deki KVKK-onaysız yetim hesap temizliği) yanlışlıkla İKİNCİ KEZ çalışıp gerçek veri silmesini engellemek için kullanılan küçük bir işaret tablosu. Uygulama kodu bu tabloyu hiç kullanmaz, sadece migration''lar kullanır.';
+
 do $$
 declare
   v_silinen_id uuid;
   v_sayac int := 0;
 begin
-  for v_silinen_id in
-    select p.id
-    from public.profiles p
-    where p.kvkk_onay_verildi = false
-      and p.role <> 'admin'
-      and p.created_at < now() - interval '1 hour'
-  loop
-    delete from auth.users where id = v_silinen_id;
-    v_sayac := v_sayac + 1;
-  end loop;
-  raise notice 'KVKK onayı verilmemiş % adet yetim hesap silindi.', v_sayac;
+  if exists (select 1 from public._tek_seferlik_islemler where anahtar = '0008_kvkk_yetim_hesap_temizligi') then
+    raise notice '0008''deki KVKK-onaysız yetim hesap temizliği DAHA ÖNCE çalıştı, tekrar ÇALIŞTIRILMIYOR (güvenlik payı).';
+  else
+    for v_silinen_id in
+      select p.id
+      from public.profiles p
+      where p.kvkk_onay_verildi = false
+        and p.role <> 'admin'
+        and p.created_at < now() - interval '1 hour'
+    loop
+      delete from auth.users where id = v_silinen_id;
+      v_sayac := v_sayac + 1;
+    end loop;
+
+    insert into public._tek_seferlik_islemler (anahtar) values ('0008_kvkk_yetim_hesap_temizligi');
+    raise notice 'KVKK onayı verilmemiş % adet yetim hesap silindi (bu işlem bir daha asla tekrarlanmayacak).', v_sayac;
+  end if;
 end $$;
 
 -- ----------------------------------------------------------------------------
