@@ -150,6 +150,16 @@ permalink: "/panel/panel.html"
     </section>
 
     <section class="panel-section">
+      <h2>Açık Oturumlar</h2>
+      <p class="muted">
+        Hesabına giriş yapılmış tüm cihazlar burada listelenir. Tanımadığın
+        bir cihaz görürsen hemen "Çıkış Yap" ile o oturumu kapatabilirsin.
+      </p>
+      <div id="acik-oturumlar-durum"><p class="muted">Yükleniyor...</p></div>
+      <div id="acik-oturumlar-message" class="auth-message" hidden></div>
+    </section>
+
+    <section class="panel-section">
       <h2>Şifre Değiştir</h2>
       <form id="sifre-degistir-form" novalidate>
         <div class="form-field">
