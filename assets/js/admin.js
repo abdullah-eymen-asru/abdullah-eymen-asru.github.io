@@ -18,6 +18,32 @@
 import { supabase, showMessage, escapeHtml } from "./supabase-client.js";
 import { requireAuth } from "./auth-guard.js";
 import { wireAdminChat } from "./chat.js";
+
+/**
+ * Büyük/küçük harf duyarsız arama için Türkçe'ye uygun harf küçültme.
+ * JS'in düz toLowerCase()'i "İ" (noktalı büyük İ) harfini Türkçe kuralına
+ * göre değil, Unicode varsayılanına göre çevirir ("i̇" gibi iki karakterlik
+ * garip bir sonuç verebilir) — bu da "İrem" yazınca "irem" ile eşleşmemesi
+ * gibi görünüşte rastgele arama başarısızlıklarına yol açabiliyordu.
+ * toLocaleLowerCase("tr") bunu Türkçe harf kurallarına göre doğru çevirir.
+ */
+function kucukHarfeCevirTr(metin) {
+  return (metin || "").toLocaleLowerCase("tr");
+}
+
+/**
+ * Bir kullanıcının ad, soyad, tam ad ve e-postasından herhangi biri, aranan
+ * metni büyük/küçük harften bağımsız olarak İÇERİYOR mu? Sadece `full_name`
+ * (ad+soyad birleşimi, DB'de otomatik türetilen bir alan) yerine first_name
+ * ve last_name'e AYRI AYRI da bakıyoruz — full_name bir sebeple boş/senkron
+ * dışı kalmış olsa bile (ör. eski kayıt) arama yine de çalışsın diye.
+ */
+function kullaniciAramayaUyuyorMu(kullanici, aramaKucuk) {
+  if (!aramaKucuk) return true;
+  const alanlar = [kullanici.first_name, kullanici.last_name, kullanici.full_name, kullanici.email];
+  return alanlar.some((alan) => kucukHarfeCevirTr(alan).includes(aramaKucuk));
+}
+
 import { imzaliLinkUret } from "./dosya-paylasim.js";
 
 const DELETE_ACCOUNT_FUNCTION_URL =
@@ -161,16 +187,12 @@ function wireUserSearch() {
   const input = document.getElementById("kullanici-arama");
   if (!input) return;
   input.addEventListener("input", () => {
-    const q = input.value.trim().toLowerCase();
+    const q = kucukHarfeCevirTr(input.value.trim());
     if (!q) {
       renderUserTable(TUM_KULLANICILAR);
       return;
     }
-    const filtrelenmis = TUM_KULLANICILAR.filter(
-      (u) =>
-        (u.email || "").toLowerCase().includes(q) ||
-        (u.full_name || "").toLowerCase().includes(q)
-    );
+    const filtrelenmis = TUM_KULLANICILAR.filter((u) => kullaniciAramayaUyuyorMu(u, q));
     renderUserTable(filtrelenmis);
   });
 }
@@ -586,12 +608,10 @@ function wireIcerikAtamaArama() {
   const input = document.getElementById("icerik-atama-arama");
   if (!input) return;
   input.addEventListener("input", () => {
-    const q = input.value.trim().toLowerCase();
+    const q = kucukHarfeCevirTr(input.value.trim());
     const hedefKullanicilar = TUM_KULLANICILAR.filter((u) => u.role === "special_user" || u.role === "admin");
     const filtrelenmis = q
-      ? hedefKullanicilar.filter(
-          (u) => (u.email || "").toLowerCase().includes(q) || (u.full_name || "").toLowerCase().includes(q)
-        )
+      ? hedefKullanicilar.filter((u) => kullaniciAramayaUyuyorMu(u, q))
       : hedefKullanicilar;
     atamaListesiCiz(filtrelenmis);
   });
