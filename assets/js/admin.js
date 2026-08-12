@@ -18,6 +18,7 @@
 import { supabase, showMessage, escapeHtml } from "./supabase-client.js";
 import { requireAuth } from "./auth-guard.js";
 import { wireAdminChat } from "./chat.js";
+import { imzaliLinkUret } from "./dosya-paylasim.js";
 
 /**
  * Büyük/küçük harf duyarsız arama için Türkçe'ye uygun harf küçültme.
@@ -32,19 +33,21 @@ function kucukHarfeCevirTr(metin) {
 }
 
 /**
- * Bir kullanıcının ad, soyad, tam ad ve e-postasından herhangi biri, aranan
- * metni büyük/küçük harften bağımsız olarak İÇERİYOR mu? Sadece `full_name`
- * (ad+soyad birleşimi, DB'de otomatik türetilen bir alan) yerine first_name
- * ve last_name'e AYRI AYRI da bakıyoruz — full_name bir sebeple boş/senkron
- * dışı kalmış olsa bile (ör. eski kayıt) arama yine de çalışsın diye.
+ * Bir kullanıcının ADI, SOYADI, tam adı ve e-postasından HERHANGİ BİRİ,
+ * aranan metni büyük/küçük harften bağımsız olarak İÇERİYOR mu?
+ * first_name ve last_name'e AYRI AYRI bakmak önemli: sadece full_name'e
+ * (ad+soyad birleşimi) bakılsaydı, örneğin "Ensar" yazan biri ancak
+ * full_name "Ensar ..." ile BAŞLIYORSA değil, tam adın HERHANGİ BİR
+ * yerinde geçiyorsa bulunurdu — ama full_name boş/senkron dışı kalmış
+ * eski bir kayıtta bu da çalışmazdı. first_name/last_name'e ayrı ayrı
+ * bakmak, sadece adı ya da sadece soyadı yazan aramaların da kesin
+ * çalışmasını garanti ediyor.
  */
 function kullaniciAramayaUyuyorMu(kullanici, aramaKucuk) {
   if (!aramaKucuk) return true;
   const alanlar = [kullanici.first_name, kullanici.last_name, kullanici.full_name, kullanici.email];
   return alanlar.some((alan) => kucukHarfeCevirTr(alan).includes(aramaKucuk));
 }
-
-import { imzaliLinkUret } from "./dosya-paylasim.js";
 
 const DELETE_ACCOUNT_FUNCTION_URL =
   "https://eahvcirspmvntffzphye.supabase.co/functions/v1/delete-account";
