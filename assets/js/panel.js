@@ -42,6 +42,7 @@ async function init() {
     ["profil formu (kaydet)", () => wireProfileForm(profile)],
     ["e-posta değiştirme", () => wireEmailChange(profile)],
     ["bağlı hesaplar", () => wireBagliHesaplar()],
+    ["açık oturumlar", () => wireAcikOturumlar()],
     ["şifre değiştirme", () => wirePasswordChange()],
     ["hesap silme", () => wireDeleteAccount(session, profile)],
     ["KVKK", () => wireKvkk(profile)],
@@ -463,6 +464,161 @@ async function renderBagliHesaplar() {
     }
     showMessage(msg, "Google bağlantısı kesildi. Bundan sonra e-posta + şifreyle giriş yapabilirsin.", "success");
     await renderBagliHesaplar();
+  });
+}
+
+/* ---------------------------------------------------------------------- */
+/* AÇIK OTURUMLAR — hangi cihazlarda oturum açık, tek tek kapatabilme      */
+/* ---------------------------------------------------------------------- */
+/*
+ * Supabase JS SDK'sı sadece İÇİNDE BULUNULAN oturumu döner; tüm cihazları
+ * görmek için sunucu tarafındaki auth.sessions tablosuna bakan iki RPC
+ * kullanıyoruz (bkz. migration 0011): oturumlarimi_listele() ve
+ * oturum_sonlandir(id). "Bu cihaz" etiketini bulmak için mevcut access
+ * token'ın (JWT) içindeki "session_id" claim'i çözümleniyor — bu, GoTrue'nun
+ * auth.sessions.id ile eşleştirdiği resmî yöntem.
+ */
+
+// JWT'nin ortadaki (payload) bölümünü çözüp içinden "session_id" claim'ini
+// çıkarır. JWT formatı bozuksa/beklenmedikse sessizce null döner — bu satır
+// olmadan da "Bu cihaz" rozeti görünmez, kritik bir işlev değil.
+function mevcutOturumIdCikar(accessToken) {
+  try {
+    const payloadB64 = accessToken.split(".")[1];
+    const payloadJson = decodeURIComponent(
+      atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/"))
+        .split("")
+        .map((c) => "%" + c.charCodeAt(0).toString(16).padStart(2, "0"))
+        .join("")
+    );
+    return JSON.parse(payloadJson)?.session_id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// user_agent metninden kabaca "Chrome · Windows" gibi okunabilir bir etiket
+// çıkarır. Kesin bir cihaz tespiti değil, sadece listede ayırt edici bir
+// ipucu — GoTrue bu alanı oturum İLK açıldığında bir kez kaydeder.
+function cihazEtiketiCikar(userAgent) {
+  if (!userAgent) return "Bilinmeyen cihaz";
+  const ua = userAgent;
+  let tarayici = "Bilinmeyen tarayıcı";
+  if (/Edg\//.test(ua)) tarayici = "Edge";
+  else if (/OPR\/|Opera/.test(ua)) tarayici = "Opera";
+  else if (/Chrome\//.test(ua)) tarayici = "Chrome";
+  else if (/Firefox\//.test(ua)) tarayici = "Firefox";
+  else if (/Safari\//.test(ua)) tarayici = "Safari";
+
+  let cihaz = "Bilgisayar";
+  if (/iPhone/.test(ua)) cihaz = "iPhone";
+  else if (/iPad/.test(ua)) cihaz = "iPad";
+  else if (/Android/.test(ua)) cihaz = "Android";
+  else if (/Macintosh/.test(ua)) cihaz = "Mac";
+  else if (/Windows/.test(ua)) cihaz = "Windows";
+  else if (/Linux/.test(ua)) cihaz = "Linux";
+
+  return `${tarayici} · ${cihaz}`;
+}
+
+function tarihFormatla(isoStr) {
+  if (!isoStr) return "—";
+  try {
+    return new Date(isoStr).toLocaleString("tr-TR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return isoStr;
+  }
+}
+
+async function wireAcikOturumlar() {
+  await renderAcikOturumlar();
+}
+
+async function renderAcikOturumlar() {
+  const box = document.getElementById("acik-oturumlar-durum");
+  const msg = document.getElementById("acik-oturumlar-message");
+  if (!box) return;
+
+  box.innerHTML = `<p class="muted">Yükleniyor...</p>`;
+
+  const [{ data: sessionData }, { data: oturumlar, error }] = await Promise.all([
+    supabase.auth.getSession(),
+    supabase.rpc("oturumlarimi_listele"),
+  ]);
+
+  if (error) {
+    box.innerHTML = `<p class="muted">Açık oturumlar yüklenemedi: ${escapeHtml(error.message)}</p>`;
+    return;
+  }
+
+  const mevcutId = sessionData?.session?.access_token
+    ? mevcutOturumIdCikar(sessionData.session.access_token)
+    : null;
+
+  if (!oturumlar || oturumlar.length === 0) {
+    box.innerHTML = `<p class="muted">Açık oturum bulunamadı.</p>`;
+    return;
+  }
+
+  box.innerHTML = oturumlar
+    .map((o) => {
+      const buCihaz = o.id === mevcutId;
+      return `
+        <div class="bagli-hesap-satir">
+          <span>
+            <strong>${escapeHtml(cihazEtiketiCikar(o.user_agent))}</strong>
+            ${buCihaz ? '<span class="eposta-onay-rozet eposta-onay-rozet--ok">Bu cihaz</span>' : ""}
+            <br>
+            <span class="muted" style="font-size:0.85rem;">
+              Son aktivite: ${tarihFormatla(o.guncellenme || o.olusturulma)}
+              ${o.ip ? " · " + escapeHtml(o.ip) : ""}
+            </span>
+          </span>
+          <button type="button" class="btn-secondary tablo-aksiyon-btn oturum-sonlandir-btn" data-id="${escapeHtml(o.id)}" data-bu-cihaz="${buCihaz ? "1" : "0"}">
+            Çıkış Yap
+          </button>
+        </div>`;
+    })
+    .join("");
+
+  box.querySelectorAll(".oturum-sonlandir-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const buCihaz = btn.dataset.buCihaz === "1";
+      const oturumId = btn.dataset.id;
+
+      const emin = window.confirm(
+        buCihaz
+          ? "Bu, ŞU AN kullandığın cihaz. Çıkış yaparsan buradan da atılırsın, devam edeyim mi?"
+          : "Bu cihazdaki oturumu kapatmak istediğine emin misin?"
+      );
+      if (!emin) return;
+
+      btn.disabled = true;
+      const { error: sonlandirErr } = await supabase.rpc("oturum_sonlandir", { p_session_id: oturumId });
+
+      if (sonlandirErr) {
+        btn.disabled = false;
+        showMessage(msg, "Oturum sonlandırılamadı: " + sonlandirErr.message);
+        return;
+      }
+
+      if (buCihaz) {
+        // Sunucudaki oturum zaten silindi; bu tarayıcıdaki yerel oturumu
+        // (localStorage'daki token) da temizleyip giriş sayfasına dönüyoruz.
+        await supabase.auth.signOut({ scope: "local" });
+        window.location.href = "/hesap/giris.html";
+        return;
+      }
+
+      showMessage(msg, "Oturum kapatıldı.", "success");
+      await renderAcikOturumlar();
+    });
   });
 }
 
