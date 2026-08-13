@@ -1366,12 +1366,6 @@ Aşağıdaki her blok bağımsızdır — sadece istemediğini sil, geri kalanı
 - GitHub repo ayarlarından eklediysen `CLOUDFLARE_DEPLOY_HOOK_URL` secret'ını da silebilirsin
 - Not: Bunu silersen, gelecek tarihli/gizli yazılar sadece SEN elle bir push yaptığında görünür hale gelir, otomatik gelmez
 
-**Cloudflare Pages'i hiç kullanmayıp sadece GitHub Pages'te barındıracaksan:**
-- `_config_cloudflare.yml` dosyasını sil
-- `_headers` dosyasını sil (bu dosya sadece Cloudflare Pages'te işe yarar, GitHub Pages'te zaten görmezden gelinir ama gereksizse silebilirsin)
-- `.github/workflows/zamanlanmis-yayin.yml` dosyasını sil (Cloudflare'e özel)
-- `_config.yml` içindeki `mirror_site_url` satırını sil, `url` alanına GitHub Pages adresini yaz
-
 **Android uygulama bağlantısını (App Links) kullanmıyorsan:**
 - `.well-known/assetlinks.json` dosyasını sil
 - `_config.yml` içindeki `include: - .well-known` satırını silebilirsin
@@ -1390,7 +1384,58 @@ Aşağıdaki her blok bağımsızdır — sadece istemediğini sil, geri kalanı
   General → Delete Project** üzerinden yapabilirsin (bu, koddan bağımsız,
   ayrı bir adım)
 
-### 4. Secret / Gizli Anahtarlar — Nerede, Nasıl Tanımlanır
+### 4. Cloudflare Pages mi, GitHub Pages mi? (Birincil Adres / Barındırma Seçimi)
+
+Bu site aynı anda **iki adreste** barınabilir: Cloudflare Pages
+(`pages.dev`) ve GitHub Pages (`github.io`). Repoyu fork'ladığında hangisini
+nasıl kullanacağına göre iki farklı senaryo var — hangisi sana uyuyorsa
+onu uygula, ikisi birbirinden bağımsızdır.
+
+#### Senaryo A — İkisini de kullanmaya devam edip sadece birincil adresi değiştirmek istiyorum
+
+Örneğin Google'ın indekslediği/canonical adresin `pages.dev` yerine
+`github.io` olsun istiyorsun, ama Cloudflare Pages'i yedek olarak
+kullanmaya devam edeceksin. Sadece **3 satır** değişiyor, kod tarafında
+başka hiçbir şeye dokunman gerekmiyor (sitemap.xml, feed.xml,
+canonical/og:url etiketleri hepsi aşağıdaki `url:` değerini otomatik takip
+eder):
+
+| Dosya | Satır | Şimdi | Değişecek |
+|---|---|---|---|
+| `_config.yml` | `url:` | `https://kullaniciadin.pages.dev` | `https://kullaniciadin.github.io` |
+| `_config.yml` | `mirror_site_url:` | `https://kullaniciadin.github.io` | `https://kullaniciadin.pages.dev` |
+| `robots.txt` | `Sitemap:` satırı | `.../pages.dev/sitemap.xml` | `.../github.io/sitemap.xml` |
+
+Kod dışında (repo'da olmayan) ayrıca yapman gerekenler:
+- Supabase Dashboard → Authentication → URL Configuration'da "Site URL"i
+  yeni birincil adresle güncelle (Redirect URLs listesinde her iki adres
+  de zaten varsa dokunmana gerek yok).
+- Google Search Console'a yeni adresi ayrıca doğrulat, yeni sitemap'i
+  gönder.
+- GitHub repo ayarlarında **Settings → Pages**'in açık olduğunu teyit et.
+
+İki Cloudflare Worker ve iki Supabase Edge Function'ı (`delete-account`,
+`admin-change-email`) zaten her iki adresi de izin listesinde tuttuğu
+için, hangisini birincil yaparsan yap ikisi de çalışmaya devam eder —
+onlara dokunmuyorsun.
+
+#### Senaryo B — Cloudflare Pages'i tamamen bırakıp SADECE GitHub Pages kullanacağım
+
+- `_config_cloudflare.yml` dosyasını sil
+- `_headers` dosyasını sil (bu dosya sadece Cloudflare Pages'te işe yarar,
+  GitHub Pages'te zaten görmezden gelinir ama gereksizse silebilirsin)
+- `.github/workflows/zamanlanmis-yayin.yml` dosyasını sil (Cloudflare'e özel deploy hook'u tetikliyor)
+- `_config.yml` içindeki `mirror_site_url` satırını sil, `url` alanına
+  GitHub Pages adresini yaz
+- `robots.txt` içindeki `Sitemap:` satırını GitHub Pages adresine güncelle
+  (Senaryo A'daki tabloyla aynı satır)
+- Cloudflare Worker'lardaki (`r2_storage_worker`, `izleme_okuma_worker`)
+  ve Edge Function'lardaki (`delete-account`, `admin-change-email`)
+  `pages.dev` referanslarını silmen ZORUNLU değil (kullanılmayan bir
+  adresin izin listesinde durması zarar vermez), ama istersen temizlik
+  için kaldırabilirsin.
+
+### 5. Secret / Gizli Anahtarlar — Nerede, Nasıl Tanımlanır
 
 Bu projede kod içine **asla düz yazılmaması gereken** tek secret,
 Cloudflare Pages'i otomatik build tetikleyen deploy hook URL'idir.
@@ -1406,14 +1451,14 @@ giscus, Google Forms) API anahtarı değil, herkese açık/genel amaçlı ID'ler
 kullanır; bunları `_config.yml` veya ilgili `.md` dosyasına doğrudan
 yazman güvenlidir, GitHub Secrets'a eklemene gerek yoktur.
 
-### 5. Yayına Alma Sırası (Özet)
+### 6. Yayına Alma Sırası (Özet)
 
 1. Yukarıdaki `_config.yml` ve `_config_cloudflare.yml` alanlarını doldur
 2. İstemediğin özellikleri "Bölüm 3"e göre sil
 3. Cloudflare Pages'te yeni bir proje oluştur, bu repo'yu bağla
    - Build command: `bundle exec jekyll build --config _config.yml,_config_cloudflare.yml`
    - Build output directory: `_site`
-4. Zamanlanmış yayın özelliğini kullanacaksan `CLOUDFLARE_DEPLOY_HOOK_URL` secret'ını ekle (Bölüm 4)
+4. Zamanlanmış yayın özelliğini kullanacaksan `CLOUDFLARE_DEPLOY_HOOK_URL` secret'ını ekle (Bölüm 5)
 5. GitHub Pages'i de yedek olarak kullanacaksan repo **Settings → Pages** üzerinden aktif et
 
 </details>
