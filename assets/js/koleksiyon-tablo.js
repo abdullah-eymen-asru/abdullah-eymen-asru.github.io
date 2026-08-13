@@ -35,6 +35,19 @@ function guvenliLink(url) {
   return "#";
 }
 
+// Büyük/küçük harf duyarsız arama için Türkçe'ye uygun harf küçültme.
+// Düz toLowerCase() "İ" (noktalı büyük İ) gibi harfleri Türkçe kuralına
+// göre değil Unicode varsayılanına göre çevirir — bu da örneğin "İstanbul"
+// yazınca "istanbul" ile eşleşmemesi gibi görünüşte rastgele arama
+// başarısızlıklarına yol açabiliyordu. toLocaleLowerCase("tr") bunu
+// Türkçe harf kurallarına göre doğru çevirir. (admin.js/github-yonetim.js
+// içindeki aynı düzeltmeyle tutarlı olsun diye burada da uygulanıyor —
+// bu dosya <script type="module"> DEĞİL, klasik bir script olduğu için
+// ortak yardımcı dosyadan import edemiyor, küçük bir yerel kopya yeterli.)
+function kucukHarfeCevirTr(metin) {
+  return (metin == null ? "" : String(metin)).toLocaleLowerCase("tr");
+}
+
 /**
  * @param {Object} config
  * @param {string} config.jsonUrl - JSON dosyasının yolu (örn. "/assets/data/izlenenler.json")
@@ -112,7 +125,8 @@ async function koleksiyonTablosuOlustur(config) {
       (config.aramaAlanlari || []).forEach(alan => {
         if (item[alan] != null) aramaMetniParcalari.push(item[alan]);
       });
-      const searchText = aramaMetniParcalari.join(" ").toString().toLowerCase();
+      const searchText = aramaMetniParcalari.join(" ").toString();
+      const searchTextKucuk = kucukHarfeCevirTr(searchText);
 
       const hucreler = sutunlar.map(sutun => {
         const deger = item[sutun];
@@ -120,7 +134,7 @@ async function koleksiyonTablosuOlustur(config) {
       }).join("");
 
       rows += `
-        <tr class="searchable" data-search="${escapeHtml(searchText)}" data-tur="${escapeHtml(String(turDegeri).toLowerCase())}">
+        <tr class="searchable" data-search="${escapeHtml(searchTextKucuk)}" data-tur="${escapeHtml(kucukHarfeCevirTr(turDegeri))}">
           <td class="col-index">${index + 1}</td>
           <td><a href="${escapeHtml(guvenliLink(item.url))}" target="_blank">${escapeHtml(item.title)}</a></td>
           ${hucreler}
@@ -148,7 +162,7 @@ async function koleksiyonTablosuOlustur(config) {
       if (benzersizTurler.length > 0) {
         benzersizTurler.forEach(tur => {
           const ornekItem = items.find(
-            it => String(it[config.turFieldName] || "").toLowerCase() === tur
+            it => kucukHarfeCevirTr(it[config.turFieldName] || "") === tur
           );
           const option = document.createElement("option");
           option.value = tur;
@@ -165,7 +179,7 @@ async function koleksiyonTablosuOlustur(config) {
     // arama yaptığında, o aramaya uyan tüm sonuçlar kendi sayfalarına göre
     // bölünür, filtrelenmemiş satırlar sayıma hiç girmez.
     function eslesenSatirlariBul() {
-      const q = (searchBox.value || "").trim().toLowerCase();
+      const q = kucukHarfeCevirTr((searchBox.value || "").trim());
       const secilenTur = turSelect ? turSelect.value : "";
       return tumSatirlar.filter(tr => {
         const metinEslesiyor = tr.dataset.search.includes(q);
