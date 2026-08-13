@@ -1,0 +1,17 @@
+# Abdullah Eymen Asru - Kişisel Web Sitesi ve Portfolyo
+
+> Bu dosya, büyük dil modellerinin (LLM) site içeriğini daha iyi anlaması ve indekslemesi için hazırlanmış özet belgedir.
+
+Abdullah Eymen Aşru'nun Uluslararası İlişkiler, jeopolitik kaynak rekabeti, stratejik araştırmalar ve açık kaynak teknolojileri üzerine çalışmalarını paylaştığı kişisel web sitesi.
+
+## Ana Sayfalar ve Bağlantılar
+
+- [Anasayfa](https://abdullah-eymen-asru.pages.dev/): Site hakkındaki genel bilgiler, biyografi ve sosyal medya bağlantıları.
+- [Blog](https://abdullah-eymen-asru.pages.dev/icerik/blog.html): Analitik yazılar.
+- [Akademik Projeler](https://abdullah-eymen-asru.pages.dev/icerik/akademik-projeler.html): Akademik araştırmalar ve projeler.
+- [İletişim](https://abdullah-eymen-asru.pages.dev/kurumsal/iletisim.html): İletişim bilgileri.
+
+## İsteğe Bağlı Ek Kaynaklar
+
+- [RSS Akışı](https://abdullah-eymen-asru.github.io/feed.xml): Sitedeki son içeriklerin RSS formatındaki dökümü.
+- [GitHub Profili](https://github.com/abdullah-eymen-asru): Açık kaynak kodlu projeler ve kod depoları.
