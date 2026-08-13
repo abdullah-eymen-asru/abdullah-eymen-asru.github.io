@@ -3,6 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- PERFORMANCE / PRECONNECT OPTİMİZASYONU:
+       Ağ gecikmelerini düşürmek (LCP/FCP süresini iyileştirmek) için dış kaynak 
+       sunucularına (esm.sh) önceden bağlantı (DNS + SSL el sıkışması) kuruluyor. -->
+  <link rel="preconnect" href="https://esm.sh" crossorigin>
+  <link rel="dns-prefetch" href="https://esm.sh">
+
   <!--
     SAMSUNG INTERNET / ANDROID CHROME "ZORLA KARARTMA" SORUNU:
     Bazı mobil tarayıcılarda (özellikle Samsung Internet'in kendi "Gece
@@ -123,25 +130,25 @@
 
   {% if page.auth_css %}
   <!-- auth.css: giris/kayit/panel/admin sayfalarına özel stiller. Önceden
-       her sayfanın KENDİ içeriğinde (Markdown gövdesinde) inline
-       <link rel="stylesheet"> olarak ekleniyordu — bu, HTML olarak
-       geçersizdi (</head>'ten SONRA, <body> içine düşüyordu, çünkü sayfa
-       gövdesi her zaman <body> içinde render edilir) ve bazı
-       tarayıcılarda/uzantılarda (içerik engelleyiciler, okuyucu modları,
-       bazı Safari/Samsung Internet sürümleri) <body> içindeki <link>
-       etiketleri ya HİÇ YÜKLENMİYOR ya da normalden GEÇ/farklı öncelikle
-       yükleniyordu — "buton yazıları görünmüyor", "mesajlaşma modern
-       görünmüyor" gibi tarayıcıya göre değişen görünüm sorunlarının kök
-       nedeni buydu. Şimdi <head> içinde, diğer stillerle aynı güvenilir
-       şekilde yükleniyor. Sayfa bunu front matter'da "auth_css: true" ile
-       ister (bkz. panel/panel.md, panel/admin.md, hesap/giris.md vb.).
+        her sayfanın KENDİ içeriğinde (Markdown gövdesinde) inline
+        <link rel="stylesheet"> olarak ekleniyordu — bu, HTML olarak
+        geçersizdi (</head>'ten SONRA, <body> içine düşüyordu, çünkü sayfa
+        gövdesi her zaman <body> içinde render edilir) ve bazı
+        tarayıcılarda/uzantılarda (içerik engelleyiciler, okuyucu modları,
+        bazı Safari/Samsung Internet sürümleri) <body> içindeki <link>
+        etiketleri ya HİÇ YÜKLENMİYOR ya da normalden GEÇ/farklı öncelikle
+        yükleniyordu — "buton yazıları görünmüyor", "mesajlaşma modern
+        görünmüyor" gibi tarayıcıya göre değişen görünüm sorunlarının kök
+        nedeni buydu. Şimdi <head> içinde, diğer stillerle aynı güvenilir
+        şekilde yükleniyor. Sayfa bunu front matter'da "auth_css: true" ile
+        ister (bkz. panel/panel.md, panel/admin.md, hesap/giris.md vb.).
 
-       ÖNEMLİ (kendi kendine referans hatasından kaçının): bu yorumun İÇİNDE
-       çift süslü parantez kullanmayın (ör. sayfa gövdesi değişkenini adıyla
-       yazmayın) — Jekyll'in Liquid motoru dosyayı HTML yorumlarını hiç
-       ayırt etmeden düz metin olarak tarar; yorum içine yazılan bir Liquid
-       etiketi yine de ÇALIŞTIRILIR ve buradaki gibi tüm sayfa gövdesini
-       </head> kapanmadan bu satıra basıp sayfayı bozar. -->
+        ÖNEMLİ (kendi kendine referans hatasından kaçının): bu yorumun İÇİNDE
+        çift süslü parantez kullanmayın (ör. sayfa gövdesi değişkenini adıyla
+        yazmayın) — Jekyll'in Liquid motoru dosyayı HTML yorumlarını hiç
+        ayırt etmeden düz metin olarak tarar; yorum içine yazılan bir Liquid
+        etiketi yine de ÇALIŞTIRILIR ve buradaki gibi tüm sayfa gövdesini
+        </head> kapanmadan bu satıra basıp sayfayı bozar. -->
   <link rel="stylesheet" href="{{ '/assets/css/auth.css' | relative_url }}">
   {% endif %}
 
