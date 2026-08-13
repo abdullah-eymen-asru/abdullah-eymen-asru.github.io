@@ -646,7 +646,6 @@ th { color: var(--muted); font-weight: 600; }
   overflow-y: auto;
   padding-right: 6px;
 }
-
 .scroll-list .post-card:last-child { margin-bottom: 0; }
 
 .no-results { padding: 8px 0; }
@@ -687,7 +686,20 @@ th { color: var(--muted); font-weight: 600; }
 /* Tablolu sayfalarda (izlediklerim/okuduklarım) sütun sayısı fazla,
    dar ekranlarda tablo kendi içinde yatay kaysın, sayfa bozulmasın.
    Bu sayfalarda artık sayfalama (pagination) uzunluğu zaten kontrol
-   ettiği için dikey kaydırmayı (max-height) burada devre dışı bırakıyoruz. */
+   ettiği için dikey kaydırmayı (max-height) burada devre dışı bırakıyoruz.
+   NOT: Önceden bu kural ":has(table)" seçicisiyle otomatik tespit
+   ediliyordu — ama :has() eski tarayıcılarda (ör. Aralık 2023'ten önceki
+   Firefox sürümleri) DESTEKLENMEZ, desteklenmeyen tarayıcıda kural hiç
+   uygulanmaz ve tablo gereksiz yere küçük, dikey kaydırmalı bir kutuya
+   sıkışırdı. Artık HTML tarafında (icerik/izlediklerim.md,
+   icerik/okuduklarim.md) doğrudan eklenen ".scroll-list--tablo" sınıfına
+   bakıyoruz — hiçbir tarayıcı desteğine bağımlı değil, %100 garantili. */
+.scroll-list--tablo {
+  max-height: none;
+  overflow-y: visible;
+}
+/* Eski :has() kuralı ekstra bir güvenlik katmanı olarak kalıyor (zararı
+   yok, destekleyen tarayıcılarda aynı sonucu verir). */
 .scroll-list:has(table) {
   max-height: none;
   overflow-y: visible;
