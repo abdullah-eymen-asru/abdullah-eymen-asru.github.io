@@ -155,6 +155,24 @@
     gtag('config', '{{ site.google_analytics_id }}');
   </script>
   {% endif %}
+  
+  <!-- Schema.org Verisi (Google / Yandex Doğrulama Kodu) -->
+  <script>
+    fetch("{{ '/assets/data/schema.json' | relative_url }}")
+      .then(function(response) {
+        if (!response.ok) throw new Error("Schema yüklenemedi.");
+        return response.json();
+      })
+      .then(function(data) {
+        var script = document.createElement("script");
+        script.type = "application/ld+json";
+        script.text = JSON.stringify(data);
+        document.head.appendChild(script);
+      })
+      .catch(function(err) {
+        console.error("Schema Hatası:", err);
+      });
+  </script>
 </head>
 <body>
   <div id="lang-notice" style="display:none;" class="lang-notice">
