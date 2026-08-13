@@ -9,6 +9,8 @@
        sunucularına (esm.sh) önceden bağlantı (DNS + SSL el sıkışması) kuruluyor. -->
   <link rel="preconnect" href="https://esm.sh" crossorigin>
   <link rel="dns-prefetch" href="https://esm.sh">
+  <!-- OPTİMİZASYON (Kritik İstek Zinciri): Supabase kütüphanesinin önceden indirilip zincir gecikmesinin azaltılması için modulepreload eklendi. -->
+  <link rel="modulepreload" href="https://esm.sh/@supabase/supabase-js@2.45.4">
 
   <!--
     SAMSUNG INTERNET / ANDROID CHROME "ZORLA KARARTMA" SORUNU:
@@ -136,7 +138,7 @@
         gövdesi her zaman <body> içinde render edilir) ve bazı
         tarayıcılarda/uzantılarda (içerik engelleyiciler, okuyucu modları,
         bazı Safari/Samsung Internet sürümleri) <body> içindeki <link>
-        etiketleri ya HİÇ YÜKLENMİYOR ya da normalden GEÇ/farklı öncelikle
+        etiketleri ya HİÇ YÜKLENMİYOR ya da normalden GEÇ/farklı önellikle
         yükleniyordu — "buton yazıları görünmüyor", "mesajlaşma modern
         görünmüyor" gibi tarayıcıya göre değişen görünüm sorunlarının kök
         nedeni buydu. Şimdi <head> içinde, diğer stillerle aynı güvenilir
@@ -225,8 +227,23 @@
   </header>
 
   <script type="module">
-    import { initAuthNav } from "{{ '/assets/js/nav-auth.js' | relative_url }}";
-    initAuthNav();
+    // PERFORMANS OPTİMİZASYONU (Çözüm 2 - Yol A):
+    // Oturum menüsü kütüphanesini ilk sayfa çizimini (LCP/FCP) engellememesi için
+    // sayfa yüklendikten sonra tarayıcının boş anında (requestIdleCallback) çağırıyoruz.
+    window.addEventListener('load', () => {
+      const loadAuth = () => {
+        import("{{ '/assets/js/nav-auth.js' | relative_url }}").then(m => {
+          if (m && typeof m.initAuthNav === "function") {
+            m.initAuthNav();
+          }
+        });
+      };
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(loadAuth);
+      } else {
+        setTimeout(loadAuth, 1000);
+      }
+    });
   </script>
 
   <main class="wrap content">
