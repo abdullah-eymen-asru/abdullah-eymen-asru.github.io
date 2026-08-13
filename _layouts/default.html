@@ -155,13 +155,19 @@
   {% endif %}
 
   {% if site.google_analytics_id and site.google_analytics_id != "" %}
-  <!-- Google Analytics -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id={{ site.google_analytics_id }}"></script>
+  <!-- Google Analytics (Performans Optimize: İlk sayfa çizimini geciktirmemesi için yükleme arka plana ertelendi) -->
   <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', '{{ site.google_analytics_id }}');
+    window.addEventListener('load', function() {
+      var script = document.createElement('script');
+      script.src = 'https://www.googletagmanager.com/gtag/js?id={{ site.google_analytics_id }}';
+      script.async = true;
+      document.head.appendChild(script);
+
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', '{{ site.google_analytics_id }}');
+    });
   </script>
   {% endif %}
   
