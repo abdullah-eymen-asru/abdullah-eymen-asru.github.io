@@ -30,7 +30,7 @@ permalink: "/icerik/izlediklerim.html"
   </select>
 </div>
 
-<div id="izlenenler-tablo" class="scroll-list">
+<div id="izlenenler-tablo" class="scroll-list scroll-list--tablo">
   <p class="loading">Yükleniyor…</p>
 </div>
 
