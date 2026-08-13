@@ -39,6 +39,10 @@ markdown: kramdown
 plugins:
   - jekyll-sitemap
 
+# PERFORMANS OPTİMİZASYONU: CSS dosyalarını derleme sırasında otomatik sıkıştırarak (minify) dosya boyutunu düşürür.
+sass:
+  style: compressed
+
 # Nokta ile başlayan klasörlerin Jekyll derlemesinde silinmesini engeller (Android App Links için zorunlu)
 include:
   - .well-known
