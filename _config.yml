@@ -46,6 +46,7 @@ sass:
 # Nokta ile başlayan klasörlerin Jekyll derlemesinde silinmesini engeller (Android App Links için zorunlu)
 include:
   - .well-known
+  - llms.txt
 
 # NOT: jekyll-feed plugin'i BİLEREK kullanılmıyor. Bunun yerine kökte
 # elle yazılmış bir feed.xml var (bkz. o dosyanın başındaki açıklama) —
