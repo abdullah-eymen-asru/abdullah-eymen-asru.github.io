@@ -34,7 +34,15 @@ import { requireAuth } from "./auth-guard.js";
 import { escapeHtml, showMessage } from "./supabase-client.js";
 
 const GITHUB_API = "https://api.github.com";
-const PROFIL_YOLU = "assets/profil.jpg";
+// Profil fotoğrafının GERÇEK yolu artık sabit kodlanmıyor: her zaman
+// _config.yml içindeki `profile_image` alanından okunur. Böylece dosya
+// assets/profil.jpg, assets/profile.webp ya da başka bir isimle kayıtlı
+// olsa da panel onu bulup gösterebilir/değiştirebilir/silebilir — çünkü
+// sitenin favicon/profil resmi olarak GERÇEKTEN kullandığı dosya zaten
+// bu alanla belirleniyor (bkz. _layouts/default.html). Bkz. aşağıdaki
+// profilYapilandirmasiniOku().
+const CONFIG_YOLU = "_config.yml";
+let PROFIL_YOLU = null;
 
 // Token SADECE bellekte — bkz. dosya başındaki güvenlik notu.
 let PAT_BELLEK = "";
@@ -1224,28 +1232,105 @@ function icerikDuzenlemeyeYukle(item, tur) {
 }
 
 /* ---------------------------------------------------------------------- */
-/* PROFİL FOTOĞRAFI YÖNETİMİ (assets/profil.jpg)                          */
+/* PROFİL FOTOĞRAFI YÖNETİMİ (yolu _config.yml → profile_image'tan okunur) */
 /* ---------------------------------------------------------------------- */
 function wireProfilFoto() {
   document.getElementById("pf-yukle-btn").addEventListener("click", profilFotoYukle);
   document.getElementById("pf-sil-btn").addEventListener("click", profilFotoSil);
 }
 
+/* _config.yml içeriğini okuyup `profile_image:` satırının değerini
+ * (baştaki "/" temizlenmiş, repo-göreli hâliyle) çıkarır. Satır yoksa ya
+ * da değeri boşsa yol=null döner. */
+async function profilYapilandirmasiniOku() {
+  const dosya = await ghGetContents(CONFIG_YOLU);
+  if (!dosya) throw new Error("_config.yml bulunamadı.");
+  const icerik = b64Decode(dosya.content.replace(/\n/g, ""));
+  const eslesme = icerik.match(PROFIL_IMAGE_SATIR_REGEX);
+  let yol = null;
+  if (eslesme) {
+    let deger = (eslesme[1] || "").trim().replace(/^["']|["']$/g, "").trim();
+    if (deger) yol = deger.replace(/^\/+/, "");
+  }
+  return { yol, icerik, sha: dosya.sha };
+}
+
+/* profile_image satırını yakalar; 1. grup değeri, 2. grup varsa satır
+ * sonu yorumunu ("  # ..." kısmı) tutar, böylece güncellerken yorum
+ * korunur. */
+const PROFIL_IMAGE_SATIR_REGEX = /^profile_image:[ \t]*("[^"]*"|'[^']*'|[^#\r\n]*?)?[ \t]*(#.*)?$/m;
+
+function configIcindeProfilYoluYaz(icerik, yeniDegerYaml) {
+  const eslesme = icerik.match(PROFIL_IMAGE_SATIR_REGEX);
+  const yorum = eslesme && eslesme[2] ? `   ${eslesme[2]}` : "";
+  const yeniSatir = `profile_image: ${yeniDegerYaml}${yorum}`;
+  if (eslesme) return icerik.replace(PROFIL_IMAGE_SATIR_REGEX, yeniSatir);
+  return `${yeniSatir}\n${icerik}`;
+}
+
+async function configProfilYoluGuncelle(yeniYol) {
+  const { icerik, sha } = await profilYapilandirmasiniOku();
+  const guncel = configIcindeProfilYoluYaz(icerik, `"/${yeniYol}"`);
+  await ghPutFile(CONFIG_YOLU, b64Encode(guncel), `_config.yml: profile_image → /${yeniYol}`, sha);
+}
+
+async function configProfilYoluTemizle() {
+  const { icerik, sha, yol } = await profilYapilandirmasiniOku();
+  if (!yol) return; // zaten boş
+  const guncel = configIcindeProfilYoluYaz(icerik, `""`);
+  await ghPutFile(CONFIG_YOLU, b64Encode(guncel), "_config.yml: profile_image temizlendi", sha);
+}
+
+/* Dosya adını GitHub'a güvenli şekilde yazılabilecek, Türkçe karakterden
+ * arındırılmış bir ada çevirir (ör. "Yeni Fotoğrafım Ş.PNG" -> "yeni-fotografim-s.png"). */
+function profilDosyaAdiTemizle(ad) {
+  const TR_HARF = { ç: "c", ğ: "g", ı: "i", ö: "o", ş: "s", ü: "u", İ: "i", Ç: "c", Ğ: "g", Ö: "o", Ş: "s", Ü: "u" };
+  const sonNokta = ad.lastIndexOf(".");
+  let isim = sonNokta > 0 ? ad.slice(0, sonNokta) : ad;
+  let uzanti = sonNokta > 0 ? ad.slice(sonNokta + 1).toLowerCase().replace(/[^a-z0-9]/g, "") : "";
+  isim = isim
+    .split("")
+    .map((c) => TR_HARF[c] || c)
+    .join("")
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[-.]+|[-.]+$/g, "");
+  if (!isim) isim = "profile";
+  return uzanti ? `${isim}.${uzanti}` : isim;
+}
+
+function profilMimeTuruTahminEt(yol) {
+  const uzanti = (yol.split(".").pop() || "").toLowerCase();
+  const tablo = { jpg: "jpeg", jpeg: "jpeg", png: "png", webp: "webp", gif: "gif", svg: "svg+xml", avif: "avif", bmp: "bmp" };
+  return `image/${tablo[uzanti] || "jpeg"}`;
+}
+
 async function profilFotoDurumYukle() {
   const el = document.getElementById("pf-mevcut");
   el.innerHTML = '<p class="muted">Yükleniyor...</p>';
   try {
+    const { yol } = await profilYapilandirmasiniOku();
+    PROFIL_YOLU = yol;
+    if (!PROFIL_YOLU) {
+      PROFIL_SHA = null;
+      el.innerHTML = '<p class="muted">Şu anda bir profil fotoğrafı yok (yapılandırmada tanımlı değil).</p>';
+      return;
+    }
     const dosya = await ghGetContents(PROFIL_YOLU);
     if (!dosya) {
       PROFIL_SHA = null;
-      el.innerHTML = '<p class="muted">Şu anda bir profil fotoğrafı yok.</p>';
+      el.innerHTML = `<p class="muted">Şu anda bir profil fotoğrafı yok (yapılandırmadaki <code>${escapeHtml(
+        PROFIL_YOLU
+      )}</code> dosyası repoda bulunamadı).</p>`;
       return;
     }
     PROFIL_SHA = dosya.sha;
-    const src = dosya.download_url || `data:image/jpeg;base64,${dosya.content.replace(/\n/g, "")}`;
-    el.innerHTML = `<img src="${src}" alt="Mevcut profil fotoğrafı"><span class="muted">Mevcut fotoğraf (sha: ${escapeHtml(
-      dosya.sha.slice(0, 8)
-    )}...)</span>`;
+    const src =
+      dosya.download_url || `data:${profilMimeTuruTahminEt(PROFIL_YOLU)};base64,${dosya.content.replace(/\n/g, "")}`;
+    el.innerHTML = `<img src="${src}" alt="Mevcut profil fotoğrafı"><span class="muted">Mevcut dosya: <code>${escapeHtml(
+      PROFIL_YOLU
+    )}</code> (sha: ${escapeHtml(dosya.sha.slice(0, 8))}...)</span>`;
   } catch (err) {
     el.innerHTML = `<p class="muted">Durum okunamadı: ${escapeHtml(err.message)}</p>`;
   }
@@ -1278,13 +1363,32 @@ async function profilFotoYukle() {
   btn.disabled = true;
   btn.textContent = "Yükleniyor...";
   try {
+    const { yol: eskiYol } = await profilYapilandirmasiniOku();
+    const yeniYol = "assets/" + profilDosyaAdiTemizle(dosya.name);
     const base64 = await dosyayiBase64eCevir(dosya);
-    await ghPutFile(
-      PROFIL_YOLU,
-      base64,
-      PROFIL_SHA ? "Profil fotoğrafı güncellendi" : "Profil fotoğrafı eklendi",
-      PROFIL_SHA
-    );
+
+    if (eskiYol && eskiYol === yeniYol) {
+      // Aynı yol/isim: dosyanın güncel sha'sını al ve üzerine yaz.
+      const mevcut = await ghGetContents(yeniYol);
+      await ghPutFile(yeniYol, base64, "Profil fotoğrafı güncellendi", mevcut ? mevcut.sha : null);
+    } else {
+      // Farklı isim/uzantı: yeni dosyayı ekle, eskisini (varsa) sil,
+      // ardından _config.yml → profile_image'ı yeni yola güncelle —
+      // böylece yeni yüklenen dosyanın ismi eskisinden farklı olabilir.
+      await ghPutFile(yeniYol, base64, `Profil fotoğrafı eklendi (${yeniYol})`, null);
+      if (eskiYol) {
+        try {
+          const eskiDosya = await ghGetContents(eskiYol);
+          if (eskiDosya) {
+            await ghDeleteFile(eskiYol, eskiDosya.sha, `Eski profil fotoğrafı kaldırıldı (${eskiYol})`);
+          }
+        } catch (e) {
+          // Eski dosya silinemedi (ör. zaten yoktu); kritik değil, devam et.
+        }
+      }
+      await configProfilYoluGuncelle(yeniYol);
+    }
+
     showMessage(msgEl, "İşlem başarıyla GitHub'a iletildi, 1-2 dakika içinde sitede güncellenecektir.", "success");
     dosyaInput.value = "";
     await profilFotoDurumYukle();
@@ -1303,16 +1407,21 @@ async function profilFotoSil() {
     showMessage(msgEl, 'Önce "GitHub Bağlantısı" sekmesinden bağlantını doğrula.', "error");
     return;
   }
-  if (!PROFIL_SHA) {
+  if (!PROFIL_YOLU || !PROFIL_SHA) {
     showMessage(msgEl, "Silinecek bir profil fotoğrafı yok.", "error");
     return;
   }
-  if (!confirm("Profil fotoğrafını silmek istediğine emin misin?")) return;
+  if (!confirm(`"${PROFIL_YOLU}" dosyasını silmek istediğine emin misin?`)) return;
 
   const btn = document.getElementById("pf-sil-btn");
   btn.disabled = true;
   try {
-    await ghDeleteFile(PROFIL_YOLU, PROFIL_SHA, "Profil fotoğrafı silindi");
+    await ghDeleteFile(PROFIL_YOLU, PROFIL_SHA, `Profil fotoğrafı silindi (${PROFIL_YOLU})`);
+    try {
+      await configProfilYoluTemizle();
+    } catch (e) {
+      // _config.yml temizlenemedi; dosya yine de silindi, kritik değil.
+    }
     showMessage(msgEl, "İşlem başarıyla GitHub'a iletildi, 1-2 dakika içinde sitede güncellenecektir.", "success");
     await profilFotoDurumYukle();
   } catch (err) {
