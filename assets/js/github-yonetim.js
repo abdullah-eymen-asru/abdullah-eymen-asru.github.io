@@ -281,9 +281,39 @@ function guncelleIcerikTuru() {
 /* HAFİF MARKDOWN EDİTÖR ARAÇ ÇUBUĞU                                      */
 /* ---------------------------------------------------------------------- */
 function wireEditorToolbar() {
-  document.querySelectorAll(".gy-editor-toolbar button").forEach((btn) => {
+  document.querySelectorAll(".gy-editor-toolbar button[data-md]").forEach((btn) => {
     btn.addEventListener("click", () => markdownUygula(btn.dataset.md));
   });
+}
+
+/**
+ * Seçili metni (varsa) bir "sarmalayıcı" (wrapper) ile sarar — örn. **metin**.
+ * Seçim yoksa yer tutucu metinle birlikte wrapper eklenir ve o yer tutucu
+ * seçili bırakılır ki kullanıcı hemen üzerine yazabilsin.
+ */
+function satirIciUygula(ta, start, end, secili, onEk, sonEk, yerTutucu) {
+  const govde = secili || yerTutucu;
+  const yeni = `${onEk}${govde}${sonEk}`;
+  ta.setRangeText(yeni, start, end, "select");
+  if (!secili) {
+    // Yer tutucu metni seçili bırak (onEk uzunluğu kadar içeriden başlar).
+    ta.setSelectionRange(start + onEk.length, start + onEk.length + yerTutucu.length);
+  }
+}
+
+/** Seçili metnin HER SATIRINI bir önekle başlatır (liste, alıntı, başlık gibi bloklar için). */
+function satirBasinaUygula(ta, start, end, secili, onEkUretici, yerTutucu) {
+  const govde = secili || yerTutucu;
+  const satirlar = govde.split("\n");
+  const yeni = satirlar.map((s, i) => `${onEkUretici(i)}${s}`).join("\n");
+  ta.setRangeText(yeni, start, end, "end");
+}
+
+/** İmlecin bulunduğu satırın başında mı sonunda mı olduğuna bakmadan, blok öncesi/sonrası için gereken boş satırları ekler. */
+function blokIcinBosSatirGerekliMi(ta, start) {
+  if (start === 0) return { once: "", sonra: "\n" };
+  const oncekiKarakter = ta.value[start - 1];
+  return { once: oncekiKarakter === "\n" ? "" : "\n", sonra: "\n" };
 }
 
 function markdownUygula(tur) {
@@ -291,36 +321,119 @@ function markdownUygula(tur) {
   const start = ta.selectionStart;
   const end = ta.selectionEnd;
   const secili = ta.value.slice(start, end);
-  let yeni;
 
   switch (tur) {
+    /* --- satır içi biçimlendirme --- */
     case "bold":
-      yeni = `**${secili || "kalın metin"}**`;
-      break;
+      satirIciUygula(ta, start, end, secili, "**", "**", "kalın metin");
+      ta.focus();
+      return;
     case "italic":
-      yeni = `*${secili || "italik metin"}*`;
-      break;
+      satirIciUygula(ta, start, end, secili, "*", "*", "italik metin");
+      ta.focus();
+      return;
+    case "strikethrough":
+      satirIciUygula(ta, start, end, secili, "~~", "~~", "üstü çizili metin");
+      ta.focus();
+      return;
+    case "inline-code":
+      satirIciUygula(ta, start, end, secili, "`", "`", "kod");
+      ta.focus();
+      return;
+
+    /* --- başlıklar (satır başına ##/###/#### eklenir) --- */
     case "h2":
-      yeni = `\n## ${secili || "Başlık"}\n`;
-      break;
+    case "h3":
+    case "h4": {
+      const { once, sonra } = blokIcinBosSatirGerekliMi(ta, start);
+      const onek = tur === "h2" ? "## " : tur === "h3" ? "### " : "#### ";
+      const yeni = `${once}${onek}${secili || "Başlık"}${sonra}`;
+      ta.setRangeText(yeni, start, end, "end");
+      ta.focus();
+      return;
+    }
+
+    /* --- liste türleri (satır başına eklenir) --- */
     case "list":
-      yeni = (secili || "liste maddesi")
-        .split("\n")
-        .map((s) => `- ${s}`)
-        .join("\n");
-      break;
+      satirBasinaUygula(ta, start, end, secili, () => "- ", "liste maddesi");
+      ta.focus();
+      return;
+    case "ordered-list":
+      satirBasinaUygula(ta, start, end, secili, (i) => `${i + 1}. `, "liste maddesi");
+      ta.focus();
+      return;
+    case "task-list":
+      satirBasinaUygula(ta, start, end, secili, () => "- [ ] ", "yapılacak");
+      ta.focus();
+      return;
+
+    /* --- alıntı --- */
+    case "quote":
+      satirBasinaUygula(ta, start, end, secili, () => "> ", "alıntı metni");
+      ta.focus();
+      return;
+
+    /* --- kod bloğu (dil isteğe bağlı sorulur) --- */
+    case "code-block": {
+      const dil = window.prompt(
+        "Kod bloğunun dili (opsiyonel, boş bırakabilirsin — örn. js, python, bash):",
+        ""
+      );
+      if (dil === null) return; // vazgeçildi
+      const { once, sonra } = blokIcinBosSatirGerekliMi(ta, start);
+      const govde = secili || "kod buraya";
+      const yeni = `${once}\`\`\`${dil.trim()}\n${govde}\n\`\`\`${sonra}`;
+      ta.setRangeText(yeni, start, end, "end");
+      ta.focus();
+      return;
+    }
+
+    /* --- yatay çizgi --- */
+    case "hr": {
+      const { once, sonra } = blokIcinBosSatirGerekliMi(ta, start);
+      const yeni = `${once}---${sonra}`;
+      ta.setRangeText(yeni, start, end, "end");
+      ta.focus();
+      return;
+    }
+
+    /* --- bağlantı --- */
     case "link": {
       const url = window.prompt("Bağlantı URL'si:", "https://");
       if (!url) return;
-      yeni = `[${secili || "bağlantı metni"}](${url})`;
-      break;
+      satirIciUygula(ta, start, end, secili, "[", `](${url})`, "bağlantı metni");
+      ta.focus();
+      return;
     }
+
+    /* --- görsel (SADECE dış URL — GitHub'a dosya yüklemez) --- */
+    case "image": {
+      const url = window.prompt("Görselin URL'si (dış bağlantı, örn. https://... .jpg/.png):", "https://");
+      if (!url) return;
+      const altMetin = window.prompt(
+        "Görsel için kısa açıklama (alt metin — erişilebilirlik ve SEO için önerilir):",
+        secili || ""
+      );
+      const { once, sonra } = blokIcinBosSatirGerekliMi(ta, start);
+      const yeni = `${once}![${(altMetin || "").trim()}](${url.trim()})${sonra}`;
+      ta.setRangeText(yeni, start, end, "end");
+      ta.focus();
+      return;
+    }
+
+    /* --- tablo şablonu (2 sütun, 2 satırlık iskelet — kullanıcı doldurur) --- */
+    case "table": {
+      const { once, sonra } = blokIcinBosSatirGerekliMi(ta, start);
+      const yeni =
+        `${once}| Başlık 1 | Başlık 2 |\n` + `| --- | --- |\n` + `| Hücre 1 | Hücre 2 |\n` + `| Hücre 3 | Hücre 4 |${sonra}`;
+      ta.setRangeText(yeni, start, end, "end");
+      ta.focus();
+      return;
+    }
+
     default:
       return;
   }
-
-  ta.focus();
-  ta.setRangeText(yeni, start, end, "end");
 }
 
 /* ---------------------------------------------------------------------- */
