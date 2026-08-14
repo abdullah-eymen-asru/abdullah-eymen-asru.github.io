@@ -385,6 +385,34 @@ Panelin üstündeki "GitHub Bağlantısı" sekmesinden şunları girmen gerekir:
 
 ---
 
+## 11. `assets/data/schema.json` ve `llms.txt` — Kişisel/SEO ve LLM verisi
+
+Bu iki dosya, diğerlerinden farklı olarak **kod değil, saf kişisel veri**
+içeriyor — bana (Abdullah Eymen Asru) ait isim, sosyal medya/akademik
+profil linkleri ve site açıklaması. Fork'ladıysan **ikisini de kendi
+bilgilerinle değiştirmen gerekir**, yoksa kendi sitende benim adım/
+linklerim görünmeye devam eder. Fork kurulum adımlarının tam listesi için
+bkz. [🍴 Fork Kurulumu](./03-fork-kurulumu.md) sekmesindeki "2. Zorunlu
+Değişiklikler — `assets/data/schema.json` ve `llms.txt`" bölümü.
+
+| Dosya | Ne işe yarar | Nerede kullanılıyor |
+|---|---|---|
+| `assets/data/schema.json` | [Schema.org](https://schema.org) `Person` tipinde JSON-LD verisi — Google/Yandex gibi arama motorlarının seni bir "kişi" olarak tanıyıp zengin sonuç (rich result) / bilgi paneli göstermesini sağlar. `name`, `url` ve `sameAs` (sosyal medya, akademik profil, ORCID, uygulama mağazası vb. linklerin listesi) alanlarını içerir. | `_layouts/default.html` içinde `<head>` bölümünde `fetch()` ile çekilip `application/ld+json` script'i olarak sayfaya enjekte edilir (dosya adını/yolunu değiştirme, sadece içeriğini güncelle). |
+| `llms.txt` | Site içeriğinin büyük dil modelleri (ChatGPT, Claude vb.) tarafından daha kolay özetlenmesi/indekslenmesi için yazılmış serbest metin özet — kimsin, site ne anlatıyor, ana sayfalar hangileri. Yeni bir standart olan [llms.txt](https://llmstxt.org) formatını takip eder. | `_config.yml` içindeki `include:` listesinde (`- llms.txt`) yer aldığı için Jekyll, normalde gizli/nokta ile başlamayan dosyalar dışında kalan bu dosyayı olduğu gibi site köküne kopyalar; koddan değil sadece bu satırdan referans alır. |
+
+Değiştirmen gerekenler:
+- **`schema.json`** → `name` alanına kendi adını, `url` alanına kendi site
+  adresini, `sameAs` dizisine sahip olduğun sosyal medya/akademik/GitHub
+  profillerinin linklerini yaz; kullanmadığın satırları sil, olmayan bir
+  platform için satır uydurma.
+- **`llms.txt`** → Başlıktaki adı, biyografi paragrafını ve "Ana Sayfalar
+  ve Bağlantılar" ile "İsteğe Bağlı Ek Kaynaklar" altındaki tüm linkleri
+  kendi domainine ve kendi sayfalarına göre güncelle; "Bölüm 4 — Silme"ye
+  göre kaldırdığın bir sayfa varsa (örn. akademik projeler) buradaki
+  linki de sil.
+
+---
+
 # 🎨 Tema Anahtarı (Koyu/Açık Mod)
 
 Header'daki kayan switch — ☀️/🌙 ikonları sabit iki uçta, ortadaki topuz
@@ -437,7 +465,7 @@ ayarı oluşturup `_includes/comments.html` içindeki ilgili
 
 Bu menü, sitenin Supabase kullanıcı sistemine bağlıdır — bkz. aşağıdaki
 "🔐 Supabase Kullanıcı Sistemi" bölümü. O sistemi tamamen kaldırırsan
-(bkz. "Bölüm 3 — Silme" altındaki "Supabase kullanıcı sistemini kaldırmak
+(bkz. "Bölüm 4 — Silme" altındaki "Supabase kullanıcı sistemini kaldırmak
 istersen"), bu menüyü de kaldırman gerekir.
 
 ---
