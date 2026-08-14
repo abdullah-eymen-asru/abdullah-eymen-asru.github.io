@@ -18,13 +18,64 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // GitHub Pages / Cloudflare Pages gibi saf statik hosting ile tam uyumlu).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
+/*
+ * "OTURUMUMU HATIRLA" (bkz. hesap/giris.md + assets/js/auth-pages.js)
+ * ---------------------------------------------------------------------
+ * Supabase SDK, persistSession:true olduğunda oturumu varsayılan olarak
+ * HER ZAMAN localStorage'a yazar — yani tarayıcı kapatılıp açılsa bile
+ * kullanıcı oturumu açık kalır. Giriş sayfasına eklenen "Oturumumu
+ * hatırla" checkbox'ı işaretini kaldırırsa bunun yerine sessionStorage
+ * kullanılmasını (sekme/tarayıcı kapanınca oturumun sona ermesini)
+ * istiyoruz. SDK'nın kendisi böyle bir "sadece bu oturumluk" seçeneği
+ * sunmadığından, kendi "dinamik" storage adaptörümüzü veriyoruz: her
+ * getItem/setItem/removeItem çağrısında O ANKİ tercihe (localStorage'da
+ * saklanan aea_oturumu_hatirla bayrağı) bakıp doğru depoya yönlendiriyor.
+ * Tercih localStorage'da saklanıyor (bilerek — bu bayrağın kendisi kalıcı
+ * olmalı ki bir sonraki ziyarette de hatırlanabilsin), ama asıl oturum
+ * TOKEN'ı tercihe göre localStorage YA DA sessionStorage'a gidiyor.
+ */
+const OTURUM_HATIRLA_ANAHTARI = "aea_oturumu_hatirla"; // "0" ise sessionStorage kullanılır.
+
+function aktifOturumDeposu() {
+  return localStorage.getItem(OTURUM_HATIRLA_ANAHTARI) === "0" ? sessionStorage : localStorage;
+}
+
+const dinamikOturumDeposu = {
+  getItem: (anahtar) => aktifOturumDeposu().getItem(anahtar),
+  setItem: (anahtar, deger) => aktifOturumDeposu().setItem(anahtar, deger),
+  removeItem: (anahtar) => aktifOturumDeposu().removeItem(anahtar),
+};
+
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true, // OAuth / e-posta linki dönüşünde token'ı otomatik yakalar
+    storage: dinamikOturumDeposu,
   },
 });
+
+/**
+ * Giriş sayfasındaki "Oturumumu hatırla" checkbox'ının durumunu kaydeder.
+ * ÖNEMLİ: signInWithPassword / signInWithOAuth çağrılmadan HEMEN ÖNCE
+ * çağrılmalı — SDK oturumu kurduğu anda storage.setItem() çağırıyor ve
+ * dinamikOturumDeposu o anki tercihe bakıyor, sonradan değiştirmenin bir
+ * etkisi olmuyor.
+ * Diğer depoda önceki bir girişten kalmış olabilecek eski bir oturum
+ * token'ı da temizlenir — yoksa örn. kullanıcı bu sefer "hatırlama" dese
+ * bile, tarayıcı kapatılıp tekrar açıldığında localStorage'daki ESKİ token
+ * oturumu sessizce geri getirebilirdi.
+ */
+export function oturumHatirlamaTercihiniKaydet(hatirla) {
+  localStorage.setItem(OTURUM_HATIRLA_ANAHTARI, hatirla ? "1" : "0");
+  try {
+    const projeRef = new URL(SUPABASE_URL).hostname.split(".")[0];
+    const digerDepo = hatirla ? sessionStorage : localStorage;
+    digerDepo.removeItem(`sb-${projeRef}-auth-token`);
+  } catch {
+    // SUPABASE_URL ayrıştırılamazsa (olmamalı) sessizce geç — kritik değil.
+  }
+}
 
 /** Basit HTML escape — kullanıcıdan/DB'den gelen metni innerHTML'e basmadan önce kullan. */
 export function escapeHtml(str) {
