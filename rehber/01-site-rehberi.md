@@ -127,9 +127,22 @@ tanıtım yazını buraya serbest metin olarak yaz.
 
 ## 8. İçerik ekleme — blog yazıları ve akademik projeler
 
-- **Blog yazısı:** `_posts/` klasörüne `YIL-AY-GUN-baslik.md` formatında
-  yeni bir dosya ekle (örn. `_posts/2026-09-01-yeni-yazi.md`). `icerik/blog.md`
+- **Blog yazısı:** `_posts/YIL/` klasörüne `YIL-AY-GUN-baslik.md` formatında
+  yeni bir dosya ekle (örn. `_posts/2026/2026-09-01-yeni-yazi.md`). `icerik/blog.md`
   sayfasına hiç dokunmana gerek yok, otomatik listelenir.
+  **Neden yıl alt klasörü:** Jekyll için `_posts/` koleksiyonundaki dosyanın
+  hangi ALT KLASÖRDE durduğunun hiçbir önemi yok — permalink her zaman
+  dosya ADINDAKİ (`YYYY-AY-GUN-slug.md`) tarih ve slug'dan üretilir. Yani
+  `_posts/2026/2026-09-01-yeni-yazi.md` ile eskiden olduğu gibi düz
+  `_posts/2026-09-01-yeni-yazi.md` **birebir aynı URL'i** üretir — bu
+  sadece yazı sayısı arttıkça `_posts/` klasörünün tek bir uzun liste
+  olmasını önlemek için bir organizasyon kolaylığı. Panel
+  (`github-yonetim.js`) yeni yazıları otomatik olarak ilgili yıl
+  klasörüne yazar; klasör yoksa GitHub API onu ilk dosyayla birlikte
+  kendiliğinden oluşturur. Alt klasörleme öncesinden kalma, hâlâ
+  `_posts/` kökünde duran eski dosyalar da bozulmadan listelenmeye ve
+  çalışmaya devam eder — geriye dönük bir taşıma/migrasyon **zorunlu
+  değildir**, istersen zamanla elle ilgili yıl klasörüne taşıyabilirsin.
 - **Akademik proje:** `_projects/` klasörüne aynı mantıkla yeni bir `.md`
   dosyası ekle (örn. `_projects/2026-yeni-proje.md`). Kullanılabilecek
   front-matter alanları için `_projects/2025-ornek-proje.md` dosyasındaki
@@ -229,9 +242,10 @@ permalink: /blog/on-izleme-RASTGELE-BIR-DIZI/
      (örneğin tarihi tam geçtiği an hemen yayınlanmasını istiyorsan).
   4. Cron saatini değiştirmek istersen workflow dosyasındaki `cron:`
      satırını düzenle (yorum satırında açıklama var).
-- Örnek bir taslak dosya için `_posts/2026-08-15-ornek-zamanlanmis-yazi.md`
-  dosyasına bak — aynı desen `_projects/` için de birebir çalışır (örnek
-  alanlar `_projects/2025-ornek-proje.md` içinde yorum satırı olarak var).
+- Örnek bir taslak dosya için `_posts/2026/2026-08-15-ornek-zamanlanmis-yazi.md`
+  dosyasına bak (yıl alt klasörü içinde — bkz. Bölüm 8) — aynı desen
+  `_projects/` için de birebir çalışır (örnek alanlar
+  `_projects/2025-ornek-proje.md` içinde yorum satırı olarak var).
 
 ### Nerede tanımlı (teknik detay, dokunmana gerek yok ama bilgi için)
 
@@ -321,6 +335,21 @@ assets/css/github-yonetim.css  <- Bu sayfaya özel ek stiller (auth.css'in üzer
   "henüz yayında değil" uyarısı görünür (bkz. `_layouts/post.html` /
   `_layouts/project.html`), böylece linke sahip olan biri içeriği
   görüntülerken durumundan haberdar olur.
+- **Yeniden yayınlama / yayından kaldırma — kartlar üzerinden tek tıkla:**
+  "Mevcut İçerikler" listesindeki her kartta, o an yayında olan içerikler
+  için **"Yayından Kaldır"**, gizli olanlar için **"Yeniden Yayınla"**
+  butonu var. Formu açıp toggle'ı çevirip tekrar kaydetmene gerek kalmadan
+  tek tıkla (bir onay penceresinden sonra) doğrudan GitHub'a commit atar.
+  **Önemli — link artık yayın durumundan bağımsız hatırlanır:** kod, dosya
+  "Yayında" olsa bile front-matter'da gizli bir `onizleme_kod` alanında
+  saklanmaya devam eder (görünmez, sayfa render'ında kullanılmaz). Yani
+  bir yazıyı önce gizli paylaşıp linkini birine gönderdikten sonra yayına
+  alıp, bir süre sonra tekrar "Yayından Kaldır" ile gizlersen, **daha önce
+  paylaştığın aynı link** geri döner — yeni bir kod üretilmez, eski link
+  kırılmaz. Kod sadece formu açıp "🎲 Yenile" ile bilerek değiştirirsen
+  farklılaşır. Gizli veya daha önce gizlenmiş bir içeriğin kartında ayrıca
+  **"🔗 Linki Kopyala"** butonu görünür — formu hiç açmadan ön izleme
+  linkini doğrudan panoya kopyalayabilirsin.
 - **Hafif bir Markdown editörü** — kalın, italik, başlık ve bağlantı
   eklemek için metin alanının üstünde küçük araç çubuğu butonları var.
 - **Mevcut İçerikler** sekmesi — `_posts/` ve `_projects/` klasörlerindeki
