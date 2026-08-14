@@ -892,3 +892,41 @@
   cursor: pointer;
 }
 .okundu-manuel-btn:hover { border-color: var(--accent); }
+
+/* ---------------------------------------------------------------------- */
+/* ŞİFRE/TOKEN GÖSTER-GİZLE DÜĞMESİ — bkz. assets/js/sifre-goster.js      */
+/* ---------------------------------------------------------------------- */
+/* .form-field .sifre-goster-sarmalayici input, aynı specificity'deki
+   ".form-field input" kuralından (yukarıda) sonra tanımlı olduğu için değil,
+   BİLEREK daha yüksek specificity (2 sınıf) ile yazıldı — CSS kaynak sırası
+   değişse/dosya birleştirilse bile padding-right kuralının kazanacağından
+   emin olmak için. */
+.sifre-goster-sarmalayici {
+  position: relative;
+  width: 100%;
+}
+.form-field .sifre-goster-sarmalayici input {
+  width: 100%;
+  padding-right: 40px;
+  box-sizing: border-box;
+}
+.sifre-goster-btn {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.sifre-goster-btn:hover { color: var(--text); background: var(--bg); }
+.sifre-goster-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.sifre-goster-btn svg { width: 18px; height: 18px; display: block; }
