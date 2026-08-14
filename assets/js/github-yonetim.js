@@ -134,16 +134,43 @@ function ghAyarlari() {
   };
 }
 
+/*
+ * Token yapıştırılırken (özellikle GitHub'ın kendi token sayfasından,
+ * bir not/PDF'ten ya da bir mesajlaşma uygulamasından kopyalanırken) araya
+ * görünmez satır sonu, sekme veya "non-breaking space" gibi boşluk
+ * karakterleri karışabiliyor; bazı arayüzler uzun token'ı ekranda iki
+ * satıra sararak gösteriyor ve kopyalarken o satır sonu da kopyalanıyor.
+ * GitHub token'ları hiçbir zaman boşluk İÇERMEDİĞİNDEN, sadece baştaki/
+ * sondaki değil, ARADAKİ tüm boşluk karakterlerini de güvenle
+ * kırpabiliyoruz. Ayrıca bir kod bloğundan/JSON'dan kopyalarken sıkça
+ * birlikte gelen tırnak/backtick işaretlerini de temizliyoruz. Bu satırlar
+ * eklenmeden önce, ortasında gizli bir satır sonu olan bir token GitHub'a
+ * OLDUĞU GİBİ gönderiliyordu — bazen tarayıcı bunu geçersiz bir header
+ * değeri olarak reddedip belirsiz bir "TypeError" fırlatıyordu, bazen de
+ * (satır sonu sessizce yutulup iki parça birleşince) sunucuya YANLIŞ ama
+ * biçimsel olarak geçerli bir token gidiyor ve GitHub bunu "401 Bad
+ * credentials" ile reddediyordu — kullanıcı token'ın doğru olduğundan emin
+ * olsa bile.
+ */
+function patTemizle(ham) {
+  return (ham || "").replace(/\s+/g, "").replace(/^[`'"]+|[`'"]+$/g, "");
+}
+
 function wireBaglantiDogrula() {
   document.getElementById("gh-baglan-btn").addEventListener("click", async () => {
     const msgEl = document.getElementById("gh-baglanti-message");
     const { owner, repo, branch } = ghAyarlari();
-    const pat = document.getElementById("gh-pat").value.trim();
+    const patHam = document.getElementById("gh-pat").value;
+    const pat = patTemizle(patHam);
 
     if (!owner || !repo || !pat) {
       showMessage(msgEl, "Kullanıcı adı, repo adı ve token gerekli.", "error");
       return;
     }
+    // Temizleme bir şey değiştirdiyse (yani orijinalde gizli boşluk/tırnak
+    // varmış), giriş alanını da güncelleyelim ki kullanıcı neyin
+    // gönderildiğini görebilsin ve tekrar denediğinde aynı sorunu yaşamasın.
+    if (pat !== patHam) document.getElementById("gh-pat").value = pat;
 
     PAT_BELLEK = pat;
     localStorage.setItem("gy_owner", owner);
@@ -155,7 +182,20 @@ function wireBaglantiDogrula() {
     btn.textContent = "Kontrol ediliyor...";
     try {
       const res = await ghRequest("");
-      if (!res.ok) throw new Error(await ghHataMesaji(res));
+      if (!res.ok) {
+        const temelMesaj = await ghHataMesaji(res);
+        if (res.status === 401) {
+          throw new Error(
+            `${temelMesaj} — GitHub token'ı reddetti. Kontrol et: (1) token süresi dolmuş ya da elle/GitHub tarafından ` +
+              `iptal edilmiş olabilir, yeni bir tane oluşturmayı dene; (2) fine-grained token oluşturuken "Resource owner" ` +
+              `olarak "${escapeHtml(owner)}" seçilip erişime "${escapeHtml(repo)}" reposu eklenmiş mi; (3) hesap bir ` +
+              `organizasyona bağlıysa, organizasyon fine-grained token'lara onay vermiş mi (Settings → Personal access ` +
+              `tokens). Kopyalarken araya karışmış boşluk/satır sonu artık otomatik temizleniyor, yine de token'ı GitHub'da ` +
+              `tekrar kopyalayıp deneyebilirsin.`
+          );
+        }
+        throw new Error(temelMesaj);
+      }
       const repoData = await res.json();
       const yazmaYetkisi = repoData.permissions?.push;
       showMessage(
