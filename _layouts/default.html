@@ -130,6 +130,14 @@
 
   <link rel="stylesheet" href="{{ '/assets/style.css' | relative_url }}">
 
+  <!-- ŞİFRE/TOKEN GÖSTER-GİZLE: site genelinde HER type="password" alanına
+       (giriş/kayıt/panel şifreleri, panel > GitHub Yönetimi PAT token'ı vb.)
+       otomatik göz ikonu ekler — bkz. assets/js/sifre-goster.js. Sayfa
+       başına ayrı ayrı bağlamaya gerek kalmasın diye <head>'de "defer" ile
+       tek seferde yükleniyor (defer: DOM ayrıştırması bitince, ama
+       DOMContentLoaded'dan hemen önce çalışır). -->
+  <script defer src="{{ '/assets/js/sifre-goster.js' | relative_url }}"></script>
+
   {% if page.auth_css %}
   <!-- auth.css: giris/kayit/panel/admin sayfalarına özel stiller. Önceden
         her sayfanın KENDİ içeriğinde (Markdown gövdesinde) inline
