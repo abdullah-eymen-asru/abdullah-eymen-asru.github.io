@@ -235,9 +235,12 @@ permalink: "/panel/github-yonetim.html"
       <section id="profil-foto" class="panel-section">
         <h2>Profil Fotoğrafı Yönetimi</h2>
         <p class="muted">
-          <code>assets/profil.jpg</code> dosyasını buradan görüntüle,
-          değiştir veya sil (site genelinde favicon ve profil resmi olarak
-          kullanılır, bkz. <code>_config.yml → profile_image</code>).
+          Sitede favicon ve profil resmi olarak kullanılan dosyayı (yolu
+          <code>_config.yml → profile_image</code> alanından otomatik
+          okunur, dosya adı/uzantısı ne olursa olsun) buradan görüntüle,
+          değiştir veya sil. Yeni bir fotoğraf yüklediğinde dosya adı
+          eskisinden farklı olabilir — panel yeni dosyayı ekler, eskisini
+          siler ve <code>_config.yml</code>'i otomatik günceller.
         </p>
         <div id="pf-mevcut" class="gy-profil-onizleme">
           <p class="muted">Görüntülemek için önce bağlantıyı doğrula.</p>
