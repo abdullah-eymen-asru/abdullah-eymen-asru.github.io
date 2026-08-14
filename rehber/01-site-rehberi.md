@@ -350,8 +350,28 @@ assets/css/github-yonetim.css  <- Bu sayfaya özel ek stiller (auth.css'in üzer
   farklılaşır. Gizli veya daha önce gizlenmiş bir içeriğin kartında ayrıca
   **"🔗 Linki Kopyala"** butonu görünür — formu hiç açmadan ön izleme
   linkini doğrudan panoya kopyalayabilirsin.
-- **Hafif bir Markdown editörü** — kalın, italik, başlık ve bağlantı
-  eklemek için metin alanının üstünde küçük araç çubuğu butonları var.
+- **Genişletilmiş Markdown editör araç çubuğu** — metin alanının üstünde,
+  gruplanmış butonlarla şu araçlar var:
+  - **Biçimlendirme:** kalın, italik, üstü çizili, satır içi kod.
+  - **Başlıklar:** H2, H3, H4 (`## `, `### `, `#### `) — hepsi metnin
+    kendi satırına, önceki/sonraki içerikten boş satırla ayrılarak eklenir.
+  - **Listeler:** madde işaretli liste, numaralı liste, yapılacaklar
+    listesi (`- [ ] `) — çok satırlı bir seçim yapılırsa HER satıra ayrı
+    ayrı önek eklenir.
+  - **Bloklar:** alıntı (`> `), kod bloğu (dil adını isteğe bağlı sorar,
+    örn. `js`/`python`/`bash` — boş bırakılabilir), yatay çizgi (`---`),
+    2 sütunluk doldurulmaya hazır tablo şablonu.
+  - **Bağlantı ve görsel:** bağlantı, seçili metni link haline getirir.
+    Görsel butonu SADECE dış bir URL'e göre `![açıklama](url)` üretir —
+    panel GitHub'a görsel dosyası YÜKLEMEZ, görselin başka bir yerde
+    (örn. bir CDN, resim barındırma servisi ya da başka bir repo) zaten
+    yayında olması ve URL'inin elde olması gerekir. Alt metin (açıklama)
+    ayrıca ve isteğe bağlı olarak sorulur — erişilebilirlik ve SEO için
+    doldurulması önerilir, boş bırakılabilir.
+  - Genel davranış: bir metin seçiliyken buton tıklanırsa seçili metin
+    ilgili biçimle sarmalanır/önekli hale gelir; hiçbir şey seçili değilse
+    açıklayıcı bir yer tutucu metin eklenir ve o metin otomatik olarak
+    seçili bırakılır, böylece hemen üzerine yazabilirsin.
 - **Mevcut İçerikler** sekmesi — `_posts/` ve `_projects/` klasörlerindeki
   tüm dosyaları listeler (yayında/gizli durumunu rozetle gösterir),
   "Düzenle" ile formu doldurup güncelleyebilir, "Sil" ile GitHub'dan
