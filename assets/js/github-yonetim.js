@@ -314,12 +314,11 @@ function wireIcerikTuruToggle() {
   guncelleIcerikTuru();
 }
 
-function guncelleIcerikTuru() {
+async function guncelleIcerikTuru() {
   const proje = icerikTuru() === "proje";
   document.getElementById("ic-proje-alanlar").hidden = !proje;
   document.getElementById("ic-yil-oneki-wrap").hidden = !proje;
-  const klasorWrap = document.getElementById("ic-klasor-wrap");
-  if (klasorWrap) klasorWrap.hidden = proje;
+  await guncelleKlasorEtiketleri(proje);
   document.getElementById("ic-form-baslik").textContent = DUZENLENEN_YOL
     ? proje
       ? "Akademik Projeyi Düzenle"
@@ -329,9 +328,52 @@ function guncelleIcerikTuru() {
     : "Yeni Blog Yazısı Ekle";
 }
 
+/**
+ * "Klasör" alanı hem blog hem proje formunda görünür (her iki koleksiyon
+ * da alt klasörlenebilir — bkz. dosyaYoluHesapla), ama etiket/açıklama
+ * metni ve dropdown'daki koleksiyon kökü (_posts/ ya da _projects/) türe
+ * göre değişir. İçerik türü değiştiğinde dropdown'ı da o türün gerçek
+ * klasörleriyle yeniden doldururuz (icerikFormuKlasorSecimGuncelle zaten
+ * icerikTuru()'nu kendi okuyor). ASYNC: çağıran taraf (guncelleIcerikTuru
+ * ve icerikDuzenlemeyeYukle) bu bitmeden devam ETMEMELİ, aksi halde
+ * ardından yapılan "düzenlenen dosyanın klasörünü seçili göster" işlemi
+ * bu fonksiyonun geç gelen dropdown sıfırlamasıyla ezilebilir.
+ */
+async function guncelleKlasorEtiketleri(proje) {
+  const kokKlasor = proje ? "_projects" : "_posts";
+  const ornekAltKlasor = proje ? "konferanslar" : "seyahat";
+  const etiket = document.querySelector('label[for="ic-klasor-secim"]');
+  if (etiket) {
+    etiket.innerHTML = `Klasör (${proje ? "projenin" : "blog yazısının"} <code>${kokKlasor}/</code> altında hangi alt klasöre kaydedileceği)`;
+  }
+  const otomatikOption = document.querySelector('#ic-klasor-secim option[value="__auto__"]');
+  if (otomatikOption) {
+    otomatikOption.textContent = `Otomatik — tarihe göre yıl klasörü (örn. ${kokKlasor}/2026/)`;
+  }
+  const yardim = document.getElementById("ic-klasor-yardim");
+  if (yardim) {
+    yardim.innerHTML = `
+      "Otomatik" seçiliyken dosya, yukarıdaki tarihin yılına göre
+      (<code>${kokKlasor}/&lt;yıl&gt;/</code>) kaydedilir — hiçbir şey
+      yapmana gerek yok. Farklı bir klasör seçersen (örn. konuya göre
+      <code>${kokKlasor}/${ornekAltKlasor}/</code> ya da farklı bir yıl)
+      dosya SEÇTİĞİN klasöre gider; hangi klasörde durduğu içeriğin
+      linkini (permalink'ini) ETKİLEMEZ. Yeni klasörleri "📁 Klasörler"
+      sekmesinden de yönetebilirsin (oluşturma, yeniden adlandırma,
+      silme).
+    `;
+  }
+  await icerikFormuKlasorSecimGuncelle();
+}
+
 /* ---------------------------------------------------------------------- */
-/* BLOG FORMUNDAKİ "KLASÖR" SEÇİCİSİ                                      */
+/* İÇERİK FORMUNDAKİ "KLASÖR" SEÇİCİSİ (blog: _posts/, proje: _projects/) */
 /* ---------------------------------------------------------------------- */
+
+/** Aktif içerik türüne göre kök koleksiyon klasörünü döner. */
+function kokKlasorAdi(tur) {
+  return tur === "proje" ? "_projects" : "_posts";
+}
 
 /** Şu an formda seçili olan klasör değerini döner: "__auto__" ya da bir klasör adı. */
 function klasorSecimDegeriniAl() {
@@ -350,19 +392,20 @@ function klasorAdiTemizle(ad) {
 }
 
 /**
- * _posts/ altındaki mevcut klasörleri GitHub'dan çeker ve "ic-klasor-secim"
- * dropdown'ını doldurur. "Otomatik" ve "Yeni klasör oluştur…" seçenekleri
- * her zaman sabit kalır, aradaki kısım GitHub'daki gerçek klasörlerle
- * güncellenir. Bağlantı henüz doğrulanmamışsa ya da istek başarısız
- * olursa sessizce hiçbir şey yapmaz (form yine de "Otomatik" ile normal
- * çalışmaya devam eder).
+ * Aktif içerik türünün (blog/proje) kök koleksiyonundaki mevcut
+ * klasörleri GitHub'dan çeker ve "ic-klasor-secim" dropdown'ını doldurur.
+ * "Otomatik" ve "Yeni klasör oluştur…" seçenekleri her zaman sabit kalır,
+ * aradaki kısım GitHub'daki gerçek klasörlerle güncellenir. Bağlantı
+ * henüz doğrulanmamışsa ya da istek başarısız olursa sessizce hiçbir şey
+ * yapmaz (form yine de "Otomatik" ile normal çalışmaya devam eder).
  */
 async function icerikFormuKlasorSecimGuncelle() {
   const secim = document.getElementById("ic-klasor-secim");
   if (!secim || !PAT_BELLEK) return;
+  const kokKlasor = kokKlasorAdi(icerikTuru());
   const oncekiDeger = secim.value;
   try {
-    const klasorler = await postKlasorleriniListele();
+    const klasorler = await koleksiyonKlasorleriniListele(kokKlasor);
     const ozelSecenekler = Array.from(secim.querySelectorAll('option[value="__auto__"], option[value="__yeni__"]'));
     secim.innerHTML = "";
     ozelSecenekler.forEach((o) => secim.appendChild(o));
@@ -371,11 +414,13 @@ async function icerikFormuKlasorSecimGuncelle() {
       .forEach((ad) => {
         const opt = document.createElement("option");
         opt.value = ad;
-        opt.textContent = `_posts/${ad}/`;
+        opt.textContent = `${kokKlasor}/${ad}/`;
         secim.insertBefore(opt, secim.querySelector('option[value="__yeni__"]'));
       });
     if ([...secim.options].some((o) => o.value === oncekiDeger)) {
       secim.value = oncekiDeger;
+    } else {
+      secim.value = "__auto__";
     }
   } catch (err) {
     console.error("Klasör listesi güncellenemedi:", err);
@@ -393,8 +438,9 @@ function wireKlasorSecici() {
 }
 
 /**
- * Bir yazı düzenlemeye açıldığında, dosyanın gerçek yolundan (item.path,
- * örn. "_posts/2026/2026-08-14-x.md") hangi klasörde durduğunu çıkarır ve
+ * Bir yazı/proje düzenlemeye açıldığında, dosyanın gerçek yolundan
+ * (item.path, örn. "_posts/2026/2026-08-14-x.md" ya da
+ * "_projects/2026/x.md") hangi klasörde durduğunu çıkarır ve
  * "ic-klasor-secim" dropdown'ını buna göre ayarlar:
  *   - Klasör adı tarihin yılıyla birebir aynıysa ("otomatik" davranışın
  *     üreteceği isim) -> "Otomatik" seçili bırakılır, kullanıcı hiçbir
@@ -402,14 +448,18 @@ function wireKlasorSecici() {
  *   - Farklı bir klasördeyse (özel isim ya da farklı yıl) -> o klasör
  *     dropdown'da yoksa geçici olarak eklenir ve seçili yapılır, böylece
  *     kaydettiğinde dosya YANLIŞLIKLA başka bir klasöre taşınmaz.
+ *   - Dosya kök klasörde duruyorsa (alt klasörleme öncesinden kalma,
+ *     örn. eski düz "_posts/2026-...md") -> "Otomatik" seçili bırakılır;
+ *     kaydettiğinde dosya normal şekilde ilgili yıl klasörüne taşınır.
  */
-function icerikDuzenlemeKlasorSecimineYansit(path, tarih) {
+function icerikDuzenlemeKlasorSecimineYansit(path, tarih, tur) {
   const secim = document.getElementById("ic-klasor-secim");
   const yeniAdInput = document.getElementById("ic-klasor-yeni-ad");
   if (!secim) return;
 
-  const parcalar = path.split("/"); // ["_posts", "<klasor>", "dosya.md"]
-  const mevcutKlasor = parcalar.length === 3 ? parcalar[1] : null;
+  const kokKlasor = kokKlasorAdi(tur);
+  const parcalar = path.split("/"); // [kokKlasor, "<klasor>", "dosya.md"]
+  const mevcutKlasor = parcalar.length === 3 && parcalar[0] === kokKlasor ? parcalar[1] : null;
   const otomatikOlacakKlasor = (tarih || "").slice(0, 4);
 
   yeniAdInput.hidden = true;
@@ -424,28 +474,43 @@ function icerikDuzenlemeKlasorSecimineYansit(path, tarih) {
   if (!zatenListede) {
     const opt = document.createElement("option");
     opt.value = mevcutKlasor;
-    opt.textContent = `_posts/${mevcutKlasor}/`;
+    opt.textContent = `${kokKlasor}/${mevcutKlasor}/`;
     secim.insertBefore(opt, secim.querySelector('option[value="__yeni__"]'));
   }
   secim.value = mevcutKlasor;
 }
 
 /* ---------------------------------------------------------------------- */
-/* KLASÖR YÖNETİMİ (_posts/ altındaki alt klasörler) BÖLÜMÜ               */
+/* KLASÖR YÖNETİMİ (_posts/ ve _projects/ altındaki alt klasörler) BÖLÜMÜ */
 /* ---------------------------------------------------------------------- */
 
-/** _posts/ altındaki alt klasörlerin adlarını (sadece isim, "_posts/" olmadan) döner. */
-async function postKlasorleriniListele() {
-  const kokIcerik = await ghGetContents("_posts").catch(() => []);
+/** Verilen kök koleksiyon klasörünün ("_posts" ya da "_projects") altındaki alt klasörlerin adlarını döner. */
+async function koleksiyonKlasorleriniListele(kokKlasor) {
+  const kokIcerik = await ghGetContents(kokKlasor).catch(() => []);
   if (!Array.isArray(kokIcerik)) return [];
   return kokIcerik.filter((f) => f.type === "dir").map((f) => f.name);
 }
+
+/** "Klasörler" sekmesinde şu an hangi koleksiyonun (blog/proje) gösterildiğini tutar. */
+let KLASOR_SEKME_TUR = "blog";
 
 function wireKlasorYonetimi() {
   const yenileBtn = document.getElementById("kl-liste-yenile-btn");
   const olusturBtn = document.getElementById("kl-olustur-btn");
   const yeniAdInput = document.getElementById("kl-yeni-ad");
   if (!yenileBtn || !olusturBtn || !yeniAdInput) return;
+
+  document.querySelectorAll(".gy-klasor-tur-sekme").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      KLASOR_SEKME_TUR = btn.dataset.klasorTur;
+      document.querySelectorAll(".gy-klasor-tur-sekme").forEach((b) => {
+        b.classList.toggle("active", b === btn);
+        b.setAttribute("aria-selected", b === btn ? "true" : "false");
+      });
+      document.getElementById("kl-baslik-koleksiyon").textContent = kokKlasorAdi(KLASOR_SEKME_TUR);
+      klasorListesiYukle();
+    });
+  });
 
   yenileBtn.addEventListener("click", () => klasorListesiYukle());
   olusturBtn.addEventListener("click", () => klasorOlustur());
@@ -478,6 +543,7 @@ async function klasorOlustur() {
   const input = document.getElementById("kl-yeni-ad");
   const btn = document.getElementById("kl-olustur-btn");
   msgEl.hidden = true;
+  const kokKlasor = kokKlasorAdi(KLASOR_SEKME_TUR);
 
   const ad = klasorAdiTemizle(input.value.trim());
   if (!ad) {
@@ -488,14 +554,14 @@ async function klasorOlustur() {
   btn.disabled = true;
   btn.textContent = "Oluşturuluyor...";
   try {
-    const mevcut = await ghGetContents(`_posts/${ad}/.gitkeep`).catch(() => null);
+    const mevcut = await ghGetContents(`${kokKlasor}/${ad}/.gitkeep`).catch(() => null);
     if (mevcut) {
-      showMessage(msgEl, `"_posts/${ad}/" klasörü zaten var.`, "error");
+      showMessage(msgEl, `"${kokKlasor}/${ad}/" klasörü zaten var.`, "error");
       return;
     }
-    await ghPutFile(`_posts/${ad}/.gitkeep`, b64Encode(GITKEEP_ICERIK), `Klasör oluşturuldu: _posts/${ad}/`);
+    await ghPutFile(`${kokKlasor}/${ad}/.gitkeep`, b64Encode(GITKEEP_ICERIK), `Klasör oluşturuldu: ${kokKlasor}/${ad}/`);
     input.value = "";
-    showMessage(msgEl, `"_posts/${ad}/" klasörü oluşturuldu.`, "success");
+    showMessage(msgEl, `"${kokKlasor}/${ad}/" klasörü oluşturuldu.`, "success");
     await klasorListesiYukle();
     await icerikFormuKlasorSecimGuncelle();
   } catch (err) {
@@ -509,16 +575,17 @@ async function klasorOlustur() {
 async function klasorListesiYukle() {
   const el = document.getElementById("kl-liste");
   if (!el) return;
+  const kokKlasor = kokKlasorAdi(KLASOR_SEKME_TUR);
   if (!PAT_BELLEK) {
     el.innerHTML = '<p class="muted">Önce "GitHub Bağlantısı" sekmesinden bağlantını doğrula.</p>';
     return;
   }
   el.innerHTML = '<p class="muted">Yükleniyor...</p>';
   try {
-    const kokIcerik = await ghGetContents("_posts").catch(() => []);
-    const yilKlasorleri = (kokIcerik || []).filter((f) => f.type === "dir");
+    const kokIcerik = await ghGetContents(kokKlasor).catch(() => []);
+    const altKlasorler = (kokIcerik || []).filter((f) => f.type === "dir");
 
-    if (yilKlasorleri.length === 0) {
+    if (altKlasorler.length === 0) {
       el.innerHTML = '<p class="muted">Henüz hiç alt klasör yok.</p>';
       return;
     }
@@ -526,10 +593,10 @@ async function klasorListesiYukle() {
     // Her klasörün içindeki dosya sayısını (.gitkeep hariç) ayrıca çekmek
     // gerekiyor, aksi halde "silinebilir mi" bilgisini gösteremeyiz.
     const detaylar = await Promise.all(
-      yilKlasorleri.map(async (klasor) => {
+      altKlasorler.map(async (klasor) => {
         const icerik = await ghGetContents(klasor.path).catch(() => []);
         const dosyalar = (icerik || []).filter((f) => f.type === "file" && f.name !== ".gitkeep");
-        return { ad: klasor.name, path: klasor.path, dosyaSayisi: dosyalar.length };
+        return { ad: klasor.name, path: klasor.path, dosyaSayisi: dosyalar.length, kokKlasor };
       })
     );
 
@@ -548,13 +615,13 @@ function klasorKartiCiz(k) {
   const silDevreDisi = k.dosyaSayisi > 0;
   kart.innerHTML = `
     <div class="gy-klasor-kart-bilgi">
-      <div class="gy-klasor-kart-baslik">📁 _posts/${escapeHtml(k.ad)}/</div>
-      <div class="gy-klasor-kart-meta">${k.dosyaSayisi} yazı</div>
+      <div class="gy-klasor-kart-baslik">📁 ${escapeHtml(k.kokKlasor)}/${escapeHtml(k.ad)}/</div>
+      <div class="gy-klasor-kart-meta">${k.dosyaSayisi} ${k.kokKlasor === "_projects" ? "proje" : "yazı"}</div>
     </div>
     <div class="gy-klasor-kart-aksiyonlar">
       <button type="button" class="gy-klasor-yenidenadlandir-btn">Yeniden Adlandır</button>
       <button type="button" class="gy-klasor-sil-btn" ${silDevreDisi ? "disabled" : ""} title="${
-    silDevreDisi ? "Önce içindeki yazıları başka bir klasöre taşı ya da sil" : ""
+    silDevreDisi ? "Önce içindeki dosyaları başka bir klasöre taşı ya da sil" : ""
   }">Sil</button>
     </div>
   `;
@@ -567,7 +634,7 @@ function klasorKartiCiz(k) {
 }
 
 /**
- * Bir klasörü yeniden adlandırır: içindeki HER dosyayı (yazılar +
+ * Bir klasörü yeniden adlandırır: içindeki HER dosyayı (yazılar/projeler +
  * .gitkeep) yeni klasör adının altına aynı dosya adıyla yeniden yazar,
  * sonra eskilerini siler. GitHub Contents API'de "taşıma"/"rename"
  * doğrudan yoktur, bu yüzden dosya bazında kopyala+sil yapılır. İşlem
@@ -578,7 +645,7 @@ function klasorKartiCiz(k) {
 async function klasorYenidenAdlandir(k) {
   const msgEl = document.getElementById("kl-message");
   msgEl.hidden = true;
-  const yeniAdHam = window.prompt(`"_posts/${k.ad}/" klasörünü nasıl adlandırmak istersin?`, k.ad);
+  const yeniAdHam = window.prompt(`"${k.kokKlasor}/${k.ad}/" klasörünü nasıl adlandırmak istersin?`, k.ad);
   if (yeniAdHam === null) return;
   const yeniAd = klasorAdiTemizle(yeniAdHam.trim());
   if (!yeniAd) {
@@ -587,13 +654,15 @@ async function klasorYenidenAdlandir(k) {
   }
   if (yeniAd === k.ad) return;
 
-  const hedefVarMi = await ghGetContents(`_posts/${yeniAd}`).catch(() => null);
+  const hedefVarMi = await ghGetContents(`${k.kokKlasor}/${yeniAd}`).catch(() => null);
   if (hedefVarMi) {
-    showMessage(msgEl, `"_posts/${yeniAd}/" adında bir klasör zaten var.`, "error");
+    showMessage(msgEl, `"${k.kokKlasor}/${yeniAd}/" adında bir klasör zaten var.`, "error");
     return;
   }
 
-  if (!confirm(`"_posts/${k.ad}/" içindeki tüm dosyalar "_posts/${yeniAd}/" klasörüne taşınacak. Onaylıyor musun?`)) {
+  if (
+    !confirm(`"${k.kokKlasor}/${k.ad}/" içindeki tüm dosyalar "${k.kokKlasor}/${yeniAd}/" klasörüne taşınacak. Onaylıyor musun?`)
+  ) {
     return;
   }
 
@@ -603,7 +672,7 @@ async function klasorYenidenAdlandir(k) {
       if (dosya.type !== "file") continue;
       const detay = await ghGetContents(dosya.path);
       await ghPutFile(
-        `_posts/${yeniAd}/${dosya.name}`,
+        `${k.kokKlasor}/${yeniAd}/${dosya.name}`,
         detay.content.replace(/\n/g, ""),
         `Klasör yeniden adlandırıldı: ${k.ad} -> ${yeniAd} (${dosya.name})`
       );
@@ -613,14 +682,14 @@ async function klasorYenidenAdlandir(k) {
         `Klasör yeniden adlandırıldı: ${k.ad} -> ${yeniAd} (${dosya.name} temizlendi)`
       );
     }
-    showMessage(msgEl, `"_posts/${k.ad}/" → "_posts/${yeniAd}/" olarak yeniden adlandırıldı.`, "success");
+    showMessage(msgEl, `"${k.kokKlasor}/${k.ad}/" → "${k.kokKlasor}/${yeniAd}/" olarak yeniden adlandırıldı.`, "success");
     await klasorListesiYukle();
     await icerikFormuKlasorSecimGuncelle();
     await icerikListesiYukle();
   } catch (err) {
     showMessage(
       msgEl,
-      `Hata: ${err.message} — işlem yarıda kalmış olabilir, listeyi yenileyip _posts/${k.ad}/ ve _posts/${yeniAd}/ klasörlerini GitHub'dan kontrol et.`,
+      `Hata: ${err.message} — işlem yarıda kalmış olabilir, listeyi yenileyip ${k.kokKlasor}/${k.ad}/ ve ${k.kokKlasor}/${yeniAd}/ klasörlerini GitHub'dan kontrol et.`,
       "error"
     );
   }
@@ -630,19 +699,19 @@ async function klasorYenidenAdlandir(k) {
 async function klasorSil(k) {
   const msgEl = document.getElementById("kl-message");
   msgEl.hidden = true;
-  if (!confirm(`"_posts/${k.ad}/" klasörü silinsin mi? Bu işlem geri alınamaz.`)) return;
+  if (!confirm(`"${k.kokKlasor}/${k.ad}/" klasörü silinsin mi? Bu işlem geri alınamaz.`)) return;
   try {
     const icerik = await ghGetContents(k.path);
     const dosyalar = (icerik || []).filter((f) => f.type === "file");
     const gercekDosyalar = dosyalar.filter((f) => f.name !== ".gitkeep");
     if (gercekDosyalar.length > 0) {
-      showMessage(msgEl, "Bu klasörde hâlâ yazı var, önce onları taşı ya da sil.", "error");
+      showMessage(msgEl, "Bu klasörde hâlâ içerik var, önce onları taşı ya da sil.", "error");
       return;
     }
     for (const dosya of dosyalar) {
-      await ghDeleteFile(dosya.path, dosya.sha, `Klasör silindi: _posts/${k.ad}/ (${dosya.name})`);
+      await ghDeleteFile(dosya.path, dosya.sha, `Klasör silindi: ${k.kokKlasor}/${k.ad}/ (${dosya.name})`);
     }
-    showMessage(msgEl, `"_posts/${k.ad}/" klasörü silindi.`, "success");
+    showMessage(msgEl, `"${k.kokKlasor}/${k.ad}/" klasörü silindi.`, "success");
     await klasorListesiYukle();
     await icerikFormuKlasorSecimGuncelle();
   } catch (err) {
@@ -944,31 +1013,39 @@ function frontMatterOku(ham) {
 }
 
 /**
- * Blog yazıları _posts/ altında alt klasörlenir. Jekyll'in _posts
- * koleksiyonu için dosya YOLU tamamen serbesttir — permalink her zaman
- * dosya ADINDAKİ (YYYY-AY-GUN-slug.md) tarih ve slug'dan üretilir, hangi
- * alt klasörde durduğu URL'i ETKİLEMEZ. Bu yüzden klasör organizasyonu
- * mevcut linkleri/permalink şemasını bozmadan sadece depo içindeki dosya
- * düzenini ilgilendirir.
+ * Hem blog yazıları (_posts/) hem akademik projeler (_projects/) alt
+ * klasörlenebilir. Her iki koleksiyon için de dosya YOLU tamamen
+ * serbesttir — permalink blog'da dosya ADINDAKİ (YYYY-AY-GUN-slug.md)
+ * tarih ve slug'dan, projelerde ise `_config.yml`'deki `permalink:
+ * /projects/:name/` şemasına göre YİNE dosya ADINDAN üretilir. Yani her
+ * iki türde de dosyanın hangi alt klasörde durduğu URL'i ETKİLEMEZ, bu
+ * yüzden klasör organizasyonu mevcut linkleri/permalink şemasını
+ * bozmadan sadece depo içindeki dosya düzenini ilgilendirir.
  *
- * blogKlasoru: kullanıcının "Klasör" seçicisinden seçtiği değer.
+ * klasor: kullanıcının "Klasör" seçicisinden seçtiği değer.
  *   - "__auto__" (ya da boş/undefined): eskisi gibi tarihin YILINA göre
- *     otomatik hesaplanır (_posts/<yıl>/...). Bu VARSAYILAN davranıştır,
- *     kullanıcı hiçbir şey seçmese de aynen çalışmaya devam eder.
- *   - başka herhangi bir değer (örn. "2027", "seyahat"): dosya doğrudan
- *     _posts/<blogKlasoru>/... altına yazılır — yıldan bağımsız, tamamen
- *     serbest bir klasör adı olabilir.
+ *     otomatik hesaplanır (_posts/<yıl>/... ya da _projects/<yıl>/...).
+ *     Bu VARSAYILAN davranıştır, kullanıcı hiçbir şey seçmese de aynen
+ *     çalışmaya devam eder — iki koleksiyon da birbiriyle simetriktir.
+ *   - başka herhangi bir değer (örn. "2027", "seyahat", "konferanslar"):
+ *     dosya doğrudan <koleksiyon>/<klasor>/... altına yazılır — yıldan
+ *     bağımsız, tamamen serbest bir klasör adı olabilir.
  *
- * Akademik projelerde (_projects/) alt klasörleme yok; proje sayısı blog
- * yazılarına göre çok daha az ve permalink zaten :name bazlı.
+ * yilOneki: SADECE proje türünde, dosya ADINA (klasöre değil) yıl öneki
+ * eklenip eklenmeyeceğini belirler (örn. _projects/2026/2026-proje.md).
+ * Bu, klasörlemeden bağımsız, isteğe bağlı ayrı bir tercih — ikisi
+ * birlikte de kullanılabilir.
  */
-function dosyaYoluHesapla(tur, tarih, slug, yilOneki, blogKlasoru) {
-  if (tur === "blog") {
-    const klasor = blogKlasoru && blogKlasoru !== "__auto__" ? blogKlasoru : tarih.slice(0, 4);
-    return `_posts/${klasor}/${tarih}-${slug}.md`;
-  }
+function dosyaYoluHesapla(tur, tarih, slug, yilOneki, klasor) {
   const yil = tarih.slice(0, 4);
-  return `_projects/${yilOneki ? yil + "-" : ""}${slug}.md`;
+  const kokKlasor = tur === "blog" ? "_posts" : "_projects";
+  const altKlasor = klasor && klasor !== "__auto__" ? klasor : yil;
+
+  if (tur === "blog") {
+    return `${kokKlasor}/${altKlasor}/${tarih}-${slug}.md`;
+  }
+  const dosyaAdi = `${yilOneki ? yil + "-" : ""}${slug}.md`;
+  return `${kokKlasor}/${altKlasor}/${dosyaAdi}`;
 }
 
 /**
@@ -1101,7 +1178,7 @@ async function icerikKaydet() {
 
   const yayinda = document.getElementById("ic-yayinda").checked;
   const yilOneki = tur === "proje" && document.getElementById("ic-yil-oneki").checked;
-  const blogKlasoru = tur === "blog" ? klasorSecimDegeriniAl() : null;
+  const klasor = klasorSecimDegeriniAl();
 
   const alan = { title, date };
   if (tur === "proje") {
@@ -1132,7 +1209,7 @@ async function icerikKaydet() {
   }
 
   const dosyaIcerigi = dosyaIcerigiOlustur(tur, alan, yayinda, gizliKod, govde);
-  const yeniYol = dosyaYoluHesapla(tur, date, slug, yilOneki, blogKlasoru);
+  const yeniYol = dosyaYoluHesapla(tur, date, slug, yilOneki, klasor);
 
   submitBtn.disabled = true;
   submitBtn.textContent = "Gönderiliyor...";
@@ -1241,24 +1318,26 @@ function wireIcerikListe() {
 }
 
 /**
- * _posts/ artık yıla göre alt klasörlenmiş durumda (_posts/2026/...), ama
- * GitHub Contents API bir klasörü SADECE tek seviye listeler — alt
- * klasörlerin içini görmek için her birine ayrıca istek atmak gerekir. Bu
- * fonksiyon önce _posts/'un doğrudan içeriğini okur; içinde tür=dir olan
- * (yıl adlı) girdiler varsa onların içine de ayrıca bakar. Eski, alt
- * klasörleme ÖNCESİ taşınmamış "_posts/YIL-AY-GUN-slug.md" dosyaları da
- * (varsa) hâlâ listede görünmeye devam eder, geriye dönük uyumluluk için
- * ayrıca bir taşıma/migrasyon ZORUNLU DEĞİLDİR.
+ * Hem _posts/ hem _projects/ artık alt klasörlenebilir durumda (örn.
+ * _posts/2026/... ya da _projects/seyahat/...), ama GitHub Contents API
+ * bir klasörü SADECE tek seviye listeler — alt klasörlerin içini görmek
+ * için her birine ayrıca istek atmak gerekir. Bu fonksiyon önce verilen
+ * kök koleksiyonun (kokKlasor: "_posts" ya da "_projects") doğrudan
+ * içeriğini okur; içinde tür=dir olan (yıl ya da özel adlı) girdiler
+ * varsa onların içine de ayrıca bakar. Eski, alt klasörleme ÖNCESİ
+ * taşınmamış (örn. "_posts/YIL-AY-GUN-slug.md") dosyalar da (varsa) hâlâ
+ * listede görünmeye devam eder, geriye dönük uyumluluk için ayrıca bir
+ * taşıma/migrasyon ZORUNLU DEĞİLDİR.
  */
-async function postDosyalariniListele() {
-  const kokIcerik = await ghGetContents("_posts").catch(() => []);
+async function koleksiyonDosyalariniListele(kokKlasor) {
+  const kokIcerik = await ghGetContents(kokKlasor).catch(() => []);
   if (!Array.isArray(kokIcerik)) return [];
 
   const kokDosyalar = kokIcerik.filter((f) => f.type === "file" && f.name.endsWith(".md"));
-  const yilKlasorleri = kokIcerik.filter((f) => f.type === "dir");
+  const altKlasorler = kokIcerik.filter((f) => f.type === "dir");
 
   const altKlasorSonuclari = await Promise.all(
-    yilKlasorleri.map((klasor) => ghGetContents(klasor.path).catch(() => []))
+    altKlasorler.map((klasor) => ghGetContents(klasor.path).catch(() => []))
   );
   const altKlasorDosyalari = altKlasorSonuclari
     .flat()
@@ -1276,12 +1355,10 @@ async function icerikListesiYukle() {
 
   el.innerHTML = '<p class="muted">Yükleniyor...</p>';
   try {
-    const [postDosyalari, projeler] = await Promise.all([
-      postDosyalariniListele(),
-      ghGetContents("_projects").catch(() => []),
+    const [postDosyalari, projeDosyalari] = await Promise.all([
+      koleksiyonDosyalariniListele("_posts"),
+      koleksiyonDosyalariniListele("_projects"),
     ]);
-
-    const projeDosyalari = (projeler || []).filter((f) => f.type === "file" && f.name.endsWith(".md"));
 
     // Promise.allSettled: tek bir dosyanın okunması başarısız olursa
     // (silinmiş, geçici ağ hatası, vb.) diğer tüm liste elemanlarını
@@ -1562,12 +1639,12 @@ async function icerikSil(item) {
   }
 }
 
-function icerikDuzenlemeyeYukle(item, tur) {
+async function icerikDuzenlemeyeYukle(item, tur) {
   DUZENLENEN_YOL = item.path;
   DUZENLENEN_SHA = item.sha;
 
   document.querySelector(`input[name="icerik-turu"][value="${tur}"]`).checked = true;
-  guncelleIcerikTuru();
+  await guncelleIcerikTuru();
 
   document.getElementById("ic-title").value = item.data.title || "";
   document.getElementById("ic-date").value = item.data.date || "";
@@ -1577,9 +1654,12 @@ function icerikDuzenlemeyeYukle(item, tur) {
     tur === "blog" ? dosyaAdi.replace(/^\d{4}-\d{2}-\d{2}-/, "") : dosyaAdi.replace(/^\d{4}-/, "");
   document.getElementById("ic-yil-oneki").checked = tur === "proje" && /^\d{4}-/.test(dosyaAdi);
 
-  if (tur === "blog") {
-    icerikDuzenlemeKlasorSecimineYansit(item.path, item.data.date);
-  }
+  // NOT: guncelleIcerikTuru()'nun (dolayısıyla dropdown'ı GitHub'daki
+  // gerçek klasörlerle dolduran icerikFormuKlasorSecimGuncelle'nin)
+  // yukarıda "await" ile BİTMİŞ olması burada zorunlu — aksi halde bu
+  // satırın eklediği/seçtiği klasör, geç gelen dropdown sıfırlamasıyla
+  // ezilebilirdi.
+  icerikDuzenlemeKlasorSecimineYansit(item.path, item.data.date, tur);
 
   if (tur === "proje") {
     document.getElementById("ic-venue").value = item.data.venue || "";
