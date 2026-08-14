@@ -369,9 +369,17 @@ function fmSatiri(anahtar, deger, ciplak = false) {
  * değil" olarak kaydediliyorsa yeni üretilir, daha önce zaten bir ön izleme
  * kodu varsa (düzenleme sırasında) AYNI kod korunur — böylece link, panelde
  * her açılışta/düzenlemede DEĞİŞMEZ ve daha önce paylaşılmış olabilecek bir
- * link kırılmaz. Kod yalnızca "Yayında değil" iken "Yayında"ya çevrilip
- * tekrar "Yayında değil"e alınırsa ya da kullanıcı bilinçli olarak
- * yenilerse değişir.
+ * link kırılmaz. Kod yalnızca kullanıcı bilerek yenilerse değişir.
+ *
+ * ÖNEMLİ — "onizleme_kod" alanı (yeniden yayınlama / re-publish desteği):
+ * Kod, sadece "yayında: false" iken var olan `permalink` alanından değil,
+ * AYRICA gizli bir `onizleme_kod` alanından da yazılır — bu alan içerik
+ * "Yayında" (true) olsa BİLE dosyada kalır. Böylece bir yazı önce gizli
+ * paylaşılıp linki birine gönderilir, sonra yayına alınır, sonra bir
+ * sebeple TEKRAR "yayında değil"e çekilirse ("yeniden yayından kaldırma")
+ * daha önce paylaşılmış olan AYNI ön izleme linki geri döner — yeni/farklı
+ * bir kod üretilmez. Kod yalnızca kullanıcı "🎲 Yenile" ile bilerek
+ * değiştirirse ya da bu içerik için hiç kod üretilmemişse değişir.
  */
 function dosyaIcerigiOlustur(tur, alan, yayinda, gizliKod, govde) {
   const satirlar = ["---"];
@@ -393,10 +401,27 @@ function dosyaIcerigiOlustur(tur, alan, yayinda, gizliKod, govde) {
     const onEk = tur === "proje" ? "/projects/" : "/blog/";
     satirlar.push(fmSatiri("permalink", `${onEk}on-izleme-${gizliKod}/`, true));
   }
+  // Kod, yayın durumundan bağımsız olarak her zaman ayrıca saklanır (bkz.
+  // yukarıdaki fonksiyon açıklaması). Sadece front-matter'da görünür kalır,
+  // sayfa render'ında kullanılmaz — tek amacı "yeniden yayından kaldırma"
+  // anında panelin eski linki hatırlayabilmesidir.
+  if (gizliKod) {
+    satirlar.push(fmSatiri("onizleme_kod", gizliKod));
+  }
 
   satirlar.push("---");
   const frontMatter = satirlar.filter(Boolean).join("\n");
   return `${frontMatter}\n\n${govde.trim()}\n`;
+}
+
+/**
+ * Bir içeriğin gizli ön izleme kodunu bulur: önce aktif `permalink`
+ * alanından (o an "yayında değil" ise buradan gelir), yoksa kalıcı olarak
+ * saklanan `onizleme_kod` alanından (içerik şu an "yayında" olsa bile daha
+ * önce üretilmiş bir kodu hatırlamak için) okur. İkisi de yoksa null döner.
+ */
+function icerikGizliKoduBul(data) {
+  return permalinktenGizliKoduCikar(data?.permalink) || data?.onizleme_kod || null;
 }
 
 /** Bir permalink değerinden ("/blog/on-izleme-abc123/" gibi) gizli kodu çıkarır, yoksa null döner. */
@@ -432,8 +457,21 @@ function frontMatterOku(ham) {
   return { data, body: (eslesme[2] || "").replace(/^\n+/, "") };
 }
 
+/**
+ * Blog yazıları artık _posts/YIL/ altında yıla göre alt klasörlenir
+ * (örn. _posts/2026/2026-08-14-arktik.md). Jekyll'in _posts koleksiyonu
+ * için dosya YOLU tamamen serbesttir — permalink her zaman dosya ADINDAKİ
+ * (YYYY-AY-GUN-slug.md) tarih ve slug'dan üretilir, hangi alt klasörde
+ * durduğu URL'i ETKİLEMEZ. Bu yüzden bu değişiklik mevcut linkleri/
+ * permalink şemasını bozmadan sadece depo içindeki dosya organizasyonunu
+ * iyileştirir. Akademik projelerde (_projects/) alt klasörleme yok; proje
+ * sayısı blog yazılarına göre çok daha az ve permalink zaten :name bazlı.
+ */
 function dosyaYoluHesapla(tur, tarih, slug, yilOneki) {
-  if (tur === "blog") return `_posts/${tarih}-${slug}.md`;
+  if (tur === "blog") {
+    const yil = tarih.slice(0, 4);
+    return `_posts/${yil}/${tarih}-${slug}.md`;
+  }
   const yil = tarih.slice(0, 4);
   return `_projects/${yilOneki ? yil + "-" : ""}${slug}.md`;
 }
@@ -706,6 +744,33 @@ function wireIcerikListe() {
   });
 }
 
+/**
+ * _posts/ artık yıla göre alt klasörlenmiş durumda (_posts/2026/...), ama
+ * GitHub Contents API bir klasörü SADECE tek seviye listeler — alt
+ * klasörlerin içini görmek için her birine ayrıca istek atmak gerekir. Bu
+ * fonksiyon önce _posts/'un doğrudan içeriğini okur; içinde tür=dir olan
+ * (yıl adlı) girdiler varsa onların içine de ayrıca bakar. Eski, alt
+ * klasörleme ÖNCESİ taşınmamış "_posts/YIL-AY-GUN-slug.md" dosyaları da
+ * (varsa) hâlâ listede görünmeye devam eder, geriye dönük uyumluluk için
+ * ayrıca bir taşıma/migrasyon ZORUNLU DEĞİLDİR.
+ */
+async function postDosyalariniListele() {
+  const kokIcerik = await ghGetContents("_posts").catch(() => []);
+  if (!Array.isArray(kokIcerik)) return [];
+
+  const kokDosyalar = kokIcerik.filter((f) => f.type === "file" && f.name.endsWith(".md"));
+  const yilKlasorleri = kokIcerik.filter((f) => f.type === "dir");
+
+  const altKlasorSonuclari = await Promise.all(
+    yilKlasorleri.map((klasor) => ghGetContents(klasor.path).catch(() => []))
+  );
+  const altKlasorDosyalari = altKlasorSonuclari
+    .flat()
+    .filter((f) => f && f.type === "file" && f.name.endsWith(".md"));
+
+  return [...kokDosyalar, ...altKlasorDosyalari];
+}
+
 async function icerikListesiYukle() {
   const el = document.getElementById("ic-liste");
   if (!PAT_BELLEK) {
@@ -715,12 +780,11 @@ async function icerikListesiYukle() {
 
   el.innerHTML = '<p class="muted">Yükleniyor...</p>';
   try {
-    const [postlar, projeler] = await Promise.all([
-      ghGetContents("_posts").catch(() => []),
+    const [postDosyalari, projeler] = await Promise.all([
+      postDosyalariniListele(),
       ghGetContents("_projects").catch(() => []),
     ]);
 
-    const postDosyalari = (postlar || []).filter((f) => f.type === "file" && f.name.endsWith(".md"));
     const projeDosyalari = (projeler || []).filter((f) => f.type === "file" && f.name.endsWith(".md"));
 
     // Promise.allSettled: tek bir dosyanın okunması başarısız olursa
@@ -823,7 +887,7 @@ function onizlemeKoduCakisiyorMu(tur, gizliKod, haricTutulacakYol) {
     (item) =>
       item.tur === tur &&
       item.path !== haricTutulacakYol &&
-      permalinktenGizliKoduCikar(item.data.permalink) === gizliKod
+      icerikGizliKoduBul(item.data) === gizliKod
   );
 }
 
@@ -890,6 +954,27 @@ function icerikKartiCiz(item, tur) {
     ? `<div class="gy-icerik-kart-ozet">${metniVurgula(item.data.summary)}</div>`
     : "";
 
+  // Gizliyken doğrudan gösterilecek ön izleme linki; yayındaysa da daha
+  // önce üretilmiş bir kod varsa (bkz. icerikGizliKoduBul / onizleme_kod
+  // alanı) "Linki Kopyala" ile hızlıca erişilebilsin diye kart üstünde
+  // hazır tutulur (link'e tıklamadan/formu açmadan görünmez ama buton
+  // panoya kopyalar).
+  const gizliKod = icerikGizliKoduBul(item.data);
+  const onEk = tur === "proje" ? "/projects/" : "/blog/";
+  const onizlemeLink = gizliKod ? `${location.origin}${onEk}on-izleme-${gizliKod}/` : null;
+
+  // Hızlı yayın-durumu aksiyonu: gizliyse tek tıkla "Yeniden Yayınla",
+  // yayındaysa tek tıkla "Yayından Kaldır". İkisi de icerikYayinDurumunuDegistir
+  // üzerinden AYNI kaydetme akışını (icerikKaydet'in çekirdeği) kullanır,
+  // formu açıp elle toggle'a basmaya gerek bırakmaz. Kod her koşulda
+  // korunur (bkz. dosyaIcerigiOlustur'daki onizleme_kod notu).
+  const durumBtn = yayinda
+    ? '<button type="button" class="gy-durum-degistir-btn" data-hedef="gizle">Yayından Kaldır</button>'
+    : '<button type="button" class="gy-durum-degistir-btn gy-durum-degistir-btn--yayinla" data-hedef="yayinla">Yeniden Yayınla</button>';
+  const linkBtn = onizlemeLink
+    ? `<button type="button" class="gy-link-kopyala-mini-btn" title="${escapeHtml(onizlemeLink)}">🔗 Linki Kopyala</button>`
+    : "";
+
   kart.innerHTML = `
     <div class="gy-icerik-kart-bilgi">
       <div class="gy-icerik-kart-baslik">${metniVurgula(item.data.title || item.path)}${rozet}</div>
@@ -897,13 +982,78 @@ function icerikKartiCiz(item, tur) {
       ${ozet}
     </div>
     <div class="gy-icerik-kart-aksiyonlar">
+      ${durumBtn}
+      ${linkBtn}
       <button type="button" class="gy-duzenle-btn">Düzenle</button>
       <button type="button" class="gy-sil-btn">Sil</button>
     </div>
   `;
   kart.querySelector(".gy-duzenle-btn").addEventListener("click", () => icerikDuzenlemeyeYukle(item, tur));
   kart.querySelector(".gy-sil-btn").addEventListener("click", () => icerikSil(item));
+  kart.querySelector(".gy-durum-degistir-btn").addEventListener("click", (e) => {
+    icerikYayinDurumunuDegistir(item, tur, e.currentTarget);
+  });
+  const linkKopyalaBtn = kart.querySelector(".gy-link-kopyala-mini-btn");
+  if (linkKopyalaBtn) {
+    linkKopyalaBtn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(onizlemeLink);
+        linkKopyalaBtn.textContent = "Kopyalandı ✓";
+      } catch {
+        window.prompt("Linki elle kopyala:", onizlemeLink);
+      }
+      setTimeout(() => (linkKopyalaBtn.textContent = "🔗 Linki Kopyala"), 1600);
+    });
+  }
   return kart;
+}
+
+/**
+ * Kart üstündeki "Yeniden Yayınla" / "Yayından Kaldır" hızlı aksiyonu.
+ * Formu açıp toggle'ı çevirip tekrar kaydetmeye gerek kalmadan, mevcut
+ * front-matter'ı olduğu gibi koruyarak SADECE yayinda/sitemap/permalink
+ * (ve onizleme_kod) alanlarını günceller ve doğrudan commit atar.
+ *
+ * "Yeniden Yayınla" durumunda: ÖNEMLİ — içerik gizliyken saklanan kod
+ * (icerikGizliKoduBul) yayına alındıktan SONRA da onizleme_kod alanında
+ * kalmaya devam eder (bkz. dosyaIcerigiOlustur), böylece bu içerik daha
+ * sonra tekrar "Yayından Kaldır" ile gizlenirse AYNI link geri döner.
+ */
+async function icerikYayinDurumunuDegistir(item, tur, btn) {
+  const yeniYayinda = item.data.yayinda === false; // şu an gizliyse -> yayına al, değilse -> gizle
+  const eylemAdi = yeniYayinda ? "yayına alınsın" : "yayından kaldırılsın";
+  if (!confirm(`"${item.data.title || item.path}" ${eylemAdi} mı?`)) return;
+
+  const gizliKod = !yeniYayinda ? icerikGizliKoduBul(item.data) || rastgeleKod(8) : icerikGizliKoduBul(item.data);
+
+  if (!yeniYayinda && onizlemeKoduCakisiyorMu(tur, gizliKod, item.path)) {
+    alert(
+      `Bu içeriğin daha önce kullandığı ön izleme kodu ("${gizliKod}") başka bir içerikte de kullanılıyor gibi görünüyor. Formu açıp "Düzenle" ile yeni bir kod üretmen gerekiyor.`
+    );
+    return;
+  }
+
+  btn.disabled = true;
+  const oncekiMetin = btn.textContent;
+  btn.textContent = "İşleniyor...";
+  try {
+    const alan = { title: item.data.title, date: item.data.date };
+    if (tur === "proje") {
+      alan.venue = item.data.venue;
+      alan.status = item.data.status;
+      alan.summary = item.data.summary;
+      alan.link = item.data.link;
+      alan.link_label = item.data.link_label;
+    }
+    const dosyaIcerigi = dosyaIcerigiOlustur(tur, alan, yeniYayinda, gizliKod, item.body || "");
+    const mesaj = yeniYayinda ? `Yeniden yayınlandı: ${item.path}` : `Yayından kaldırıldı: ${item.path}`;
+    await ghPutFile(item.path, b64Encode(dosyaIcerigi), mesaj, item.sha);
+    await icerikListesiYukle();
+  } catch (err) {
+    alert(`İşlem başarısız: ${err.message}`);
+    btn.disabled = false;
+    btn.textContent = oncekiMetin;
+  }
 }
 
 async function icerikSil(item) {
@@ -948,7 +1098,7 @@ function icerikDuzenlemeyeYukle(item, tur) {
   // düzenlemeye her açıldığında linkini yeniden görebilir, kod da kaydetme
   // sırasında DEĞİŞMEDEN korunur. Permalink herhangi bir sebeple eksikse
   // (elle düzenlenmiş dosya vb.) yeni bir kod üretip gösteriyoruz.
-  DUZENLENEN_GIZLI_KOD = permalinktenGizliKoduCikar(item.data.permalink);
+  DUZENLENEN_GIZLI_KOD = icerikGizliKoduBul(item.data);
   if (!yayinda) {
     onizlemeKutusunuGoster(tur, DUZENLENEN_GIZLI_KOD || rastgeleKod(8));
   } else {
