@@ -26,6 +26,7 @@ permalink: "/panel/github-yonetim.html"
     <a href="#baglanti" data-section="baglanti" class="active">🔑 GitHub Bağlantısı</a>
     <a href="#icerik-ekle" data-section="icerik-ekle">📝 İçerik Ekle / Düzenle</a>
     <a href="#icerikler" data-section="icerikler">📚 Mevcut İçerikler</a>
+    <a href="#klasorler" data-section="klasorler">📁 Klasörler</a>
     <a href="#profil-foto" data-section="profil-foto">🖼️ Profil Fotoğrafı</a>
   </nav>
 
@@ -90,6 +91,25 @@ permalink: "/panel/github-yonetim.html"
           <div class="form-field">
             <label for="ic-slug">Dosya adı / slug (boş bırakılırsa başlıktan otomatik üretilir)</label>
             <input id="ic-slug" type="text" placeholder="ornek-yazi-basligi" autocomplete="off">
+          </div>
+          <div class="form-field" id="ic-klasor-wrap">
+            <label for="ic-klasor-secim">Klasör (blog yazısının <code>_posts/</code> altında hangi alt klasöre kaydedileceği)</label>
+            <select id="ic-klasor-secim">
+              <option value="__auto__">Otomatik — tarihe göre yıl klasörü (örn. _posts/2026/)</option>
+              <option value="__yeni__">➕ Yeni klasör oluştur…</option>
+            </select>
+            <input id="ic-klasor-yeni-ad" type="text" placeholder="örn. seyahat ya da 2027" autocomplete="off" hidden style="margin-top:8px;">
+            <p class="gy-yardim-metni" id="ic-klasor-yardim">
+              "Otomatik" seçiliyken dosya, yukarıdaki tarihin yılına göre
+              (<code>_posts/&lt;yıl&gt;/</code>) kaydedilir — hiçbir şey
+              yapmana gerek yok. Farklı bir klasör seçersen (örn. konuya
+              göre <code>_posts/seyahat/</code> ya da farklı bir yıl)
+              dosya SEÇTİĞİN klasöre gider; hangi klasörde durduğu
+              yazının linkini (permalink'ini) ETKİLEMEZ, link her zaman
+              tarih ve slug'dan üretilir. Yeni klasörleri "📁 Klasörler"
+              sekmesinden de yönetebilirsin (oluşturma, yeniden
+              adlandırma, silme).
+            </p>
           </div>
           <div class="form-field" id="ic-yil-oneki-wrap" hidden>
             <label class="gy-checkbox"><input id="ic-yil-oneki" type="checkbox"> Dosya adına yıl önekini ekle (<code>YYYY-slug.md</code>)</label>
@@ -230,6 +250,32 @@ permalink: "/panel/github-yonetim.html"
 
         <div id="ic-liste"><p class="muted">Henüz yüklenmedi.</p></div>
         <p id="ic-liste-sonuc-yok" class="muted" hidden>Aramanla/filtrenle eşleşen içerik bulunamadı.</p>
+      </section>
+
+      <section id="klasorler" class="panel-section">
+        <h2>Klasörler (<code>_posts/</code> altındaki alt klasörler)</h2>
+        <p class="muted">
+          Blog yazıların <code>_posts/</code> altında alt klasörlerde tutulur
+          (varsayılan olarak yıla göre, örn. <code>_posts/2026/</code>) —
+          hangi klasörde durdukları yazının linkini (permalink'ini)
+          ETKİLEMEZ, sadece depodaki dosya organizasyonunu ilgilendirir.
+          Burada yeni bir klasör oluşturabilir, mevcut bir klasörü yeniden
+          adlandırabilir (içindeki tüm dosyalar yeni klasöre taşınır) ya da
+          BOŞ bir klasörü silebilirsin. GitHub'da "gerçek" boş klasör
+          kavramı olmadığı için yeni klasör oluşturma işlemi, o klasörün
+          içine görünmez küçük bir <code>.gitkeep</code> dosyası ekleyerek
+          yapılır — bu dosya klasörü var eder ama sitede hiçbir şekilde
+          görünmez veya listelenmez.
+        </p>
+        <button id="kl-liste-yenile-btn" type="button" class="btn-primary" style="width:auto; margin-bottom:12px;">Klasörleri Yükle / Yenile</button>
+
+        <div class="gy-klasor-olustur">
+          <input id="kl-yeni-ad" type="text" placeholder="Yeni klasör adı (örn. 2027 ya da seyahat)" autocomplete="off">
+          <button id="kl-olustur-btn" type="button" class="btn-primary" style="width:auto;">➕ Klasör Oluştur</button>
+        </div>
+        <div id="kl-message" class="auth-message" hidden></div>
+
+        <div id="kl-liste"><p class="muted">Henüz yüklenmedi.</p></div>
       </section>
 
       <section id="profil-foto" class="panel-section">
