@@ -331,6 +331,38 @@
   color: #c0392b;
 }
 
+/* "Yeniden Yayınla" / "Yayından Kaldır" hızlı aksiyon butonu — durumuna göre renklenir */
+.gy-durum-degistir-btn {
+  font-weight: 600;
+}
+.gy-durum-degistir-btn--yayinla {
+  border-color: #1e6b3a;
+  color: #1e6b3a;
+  background: #eaf7ee;
+}
+.gy-durum-degistir-btn--yayinla:hover {
+  border-color: #1e6b3a;
+  background: #d9f0e0;
+}
+[data-theme="dark"] .gy-durum-degistir-btn--yayinla {
+  border-color: #9ee3b6;
+  color: #9ee3b6;
+  background: #123a22;
+}
+.gy-icerik-kart-aksiyonlar button.gy-durum-degistir-btn:not(.gy-durum-degistir-btn--yayinla):hover {
+  border-color: #a13327;
+  color: #a13327;
+}
+
+/* Kart üstündeki "Linki Kopyala" mini butonu — gizli/daha önce gizlenmiş içeriklerde görünür */
+.gy-link-kopyala-mini-btn {
+  color: var(--muted);
+}
+.gy-link-kopyala-mini-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .gy-liste-baslik {
   display: flex;
   align-items: baseline;
