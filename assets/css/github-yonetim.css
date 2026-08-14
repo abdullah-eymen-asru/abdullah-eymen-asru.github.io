@@ -250,13 +250,15 @@
 .gy-arama-temizle:hover { background: var(--border); }
 
 .gy-tur-sekmeleri,
-.gy-durum-sekmeleri {
+.gy-durum-sekmeleri,
+.gy-klasor-tur-sekmeleri {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
 }
 .gy-tur-sekme,
-.gy-durum-sekme {
+.gy-durum-sekme,
+.gy-klasor-tur-sekme {
   padding: 7px 14px;
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -267,14 +269,17 @@
   transition: all 0.15s ease;
 }
 .gy-tur-sekme:hover,
-.gy-durum-sekme:hover { border-color: var(--accent); }
+.gy-durum-sekme:hover,
+.gy-klasor-tur-sekme:hover { border-color: var(--accent); }
 .gy-tur-sekme.active,
-.gy-durum-sekme.active {
+.gy-durum-sekme.active,
+.gy-klasor-tur-sekme.active {
   border-color: var(--accent);
   background: var(--tag-bg);
   font-weight: 600;
 }
 .gy-durum-sekmeleri { font-size: 0.8rem; }
+.gy-klasor-tur-sekmeleri { margin-bottom: 14px; }
 
 /* Mevcut içerikler listesi */
 .gy-icerik-kart {
