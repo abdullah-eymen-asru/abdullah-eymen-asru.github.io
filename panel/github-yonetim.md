@@ -125,11 +125,36 @@ permalink: "/panel/github-yonetim.html"
           <div class="form-field">
             <label for="ic-body">İçerik (Markdown)</label>
             <div class="gy-editor-toolbar" role="toolbar" aria-label="Markdown biçimlendirme">
-              <button type="button" data-md="bold" title="Kalın (**metin**)"><strong>K</strong></button>
-              <button type="button" data-md="italic" title="İtalik (*metin*)"><em>İ</em></button>
-              <button type="button" data-md="h2" title="Başlık (## metin)">H</button>
-              <button type="button" data-md="link" title="Bağlantı ([metin](url))">🔗</button>
-              <button type="button" data-md="list" title="Liste (- madde)">≡</button>
+              <span class="gy-editor-grup">
+                <button type="button" data-md="bold" title="Kalın (**metin**)"><strong>K</strong></button>
+                <button type="button" data-md="italic" title="İtalik (*metin*)"><em>İ</em></button>
+                <button type="button" data-md="strikethrough" title="Üstü çizili (~~metin~~)"><s>Ü</s></button>
+                <button type="button" data-md="inline-code" title="Satır içi kod (`kod`)">&lt;/&gt;</button>
+              </span>
+              <span class="gy-editor-ayrac" aria-hidden="true"></span>
+              <span class="gy-editor-grup">
+                <button type="button" data-md="h2" title="Başlık (## metin)">H2</button>
+                <button type="button" data-md="h3" title="Alt başlık (### metin)">H3</button>
+                <button type="button" data-md="h4" title="Alt-alt başlık (#### metin)">H4</button>
+              </span>
+              <span class="gy-editor-ayrac" aria-hidden="true"></span>
+              <span class="gy-editor-grup">
+                <button type="button" data-md="list" title="Madde işaretli liste (- madde)">≡</button>
+                <button type="button" data-md="ordered-list" title="Numaralı liste (1. madde)">1.</button>
+                <button type="button" data-md="task-list" title="Yapılacaklar listesi (- [ ] madde)">☑</button>
+              </span>
+              <span class="gy-editor-ayrac" aria-hidden="true"></span>
+              <span class="gy-editor-grup">
+                <button type="button" data-md="quote" title="Alıntı (&gt; metin)">❝</button>
+                <button type="button" data-md="code-block" title="Kod bloğu (```)">{ }</button>
+                <button type="button" data-md="hr" title="Yatay çizgi (---)">―</button>
+                <button type="button" data-md="table" title="Tablo şablonu (2 sütun)">▦</button>
+              </span>
+              <span class="gy-editor-ayrac" aria-hidden="true"></span>
+              <span class="gy-editor-grup">
+                <button type="button" data-md="link" title="Bağlantı ([metin](url))">🔗</button>
+                <button type="button" data-md="image" title="Görsel — dış URL ile (![açıklama](url))">🖼️</button>
+              </span>
             </div>
             <textarea id="ic-body" rows="14" placeholder="Markdown formatında içeriğini buraya yaz..."></textarea>
           </div>
