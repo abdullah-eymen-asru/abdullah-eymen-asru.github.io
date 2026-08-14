@@ -4,7 +4,14 @@
  * hesap/sifre-guncelle.html tarafından ortak kullanılan fonksiyonlar. Her
  * sayfa sadece ihtiyacı olan init fonksiyonunu çağırır (aşağıya bkz).
  */
-import { supabase, showMessage, showSpamNotice, KVKK_METIN_SURUMU, turkceOtpHatasi } from "./supabase-client.js";
+import {
+  supabase,
+  showMessage,
+  showSpamNotice,
+  KVKK_METIN_SURUMU,
+  turkceOtpHatasi,
+  oturumHatirlamaTercihiniKaydet,
+} from "./supabase-client.js";
 
 const REDIRECT_AFTER_LOGIN = "/panel/panel.html";
 // Google OAuth ve "şifre sıfırlama" e-postası kullanıcıyı bu sayfaya
@@ -129,6 +136,10 @@ export function initGirisPage() {
     const email = form.email.value.trim();
     const password = form.password.value;
 
+    // signInWithPassword'dan ÖNCE kaydedilmeli — bkz. supabase-client.js
+    // içindeki oturumHatirlamaTercihiniKaydet() açıklaması.
+    oturumHatirlamaTercihiniKaydet(document.getElementById("remember-me")?.checked ?? true);
+
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     submitBtn.disabled = false;
@@ -157,6 +168,10 @@ export function initGirisPage() {
     // hedefi sessionStorage'da saklayıp kontrolden SONRA oraya gideceğiz.
     sessionStorage.setItem(GOOGLE_GIRIS_INTENT_KEY, "1");
     sessionStorage.setItem(GOOGLE_GIRIS_DONUS_KEY, donus);
+    // Google ile girişte de aynı checkbox'a bakıyoruz — OAuth dönüşünde
+    // (googleGirisDonusunuIsle) oturum bu sayfada kurulur, o an dinamik
+    // depo zaten burada kaydettiğimiz tercihi kullanır.
+    oturumHatirlamaTercihiniKaydet(document.getElementById("remember-me")?.checked ?? true);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: `${SITE_ORIGIN}/hesap/giris.html` },
