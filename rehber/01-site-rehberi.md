@@ -137,17 +137,34 @@ tanıtım yazını buraya serbest metin olarak yaz.
   `_posts/2026-09-01-yeni-yazi.md` **birebir aynı URL'i** üretir — bu
   sadece yazı sayısı arttıkça `_posts/` klasörünün tek bir uzun liste
   olmasını önlemek için bir organizasyon kolaylığı. Panel
-  (`github-yonetim.js`) yeni yazıları otomatik olarak ilgili yıl
+  (`github-yonetim.js`) yeni yazıları VARSAYILAN olarak ilgili yıl
   klasörüne yazar; klasör yoksa GitHub API onu ilk dosyayla birlikte
   kendiliğinden oluşturur. Alt klasörleme öncesinden kalma, hâlâ
   `_posts/` kökünde duran eski dosyalar da bozulmadan listelenmeye ve
   çalışmaya devam eder — geriye dönük bir taşıma/migrasyon **zorunlu
   değildir**, istersen zamanla elle ilgili yıl klasörüne taşıyabilirsin.
-- **Akademik proje:** `_projects/` klasörüne aynı mantıkla yeni bir `.md`
-  dosyası ekle (örn. `_projects/2026-yeni-proje.md`). Kullanılabilecek
+  **Klasörü kendin de seçebilirsin:** panelin "İçerik Ekle / Düzenle"
+  formunda, blog türü seçiliyken görünen "Klasör" alanı sayesinde
+  otomatik yıl davranışını bırakıp dosyayı mevcut bir klasöre (örn. farklı
+  bir yıl, ya da konuya göre `_posts/seyahat/`) kaydedebilir, ya da aynı
+  formdan "➕ Yeni klasör oluştur…" seçeneğiyle anında yeni bir klasör
+  belirleyebilirsin. "Otomatik" seçili kalırsa hiçbir şey değişmez, eski
+  davranış aynen sürer. Klasörleri ayrıca "📁 Klasörler" sekmesinden de
+  oluşturabilir, yeniden adlandırabilir (içindeki tüm yazılar otomatik
+  taşınır) veya BOŞ bir klasörü silebilirsin — bkz. Bölüm 10a.
+- **Akademik proje:** `_projects/` de blog yazıları gibi alt klasörlenir —
+  aynı "Klasör" seçici ve aynı "Otomatik" (tarihin yılına göre, örn.
+  `_projects/2026/`) davranışı proje formunda da vardır ve `_posts/` ile
+  birebir simetriktir. Panel, örneğin `_projects/2026/yeni-proje.md`
+  şeklinde bir dosya oluşturur. `_projects` koleksiyonunun permalink'i
+  `_config.yml`'de `/projects/:name/` olarak tanımlıdır — yani URL
+  SADECE dosya adından (`:name`) üretilir, hangi alt klasörde durduğu
+  hiçbir etkisi yoktur; tıpkı blog yazılarında olduğu gibi. Kullanılabilecek
   front-matter alanları için `_projects/2025-ornek-proje.md` dosyasındaki
   örneğe bak (`title`, `date`, `venue`, `status`, `summary`, `link`,
-  `link_label`).
+  `link_label`). Ayrıca "dosya adına yıl öneki ekle" seçeneği (örn.
+  `2026-proje-adi.md`) klasörlemeden TAMAMEN bağımsızdır — ikisi birlikte
+  de, ayrı ayrı da kullanılabilir.
 
 ## 9. Zamanlanmış ve gizli yazılar/projeler
 
@@ -431,6 +448,68 @@ Panelin üstündeki "GitHub Bağlantısı" sekmesinden şunları girmen gerekir:
   (`yayinda`/`date`/`sitemap`) aynen uyar — ürettiği dosyalar mevcut
   `icerik/blog.md`, `icerik/akademik-projeler.md`, `feed.xml` ve `sitemap.xml` ile
   sorunsuz çalışır.
+
+### 10a. Klasör yönetimi — "📁 Klasörler" sekmesi
+
+Hem `_posts/` (blog yazıları) hem `_projects/` (akademik projeler)
+altındaki alt klasörleri (yıl bazlı ya da tamamen serbest isimli)
+doğrudan panelden yönetebilirsin, GitHub'a elle gitmene gerek kalmadan —
+her iki koleksiyon da BİREBİR aynı mekanizmayı kullanır.
+
+- **Yeni içerik eklerken klasör seçimi:** "İçerik Ekle / Düzenle"
+  formunda, hem blog hem proje türünde görünen **"Klasör"** açılır listesi
+  üç türlü kullanılabilir:
+  1. **Otomatik** (varsayılan) — eskisi gibi tarihin yılına göre
+     (`_posts/<yıl>/` ya da `_projects/<yıl>/`) otomatik hesaplanır,
+     hiçbir şey yapman gerekmez.
+  2. **Mevcut bir klasör seçme** — dropdown, seçili içerik türüne göre
+     GitHub'daki gerçek `_posts/` ya da `_projects/` alt klasörlerini
+     (bağlantı doğrulanınca, içerik türü değiştirilince ve "Klasörler"
+     sekmesi her güncellendiğinde) otomatik listeler; istediğini seçip
+     dosyayı doğrudan oraya kaydedebilirsin (örn. farklı bir yıla ya da
+     konu bazlı bir klasöre, `_posts/seyahat/` ya da
+     `_projects/konferanslar/` gibi).
+  3. **"➕ Yeni klasör oluştur…"** — dropdown'dan bu seçilince beliren
+     metin kutusuna yeni klasör adını yazman yeterli; kaydettiğinde
+     klasör otomatik oluşturulur (ayrıca önceden "Klasörler" sekmesinden
+     de oluşturabilirsin).
+  Bir yazıyı/projeyi düzenlemeye açtığında, dosyanın GERÇEKTE hangi
+  klasörde olduğu bu seçiciye otomatik yansır — "Otomatik" davranışın
+  üreteceği klasörle (tarihin yılı) aynıysa "Otomatik" seçili kalır,
+  farklıysa o klasör seçili gösterilir; böylece kaydettiğinde dosya
+  yanlışlıkla başka bir klasöre taşınmaz. İçerik türünü (Blog/Proje)
+  değiştirdiğinde dropdown, o türün kendi koleksiyonundaki klasörlerle
+  otomatik olarak yeniden doldurulur.
+- **"📁 Klasörler" sekmesi — koleksiyon sekmesi:** sekmenin üstünde
+  "📰 Blog (_posts/)" / "🎓 Projeler (_projects/)" seçimi vardır; hangisi
+  seçiliyse aşağıdaki liste ve "Klasör Oluştur" işlemi O koleksiyonu
+  hedefler. İki koleksiyonun klasörleri birbirinden tamamen bağımsızdır
+  (örn. `_posts/2027/` oluşturman `_projects/2027/`'yi etkilemez, ayrı
+  ayrı oluşturman gerekir).
+- **Klasör oluşturma:** "Yeni klasör adı" kutusuna istediğin adı (örn.
+  `2027`, `seyahat`, `konferanslar`) yazıp "➕ Klasör Oluştur"a basman
+  yeterli. GitHub'da "gerçek" boş klasör kavramı olmadığından (bir klasör
+  ancak içinde en az bir dosya varsa var olur), oluşturma işlemi o
+  klasörün altına görünmez, sitede hiçbir şekilde kullanılmayan küçük bir
+  `.gitkeep` dosyası ekler — Jekyll nokta ile başlayan dosyaları
+  derlemeye almadığı için bu dosya sitede ASLA görünmez, sadece klasörün
+  GitHub'da var olmasını sağlar.
+- **Yeniden adlandırma:** her klasör kartındaki "Yeniden Adlandır"
+  butonu, klasördeki TÜM dosyaları (yazılar/projeler + varsa `.gitkeep`)
+  yeni klasör adının altına taşır (kopyala + eskisini sil şeklinde —
+  GitHub Contents API'de doğrudan bir "rename" yoktur). İçeriklerin
+  permalink'i (URL'i) hiçbir şekilde ETKİLENMEZ — blogda tarih+slug'dan,
+  projede `_config.yml`'deki `/projects/:name/` şemasına göre dosya
+  adından üretilir, ikisi de klasörden bağımsızdır — sadece depo
+  içindeki konumları değişir. İşlem sırasında bir ağ hatası olursa
+  (nadir) klasörde hem eski hem yeni dosyalar kalmış olabilir; bu
+  durumda panel hata mesajında listeyi yenileyip GitHub'dan elle kontrol
+  etmeni önerir.
+- **Silme:** sadece **BOŞ** klasörler silinebilir (içinde `.gitkeep`
+  dışında dosya yoksa) — dolu bir klasörün "Sil" butonu otomatik olarak
+  devre dışı bırakılır ve üzerine gelince neden devre dışı olduğunu
+  açıklayan bir ipucu gösterir. Önce içindeki dosyaları başka bir klasöre
+  taşımalısın (Yeniden Adlandır ile) ya da tek tek silmelisin.
 
 ---
 
