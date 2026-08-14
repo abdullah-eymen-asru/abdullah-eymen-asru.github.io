@@ -24,6 +24,12 @@ permalink: "/hesap/giris.html"
       <label for="password">Şifre</label>
       <input id="password" name="password" type="password" autocomplete="current-password" required>
     </div>
+    <div class="form-field">
+      <label style="display:flex; gap:8px; align-items:center; flex-direction:row; font-size:0.9rem; color:var(--text);">
+        <input id="remember-me" name="remember_me" type="checkbox" checked>
+        <span>Oturumumu hatırla</span>
+      </label>
+    </div>
     <button type="submit" class="btn-primary">Giriş Yap</button>
   </form>
 
