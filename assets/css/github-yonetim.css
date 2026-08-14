@@ -377,6 +377,70 @@
   color: var(--accent);
 }
 
+/* Form içindeki kısa yardım/açıklama metni (örn. klasör seçici altında) */
+.gy-yardim-metni {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin: 6px 0 0;
+  line-height: 1.5;
+}
+
+/* "Klasörler" bölümü — yeni klasör oluşturma satırı */
+.gy-klasor-olustur {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.gy-klasor-olustur input {
+  flex: 1;
+  min-width: 220px;
+}
+
+/* "Klasörler" bölümü — klasör kartları (icerik-kart ile aynı desende) */
+.gy-klasor-kart {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.gy-klasor-kart-bilgi { min-width: 0; }
+.gy-klasor-kart-baslik {
+  font-weight: 600;
+}
+.gy-klasor-kart-meta {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.gy-klasor-kart-aksiyonlar {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.gy-klasor-kart-aksiyonlar button {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.gy-klasor-kart-aksiyonlar button:hover { border-color: var(--accent); }
+.gy-klasor-kart-aksiyonlar button.gy-klasor-sil-btn:hover:not(:disabled) {
+  border-color: #c0392b;
+  color: #c0392b;
+}
+.gy-klasor-kart-aksiyonlar button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .gy-liste-baslik {
   display: flex;
   align-items: baseline;
