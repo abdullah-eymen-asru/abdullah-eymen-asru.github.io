@@ -6,9 +6,9 @@ status: "Yayınlandı"
 summary: "Araştırmalarını yaptığım akademik çalışmaların kaynakçaları."
 link: "https://github.com/abdullah-eymen-asru/Akademik-Kaynaklar"
 link_label: "Kaynakçaları Görüntüle (See Bibliography)"
-yayinda: true            # zamanlanmış/gizli proje için — bkz. README.md
-sitemap: true             # yayinda:false ile BİRLİKTE yazılmalı — bkz. README.md
-permalink:   # gizli linkin adresi — bkz. README.md
+yayinda: true            # zamanlanmış/gizli proje için — bkz. rehber/01-site-rehberi.md § 9
+sitemap: true             # yayinda:false ile BİRLİKTE yazılmalı — bkz. rehber/01-site-rehberi.md § 9
+permalink:   # gizli linkin adresi — bkz. rehber/01-site-rehberi.md § 9
 ---
 
 Bu depo, YouTube kanalımda yayınladığım jeopolitik analizler, açık kaynak istihbaratı (OSINT) raporları ve veri odaklı araştırmaların arkasındaki akademik kaynakçaları ve veri setlerini barındırmaktadır. 
