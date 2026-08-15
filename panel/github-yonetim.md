@@ -253,20 +253,28 @@ permalink: "/panel/github-yonetim.html"
       </section>
 
       <section id="klasorler" class="panel-section">
-        <h2>Klasörler (<code>_posts/</code> altındaki alt klasörler)</h2>
+        <h2>Klasörler (<code id="kl-baslik-koleksiyon">_posts</code>/ altındaki alt klasörler)</h2>
         <p class="muted">
-          Blog yazıların <code>_posts/</code> altında alt klasörlerde tutulur
+          Blog yazıların <code>_posts/</code>, akademik projelerin ise
+          <code>_projects/</code> altında alt klasörlerde tutulur
           (varsayılan olarak yıla göre, örn. <code>_posts/2026/</code>) —
-          hangi klasörde durdukları yazının linkini (permalink'ini)
+          hangi klasörde durdukları içeriğin linkini (permalink'ini)
           ETKİLEMEZ, sadece depodaki dosya organizasyonunu ilgilendirir.
-          Burada yeni bir klasör oluşturabilir, mevcut bir klasörü yeniden
-          adlandırabilir (içindeki tüm dosyalar yeni klasöre taşınır) ya da
-          BOŞ bir klasörü silebilirsin. GitHub'da "gerçek" boş klasör
-          kavramı olmadığı için yeni klasör oluşturma işlemi, o klasörün
-          içine görünmez küçük bir <code>.gitkeep</code> dosyası ekleyerek
-          yapılır — bu dosya klasörü var eder ama sitede hiçbir şekilde
-          görünmez veya listelenmez.
+          Aşağıdan blog/akademik proje klasörleri arasında geçiş
+          yapabilirsin. Burada yeni bir klasör oluşturabilir, mevcut bir
+          klasörü yeniden adlandırabilir (içindeki tüm dosyalar yeni
+          klasöre taşınır) ya da BOŞ bir klasörü silebilirsin. GitHub'da
+          "gerçek" boş klasör kavramı olmadığı için yeni klasör oluşturma
+          işlemi, o klasörün içine görünmez küçük bir <code>.gitkeep</code>
+          dosyası ekleyerek yapılır — bu dosya klasörü var eder ama sitede
+          hiçbir şekilde görünmez veya listelenmez.
         </p>
+
+        <div class="gy-klasor-tur-sekmeleri" role="tablist" aria-label="Klasör türüne göre geçiş yap">
+          <button type="button" class="gy-klasor-tur-sekme active" data-klasor-tur="blog" role="tab" aria-selected="true">📰 Blog (<code>_posts/</code>)</button>
+          <button type="button" class="gy-klasor-tur-sekme" data-klasor-tur="proje" role="tab" aria-selected="false">🎓 Akademik Proje (<code>_projects/</code>)</button>
+        </div>
+
         <button id="kl-liste-yenile-btn" type="button" class="btn-primary" style="width:auto; margin-bottom:12px;">Klasörleri Yükle / Yenile</button>
 
         <div class="gy-klasor-olustur">
