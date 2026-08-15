@@ -27,16 +27,40 @@
  * Supabase'teki kullanıcı/rol/özel içerik sistemini yönetir; bu sayfa ise
  * GitHub Pages'in kendi statik Jekyll içeriğini (blog yazıları, akademik
  * projeler, profil fotoğrafı) yönetir. Erişim kontrolü: bu sayfaya
- * requireAuth({ role: 'editor' }) ile giriliyor (bkz. auth-guard.js) — bu,
- * hem role='editor' HEM role='admin' olan kullanıcıların girebilmesi
- * anlamına gelir (auth-guard.js'te "admin her zaman geçer" kuralı zaten
- * var, ayrıca bir değişiklik gerekmedi). role='user'/'special_user' olanlar
- * hâlâ giremez. Taslak tablosunun RLS politikası da bunu veritabanı
- * seviyesinde ayrıca zorunlu kılıyor — ama editor sadece KENDİ taslaklarını
- * ekleyip/düzenleyip/silebilir, admin hepsini yönetebilir (bkz. migration
- * 0014). Kullanıcı/rol yönetimi (panel/admin.md) HÂLÂ SADECE admin'e özel —
- * admin.js kendi requireAuth çağrısında role:'admin' istiyor, editor oraya
- * giremez (auth-guard.js otomatik olarak panel/panel.html'e yönlendirir).
+ * requireAuth({ role: ['editor','manager'] }) ile giriliyor (bkz.
+ * auth-guard.js) — bu, editor, manager (panelde "İçerik Sorumlusu") HEM DE
+ * admin olan kullanıcıların girebilmesi anlamına gelir (auth-guard.js'te
+ * "admin her zaman geçer" kuralı zaten var). role='user'/'special_user'
+ * olanlar hâlâ giremez. Taslak tablosunun RLS politikası da bunu veritabanı
+ * seviyesinde ayrıca zorunlu kılıyor — ama editor VE manager sadece KENDİ
+ * taslaklarını ekleyip/düzenleyip/silebilir, admin hepsini yönetebilir
+ * (bkz. migration 0014, is_editor_or_admin() migration 0016'da 'manager'ı
+ * da kapsayacak şekilde genişletildi). Kullanıcı/rol yönetimi
+ * (panel/admin.md) HÂLÂ SADECE admin'e özel — admin.js kendi requireAuth
+ * çağrısında role:['admin','manager'] ister ama manager girince
+ * "Kullanıcılar & Roller" sekmesini görmez (bkz. admin.js).
+ *
+ * ÖNEMLİ — "ADMİN ADINA YAYINLA" ONAY SÜRECİ (manager rolüne özel):
+ *   manager (İçerik Sorumlusu), bir içeriği Admin'in adıyla yayınlamak
+ *   isterse "Admin adına yayınla (onay gerekir)" kutusunu işaretler (bkz.
+ *   wireAdminAdinaTalep). Bu durumda:
+ *     - "Yayında" anahtarı ve "GitHub'a gizli commit et (eski yöntem)"
+ *       seçeneği bu panelde DEVRE DIŞI bırakılır — içerik SADECE gizli bir
+ *       Supabase taslağı olarak kaydedilebilir (icerikSupabaseeYaz).
+ *     - Veritabanı tetikleyicisi (migration 0016 §6), admin onaylamadan bu
+ *       içeriğin GERÇEKTEN yayında bir duruma geçmesini zaten engeller —
+ *       yani bu panel kısıtlaması bir güvenlik sınırı değil, kullanıcıyı
+ *       veritabanının zaten reddedeceği bir işlemi denemekten önceden
+ *       caydıran bir KOLAYLIK katmanıdır.
+ *     - Admin, "Mevcut İçerikler" listesinde onay bekleyen kartlarda görünen
+ *       "✅ Onayla" / "❌ Reddet" butonlarıyla karar verir (bkz.
+ *       icerikKartiCiz). Onaylanınca içerik normal "Yayınla" butonuyla
+ *       (admin veya manager tarafından) GitHub'a/Supabase'e yayınlanabilir.
+ *     - DÜRÜSTLÜK PAYI: manager'a bu repo için yazma izni olan bir GitHub
+ *       PAT verirsen, teknik olarak bu panelin DIŞINDA GitHub API'sine
+ *       doğrudan da commit atabilir — bu, zaten var olan editor rolü için
+ *       de aynı derecede geçerli olan mimari bir sınırdır (bkz. dosya
+ *       başındaki PAT notu), bu özellik bunu değiştirmez.
  *
  * GÜVENLİK NOTU — GitHub Personal Access Token (PAT):
  *   Token SADECE bu modülün belleğinde (PAT_BELLEK değişkeni) tutulur.
@@ -89,8 +113,12 @@ let PROFIL_SHA = null;
 // (bkz. wireYazarAlani).
 let GIRIS_YAPAN_PROFIL = null;
 
+// "Admin adına yayınla" kutusu işaretliyken hedef admin'in {id, ad} bilgisi
+// (bkz. wireAdminAdinaTalep / yazarBilgisiniAl). null ise talep aktif değil.
+let ADMIN_ADINA_HEDEF = null;
+
 async function init() {
-  const { profile } = await requireAuth({ role: "editor" });
+  const { profile } = await requireAuth({ role: ["editor", "manager"] });
   GIRIS_YAPAN_PROFIL = profile;
   document.getElementById("loading")?.setAttribute("hidden", "");
   document.getElementById("app").hidden = false;
@@ -103,6 +131,7 @@ async function init() {
     ["bölüm navigasyonu", () => wireSectionNav()],
     ["içerik türü", () => wireIcerikTuruToggle()],
     ["yazar alanı", () => wireYazarAlani()],
+    ["admin adına yayın isteği", () => wireAdminAdinaTalep()],
     ["editör araç çubuğu", () => wireEditorToolbar()],
     ["bağlantı doğrulama", () => wireBaglantiDogrula()],
     ["içerik formu", () => wireIcerikForm()],
@@ -441,7 +470,7 @@ async function wireYazarAlani() {
     return;
   }
 
-  // admin: içerik yönetebilen herkes (admin + editor) arasından yazar seçebilir.
+  // admin: içerik yönetebilen herkes (admin + editor + manager) arasından yazar seçebilir.
   girdi.hidden = true;
   secim.hidden = false;
   secim.innerHTML = '<option value="">Yükleniyor…</option>';
@@ -449,14 +478,15 @@ async function wireYazarAlani() {
     const { data, error } = await supabase
       .from("profiles")
       .select("id, full_name, email, role")
-      .in("role", ["admin", "editor"])
+      .in("role", ["admin", "editor", "manager"])
       .order("full_name", { ascending: true });
     if (error) throw error;
 
+    const ROL_ETIKETI = { admin: "Yönetici", editor: "Editör", manager: "İçerik Sorumlusu" };
     secim.innerHTML = (data || [])
       .map((p) => {
         const ad = p.full_name || p.email;
-        return `<option value="${p.id}" data-ad="${escapeHtml(ad)}">${escapeHtml(ad)} (${p.role === "admin" ? "Yönetici" : "Editör"})</option>`;
+        return `<option value="${p.id}" data-ad="${escapeHtml(ad)}">${escapeHtml(ad)} (${ROL_ETIKETI[p.role] || p.role})</option>`;
       })
       .join("");
 
@@ -469,8 +499,90 @@ async function wireYazarAlani() {
   }
 }
 
+/**
+ * "Admin adına yayınla (onay gerekir)" özelliği — SADECE role='manager'
+ * (panelde "İçerik Sorumlusu") için. editor ve admin bu kutuyu hiç görmez:
+ * editor zaten sadece kendi adına yazabilir (yukarıdaki wireYazarAlani),
+ * admin'in ise zaten kendi adına doğrudan yazma yetkisi var, onaya ihtiyacı
+ * yok. Kutu işaretlenince:
+ *   - Yazar, GİRİŞ YAPAN KİŞİ DEĞİL, seçilen admin olarak kaydedilir
+ *     (bkz. yazarBilgisiniAl) ve satıra admin_adina_talep=true eklenir
+ *     (bkz. icerikKaydet → icerikSupabaseeYaz/icerikSadeceSupabaseeYayinla/
+ *     icerikSupabaseVeGithubaYaz).
+ *   - "Yayında" anahtarı kapatılıp kilitlenir ve "GitHub'a gizli commit et
+ *     (eski yöntem)" seçeneği devre dışı bırakılır — içerik SADECE gizli
+ *     bir Supabase taslağı olarak kaydedilebilir; admin onaylamadan
+ *     GERÇEKTEN yayına alınamaz (veritabanı tetikleyicisi de bunu ayrıca
+ *     zorunlu kılar, bkz. migration 0016 §6 — bu, o kuralın istemci
+ *     tarafındaki bir kolaylık yansımasıdır, güvenlik sınırı DEĞİLDİR).
+ */
+async function wireAdminAdinaTalep() {
+  const sarmalayici = document.getElementById("ic-admin-adina-wrap");
+  if (!sarmalayici || !GIRIS_YAPAN_PROFIL) return;
+
+  if (GIRIS_YAPAN_PROFIL.role !== "manager") {
+    sarmalayici.hidden = true;
+    return;
+  }
+
+  const kutu = document.getElementById("ic-admin-adina-kutu");
+  const hedefSecim = document.getElementById("ic-admin-adina-hedef");
+  const yayindaAnahtari = document.getElementById("ic-yayinda");
+  const gizliHedefGithubRadio = document.querySelector('input[name="gizli-hedef"][value="github"]');
+  if (!kutu || !hedefSecim) return;
+
+  sarmalayici.hidden = false;
+
+  try {
+    const { data, error } = await supabase.from("profiles").select("id, full_name, email").eq("role", "admin");
+    if (error) throw error;
+    const adminler = data || [];
+    hedefSecim.innerHTML = adminler
+      .map((p) => `<option value="${p.id}" data-ad="${escapeHtml(p.full_name || p.email)}">${escapeHtml(p.full_name || p.email)}</option>`)
+      .join("");
+    // Tek admin varsa seçim kutusunu gizle, "X adına" metnini otomatik göster.
+    hedefSecim.hidden = adminler.length <= 1;
+  } catch (err) {
+    console.error("Admin listesi yüklenemedi (admin adına yayınla):", err);
+    hedefSecim.innerHTML = "";
+  }
+
+  const uygula = () => {
+    const aktif = kutu.checked;
+    hedefSecim.style.display = aktif && !hedefSecim.hidden ? "" : "none";
+    ADMIN_ADINA_HEDEF = aktif
+      ? { id: hedefSecim.value || null, ad: hedefSecim.selectedOptions?.[0]?.dataset.ad || "" }
+      : null;
+
+    // "Yayında" anahtarını kapat + kilitle: admin onaylamadan bu içerik
+    // gerçekten yayına alınamaz, o yüzden formda hiç seçenek olarak
+    // sunulmuyor.
+    if (yayindaAnahtari) {
+      if (aktif) yayindaAnahtari.checked = false;
+      yayindaAnahtari.disabled = aktif;
+      yayindaAnahtari.dispatchEvent(new Event("change"));
+    }
+    // "GitHub'a gizli commit et (eski yöntem)" seçeneği bu panelin DIŞINDA,
+    // Supabase'i hiç görmeden doğrudan GitHub'a commit atar — admin onay
+    // sürecini tamamen atlar, o yüzden "admin adına" talebi aktifken
+    // devre dışı bırakılıp "Supabase'te taslak" seçeneğine zorlanıyor.
+    if (gizliHedefGithubRadio) {
+      gizliHedefGithubRadio.disabled = aktif;
+      if (aktif && gizliHedefGithubRadio.checked) {
+        const supabaseRadio = document.querySelector('input[name="gizli-hedef"][value="supabase"]');
+        if (supabaseRadio) supabaseRadio.checked = true;
+      }
+    }
+  };
+
+  kutu.addEventListener("change", uygula);
+  hedefSecim.addEventListener("change", uygula);
+  uygula();
+}
+
 /** Formda o an seçili/girilmiş yazar bilgisini { id, ad } olarak döner. */
 function yazarBilgisiniAl() {
+  if (ADMIN_ADINA_HEDEF) return ADMIN_ADINA_HEDEF;
   const secim = document.getElementById("ic-yazar-secim");
   const girdi = document.getElementById("ic-yazar-adi");
   if (secim && !secim.hidden) {
@@ -1421,6 +1533,11 @@ function duzenlemeyiIptalEt() {
   // input'un JS ile atanmış değerini, native reset bunu bilmediği için)
   // boşaltmış olabilir — kendi adıyla yeniden doldur.
   wireYazarAlani();
+  // "Admin adına yayınla" kutusu da form.reset() ile işaretsiz hâle
+  // döndü ama ADMIN_ADINA_HEDEF değişkeni ve "Yayında"/"gizli-hedef"
+  // kilitleri hâlâ eski durumda kalabilir — change olayını tetikleyip
+  // uygula()'yı yeniden çalıştırıyoruz.
+  document.getElementById("ic-admin-adina-kutu")?.dispatchEvent(new Event("change"));
 }
 
 const SECENEK_BUTON_ID = {
@@ -1448,6 +1565,10 @@ async function icerikKaydet(secenek = "a") {
     showMessage(msgEl, "Yazar bilgisi belirlenemedi (profil adı boş) — lütfen bir yazar seç/yaz.", "error");
     return;
   }
+  if (ADMIN_ADINA_HEDEF && !ADMIN_ADINA_HEDEF.id) {
+    showMessage(msgEl, '"Admin adına yayınla" işaretli ama hedef admin seçilmedi.', "error");
+    return;
+  }
 
   const slugGirdi = document.getElementById("ic-slug").value.trim();
   const slug = slugOlustur(slugGirdi || title);
@@ -1460,7 +1581,7 @@ async function icerikKaydet(secenek = "a") {
   const yilOneki = tur === "proje" && document.getElementById("ic-yil-oneki").checked;
   const klasor = klasorSecimDegeriniAl();
 
-  const alan = { title, date, author: yazar.ad, yazarId: yazar.id };
+  const alan = { title, date, author: yazar.ad, yazarId: yazar.id, adminAdinaTalep: !!ADMIN_ADINA_HEDEF };
   if (tur === "proje") {
     alan.venue = document.getElementById("ic-venue").value.trim();
     alan.status = document.getElementById("ic-status").value;
@@ -1643,6 +1764,9 @@ async function icerikSupabaseeYaz(tur, alan, gizliKod, govde, slug, dosyaYolu, m
     yayin_durumu: "taslak",
     yazar_id: alan.yazarId || null,
     yazar_adi: alan.author || null,
+    // "Admin adına yayınla" onay süreci (bkz. migration 0016 / wireAdminAdinaTalep)
+    // — sunucu tarafındaki tetikleyici admin_onay_durumu'nu buna göre otomatik ayarlar.
+    admin_adina_talep: alan.adminAdinaTalep === true,
   };
 
   let taslakSonuc;
@@ -1739,6 +1863,9 @@ async function icerikSadeceSupabaseeYayinla(tur, alan, gizliKod, govde, slug, do
     yayin_durumu: "sadece_supabase",
     yazar_id: alan.yazarId || null,
     yazar_adi: alan.author || null,
+    // "Admin adına yayınla" onay süreci (bkz. migration 0016 / wireAdminAdinaTalep)
+    // — sunucu tarafındaki tetikleyici admin_onay_durumu'nu buna göre otomatik ayarlar.
+    admin_adina_talep: alan.adminAdinaTalep === true,
   };
 
   let taslakSonuc;
@@ -1829,6 +1956,9 @@ async function icerikSupabaseVeGithubaYaz(tur, alan, gizliKod, govde, slug, dosy
     yayin_durumu: "supabase_ve_github",
     yazar_id: alan.yazarId || null,
     yazar_adi: alan.author || null,
+    // "Admin adına yayınla" onay süreci (bkz. migration 0016 / wireAdminAdinaTalep)
+    // — sunucu tarafındaki tetikleyici admin_onay_durumu'nu buna göre otomatik ayarlar.
+    admin_adina_talep: alan.adminAdinaTalep === true,
   };
 
   let taslakSonuc;
@@ -2016,7 +2146,13 @@ function taslakToItem(row) {
       slug: row.slug,
       dosya_yolu: row.dosya_yolu,
       yazar_adi: row.yazar_adi,
+      yazar_id: row.yazar_id,
       yayin_durumu: row.yayin_durumu,
+      // "Admin adına yayınla" onay süreci (bkz. migration 0016) — manager
+      // (İçerik Sorumlusu) rolündeki bir kullanıcı bu talebi işaretlediyse
+      // dolar; icerikKartiCiz bu alanlara göre onay rozeti/butonu gösterir.
+      admin_adina_talep: row.admin_adina_talep,
+      admin_onay_durumu: row.admin_onay_durumu,
     },
     body: row.govde || "",
   };
@@ -2266,6 +2402,13 @@ function icerikKartiCiz(item, tur) {
   const supabaseYedekRozet = item.supabaseYedek
     ? `<span class="gy-rozet gy-rozet--gizli" title="Bu içeriğin GitHub'daki hâlinin yanında Supabase'te de bir yedek/arama kaydı var (Seçenek B ile yayınlandı).">🗄️ Supabase yedeği</span>`
     : "";
+  // "Admin adına yayınla" onay rozeti (bkz. migration 0016 / wireAdminAdinaTalep).
+  const ONAY_ROZET = {
+    beklemede: '<span class="gy-rozet gy-rozet--gizli" title="Bu içerik Admin adına yayınlanmak üzere hazırlandı, admin onayı bekliyor.">⏳ Admin onayı bekliyor</span>',
+    onaylandi: '<span class="gy-rozet gy-rozet--yayinda" title="Admin bu içeriği kendi adına yayınlanması için onayladı.">✅ Admin onayladı</span>',
+    reddedildi: '<span class="gy-rozet gy-rozet--gizli" title="Admin bu içeriğin kendi adına yayınlanma talebini reddetti.">❌ Admin reddetti</span>',
+  };
+  const onayRozet = item.data.admin_adina_talep ? ONAY_ROZET[item.data.admin_onay_durumu] || "" : "";
   const ozet = item.data.summary
     ? `<div class="gy-icerik-kart-ozet">${metniVurgula(item.data.summary)}</div>`
     : "";
@@ -2295,15 +2438,33 @@ function icerikKartiCiz(item, tur) {
   //    (aynı işlemi yapar — GitHub'daki dosya artık bu yeni sistemde bulunmaması gereken bir
   //    yerde durduğu için Supabase'e taşınır).
   let durumBtn;
+  // Admin onayı bekleyen/reddedilmiş bir "admin adına" talebi, admin
+  // OLMAYAN biri gerçekten yayına alamaz — düğme devre dışı bırakılıp
+  // sebebi title'da gösteriliyor (bkz. migration 0016 §6'daki DB
+  // tetikleyicisi zaten aynı kuralı zorunlu kılıyor, bu sadece kullanıcıyı
+  // önceden bilgilendiren bir kolaylık katmanı).
+  const onayEksikDegilMi =
+    item.data.admin_adina_talep &&
+    item.data.admin_onay_durumu !== "onaylandi" &&
+    GIRIS_YAPAN_PROFIL?.role !== "admin";
+  const kilitliOznitelik = onayEksikDegilMi
+    ? `disabled title="Bu içerik admin onayı ${item.data.admin_onay_durumu === "reddedildi" ? "reddedildiği için" : "bekleniyor olduğu için"} henüz yayınlanamaz."`
+    : "";
   if (item.kaynak === "supabase" && sadeceSupabaseYayinda) {
-    durumBtn = '<button type="button" class="gy-durum-degistir-btn gy-durum-degistir-btn--yayinla" data-hedef="yayinla">GitHub\'a da Aktar</button>';
+    durumBtn = `<button type="button" class="gy-durum-degistir-btn gy-durum-degistir-btn--yayinla" data-hedef="yayinla" ${kilitliOznitelik}>GitHub'a da Aktar</button>`;
   } else if (item.kaynak === "supabase") {
-    durumBtn = '<button type="button" class="gy-durum-degistir-btn gy-durum-degistir-btn--yayinla" data-hedef="yayinla">Yayınla</button>';
+    durumBtn = `<button type="button" class="gy-durum-degistir-btn gy-durum-degistir-btn--yayinla" data-hedef="yayinla" ${kilitliOznitelik}>Yayınla</button>`;
   } else if (yayinda) {
     durumBtn = '<button type="button" class="gy-durum-degistir-btn" data-hedef="gizle">Yayından Kaldır</button>';
   } else {
     durumBtn = '<button type="button" class="gy-durum-degistir-btn gy-durum-degistir-btn--yayinla" data-hedef="tasi">Supabase\'e Taşı</button>';
   }
+  // Admin, onay bekleyen bir talebi burada doğrudan onaylayabilir/reddedebilir.
+  const onayBtns =
+    GIRIS_YAPAN_PROFIL?.role === "admin" && item.data.admin_adina_talep && item.data.admin_onay_durumu === "beklemede"
+      ? `<button type="button" class="gy-onay-btn" data-onay="1">✅ Onayla</button>
+         <button type="button" class="gy-onay-btn gy-onay-btn--red" data-onay="0">❌ Reddet</button>`
+      : "";
   const linkBtn = onizlemeLink
     ? `<button type="button" class="gy-link-kopyala-mini-btn" title="${escapeHtml(onizlemeLink)}">🔗 Linki Kopyala</button>`
     : "";
@@ -2312,11 +2473,12 @@ function icerikKartiCiz(item, tur) {
 
   kart.innerHTML = `
     <div class="gy-icerik-kart-bilgi">
-      <div class="gy-icerik-kart-baslik">${metniVurgula(item.data.title || yolGoster)}${rozet}${kaynakRozet}${supabaseYedekRozet}</div>
+      <div class="gy-icerik-kart-baslik">${metniVurgula(item.data.title || yolGoster)}${rozet}${kaynakRozet}${supabaseYedekRozet}${onayRozet}</div>
       <div class="gy-icerik-kart-meta">${escapeHtml(item.data.date || "")} · ${metniVurgula(yolGoster)}${yazarSatiri}</div>
       ${ozet}
     </div>
     <div class="gy-icerik-kart-aksiyonlar">
+      ${onayBtns}
       ${durumBtn}
       ${linkBtn}
       <button type="button" class="gy-duzenle-btn">Düzenle</button>
@@ -2325,12 +2487,16 @@ function icerikKartiCiz(item, tur) {
   `;
   kart.querySelector(".gy-duzenle-btn").addEventListener("click", () => icerikDuzenlemeyeYukle(item, tur));
   kart.querySelector(".gy-sil-btn").addEventListener("click", () => icerikSil(item));
-  kart.querySelector(".gy-durum-degistir-btn").addEventListener("click", (e) => {
+  kart.querySelector(".gy-durum-degistir-btn")?.addEventListener("click", (e) => {
+    if (e.currentTarget.disabled) return;
     if (item.kaynak === "supabase") {
       taslagiYayinla(item, tur, e.currentTarget);
     } else {
       gitDenTaslagaTasi(item, tur, e.currentTarget);
     }
+  });
+  kart.querySelectorAll(".gy-onay-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => adminTaslakOnayla(item, tur, e.currentTarget.dataset.onay === "1", e.currentTarget));
   });
   const linkKopyalaBtn = kart.querySelector(".gy-link-kopyala-mini-btn");
   if (linkKopyalaBtn) {
@@ -2353,6 +2519,32 @@ function icerikKartiCiz(item, tur) {
  * kaydedilirken seçilen klasör dahil, item.data.dosya_yolu) commit atar,
  * başarılı olursa taslak satırını Supabase'den siler.
  */
+/**
+ * Admin, "admin adına" onay bekleyen bir taslağı burada onaylar/reddeder
+ * (bkz. admin_taslak_onayla RPC'si, migration 0016 §7). Onaylandıktan
+ * sonra içerik normal "Yayınla" butonuyla (admin veya isteği yapan manager
+ * tarafından) gerçekten yayına alınabilir hâle gelir.
+ */
+async function adminTaslakOnayla(item, tur, onay, btn) {
+  if (GIRIS_YAPAN_PROFIL?.role !== "admin" || !item.taslakId) return;
+  btn.disabled = true;
+  const oncekiMetin = btn.textContent;
+  btn.textContent = "İşleniyor…";
+  try {
+    const { error } = await supabase.rpc("admin_taslak_onayla", {
+      p_taslak_id: item.taslakId,
+      p_onay: onay,
+    });
+    if (error) throw error;
+    await icerikListesiYukle();
+  } catch (err) {
+    console.error("Onay/red işlemi başarısız:", err);
+    alert(`İşlem başarısız: ${err.message}`);
+    btn.disabled = false;
+    btn.textContent = oncekiMetin;
+  }
+}
+
 async function taslagiYayinla(item, tur, btn) {
   // "sadece_supabase" (zaten GERÇEKTEN yayında) bir satır için bu buton
   // "GitHub'a da Aktar" anlamına gelir — içerik Supabase'te yayında kalmaya
@@ -2526,6 +2718,18 @@ async function icerikDuzenlemeyeYukle(item, tur) {
   if (yazarSecim && !yazarSecim.hidden && item.data.yazar_adi) {
     const eslesenSecenek = Array.from(yazarSecim.options).find((o) => o.dataset.ad === item.data.yazar_adi);
     if (eslesenSecenek) yazarSecim.value = eslesenSecenek.value;
+  }
+
+  // "Admin adına yayınla" durumunu geri yükle (sadece manager rolünde
+  // görünen kutu — bkz. wireAdminAdinaTalep).
+  const adminAdinaKutu = document.getElementById("ic-admin-adina-kutu");
+  if (adminAdinaKutu && !document.getElementById("ic-admin-adina-wrap")?.hidden) {
+    adminAdinaKutu.checked = item.data.admin_adina_talep === true;
+    if (item.data.admin_adina_talep && item.data.yazar_id) {
+      const hedefSecim = document.getElementById("ic-admin-adina-hedef");
+      if (hedefSecim) hedefSecim.value = item.data.yazar_id;
+    }
+    adminAdinaKutu.dispatchEvent(new Event("change"));
   }
 
   document.querySelector(`input[name="icerik-turu"][value="${tur}"]`).checked = true;
