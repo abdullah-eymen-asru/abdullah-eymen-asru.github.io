@@ -82,7 +82,14 @@ function guncelleAdSoyadBasligi(profile) {
 }
 
 function rolEtiketi(role) {
-  return { admin: "Yönetici", special_user: "Özel Üye", user: "Üye" }[role] ?? role;
+  // BUG FİX: bu haritada 'editor' hiç yoktu (fallback olarak ham 'editor'
+  // metni görünüyordu) — 'manager' (İçerik Sorumlusu) rolü eklenirken o da
+  // dahil edildi.
+  return (
+    { admin: "Yönetici", special_user: "Özel Üye", user: "Üye", editor: "Editör", manager: "İçerik Sorumlusu" }[
+      role
+    ] ?? role
+  );
 }
 
 function wireProfileForm(profile) {
