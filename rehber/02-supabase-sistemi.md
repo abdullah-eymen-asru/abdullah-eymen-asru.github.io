@@ -440,6 +440,22 @@ projelerinde bu özellik zaten açıktır; kapalıysa Dashboard →
 Authentication"** bölümünden **"Authenticator App (TOTP)"** seçeneğini aç.
 Üyeler kendi isteğiyle etkinleştirir/kaldırır, zorunlu değildir.
 
+**Yedek/kurtarma kodları:** 2FA etkinleştirildiği anda (ve panelden
+istenildiği zaman) 8 adet tek seferlik yedek kod üretilir — authenticator
+uygulamasına erişim kaybedilirse (telefon değişimi, uygulama silinmesi
+vb.) girişte bu kodlardan biriyle devam edilebilir. Bu, Supabase Auth'un
+yerleşik MFA API'sinin **desteklemediği** bir özellik olduğu için ayrı bir
+migration ile eklendi: `supabase/migrations/0017_2fa_yedek_kodlar.sql`
+(tablo + `yedek_kodlar_olustur()` / `yedek_kod_durumu()` /
+`yedek_kod_ile_2fa_kaldir()` / `yedek_kodlar_temizle()` fonksiyonları).
+Kodların yalnızca SHA-256 hash'i saklanır; düz metin kod sadece üretildiği
+an panelde gösterilir ve kısa süreli bir `.txt` indirmesiyle sunulur (bkz.
+`panel.js` → `yedekKodlariGosterVeIndir`). Girişte "Authenticator'a
+erişemiyorum" bağlantısına tıklayıp doğru bir yedek kod girmek, hesaptaki
+2FA'yı kaldırır (kullanıcıya panelden tekrar kurması önerilir) — bkz.
+`auth-pages.js` → `mfaKoduIste()`. Bu migration'ı da diğerleri gibi
+Supabase Dashboard → SQL Editor'den çalıştırman gerekiyor.
+
 ---
 
 ## Adım 6 — CSP / `_headers` Kontrolü
