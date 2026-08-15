@@ -252,6 +252,19 @@ async function ghRequest(path, options = {}) {
   if (!owner || !repo) throw new Error("GitHub kullanıcı adı ve repo adı gerekli.");
   return fetch(`${GITHUB_API}/repos/${owner}/${repo}${path}`, {
     ...options,
+    // ÖNEMLİ — "cache: no-store" OLMADAN tarayıcı, GitHub'ın Contents API
+    // yanıtlarını (aynı URL'ye tekrar istek atıldığında) kendi HTTP
+    // önbelleğinden döndürebiliyordu. Bu panel bir "canlı" içerik yönetim
+    // aracı olduğundan bu YIKICI bir sorundu: örn. bir klasör oluşturduktan
+    // hemen sonra listeyi tazelemek eski (klasörün henüz olmadığı) veriyi
+    // gösteriyordu; bir yazı sildikten sonra listeyi tazelemek dosyayı hâlâ
+    // orada gösterip tek tek okurken "okunamadı" hatası veriyordu (çünkü
+    // klasör listesi önbellekten geliyordu ama tekil dosya isteği gerçek
+    // GitHub'a gidip 404 dönüyordu); bir klasörün gerçekten boş olup
+    // olmadığı (silme butonunun aktif olup olmayacağı) da eski veriyle
+    // hesaplanabiliyordu. "no-store" ile HER istek doğrudan ağa gider,
+    // hiçbir ara katmanda önbelleklenmez.
+    cache: "no-store",
     headers: {
       Authorization: `token ${PAT_BELLEK}`,
       Accept: "application/vnd.github+json",
@@ -1079,6 +1092,51 @@ function frontMatterOku(ham) {
  * Bu, klasörlemeden bağımsız, isteğe bağlı ayrı bir tercih — ikisi
  * birlikte de kullanılabilir.
  */
+/* ---------------------------------------------------------------------- */
+/* .GITKEEP YAŞAM DÖNGÜSÜ — bir klasöre gerçek içerik girince .gitkeep     */
+/* temizlenir, klasörün SON gerçek dosyası da silinince .gitkeep geri     */
+/* eklenir (aksi halde GitHub'da "boş klasör" diye bir şey olmadığından   */
+/* klasör depodan tamamen kaybolur ve "📁 Klasörler" listesinde de artık  */
+/* görünmez olurdu). Her iki fonksiyon da KOZMETİK bir iyileştirmedir;    */
+/* başarısız olurlarsa (ör. .gitkeep zaten yok/var) sessizce yutulur,     */
+/* çağıran asıl işlemi (içerik kaydetme/silme) ASLA başarısız kılmazlar.  */
+/* ---------------------------------------------------------------------- */
+
+/** Bir dosya yolundan onu içeren klasörün yolunu döner (ör. "_posts/2026/x.md" -> "_posts/2026"). */
+function ustKlasorYolu(dosyaYolu) {
+  const parcalar = dosyaYolu.split("/");
+  parcalar.pop();
+  return parcalar.join("/");
+}
+
+/** Verilen klasörde artık gerçek içerik olduğu için, oradaki .gitkeep dosyasını (varsa) siler. */
+async function klasordekiGitkeepiTemizle(klasorYolu) {
+  try {
+    const gitkeep = await ghGetContents(`${klasorYolu}/.gitkeep`);
+    if (gitkeep) {
+      await ghDeleteFile(`${klasorYolu}/.gitkeep`, gitkeep.sha, `.gitkeep temizlendi: ${klasorYolu}/`);
+    }
+  } catch (err) {
+    console.error(`.gitkeep temizlenemedi (${klasorYolu}):`, err);
+  }
+}
+
+/** Bir dosya silindikten sonra klasörde başka hiç gerçek dosya kalmadıysa, klasörü korumak için .gitkeep geri ekler. */
+async function klasorBosaldiysaGitkeepEkle(klasorYolu) {
+  try {
+    const icerik = await ghGetContents(klasorYolu);
+    const gercekVarMi = Array.isArray(icerik) && icerik.some((f) => f.type === "file" && f.name !== ".gitkeep");
+    if (!gercekVarMi) {
+      const zatenVarMi = Array.isArray(icerik) && icerik.some((f) => f.name === ".gitkeep");
+      if (!zatenVarMi) {
+        await ghPutFile(`${klasorYolu}/.gitkeep`, b64Encode(GITKEEP_ICERIK), `Klasör boşaldı, .gitkeep geri eklendi: ${klasorYolu}/`);
+      }
+    }
+  } catch (err) {
+    console.error(`.gitkeep geri eklenemedi (${klasorYolu}):`, err);
+  }
+}
+
 function dosyaYoluHesapla(tur, tarih, slug, yilOneki, klasor) {
   const yil = tarih.slice(0, 4);
   const kokKlasor = tur === "blog" ? "_posts" : "_projects";
@@ -1293,8 +1351,14 @@ async function icerikGitHubaYaz(tur, alan, gizliKod, govde, dosyaYolu, msgEl) {
     // Düzenleme sırasında GİT dosyasının yolu değiştiyse eski dosyayı sil (yeniden adlandırma).
     if (DUZENLENEN_YOL && DUZENLENEN_YOL !== dosyaYolu && DUZENLENEN_SHA) {
       await ghDeleteFile(DUZENLENEN_YOL, DUZENLENEN_SHA, `Yeniden adlandırıldı: ${DUZENLENEN_YOL} -> ${dosyaYolu}`);
+      // Eski klasör bu taşımayla boşaldıysa (yeniden adlandırma öncesi
+      // klasörü değiştiyse), o klasörü korumak için .gitkeep geri eklenir.
+      await klasorBosaldiysaGitkeepEkle(ustKlasorYolu(DUZENLENEN_YOL));
     }
   }
+
+  // Hedef klasörde artık bu gerçek içerik var, orada duran .gitkeep varsa temizlenir.
+  await klasordekiGitkeepiTemizle(ustKlasorYolu(dosyaYolu));
 
   // Supabase'teki bir taslak yayınlanıyorsa, artık GitHub'da yaşadığı için taslak satırı silinir.
   if (DUZENLENEN_TASLAK_ID) {
@@ -1362,6 +1426,7 @@ async function icerikSupabaseeYaz(tur, alan, gizliKod, govde, slug, dosyaYolu, m
   if (DUZENLENEN_YOL) {
     try {
       await ghDeleteFile(DUZENLENEN_YOL, DUZENLENEN_SHA, `Supabase'e taşındı (yayından kaldırıldı): ${DUZENLENEN_YOL}`);
+      await klasorBosaldiysaGitkeepEkle(ustKlasorYolu(DUZENLENEN_YOL));
     } catch (e) {
       gitSilmeHatasi = e;
       console.error("Eski GitHub dosyası silinemedi:", e);
@@ -1793,6 +1858,8 @@ async function taslagiYayinla(item, tur, btn) {
 
     const mevcutHedef = await ghGetContents(dosyaYolu).catch(() => null);
     await ghPutFile(dosyaYolu, b64Encode(dosyaIcerigi), `Yayınlandı: ${dosyaYolu}`, mevcutHedef?.sha || null);
+    // Hedef klasörde artık bu gerçek içerik var, orada duran .gitkeep varsa temizlenir.
+    await klasordekiGitkeepiTemizle(ustKlasorYolu(dosyaYolu));
 
     const { error } = await supabase.from("taslak_icerikler").delete().eq("id", item.taslakId);
     if (error) console.error("Taslak satırı silinemedi (dosya GitHub'a başarıyla yayınlandı):", error);
@@ -1855,6 +1922,7 @@ async function gitDenTaslagaTasi(item, tur, btn) {
     if (upsertHata) throw new Error(upsertHata.message);
 
     await ghDeleteFile(item.path, item.sha, `Supabase'e taşındı (yayından kaldırıldı): ${item.path}`);
+    await klasorBosaldiysaGitkeepEkle(ustKlasorYolu(item.path));
     await icerikListesiYukle();
   } catch (err) {
     alert(`İşlem başarısız: ${err.message}`);
@@ -1871,7 +1939,18 @@ async function icerikSil(item) {
       if (error) throw new Error(error.message);
     } else {
       await ghDeleteFile(item.path, item.sha, `İçerik silindi: ${item.path}`);
+      // Klasör bu silinen dosyayla birlikte tamamen boşaldıysa, GitHub'da
+      // "boş klasör" diye bir kavram olmadığından klasörün depodan
+      // tamamen kaybolmaması için oraya .gitkeep geri eklenir (bkz. dosya
+      // başındaki .gitkeep yaşam döngüsü notu).
+      await klasorBosaldiysaGitkeepEkle(ustKlasorYolu(item.path));
     }
+    // Silinen öğeyi listeden HEMEN kaldır — "okunamadı" rozetiyle listede
+    // hayalet olarak kalmasını önler (bkz. ghRequest'teki cache notu: bu
+    // yerel kaldırma, olası bir gecikme/tutarlılık sorununa karşı ek bir
+    // güvence, tek başına yeterli olan asıl düzeltme değil).
+    TUM_ICERIKLER = TUM_ICERIKLER.filter((i) => itemAnahtari(i) !== itemAnahtari(item));
+    listeyiYenidenCiz();
     await icerikListesiYukle();
   } catch (err) {
     alert(`Silinemedi: ${err.message}`);
