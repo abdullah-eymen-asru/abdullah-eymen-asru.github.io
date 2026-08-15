@@ -179,39 +179,73 @@ async function mfaKoduIste(msg, hedefUrl) {
     mfaKutu = document.createElement("div");
     mfaKutu.id = "mfa-giris-kutu";
     mfaKutu.innerHTML = `
-      <p class="muted" style="margin-bottom:12px;">
+      <p class="muted" id="mfa-giris-aciklama" style="margin-bottom:12px;">
         Hesabında iki adımlı doğrulama (2FA) açık. Authenticator
         uygulamandaki 6 haneli kodu gir.
       </p>
       <div class="form-field">
-        <label for="mfa-giris-kod">Doğrulama kodu</label>
+        <label for="mfa-giris-kod" id="mfa-giris-label">Doğrulama kodu</label>
         <input id="mfa-giris-kod" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456">
       </div>
       <button type="button" id="mfa-giris-dogrula-btn" class="btn-primary">Doğrula ve Giriş Yap</button>
+      <p style="margin-top:12px;">
+        <a href="#" id="mfa-yedek-kod-toggle" style="font-size:0.9rem;">Authenticator'a erişemiyorum, yedek kod kullanacağım</a>
+      </p>
     `;
     authBox?.appendChild(mfaKutu);
   }
   mfaKutu.removeAttribute("hidden");
 
   const kodInput = document.getElementById("mfa-giris-kod");
+  const kodLabel = document.getElementById("mfa-giris-label");
+  const aciklama = document.getElementById("mfa-giris-aciklama");
   const dogrulaBtn = document.getElementById("mfa-giris-dogrula-btn");
+  const toggleLink = document.getElementById("mfa-yedek-kod-toggle");
   kodInput?.focus();
 
-  const dogrula = async () => {
-    const kod = kodInput.value.trim();
-    if (!/^\d{6}$/.test(kod)) {
-      showMessage(msg, "6 haneli kodu eksiksiz gir.");
-      return;
-    }
-    dogrulaBtn.disabled = true;
+  // false: authenticator'daki 6 haneli TOTP kodu. true: tek seferlik yedek
+  // (kurtarma) kodu — bkz. panel.js "Yedek Kodlar" bölümü / migration
+  // 0017_2fa_yedek_kodlar.sql. İki mod aynı input'u ve aynı "Doğrula ve
+  // Giriş Yap" butonunu paylaşır, sadece doğrulama yolu değişir.
+  let yedekKodModu = false;
 
+  const modaGoreGuncelle = () => {
+    if (yedekKodModu) {
+      aciklama.textContent =
+        "Authenticator'a erişemiyorsan, 2FA'yı etkinleştirirken kaydettiğin yedek kodlardan birini gir. Bu, hesabındaki 2FA'yı kaldırır — girişten sonra panelden tekrar kurabilirsin.";
+      kodLabel.textContent = "Yedek kod";
+      kodInput.setAttribute("maxlength", "11");
+      kodInput.setAttribute("placeholder", "XXXXX-XXXXX");
+      kodInput.setAttribute("inputmode", "text");
+      kodInput.removeAttribute("autocomplete");
+      toggleLink.textContent = "Bunun yerine authenticator kodu kullanacağım";
+    } else {
+      aciklama.textContent =
+        "Hesabında iki adımlı doğrulama (2FA) açık. Authenticator uygulamandaki 6 haneli kodu gir.";
+      kodLabel.textContent = "Doğrulama kodu";
+      kodInput.setAttribute("maxlength", "6");
+      kodInput.setAttribute("placeholder", "123456");
+      kodInput.setAttribute("inputmode", "numeric");
+      kodInput.setAttribute("autocomplete", "one-time-code");
+      toggleLink.textContent = "Authenticator'a erişemiyorum, yedek kod kullanacağım";
+    }
+    kodInput.value = "";
+    kodInput.focus();
+  };
+
+  toggleLink.addEventListener("click", (e) => {
+    e.preventDefault();
+    yedekKodModu = !yedekKodModu;
+    modaGoreGuncelle();
+  });
+
+  const totpIleDogrula = async (kod) => {
     const { data: challengeData, error: challengeErr } = await supabase.auth.mfa.challenge({
       factorId: factor.id,
     });
     if (challengeErr) {
-      dogrulaBtn.disabled = false;
       showMessage(msg, "Doğrulama başlatılamadı: " + challengeErr.message);
-      return;
+      return false;
     }
 
     const { error: verifyErr } = await supabase.auth.mfa.verify({
@@ -220,12 +254,57 @@ async function mfaKoduIste(msg, hedefUrl) {
       code: kod,
     });
 
-    dogrulaBtn.disabled = false;
-
     if (verifyErr) {
       showMessage(msg, "Kod hatalı veya süresi doldu.");
+      return false;
+    }
+    return true;
+  };
+
+  const yedekKodIleDogrula = async (kod) => {
+    const { error: rpcErr } = await supabase.rpc("yedek_kod_ile_2fa_kaldir", { p_kod: kod });
+    if (rpcErr) {
+      showMessage(msg, rpcErr.message || "Kod geçersiz ya da daha önce kullanılmış.");
+      return false;
+    }
+    return true;
+  };
+
+  const dogrula = async () => {
+    const kod = kodInput.value.trim();
+
+    if (yedekKodModu) {
+      if (!kod) {
+        showMessage(msg, "Yedek kodu gir.");
+        return;
+      }
+    } else if (!/^\d{6}$/.test(kod)) {
+      showMessage(msg, "6 haneli kodu eksiksiz gir.");
+      return;
+    }
+
+    dogrulaBtn.disabled = true;
+    const basarili = yedekKodModu ? await yedekKodIleDogrula(kod) : await totpIleDogrula(kod);
+    dogrulaBtn.disabled = false;
+
+    if (!basarili) {
       kodInput.value = "";
       kodInput.focus();
+      return;
+    }
+
+    if (yedekKodModu) {
+      // Kullanıcı "2FA kaldırıldı" mesajını görebilsin diye yönlendirmeden
+      // önce kısa bir gecikme — TOTP yolunda anlık yönlendirme yeterliydi
+      // ama bu, kullanıcının bilmesi gereken önemli bir güvenlik bilgisi.
+      showMessage(
+        msg,
+        "Giriş yapıldı, 2FA kaldırıldı. Güvenliğin için panelden tekrar kurmanı öneririz.",
+        "success"
+      );
+      setTimeout(() => {
+        window.location.href = hedefUrl;
+      }, 1800);
       return;
     }
 
