@@ -262,10 +262,17 @@ permalink: "/panel/github-yonetim.html"
             içerik hem Supabase'e (kalıcı bir yedek/arama kaydı olarak) hem
             de GitHub'a yazılır — ikisi de aynı içeriği gösterir, panelde
             tek bir kart olarak listelenir.
+            <strong>🅲️ Sadece Supabase'te Yayınla:</strong> içerik GitHub'a
+            HİÇ commit edilmez — reponun git geçmişinde hiçbir zaman yer
+            almaz — ama yine de GERÇEKTEN yayındadır: blog/proje listesinde
+            görünür, kendi sayfası vardır ve normal bir yazı gibi
+            paylaşılabilir. Sonradan istersen "Mevcut İçerikler" listesinden
+            aynı yazıyı GitHub'a da aktarabilirsin.
           </p>
           <div style="display:flex; gap:10px; flex-wrap: wrap;">
             <button type="submit" id="ic-submit-btn" class="btn-primary" style="width:auto;">🅰️ Doğrudan GitHub'a Aktar ve Yayınla</button>
             <button type="button" id="ic-submit-b-btn" class="btn-primary" style="width:auto;" hidden>🅱️ Supabase'e Kaydet ve GitHub ile Yayınla</button>
+            <button type="button" id="ic-submit-c-btn" class="btn-secondary" style="width:auto;" hidden>🅲️ Sadece Supabase'te Yayınla (GitHub'a Commit Atma)</button>
             <button type="button" id="ic-iptal-btn" class="btn-danger" style="width:auto;" hidden>Düzenlemeyi İptal Et</button>
           </div>
         </form>
