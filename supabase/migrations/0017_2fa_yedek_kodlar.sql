@@ -25,7 +25,17 @@
 --     tekrar kurması önerilir (bkz. auth-pages.js "Yedek kod kullan").
 --     auth.mfa_factors, 0011'de auth.sessions için yapılanla AYNI şekilde
 --     doğrudan değiştirilebiliyor (aynı şema, aynı yönetimsel izinler).
+--   - pgcrypto'nun gen_random_bytes()/digest() fonksiyonları Supabase
+--     projesinin oluşturulma tarihine göre "public" ya da "extensions"
+--     şemasında olabiliyor (bkz. 0004_mesajlasma_ve_temizlik.sql'deki
+--     pg_trgm ile ilgili aynı not). Bu yüzden aşağıdaki fonksiyonların
+--     search_path'ine HER İKİ şema da eklendi — hangisinde kuruluysa
+--     çözülebilsin diye.
 -- ============================================================================
+
+-- pgcrypto zaten 0001/0002'de kurulmuş olabilir; "if not exists" ile
+-- burada tekrar denemek zaten kuruluysa no-op'tur, zarar vermez.
+create extension if not exists "pgcrypto";
 
 -- ----------------------------------------------------------------------------
 -- 1) TABLO
@@ -64,7 +74,7 @@ create or replace function public.yedek_kodlar_olustur()
 returns text[]
 language plpgsql
 security definer
-set search_path = public, auth
+set search_path = public, extensions, auth
 as $$
 declare
   v_kodlar text[] := '{}';
@@ -115,7 +125,7 @@ create or replace function public.yedek_kod_durumu()
 returns table (toplam int, kalan int)
 language sql
 security definer
-set search_path = public, auth
+set search_path = public, extensions, auth
 as $$
   select count(*)::int as toplam,
          count(*) filter (where not kullanildi_mi)::int as kalan
@@ -142,7 +152,7 @@ create or replace function public.yedek_kod_ile_2fa_kaldir(p_kod text)
 returns boolean
 language plpgsql
 security definer
-set search_path = public, auth
+set search_path = public, extensions, auth
 as $$
 declare
   v_normalized text;
@@ -204,7 +214,7 @@ create or replace function public.yedek_kodlar_temizle()
 returns void
 language sql
 security definer
-set search_path = public, auth
+set search_path = public, extensions, auth
 as $$
   delete from public.mfa_yedek_kodlar where user_id = auth.uid();
 $$;
