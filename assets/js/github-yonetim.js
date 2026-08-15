@@ -2270,7 +2270,7 @@ function icerikKartiCiz(item, tur) {
     ? `<div class="gy-icerik-kart-ozet">${metniVurgula(item.data.summary)}</div>`
     : "";
   const yazarSatiri = item.data.yazar_adi
-    ? `<span class="gy-icerik-kart-yazar"> · ✍️ ${metniVurgula(item.data.yazar_adi)}</span>`
+    ? `<span class="gy-icerik-kart-yazar"> · Yazan: ${metniVurgula(item.data.yazar_adi)}</span>`
     : "";
 
   // Sadece Supabase'te GERÇEKTEN yayındaki bir yazının linki gizli bir kod
