@@ -383,7 +383,13 @@ function submitButonMetniGuncelle() {
     return;
   }
   const yayinda = document.getElementById("ic-yayinda")?.checked;
-  btn.textContent = yayinda ? "GitHub'a Yayınla" : "Taslağı Kaydet (Gizli)";
+  if (yayinda) {
+    btn.textContent = "GitHub'a Yayınla";
+  } else if (gizliHedefDegeriniAl() === "github") {
+    btn.textContent = "GitHub'a Gizli Commit Et";
+  } else {
+    btn.textContent = "Taslağı Kaydet (Gizli)";
+  }
 }
 
 /**
@@ -989,19 +995,23 @@ function fmSatiri(anahtar, deger, ciplak = false) {
 }
 
 /**
- * Front matter + gövdeden tam Markdown dosya içeriğini üretir. Bu fonksiyon
- * SADECE bir içerik GitHub'a YAYINLANIRKEN çağrılır — dolayısıyla üretilen
- * dosya her zaman `yayinda: true, sitemap: true` olur, `permalink` alanı
- * hiç yazılmaz ("yayında değil" içerikler artık GitHub'a hiç gitmiyor,
- * bkz. dosya başındaki not).
+ * Front matter + gövdeden tam Markdown dosya içeriğini üretir. GitHub'a
+ * yazılacak HER içerik için kullanılır — hem normal yayınlama (yayinda:
+ * true) hem de eski "GitHub'a gizli commit et" yöntemi (yayinda: false +
+ * tahmin edilemez permalink, bkz. rehber/01-site-rehberi.md § 9) için.
  *
- * gizliKod yine de front-matter'a `onizleme_kod` olarak yazılır (görünmez,
- * sayfa render'ında kullanılmaz) — TEK amacı, bu içerik daha sonra tekrar
- * "Yayından Kaldır" ile Supabase'e taşınırsa AYNI ön izleme linkinin geri
- * dönebilmesidir (kod, sadece kullanıcı bilerek "🎲 Yenile" ile değiştirirse
- * farklılaşır).
+ * yayinda=true iken: `sitemap: true`, `permalink` hiç yazılmaz (Jekyll
+ * dosya adından üretir), gizliKod sadece görünmez `onizleme_kod` alanı
+ * olarak saklanır (TEK amacı: içerik sonradan "Yayından Kaldır" ile
+ * Supabase'e taşınırsa AYNI ön izleme linkinin geri dönebilmesi).
+ *
+ * yayinda=false iken (GitHub'a gizli commit): `sitemap: false` YAZILIR
+ * (aksi halde sayfa sitemap.xml'de "keşfedilebilir" kalır) ve gizliKod
+ * `permalink: /blog/on-izleme-<kod>/` (ya da proje için `/projects/...`)
+ * olarak yazılır — gizliliğin TEK dayanağı bu adresin tahmin edilemez
+ * kalmasıdır.
  */
-function dosyaIcerigiOlustur(tur, alan, gizliKod, govde) {
+function dosyaIcerigiOlustur(tur, alan, gizliKod, govde, yayinda = true) {
   const satirlar = ["---"];
   satirlar.push(fmSatiri("title", alan.title));
   satirlar.push(fmSatiri("date", alan.date, true));
@@ -1014,10 +1024,18 @@ function dosyaIcerigiOlustur(tur, alan, gizliKod, govde) {
     satirlar.push(fmSatiri("link_label", alan.link_label));
   }
 
-  satirlar.push(fmSatiri("yayinda", true, true));
-  satirlar.push(fmSatiri("sitemap", true, true));
-  if (gizliKod) {
-    satirlar.push(fmSatiri("onizleme_kod", gizliKod));
+  satirlar.push(fmSatiri("yayinda", yayinda, true));
+  if (yayinda) {
+    satirlar.push(fmSatiri("sitemap", true, true));
+    if (gizliKod) {
+      satirlar.push(fmSatiri("onizleme_kod", gizliKod));
+    }
+  } else {
+    satirlar.push(fmSatiri("sitemap", false, true));
+    if (gizliKod) {
+      const onek = tur === "proje" ? "/projects" : "/blog";
+      satirlar.push(fmSatiri("permalink", `${onek}/on-izleme-${gizliKod}/`));
+    }
   }
 
   satirlar.push("---");
@@ -1161,8 +1179,31 @@ function dosyaYoluHesapla(tur, tarih, slug, yilOneki, klasor) {
  * assets/js/onizleme.js tarafından okunup Supabase'teki
  * `taslak_onizleme_getir` RPC'sine sorulur (bkz. migration 0013).
  */
-function onizlemeKutusunuGoster(tur, gizliKod) {
-  document.getElementById("ic-onizleme-onek").textContent = `${location.origin}/onizleme/?tur=${tur}&kod=`;
+/** Formda o an seçili olan "yayında değilken nerede saklansın" hedefini döner: "supabase" | "github". */
+function gizliHedefDegeriniAl() {
+  return document.querySelector('input[name="gizli-hedef"]:checked')?.value || "supabase";
+}
+
+/**
+ * Ön izleme linkinin öneki, seçilen hedefe göre TAMAMEN farklıdır:
+ *  - "supabase": /onizleme/?tur=...&kod=... — assets/js/onizleme.js
+ *    tarafından okunup Supabase'teki `taslak_onizleme_getir` RPC'sine
+ *    sorulan, GitHub'a hiç dokunmayan bir ara sayfa.
+ *  - "github": doğrudan gerçek Jekyll sayfasının adresi (/blog/on-izleme-
+ *    <kod>/ ya da /projects/on-izleme-<kod>/) — içerik gerçekten bu
+ *    adreste GitHub'a commit edilmiş durumda duruyor (bkz.
+ *    dosyaIcerigiOlustur ve rehber/01-site-rehberi.md § 9).
+ */
+function onizlemeOnekiHesapla(tur, kaynak) {
+  if (kaynak === "github") {
+    const kokYol = tur === "proje" ? "/projects" : "/blog";
+    return `${location.origin}${kokYol}/on-izleme-`;
+  }
+  return `${location.origin}/onizleme/?tur=${tur}&kod=`;
+}
+
+function onizlemeKutusunuGoster(tur, gizliKod, kaynak = "supabase") {
+  document.getElementById("ic-onizleme-onek").textContent = onizlemeOnekiHesapla(tur, kaynak);
   document.getElementById("ic-onizleme-kod").value = gizliKod;
   document.getElementById("ic-onizleme-kutusu").hidden = false;
   onizlemeLinkGuncelle();
@@ -1202,12 +1243,26 @@ function onizlemedenGecerliKoduAl() {
  */
 function wireYayindaCanliOnizleme() {
   document.getElementById("ic-yayinda").addEventListener("change", (e) => {
+    document.getElementById("ic-gizli-hedef-wrap").hidden = e.target.checked;
     if (e.target.checked) {
       onizlemeKutusunuGizle();
     } else {
-      onizlemeKutusunuGoster(icerikTuru(), DUZENLENEN_GIZLI_KOD || rastgeleKod(8));
+      onizlemeKutusunuGoster(icerikTuru(), DUZENLENEN_GIZLI_KOD || rastgeleKod(8), gizliHedefDegeriniAl());
     }
     submitButonMetniGuncelle();
+  });
+
+  // "Nerede saklansın?" (Supabase / GitHub) seçimi değiştiğinde, hâlâ
+  // "Yayında" kapalıyken canlı ön izleme kutusunun linkini de günceller
+  // (öneki tamamen değişiyor — bkz. onizlemeOnekiHesapla).
+  document.querySelectorAll('input[name="gizli-hedef"]').forEach((r) => {
+    r.addEventListener("change", () => {
+      if (!document.getElementById("ic-yayinda").checked) {
+        const kodEl = document.getElementById("ic-onizleme-kod");
+        onizlemeKutusunuGoster(icerikTuru(), kodEl.value || DUZENLENEN_GIZLI_KOD || rastgeleKod(8), gizliHedefDegeriniAl());
+      }
+      submitButonMetniGuncelle();
+    });
   });
 
   document.getElementById("ic-onizleme-kod").addEventListener("input", onizlemeLinkGuncelle);
@@ -1257,6 +1312,7 @@ function duzenlemeyiIptalEt() {
   duzenlemeyiKapat();
   document.getElementById("icerik-form").reset();
   document.getElementById("ic-date").value = new Date().toISOString().slice(0, 10);
+  document.getElementById("ic-gizli-hedef-wrap").hidden = true;
   onizlemeKutusunuGizle();
   guncelleIcerikTuru();
   submitButonMetniGuncelle();
@@ -1320,6 +1376,8 @@ async function icerikKaydet() {
   try {
     if (yayinda) {
       await icerikGitHubaYaz(tur, alan, gizliKod, govde, dosyaYolu, msgEl);
+    } else if (gizliHedefDegeriniAl() === "github") {
+      await icerikGitHubaGizliYaz(tur, alan, gizliKod, govde, dosyaYolu, msgEl);
     } else {
       await icerikSupabaseeYaz(tur, alan, gizliKod, govde, slug, dosyaYolu, msgEl);
     }
@@ -1376,6 +1434,59 @@ async function icerikGitHubaYaz(tur, alan, gizliKod, govde, dosyaYolu, msgEl) {
   DUZENLENEN_YOL = dosyaYolu;
   DUZENLENEN_SHA = (await ghGetContents(dosyaYolu))?.sha || DUZENLENEN_SHA;
   document.getElementById("ic-iptal-btn").hidden = false;
+  guncelleIcerikTuru();
+}
+
+/**
+ * "Yayında" KAPALI + hedef "GitHub'a commit et" olarak seçiliyken kullanılan
+ * ESKİ yöntem (bkz. rehber/01-site-rehberi.md § 9): içerik yine GitHub'a
+ * commit edilir ama `yayinda: false` + tahmin edilemez bir `permalink` ile —
+ * yani dosya reponun git geçmişinde durur, sadece adresi paylaşılmadığı
+ * sürece gizli sayılır. Supabase'e HİÇ dokunmaz; daha önce Supabase'te bir
+ * taslak düzenleniyorduysa (DUZENLENEN_TASLAK_ID doluysa) artık içerik
+ * GitHub'da yaşadığı için o taslak satırı silinir (icerikGitHubaYaz ile
+ * aynı davranış — bir içerik iki yerde birden asla durmaz).
+ */
+async function icerikGitHubaGizliYaz(tur, alan, gizliKod, govde, dosyaYolu, msgEl) {
+  const dosyaIcerigi = dosyaIcerigiOlustur(tur, alan, gizliKod, govde, false);
+  const icerikB64 = b64Encode(dosyaIcerigi);
+  const commitMesaji = DUZENLENEN_YOL
+    ? `Gizli içerik güncellendi (yayinda: false): ${dosyaYolu}`
+    : `Yeni gizli içerik eklendi (GitHub, yayinda: false): ${dosyaYolu}`;
+
+  if (DUZENLENEN_YOL && DUZENLENEN_YOL === dosyaYolu) {
+    await ghPutFile(dosyaYolu, icerikB64, commitMesaji, DUZENLENEN_SHA);
+  } else {
+    const mevcutHedef = await ghGetContents(dosyaYolu).catch(() => null);
+    await ghPutFile(dosyaYolu, icerikB64, commitMesaji, mevcutHedef?.sha || null);
+
+    if (DUZENLENEN_YOL && DUZENLENEN_YOL !== dosyaYolu && DUZENLENEN_SHA) {
+      await ghDeleteFile(DUZENLENEN_YOL, DUZENLENEN_SHA, `Yeniden adlandırıldı: ${DUZENLENEN_YOL} -> ${dosyaYolu}`);
+      await klasorBosaldiysaGitkeepEkle(ustKlasorYolu(DUZENLENEN_YOL));
+    }
+  }
+
+  // Hedef klasörde artık bu gerçek içerik var, orada duran .gitkeep varsa temizlenir.
+  await klasordekiGitkeepiTemizle(ustKlasorYolu(dosyaYolu));
+
+  // Supabase'teki bir taslak buradan GitHub'a taşınıyorsa, artık GitHub'da yaşadığı için taslak satırı silinir.
+  if (DUZENLENEN_TASLAK_ID) {
+    const { error } = await supabase.from("taslak_icerikler").delete().eq("id", DUZENLENEN_TASLAK_ID);
+    if (error) console.error("Taslak satırı silinemedi (dosya GitHub'a başarıyla yazıldı):", error);
+  }
+
+  DUZENLENEN_GIZLI_KOD = gizliKod;
+  DUZENLENEN_TASLAK_ID = null;
+  DUZENLENEN_YOL = dosyaYolu;
+  DUZENLENEN_SHA = (await ghGetContents(dosyaYolu))?.sha || DUZENLENEN_SHA;
+  document.getElementById("ic-iptal-btn").hidden = false;
+  onizlemeKutusunuGoster(tur, gizliKod, "github");
+
+  showMessage(
+    msgEl,
+    "İçerik GitHub'a \"yayinda: false\" olarak commit edildi (eski yöntem) — 1-2 dakika içinde sitede sadece aşağıdaki gizli linkle erişilebilir olacak.",
+    "success"
+  );
   guncelleIcerikTuru();
 }
 
@@ -1761,6 +1872,8 @@ function icerikKartiCiz(item, tur) {
   const kaynakRozet =
     item.kaynak === "supabase"
       ? `<span class="gy-rozet gy-rozet--gizli" title="Bu içerik GitHub'a hiç commit edilmedi, sadece Supabase'te duruyor.">Supabase</span>`
+      : !yayinda
+      ? `<span class="gy-rozet gy-rozet--gizli" title="Bu içerik &quot;yayinda: false&quot; olarak GitHub'a commit edilmiş durumda (eski yöntem) — reponun git geçmişinde duruyor, sadece linki paylaşılmadığı sürece gizli.">GitHub (gizli commit)</span>`
       : "";
   const ozet = item.data.summary
     ? `<div class="gy-icerik-kart-ozet">${metniVurgula(item.data.summary)}</div>`
@@ -2007,13 +2120,20 @@ async function icerikDuzenlemeyeYukle(item, tur) {
   document.getElementById("ic-body").value = item.body || "";
   const yayinda = item.data.yayinda !== false;
   document.getElementById("ic-yayinda").checked = yayinda;
+  document.getElementById("ic-gizli-hedef-wrap").hidden = yayinda;
 
   // İçeriğin daha önce üretilmiş bir gizli ön izleme kodu varsa hatırla ve
   // göster. Permalink/onizleme_kod herhangi bir sebeple eksikse (elle
-  // düzenlenmiş dosya vb.) yeni bir kod üretip gösteriyoruz.
+  // düzenlenmiş dosya vb.) yeni bir kod üretip gösteriyoruz. Hedef seçimi
+  // (Supabase/GitHub) içeriğin şu an nerede durduğuna göre otomatik
+  // ayarlanır: bir Supabase taslağı düzenleniyorsa "supabase", GitHub'da
+  // "yayinda: false" olarak duran bir dosya düzenleniyorsa "github".
   DUZENLENEN_GIZLI_KOD = icerikGizliKoduBul(item.data);
   if (!yayinda) {
-    onizlemeKutusunuGoster(tur, DUZENLENEN_GIZLI_KOD || rastgeleKod(8));
+    const hedef = item.kaynak === "supabase" ? "supabase" : "github";
+    const hedefInput = document.querySelector(`input[name="gizli-hedef"][value="${hedef}"]`);
+    if (hedefInput) hedefInput.checked = true;
+    onizlemeKutusunuGoster(tur, DUZENLENEN_GIZLI_KOD || rastgeleKod(8), hedef);
   } else {
     onizlemeKutusunuGizle();
   }
