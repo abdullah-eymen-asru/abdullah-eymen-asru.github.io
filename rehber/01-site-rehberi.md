@@ -168,6 +168,22 @@ tanıtım yazını buraya serbest metin olarak yaz.
 
 ## 9. Zamanlanmış ve gizli yazılar/projeler
 
+> **📌 Güncelleme:** `/panel/github-yonetim.html` paneli artık "Yayında"
+> anahtarı kapalıyken içeriği bu bölümde anlatıldığı gibi `yayinda: false`
+> + tahmin edilemez bir `permalink` ile GitHub'a HİÇ commit ETMİYOR —
+> içerik bunun yerine sadece Supabase'teki `taslak_icerikler` tablosunda
+> duruyor, GitHub'a hiç dokunulmuyor (bkz. Bölüm 10'daki "Supabase Taslak
+> Sistemi" alt başlığı ve `rehber/02-supabase-sistemi.md`). Aşağıdaki
+> `yayinda: false` + `permalink` yöntemi hâlâ ÇALIŞIR (Jekyll seviyesinde
+> hiçbir şey kaldırılmadı) ve **sadece** ileri tarihli otomatik yayınlama
+> senaryosu için (`yayinda: true` + gelecek `date`) hâlâ birebir
+> kullanılıyor — ama panel artık kalıcı/süresiz gizli içerik için bu
+> yöntemi ÜRETMİYOR, çünkü dosya reponun herkese açık git geçmişinde
+> durmaya devam ediyordu (sadece adresi paylaşılmadığı için "gizli"
+> sayılıyordu). Dosyayı elle (GitHub arayüzünden veya Git ile) düzenleyen
+> biri isterse aşağıdaki yöntemi yine de kullanabilir, ama artık önerilen
+> yol değil.
+
 Bir yazıyı ya da akademik projeyi GitHub'a hemen ekleyip, sitede **istediğin
 tarihe kadar veya sen izin verene kadar** görünmemesini sağlayabilirsin.
 
@@ -302,24 +318,78 @@ gibi 3. parti bir servise ihtiyaç duymaz — doğrudan GitHub REST API'sine
 (`contents` endpoint'i) istek atıp commit oluşturur, tamamen GitHub
 Pages'in kendisiyle çalışır.
 
-**Bu panel, sitenin Supabase tabanlı `/panel/admin.html` panelinden TAMAMEN
-BAĞIMSIZDIR.** `/panel/admin.html` Supabase'teki üye/rol/özel içerik sistemini
-yönetir; `/panel/github-yonetim.html` ise bu deponun kendi statik Jekyll
-içeriğini (blog yazıları, akademik projeler, profil fotoğrafı) yönetir.
-Aralarındaki tek ortak nokta: bu sayfaya erişim de aynı
+**Bu panel, sitenin Supabase tabanlı `/panel/admin.html` panelinden
+kullanıcı/rol/özel-içerik yönetimi açısından TAMAMEN BAĞIMSIZDIR** — ama
+artık "yayında değil" (taslak) blog yazıları ve akademik projeler için
+AYNI Supabase projesini kullanıyor (bkz. aşağıdaki "Supabase Taslak
+Sistemi" alt başlığı). `/panel/admin.html` Supabase'teki üye/rol/özel
+içerik sistemini yönetir; `/panel/github-yonetim.html` ise bu deponun
+statik Jekyll içeriğini (blog yazıları, akademik projeler, profil
+fotoğrafı) yönetir. Erişim kontrolü ortak: bu sayfaya erişim de aynı
 `requireAuth({ role: 'admin' })` mekanizmasıyla korunur (bkz.
 `assets/js/auth-guard.js`), yani sadece Supabase'te `role: 'admin'` olan
-hesaplar görebilir. Header'daki **"Hesabım ▾"** menüsünde, adminsen
-"Admin Paneli" linkinin hemen altında **"GitHub İçerik Yönetimi"** olarak
-görünür (bkz. `assets/js/nav-auth.js`).
+hesaplar görebilir — taslak tablosunun RLS politikası bunu veritabanı
+seviyesinde ayrıca zorunlu kılar. Header'daki **"Hesabım ▾"** menüsünde,
+adminsen "Admin Paneli" linkinin hemen altında **"GitHub İçerik
+Yönetimi"** olarak görünür (bkz. `assets/js/nav-auth.js`).
 
 ### Paketteki dosyalar
 
 ```
-panel/github-yonetim.md              <- Jekyll sayfası (_layouts/default.html'i kullanır, admin-only)
-assets/js/github-yonetim.js    <- Panelin tüm mantığı
-assets/css/github-yonetim.css  <- Bu sayfaya özel ek stiller (auth.css'in üzerine eklenir)
+panel/github-yonetim.md                <- Jekyll sayfası (_layouts/default.html'i kullanır, admin-only)
+assets/js/github-yonetim.js            <- Panelin tüm mantığı
+assets/css/github-yonetim.css          <- Bu sayfaya özel ek stiller (auth.css'in üzerine eklenir)
+onizleme/index.md                      <- Jekyll sayfası: /onizleme/ — gizli ön izleme linklerinin açıldığı yer
+assets/js/onizleme.js                  <- /onizleme/ sayfasının mantığı (Supabase RPC'sini okur)
+supabase/migrations/0013_...sql        <- `taslak_icerikler` tablosu + RLS + `taslak_onizleme_getir` RPC'si
 ```
+
+### Supabase Taslak Sistemi — "Yayında değil" içerik artık GitHub'a hiç gitmiyor
+
+Panelin en önemli mimari kararı: **bir içerik, her zaman ya GitHub'da
+(yayında) ya da Supabase'de (gizli) durur — iki yerde birden asla
+durmaz.**
+
+- **"Yayında" anahtarı KAPALIYKEN kaydedersen:** içerik GitHub'a hiç
+  commit edilmez. Bunun yerine Supabase'teki `taslak_icerikler` tablosuna
+  (başlık, tarih, gövde, proje alanları, yayınlanınca gideceği dosya yolu
+  ve gizli ön izleme kodu ile birlikte) yazılır. Bu tablo RLS ile
+  korunur: sadece admin rolündeki Supabase hesapları okuyup/yazabilir —
+  ön izleme linkine sahip anonim bir ziyaretçi bile tabloyu LİSTELEYEMEZ,
+  sadece aşağıda anlatılan RPC üzerinden tur+kod tam eşleşen TEK satırı
+  görebilir.
+- **Gizli ön izleme linki artık `/onizleme/?tur=<blog|proje>&kod=<kod>`
+  formatındadır** (eski `/blog/on-izleme-XXXX/` formatı YERİNE — panel
+  artık bu yeni formatta linkler üretir). `/onizleme/index.md` sayfası,
+  `assets/js/onizleme.js` aracılığıyla URL'deki tur+kod'u Supabase'teki
+  `taslak_onizleme_getir(p_tur, p_kod)` RPC'sine sorar; bu RPC
+  `SECURITY DEFINER` olduğu için RLS'i by-pass eder ama SADECE tam
+  eşleşen tek satırı ve sadece görüntüleme için gereken alanları
+  döndürür — tabloyu listelemeye izin vermez. Giriş yapmamış bir
+  ziyaretçi de (tıpkı eski sistemde olduğu gibi) bu linki açabilir.
+- **"Yayınla" butonuna basınca (formdan "Yayında"yı açıp kaydetmek ya da
+  listedeki "Yayınla" butonuna basmak):** taslağın içeriği front-matter'a
+  dönüştürülüp hedef yola (`taslak_icerikler.dosya_yolu` — taslak
+  kaydedilirken seçilen klasör dahil) GitHub'a commit edilir, ardından
+  Supabase'teki taslak satırı silinir.
+- **"Yayından Kaldır" butonuna basınca (o an GitHub'da yayında olan bir
+  içerik için):** GitHub'daki dosyanın front-matter'ı + gövdesi okunup
+  Supabase'e taslak olarak yazılır (aynı gizli kod korunur — bkz.
+  aşağıdaki not), ardından GitHub'daki dosya silinir.
+- **Ön izleme kodu, yayında olsa bile front-matter'da gizli bir
+  `onizleme_kod` alanında saklanmaya devam eder** (görünmez, sayfa
+  render'ında kullanılmaz) — tıpkı eski sistemdeki gibi. Böylece bir
+  yazı önce gizli paylaşılıp linki birine gönderildikten sonra yayına
+  alınır, bir süre sonra tekrar "Yayından Kaldır" ile gizlenirse **daha
+  önce paylaşılan aynı link** geri döner.
+- **Eski sistemden kalma, hâlâ GitHub'da `yayinda: false` olarak duran
+  bir dosya bulunursa** (bkz. Bölüm 9'daki güncelleme notu), kartında
+  "Yeniden Yayınla" yerine **"Supabase'e Taşı"** butonu görünür — bu da
+  aynı "GitHub'dan Supabase'e taşı" işlemini yapar, böylece o içerik de
+  artık reponun herkese açık git geçmişinde durmaz.
+- Panelin "Mevcut İçerikler" listesinde Supabase'teki taslaklar **"Gizli"**
+  rozetinin yanında ayrıca bir **"Supabase"** rozetiyle işaretlenir, GitHub
+  dosyaları için bu rozet görünmez.
 
 ### Neler yapabilirsin
 
@@ -329,44 +399,44 @@ assets/css/github-yonetim.css  <- Bu sayfaya özel ek stiller (auth.css'in üzer
   adı (slug) boş bırakılırsa başlıktan otomatik üretilir (Türkçe
   karakterler sadeleştirilir).
 - **"Yayında" anahtarını kapatırsan** (modern bir toggle switch; klasik
-  onay kutusu değil) panel otomatik olarak `yayinda: false`,
-  `sitemap: false` yazar ve 8 karakterlik rastgele bir kodla
-  (`crypto.getRandomValues` ile üretilir, tahmin edilemez) gizli bir ön
-  izleme linki oluşturur (`/blog/on-izleme-XXXXXXXX/` veya
-  `/projects/on-izleme-XXXXXXXX/`) — bkz. yukarıdaki Bölüm 9'daki mantığın
-  aynısı, sadece elle yazmak yerine panel yazıyor.
+  onay kutusu değil) içerik GitHub'a HİÇ commit edilmez — panel onu
+  Supabase'teki `taslak_icerikler` tablosuna yazar ve 8 karakterlik
+  rastgele bir kodla (`crypto.getRandomValues` ile üretilir, tahmin
+  edilemez) gizli bir ön izleme linki oluşturur
+  (`/onizleme/?tur=blog&kod=XXXXXXXX` ya da `?tur=proje&kod=XXXXXXXX`) —
+  bkz. yukarıdaki "Supabase Taslak Sistemi" alt başlığı.
   **Bu link tek seferlik değildir ve düzenlenebilir:** anahtarı kapatır
-  kapatmaz, dosyayı hiç kaydetmeden önce bile ekranda görünür — kodu
-  olduğu gibi kullanabilir, kutuya kendi kodunu elle yazabilir (örn.
-  `/blog/on-izleme-taslak-v2/`) veya "🎲 Yenile" butonuyla yeni bir
-  rastgele kod üretebilirsin. Kaydettikten sonra da ekranda kalır,
-  anahtarı kapatıp açtığında anında görünür/gizlenir, "Mevcut İçerikler"
-  listesinden aynı yazıyı tekrar "Düzenle"ye açtığında da aynı link
-  otomatik olarak yeniden gösterilir — panel bunu dosyanın `permalink`
-  alanından okur. Link, sen bilerek değiştirmediğin sürece her
-  düzenlemede **aynı kalır**, böylece daha önce birine gönderdiğin bir ön
-  izleme linki içeriği güncellesen bile kırılmaz. Panel, aynı türde
-  (blog/proje) başka bir içeriğin zaten kullandığı bir kodu tekrar
-  kaydetmene izin vermez (çakışma kontrolü) — böyle bir durumda hata
-  mesajıyla uyarır. Yazının/projenin kendi sayfasında da (görüntülerken)
-  "henüz yayında değil" uyarısı görünür (bkz. `_layouts/post.html` /
-  `_layouts/project.html`), böylece linke sahip olan biri içeriği
-  görüntülerken durumundan haberdar olur.
-- **Yeniden yayınlama / yayından kaldırma — kartlar üzerinden tek tıkla:**
-  "Mevcut İçerikler" listesindeki her kartta, o an yayında olan içerikler
-  için **"Yayından Kaldır"**, gizli olanlar için **"Yeniden Yayınla"**
-  butonu var. Formu açıp toggle'ı çevirip tekrar kaydetmene gerek kalmadan
-  tek tıkla (bir onay penceresinden sonra) doğrudan GitHub'a commit atar.
-  **Önemli — link artık yayın durumundan bağımsız hatırlanır:** kod, dosya
-  "Yayında" olsa bile front-matter'da gizli bir `onizleme_kod` alanında
-  saklanmaya devam eder (görünmez, sayfa render'ında kullanılmaz). Yani
-  bir yazıyı önce gizli paylaşıp linkini birine gönderdikten sonra yayına
-  alıp, bir süre sonra tekrar "Yayından Kaldır" ile gizlersen, **daha önce
-  paylaştığın aynı link** geri döner — yeni bir kod üretilmez, eski link
-  kırılmaz. Kod sadece formu açıp "🎲 Yenile" ile bilerek değiştirirsen
-  farklılaşır. Gizli veya daha önce gizlenmiş bir içeriğin kartında ayrıca
-  **"🔗 Linki Kopyala"** butonu görünür — formu hiç açmadan ön izleme
-  linkini doğrudan panoya kopyalayabilirsin.
+  kapatmaz, taslağı hiç kaydetmeden önce bile ekranda görünür — kodu
+  olduğu gibi kullanabilir, kutuya kendi kodunu elle yazabilir veya
+  "🎲 Yenile" butonuyla yeni bir rastgele kod üretebilirsin. Kaydettikten
+  sonra da ekranda kalır, anahtarı kapatıp açtığında anında
+  görünür/gizlenir, "Mevcut İçerikler" listesinden aynı taslağı tekrar
+  "Düzenle"ye açtığında da aynı link otomatik olarak yeniden gösterilir.
+  Link, sen bilerek değiştirmediğin sürece her düzenlemede **aynı
+  kalır**, böylece daha önce birine gönderdiğin bir ön izleme linki
+  içeriği güncellesen bile kırılmaz. Panel, aynı türde (blog/proje)
+  başka bir içeriğin (GitHub'da ya da Supabase'de) zaten kullandığı bir
+  kodu tekrar kaydetmene izin vermez (çakışma kontrolü) — böyle bir
+  durumda hata mesajıyla uyarır. `/onizleme/` sayfasında da içeriği
+  görüntülerken "henüz yayında değil" uyarısı görünür, böylece linke
+  sahip olan biri durumundan haberdar olur.
+- **Yayınlama / yayından kaldırma — kartlar üzerinden tek tıkla:**
+  "Mevcut İçerikler" listesindeki her kartta, Supabase'teki taslaklar
+  için **"Yayınla"** (GitHub'a commit eder, taslak satırı silinir), o an
+  GitHub'da yayında olan içerikler için **"Yayından Kaldır"** (Supabase'e
+  taşır, GitHub dosyasını siler) butonu var. Formu açıp toggle'ı çevirip
+  tekrar kaydetmene gerek kalmadan tek tıkla (bir onay penceresinden
+  sonra) işlemi tamamlar. **Önemli — link yayın durumundan bağımsız
+  hatırlanır:** kod, içerik GitHub'da "Yayında" olsa bile front-matter'da
+  gizli bir `onizleme_kod` alanında saklanmaya devam eder (görünmez,
+  sayfa render'ında kullanılmaz). Yani bir yazıyı önce gizli paylaşıp
+  linkini birine gönderdikten sonra yayına alıp, bir süre sonra tekrar
+  "Yayından Kaldır" ile gizlersen, **daha önce paylaştığın aynı link**
+  geri döner — yeni bir kod üretilmez, eski link kırılmaz. Kod sadece
+  formu açıp "🎲 Yenile" ile bilerek değiştirirsen farklılaşır. Gizli
+  veya daha önce gizlenmiş bir içeriğin kartında ayrıca **"🔗 Linki
+  Kopyala"** butonu görünür — formu hiç açmadan ön izleme linkini
+  doğrudan panoya kopyalayabilirsin.
 - **Genişletilmiş Markdown editör araç çubuğu** — metin alanının üstünde,
   gruplanmış butonlarla şu araçlar var:
   - **Biçimlendirme:** kalın, italik, üstü çizili, satır içi kod.
