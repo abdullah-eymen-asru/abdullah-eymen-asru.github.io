@@ -41,7 +41,7 @@ permalink: "/icerik/blog.html"
         <h3><a href="{{ post.url | relative_url }}">{{ post.title }}</a></h3>
         <div class="meta">
           {{ post.date | date: "%d %B %Y" }}
-          {% if post.author %} · ✍️ {{ post.author }}{% endif %}
+          {% if post.author %} · Yazan: {{ post.author }}{% endif %}
         </div>
         <p>{{ post.excerpt }}</p>
       </div>
@@ -221,7 +221,7 @@ baglaArama("notes-search", "notes-posts");
           <h3><a href="${href}">${escapeHtml(yazi.baslik || "")}</a></h3>
           <div class="meta">
             ${escapeHtml(tarihMetni)}
-            ${yazi.yazar_adi ? ` · ✍️ ${escapeHtml(yazi.yazar_adi)}` : ""}
+            ${yazi.yazar_adi ? ` · Yazan: ${escapeHtml(yazi.yazar_adi)}` : ""}
           </div>
           <p>${escapeHtml(ozet)}${ozet.length >= 180 ? "…" : ""}</p>
         `;
