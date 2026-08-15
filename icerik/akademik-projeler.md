@@ -25,7 +25,7 @@ permalink: "/icerik/akademik-projeler.html"
       {% if project.venue %}{{ project.venue }}{% endif %}
       {% if project.date %} · {{ project.date | date: "%Y" }}{% endif %}
       {% if project.status %} · <span class="tag">{{ project.status }}</span>{% endif %}
-      {% if project.author %} · ✍️ {{ project.author }}{% endif %}
+      {% if project.author %} · Yazan: {{ project.author }}{% endif %}
     </div>
     <p>{{ project.summary }}</p>
   </div>
@@ -72,7 +72,7 @@ permalink: "/icerik/akademik-projeler.html"
         if (proje.venue) metaParcalar.push(escapeHtml(proje.venue));
         if (yil) metaParcalar.push(yil);
         if (proje.durum) metaParcalar.push(`<span class="tag">${escapeHtml(proje.durum)}</span>`);
-        if (proje.yazar_adi) metaParcalar.push(`✍️ ${escapeHtml(proje.yazar_adi)}`);
+        if (proje.yazar_adi) metaParcalar.push(`Yazan: ${escapeHtml(proje.yazar_adi)}`);
         card.innerHTML = `
           <h3><a href="${href}">${escapeHtml(proje.baslik || "")}</a></h3>
           <div class="meta">${metaParcalar.join(" · ")}</div>
