@@ -37,7 +37,7 @@ permalink: "/icerik/blog.html"
     <div id="notes-posts" class="scroll-list">
       {% assign yayindaki_yazilar = site.posts | where_exp: "p", "p.yayinda != false" | where_exp: "p", "p.date <= site.time" %}
       {% for post in yayindaki_yazilar %}
-      <div class="post-card searchable" data-search="{{ post.title | downcase }} {{ post.author | downcase }} {{ post.excerpt | strip_html | downcase }}">
+      <div class="post-card searchable" data-search="{{ post.title | downcase }} {{ post.author | downcase }} {{ post.excerpt | strip_html | downcase }}" data-date="{{ post.date | date: '%Y-%m-%d' }}">
         <h3><a href="{{ post.url | relative_url }}">{{ post.title }}</a></h3>
         <div class="meta">
           {{ post.date | date: "%d %B %Y" }}
@@ -179,5 +179,69 @@ function baglaArama(inputId, listId) {
 
 baglaArama("substack-search", "substack-posts");
 baglaArama("notes-search", "notes-posts");
+</script>
+
+<script type="module">
+  // "Sadece Supabase'te Yayınla" (bkz. panel/github-yonetim.md, migration
+  // 0015) ile yayınlanmış, GitHub'a hiç commit edilmemiş ama GERÇEKTEN
+  // yayında olan yazıları burada Jekyll'in ürettiği statik kartlarla
+  // BİRLEŞTİRİYORUZ — build zamanında (Jekyll derlemesi sırasında) bu
+  // içerikler var olmadığından site.posts içinde hiç görünmezler, bu
+  // yüzden istemci tarafında ayrıca çekilip listeye ekleniyorlar. Arama
+  // kutusu zaten ".searchable" + "data-search" üzerinden çalıştığı için
+  // (bkz. yukarıdaki baglaArama), buraya eklenen kartlar otomatik olarak
+  // aranabilir hâle gelir — ekstra bir kablolamaya gerek yok.
+  import { supabase, escapeHtml } from "{{ '/assets/js/supabase-client.js' | relative_url }}";
+
+  (async function () {
+    const list = document.getElementById("notes-posts");
+    if (!list) return;
+
+    try {
+      const { data, error } = await supabase.rpc("sadece_supabase_yayinlari_listele", { p_tur: "blog" });
+      if (error) throw error;
+      const yazilar = data || [];
+      if (yazilar.length === 0) return;
+
+      // "Henüz not eklenmedi" mesajını (varsa) kaldır — artık en az bir yazı var.
+      list.querySelector("p.loading")?.remove();
+
+      const base = document.documentElement.dataset.baseurl || "";
+      yazilar.forEach((yazi) => {
+        const card = document.createElement("div");
+        card.className = "post-card searchable";
+        const ozet = (yazi.govde || "").replace(/[#*`>_-]/g, "").slice(0, 180);
+        card.dataset.search = `${(yazi.baslik || "").toLowerCase()} ${(yazi.yazar_adi || "").toLowerCase()} ${ozet.toLowerCase()}`;
+        card.dataset.date = yazi.tarih || "";
+        const href = `${base}/icerik/supabase-yazi.html?tur=blog&slug=${encodeURIComponent(yazi.slug)}`;
+        const tarihMetni = yazi.tarih
+          ? new Date(yazi.tarih).toLocaleDateString("tr-TR", { day: "2-digit", month: "long", year: "numeric" })
+          : "";
+        card.innerHTML = `
+          <h3><a href="${href}">${escapeHtml(yazi.baslik || "")}</a></h3>
+          <div class="meta">
+            ${escapeHtml(tarihMetni)}
+            ${yazi.yazar_adi ? ` · ✍️ ${escapeHtml(yazi.yazar_adi)}` : ""}
+          </div>
+          <p>${escapeHtml(ozet)}${ozet.length >= 180 ? "…" : ""}</p>
+        `;
+
+        // Tarihe göre doğru konuma yerleştir (en yeni en üstte) — mevcut
+        // Jekyll kartları arasına, kendi tarihine göre karışık sıralanır.
+        const digerKartlar = Array.from(list.querySelectorAll(".post-card.searchable"));
+        const eklenecekYer = digerKartlar.find((k) => (k.dataset.date || "") < card.dataset.date);
+        if (eklenecekYer) {
+          list.insertBefore(card, eklenecekYer);
+        } else {
+          list.appendChild(card);
+        }
+      });
+    } catch (err) {
+      // Sessizce vazgeç — Substack ve GitHub tabanlı yazılar zaten
+      // gösteriliyor, bu ek kaynak başarısız olsa bile sayfanın geri
+      // kalanı normal çalışmaya devam etmeli.
+      console.error("Supabase'te yayınlanan yazılar yüklenemedi:", err);
+    }
+  })();
 </script>
 
