@@ -129,6 +129,9 @@
   </script>
 
   <link rel="stylesheet" href="{{ '/assets/style.css' | relative_url }}">
+  <!-- Çerez onay şeridi/paneli: site genelinde her sayfada yüklenir
+       (bkz. assets/css/cerez-onay.css başındaki not). -->
+  <link rel="stylesheet" href="{{ '/assets/css/cerez-onay.css' | relative_url }}">
 
   <!-- ŞİFRE/TOKEN GÖSTER-GİZLE: site genelinde HER type="password" alanına
        (giriş/kayıt/panel şifreleri, panel > GitHub Yönetimi PAT token'ı vb.)
@@ -137,6 +140,8 @@
        tek seferde yükleniyor (defer: DOM ayrıştırması bitince, ama
        DOMContentLoaded'dan hemen önce çalışır). -->
   <script defer src="{{ '/assets/js/sifre-goster.js' | relative_url }}"></script>
+  <!-- Çerez onay şeridi/paneli mantığı — bkz. assets/js/cerez-onay.js başındaki tasarım notları. -->
+  <script defer src="{{ '/assets/js/cerez-onay.js' | relative_url }}"></script>
 
   {% if page.auth_css %}
   <!-- auth.css: giris/kayit/panel/admin sayfalarına özel stiller. Önceden
@@ -163,9 +168,20 @@
   {% endif %}
 
   {% if site.google_analytics_id and site.google_analytics_id != "" %}
-  <!-- Google Analytics (Performans Optimize: İlk sayfa çizimini geciktirmemesi için yükleme arka plana ertelendi) -->
+  <!--
+    Google Analytics — ÇEREZ ONAYINA BAĞLI (KVKK/GDPR): bu script artık
+    sayfa yüklenir yüklenmez OTOMATİK ÇALIŞMAZ. Sadece bir FONKSİYON
+    tanımlar; bu fonksiyon yalnızca ziyaretçi "Analitik Çerezler"i
+    onayladığında (ya da daha önce onaylamışsa sayfa açılışında) bkz.
+    assets/js/cerez-onay.js tarafından çağrılır. Performans notu (Perf.
+    Opt.) hâlâ geçerli: gerçekten çağrıldığında script yine ana thread'i
+    bloklamadan (async) arka planda yüklenir.
+  -->
   <script>
-    window.addEventListener('load', function() {
+    window.__GA_MEASUREMENT_ID__ = "{{ site.google_analytics_id }}";
+    window.__cerezAnalitikYukle = function () {
+      if (window.__cerezAnalitikYuklendi) return;
+      window.__cerezAnalitikYuklendi = true;
       var script = document.createElement('script');
       script.src = 'https://www.googletagmanager.com/gtag/js?id={{ site.google_analytics_id }}';
       script.async = true;
@@ -173,9 +189,10 @@
 
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
+      window.gtag = gtag;
       gtag('js', new Date());
       gtag('config', '{{ site.google_analytics_id }}');
-    });
+    };
   </script>
   {% endif %}
   
@@ -269,9 +286,101 @@
       <p>
         &copy; {{ 'now' | date: "%Y" }} {{ site.title }}
         · <a href="{{ '/kurumsal/gizlilik-politikasi.html' | relative_url }}">Gizlilik Politikası</a>
+        · <button type="button" id="cerez-ayarlar-ac-btn" class="link-button">🍪 Çerez Ayarları</button>
       </p>
     </div>
   </footer>
+
+  <!--
+    ÇEREZ ONAY ŞERİDİ — KVKK/GDPR uyumlu açık rıza. Sadece localStorage'da
+    kayıtlı bir tercih YOKSA gösterilir (bkz. assets/js/cerez-onay.js).
+    "hidden" JS'siz tarayıcılarda da varsayılan olarak gizli kalır; bu
+    şerit tamamen JS ile açılıp kapatıldığı için, JS çalışmıyorsa hiçbir
+    isteğe bağlı çerez zaten yüklenmez (varsayılan = kapalı ilkesi).
+  -->
+  <div id="cerez-banner" class="cerez-banner" hidden role="region" aria-label="Çerez onayı">
+    <div class="cerez-banner-metin">
+      <strong>Çerez Kullanımı</strong>
+      <p>
+        Bu site, temel işlevler (oturum, tema tercihi) için gerekli teknik
+        depolamanın yanı sıra; açık rızanla ziyaretçi istatistikleri
+        (Google Analytics) ve yorum sistemi (Giscus/GitHub) için isteğe
+        bağlı çerezler/benzer teknolojiler kullanabilir. Tercihini
+        dilediğin zaman sayfa altındaki "Çerez Ayarları"ndan
+        değiştirebilir, istemediğin çerezleri kaldırabilirsin. Detaylar için
+        <a href="{{ '/kurumsal/gizlilik-politikasi.html' | relative_url }}">Gizlilik Politikası</a>.
+      </p>
+    </div>
+    <div class="cerez-banner-aksiyonlar">
+      <button type="button" id="cerez-sadece-zorunlu" class="cerez-btn-secondary">Sadece Zorunlu</button>
+      <button type="button" id="cerez-ayarlari-yonet" class="cerez-btn-secondary">Ayarları Yönet</button>
+      <button type="button" id="cerez-tumunu-kabul" class="cerez-btn-primary">Tümünü Kabul Et</button>
+    </div>
+  </div>
+
+  <!-- ÇEREZ TERCİH PANELİ — hem ilk ziyarette "Ayarları Yönet" hem de
+       daha sonra her an alt bilgideki "🍪 Çerez Ayarları" ile açılır. -->
+  <div id="cerez-panel-overlay" class="cerez-panel-overlay" hidden>
+    <div class="cerez-panel" role="dialog" aria-modal="true" aria-labelledby="cerez-panel-baslik">
+      <button type="button" id="cerez-panel-kapat-btn" class="cerez-panel-kapat" aria-label="Kapat">&times;</button>
+      <h2 id="cerez-panel-baslik">Çerez Tercihleri</h2>
+      <p class="muted">
+        Aşağıdaki kategorileri aç/kapat, sonra "Tercihleri Kaydet"e bas.
+        Bu paneli istediğin zaman sayfa altındaki "🍪 Çerez Ayarları"
+        bağlantısından yeniden açıp tercihini değiştirebilir, daha önce
+        izin verdiğin bir kategoriyi kapatarak ilgili çerezleri
+        kaldırabilirsin.
+      </p>
+
+      <div class="cerez-kategori">
+        <div class="cerez-kategori-baslik">
+          <label><input type="checkbox" checked disabled aria-readonly="true"> Zorunlu</label>
+          <span class="cerez-rozet">Her zaman açık</span>
+        </div>
+        <p class="muted">
+          Oturum açma durumu, tema (açık/koyu) tercihi ve site içi temel
+          işlevler için gereklidir; kapatılamaz çünkü site bunlarsız
+          çalışmaz.
+        </p>
+      </div>
+
+      {% if site.google_analytics_id and site.google_analytics_id != "" %}
+      <div class="cerez-kategori">
+        <div class="cerez-kategori-baslik">
+          <label><input type="checkbox" id="cerez-analitik-kutu"> Analitik</label>
+        </div>
+        <p class="muted">
+          Google Analytics ile anonimleştirilmiş ziyaretçi istatistikleri
+          (ülke, cihaz, genel kullanım davranışı) toplanmasını sağlar.
+          Kapatırsan, tarayıcında zaten kurulmuş olan Analytics
+          çerezleri (_ga, _gid, _gat) hemen silinir.
+        </p>
+      </div>
+      {% endif %}
+
+      {% if site.giscus.repo_id and site.giscus.repo_id != "GISCUS_REPO_ID_BURAYA" %}
+      <div class="cerez-kategori">
+        <div class="cerez-kategori-baslik">
+          <label><input type="checkbox" id="cerez-islevsel-kutu"> İşlevsel / Üçüncü Taraf</label>
+        </div>
+        <p class="muted">
+          Blog/proje sayfalarındaki Giscus (GitHub Discussions tabanlı)
+          yorum widget'ının yüklenmesini sağlar. Kapatırsan widget
+          sayfadan kaldırılır; ancak giscus.app/github.com alan
+          adlarında halihazırda oluşmuş çerezler, farklı bir alan adına
+          ait oldukları için bu site tarafından silinemez — bunları
+          kaldırmak istersen tarayıcı ayarlarından temizlemen gerekir
+          (bkz. Gizlilik Politikası).
+        </p>
+      </div>
+      {% endif %}
+
+      <div class="cerez-panel-aksiyonlar">
+        <button type="button" id="cerez-panel-reddet" class="cerez-btn-secondary">Sadece Zorunlu</button>
+        <button type="button" id="cerez-panel-kaydet" class="cerez-btn-primary">Tercihleri Kaydet</button>
+      </div>
+    </div>
+  </div>
 
   <script>
     (function () {
