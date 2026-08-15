@@ -195,6 +195,7 @@ function renderUserTable(kullanicilar) {
           <select class="rol-select" data-id="${u.id}">
             <option value="user" ${u.role === "user" ? "selected" : ""}>Üye</option>
             <option value="special_user" ${u.role === "special_user" ? "selected" : ""}>Özel Üye</option>
+            <option value="editor" ${u.role === "editor" ? "selected" : ""}>Editör</option>
             <option value="admin" ${u.role === "admin" ? "selected" : ""}>Yönetici</option>
           </select>
         </td>
