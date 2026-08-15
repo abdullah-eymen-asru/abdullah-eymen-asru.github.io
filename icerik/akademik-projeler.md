@@ -22,13 +22,14 @@ permalink: "/icerik/akademik-projeler.html"
 <div id="project-list">
   {% for project in sorted_projects %}
   <div class="project-card searchable"
-       data-search="{{ project.title | downcase }} {{ project.summary | strip_html | downcase }} {{ project.venue | downcase }}"
+       data-search="{{ project.title | downcase }} {{ project.author | downcase }} {{ project.summary | strip_html | downcase }} {{ project.venue | downcase }}"
        {% if forloop.index > 8 %}data-hidden-by-page="true" style="display:none;"{% endif %}>
     <h3><a href="{{ project.url | relative_url }}">{{ project.title }}</a></h3>
     <div class="meta">
       {% if project.venue %}{{ project.venue }}{% endif %}
       {% if project.date %} · {{ project.date | date: "%Y" }}{% endif %}
       {% if project.status %} · <span class="tag">{{ project.status }}</span>{% endif %}
+      {% if project.author %} · ✍️ {{ project.author }}{% endif %}
     </div>
     <p>{{ project.summary }}</p>
   </div>
