@@ -21,9 +21,10 @@ import { supabase } from "./supabase-client.js";
 
 /**
  * @param {Object} opts
- * @param {'user'|'special_user'|'admin'|null} opts.role
+ * @param {'user'|'special_user'|'editor'|'admin'|null} opts.role
  *   null/undefined  -> sadece giriş yapmış olmak yeterli
  *   'special_user'  -> special_user VEYA admin erişebilir
+ *   'editor'        -> editor VEYA admin erişebilir
  *   'admin'         -> sadece admin erişebilir
  * @param {string} opts.redirectTo - yetkisizse gidilecek sayfa
  */
@@ -69,11 +70,21 @@ export async function requireAuth({ role = null, redirectTo = "/hesap/giris.html
     return new Promise(() => {});
   }
 
+  // BUG FİX: bu kontrol öncesinde SADECE role==='special_user' özel olarak
+  // ele alınıyordu (zaten yukarıdaki profile.role === role satırı bunu
+  // gereksiz kılıyordu) — role==='editor' için HİÇBİR dal yoktu. Sonuç:
+  // github-yonetim.js'in istediği requireAuth({role:'editor'}) çağrısında
+  // editor rolündeki bir kullanıcı için roleOk hiçbir zaman true olmuyor,
+  // "admin her zaman geçer" satırı sadece admin'i kurtarıyordu — yani editor
+  // rolündeki kullanıcılar GitHub İçerik Yönetimi paneline hiç giremiyordu
+  // (bkz. panel/github-yonetim.md, dosya başındaki yorum bunun ZATEN böyle
+  // çalışması gerektiğini varsayıyordu ama kod bunu sağlamıyordu). Şimdi
+  // role==='editor' isteği hem 'editor' hem 'admin' profiline izin veriyor;
+  // role==='special_user' isteği de aynı şekilde hem kendisine hem admin'e.
   const roleOk =
     role === null ||
     profile.role === role ||
-    profile.role === "admin" || // admin her zaman geçer
-    (role === "special_user" && profile.role === "special_user");
+    profile.role === "admin"; // admin her zaman geçer
 
   if (!roleOk) {
     // Giriş yapmış ama yetkisi yok -> panel sayfasına yolla, giriş sayfasına değil
