@@ -197,6 +197,33 @@ permalink: "/panel/github-yonetim.html"
               </span>
             </label>
           </div>
+          <div class="form-field" id="ic-gizli-hedef-wrap" hidden>
+            <label>Yayında değilken nerede saklansın?</label>
+            <div class="gy-tip-secim">
+              <label class="gy-radio">
+                <input type="radio" name="gizli-hedef" value="supabase" checked>
+                🗄️ Supabase'te taslak (önerilen — GitHub'a hiç commit edilmez)
+              </label>
+              <label class="gy-radio">
+                <input type="radio" name="gizli-hedef" value="github">
+                🐙 GitHub'a commit et (eski yöntem — <code>yayinda: false</code> + gizli linkle)
+              </label>
+            </div>
+            <p class="gy-yardim-metni">
+              <strong>Supabase'te taslak:</strong> içerik GitHub'a hiç
+              dokunmaz, reponun git geçmişinde hiçbir iz bırakmaz — en
+              gizli seçenek budur.
+              <strong>GitHub'a commit et:</strong> içerik yine bu depoya
+              <code>yayinda: false</code> ve tahmin edilemez bir
+              <code>permalink</code> ile commit edilir; dosya reponun
+              (herkese açık ise) git geçmişinde durmaya devam eder, sadece
+              adresi paylaşılmadığı için gizli sayılır. Bu eski yöntem;
+              içeriği GitHub üzerinden elle düzenlemek, zamanlanmış
+              otomatik yayınla birlikte kullanmak ya da tercihen Supabase
+              yerine git'te tutmak isteyenler için hâlâ burada duruyor
+              (bkz. <code>rehber/01-site-rehberi.md</code> § 9).
+            </p>
+          </div>
           <div id="ic-onizleme-kutusu" class="gy-onizleme-kutusu" hidden>
             <div class="gy-onizleme-baslik">🔒 Gizli ön izleme linki</div>
             <p class="muted">
