@@ -40,7 +40,7 @@ create table if not exists public.mfa_yedek_kodlar (
 );
 
 comment on table public.mfa_yedek_kodlar is
-  '2FA (TOTP) yedek/kurtarma kodları — sadece SHA-256 hash''i saklanır, düz metin kod hiçbir yerde tutulmaz. Erişim SADECE yedek_kodlar_olustur() / yedek_kod_ile_2fa_kaldir() / yedek_kod_durumu() fonksiyonları üzerinden; tabloya doğrudan RLS policy'si YOK.';
+  '2FA (TOTP) yedek/kurtarma kodları — sadece SHA-256 hash''i saklanır, düz metin kod hiçbir yerde tutulmaz. Erişim SADECE yedek_kodlar_olustur() / yedek_kod_ile_2fa_kaldir() / yedek_kod_durumu() fonksiyonları üzerinden; tabloya doğrudan RLS policy''si YOK.';
 comment on column public.mfa_yedek_kodlar.kod_hash is
   'upper(kod) üzerinden sha256 hex digest''i (bkz. digest(..., ''sha256'')). Düz metin kod asla saklanmaz.';
 
