@@ -15,6 +15,44 @@
           : "light";
       }
 
+      // ÇEREZ ONAYI (KVKK/GDPR): Giscus, giscus.app/github.com üzerinden
+      // bir iframe yükler ve o alan adlarına ait çerezler kurar — bu
+      // yüzden "İşlevsel/Üçüncü Taraf" kategorisi onaylanmadan widget
+      // HİÇ yüklenmez (bkz. assets/js/cerez-onay.js).
+      //
+      // NOT (yarış durumu önlemi): bu inline script, sayfa gövdesi
+      // ayrıştırılırken HEMEN çalışır — <head>'deki "defer" işaretli
+      // cerez-onay.js ise DOM ayrıştırması bitene KADAR çalışmaz. Yani
+      // IntersectionObserver çok erken tetiklenirse (container sayfa
+      // açılışında zaten görünür alandaysa) window.CerezTercihleri henüz
+      // TANIMLANMAMIŞ olabilir. Bu yüzden global API'ye güvenmek yerine
+      // localStorage'ı DOĞRUDAN okuyoruz (anahtar adı cerez-onay.js
+      // içindeki CEREZ_ANAHTAR ile aynı olmalı: "cerez_tercihleri").
+      function islevselOnayVarMi() {
+        try {
+          const ham = localStorage.getItem("cerez_tercihleri");
+          if (!ham) return false;
+          const veri = JSON.parse(ham);
+          return !!(veri && veri.islevsel);
+        } catch (e) {
+          return false;
+        }
+      }
+
+      function yerTutucuGoster() {
+        const container = document.getElementById("giscus-container");
+        if (!container || iframeKuruldu) return;
+        container.innerHTML =
+          '<p class="muted">Yorumları görüntülemek için "İşlevsel / Üçüncü Taraf" çerezlerini (Giscus – GitHub Discussions) kabul etmen gerekiyor.</p>' +
+          '<button type="button" id="giscus-cerez-kabul-btn" class="cerez-btn-secondary">İşlevsel Çerezleri Kabul Et ve Yorumları Göster</button>';
+        document.getElementById("giscus-cerez-kabul-btn")?.addEventListener("click", () => {
+          // Ziyaretçinin analitik tercihini BOZMADAN sadece işlevsel
+          // kategoriyi açıyoruz (analitik daha önce açıksa açık kalır).
+          const mevcut = (window.CerezTercihleri && window.CerezTercihleri.al()) || { analitik: false };
+          window.CerezTercihleri && window.CerezTercihleri.kaydet(mevcut.analitik, true);
+        });
+      }
+
       // DÜZELTME (v2): Önceki iki yaklaşım da (postMessage-only, sonra
       // "her tema değişiminde iframe'i tamamen yık ve yeniden kur") görsel
       // bir bozulmaya yol açıyordu — ikinci yaklaşımda özellikle, iframe
@@ -105,12 +143,34 @@
         new IntersectionObserver(function (entries, obs) {
           entries.forEach(function (entry) {
             if (entry.isIntersecting) {
-              girisusKur();
+              if (islevselOnayVarMi()) {
+                girisusKur();
+              } else {
+                yerTutucuGoster();
+              }
               obs.disconnect();
             }
           });
         }, { rootMargin: "200px" }).observe(container);
       }
+
+      // Ziyaretçi tercihini SONRADAN (panel üzerinden) değiştirirse —
+      // izin verirse widget'ı kur, izni geri çekerse kaldır. cerez-onay.js
+      // bu olayı her "kaydet" çağrısında yayınlar (bkz. tercihleriUygula).
+      document.addEventListener("cerez-islevsel-degisti", function (e) {
+        if (e.detail && e.detail.acik) {
+          girisusKur();
+        } else if (iframeKuruldu) {
+          // DÜRÜSTLÜK PAYI: giscus.app/github.com alan adlarında zaten
+          // oluşmuş çerezleri buradan (farklı origin olduğu için)
+          // SİLEMEYİZ — sadece widget'ı kaldırıp yeni veri toplanmasını
+          // engelleyebiliriz (bkz. Gizlilik Politikası § Çerezler).
+          const c = document.getElementById("giscus-container");
+          if (c) c.innerHTML = "";
+          iframeKuruldu = false;
+          yerTutucuGoster();
+        }
+      });
     })();
   </script>
 </div>
