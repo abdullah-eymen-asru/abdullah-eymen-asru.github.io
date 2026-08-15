@@ -169,7 +169,12 @@ export default {
         { headers: restHeaders }
       );
       const profilData = profilRes.ok ? await profilRes.json() : [];
-      const isAdmin = profilData?.[0]?.role === "admin";
+      // 'manager' (panelde "İçerik Sorumlusu") rolü, admin panelindeki R2
+      // Dosya Paylaşımı bölümüne admin ile AYNI (herhangi bir key için,
+      // content_access ataması aranmadan) erişebiliyor — bkz.
+      // supabase/migrations/0016_..._admin_adina_onay.sql ve panel/admin.md.
+      const rol = profilData?.[0]?.role;
+      const isAdmin = rol === "admin" || rol === "manager";
 
       if (!isAdmin) {
         if (!uuidRegex.test(contentId)) {
