@@ -24,6 +24,12 @@
   border-top: 1px solid var(--border);
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
 }
+/* Aynı specificity çakışması .cerez-panel-overlay için de geçerli
+   (bkz. aşağıdaki açıklama) — şerit de "hidden" iken KESİN olarak
+   gizlenmeli, kaynak sırası şansına bırakılmamalı. */
+.cerez-banner[hidden] {
+  display: none !important;
+}
 
 .cerez-banner-metin {
   flex: 1 1 320px;
@@ -108,6 +114,21 @@
      ekliyoruz (bkz. assets/js/cerez-onay.js -> panelKapat). */
   opacity: 1;
   transition: opacity 0.18s ease;
+}
+/*
+ * KRİTİK DÜZELTME: "[hidden]" (tarayıcının dahili user-agent kuralı,
+ * display:none verir) ile yukarıdaki ".cerez-panel-overlay" kuralı AYNI
+ * ÖZGÜLLÜKTE (0,1,0) olduğu için, bu CSS dosyasındaki kural KAYNAK
+ * SIRASINDA SONRA geldiğinden UA kuralını EZİYORDU — yani panel,
+ * <div ... hidden> ile işaretlense bile HER ZAMAN görünür kalıyor,
+ * sayfa yüklenir yüklenmez (kullanıcı hiçbir butona basmadan) ekranda
+ * beliriyordu. "display:none !important" ile bunu KESİN olarak
+ * kapatıyoruz; JS zaten panelAc()'ta "hidden" attribute'unu kaldırıp
+ * panelKapat()'ta geri ekliyor (bkz. assets/js/cerez-onay.js), burada
+ * sadece CSS'in bu attribute'a gerçekten uymasını garanti ediyoruz.
+ */
+.cerez-panel-overlay[hidden] {
+  display: none !important;
 }
 .cerez-panel-overlay.cerez-panel-kapaniyor {
   opacity: 0;
