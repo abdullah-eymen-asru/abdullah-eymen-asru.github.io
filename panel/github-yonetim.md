@@ -84,6 +84,16 @@ permalink: "/panel/github-yonetim.html"
             <label for="ic-title">Başlık</label>
             <input id="ic-title" type="text" required>
           </div>
+          <div class="form-field" id="ic-yazar-wrap">
+            <label for="ic-yazar-adi">Yazar</label>
+            <select id="ic-yazar-secim" hidden></select>
+            <input id="ic-yazar-adi" type="text" placeholder="Yazar adı" autocomplete="off" readonly hidden>
+            <p class="gy-yardim-metni">
+              Yönetici (admin) iseniz, içerik yönetebilen (editör/yönetici)
+              kullanıcılar arasından yazar seçebilirsiniz. Editör iseniz bu
+              alan otomatik olarak kendi adınızla dolar ve değiştirilemez.
+            </p>
+          </div>
           <div class="form-field">
             <label for="ic-date">Tarih</label>
             <input id="ic-date" type="date" required>
@@ -244,8 +254,18 @@ permalink: "/panel/github-yonetim.html"
             </div>
           </div>
 
+          <p class="gy-yardim-metni" id="ic-yayin-secenek-yardim" hidden>
+            <strong>🅰️ Doğrudan GitHub'a Aktar ve Yayınla:</strong> içerik
+            Supabase'e hiç kaydedilmeden doğrudan GitHub'a commit edilir
+            (mevcut/varsayılan yöntem).
+            <strong>🅱️ Supabase'e Kaydet ve GitHub ile Yayınla:</strong>
+            içerik hem Supabase'e (kalıcı bir yedek/arama kaydı olarak) hem
+            de GitHub'a yazılır — ikisi de aynı içeriği gösterir, panelde
+            tek bir kart olarak listelenir.
+          </p>
           <div style="display:flex; gap:10px; flex-wrap: wrap;">
-            <button type="submit" id="ic-submit-btn" class="btn-primary" style="width:auto;">GitHub'a Yayınla</button>
+            <button type="submit" id="ic-submit-btn" class="btn-primary" style="width:auto;">🅰️ Doğrudan GitHub'a Aktar ve Yayınla</button>
+            <button type="button" id="ic-submit-b-btn" class="btn-primary" style="width:auto;" hidden>🅱️ Supabase'e Kaydet ve GitHub ile Yayınla</button>
             <button type="button" id="ic-iptal-btn" class="btn-danger" style="width:auto;" hidden>Düzenlemeyi İptal Et</button>
           </div>
         </form>
@@ -260,7 +280,7 @@ permalink: "/panel/github-yonetim.html"
         <div class="gy-liste-araclar">
           <div class="gy-arama-kutu">
             <span class="gy-arama-ikon" aria-hidden="true">🔎</span>
-            <input id="ic-liste-arama" type="search" placeholder="Başlık, dosya adı veya özet içinde ara..." autocomplete="off">
+            <input id="ic-liste-arama" type="search" placeholder="Başlık, yazar veya içerik metninde ara..." autocomplete="off">
             <button type="button" id="ic-liste-arama-temizle" class="gy-arama-temizle" hidden aria-label="Aramayı temizle">✕</button>
           </div>
           <div class="gy-tur-sekmeleri" role="tablist" aria-label="İçerik türüne göre filtrele">
