@@ -719,7 +719,10 @@ async function renderMfaDurumu(box) {
         ✓ İki faktörlü doğrulama (2FA) aktif.
       </p>
       <button id="mfa-kaldir-btn" type="button" class="btn-danger" style="width:auto;">2FA'yı Kaldır</button>
-      <div id="mfa-message" class="auth-message" hidden></div>`;
+      <div id="mfa-message" class="auth-message" hidden></div>
+      <div id="yedek-kod-alani" style="margin-top:20px; border-top:1px solid var(--border); padding-top:16px;">
+        <p class="muted">Yükleniyor...</p>
+      </div>`;
 
     document.getElementById("mfa-kaldir-btn").addEventListener("click", async () => {
       if (!confirm("2FA'yı kaldırmak istediğine emin misin? Hesabın tekrar sadece şifreyle korunacak.")) return;
@@ -731,8 +734,18 @@ async function renderMfaDurumu(box) {
         showMessage(msg, "Kaldırılamadı: " + unenrollErr.message);
         return;
       }
+      // 2FA kapandığına göre eski yedek kodların artık bir anlamı yok —
+      // best-effort temizlik (başarısız olsa da 2FA kaldırma işlemini
+      // engellemesin diye hatası yutuluyor).
+      try {
+        await supabase.rpc("yedek_kodlar_temizle");
+      } catch (_e) {
+        /* önemsiz — kodlar zaten faktörsüz işe yaramaz */
+      }
       await renderMfaDurumu(box);
     });
+
+    await renderYedekKodDurumu(document.getElementById("yedek-kod-alani"));
     return;
   }
 
@@ -886,8 +899,168 @@ function mfaDogrulamayiBagla(enrollData, msg, box) {
       }
 
       showMessage(msg, "2FA başarıyla etkinleştirildi.", "success");
-      await renderMfaDurumu(box);
+
+      // 2FA yeni etkinleştirildi -> hemen yedek/kurtarma kodları üret ve
+      // göster. Bu kodlar SADECE ŞİMDİ, bir kereliğine dönüyor (düz metin
+      // hiçbir yerde saklanmıyor) — kullanıcı authenticator uygulamasına
+      // erişimini kaybederse (telefon değişimi, uygulama silinmesi vb.)
+      // hesabına bu kodlarla geri dönebilsin diye.
+      const { data: kodlar, error: kodErr } = await supabase.rpc("yedek_kodlar_olustur");
+      if (kodErr || !Array.isArray(kodlar) || kodlar.length === 0) {
+        // Kritik değil — 2FA zaten aktifleşti, kullanıcı panelden
+        // "Yeni Yedek Kodlar Oluştur" ile daha sonra da üretebilir.
+        console.error("Yedek kodlar oluşturulamadı:", kodErr);
+        await renderMfaDurumu(box);
+        return;
+      }
+      box.innerHTML = `
+        <p class="auth-message auth-message--success" style="position:static;">
+          ✓ İki faktörlü doğrulama (2FA) aktif.
+        </p>
+        <div id="yedek-kod-goster-alani"></div>`;
+      yedekKodlariGosterVeIndir(
+        document.getElementById("yedek-kod-goster-alani"),
+        kodlar,
+        () => renderMfaDurumu(box)
+      );
     });
+}
+
+/* ---------------------------------------------------------------------- */
+/* 2FA YEDEK/KURTARMA KODLARI                                              */
+/* Authenticator uygulamasına erişim kaybedilirse (telefon değişimi,       */
+/* uygulama silinmesi vb.) diye TEK SEFERLİK kullanılabilen yedek kodlar.  */
+/* Düz metin kodlar SADECE üretildikleri an (yedek_kodlar_olustur RPC'si   */
+/* dönüşünde) görünür; veritabanında yalnızca SHA-256 hash'leri tutulur    */
+/* (bkz. supabase/migrations/0017_2fa_yedek_kodlar.sql).                   */
+/* ---------------------------------------------------------------------- */
+
+/** Aktif-2FA görünümündeki "Yedek Kodlar" alt bölümü: kalan/toplam kod
+ * sayısını gösterir ve (yeniden) oluşturma butonunu bağlar. */
+async function renderYedekKodDurumu(alan) {
+  if (!alan) return;
+  alan.innerHTML = `<p class="muted">Yükleniyor...</p>`;
+
+  const { data, error } = await supabase.rpc("yedek_kod_durumu");
+  const durum = Array.isArray(data) ? data[0] : data;
+  const kalan = !error && durum ? durum.kalan : 0;
+  const toplam = !error && durum ? durum.toplam : 0;
+
+  const durumMetni =
+    toplam === 0
+      ? "Henüz yedek kod oluşturmadın."
+      : `${kalan} / ${toplam} yedek kod kullanılabilir.`;
+
+  alan.innerHTML = `
+    <h3 style="margin:0 0 6px; font-size:1rem;">Yedek Kodlar</h3>
+    <p class="muted" style="margin-top:0;">
+      Authenticator uygulamana erişimini kaybedersen (telefon değişimi,
+      uygulama silinmesi vb.) hesabına girmeni sağlar. ${escapeHtml(durumMetni)}
+    </p>
+    <button id="yedek-kod-olustur-btn" type="button" class="btn-secondary" style="width:auto;">
+      ${toplam === 0 ? "Yedek Kodları Oluştur" : "Yeni Yedek Kodlar Oluştur"}
+    </button>
+    <div id="yedek-kod-durum-message" class="auth-message" hidden></div>
+    <div id="yedek-kod-goster-alani" style="margin-top:12px;"></div>`;
+
+  document.getElementById("yedek-kod-olustur-btn").addEventListener("click", async () => {
+    if (
+      toplam > 0 &&
+      !confirm("Yeni kodlar oluşturmak MEVCUT tüm yedek kodlarını geçersiz kılar. Devam edilsin mi?")
+    ) {
+      return;
+    }
+    const btn = document.getElementById("yedek-kod-olustur-btn");
+    const msg = document.getElementById("yedek-kod-durum-message");
+    btn.disabled = true;
+
+    const { data: kodlar, error: kodErr } = await supabase.rpc("yedek_kodlar_olustur");
+    btn.disabled = false;
+
+    if (kodErr || !Array.isArray(kodlar) || kodlar.length === 0) {
+      showMessage(msg, "Kodlar oluşturulamadı: " + (kodErr?.message || "bilinmeyen hata"));
+      return;
+    }
+
+    yedekKodlariGosterVeIndir(document.getElementById("yedek-kod-goster-alani"), kodlar, () =>
+      renderYedekKodDurumu(alan)
+    );
+  });
+}
+
+/** Üretilen düz metin kodları ekrana basar + kısa süreli indirilebilir bir
+ * .txt dosyası sunar. Blob URL'i tarayıcı belleğinde oluşturulur (sunucuya
+ * hiç gitmez) ve kullanıcının hemen kaydetmesi için sınırlı bir süre sonra
+ * (2 dk) otomatik olarak geçersiz kılınır. */
+function yedekKodlariGosterVeIndir(alan, kodlar, devamCallback) {
+  if (!alan) return;
+
+  const dosyaIcerik =
+    `Abdullah Eymen Asru — 2FA Yedek Kodları\n` +
+    `Oluşturulma: ${new Date().toLocaleString("tr-TR")}\n\n` +
+    `Her kod SADECE BİR KERE kullanılabilir. Bu dosyayı güvenli bir yerde\n` +
+    `sakla (şifre yöneticisi, kasa vb.) — authenticator uygulamana\n` +
+    `erişemediğinde hesabına girmek için gerekecek.\n\n` +
+    kodlar.join("\n") +
+    `\n`;
+
+  const blob = new Blob([dosyaIcerik], { type: "text/plain;charset=utf-8" });
+  const blobUrl = URL.createObjectURL(blob);
+  const dosyaAdi = `2fa-yedek-kodlar-${new Date().toISOString().slice(0, 10)}.txt`;
+
+  alan.innerHTML = `
+    <p class="auth-message auth-message--success" style="position:static;">
+      Yeni yedek kodların hazır. Bu kodlar SADECE ŞİMDİ gösteriliyor —
+      bir daha görüntülenemez, mutlaka kaydet.
+    </p>
+    <div class="yedek-kod-liste">
+      ${kodlar.map((k) => `<code>${escapeHtml(k)}</code>`).join("")}
+    </div>
+    <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+      <a id="yedek-kod-indir-link" class="btn-secondary" style="width:auto;" href="${blobUrl}" download="${dosyaAdi}">
+        İndir (.txt)
+      </a>
+      <button id="yedek-kod-kopyala-btn" type="button" class="btn-secondary" style="width:auto;">Panoya Kopyala</button>
+      <button id="yedek-kod-devam-btn" type="button" class="btn-primary" style="width:auto;">Kaydettim, Devam Et</button>
+    </div>
+    <p id="yedek-kod-indir-durum" class="muted" style="font-size:0.85rem; margin-top:8px;">
+      İndirme bağlantısı yaklaşık 2 dakika içinde geçersiz olur.
+    </p>`;
+
+  document.getElementById("yedek-kod-kopyala-btn").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(kodlar.join("\n"));
+      showMessage(document.getElementById("yedek-kod-indir-durum"), "Panoya kopyalandı.", "success");
+    } catch (_e) {
+      showMessage(document.getElementById("yedek-kod-indir-durum"), "Kopyalanamadı, kodları elle seçip kopyala.");
+    }
+  });
+
+  // Kısa süreli indirilebilir dosya: blob URL'i ve indirme bağlantısı
+  // belirli bir süre sonra devre dışı bırakılır — dosya sunucuda hiç
+  // saklanmadığı için bu, kullanıcıyı kodları HEMEN indirmeye/kaydetmeye
+  // yönlendiren bir güvenlik önlemidir.
+  const sureMs = 120000;
+  const zamanlayici = setTimeout(() => {
+    URL.revokeObjectURL(blobUrl);
+    const link = document.getElementById("yedek-kod-indir-link");
+    const durumEl = document.getElementById("yedek-kod-indir-durum");
+    if (link) {
+      link.removeAttribute("href");
+      link.style.opacity = "0.5";
+      link.style.pointerEvents = "none";
+      link.textContent = "İndirme süresi doldu";
+    }
+    if (durumEl) {
+      durumEl.textContent = "İndirme bağlantısının süresi doldu — kodlar hâlâ yukarıda, elle kopyalayabilirsin.";
+    }
+  }, sureMs);
+
+  document.getElementById("yedek-kod-devam-btn").addEventListener("click", () => {
+    clearTimeout(zamanlayici);
+    URL.revokeObjectURL(blobUrl);
+    if (typeof devamCallback === "function") devamCallback();
+  });
 }
 
 /* ---------------------------------------------------------------------- */
