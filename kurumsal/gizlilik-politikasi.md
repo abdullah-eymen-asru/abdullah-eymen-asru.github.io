@@ -115,7 +115,9 @@ permalink: "/kurumsal/gizlilik-politikasi.html"
   Analytics</strong> kullanır. Bu araç; ülke, cihaz türü, tarayıcı ve genel
   kullanım davranışı gibi anonimleştirilmiş verileri toplar. Üyelik
   sisteminden bağımsız olarak, kişisel olarak sizi tanımlayacak bir veri
-  bu araç üzerinden toplanmaz.
+  bu araç üzerinden toplanmaz. <strong>Bu araç, aşağıdaki § 9'da açıklanan
+  çerez onayı olmadan hiçbir şekilde çalışmaz</strong> — açık rızanı
+  vermeden Google Analytics çerezi kurulmaz.
 </p>
 
 <h2>8. Yorumlar</h2>
@@ -124,16 +126,78 @@ permalink: "/kurumsal/gizlilik-politikasi.html"
   <strong>GitHub hesabınla</strong> giriş yapman gerekir (Giscus altyapısı,
   GitHub Discussions üzerinden çalışır). Yaptığın yorumlar GitHub'ın kendi
   platformunda, GitHub hesabınla ilişkilendirilmiş şekilde saklanır — bu
-  site ayrıca hiçbir yorum verisi tutmaz.
+  site ayrıca hiçbir yorum verisi tutmaz. Yorum widget'ının kendisi de
+  aşağıdaki § 9'da açıklanan çerez onayı olmadan yüklenmez.
 </p>
 
-<h2>9. Tema Tercihi ve Çerezler</h2>
+<h2>9. Çerezler ve Benzer Teknolojiler</h2>
 <p>
-  Açık/koyu tema seçimin ve dil uyarı şeridinin kapatılma durumu,
-  tarayıcının <code>localStorage</code> özelliği ile yalnızca senin
-  cihazında saklanır; hiçbir sunucuya gönderilmez ve üçüncü taraflarla
-  paylaşılmaz. Üyelik oturumun (giriş durumun), Supabase Auth tarafından
-  yönetilen bir oturum belirteci (token) ile tarayıcında tutulur.
+  Siteye ilk girişinde, sayfanın altında bir <strong>çerez onay
+  şeridi</strong> görürsün. Bu şerit, 6698 sayılı KVKK'nın çerez
+  uygulamalarına ilişkin rehberi ve AB Genel Veri Koruma Tüzüğü (GDPR)
+  ile uyumlu şekilde, <strong>zorunlu olmayan hiçbir çerezin açık rızan
+  olmadan kurulmamasını</strong> sağlar: sayfa ilk açıldığında zorunlu
+  teknik depolama dışında hiçbir şey yüklenmez; Analitik ve İşlevsel/
+  Üçüncü Taraf kategorileri yalnızca sen "Tümünü Kabul Et" dersen ya da
+  "Ayarları Yönet" panelinden ilgili kategoriyi işaretleyip kaydedersen
+  etkinleşir.
+</p>
+<table>
+  <thead>
+    <tr><th>Kategori</th><th>Amaç</th><th>Kapatılabilir mi?</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Zorunlu</strong></td>
+      <td>
+        Oturum açma durumu (Supabase Auth token), açık/koyu tema tercihi,
+        dil uyarı şeridinin kapatılma durumu ve (panel kullanıcıları için)
+        GitHub İçerik Yönetimi panelindeki bağlantı ayarları —
+        <code>localStorage</code> ile yalnızca kendi cihazında saklanır,
+        hiçbir sunucuya gönderilmez, üçüncü taraflarla paylaşılmaz.
+      </td>
+      <td>Hayır — site bunlarsız çalışmaz.</td>
+    </tr>
+    <tr>
+      <td><strong>Analitik</strong></td>
+      <td>
+        Google Analytics; ülke, cihaz türü, tarayıcı ve genel kullanım
+        davranışı gibi anonimleştirilmiş istatistikleri toplamak için
+        <code>_ga</code>, <code>_gid</code>, <code>_gat</code> önekli
+        çerezleri kurar.
+      </td>
+      <td>
+        Evet — reddedersen hiç kurulmaz; daha önce kabul ettiysen ve
+        sonradan kapatırsan, bu site kendi alan adında zaten oluşmuş bu
+        çerezleri anında siler.
+      </td>
+    </tr>
+    <tr>
+      <td><strong>İşlevsel / Üçüncü Taraf</strong></td>
+      <td>
+        Blog/proje sayfalarındaki Giscus (GitHub Discussions tabanlı)
+        yorum widget'ının yüklenmesini sağlar; widget, giscus.app ve
+        github.com alan adlarından çerez kurabilir.
+      </td>
+      <td>
+        Evet — reddedersen widget hiç yüklenmez (yerine "kabul et"
+        butonu içeren bir yer tutucu görünür); sonradan kapatırsan
+        widget sayfadan kaldırılır. <strong>Önemli sınır:</strong>
+        giscus.app/github.com alan adlarında zaten oluşmuş çerezleri, bu
+        site (farklı bir alan adı olduğu için tarayıcı güvenlik modeli
+        gereği) SİLEMEZ — bunları kaldırmak istersen tarayıcının kendi
+        "Site Verileri/Çerezler" ayarlarından o alan adlarını aramanız
+        gerekir.
+      </td>
+    </tr>
+  </tbody>
+</table>
+<p>
+  Tercihini istediğin zaman, sayfanın altındaki
+  <strong>"🍪 Çerez Ayarları"</strong> bağlantısıyla yeniden açabilir,
+  önceden verdiğin bir izni geri çekebilir ya da o ana kadar reddettiğin
+  bir kategoriyi sonradan kabul edebilirsin — değişiklik anında uygulanır,
+  sayfayı yenilemen gerekmez.
 </p>
 
 <h2>10. İletişim Formu</h2>
