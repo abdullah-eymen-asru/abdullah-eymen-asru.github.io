@@ -89,9 +89,24 @@ permalink: "/panel/github-yonetim.html"
             <select id="ic-yazar-secim" hidden></select>
             <input id="ic-yazar-adi" type="text" placeholder="Yazar adı" autocomplete="off" readonly hidden>
             <p class="gy-yardim-metni">
-              Yönetici (admin) iseniz, içerik yönetebilen (editör/yönetici)
-              kullanıcılar arasından yazar seçebilirsiniz. Editör iseniz bu
-              alan otomatik olarak kendi adınızla dolar ve değiştirilemez.
+              Yönetici (admin) iseniz, içerik yönetebilen (editör/İçerik
+              Sorumlusu/yönetici) kullanıcılar arasından yazar seçebilirsiniz.
+              Editör veya İçerik Sorumlusu iseniz bu alan otomatik olarak
+              kendi adınızla dolar ve değiştirilemez.
+            </p>
+          </div>
+          <div class="form-field" id="ic-admin-adina-wrap" hidden>
+            <label class="gy-toggle-satir" for="ic-admin-adina-kutu">
+              <span>Admin adına yayınla (onay gerekir)</span>
+              <input id="ic-admin-adina-kutu" type="checkbox" role="switch">
+            </label>
+            <select id="ic-admin-adina-hedef" hidden></select>
+            <p class="gy-yardim-metni">
+              İşaretlersen bu içerik seçtiğin admin'in adıyla kaydedilir ve
+              "taslak" (gizli) durumunda admin onayına düşer — admin
+              onaylamadan gerçekten yayına alınamaz. Onaya düşene kadar
+              "Yayında" anahtarı ve "GitHub'a gizli commit et (eski
+              yöntem)" seçeneği devre dışı bırakılır.
             </p>
           </div>
           <div class="form-field">
