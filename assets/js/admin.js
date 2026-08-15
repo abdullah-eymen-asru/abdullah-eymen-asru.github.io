@@ -1,7 +1,14 @@
 /*
  * assets/js/admin.js — /panel/admin.html
- * Sadece role='admin' olan kullanıcılar bu sayfaya girebilir (requireAuth
- * ile zorlanır, RLS ile de veritabanı seviyesinde garanti edilir).
+ * role='admin' HERŞEYE erişir. role='manager' (panelde "İçerik Sorumlusu")
+ * de artık bu sayfaya girebilir ama SADECE "Özel İçerik Ekle/Düzenle",
+ * "Mevcut Özel İçerikler" ve "R2 Dosya Paylaşımı" sekmelerine — bkz. aşağıda
+ * init() içindeki TAM_YETKILI dalı. "Kullanıcılar & Roller", "Mesajlar" ve
+ * "Hesabım" sekmeleri manager için DOM'dan gizlenir; bu sadece bir UX
+ * katmanıdır, GERÇEK yetki sınırı veritabanı seviyesinde RLS ile (bkz.
+ * supabase/migrations/0016_icerik_sorumlusu_rolu_ve_admin_adina_onay.sql —
+ * profiles UPDATE, admin_set_user_role, mesajlaşma tabloları HÂLÂ sadece
+ * admin'e açık) zaten sağlanıyor.
  *
  * Bölüm (section) bazlı gezinme (sol menü), üye arama (isim/mail), içerik
  * DÜZENLEME, içerik atarken üye başına son geçerlilik TARİH+SAAT'i (Türkiye
@@ -33,9 +40,18 @@ let DUZENLENEN_ICERIK_ID = null; // null: yeni içerik ekleniyor, doluysa düzen
 let ATAMA_DURUMU = new Map();
 
 async function init() {
-  const { session } = await requireAuth({ role: "admin" });
+  const { session, profile } = await requireAuth({ role: ["admin", "manager"] });
+  // TAM_YETKILI=false demek: giren kişi 'manager' (İçerik Sorumlusu) —
+  // admin DEĞİL. Aşağıdaki dallanmalar bunu hem hangi adımların
+  // çalıştırılacağını hem de hangi sekmelerin görüneceğini belirlemek için
+  // kullanır.
+  const TAM_YETKILI = profile.role === "admin";
   document.getElementById("loading")?.setAttribute("hidden", "");
   document.getElementById("app").hidden = false;
+
+  if (!TAM_YETKILI) {
+    kisitliManagerGorunumunuUygula();
+  }
 
   wireSectionNav();
 
@@ -47,16 +63,28 @@ async function init() {
   // hiç çalışmamasına yol açıyordu.
   const adimlar = [
     ["süresi geçmiş erişim temizliği", () => temizleSuresiGecmisErisimler()],
+    // loadUsers() manager için de gerekli: "Erişim Verilecek Özel Üyeler"
+    // atama listesini (icerik-ekle sekmesi) doldurur — kullanıcı/rol tablosu
+    // (kullanicilar sekmesi) kendisi manager'dan zaten gizleniyor.
     ["kullanıcı listesi", () => loadUsers()],
     ["içerik listesi", () => loadContents()],
-    ["kullanıcı arama", () => wireUserSearch()],
     ["içerik atama arama", () => wireIcerikAtamaArama()],
     ["içerik formu", () => wireContentForm()],
-    ["kendi hesabını silme", () => wireCurrentAdminSelfDelete(session)],
-    ["e-posta değiştirme", () => wireAdminEmailChange()],
     ["dosya paylaşım", () => wireR2DosyaPaylasim()],
-    ["mesajlaşma", () => wireAdminChat(session.user.id)],
   ];
+
+  // Sadece admin'e özel adımlar: kullanıcı arama (kullanicilar sekmesi),
+  // kendi hesabını silme + e-posta değiştirme (hesabım/kullanicilar
+  // sekmeleri) ve mesajlaşma (mesajlar sekmesi). manager bu sekmeleri hiç
+  // görmediği için bu adımları çalıştırmaya da gerek yok.
+  if (TAM_YETKILI) {
+    adimlar.push(
+      ["kullanıcı arama", () => wireUserSearch()],
+      ["kendi hesabını silme", () => wireCurrentAdminSelfDelete(session)],
+      ["e-posta değiştirme", () => wireAdminEmailChange()],
+      ["mesajlaşma", () => wireAdminChat(session.user.id)]
+    );
+  }
 
   for (const [ad, fn] of adimlar) {
     try {
@@ -64,6 +92,39 @@ async function init() {
     } catch (err) {
       console.error(`admin.js: "${ad}" bölümü başlatılamadı:`, err);
     }
+  }
+}
+
+/**
+ * manager (İçerik Sorumlusu) girişinde: "Kullanıcılar & Roller", "Mesajlar"
+ * ve "Hesabım" sekmelerini (hem üstteki nav linkini hem section'ın
+ * kendisini) DOM'dan gizler ve varsayılan aktif sekmeyi "Özel İçerik
+ * Ekle/Düzenle"ye çeker. Bu SADECE bir UX katmanıdır — gerçek yetki sınırı
+ * RLS'te (bkz. dosya başındaki not).
+ */
+function kisitliManagerGorunumunuUygula() {
+  const gizlenecekSekmeler = ["kullanicilar", "mesajlar", "hesabim"];
+  gizlenecekSekmeler.forEach((id) => {
+    document.querySelector(`#admin-nav a[data-section="${id}"]`)?.setAttribute("hidden", "");
+    document.getElementById(id)?.setAttribute("hidden", "");
+  });
+
+  const kullanicilarLink = document.querySelector('#admin-nav a[data-section="kullanicilar"]');
+  const icerikEkleLink = document.querySelector('#admin-nav a[data-section="icerik-ekle"]');
+  kullanicilarLink?.classList.remove("active");
+  icerikEkleLink?.classList.add("active");
+
+  const baslik = document.querySelector("#app > h1");
+  if (baslik) baslik.textContent = "Admin Paneli — İçerik Sorumlusu Görünümü";
+
+  const nav = document.getElementById("admin-nav");
+  if (nav) {
+    const notu = document.createElement("p");
+    notu.className = "muted";
+    notu.style.cssText = "margin:8px 0 16px;font-size:0.85rem;";
+    notu.textContent =
+      "İçerik Sorumlusu rolündesin: sadece özel içerik ekleme/düzenleme ve R2 dosya paylaşımı bölümlerine erişimin var. Kullanıcı/rol yönetimi ve mesajlar sadece admin'e özeldir.";
+    nav.insertAdjacentElement("afterend", notu);
   }
 }
 
@@ -196,6 +257,7 @@ function renderUserTable(kullanicilar) {
             <option value="user" ${u.role === "user" ? "selected" : ""}>Üye</option>
             <option value="special_user" ${u.role === "special_user" ? "selected" : ""}>Özel Üye</option>
             <option value="editor" ${u.role === "editor" ? "selected" : ""}>Editör</option>
+            <option value="manager" ${u.role === "manager" ? "selected" : ""}>İçerik Sorumlusu</option>
             <option value="admin" ${u.role === "admin" ? "selected" : ""}>Yönetici</option>
           </select>
         </td>
