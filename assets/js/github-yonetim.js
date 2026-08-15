@@ -26,11 +26,17 @@
  * Supabase projesini (aynı `supabase` istemcisini) kullanıyor. O panel
  * Supabase'teki kullanıcı/rol/özel içerik sistemini yönetir; bu sayfa ise
  * GitHub Pages'in kendi statik Jekyll içeriğini (blog yazıları, akademik
- * projeler, profil fotoğrafı) yönetir. Erişim kontrolü de aynı: bu sayfaya
- * erişim de aynı requireAuth({ role: 'admin' }) mekanizmasıyla (bkz.
- * auth-guard.js), yani sadece Supabase'te role='admin' olan kullanıcılar
- * görebilir — taslak tablosunun RLS politikası da bunu veritabanı
- * seviyesinde ayrıca zorunlu kılıyor (bkz. migration 0013).
+ * projeler, profil fotoğrafı) yönetir. Erişim kontrolü: bu sayfaya
+ * requireAuth({ role: 'editor' }) ile giriliyor (bkz. auth-guard.js) — bu,
+ * hem role='editor' HEM role='admin' olan kullanıcıların girebilmesi
+ * anlamına gelir (auth-guard.js'te "admin her zaman geçer" kuralı zaten
+ * var, ayrıca bir değişiklik gerekmedi). role='user'/'special_user' olanlar
+ * hâlâ giremez. Taslak tablosunun RLS politikası da bunu veritabanı
+ * seviyesinde ayrıca zorunlu kılıyor — ama editor sadece KENDİ taslaklarını
+ * ekleyip/düzenleyip/silebilir, admin hepsini yönetebilir (bkz. migration
+ * 0014). Kullanıcı/rol yönetimi (panel/admin.md) HÂLÂ SADECE admin'e özel —
+ * admin.js kendi requireAuth çağrısında role:'admin' istiyor, editor oraya
+ * giremez (auth-guard.js otomatik olarak panel/panel.html'e yönlendirir).
  *
  * GÜVENLİK NOTU — GitHub Personal Access Token (PAT):
  *   Token SADECE bu modülün belleğinde (PAT_BELLEK değişkeni) tutulur.
@@ -78,8 +84,14 @@ let DUZENLENEN_GIZLI_KOD = null;
 
 let PROFIL_SHA = null;
 
+// Girişi yapan kullanıcının profili (id, full_name, email, role). Yazar
+// alanının otomatik doldurulması/açılır listesi bu bilgiye göre kurulur
+// (bkz. wireYazarAlani).
+let GIRIS_YAPAN_PROFIL = null;
+
 async function init() {
-  await requireAuth({ role: "admin" });
+  const { profile } = await requireAuth({ role: "editor" });
+  GIRIS_YAPAN_PROFIL = profile;
   document.getElementById("loading")?.setAttribute("hidden", "");
   document.getElementById("app").hidden = false;
 
@@ -90,6 +102,7 @@ async function init() {
     ["ayarları yükle", () => ghAyarlariniYukle()],
     ["bölüm navigasyonu", () => wireSectionNav()],
     ["içerik türü", () => wireIcerikTuruToggle()],
+    ["yazar alanı", () => wireYazarAlani()],
     ["editör araç çubuğu", () => wireEditorToolbar()],
     ["bağlantı doğrulama", () => wireBaglantiDogrula()],
     ["içerik formu", () => wireIcerikForm()],
@@ -377,19 +390,89 @@ async function guncelleIcerikTuru() {
  */
 function submitButonMetniGuncelle() {
   const btn = document.getElementById("ic-submit-btn");
+  const btnB = document.getElementById("ic-submit-b-btn");
+  const yardimEl = document.getElementById("ic-yayin-secenek-yardim");
   if (!btn) return;
+  const yayinda = document.getElementById("ic-yayinda")?.checked;
+
+  // "Seçenek B" (Supabase'e Kaydet ve GitHub ile Yayınla) butonu SADECE
+  // "Yayında" açıkken anlamlıdır — kapalıyken zaten mevcut "Nerede
+  // saklansın?" (Supabase/GitHub) seçimi bu ayrımı yapıyor.
+  if (btnB) btnB.hidden = !yayinda;
+  if (yardimEl) yardimEl.hidden = !yayinda;
+
   if (duzenlemeModuMu()) {
-    btn.textContent = "Güncelle";
+    btn.textContent = yayinda ? "🅰️ Güncelle ve Doğrudan Yayınla" : "Güncelle";
+    if (btnB) btnB.textContent = "🅱️ Güncelle (Supabase Yedekli)";
     return;
   }
-  const yayinda = document.getElementById("ic-yayinda")?.checked;
   if (yayinda) {
-    btn.textContent = "GitHub'a Yayınla";
+    btn.textContent = "🅰️ Doğrudan GitHub'a Aktar ve Yayınla";
+    if (btnB) btnB.textContent = "🅱️ Supabase'e Kaydet ve GitHub ile Yayınla";
   } else if (gizliHedefDegeriniAl() === "github") {
     btn.textContent = "GitHub'a Gizli Commit Et";
   } else {
     btn.textContent = "Taslağı Kaydet (Gizli)";
   }
+}
+
+/* ---------------------------------------------------------------------- */
+/* YAZAR ALANI — admin başka bir editör/admin adına yazabilir, editor      */
+/* sadece kendi adına yazabilir (salt okunur alan)                        */
+/* ---------------------------------------------------------------------- */
+async function wireYazarAlani() {
+  const secim = document.getElementById("ic-yazar-secim");
+  const girdi = document.getElementById("ic-yazar-adi");
+  if (!secim || !girdi || !GIRIS_YAPAN_PROFIL) return;
+
+  const kendiAdi = GIRIS_YAPAN_PROFIL.full_name || GIRIS_YAPAN_PROFIL.email || "";
+
+  if (GIRIS_YAPAN_PROFIL.role !== "admin") {
+    // editor: kendi adı dışında bir şey seçemez, alan salt okunur.
+    secim.hidden = true;
+    girdi.hidden = false;
+    girdi.value = kendiAdi;
+    girdi.readOnly = true;
+    return;
+  }
+
+  // admin: içerik yönetebilen herkes (admin + editor) arasından yazar seçebilir.
+  girdi.hidden = true;
+  secim.hidden = false;
+  secim.innerHTML = '<option value="">Yükleniyor…</option>';
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, full_name, email, role")
+      .in("role", ["admin", "editor"])
+      .order("full_name", { ascending: true });
+    if (error) throw error;
+
+    secim.innerHTML = (data || [])
+      .map((p) => {
+        const ad = p.full_name || p.email;
+        return `<option value="${p.id}" data-ad="${escapeHtml(ad)}">${escapeHtml(ad)} (${p.role === "admin" ? "Yönetici" : "Editör"})</option>`;
+      })
+      .join("");
+
+    // Varsayılan: giriş yapan admin'in kendisi.
+    if (GIRIS_YAPAN_PROFIL.id) secim.value = GIRIS_YAPAN_PROFIL.id;
+    if (!secim.value && secim.options.length > 0) secim.selectedIndex = 0;
+  } catch (err) {
+    console.error("Yazar listesi yüklenemedi:", err);
+    secim.innerHTML = `<option value="${GIRIS_YAPAN_PROFIL.id || ""}">${escapeHtml(kendiAdi)}</option>`;
+  }
+}
+
+/** Formda o an seçili/girilmiş yazar bilgisini { id, ad } olarak döner. */
+function yazarBilgisiniAl() {
+  const secim = document.getElementById("ic-yazar-secim");
+  const girdi = document.getElementById("ic-yazar-adi");
+  if (secim && !secim.hidden) {
+    const secili = secim.selectedOptions?.[0];
+    return { id: secim.value || null, ad: secili?.dataset.ad || secili?.textContent || "" };
+  }
+  return { id: GIRIS_YAPAN_PROFIL?.id || null, ad: girdi?.value || "" };
 }
 
 /**
@@ -1014,6 +1097,7 @@ function fmSatiri(anahtar, deger, ciplak = false) {
 function dosyaIcerigiOlustur(tur, alan, gizliKod, govde, yayinda = true) {
   const satirlar = ["---"];
   satirlar.push(fmSatiri("title", alan.title));
+  satirlar.push(fmSatiri("author", alan.author));
   satirlar.push(fmSatiri("date", alan.date, true));
 
   if (tur === "proje") {
@@ -1293,8 +1377,14 @@ function wireYayindaCanliOnizleme() {
 function wireIcerikForm() {
   document.getElementById("icerik-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    await icerikKaydet();
+    await icerikKaydet("a");
   });
+  const btnB = document.getElementById("ic-submit-b-btn");
+  if (btnB) {
+    btnB.addEventListener("click", async () => {
+      await icerikKaydet("b");
+    });
+  }
   document.getElementById("ic-iptal-btn").addEventListener("click", duzenlemeyiIptalEt);
 }
 
@@ -1316,11 +1406,15 @@ function duzenlemeyiIptalEt() {
   onizlemeKutusunuGizle();
   guncelleIcerikTuru();
   submitButonMetniGuncelle();
+  // form.reset() az önce editor'ün salt-okunur yazar alanını (readonly
+  // input'un JS ile atanmış değerini, native reset bunu bilmediği için)
+  // boşaltmış olabilir — kendi adıyla yeniden doldur.
+  wireYazarAlani();
 }
 
-async function icerikKaydet() {
+async function icerikKaydet(secenek = "a") {
   const msgEl = document.getElementById("ic-message");
-  const submitBtn = document.getElementById("ic-submit-btn");
+  const submitBtn = secenek === "b" ? document.getElementById("ic-submit-b-btn") : document.getElementById("ic-submit-btn");
   msgEl.hidden = true;
 
   const tur = icerikTuru();
@@ -1329,6 +1423,12 @@ async function icerikKaydet() {
 
   if (!title || !date) {
     showMessage(msgEl, "Başlık ve tarih zorunludur.", "error");
+    return;
+  }
+
+  const yazar = yazarBilgisiniAl();
+  if (!yazar.ad) {
+    showMessage(msgEl, "Yazar bilgisi belirlenemedi (profil adı boş) — lütfen bir yazar seç/yaz.", "error");
     return;
   }
 
@@ -1343,7 +1443,7 @@ async function icerikKaydet() {
   const yilOneki = tur === "proje" && document.getElementById("ic-yil-oneki").checked;
   const klasor = klasorSecimDegeriniAl();
 
-  const alan = { title, date };
+  const alan = { title, date, author: yazar.ad, yazarId: yazar.id };
   if (tur === "proje") {
     alan.venue = document.getElementById("ic-venue").value.trim();
     alan.status = document.getElementById("ic-status").value;
@@ -1371,10 +1471,19 @@ async function icerikKaydet() {
 
   const dosyaYolu = dosyaYoluHesapla(tur, date, slug, yilOneki, klasor);
 
+  const digerBtn = secenek === "b" ? document.getElementById("ic-submit-btn") : document.getElementById("ic-submit-b-btn");
   submitBtn.disabled = true;
+  if (digerBtn) digerBtn.disabled = true;
+  const oncekiMetin = submitBtn.textContent;
   submitBtn.textContent = "Gönderiliyor...";
   try {
-    if (yayinda) {
+    if (yayinda && secenek === "b") {
+      // Seçenek B: içerik hem Supabase'te (yedek/arama kaydı) kalıcı
+      // olarak tutulur hem de GitHub'a commit edilir.
+      await icerikSupabaseVeGithubaYaz(tur, alan, gizliKod, govde, slug, dosyaYolu, msgEl);
+    } else if (yayinda) {
+      // Seçenek A (varsayılan/mevcut davranış): Supabase'e hiç dokunmadan
+      // doğrudan GitHub'a commit edilir.
       await icerikGitHubaYaz(tur, alan, gizliKod, govde, dosyaYolu, msgEl);
     } else if (gizliHedefDegeriniAl() === "github") {
       await icerikGitHubaGizliYaz(tur, alan, gizliKod, govde, dosyaYolu, msgEl);
@@ -1384,8 +1493,10 @@ async function icerikKaydet() {
     await icerikListesiYukle();
   } catch (err) {
     showMessage(msgEl, `Hata: ${err.message}`, "error");
+    submitBtn.textContent = oncekiMetin;
   } finally {
     submitBtn.disabled = false;
+    if (digerBtn) digerBtn.disabled = false;
     submitButonMetniGuncelle();
   }
 }
@@ -1505,6 +1616,9 @@ async function icerikSupabaseeYaz(tur, alan, gizliKod, govde, slug, dosyaYolu, m
     link_etiket: alan.link_label || null,
     govde,
     onizleme_kod: gizliKod,
+    yayin_durumu: "taslak",
+    yazar_id: alan.yazarId || null,
+    yazar_adi: alan.author || null,
   };
 
   let taslakSonuc;
@@ -1565,6 +1679,111 @@ async function icerikSupabaseeYaz(tur, alan, gizliKod, govde, slug, dosyaYolu, m
   }
 
   document.getElementById("ic-iptal-btn").hidden = false;
+  guncelleIcerikTuru();
+}
+
+/**
+ * "Yayında" AÇIK + Seçenek B ("Supabase'e Kaydet ve GitHub ile Yayınla"):
+ * içerik önce Supabase `taslak_icerikler` tablosuna `yayin_durumu:
+ * 'supabase_ve_github'` olarak kaydedilir/güncellenir, ARDINDAN aynı içerik
+ * GitHub'a da commit edilir. icerikGitHubaYaz'ın aksine bu satır GitHub'a
+ * yazma başarılı olsa bile Supabase'den SİLİNMEZ — bilerek iki yerde birden
+ * (kalıcı bir yedek/arama kaydı olarak) tutulur; icerikListesiYukle bu
+ * durumu tespit edip aynı içerik için tek bir kart gösterir (bkz. "🗄️
+ * Supabase yedeği" rozeti).
+ */
+async function icerikSupabaseVeGithubaYaz(tur, alan, gizliKod, govde, slug, dosyaYolu, msgEl) {
+  const satir = {
+    tur,
+    baslik: alan.title,
+    tarih: alan.date,
+    slug,
+    dosya_yolu: dosyaYolu,
+    venue: alan.venue || null,
+    durum: alan.status || null,
+    ozet: alan.summary || null,
+    link: alan.link || null,
+    link_etiket: alan.link_label || null,
+    govde,
+    onizleme_kod: gizliKod,
+    yayin_durumu: "supabase_ve_github",
+    yazar_id: alan.yazarId || null,
+    yazar_adi: alan.author || null,
+  };
+
+  let taslakSonuc;
+  if (DUZENLENEN_TASLAK_ID) {
+    const { data, error } = await supabase
+      .from("taslak_icerikler")
+      .update(satir)
+      .eq("id", DUZENLENEN_TASLAK_ID)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    taslakSonuc = data;
+  } else {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const { data, error } = await supabase
+      .from("taslak_icerikler")
+      .insert({ ...satir, created_by: user?.id || null })
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    taslakSonuc = data;
+  }
+
+  // Supabase kaydı başarılı — şimdi aynı içerik GitHub'a commit edilir.
+  // Burada bir hata olursa Supabase satırı ZATEN kaydedilmiş durumda kalır
+  // (kaybolmaz) — kullanıcı "Mevcut İçerikler" listesinden tekrar
+  // "Yayınla" deneyebilir, bkz. taslagiYayinla.
+  const dosyaIcerigi = dosyaIcerigiOlustur(tur, alan, gizliKod, govde);
+  const icerikB64 = b64Encode(dosyaIcerigi);
+  const commitMesaji = DUZENLENEN_YOL
+    ? `İçerik güncellendi (Supabase yedekli): ${dosyaYolu}`
+    : `Yeni içerik eklendi (Supabase yedekli): ${dosyaYolu}`;
+
+  try {
+    if (DUZENLENEN_YOL && DUZENLENEN_YOL === dosyaYolu) {
+      await ghPutFile(dosyaYolu, icerikB64, commitMesaji, DUZENLENEN_SHA);
+    } else {
+      const mevcutHedef = await ghGetContents(dosyaYolu).catch(() => null);
+      await ghPutFile(dosyaYolu, icerikB64, commitMesaji, mevcutHedef?.sha || null);
+      if (DUZENLENEN_YOL && DUZENLENEN_YOL !== dosyaYolu && DUZENLENEN_SHA) {
+        await ghDeleteFile(DUZENLENEN_YOL, DUZENLENEN_SHA, `Yeniden adlandırıldı: ${DUZENLENEN_YOL} -> ${dosyaYolu}`);
+        await klasorBosaldiysaGitkeepEkle(ustKlasorYolu(DUZENLENEN_YOL));
+      }
+    }
+    await klasordekiGitkeepiTemizle(ustKlasorYolu(dosyaYolu));
+  } catch (err) {
+    DUZENLENEN_TASLAK_ID = taslakSonuc.id;
+    DUZENLENEN_YOL = null;
+    DUZENLENEN_SHA = null;
+    DUZENLENEN_GIZLI_KOD = gizliKod;
+    document.getElementById("ic-iptal-btn").hidden = false;
+    showMessage(
+      msgEl,
+      `Taslak Supabase'e kaydedildi ama GitHub'a yazılamadı: ${err.message}. "Mevcut İçerikler" listesinden tekrar "Yayınla" deneyebilirsin.`,
+      "error"
+    );
+    return;
+  }
+
+  DUZENLENEN_GIZLI_KOD = gizliKod;
+  // Supabase satırı BİLEREK korunuyor — taslakId hâlâ geçerli, "Sil"
+  // artık hem GitHub dosyasını hem bu satırı birlikte silecek (bkz.
+  // icerikSil).
+  DUZENLENEN_TASLAK_ID = taslakSonuc.id;
+  DUZENLENEN_YOL = dosyaYolu;
+  DUZENLENEN_SHA = (await ghGetContents(dosyaYolu))?.sha || DUZENLENEN_SHA;
+  document.getElementById("ic-iptal-btn").hidden = false;
+
+  showMessage(
+    msgEl,
+    "İçerik hem Supabase'e (yedek/arama kaydı olarak) kaydedildi hem de GitHub'a commit edildi — 1-2 dakika içinde sitede yayında olacak.",
+    "success"
+  );
   guncelleIcerikTuru();
 }
 
@@ -1670,6 +1889,8 @@ function taslakToItem(row) {
       onizleme_kod: row.onizleme_kod,
       slug: row.slug,
       dosya_yolu: row.dosya_yolu,
+      yazar_adi: row.yazar_adi,
+      yayin_durumu: row.yayin_durumu,
     },
     body: row.govde || "",
   };
@@ -1711,8 +1932,34 @@ async function icerikListesiYukle() {
     } catch (e) {
       console.error("Taslaklar (Supabase) yüklenemedi:", e);
     }
-    const supaBlog = taslaklar.filter((t) => t.tur === "blog").map(taslakToItem);
-    const supaProje = taslaklar.filter((t) => t.tur === "proje").map(taslakToItem);
+    // "Seçenek B" ile yayınlanan içerikler (yayin_durumu='supabase_ve_github')
+    // hem bu Supabase listesinde HEM GitHub dosya listesinde bulunur — aynı
+    // içerik için İKİ ayrı kart göstermemek için, dosya_yolu eşleşen bir
+    // GitHub öğesi bulunursa Supabase satırı ayrı bir kart olarak
+    // eklenmez; bunun yerine GitHub öğesine "supabaseYedek" bilgisi
+    // iğnelenir (bkz. icerikKartiCiz'deki "🗄️ Supabase yedeği" rozeti ve
+    // icerikSil'deki ikili silme).
+    const githubYolHaritasi = new Map();
+    [...postDetaylari, ...projeDetaylari].forEach((it) => githubYolHaritasi.set(it.path, it));
+
+    const supaBagimsizTaslaklar = [];
+    taslaklar.forEach((row) => {
+      if (row.yayin_durumu === "supabase_ve_github") {
+        const eslesenGithubOgesi = githubYolHaritasi.get(row.dosya_yolu);
+        if (eslesenGithubOgesi) {
+          eslesenGithubOgesi.supabaseYedek = true;
+          eslesenGithubOgesi.taslakId = row.id;
+          eslesenGithubOgesi.data.yazar_adi = eslesenGithubOgesi.data.yazar_adi || row.yazar_adi;
+          return;
+        }
+        // Eşleşen bir GitHub dosyası yoksa (ör. dosya elle silinmiş) yine
+        // de kaybolmasın diye normal bir Supabase kartı olarak gösterilir.
+      }
+      supaBagimsizTaslaklar.push(taslakToItem(row));
+    });
+
+    const supaBlog = supaBagimsizTaslaklar.filter((t) => t.tur === "blog");
+    const supaProje = supaBagimsizTaslaklar.filter((t) => t.tur === "proje");
 
     const blogTumu = [...postDetaylari, ...supaBlog].sort((a, b) => (b.data.date || "").localeCompare(a.data.date || ""));
     const projeTumu = [...projeDetaylari, ...supaProje].sort((a, b) => (b.data.date || "").localeCompare(a.data.date || ""));
@@ -1776,7 +2023,19 @@ function icerikFiltreyeUyuyorMu(item) {
   if (LISTE_FILTRE_DURUM === "gizli" && yayinda) return false;
 
   if (LISTE_ARAMA) {
-    const aranan = [item.data.title, item.path || item.data.dosya_yolu, item.data.summary, item.data.venue]
+    // Başlık, dosya yolu, özet, venue, YAZAR ADI ve İÇERİK GÖVDESİ (metin
+    // ici tam arama) — item.body her zaman zaten yüklenmiş durumda
+    // (GitHub öğeleri için icerikOzetiGetir, Supabase taslakları için
+    // taslakToItem tarafından doldurulur), bu yüzden ekstra bir istek
+    // atmadan anında aranabilir.
+    const aranan = [
+      item.data.title,
+      item.path || item.data.dosya_yolu,
+      item.data.summary,
+      item.data.venue,
+      item.data.yazar_adi,
+      item.body,
+    ]
       .filter(Boolean)
       .join(" ")
       .toLocaleLowerCase("tr");
@@ -1875,8 +2134,14 @@ function icerikKartiCiz(item, tur) {
       : !yayinda
       ? `<span class="gy-rozet gy-rozet--gizli" title="Bu içerik &quot;yayinda: false&quot; olarak GitHub'a commit edilmiş durumda (eski yöntem) — reponun git geçmişinde duruyor, sadece linki paylaşılmadığı sürece gizli.">GitHub (gizli commit)</span>`
       : "";
+  const supabaseYedekRozet = item.supabaseYedek
+    ? `<span class="gy-rozet gy-rozet--gizli" title="Bu içeriğin GitHub'daki hâlinin yanında Supabase'te de bir yedek/arama kaydı var (Seçenek B ile yayınlandı).">🗄️ Supabase yedeği</span>`
+    : "";
   const ozet = item.data.summary
     ? `<div class="gy-icerik-kart-ozet">${metniVurgula(item.data.summary)}</div>`
+    : "";
+  const yazarSatiri = item.data.yazar_adi
+    ? `<span class="gy-icerik-kart-yazar"> · ✍️ ${metniVurgula(item.data.yazar_adi)}</span>`
     : "";
 
   // Gizliyken doğrudan gösterilecek ön izleme linki; yayındaysa da daha
@@ -1909,8 +2174,8 @@ function icerikKartiCiz(item, tur) {
 
   kart.innerHTML = `
     <div class="gy-icerik-kart-bilgi">
-      <div class="gy-icerik-kart-baslik">${metniVurgula(item.data.title || yolGoster)}${rozet}${kaynakRozet}</div>
-      <div class="gy-icerik-kart-meta">${escapeHtml(item.data.date || "")} · ${metniVurgula(yolGoster)}</div>
+      <div class="gy-icerik-kart-baslik">${metniVurgula(item.data.title || yolGoster)}${rozet}${kaynakRozet}${supabaseYedekRozet}</div>
+      <div class="gy-icerik-kart-meta">${escapeHtml(item.data.date || "")} · ${metniVurgula(yolGoster)}${yazarSatiri}</div>
       ${ozet}
     </div>
     <div class="gy-icerik-kart-aksiyonlar">
@@ -2057,6 +2322,16 @@ async function icerikSil(item) {
       // tamamen kaybolmaması için oraya .gitkeep geri eklenir (bkz. dosya
       // başındaki .gitkeep yaşam döngüsü notu).
       await klasorBosaldiysaGitkeepEkle(ustKlasorYolu(item.path));
+
+      // "Seçenek B" ile yayınlanmış bir içerikse (bkz. supabaseYedek),
+      // GitHub dosyasıyla birlikte Supabase'teki yedek/arama kaydı da
+      // silinir — aksi halde GitHub'da artık var olmayan bir içeriğin
+      // Supabase satırı öksüz kalır ve bir sonraki yüklemede yanlışlıkla
+      // bağımsız bir taslak olarak tekrar listelenir.
+      if (item.supabaseYedek && item.taslakId) {
+        const { error } = await supabase.from("taslak_icerikler").delete().eq("id", item.taslakId);
+        if (error) console.error("Supabase yedek satırı silinemedi (GitHub dosyası başarıyla silindi):", error);
+      }
     }
     // Silinen öğeyi listeden HEMEN kaldır — "okunamadı" rozetiyle listede
     // hayalet olarak kalmasını önler (bkz. ghRequest'teki cache notu: bu
@@ -2078,7 +2353,20 @@ async function icerikDuzenlemeyeYukle(item, tur) {
   } else {
     DUZENLENEN_YOL = item.path;
     DUZENLENEN_SHA = item.sha;
-    DUZENLENEN_TASLAK_ID = null;
+    // "Seçenek B" ile yayınlanmış bir GitHub öğesiyse (supabaseYedek),
+    // Supabase'teki yedek satırın id'si de hatırlanır — böylece tekrar
+    // "🅱️" ile kaydedilirse YENİ bir satır açmak yerine AYNI satır
+    // güncellenir (bkz. icerikSupabaseVeGithubaYaz).
+    DUZENLENEN_TASLAK_ID = item.supabaseYedek ? item.taslakId : null;
+  }
+
+  // Yazar alanını içeriğin kayıtlı yazarına göre doldur (admin seçim
+  // kutusundaysa ilgili seçeneği işaretler; editor için zaten salt okunur
+  // ve her zaman kendi adını gösterir, bkz. wireYazarAlani).
+  const yazarSecim = document.getElementById("ic-yazar-secim");
+  if (yazarSecim && !yazarSecim.hidden && item.data.yazar_adi) {
+    const eslesenSecenek = Array.from(yazarSecim.options).find((o) => o.dataset.ad === item.data.yazar_adi);
+    if (eslesenSecenek) yazarSecim.value = eslesenSecenek.value;
   }
 
   document.querySelector(`input[name="icerik-turu"][value="${tur}"]`).checked = true;
