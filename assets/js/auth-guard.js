@@ -48,6 +48,21 @@ export async function requireAuth({ role = null, redirectTo = "/hesap/giris.html
     return new Promise(() => {});
   }
 
+  // GÜVENLİK DÜZELTMESİ (savunma derinliği — 2FA bypass): Asıl 2FA
+  // zorunluluğu giris.html'deki giriş akışında uygulanır (bkz.
+  // assets/js/auth-pages.js -> mfaGerekirseDogrulaVeYonlendir). Ama bu
+  // korumalı sayfa (panel/admin) YİNE DE burada AYRICA kontrol ediyor:
+  // kullanıcının doğrulanmış bir TOTP faktörü olduğu halde mevcut oturum
+  // hâlâ AAL1'deyse (ör. eski/başka bir sekmede kalmış bir oturum, ya da
+  // giriş akışı ileride başka bir yoldan bypass edilmeye çalışılırsa)
+  // panel içeriği YİNE DE gösterilmez, kullanıcı giriş sayfasına
+  // (donus=bu sayfa ile) geri gönderilir; orada 2FA kodu tekrar istenir.
+  const { data: aal, error: aalErr } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (!aalErr && aal.nextLevel === "aal2" && aal.currentLevel !== aal.nextLevel) {
+    redirectWithReturnUrl(redirectTo);
+    return new Promise(() => {});
+  }
+
   // NOT: "avatar_url" ve "bio" kolonları artık hiçbir arayüzde
   // kullanılmıyor (profil fotoğrafı yükleme ve kişisel bio düzenleme
   // özellikleri kaldırıldı) — o yüzden burada da seçilmiyor, gereksiz veri
