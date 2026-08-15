@@ -372,6 +372,28 @@
   border-color: #a13327;
   color: #a13327;
 }
+.gy-icerik-kart-aksiyonlar button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.gy-icerik-kart-aksiyonlar button:disabled:hover { border-color: var(--border); }
+
+/* "Admin adına yayınla" onay/red butonları (bkz. admin_taslak_onayla RPC'si) */
+.gy-onay-btn {
+  font-weight: 600;
+  border-color: #1e6b3a;
+  color: #1e6b3a;
+  background: #eaf7ee;
+}
+.gy-onay-btn:hover { background: #d9f0e0; }
+.gy-onay-btn--red {
+  border-color: #a13327;
+  color: #a13327;
+  background: #fdecea;
+}
+.gy-onay-btn--red:hover { background: #f9d9d5; }
+[data-theme="dark"] .gy-onay-btn { border-color: #9ee3b6; color: #9ee3b6; background: #123a22; }
+[data-theme="dark"] .gy-onay-btn--red { border-color: #f3a89c; color: #f3a89c; background: #3a1f1c; }
 
 /* Kart üstündeki "Linki Kopyala" mini butonu — gizli/daha önce gizlenmiş içeriklerde görünür */
 .gy-link-kopyala-mini-btn {
