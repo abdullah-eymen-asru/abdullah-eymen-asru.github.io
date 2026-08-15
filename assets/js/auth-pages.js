@@ -90,6 +90,157 @@ const GOOGLE_GIRIS_INTENT_KEY = "aea_google_giris_intent";
 const GOOGLE_GIRIS_DONUS_KEY = "aea_google_giris_donus";
 const GOOGLE_KAYIT_INTENT_KEY = "aea_google_kayit_intent";
 
+/*
+ * GÜVENLİK DÜZELTMESİ — 2FA (TOTP) girişte hiç sorulmuyordu
+ * ---------------------------------------------------------------------
+ * ÖNCEDEN: Panelde "2FA'yı Etkinleştir" ile bir TOTP faktörü kayıt
+ * edilmiş (verified) olsa bile, giris.html'deki signInWithPassword() (ve
+ * Google OAuth dönüşü) çağrısı BAŞARILI bir session döndüğü an kullanıcı
+ * doğrudan panele yönlendiriliyordu — authenticator uygulamasındaki 6
+ * haneli kod hiçbir zaman İSTENMİYORDU. Kök neden: Supabase'te
+ * signInWithPassword / signInWithOAuth SADECE şifreyi (ya da OAuth
+ * kimliğini) doğrular ve oturumu "AAL1" (Authenticator Assurance Level 1)
+ * seviyesinde açar; kullanıcının ayrıca bir doğrulanmış TOTP faktörü
+ * varsa oturumun "AAL2"ye YÜKSELTİLMESİ ayrı bir adımdır
+ * (mfa.challenge + mfa.verify) ve bu adım hiçbir sayfada
+ * ÇAĞRILMIYORDU — yani 2FA sadece "kurulabiliyor" ama girişte hiç
+ * ZORUNLU KILINMIYORDU.
+ *
+ * ÇÖZÜM: Her iki giriş yolundan (şifre ile / Google ile) sonra, hedefe
+ * yönlendirmeden HEMEN ÖNCE bu fonksiyon çağrılır:
+ *  - supabase.auth.mfa.getAuthenticatorAssuranceLevel() ile mevcut
+ *    (currentLevel) ve GEREKEN (nextLevel) seviyeye bakılır.
+ *  - nextLevel === "aal2" ve currentLevel !== "aal2" ise (yani kullanıcının
+ *    doğrulanmış bir TOTP faktörü var ama bu oturum henüz o faktörle
+ *    doğrulanmamış) yönlendirme YAPILMAZ; bunun yerine 6 haneli kod
+ *    isteyen bir form gösterilir. Kod mfa.challenge + mfa.verify ile
+ *    doğrulanınca oturum gerçekten AAL2'ye yükselir ve YALNIZCA O ZAMAN
+ *    hedefe yönlendirilir.
+ *  - nextLevel zaten currentLevel'a eşitse (2FA hiç kurulmamış, ya da bu
+ *    zaten AAL2 bir oturum) hiçbir ek adım olmadan normal akış devam
+ *    eder — 2FA kurmamış kullanıcılar için davranış DEĞİŞMEZ.
+ *
+ * NOT (savunma derinliği): panelde requireAuth() (bkz. auth-guard.js) de
+ * aynı kontrolü ayrıca yapar — biri atlanırsa/bypass edilmeye çalışılırsa
+ * (ör. konsoldan doğrudan panel.html'e gidilirse) ikinci katman devreye
+ * girer.
+ */
+async function mfaGerekirseDogrulaVeYonlendir(msg, hedefUrl) {
+  const { data: aal, error: aalErr } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+  if (aalErr) {
+    // AAL sorgusu başarısız olursa güvenli tarafta kal: giriş engellenmez
+    // (kullanıcı 2FA kurmamış olabilir ve bu bir servis hatası olabilir),
+    // ama hatayı konsola yazıp normal yönlendirmeye devam ediyoruz —
+    // requireAuth() panelde ikinci bir kontrol katmanı olarak kalıyor.
+    console.error("MFA seviyesi kontrol edilemedi:", aalErr);
+    window.location.href = hedefUrl;
+    return;
+  }
+
+  if (aal.nextLevel === "aal2" && aal.currentLevel !== aal.nextLevel) {
+    await mfaKoduIste(msg, hedefUrl);
+    return;
+  }
+
+  window.location.href = hedefUrl;
+}
+
+/**
+ * Giriş formunu gizleyip yerine "authenticator uygulamandaki 6 haneli
+ * kodu gir" formunu gösterir; kod doğrulanınca hedefUrl'e yönlendirir.
+ * Aynı DOM iskeleti (#auth-message'ın hemen üstüne eklenen bir kutu)
+ * hem giris.html hem de Google OAuth dönüşü için kullanılır.
+ */
+async function mfaKoduIste(msg, hedefUrl) {
+  const { data: factorList, error: factorErr } = await supabase.auth.mfa.listFactors();
+  const factor = !factorErr && (factorList?.totp || []).find((f) => f.status === "verified");
+
+  if (!factor) {
+    // Beklenmedik durum: nextLevel aal2 dedi ama doğrulanmış faktör
+    // bulunamadı. Güvenli tarafta kalıp yönlendirmiyoruz, kullanıcıyı
+    // tekrar denemeye yönlendiriyoruz.
+    showMessage(msg, "2FA doğrulaması başlatılamadı. Lütfen tekrar giriş yapmayı dene.");
+    return;
+  }
+
+  // Formu gizle, giriş kutusunun olduğu auth-box içine 2FA formunu bas.
+  const authBox = msg?.closest(".auth-box") || document.querySelector(".auth-box");
+  const girisForm = document.getElementById("giris-form");
+  const googleBtn = document.getElementById("google-giris-btn");
+  const divider = document.querySelector(".auth-divider");
+  girisForm?.setAttribute("hidden", "");
+  googleBtn?.setAttribute("hidden", "");
+  divider?.setAttribute("hidden", "");
+  document.querySelectorAll(".auth-links").forEach((el) => el.setAttribute("hidden", ""));
+
+  let mfaKutu = document.getElementById("mfa-giris-kutu");
+  if (!mfaKutu) {
+    mfaKutu = document.createElement("div");
+    mfaKutu.id = "mfa-giris-kutu";
+    mfaKutu.innerHTML = `
+      <p class="muted" style="margin-bottom:12px;">
+        Hesabında iki adımlı doğrulama (2FA) açık. Authenticator
+        uygulamandaki 6 haneli kodu gir.
+      </p>
+      <div class="form-field">
+        <label for="mfa-giris-kod">Doğrulama kodu</label>
+        <input id="mfa-giris-kod" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456">
+      </div>
+      <button type="button" id="mfa-giris-dogrula-btn" class="btn-primary">Doğrula ve Giriş Yap</button>
+    `;
+    authBox?.appendChild(mfaKutu);
+  }
+  mfaKutu.removeAttribute("hidden");
+
+  const kodInput = document.getElementById("mfa-giris-kod");
+  const dogrulaBtn = document.getElementById("mfa-giris-dogrula-btn");
+  kodInput?.focus();
+
+  const dogrula = async () => {
+    const kod = kodInput.value.trim();
+    if (!/^\d{6}$/.test(kod)) {
+      showMessage(msg, "6 haneli kodu eksiksiz gir.");
+      return;
+    }
+    dogrulaBtn.disabled = true;
+
+    const { data: challengeData, error: challengeErr } = await supabase.auth.mfa.challenge({
+      factorId: factor.id,
+    });
+    if (challengeErr) {
+      dogrulaBtn.disabled = false;
+      showMessage(msg, "Doğrulama başlatılamadı: " + challengeErr.message);
+      return;
+    }
+
+    const { error: verifyErr } = await supabase.auth.mfa.verify({
+      factorId: factor.id,
+      challengeId: challengeData.id,
+      code: kod,
+    });
+
+    dogrulaBtn.disabled = false;
+
+    if (verifyErr) {
+      showMessage(msg, "Kod hatalı veya süresi doldu.");
+      kodInput.value = "";
+      kodInput.focus();
+      return;
+    }
+
+    window.location.href = hedefUrl;
+  };
+
+  dogrulaBtn.addEventListener("click", dogrula);
+  kodInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      dogrula();
+    }
+  });
+}
+
 /* ---------------------------------------------------------------------- */
 /* GİRİŞ SAYFASI (hesap/giris.html)                                       */
 /* ---------------------------------------------------------------------- */
@@ -156,8 +307,13 @@ export function initGirisPage() {
       return;
     }
 
+    // GÜVENLİK DÜZELTMESİ: şifre doğru olsa bile, hesapta doğrulanmış bir
+    // 2FA (TOTP) faktörü varsa oturum henüz sadece AAL1'dedir — panele
+    // yönlendirmeden ÖNCE authenticator kodu istenir (bkz.
+    // mfaGerekirseDogrulaVeYonlendir başındaki ayrıntılı açıklama).
     const params = new URLSearchParams(window.location.search);
-    window.location.href = params.get("donus") || REDIRECT_AFTER_LOGIN;
+    const hedef = params.get("donus") || REDIRECT_AFTER_LOGIN;
+    await mfaGerekirseDogrulaVeYonlendir(msg, hedef);
   });
 
   googleBtn?.addEventListener("click", async () => {
@@ -218,7 +374,11 @@ function googleGirisDonusunuIsle(msg) {
       .single();
 
     if (!error && profile?.kvkk_onay_verildi) {
-      window.location.href = donus;
+      // GÜVENLİK DÜZELTMESİ: Google ile giriş de aynı şekilde AAL2
+      // kontrolünden geçmeli — hesapta 2FA açıksa Google kimliği tek
+      // başına yeterli değildir, authenticator kodu da istenir (bkz.
+      // mfaGerekirseDogrulaVeYonlendir başındaki açıklama).
+      await mfaGerekirseDogrulaVeYonlendir(msg, donus);
       return;
     }
 
