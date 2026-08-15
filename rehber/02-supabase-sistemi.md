@@ -44,6 +44,7 @@ supabase/
   migrations/0001_schema_rbac_rls.sql      <- Adım 1: SQL Editor'de çalıştır (ilk kurulum)
   migrations/0002_guvenlik_sikilastirma.sql <- Adım 1b: SQL Editor'de çalıştır (güvenlik sıkılaştırma + büyük dosya linki)
   migrations/0003_yeni_ozellikler_ve_guvenlik.sql <- Adım 1c: SQL Editor'de çalıştır (KVKK onayı, okundu/son geçerlilik, admin üye silme, arama indeksi, kalan Advisor uyarıları)
+  migrations/0013_taslak_icerikler_supabase_taslak_sistemi.sql <- SQL Editor'de çalıştır (blog/proje TASLAKLARI için `taslak_icerikler` tablosu + RLS + `taslak_onizleme_getir` RPC'si — bkz. Değişiklik Geçmişi 15.08.2026 ve rehber/01-site-rehberi.md Bölüm 10 "Supabase Taslak Sistemi")
   functions/delete-account/index.ts        <- Adım 5: Edge Function (hesap silme — artık admin başkasını da silebiliyor)
   functions/admin-change-email/index.ts    <- Adım 5c: Edge Function (admin, bir üyenin e-postasını ANINDA — mail göndermeden — değiştirir)
 assets/
@@ -841,6 +842,53 @@ istemedim.
 ## 📝 Değişiklik Geçmişi (Changelog)
 
 Bu bölüm, siteye/Supabase kullanıcı sistemine sonradan yapılan düzeltmelerin tarih sırasıyla özetidir — hangi sorun bildirildi, kök nedeni neydi, nasıl çözüldü ve (varsa) senin elle yapman gereken adım neydi. Eskiden kökte ayrı `DEGISIKLIKLER_*.md` dosyaları halinde duruyordu, artık tek doğruluk kaynağı burası — en yeni turu en üstte bulursun.
+
+### 🗓️ 15.08.2026 — "Yayında değil" içerik artık GitHub'a değil, Supabase'e gidiyor
+
+İstediğin değişiklik: blog/akademik proje taslakları "Yayında" kapalıyken
+artık GitHub'a HİÇ commit edilmiyor, sadece Supabase'de duruyor (özel
+linki bilen görebilir); "Yayınla" deyince Supabase'den GitHub'a taşınıp
+Supabase'den siliniyor; "Yayından Kaldır" deyince tam tersi oluyor.
+
+#### Değişen dosyalar
+- `assets/js/github-yonetim.js` (kaydetme/yayınlama/yayından kaldırma/silme/düzenleme akışlarının tamamı Supabase'i de kapsayacak şekilde yeniden yazıldı)
+- `panel/github-yonetim.md` (dosya kendisi değişmedi, önceki turdaki "📁 Klasörler" sekmesiyle uyumlu çalışacak şekilde JS'teki değişiklikler test edildi)
+- `rehber/01-site-rehberi.md` (Bölüm 9'a güncelleme notu, Bölüm 10'a "Supabase Taslak Sistemi" alt başlığı eklendi)
+
+#### Eklenen dosyalar
+- `supabase/migrations/0013_taslak_icerikler_supabase_taslak_sistemi.sql` ⚠️ **YENİ — Supabase SQL Editor'de çalıştırman gerekiyor.**
+- `onizleme/index.md` — yeni Jekyll sayfası, `/onizleme/` adresinde (gizli ön izleme linklerinin gerçekte açıldığı yer)
+- `assets/js/onizleme.js` — `/onizleme/` sayfasının mantığı, Supabase'teki `taslak_onizleme_getir` RPC'sini çağırır
+
+#### Ne değişti, neden
+
+**Eski davranış:** "Yayında" kapatıldığında panel yine `_posts/`/`_projects/`
+altına bir dosya commit ediyordu — `yayinda: false` + tahmin edilemez bir
+`permalink` ile. Dosya GitHub deposunun (public bir repo) git geçmişinde
+gerçekten duruyordu; "gizli" olması tamamen adresin paylaşılmamasına
+dayanıyordu. İstediğin değişiklik tam olarak bunu ortadan kaldırmak.
+
+**Yeni davranış:** `taslak_icerikler` adında yeni bir Supabase tablosu
+(migration 0013) eklendi. RLS ile SADECE admin rolündeki hesaplar
+okuyup/yazabiliyor. Anonim bir ziyaretçinin (ön izleme linkine sahip
+olsa bile) tabloyu LİSTELEYEMEMESİ için ayrı bir `taslak_onizleme_getir(p_tur,
+p_kod)` RPC'si eklendi — bu fonksiyon `SECURITY DEFINER` olduğu için
+RLS'i by-pass eder ama SADECE tur+kod tam eşleşen TEK satırı, SADECE
+görüntüleme için gereken alanlarla döndürür.
+
+Yeni ön izleme linki formatı: `/onizleme/?tur=blog&kod=XXXXXXXX` (eskisi:
+`/blog/on-izleme-XXXXXXXX/`). Daha önce paylaşılmış eski formatlı linkler
+artık çalışmaz — ama bu linkler zaten sadece `deneme3.md` ve
+`ornek-zamanlanmis-yazi.md` gibi depoda duran örnek/test dosyalarındaydı,
+gerçek bir taslağın linki değildi. `assets/js/github-yonetim.js`, eski
+sistemden kalma (hâlâ `yayinda: false` ile GitHub'da duran) bir dosya
+bulursa kartında "Supabase'e Taşı" butonu gösterir — bu butona basmak o
+dosyayı da yeni sisteme (Supabase'e) taşır.
+
+##### Yapman gereken
+1. **Supabase Dashboard → SQL Editor**'e git, `supabase/migrations/0013_taslak_icerikler_supabase_taslak_sistemi.sql` dosyasının TAMAMINI yapıştırıp **Run**'a bas.
+2. Geri kalan tüm dosyalar (JS/MD) statik olduğu için, siteyi her zamanki gibi yayınlaman (GitHub Pages / Cloudflare Pages push) yeterli — ekstra bir adım gerekmiyor.
+3. İstersen `_posts/2026/2026-08-14-deneme3.md` ve `_posts/2026/2026-08-15-ornek-zamanlanmis-yazi.md` gibi eski sistemden kalma örnek/test dosyalarını `/panel/github-yonetim.html` → "Mevcut İçerikler" listesinden "Supabase'e Taşı" ile yeni sisteme taşıyabilir ya da elle silebilirsin — dokunmazsan da bozulan bir şey olmaz, sadece eski yöntemle "gizli" kalmaya devam ederler.
 
 ### 🗓️ 12.08.2026 (2 sorun)
 
