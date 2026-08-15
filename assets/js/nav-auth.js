@@ -95,21 +95,27 @@ function renderHesapMenusu(container, role) {
   menu.hidden = true;
 
   const linkler = [{ href: "/panel/panel.html", etiket: "Panelim" }];
-  if (role === "admin") {
+  // 'manager' (panelde "İçerik Sorumlusu") de admin paneline girebiliyor —
+  // ama SADECE "Özel İçerik Ekle/Düzenle", "Mevcut Özel İçerikler" ve
+  // "R2 Dosya Paylaşımı" sekmelerine (bkz. admin.js, panel/admin.md).
+  // Linkin kendisi admin ile aynı, hangi sekmelerin görüneceğine admin.js
+  // içeri girdikten sonra karar veriyor.
+  if (role === "admin" || role === "manager") {
     linkler.push({ href: "/panel/admin.html", etiket: "Admin Paneli" });
   }
   // GitHub Pages'in kendi statik içeriğini (blog/proje yazıları, profil
   // fotoğrafı) yönetmek için ayrı, bağımsız bir sayfa — bkz.
   // panel/github-yonetim.md / assets/js/github-yonetim.js. O sayfa
-  // requireAuth({role:'editor'}) kullanır, yani hem editor hem admin
-  // girebilir (auth-guard.js'te "admin her zaman geçer" kuralı zaten var).
+  // requireAuth({role:['editor','manager']}) kullanır, yani editor, manager
+  // VEYA admin girebilir (auth-guard.js'te "admin her zaman geçer" kuralı
+  // zaten var).
   //
   // BUG FİX: bu link öncesinde SADECE role==='admin' iken ekleniyordu —
   // editor rolündeki kullanıcılar panele erişebildikleri hâlde (RLS ve
   // requireAuth doğru kurulmuştu) menüde linki HİÇ görmüyorlardı, yani
-  // panele ulaşmanın tek yolu URL'yi elle yazmaktı. Şimdi editor VEYA admin
-  // iken gösteriliyor.
-  if (role === "admin" || role === "editor") {
+  // panele ulaşmanın tek yolu URL'yi elle yazmaktı. Şimdi editor, manager
+  // veya admin iken gösteriliyor.
+  if (role === "admin" || role === "editor" || role === "manager") {
     linkler.push({ href: "/panel/github-yonetim.html", etiket: "GitHub İçerik Yönetimi" });
   }
 
