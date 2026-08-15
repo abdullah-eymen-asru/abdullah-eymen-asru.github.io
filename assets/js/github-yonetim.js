@@ -40,10 +40,11 @@
  * çağrısında role:['admin','manager'] ister ama manager girince
  * "Kullanıcılar & Roller" sekmesini görmez (bkz. admin.js).
  *
- * ÖNEMLİ — "ADMİN ADINA YAYINLA" ONAY SÜRECİ (manager rolüne özel):
- *   manager (İçerik Sorumlusu), bir içeriği Admin'in adıyla yayınlamak
- *   isterse "Admin adına yayınla (onay gerekir)" kutusunu işaretler (bkz.
- *   wireAdminAdinaTalep). Bu durumda:
+ * ÖNEMLİ — "ADMİN ADINA YAYINLA" ONAY SÜRECİ (manager VE editor rolüne
+ * özel — editor için de manager ile BİREBİR aynı şekilde çalışır):
+ *   manager (İçerik Sorumlusu) veya editor, bir içeriği Admin'in adıyla
+ *   yayınlamak isterse "Admin adına yayınla (onay gerekir)" kutusunu
+ *   işaretler (bkz. wireAdminAdinaTalep). Bu durumda:
  *     - "Yayında" anahtarı ve "GitHub'a gizli commit et (eski yöntem)"
  *       seçeneği bu panelde DEVRE DIŞI bırakılır — içerik SADECE gizli bir
  *       Supabase taslağı olarak kaydedilebilir (icerikSupabaseeYaz).
@@ -51,16 +52,20 @@
  *       içeriğin GERÇEKTEN yayında bir duruma geçmesini zaten engeller —
  *       yani bu panel kısıtlaması bir güvenlik sınırı değil, kullanıcıyı
  *       veritabanının zaten reddedeceği bir işlemi denemekten önceden
- *       caydıran bir KOLAYLIK katmanıdır.
+ *       caydıran bir KOLAYLIK katmanıdır. Bu tetikleyici zaten hem
+ *       manager hem editor için (admin olmayan herkes için) aynı şekilde
+ *       işliyordu, bu commit'te DEĞİŞMEDİ.
  *     - Admin, "Mevcut İçerikler" listesinde onay bekleyen kartlarda görünen
  *       "✅ Onayla" / "❌ Reddet" butonlarıyla karar verir (bkz.
  *       icerikKartiCiz). Onaylanınca içerik normal "Yayınla" butonuyla
- *       (admin veya manager tarafından) GitHub'a/Supabase'e yayınlanabilir.
- *     - DÜRÜSTLÜK PAYI: manager'a bu repo için yazma izni olan bir GitHub
- *       PAT verirsen, teknik olarak bu panelin DIŞINDA GitHub API'sine
- *       doğrudan da commit atabilir — bu, zaten var olan editor rolü için
- *       de aynı derecede geçerli olan mimari bir sınırdır (bkz. dosya
- *       başındaki PAT notu), bu özellik bunu değiştirmez.
+ *       (admin veya manager/editor tarafından) GitHub'a/Supabase'e
+ *       yayınlanabilir.
+ *     - DÜRÜSTLÜK PAYI: manager/editor'a bu repo için yazma izni olan bir
+ *       GitHub PAT verirsen, teknik olarak bu panelin DIŞINDA GitHub
+ *       API'sine doğrudan da commit atabilir — bu, panelin GERÇEK bir
+ *       güvenlik sınırı olmadığı, sadece bir kolaylık katmanı olduğu
+ *       anlamına gelir (bkz. dosya başındaki PAT notu), bu özellik bunu
+ *       değiştirmez.
  *
  * GÜVENLİK NOTU — GitHub Personal Access Token (PAT):
  *   Token SADECE bu modülün belleğinde (PAT_BELLEK değişkeni) tutulur.
@@ -500,11 +505,10 @@ async function wireYazarAlani() {
 }
 
 /**
- * "Admin adına yayınla (onay gerekir)" özelliği — SADECE role='manager'
- * (panelde "İçerik Sorumlusu") için. editor ve admin bu kutuyu hiç görmez:
- * editor zaten sadece kendi adına yazabilir (yukarıdaki wireYazarAlani),
- * admin'in ise zaten kendi adına doğrudan yazma yetkisi var, onaya ihtiyacı
- * yok. Kutu işaretlenince:
+ * "Admin adına yayınla (onay gerekir)" özelliği — role='manager' (panelde
+ * "İçerik Sorumlusu") VE role='editor' için aynı şekilde açık. admin bu
+ * kutuyu hiç görmez: admin'in zaten kendi adına doğrudan yazma yetkisi
+ * var, onaya ihtiyacı yok. Kutu işaretlenince:
  *   - Yazar, GİRİŞ YAPAN KİŞİ DEĞİL, seçilen admin olarak kaydedilir
  *     (bkz. yazarBilgisiniAl) ve satıra admin_adina_talep=true eklenir
  *     (bkz. icerikKaydet → icerikSupabaseeYaz/icerikSadeceSupabaseeYayinla/
@@ -520,7 +524,7 @@ async function wireAdminAdinaTalep() {
   const sarmalayici = document.getElementById("ic-admin-adina-wrap");
   if (!sarmalayici || !GIRIS_YAPAN_PROFIL) return;
 
-  if (GIRIS_YAPAN_PROFIL.role !== "manager") {
+  if (GIRIS_YAPAN_PROFIL.role !== "manager" && GIRIS_YAPAN_PROFIL.role !== "editor") {
     sarmalayici.hidden = true;
     return;
   }
@@ -2796,8 +2800,29 @@ async function icerikDuzenlemeyeYukle(item, tur) {
 
 /* ---------------------------------------------------------------------- */
 /* PROFİL FOTOĞRAFI YÖNETİMİ (yolu _config.yml → profile_image'tan okunur) */
+/*                                                                        */
+/* SADECE role='admin' — editor VE manager (İçerik Sorumlusu) sitenin     */
+/* profil fotoğrafını DEĞİŞTİREMEZ/SİLEMEZ. Bu bölüm/nav linki onlar için  */
+/* DOM'dan tamamen kaldırılır (aşağıya bkz.); profilFotoYukle/profilFotoSil */
+/* içindeki ayrı rol kontrolleri ikinci bir savunma katmanıdır — asıl      */
+/* GERÇEK güvenlik sınırı yine de kullanıcıya verilen GitHub PAT'ın        */
+/* kapsamıdır (bkz. dosya başındaki PAT notu): bu buton/bölüm kaldırılsa   */
+/* bile, bir editor/manager'a bu repo için yazma izni olan bir PAT         */
+/* verirsen, GitHub API'sine bu panelin DIŞINDAN doğrudan commit atıp      */
+/* assets/ altındaki herhangi bir dosyayı (profil fotoğrafı dahil)         */
+/* teorik olarak değiştirebilir — bu kısıtlama o mimari sınırı ORTADAN     */
+/* KALDIRMAZ, sadece panelin KENDİ arayüzünden bu işlemi engeller.         */
 /* ---------------------------------------------------------------------- */
 function wireProfilFoto() {
+  const navLink = document.querySelector('#gy-nav a[data-section="profil-foto"]');
+  const bolum = document.getElementById("profil-foto");
+
+  if (GIRIS_YAPAN_PROFIL?.role !== "admin") {
+    navLink?.remove();
+    bolum?.remove();
+    return;
+  }
+
   document.getElementById("pf-yukle-btn").addEventListener("click", profilFotoYukle);
   document.getElementById("pf-sil-btn").addEventListener("click", profilFotoSil);
 }
@@ -2870,7 +2895,12 @@ function profilMimeTuruTahminEt(yol) {
 }
 
 async function profilFotoDurumYukle() {
+  // editor/manager için bölüm DOM'dan tamamen kaldırılmış olabilir
+  // (bkz. wireProfilFoto) — bu fonksiyon yine de wireBaglantiDogrula
+  // tarafından role'e bakılmaksızın çağrılıyor, o yüzden burada da
+  // ayrıca koruyoruz.
   const el = document.getElementById("pf-mevcut");
+  if (!el || GIRIS_YAPAN_PROFIL?.role !== "admin") return;
   el.innerHTML = '<p class="muted">Yükleniyor...</p>';
   try {
     const { yol } = await profilYapilandirmasiniOku();
@@ -2910,6 +2940,10 @@ function dosyayiBase64eCevir(dosya) {
 
 async function profilFotoYukle() {
   const msgEl = document.getElementById("pf-message");
+  if (GIRIS_YAPAN_PROFIL?.role !== "admin") {
+    showMessage(msgEl, "Bu işlem için yetkin yok — profil fotoğrafını sadece admin değiştirebilir.", "error");
+    return;
+  }
   const dosyaInput = document.getElementById("pf-dosya");
   const dosya = dosyaInput.files[0];
 
@@ -2965,6 +2999,10 @@ async function profilFotoYukle() {
 
 async function profilFotoSil() {
   const msgEl = document.getElementById("pf-message");
+  if (GIRIS_YAPAN_PROFIL?.role !== "admin") {
+    showMessage(msgEl, "Bu işlem için yetkin yok — profil fotoğrafını sadece admin silebilir.", "error");
+    return;
+  }
 
   if (!PAT_BELLEK) {
     showMessage(msgEl, 'Önce "GitHub Bağlantısı" sekmesinden bağlantını doğrula.', "error");
