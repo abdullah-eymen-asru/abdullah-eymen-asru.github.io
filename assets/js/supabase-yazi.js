@@ -57,7 +57,7 @@ async function init() {
       if (kayit.venue) parcalar.push(escapeHtml(kayit.venue));
       if (kayit.tarih) parcalar.push(new Date(kayit.tarih).getFullYear());
       if (kayit.durum) parcalar.push(`<span class="tag">${escapeHtml(kayit.durum)}</span>`);
-      if (kayit.yazar_adi) parcalar.push(`✍️ ${escapeHtml(kayit.yazar_adi)}`);
+      if (kayit.yazar_adi) parcalar.push(`Yazan: ${escapeHtml(kayit.yazar_adi)}`);
       metaHtml = `<div class="meta">${parcalar.join(" · ")}</div>`;
     } else {
       const parcalar = [];
@@ -66,7 +66,7 @@ async function init() {
           new Date(kayit.tarih).toLocaleDateString("tr-TR", { day: "2-digit", month: "long", year: "numeric" })
         );
       }
-      if (kayit.yazar_adi) parcalar.push(`✍️ ${escapeHtml(kayit.yazar_adi)}`);
+      if (kayit.yazar_adi) parcalar.push(`Yazan: ${escapeHtml(kayit.yazar_adi)}`);
       metaHtml = `<div class="meta">${parcalar.join(" · ")}</div>`;
     }
 
