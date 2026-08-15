@@ -930,3 +930,23 @@
 .sifre-goster-btn:hover { color: var(--text); background: var(--bg); }
 .sifre-goster-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .sifre-goster-btn svg { width: 18px; height: 18px; display: block; }
+
+/* 2FA yedek/kurtarma kodları — panel.js "Yedek Kodlar" bölümü ve
+   auth-pages.js girişteki "yedek kod kullan" akışı. */
+.yedek-kod-liste {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.yedek-kod-liste code {
+  display: block;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--tag-bg);
+  text-align: center;
+  font-size: 0.95rem;
+  letter-spacing: 0.03em;
+  user-select: all;
+}
