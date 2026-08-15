@@ -21,11 +21,18 @@ import { supabase } from "./supabase-client.js";
 
 /**
  * @param {Object} opts
- * @param {'user'|'special_user'|'editor'|'admin'|null} opts.role
+ * @param {'user'|'special_user'|'editor'|'manager'|'admin'|Array<string>|null} opts.role
  *   null/undefined  -> sadece giriş yapmış olmak yeterli
  *   'special_user'  -> special_user VEYA admin erişebilir
  *   'editor'        -> editor VEYA admin erişebilir
+ *   'manager'       -> manager (panelde "İçerik Sorumlusu") VEYA admin erişebilir
  *   'admin'         -> sadece admin erişebilir
+ *   ['editor','manager'] -> DİZİ de verilebilir: editor, manager VEYA admin
+ *                           erişebilir (bkz. panel/github-yonetim.md — hem
+ *                           editor hem manager aynı yazma yetkisini
+ *                           paylaştığı için bu sayfaya ikisi de girebilmeli).
+ *                           "admin her zaman geçer" kuralı dizi verilse de
+ *                           geçerlidir.
  * @param {string} opts.redirectTo - yetkisizse gidilecek sayfa
  */
 export async function requireAuth({ role = null, redirectTo = "/hesap/giris.html" } = {}) {
@@ -81,9 +88,14 @@ export async function requireAuth({ role = null, redirectTo = "/hesap/giris.html
   // çalışması gerektiğini varsayıyordu ama kod bunu sağlamıyordu). Şimdi
   // role==='editor' isteği hem 'editor' hem 'admin' profiline izin veriyor;
   // role==='special_user' isteği de aynı şekilde hem kendisine hem admin'e.
+  // BUG FİX / GENİŞLETME: role artık bir DİZİ de olabilir (ör.
+  // requireAuth({role:['editor','manager']})) — panel/github-yonetim.md
+  // hem editor hem manager (İçerik Sorumlusu) rolündeki kullanıcılara açık
+  // olduğu için tek bir string ile "ya editor ya manager" ifade edilemiyordu.
+  const izinliRoller = Array.isArray(role) ? role : role === null ? [] : [role];
   const roleOk =
     role === null ||
-    profile.role === role ||
+    izinliRoller.includes(profile.role) ||
     profile.role === "admin"; // admin her zaman geçer
 
   if (!roleOk) {
