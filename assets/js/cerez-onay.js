@@ -140,12 +140,42 @@ function panelAc() {
   const islevselKutu = document.getElementById("cerez-islevsel-kutu");
   if (analitikKutu) analitikKutu.checked = veri ? !!veri.analitik : false;
   if (islevselKutu) islevselKutu.checked = veri ? !!veri.islevsel : false;
-  document.getElementById("cerez-panel-overlay")?.removeAttribute("hidden");
+  const overlay = document.getElementById("cerez-panel-overlay");
+  if (!overlay) return;
+  // Önceki bir kapanış animasyonundan kalmış olabilecek sınıfı temizle,
+  // sonra bir sonraki frame'de gösterip geçiş (fade+scale in) oynasın.
+  overlay.classList.remove("cerez-panel-kapaniyor");
+  overlay.removeAttribute("hidden");
   document.body.classList.add("cerez-panel-acik");
 }
+
+/*
+ * Paneli kapatır. X butonu / Escape / overlay'e tıklama / "Sadece
+ * Zorunlu" / "Tercihleri Kaydet" hepsi buradan geçer. Kapanış GÖRSEL
+ * olarak yukarıdan aşağı küçülerek (bkz. cerez-onay.css .cerez-panel-
+ * kapaniyor) biter; CSS geçişi bittiğinde (transitionend) ya da en fazla
+ * 250ms sonra (geçiş herhangi bir sebeple tetiklenmezse, ör. tarayıcı
+ * animasyonu atlarsa) gerçekten "hidden" ekleyip DOM'dan etkileşimi
+ * kaldırıyoruz — böylece animasyon sırasında panel görünmeye devam
+ * ederken arkadaki sayfa scroll kilidi ve odak (focus) tutarlı kalıyor.
+ */
 function panelKapat() {
-  document.getElementById("cerez-panel-overlay")?.setAttribute("hidden", "");
+  const overlay = document.getElementById("cerez-panel-overlay");
+  if (!overlay || overlay.hasAttribute("hidden")) return;
+
   document.body.classList.remove("cerez-panel-acik");
+  overlay.classList.add("cerez-panel-kapaniyor");
+
+  let tamamlandi = false;
+  const bitir = () => {
+    if (tamamlandi) return;
+    tamamlandi = true;
+    overlay.setAttribute("hidden", "");
+    overlay.classList.remove("cerez-panel-kapaniyor");
+  };
+
+  overlay.addEventListener("transitionend", bitir, { once: true });
+  setTimeout(bitir, 250); // reduced-motion veya geçişin atlandığı durumlar için güvenlik ağı
 }
 
 function kaydetVeUygula(analitik, islevsel) {
@@ -156,6 +186,13 @@ function kaydetVeUygula(analitik, islevsel) {
 }
 
 function init() {
+  // Bu dosya birden fazla kez çalıştırılırsa (ör. bir sayfa script'i
+  // yanlışlıkla iki kez eklerse) event listener'lar iki kez bağlanıp her
+  // tıklamanın iki kez tetiklenmesine (veya çakışan davranışa) yol
+  // açabilir. Tek seferlik çalışmayı garanti ediyoruz.
+  if (window.__cerezOnayBaslatildi) return;
+  window.__cerezOnayBaslatildi = true;
+
   const mevcut = cerezTercihleriniOku();
   if (mevcut) {
     tercihleriUygula(mevcut);
