@@ -6,13 +6,31 @@
  * API'sine (repos/{owner}/{repo}/contents/{path}) istek atarak _posts/ ve
  * _projects/ klasörlerine commit atar, assets/profil.jpg dosyasını yönetir.
  *
+ * ÖNEMLİ — "YAYINDA DEĞİL" İÇERİK ARTIK GIT'E HİÇ COMMIT EDİLMİYOR:
+ * Eskiden "Yayında" kapatılınca içerik yine GitHub'a, front-matter'da
+ * `yayinda: false` + tahmin edilemez bir `permalink` ile commit ediliyordu
+ * (dosya reponun İÇİNDE, herkese açık git geçmişinde duruyordu — sadece
+ * adresi paylaşılmadığı için "gizli" sayılıyordu). Artık öyle DEĞİL:
+ * "Yayında" kapalıyken içerik SADECE Supabase'teki `taslak_icerikler`
+ * tablosunda duruyor (bkz. supabase/migrations/0013_...sql), GitHub'a hiç
+ * dokunulmuyor. Ön izleme linki (`/onizleme/?tur=...&kod=...`) o tabloyu,
+ * sadece tur+kod tam eşleşen TEK satırı döndüren bir RPC üzerinden okuyor.
+ * "Yayınla" denince içerik Supabase'den GitHub'a commit edilip
+ * Supabase'teki satır silinir; "Yayından Kaldır" denince tam tersi olur —
+ * GitHub'daki dosya okunup Supabase'e yazılır ve GitHub'daki dosya silinir.
+ * Yani bir içerik, HER ZAMAN ya GitHub'da (yayında) ya da Supabase'de
+ * (gizli) durur — iki yerde birden asla durmaz.
+ *
  * ÖNEMLİ — BU SAYFA SİTENİN SUPABASE TABANLI "ADMİN PANELİ"NDEN (panel/admin.md /
- * admin.js) TAMAMEN BAĞIMSIZDIR. O panel Supabase'teki kullanıcı/rol/özel
- * içerik sistemini yönetir; bu sayfa ise GitHub Pages'in kendi statik
- * Jekyll içeriğini (blog yazıları, akademik projeler, profil fotoğrafı)
- * yönetir. Aralarındaki TEK ortak nokta: bu sayfaya erişim de aynı
- * requireAuth({ role: 'admin' }) mekanizmasıyla (bkz. auth-guard.js),
- * yani sadece Supabase'te role='admin' olan kullanıcılar görebilir.
+ * admin.js) TAMAMEN BAĞIMSIZDIR — ama artık taslak içerikler için AYNI
+ * Supabase projesini (aynı `supabase` istemcisini) kullanıyor. O panel
+ * Supabase'teki kullanıcı/rol/özel içerik sistemini yönetir; bu sayfa ise
+ * GitHub Pages'in kendi statik Jekyll içeriğini (blog yazıları, akademik
+ * projeler, profil fotoğrafı) yönetir. Erişim kontrolü de aynı: bu sayfaya
+ * erişim de aynı requireAuth({ role: 'admin' }) mekanizmasıyla (bkz.
+ * auth-guard.js), yani sadece Supabase'te role='admin' olan kullanıcılar
+ * görebilir — taslak tablosunun RLS politikası da bunu veritabanı
+ * seviyesinde ayrıca zorunlu kılıyor (bkz. migration 0013).
  *
  * GÜVENLİK NOTU — GitHub Personal Access Token (PAT):
  *   Token SADECE bu modülün belleğinde (PAT_BELLEK değişkeni) tutulur.
@@ -31,7 +49,7 @@
  *   bir token kullanmaktan çok daha güvenli.
  */
 import { requireAuth } from "./auth-guard.js";
-import { escapeHtml, showMessage } from "./supabase-client.js";
+import { escapeHtml, showMessage, supabase } from "./supabase-client.js";
 
 const GITHUB_API = "https://api.github.com";
 // Profil fotoğrafının GERÇEK yolu artık sabit kodlanmıyor: her zaman
@@ -47,9 +65,12 @@ let PROFIL_YOLU = null;
 // Token SADECE bellekte — bkz. dosya başındaki güvenlik notu.
 let PAT_BELLEK = "";
 
-// null: yeni içerik ekleniyor, doluysa mevcut bir dosya düzenleniyor.
+// GitHub'da düzenlenen bir dosya varsa DUZENLENEN_YOL/DUZENLENEN_SHA dolu,
+// Supabase'te düzenlenen bir taslak varsa DUZENLENEN_TASLAK_ID dolu olur —
+// bir içerik ikisinde BİRDEN asla olamaz (bkz. dosya başındaki not).
 let DUZENLENEN_YOL = null;
 let DUZENLENEN_SHA = null;
+let DUZENLENEN_TASLAK_ID = null;
 // Düzenlenen içeriğin daha önce üretilmiş gizli ön izleme kodu (varsa).
 // Formda "Yayında değil" seçiliyken tekrar kaydedilirse bu kod KORUNUR,
 // böylece link değişmez. Yeni içerikte veya kod hiç üretilmemişse null.
@@ -87,6 +108,7 @@ async function init() {
 
   const tarihEl = document.getElementById("ic-date");
   if (tarihEl) tarihEl.value = new Date().toISOString().slice(0, 10);
+  submitButonMetniGuncelle();
 }
 
 /* ---------------------------------------------------------------------- */
@@ -314,18 +336,56 @@ function wireIcerikTuruToggle() {
   guncelleIcerikTuru();
 }
 
+function duzenlemeModuMu() {
+  return !!(DUZENLENEN_YOL || DUZENLENEN_TASLAK_ID);
+}
+
 async function guncelleIcerikTuru() {
   const proje = icerikTuru() === "proje";
   document.getElementById("ic-proje-alanlar").hidden = !proje;
   document.getElementById("ic-yil-oneki-wrap").hidden = !proje;
   await guncelleKlasorEtiketleri(proje);
-  document.getElementById("ic-form-baslik").textContent = DUZENLENEN_YOL
+  document.getElementById("ic-form-baslik").textContent = duzenlemeModuMu()
     ? proje
       ? "Akademik Projeyi Düzenle"
       : "Blog Yazısını Düzenle"
     : proje
     ? "Yeni Akademik Proje Ekle"
     : "Yeni Blog Yazısı Ekle";
+}
+
+/**
+ * Kaydet butonunun metnini o an düzenlenen/kaydedilecek içeriğin durumuna
+ * göre günceller: mevcut bir kaydı düzenliyorsak her zaman "Güncelle" (hem
+ * GitHub'daki bir dosya hem Supabase'teki bir taslak için — hangisine
+ * kaydedileceği "Yayında" anahtarına göre otomatik belirlenir), yeni içerik
+ * ekleniyorsa "Yayında" anahtarına göre "GitHub'a Yayınla" ya da "Taslağı
+ * Kaydet (Gizli)".
+ */
+function submitButonMetniGuncelle() {
+  const btn = document.getElementById("ic-submit-btn");
+  if (!btn) return;
+  if (duzenlemeModuMu()) {
+    btn.textContent = "Güncelle";
+    return;
+  }
+  const yayinda = document.getElementById("ic-yayinda")?.checked;
+  btn.textContent = yayinda ? "GitHub'a Yayınla" : "Taslağı Kaydet (Gizli)";
+}
+
+/**
+ * Bir içeriği (git dosyası ya da Supabase taslağı) tekil olarak tanımlayan
+ * bir anahtar üretir (çakışma kontrolünde ve "bu, şu an düzenlenen kayıt
+ * mı?" karşılaştırmalarında kullanılır).
+ */
+function itemAnahtari(item) {
+  return item.kaynak === "supabase" ? `db:${item.taslakId}` : `git:${item.path}`;
+}
+
+function suAnDuzenlenenAnahtar() {
+  if (DUZENLENEN_TASLAK_ID) return `db:${DUZENLENEN_TASLAK_ID}`;
+  if (DUZENLENEN_YOL) return `git:${DUZENLENEN_YOL}`;
+  return null;
 }
 
 /**
@@ -916,27 +976,19 @@ function fmSatiri(anahtar, deger, ciplak = false) {
 }
 
 /**
- * Front matter + gövdeden tam Markdown dosya içeriğini üretir.
- * "Yayında" işaretliyse: yayinda:true, sitemap:true, permalink YOK.
- * İşaretli değilse: yayinda:false, sitemap:false + gizli ön izleme permalink'i.
+ * Front matter + gövdeden tam Markdown dosya içeriğini üretir. Bu fonksiyon
+ * SADECE bir içerik GitHub'a YAYINLANIRKEN çağrılır — dolayısıyla üretilen
+ * dosya her zaman `yayinda: true, sitemap: true` olur, `permalink` alanı
+ * hiç yazılmaz ("yayında değil" içerikler artık GitHub'a hiç gitmiyor,
+ * bkz. dosya başındaki not).
  *
- * gizliKod, çağıran taraftan (icerikKaydet) gelir: içerik ilk kez "yayında
- * değil" olarak kaydediliyorsa yeni üretilir, daha önce zaten bir ön izleme
- * kodu varsa (düzenleme sırasında) AYNI kod korunur — böylece link, panelde
- * her açılışta/düzenlemede DEĞİŞMEZ ve daha önce paylaşılmış olabilecek bir
- * link kırılmaz. Kod yalnızca kullanıcı bilerek yenilerse değişir.
- *
- * ÖNEMLİ — "onizleme_kod" alanı (yeniden yayınlama / re-publish desteği):
- * Kod, sadece "yayında: false" iken var olan `permalink` alanından değil,
- * AYRICA gizli bir `onizleme_kod` alanından da yazılır — bu alan içerik
- * "Yayında" (true) olsa BİLE dosyada kalır. Böylece bir yazı önce gizli
- * paylaşılıp linki birine gönderilir, sonra yayına alınır, sonra bir
- * sebeple TEKRAR "yayında değil"e çekilirse ("yeniden yayından kaldırma")
- * daha önce paylaşılmış olan AYNI ön izleme linki geri döner — yeni/farklı
- * bir kod üretilmez. Kod yalnızca kullanıcı "🎲 Yenile" ile bilerek
- * değiştirirse ya da bu içerik için hiç kod üretilmemişse değişir.
+ * gizliKod yine de front-matter'a `onizleme_kod` olarak yazılır (görünmez,
+ * sayfa render'ında kullanılmaz) — TEK amacı, bu içerik daha sonra tekrar
+ * "Yayından Kaldır" ile Supabase'e taşınırsa AYNI ön izleme linkinin geri
+ * dönebilmesidir (kod, sadece kullanıcı bilerek "🎲 Yenile" ile değiştirirse
+ * farklılaşır).
  */
-function dosyaIcerigiOlustur(tur, alan, yayinda, gizliKod, govde) {
+function dosyaIcerigiOlustur(tur, alan, gizliKod, govde) {
   const satirlar = ["---"];
   satirlar.push(fmSatiri("title", alan.title));
   satirlar.push(fmSatiri("date", alan.date, true));
@@ -949,17 +1001,8 @@ function dosyaIcerigiOlustur(tur, alan, yayinda, gizliKod, govde) {
     satirlar.push(fmSatiri("link_label", alan.link_label));
   }
 
-  satirlar.push(fmSatiri("yayinda", yayinda, true));
-  satirlar.push(fmSatiri("sitemap", yayinda, true));
-
-  if (!yayinda) {
-    const onEk = tur === "proje" ? "/projects/" : "/blog/";
-    satirlar.push(fmSatiri("permalink", `${onEk}on-izleme-${gizliKod}/`, true));
-  }
-  // Kod, yayın durumundan bağımsız olarak her zaman ayrıca saklanır (bkz.
-  // yukarıdaki fonksiyon açıklaması). Sadece front-matter'da görünür kalır,
-  // sayfa render'ında kullanılmaz — tek amacı "yeniden yayından kaldırma"
-  // anında panelin eski linki hatırlayabilmesidir.
+  satirlar.push(fmSatiri("yayinda", true, true));
+  satirlar.push(fmSatiri("sitemap", true, true));
   if (gizliKod) {
     satirlar.push(fmSatiri("onizleme_kod", gizliKod));
   }
@@ -970,10 +1013,10 @@ function dosyaIcerigiOlustur(tur, alan, yayinda, gizliKod, govde) {
 }
 
 /**
- * Bir içeriğin gizli ön izleme kodunu bulur: önce aktif `permalink`
- * alanından (o an "yayında değil" ise buradan gelir), yoksa kalıcı olarak
- * saklanan `onizleme_kod` alanından (içerik şu an "yayında" olsa bile daha
- * önce üretilmiş bir kodu hatırlamak için) okur. İkisi de yoksa null döner.
+ * Bir içeriğin gizli ön izleme kodunu bulur: önce (eski/legacy dosyalarda
+ * hâlâ olabilecek) `permalink` alanından, yoksa `onizleme_kod` alanından
+ * (Supabase'teki taslak satırlarında bu alan HER ZAMAN dolu) okur. İkisi de
+ * yoksa null döner.
  */
 function icerikGizliKoduBul(data) {
   return permalinktenGizliKoduCikar(data?.permalink) || data?.onizleme_kod || null;
@@ -1055,10 +1098,13 @@ function dosyaYoluHesapla(tur, tarih, slug, yilOneki, klasor) {
  * tek seferlik/salt-okunur değildir: kullanıcı kodu elle değiştirebilir
  * veya zar butonuyla yenileyebilir, her değişiklik input alanına yansır
  * ve bir sonraki kayıtta o kod kalıcı hale gelir.
+ *
+ * Link formatı: /onizleme/?tur=<blog|proje>&kod=<kod> — bu adres
+ * assets/js/onizleme.js tarafından okunup Supabase'teki
+ * `taslak_onizleme_getir` RPC'sine sorulur (bkz. migration 0013).
  */
 function onizlemeKutusunuGoster(tur, gizliKod) {
-  const onEk = tur === "proje" ? "/projects/" : "/blog/";
-  document.getElementById("ic-onizleme-onek").textContent = `${location.origin}${onEk}on-izleme-`;
+  document.getElementById("ic-onizleme-onek").textContent = `${location.origin}/onizleme/?tur=${tur}&kod=`;
   document.getElementById("ic-onizleme-kod").value = gizliKod;
   document.getElementById("ic-onizleme-kutusu").hidden = false;
   onizlemeLinkGuncelle();
@@ -1078,7 +1124,7 @@ function onizlemeLinkGuncelle() {
   const gecerli = temizKod.length >= 3;
   kodEl.classList.toggle("gy-kod-gecersiz", kodEl.value.trim() !== "" && !gecerli);
 
-  linkEl.value = gecerli ? `${onek}${temizKod}/` : "Geçerli bir kod gir (en az 3 karakter, harf/rakam/tire)";
+  linkEl.value = gecerli ? `${onek}${temizKod}` : "Geçerli bir kod gir (en az 3 karakter, harf/rakam/tire)";
 }
 
 /** Formda o an geçerli olan (kaydedilecek) ön izleme kodunu döner; boş/geçersizse null. */
@@ -1103,6 +1149,7 @@ function wireYayindaCanliOnizleme() {
     } else {
       onizlemeKutusunuGoster(icerikTuru(), DUZENLENEN_GIZLI_KOD || rastgeleKod(8));
     }
+    submitButonMetniGuncelle();
   });
 
   document.getElementById("ic-onizleme-kod").addEventListener("input", onizlemeLinkGuncelle);
@@ -1141,10 +1188,11 @@ function wireIcerikForm() {
 function duzenlemeyiKapat() {
   DUZENLENEN_YOL = null;
   DUZENLENEN_SHA = null;
+  DUZENLENEN_TASLAK_ID = null;
   DUZENLENEN_GIZLI_KOD = null;
   document.getElementById("ic-iptal-btn").hidden = true;
-  document.getElementById("ic-submit-btn").textContent = "GitHub'a Yayınla";
   guncelleIcerikTuru();
+  submitButonMetniGuncelle();
 }
 
 function duzenlemeyiIptalEt() {
@@ -1153,6 +1201,7 @@ function duzenlemeyiIptalEt() {
   document.getElementById("ic-date").value = new Date().toISOString().slice(0, 10);
   onizlemeKutusunuGizle();
   guncelleIcerikTuru();
+  submitButonMetniGuncelle();
 }
 
 async function icerikKaydet() {
@@ -1190,16 +1239,14 @@ async function icerikKaydet() {
   }
 
   const govde = document.getElementById("ic-body").value;
-  // "Yayında değil" ise: kullanıcı ön izleme kutusundaki kodu elle
-  // değiştirmiş olabilir (onizlemedenGecerliKoduAl bunu okur); geçerli bir
-  // şey girilmemişse daha önce üretilmiş kod korunur, o da yoksa yeni bir
-  // kod üretilir. Bu sayede kod hem düzenlenebilir hem de kaydetmeden
-  // önce (Yayında kapatılır kapatılmaz) zaten görüntülenebilir durumda.
+  // Kod her zaman (yayında olsa bile) korunur — bkz. dosyaIcerigiOlustur'un
+  // başındaki açıklama. "Yayında değil" iken kullanıcı ön izleme kutusundaki
+  // kodu elle değiştirmiş olabilir (onizlemedenGecerliKoduAl bunu okur).
   const gizliKod = !yayinda
     ? onizlemedenGecerliKoduAl() || DUZENLENEN_GIZLI_KOD || rastgeleKod(8)
-    : null;
+    : DUZENLENEN_GIZLI_KOD || null;
 
-  if (gizliKod && onizlemeKoduCakisiyorMu(tur, gizliKod, DUZENLENEN_YOL)) {
+  if (gizliKod && onizlemeKoduCakisiyorMu(tur, gizliKod, suAnDuzenlenenAnahtar())) {
     showMessage(
       msgEl,
       `Bu ön izleme kodu ("${gizliKod}") aynı türde başka bir içerik tarafından zaten kullanılıyor. Lütfen "🎲 Yenile" ile yeni bir kod üret ya da elle farklı bir kod yaz.`,
@@ -1208,60 +1255,141 @@ async function icerikKaydet() {
     return;
   }
 
-  const dosyaIcerigi = dosyaIcerigiOlustur(tur, alan, yayinda, gizliKod, govde);
-  const yeniYol = dosyaYoluHesapla(tur, date, slug, yilOneki, klasor);
+  const dosyaYolu = dosyaYoluHesapla(tur, date, slug, yilOneki, klasor);
 
   submitBtn.disabled = true;
   submitBtn.textContent = "Gönderiliyor...";
   try {
-    const icerikB64 = b64Encode(dosyaIcerigi);
-    const commitMesaji = DUZENLENEN_YOL ? `İçerik güncellendi: ${yeniYol}` : `Yeni içerik eklendi: ${yeniYol}`;
-
-    if (DUZENLENEN_YOL && DUZENLENEN_YOL === yeniYol) {
-      // Dosya yolu değişmedi -> doğrudan güncelle.
-      await ghPutFile(yeniYol, icerikB64, commitMesaji, DUZENLENEN_SHA);
+    if (yayinda) {
+      await icerikGitHubaYaz(tur, alan, gizliKod, govde, dosyaYolu, msgEl);
     } else {
-      // Yeni dosya, ya da düzenleme sırasında dosya adı/tarih değiştiği
-      // için yol değişti -> önce hedef yolda dosya var mı diye bak (sha
-      // gerekiyorsa al), sonra yaz.
-      const mevcutHedef = await ghGetContents(yeniYol).catch(() => null);
-      await ghPutFile(yeniYol, icerikB64, commitMesaji, mevcutHedef?.sha || null);
-
-      // Düzenleme sırasında yol değiştiyse eski dosyayı sil (yeniden adlandırma).
-      if (DUZENLENEN_YOL && DUZENLENEN_YOL !== yeniYol && DUZENLENEN_SHA) {
-        await ghDeleteFile(
-          DUZENLENEN_YOL,
-          DUZENLENEN_SHA,
-          `Yeniden adlandırıldı: ${DUZENLENEN_YOL} -> ${yeniYol}`
-        );
-      }
+      await icerikSupabaseeYaz(tur, alan, gizliKod, govde, slug, dosyaYolu, msgEl);
     }
-
-    DUZENLENEN_GIZLI_KOD = gizliKod;
-    if (!yayinda) {
-      onizlemeKutusunuGoster(tur, gizliKod);
-    } else {
-      onizlemeKutusunuGizle();
-    }
-
-    showMessage(msgEl, "İşlem başarıyla GitHub'a iletildi, 1-2 dakika içinde sitede güncellenecektir.", "success");
-    // Not: duzenlemeyiKapat() burada ÇAĞRILMIYOR — kapatılırsa ön izleme
-    // kutusu ve DUZENLENEN_GIZLI_KOD sıfırlanır, kullanıcı linki kaybeder.
-    // Form "düzenleme modunda" kalır ki içerik hemen yayına alınabilsin ya
-    // da link tekrar görüntülenebilsin. Kart listesindeki "Düzenle" veya
-    // "Yeni İçerik Ekle"ye geçiş formu zaten normal şekilde sıfırlayacaktır.
-    DUZENLENEN_YOL = yeniYol;
-    DUZENLENEN_SHA = (await ghGetContents(yeniYol))?.sha || DUZENLENEN_SHA;
-    document.getElementById("ic-iptal-btn").hidden = false;
-    document.getElementById("ic-submit-btn").textContent = "Güncelle";
-    guncelleIcerikTuru();
     await icerikListesiYukle();
   } catch (err) {
     showMessage(msgEl, `Hata: ${err.message}`, "error");
   } finally {
     submitBtn.disabled = false;
-    submitBtn.textContent = "GitHub'a Yayınla";
+    submitButonMetniGuncelle();
   }
+}
+
+/** "Yayında" AÇIK olarak kaydetme: dosyayı GitHub'a commit eder, önceden bir Supabase taslağı düzenleniyorduysa o satırı siler. */
+async function icerikGitHubaYaz(tur, alan, gizliKod, govde, dosyaYolu, msgEl) {
+  const dosyaIcerigi = dosyaIcerigiOlustur(tur, alan, gizliKod, govde);
+  const icerikB64 = b64Encode(dosyaIcerigi);
+  const commitMesaji = DUZENLENEN_YOL ? `İçerik güncellendi: ${dosyaYolu}` : `Yeni içerik eklendi: ${dosyaYolu}`;
+
+  if (DUZENLENEN_YOL && DUZENLENEN_YOL === dosyaYolu) {
+    // Dosya yolu değişmedi -> doğrudan güncelle.
+    await ghPutFile(dosyaYolu, icerikB64, commitMesaji, DUZENLENEN_SHA);
+  } else {
+    // Yeni dosya, taslaktan ilk kez yayınlanıyor, ya da düzenleme sırasında
+    // dosya adı/tarih değiştiği için yol değişti -> önce hedef yolda dosya
+    // var mı diye bak (sha gerekiyorsa al), sonra yaz.
+    const mevcutHedef = await ghGetContents(dosyaYolu).catch(() => null);
+    await ghPutFile(dosyaYolu, icerikB64, commitMesaji, mevcutHedef?.sha || null);
+
+    // Düzenleme sırasında GİT dosyasının yolu değiştiyse eski dosyayı sil (yeniden adlandırma).
+    if (DUZENLENEN_YOL && DUZENLENEN_YOL !== dosyaYolu && DUZENLENEN_SHA) {
+      await ghDeleteFile(DUZENLENEN_YOL, DUZENLENEN_SHA, `Yeniden adlandırıldı: ${DUZENLENEN_YOL} -> ${dosyaYolu}`);
+    }
+  }
+
+  // Supabase'teki bir taslak yayınlanıyorsa, artık GitHub'da yaşadığı için taslak satırı silinir.
+  if (DUZENLENEN_TASLAK_ID) {
+    const { error } = await supabase.from("taslak_icerikler").delete().eq("id", DUZENLENEN_TASLAK_ID);
+    if (error) console.error("Taslak satırı silinemedi (dosya GitHub'a başarıyla yazıldı):", error);
+  }
+
+  DUZENLENEN_GIZLI_KOD = gizliKod;
+  DUZENLENEN_TASLAK_ID = null;
+  onizlemeKutusunuGizle();
+
+  showMessage(msgEl, "İşlem başarıyla GitHub'a iletildi, 1-2 dakika içinde sitede güncellenecektir.", "success");
+  // Not: duzenlemeyiKapat() burada ÇAĞRILMIYOR — form "düzenleme modunda"
+  // kalır ki içerik hemen tekrar düzenlenebilsin.
+  DUZENLENEN_YOL = dosyaYolu;
+  DUZENLENEN_SHA = (await ghGetContents(dosyaYolu))?.sha || DUZENLENEN_SHA;
+  document.getElementById("ic-iptal-btn").hidden = false;
+  guncelleIcerikTuru();
+}
+
+/** "Yayında" KAPALI olarak kaydetme: içerik GitHub'a hiç dokunmadan Supabase'e yazılır. */
+async function icerikSupabaseeYaz(tur, alan, gizliKod, govde, slug, dosyaYolu, msgEl) {
+  const satir = {
+    tur,
+    baslik: alan.title,
+    tarih: alan.date,
+    slug,
+    dosya_yolu: dosyaYolu,
+    venue: alan.venue || null,
+    durum: alan.status || null,
+    ozet: alan.summary || null,
+    link: alan.link || null,
+    link_etiket: alan.link_label || null,
+    govde,
+    onizleme_kod: gizliKod,
+  };
+
+  let taslakSonuc;
+  if (DUZENLENEN_TASLAK_ID) {
+    const { data, error } = await supabase
+      .from("taslak_icerikler")
+      .update(satir)
+      .eq("id", DUZENLENEN_TASLAK_ID)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    taslakSonuc = data;
+  } else {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const { data, error } = await supabase
+      .from("taslak_icerikler")
+      .insert({ ...satir, created_by: user?.id || null })
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    taslakSonuc = data;
+  }
+
+  // Düzenlenen içerik daha önce GitHub'da yayındaysa (ya da eski sistemden
+  // kalma gizli bir git dosyasıysa), içerik artık güvenle Supabase'te
+  // olduğuna göre GitHub'daki dosya silinir.
+  let gitSilmeHatasi = null;
+  if (DUZENLENEN_YOL) {
+    try {
+      await ghDeleteFile(DUZENLENEN_YOL, DUZENLENEN_SHA, `Supabase'e taşındı (yayından kaldırıldı): ${DUZENLENEN_YOL}`);
+    } catch (e) {
+      gitSilmeHatasi = e;
+      console.error("Eski GitHub dosyası silinemedi:", e);
+    }
+  }
+
+  DUZENLENEN_GIZLI_KOD = gizliKod;
+  DUZENLENEN_TASLAK_ID = taslakSonuc.id;
+  DUZENLENEN_YOL = null;
+  DUZENLENEN_SHA = null;
+  onizlemeKutusunuGoster(tur, gizliKod);
+
+  if (gitSilmeHatasi) {
+    showMessage(
+      msgEl,
+      `Taslak Supabase'e kaydedildi ama eski GitHub dosyası silinemedi: ${gitSilmeHatasi.message}. "Mevcut İçerikler" listesinden elle silmen gerekebilir.`,
+      "error"
+    );
+  } else {
+    showMessage(
+      msgEl,
+      "Taslak Supabase'e kaydedildi — GitHub'a hiç commit edilmedi, sadece aşağıdaki gizli linki bilenler görebilir.",
+      "success"
+    );
+  }
+
+  document.getElementById("ic-iptal-btn").hidden = false;
+  guncelleIcerikTuru();
 }
 
 /* ---------------------------------------------------------------------- */
@@ -1346,6 +1474,31 @@ async function koleksiyonDosyalariniListele(kokKlasor) {
   return [...kokDosyalar, ...altKlasorDosyalari];
 }
 
+/** Bir Supabase `taslak_icerikler` satırını, listeleme/kart çizimi için git dosyalarıyla AYNI şekle (item) çevirir. */
+function taslakToItem(row) {
+  return {
+    path: null,
+    sha: null,
+    tur: row.tur,
+    taslakId: row.id,
+    kaynak: "supabase",
+    data: {
+      title: row.baslik,
+      date: row.tarih,
+      venue: row.venue,
+      status: row.durum,
+      summary: row.ozet,
+      link: row.link,
+      link_label: row.link_etiket,
+      yayinda: false,
+      onizleme_kod: row.onizleme_kod,
+      slug: row.slug,
+      dosya_yolu: row.dosya_yolu,
+    },
+    body: row.govde || "",
+  };
+}
+
 async function icerikListesiYukle() {
   const el = document.getElementById("ic-liste");
   if (!PAT_BELLEK) {
@@ -1367,11 +1520,28 @@ async function icerikListesiYukle() {
       icerikOzetleriGuvenliGetir(postDosyalari, "blog"),
       icerikOzetleriGuvenliGetir(projeDosyalari, "proje"),
     ]);
+    postDetaylari.forEach((x) => (x.kaynak = "github"));
+    projeDetaylari.forEach((x) => (x.kaynak = "github"));
 
-    postDetaylari.sort((a, b) => (b.data.date || "").localeCompare(a.data.date || ""));
-    projeDetaylari.sort((a, b) => (b.data.date || "").localeCompare(a.data.date || ""));
+    // Supabase'teki taslakları da getir — tek bir satırın değil ama TÜM
+    // sorgunun başarısız olması ihtimaline karşı (ağ hatası, RLS vb.) bu
+    // adım GitHub listesini düşürmüyor, sadece taslaklar boş gösteriliyor
+    // ve konsola hata yazılıyor.
+    let taslaklar = [];
+    try {
+      const { data, error } = await supabase.from("taslak_icerikler").select("*");
+      if (error) throw error;
+      taslaklar = data || [];
+    } catch (e) {
+      console.error("Taslaklar (Supabase) yüklenemedi:", e);
+    }
+    const supaBlog = taslaklar.filter((t) => t.tur === "blog").map(taslakToItem);
+    const supaProje = taslaklar.filter((t) => t.tur === "proje").map(taslakToItem);
 
-    TUM_ICERIKLER = [...postDetaylari, ...projeDetaylari];
+    const blogTumu = [...postDetaylari, ...supaBlog].sort((a, b) => (b.data.date || "").localeCompare(a.data.date || ""));
+    const projeTumu = [...projeDetaylari, ...supaProje].sort((a, b) => (b.data.date || "").localeCompare(a.data.date || ""));
+
+    TUM_ICERIKLER = [...blogTumu, ...projeTumu];
     listeyiYenidenCiz();
   } catch (err) {
     el.innerHTML = `<p class="muted">Liste yüklenemedi: ${escapeHtml(err.message)}</p>`;
@@ -1430,7 +1600,7 @@ function icerikFiltreyeUyuyorMu(item) {
   if (LISTE_FILTRE_DURUM === "gizli" && yayinda) return false;
 
   if (LISTE_ARAMA) {
-    const aranan = [item.data.title, item.path, item.data.summary, item.data.venue]
+    const aranan = [item.data.title, item.path || item.data.dosya_yolu, item.data.summary, item.data.venue]
       .filter(Boolean)
       .join(" ")
       .toLocaleLowerCase("tr");
@@ -1454,12 +1624,12 @@ function metniVurgula(metin) {
   return `${escapeHtml(once)}<span class="gy-vurgu">${escapeHtml(eslesen)}</span>${escapeHtml(sonra)}`;
 }
 
-/** Kaydedilecek gizli kodun, aynı türde BAŞKA bir içerikte zaten kullanılıp kullanılmadığını kontrol eder. */
-function onizlemeKoduCakisiyorMu(tur, gizliKod, haricTutulacakYol) {
+/** Kaydedilecek gizli kodun, aynı türde BAŞKA bir içerikte (GitHub'da ya da Supabase'de) zaten kullanılıp kullanılmadığını kontrol eder. */
+function onizlemeKoduCakisiyorMu(tur, gizliKod, haricAnahtar) {
   return TUM_ICERIKLER.some(
     (item) =>
       item.tur === tur &&
-      item.path !== haricTutulacakYol &&
+      itemAnahtari(item) !== haricAnahtar &&
       icerikGizliKoduBul(item.data) === gizliKod
   );
 }
@@ -1523,6 +1693,10 @@ function icerikKartiCiz(item, tur) {
   const rozet = yayinda
     ? '<span class="gy-rozet gy-rozet--yayinda">Yayında</span>'
     : '<span class="gy-rozet gy-rozet--gizli">Gizli</span>';
+  const kaynakRozet =
+    item.kaynak === "supabase"
+      ? `<span class="gy-rozet gy-rozet--gizli" title="Bu içerik GitHub'a hiç commit edilmedi, sadece Supabase'te duruyor.">Supabase</span>`
+      : "";
   const ozet = item.data.summary
     ? `<div class="gy-icerik-kart-ozet">${metniVurgula(item.data.summary)}</div>`
     : "";
@@ -1533,25 +1707,32 @@ function icerikKartiCiz(item, tur) {
   // hazır tutulur (link'e tıklamadan/formu açmadan görünmez ama buton
   // panoya kopyalar).
   const gizliKod = icerikGizliKoduBul(item.data);
-  const onEk = tur === "proje" ? "/projects/" : "/blog/";
-  const onizlemeLink = gizliKod ? `${location.origin}${onEk}on-izleme-${gizliKod}/` : null;
+  const onizlemeLink = gizliKod ? `${location.origin}/onizleme/?tur=${tur}&kod=${encodeURIComponent(gizliKod)}` : null;
 
-  // Hızlı yayın-durumu aksiyonu: gizliyse tek tıkla "Yeniden Yayınla",
-  // yayındaysa tek tıkla "Yayından Kaldır". İkisi de icerikYayinDurumunuDegistir
-  // üzerinden AYNI kaydetme akışını (icerikKaydet'in çekirdeği) kullanır,
-  // formu açıp elle toggle'a basmaya gerek bırakmaz. Kod her koşulda
-  // korunur (bkz. dosyaIcerigiOlustur'daki onizleme_kod notu).
-  const durumBtn = yayinda
-    ? '<button type="button" class="gy-durum-degistir-btn" data-hedef="gizle">Yayından Kaldır</button>'
-    : '<button type="button" class="gy-durum-degistir-btn gy-durum-degistir-btn--yayinla" data-hedef="yayinla">Yeniden Yayınla</button>';
+  // Hızlı yayın-durumu aksiyonu:
+  //  - Supabase'teki bir taslaksa: "Yayınla" (GitHub'a commit eder, taslak satırı silinir).
+  //  - GitHub'da yayındaysa: "Yayından Kaldır" (Supabase'e taşır, GitHub dosyası silinir).
+  //  - GitHub'da ama "gizli" (eski sistemden kalma, bkz. dosya başındaki not): "Supabase'e Taşı"
+  //    (aynı işlemi yapar — GitHub'daki dosya artık bu yeni sistemde bulunmaması gereken bir
+  //    yerde durduğu için Supabase'e taşınır).
+  let durumBtn;
+  if (item.kaynak === "supabase") {
+    durumBtn = '<button type="button" class="gy-durum-degistir-btn gy-durum-degistir-btn--yayinla" data-hedef="yayinla">Yayınla</button>';
+  } else if (yayinda) {
+    durumBtn = '<button type="button" class="gy-durum-degistir-btn" data-hedef="gizle">Yayından Kaldır</button>';
+  } else {
+    durumBtn = '<button type="button" class="gy-durum-degistir-btn gy-durum-degistir-btn--yayinla" data-hedef="tasi">Supabase\'e Taşı</button>';
+  }
   const linkBtn = onizlemeLink
     ? `<button type="button" class="gy-link-kopyala-mini-btn" title="${escapeHtml(onizlemeLink)}">🔗 Linki Kopyala</button>`
     : "";
 
+  const yolGoster = item.kaynak === "supabase" ? item.data.dosya_yolu || "(henüz GitHub'a commit edilmedi)" : item.path;
+
   kart.innerHTML = `
     <div class="gy-icerik-kart-bilgi">
-      <div class="gy-icerik-kart-baslik">${metniVurgula(item.data.title || item.path)}${rozet}</div>
-      <div class="gy-icerik-kart-meta">${escapeHtml(item.data.date || "")} · ${metniVurgula(item.path)}</div>
+      <div class="gy-icerik-kart-baslik">${metniVurgula(item.data.title || yolGoster)}${rozet}${kaynakRozet}</div>
+      <div class="gy-icerik-kart-meta">${escapeHtml(item.data.date || "")} · ${metniVurgula(yolGoster)}</div>
       ${ozet}
     </div>
     <div class="gy-icerik-kart-aksiyonlar">
@@ -1564,7 +1745,11 @@ function icerikKartiCiz(item, tur) {
   kart.querySelector(".gy-duzenle-btn").addEventListener("click", () => icerikDuzenlemeyeYukle(item, tur));
   kart.querySelector(".gy-sil-btn").addEventListener("click", () => icerikSil(item));
   kart.querySelector(".gy-durum-degistir-btn").addEventListener("click", (e) => {
-    icerikYayinDurumunuDegistir(item, tur, e.currentTarget);
+    if (item.kaynak === "supabase") {
+      taslagiYayinla(item, tur, e.currentTarget);
+    } else {
+      gitDenTaslagaTasi(item, tur, e.currentTarget);
+    }
   });
   const linkKopyalaBtn = kart.querySelector(".gy-link-kopyala-mini-btn");
   if (linkKopyalaBtn) {
@@ -1582,29 +1767,13 @@ function icerikKartiCiz(item, tur) {
 }
 
 /**
- * Kart üstündeki "Yeniden Yayınla" / "Yayından Kaldır" hızlı aksiyonu.
- * Formu açıp toggle'ı çevirip tekrar kaydetmeye gerek kalmadan, mevcut
- * front-matter'ı olduğu gibi koruyarak SADECE yayinda/sitemap/permalink
- * (ve onizleme_kod) alanlarını günceller ve doğrudan commit atar.
- *
- * "Yeniden Yayınla" durumunda: ÖNEMLİ — içerik gizliyken saklanan kod
- * (icerikGizliKoduBul) yayına alındıktan SONRA da onizleme_kod alanında
- * kalmaya devam eder (bkz. dosyaIcerigiOlustur), böylece bu içerik daha
- * sonra tekrar "Yayından Kaldır" ile gizlenirse AYNI link geri döner.
+ * Supabase'teki bir taslağı GitHub'a yayınlar: front-matter'ı taslağın
+ * alanlarından yeniden üretir (onizleme_kod korunur), hedef yola (taslak
+ * kaydedilirken seçilen klasör dahil, item.data.dosya_yolu) commit atar,
+ * başarılı olursa taslak satırını Supabase'den siler.
  */
-async function icerikYayinDurumunuDegistir(item, tur, btn) {
-  const yeniYayinda = item.data.yayinda === false; // şu an gizliyse -> yayına al, değilse -> gizle
-  const eylemAdi = yeniYayinda ? "yayına alınsın" : "yayından kaldırılsın";
-  if (!confirm(`"${item.data.title || item.path}" ${eylemAdi} mı?`)) return;
-
-  const gizliKod = !yeniYayinda ? icerikGizliKoduBul(item.data) || rastgeleKod(8) : icerikGizliKoduBul(item.data);
-
-  if (!yeniYayinda && onizlemeKoduCakisiyorMu(tur, gizliKod, item.path)) {
-    alert(
-      `Bu içeriğin daha önce kullandığı ön izleme kodu ("${gizliKod}") başka bir içerikte de kullanılıyor gibi görünüyor. Formu açıp "Düzenle" ile yeni bir kod üretmen gerekiyor.`
-    );
-    return;
-  }
+async function taslagiYayinla(item, tur, btn) {
+  if (!confirm(`"${item.data.title || item.data.dosya_yolu}" GitHub'a yayınlansın mı?`)) return;
 
   btn.disabled = true;
   const oncekiMetin = btn.textContent;
@@ -1618,9 +1787,74 @@ async function icerikYayinDurumunuDegistir(item, tur, btn) {
       alan.link = item.data.link;
       alan.link_label = item.data.link_label;
     }
-    const dosyaIcerigi = dosyaIcerigiOlustur(tur, alan, yeniYayinda, gizliKod, item.body || "");
-    const mesaj = yeniYayinda ? `Yeniden yayınlandı: ${item.path}` : `Yayından kaldırıldı: ${item.path}`;
-    await ghPutFile(item.path, b64Encode(dosyaIcerigi), mesaj, item.sha);
+    const gizliKod = icerikGizliKoduBul(item.data); // korunur — bkz. dosyaIcerigiOlustur notu
+    const dosyaIcerigi = dosyaIcerigiOlustur(tur, alan, gizliKod, item.body || "");
+    const dosyaYolu = item.data.dosya_yolu;
+
+    const mevcutHedef = await ghGetContents(dosyaYolu).catch(() => null);
+    await ghPutFile(dosyaYolu, b64Encode(dosyaIcerigi), `Yayınlandı: ${dosyaYolu}`, mevcutHedef?.sha || null);
+
+    const { error } = await supabase.from("taslak_icerikler").delete().eq("id", item.taslakId);
+    if (error) console.error("Taslak satırı silinemedi (dosya GitHub'a başarıyla yayınlandı):", error);
+
+    await icerikListesiYukle();
+  } catch (err) {
+    alert(`İşlem başarısız: ${err.message}`);
+    btn.disabled = false;
+    btn.textContent = oncekiMetin;
+  }
+}
+
+/**
+ * GitHub'daki bir dosyayı Supabase'e taşır: front-matter + gövdeyi okuyup
+ * `taslak_icerikler`e yazar (aynı tur+onizleme_kod varsa üzerine yazar),
+ * başarılı olursa GitHub'daki dosyayı siler. Hem "yayından kaldır" (o an
+ * yayında olan bir içerik için) hem de "Supabase'e taşı" (eski sistemden
+ * kalma, GitHub'da hâlâ gizli duran bir dosya için) aynı işlemdir.
+ */
+async function gitDenTaslagaTasi(item, tur, btn) {
+  const eylemAdi = item.data.yayinda === false ? "Supabase'e taşınsın" : "yayından kaldırılıp Supabase'e taşınsın";
+  if (!confirm(`"${item.data.title || item.path}" ${eylemAdi} mı?`)) return;
+
+  const gizliKod = icerikGizliKoduBul(item.data) || rastgeleKod(8);
+  if (onizlemeKoduCakisiyorMu(tur, gizliKod, itemAnahtari(item))) {
+    alert(
+      `Bu içeriğin daha önce kullandığı ön izleme kodu ("${gizliKod}") başka bir içerikte de kullanılıyor gibi görünüyor. Formu açıp "Düzenle" ile yeni bir kod üretmen gerekiyor.`
+    );
+    return;
+  }
+
+  btn.disabled = true;
+  const oncekiMetin = btn.textContent;
+  btn.textContent = "İşleniyor...";
+  try {
+    const dosyaAdi = item.path.split("/").pop().replace(/\.md$/, "");
+    const slug = tur === "blog" ? dosyaAdi.replace(/^\d{4}-\d{2}-\d{2}-/, "") : dosyaAdi.replace(/^\d{4}-/, "");
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const satir = {
+      tur,
+      baslik: item.data.title || dosyaAdi,
+      tarih: item.data.date || new Date().toISOString().slice(0, 10),
+      slug,
+      dosya_yolu: item.path,
+      venue: item.data.venue || null,
+      durum: item.data.status || null,
+      ozet: item.data.summary || null,
+      link: item.data.link || null,
+      link_etiket: item.data.link_label || null,
+      govde: item.body || "",
+      onizleme_kod: gizliKod,
+      created_by: user?.id || null,
+    };
+    const { error: upsertHata } = await supabase
+      .from("taslak_icerikler")
+      .upsert(satir, { onConflict: "tur,onizleme_kod" });
+    if (upsertHata) throw new Error(upsertHata.message);
+
+    await ghDeleteFile(item.path, item.sha, `Supabase'e taşındı (yayından kaldırıldı): ${item.path}`);
     await icerikListesiYukle();
   } catch (err) {
     alert(`İşlem başarısız: ${err.message}`);
@@ -1630,9 +1864,14 @@ async function icerikYayinDurumunuDegistir(item, tur, btn) {
 }
 
 async function icerikSil(item) {
-  if (!confirm(`"${item.data.title || item.path}" silinsin mi? Bu işlem geri alınamaz.`)) return;
+  if (!confirm(`"${item.data.title || item.path || item.data.dosya_yolu}" silinsin mi? Bu işlem geri alınamaz.`)) return;
   try {
-    await ghDeleteFile(item.path, item.sha, `İçerik silindi: ${item.path}`);
+    if (item.kaynak === "supabase") {
+      const { error } = await supabase.from("taslak_icerikler").delete().eq("id", item.taslakId);
+      if (error) throw new Error(error.message);
+    } else {
+      await ghDeleteFile(item.path, item.sha, `İçerik silindi: ${item.path}`);
+    }
     await icerikListesiYukle();
   } catch (err) {
     alert(`Silinemedi: ${err.message}`);
@@ -1640,8 +1879,15 @@ async function icerikSil(item) {
 }
 
 async function icerikDuzenlemeyeYukle(item, tur) {
-  DUZENLENEN_YOL = item.path;
-  DUZENLENEN_SHA = item.sha;
+  if (item.kaynak === "supabase") {
+    DUZENLENEN_YOL = null;
+    DUZENLENEN_SHA = null;
+    DUZENLENEN_TASLAK_ID = item.taslakId;
+  } else {
+    DUZENLENEN_YOL = item.path;
+    DUZENLENEN_SHA = item.sha;
+    DUZENLENEN_TASLAK_ID = null;
+  }
 
   document.querySelector(`input[name="icerik-turu"][value="${tur}"]`).checked = true;
   await guncelleIcerikTuru();
@@ -1649,17 +1895,27 @@ async function icerikDuzenlemeyeYukle(item, tur) {
   document.getElementById("ic-title").value = item.data.title || "";
   document.getElementById("ic-date").value = item.data.date || "";
 
-  const dosyaAdi = item.path.split("/").pop().replace(/\.md$/, "");
+  // Supabase taslaklarında slug doğrudan saklanır (bkz. taslakToItem);
+  // GitHub dosyalarında dosya adından geri çıkarılır.
+  const yolKaynagi = item.kaynak === "supabase" ? item.data.dosya_yolu || "" : item.path;
+  const dosyaAdi = yolKaynagi.split("/").pop().replace(/\.md$/, "");
   document.getElementById("ic-slug").value =
-    tur === "blog" ? dosyaAdi.replace(/^\d{4}-\d{2}-\d{2}-/, "") : dosyaAdi.replace(/^\d{4}-/, "");
+    item.kaynak === "supabase"
+      ? item.data.slug || ""
+      : tur === "blog"
+      ? dosyaAdi.replace(/^\d{4}-\d{2}-\d{2}-/, "")
+      : dosyaAdi.replace(/^\d{4}-/, "");
   document.getElementById("ic-yil-oneki").checked = tur === "proje" && /^\d{4}-/.test(dosyaAdi);
 
   // NOT: guncelleIcerikTuru()'nun (dolayısıyla dropdown'ı GitHub'daki
   // gerçek klasörlerle dolduran icerikFormuKlasorSecimGuncelle'nin)
   // yukarıda "await" ile BİTMİŞ olması burada zorunlu — aksi halde bu
   // satırın eklediği/seçtiği klasör, geç gelen dropdown sıfırlamasıyla
-  // ezilebilirdi.
-  icerikDuzenlemeKlasorSecimineYansit(item.path, item.data.date, tur);
+  // ezilebilirdi. Supabase taslaklarında da aynı mantık, dosyanın
+  // GitHub'a yayınlandığında gideceği yol (dosya_yolu) üzerinden çalışır.
+  if (yolKaynagi) {
+    icerikDuzenlemeKlasorSecimineYansit(yolKaynagi, item.data.date, tur);
+  }
 
   if (tur === "proje") {
     document.getElementById("ic-venue").value = item.data.venue || "";
@@ -1673,11 +1929,9 @@ async function icerikDuzenlemeyeYukle(item, tur) {
   const yayinda = item.data.yayinda !== false;
   document.getElementById("ic-yayinda").checked = yayinda;
 
-  // İçeriğin daha önce üretilmiş bir gizli ön izleme kodu varsa (permalink
-  // alanından çıkar) hatırla ve göster — "yayında değil" içerikler artık
-  // düzenlemeye her açıldığında linkini yeniden görebilir, kod da kaydetme
-  // sırasında DEĞİŞMEDEN korunur. Permalink herhangi bir sebeple eksikse
-  // (elle düzenlenmiş dosya vb.) yeni bir kod üretip gösteriyoruz.
+  // İçeriğin daha önce üretilmiş bir gizli ön izleme kodu varsa hatırla ve
+  // göster. Permalink/onizleme_kod herhangi bir sebeple eksikse (elle
+  // düzenlenmiş dosya vb.) yeni bir kod üretip gösteriyoruz.
   DUZENLENEN_GIZLI_KOD = icerikGizliKoduBul(item.data);
   if (!yayinda) {
     onizlemeKutusunuGoster(tur, DUZENLENEN_GIZLI_KOD || rastgeleKod(8));
@@ -1686,7 +1940,7 @@ async function icerikDuzenlemeyeYukle(item, tur) {
   }
 
   document.getElementById("ic-iptal-btn").hidden = false;
-  document.getElementById("ic-submit-btn").textContent = "Güncelle";
+  submitButonMetniGuncelle();
   document.getElementById("icerik-ekle").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
