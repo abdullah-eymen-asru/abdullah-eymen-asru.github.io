@@ -37,9 +37,12 @@ permalink: "/icerik/blog.html"
     <div id="notes-posts" class="scroll-list">
       {% assign yayindaki_yazilar = site.posts | where_exp: "p", "p.yayinda != false" | where_exp: "p", "p.date <= site.time" %}
       {% for post in yayindaki_yazilar %}
-      <div class="post-card searchable" data-search="{{ post.title | downcase }} {{ post.excerpt | strip_html | downcase }}">
+      <div class="post-card searchable" data-search="{{ post.title | downcase }} {{ post.author | downcase }} {{ post.excerpt | strip_html | downcase }}">
         <h3><a href="{{ post.url | relative_url }}">{{ post.title }}</a></h3>
-        <div class="meta">{{ post.date | date: "%d %B %Y" }}</div>
+        <div class="meta">
+          {{ post.date | date: "%d %B %Y" }}
+          {% if post.author %} · ✍️ {{ post.author }}{% endif %}
+        </div>
         <p>{{ post.excerpt }}</p>
       </div>
       {% endfor %}
