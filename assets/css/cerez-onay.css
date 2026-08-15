@@ -1,0 +1,214 @@
+/*
+ * assets/css/cerez-onay.css
+ * Çerez onay şeridi + ayrıntılı tercih paneli. assets/style.css'in
+ * ÜZERİNE eklenir (o dosya değiştirilmiyor), aynı CSS değişkenlerini
+ * (--text, --muted, --bg, --accent, --border, --card-bg) kullanarak
+ * açık/koyu temayla otomatik uyumlu çalışır. Bu dosya (auth.css'in
+ * aksine) SİTE GENELİNDE her sayfada yüklenir, çünkü şerit her sayfada
+ * görünebilmeli — bu yüzden auth.css'teki .btn-primary/.btn-secondary
+ * sınıflarına bağımlı olmadan kendi buton stillerini içerir.
+ */
+
+.cerez-banner {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 950;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: var(--card-bg);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.cerez-banner-metin {
+  flex: 1 1 320px;
+  min-width: 0;
+  font-size: 0.88rem;
+  color: var(--text);
+}
+
+.cerez-banner-metin strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.cerez-banner-metin p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.cerez-banner-metin a {
+  color: var(--accent);
+}
+
+.cerez-banner-aksiyonlar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.cerez-btn-primary,
+.cerez-btn-secondary {
+  padding: 9px 16px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cerez-btn-primary {
+  border: none;
+  background: var(--accent);
+  color: #fff;
+}
+.cerez-btn-primary:hover { filter: brightness(1.08); }
+
+.cerez-btn-secondary {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 500;
+}
+.cerez-btn-secondary:hover { border-color: var(--accent); }
+
+/* Alt bilgideki "Çerez Ayarları" bağlantısı — <button> ama link gibi görünür */
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ---- Ayrıntılı tercih paneli (modal) ---- */
+.cerez-panel-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 960;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.cerez-panel {
+  width: 100%;
+  max-width: 520px;
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.cerez-panel h2 {
+  margin-top: 0;
+  font-size: 1.2rem;
+}
+
+.cerez-panel .muted {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.cerez-kategori {
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+}
+.cerez-kategori:first-of-type { border-top: none; }
+
+.cerez-kategori-baslik {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-weight: 600;
+}
+
+.cerez-kategori-baslik label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.cerez-kategori-baslik input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.cerez-rozet {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.cerez-kategori p {
+  margin: 6px 0 0;
+}
+
+.cerez-panel-aksiyonlar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.cerez-panel-aksiyonlar .cerez-btn-primary,
+.cerez-panel-aksiyonlar .cerez-btn-secondary {
+  flex: 1 1 auto;
+}
+
+.cerez-panel-kapat {
+  display: block;
+  margin: -4px 0 8px auto;
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+}
+
+/* Panel açıkken arka planın kaydırılmasını engelle (mobilde de) */
+body.cerez-panel-acik { overflow: hidden; }
+
+/* ---- Mobil / dar ekran: her cihazda uyumlu görünüm ---- */
+@media (max-width: 640px) {
+  .cerez-banner {
+    padding: 14px 16px;
+  }
+  .cerez-banner-aksiyonlar {
+    width: 100%;
+  }
+  .cerez-banner-aksiyonlar .cerez-btn-primary,
+  .cerez-banner-aksiyonlar .cerez-btn-secondary {
+    flex: 1 1 auto;
+  }
+  .cerez-panel {
+    padding: 20px 16px;
+    max-height: 92vh;
+  }
+}
