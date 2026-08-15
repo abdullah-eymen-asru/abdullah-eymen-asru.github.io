@@ -101,32 +101,62 @@
   justify-content: center;
   padding: 20px;
   background: rgba(0, 0, 0, 0.45);
+  /* Açılış/kapanış geçişi: overlay'in kendisi fade olur, .cerez-panel
+     (aşağıda) ayrıca yukarıdan aşağı küçülerek kapanır. "hidden"
+     attribute'u display:none yaptığı için animasyonu JS tarafında
+     bir "kapanıyor" sınıfıyla tetikleyip, geçiş bitince hidden
+     ekliyoruz (bkz. assets/js/cerez-onay.js -> panelKapat). */
+  opacity: 1;
+  transition: opacity 0.18s ease;
+}
+.cerez-panel-overlay.cerez-panel-kapaniyor {
+  opacity: 0;
+}
+/* JS geçiş desteklemiyorsa (prefers-reduced-motion) anında kapanır. */
+@media (prefers-reduced-motion: reduce) {
+  .cerez-panel-overlay,
+  .cerez-panel {
+    transition: none !important;
+  }
 }
 
 .cerez-panel {
   width: 100%;
-  max-width: 520px;
-  max-height: 88vh;
+  /* Daha kompakt: "tüm ekranı kaplayan" büyük pencere hissi yerine
+     dar/orta genişlikte, içeriğe göre boyutlanan bir kart. */
+  max-width: 420px;
+  max-height: min(600px, 82vh);
   overflow-y: auto;
-  padding: 24px;
+  padding: 20px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 14px;
   background: var(--bg);
   color: var(--text);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);
+  transform-origin: top center;
+  transform: scale(1) translateY(0);
+  opacity: 1;
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+/* X'e (veya Escape/overlay tıklamasına) basılınca: yukarıdan aşağı,
+   ölçeği küçülerek ve saydamlaşarak kapanır. */
+.cerez-panel-overlay.cerez-panel-kapaniyor .cerez-panel {
+  transform: scale(0.85) translateY(-24px);
+  opacity: 0;
 }
 
 .cerez-panel h2 {
   margin-top: 0;
-  font-size: 1.2rem;
+  font-size: 1.08rem;
 }
 
 .cerez-panel .muted {
   color: var(--muted);
-  font-size: 0.88rem;
+  font-size: 0.84rem;
 }
 
 .cerez-kategori {
-  padding: 14px 0;
+  padding: 12px 0;
   border-top: 1px solid var(--border);
 }
 .cerez-kategori:first-of-type { border-top: none; }
@@ -208,7 +238,7 @@ body.cerez-panel-acik { overflow: hidden; }
     flex: 1 1 auto;
   }
   .cerez-panel {
-    padding: 20px 16px;
-    max-height: 92vh;
+    padding: 18px 16px;
+    max-height: 90vh;
   }
 }
