@@ -115,6 +115,17 @@ let PROFIL_YOLU = null;
 // GÜVENLİK MİMARİSİ notu ve wireBaglantiDogrula.
 let GH_BAGLI = false;
 
+// TEK İSTEKLİ PANEL ÖNBELLEĞİ — bkz. panelVerisiniYukle. Worker'ın
+// /panel-init uç noktasından dönen TÜM sayfa verisini (repo bilgisi,
+// _posts//_projects klasörleri+dosyaları, profil fotoğrafı/config) tek
+// seferde tutar. Sayfa açılışında (ghBaglantisiniTestEt) VE her yazma
+// işleminden SONRA (bkz. panelListeleriniTazele) SADECE BİR istekle
+// tazelenir — klasör/içerik/profil-foto listeleme fonksiyonları artık
+// GitHub'a ayrı ayrı istek atmak yerine bu önbellekten okur (Cloudflare
+// Worker'ın günlük istek kotasını, bkz. worker.js panelBaslangicVerisiGetir
+// başındaki not, sayfa/yenileme başına 1 isteğe indirmek için).
+let PANEL_VERI = null;
+
 // GitHub'da düzenlenen bir dosya varsa DUZENLENEN_YOL/DUZENLENEN_SHA dolu,
 // Supabase'te düzenlenen bir taslak varsa DUZENLENEN_TASLAK_ID dolu olur —
 // bir içerik ikisinde BİRDEN asla olamaz (bkz. dosya başındaki not).
@@ -231,23 +242,28 @@ async function ghBaglantisiniTestEt(hataGoster) {
   btn.disabled = true;
   btn.textContent = "Kontrol ediliyor...";
   try {
-    const res = await ghRequest("");
-    if (!res.ok) {
-      throw new Error(await ghHataMesaji(res));
-    }
-    const repoData = await res.json();
-    const yazmaYetkisi = repoData.permissions?.push;
+    // TEK istek: repo bilgisi + _posts//_projects klasörleri/dosyaları +
+    // config + profil fotoğrafı hepsi burada gelir (bkz. panelVerisiniYukle
+    // ve worker.js'teki panelBaslangicVerisiGetir). Aşağıdaki dört
+    // "...Yukle/Guncelle" çağrısı artık PANEL_VERI önbelleğinden okuyor,
+    // GitHub'a AYRICA istek atmıyor.
+    const veri = await panelVerisiniYukle();
+    if (!veri.repo) throw new Error("Repo bilgisi alınamadı.");
+    const yazmaYetkisi = veri.repo.permissions?.push;
     GH_BAGLI = true;
     showMessage(
       msgEl,
-      `Bağlantı doğrulandı — "${repoData.full_name}" (varsayılan branch: ${repoData.default_branch})` +
+      `Bağlantı doğrulandı — "${veri.repo.full_name}" (varsayılan branch: ${veri.repo.default_branch}) — tüm listeler tek istekle yüklendi.` +
         (yazmaYetkisi ? "" : " — UYARI: Worker'ın token'ı ile yazma izni yok gibi görünüyor."),
       yazmaYetkisi ? "success" : "error"
     );
-    await profilFotoDurumYukle();
+    profilFotoDurumYukle();
     await icerikFormuKlasorSecimGuncelle();
+    klasorListesiYukle();
+    icerikListesiYukle();
   } catch (err) {
     GH_BAGLI = false;
+    PANEL_VERI = null;
     if (hataGoster) {
       showMessage(msgEl, `Bağlantı doğrulanamadı: ${err.message}`, "error");
     }
@@ -293,6 +309,40 @@ async function ghRequest(path, options = {}) {
       ...(options.headers || {}),
     },
   });
+}
+
+/**
+ * Worker'ın /panel-init uç noktasını çağırıp TÜM panel verisini (repo,
+ * _posts//_projects klasörleri+dosyaları, config, profil fotoğrafı) TEK
+ * bir istekte çeker ve PANEL_VERI önbelleğine yazar. Sayfa açılışında
+ * (ghBaglantisiniTestEt) ve her yazma işleminden sonra (bkz.
+ * panelListeleriniTazele) çağrılır — klasör/içerik/profil listeleme
+ * fonksiyonlarının GitHub'a ayrı ayrı istek atmasının YERİNE geçer.
+ */
+async function panelVerisiniYukle() {
+  const { branch } = ghAyarlari();
+  const q = branch ? `?ref=${encodeURIComponent(branch)}` : "";
+  const res = await ghRequest(`/panel-init${q}`);
+  if (!res.ok) throw new Error(await ghHataMesaji(res));
+  PANEL_VERI = await res.json();
+  return PANEL_VERI;
+}
+
+/**
+ * Bir yazma işleminden (klasör oluştur/sil/yeniden adlandır, içerik
+ * kaydet/sil/yayınla, profil fotoğrafı değiştir) SONRA çağrılır: PANEL_VERI
+ * önbelleğini TEK bir istekle tazeler. Başarısız olursa (ör. geçici ağ
+ * sorunu) sessizce eski (bir önceki) önbellekle devam edilir — kullanıcının
+ * az önce tamamladığı işlemin "başarılı" mesajını bir liste tazeleme hatası
+ * bastırmasın diye.
+ */
+async function panelListeleriniTazele() {
+  if (!GH_BAGLI) return;
+  try {
+    await panelVerisiniYukle();
+  } catch (err) {
+    console.error("Panel verisi tazelenemedi (bir sonraki yenilemede tekrar denenecek):", err);
+  }
 }
 
 async function ghHataMesaji(res) {
@@ -741,11 +791,13 @@ function icerikDuzenlemeKlasorSecimineYansit(path, tarih, tur) {
 /* KLASÖR YÖNETİMİ (_posts/ ve _projects/ altındaki alt klasörler) BÖLÜMÜ */
 /* ---------------------------------------------------------------------- */
 
-/** Verilen kök koleksiyon klasörünün ("_posts" ya da "_projects") altındaki alt klasörlerin adlarını döner. */
-async function koleksiyonKlasorleriniListele(kokKlasor) {
-  const kokIcerik = await ghGetContents(kokKlasor).catch(() => []);
-  if (!Array.isArray(kokIcerik)) return [];
-  return kokIcerik.filter((f) => f.type === "dir").map((f) => f.name);
+/** Verilen kök koleksiyon klasörünün ("_posts" ya da "_projects") altındaki
+ * alt klasörlerin adlarını döner — artık GitHub'a AYRICA istek atmadan,
+ * PANEL_VERI önbelleğinden (bkz. panelVerisiniYukle) okur. */
+function koleksiyonKlasorleriniListele(kokKlasor) {
+  const veri = PANEL_VERI?.koleksiyonlar?.[kokKlasor];
+  if (!veri) return [];
+  return veri.klasorler.map((k) => k.name);
 }
 
 /** "Klasörler" sekmesinde şu an hangi koleksiyonun (blog/proje) gösterildiğini tutar. */
@@ -769,7 +821,13 @@ function wireKlasorYonetimi() {
     });
   });
 
-  yenileBtn.addEventListener("click", () => klasorListesiYukle());
+  // "Yenile" tıklanınca GERÇEKTEN tazelenir: PANEL_VERI önbelleği TEK bir
+  // istekle yenilenir (bkz. panelListeleriniTazele), sonra liste o güncel
+  // önbellekten çizilir — eskisi gibi klasör başına ayrı istek YOK.
+  yenileBtn.addEventListener("click", async () => {
+    await panelListeleriniTazele();
+    klasorListesiYukle();
+  });
   olusturBtn.addEventListener("click", () => klasorOlustur());
   yeniAdInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
@@ -780,8 +838,10 @@ function wireKlasorYonetimi() {
 
   wireKlasorSecici();
   // "Klasörler" sekmesine her tıklandığında (bağlantı doğrulanmışsa) listeyi tazele.
-  document.querySelector('#gy-nav a[data-section="klasorler"]')?.addEventListener("click", () => {
-    if (GH_BAGLI) klasorListesiYukle();
+  document.querySelector('#gy-nav a[data-section="klasorler"]')?.addEventListener("click", async () => {
+    if (!GH_BAGLI) return;
+    await panelListeleriniTazele();
+    klasorListesiYukle();
   });
 }
 
@@ -844,7 +904,8 @@ async function klasorOlustur() {
     );
     input.value = "";
     showMessage(msgEl, `"${kokKlasor}/${ad}/" klasörü oluşturuldu.`, "success");
-    await klasorListesiYukle();
+    await panelListeleriniTazele();
+    klasorListesiYukle();
     await icerikFormuKlasorSecimGuncelle();
   } catch (err) {
     showMessage(msgEl, `Hata: ${err.message}`, "error");
@@ -854,49 +915,36 @@ async function klasorOlustur() {
   }
 }
 
-async function klasorListesiYukle() {
+/**
+ * "Klasörler" listesini çizer — artık GitHub'a AYRICA istek atmadan,
+ * PANEL_VERI önbelleğinden okur (dosya sayısı ve boş klasörlerin .gitkeep
+ * sahip id'si Worker'ın /panel-init uç noktasında zaten hesaplanmış
+ * geliyor, bkz. panelVerisiniYukle). Güncel veri istenen her durumda
+ * (yenile butonu, sekme/klasör-türü değişimi, nav tıklaması) ÖNCE
+ * panelListeleriniTazele() ile önbellek tazelenip SONRA bu fonksiyon
+ * çağrılır.
+ */
+function klasorListesiYukle() {
   const el = document.getElementById("kl-liste");
   if (!el) return;
   const kokKlasor = kokKlasorAdi(KLASOR_SEKME_TUR);
-  if (!GH_BAGLI) {
+  if (!GH_BAGLI || !PANEL_VERI) {
     el.innerHTML = '<p class="muted">Önce "GitHub Bağlantısı" sekmesinden bağlantını doğrula.</p>';
     return;
   }
-  el.innerHTML = '<p class="muted">Yükleniyor...</p>';
-  try {
-    const kokIcerik = await ghGetContents(kokKlasor).catch(() => []);
-    const altKlasorler = (kokIcerik || []).filter((f) => f.type === "dir");
 
-    if (altKlasorler.length === 0) {
-      el.innerHTML = '<p class="muted">Henüz hiç alt klasör yok.</p>';
-      return;
-    }
-
-    // Her klasörün içindeki dosya sayısını (.gitkeep hariç) ayrıca çekmek
-    // gerekiyor, aksi halde "silinebilir mi" bilgisini gösteremeyiz. Boş
-    // olan klasörler için ayrıca .gitkeep içeriğini de okuyup "kim
-    // oluşturmuş" bilgisini (sahipId) çıkarıyoruz — SADECE editor rolünün
-    // silme butonunu doğru kısıtlayabilmek için (bkz. klasorKartiCiz).
-    const detaylar = await Promise.all(
-      altKlasorler.map(async (klasor) => {
-        const icerik = await ghGetContents(klasor.path).catch(() => []);
-        const dosyalar = (icerik || []).filter((f) => f.type === "file" && f.name !== ".gitkeep");
-        let sahipId = null;
-        if (dosyalar.length === 0 && GIRIS_YAPAN_PROFIL?.role === "editor") {
-          const gitkeep = await ghGetContents(`${klasor.path}/.gitkeep`).catch(() => null);
-          if (gitkeep?.content) sahipId = gitkeepSahibiId(b64Decode(gitkeep.content.replace(/\n/g, "")));
-        }
-        return { ad: klasor.name, path: klasor.path, dosyaSayisi: dosyalar.length, kokKlasor, sahipId };
-      })
-    );
-
-    detaylar.sort((a, b) => b.ad.localeCompare(a.ad));
-
-    el.innerHTML = "";
-    detaylar.forEach((k) => el.appendChild(klasorKartiCiz(k)));
-  } catch (err) {
-    el.innerHTML = `<p class="muted">Klasörler yüklenemedi: ${escapeHtml(err.message)}</p>`;
+  const klasorler = PANEL_VERI.koleksiyonlar?.[kokKlasor]?.klasorler || [];
+  if (klasorler.length === 0) {
+    el.innerHTML = '<p class="muted">Henüz hiç alt klasör yok.</p>';
+    return;
   }
+
+  const detaylar = klasorler
+    .map((k) => ({ ad: k.name, path: k.path, dosyaSayisi: k.dosyaSayisi, kokKlasor, sahipId: k.sahipId ?? null }))
+    .sort((a, b) => b.ad.localeCompare(a.ad));
+
+  el.innerHTML = "";
+  detaylar.forEach((k) => el.appendChild(klasorKartiCiz(k)));
 }
 
 function klasorKartiCiz(k) {
@@ -984,9 +1032,10 @@ async function klasorYenidenAdlandir(k) {
       );
     }
     showMessage(msgEl, `"${k.kokKlasor}/${k.ad}/" → "${k.kokKlasor}/${yeniAd}/" olarak yeniden adlandırıldı.`, "success");
-    await klasorListesiYukle();
+    await panelListeleriniTazele();
+    klasorListesiYukle();
     await icerikFormuKlasorSecimGuncelle();
-    await icerikListesiYukle();
+    icerikListesiYukle();
   } catch (err) {
     showMessage(
       msgEl,
@@ -1019,7 +1068,8 @@ async function klasorSil(k) {
       await ghDeleteFile(dosya.path, dosya.sha, `Klasör silindi: ${k.kokKlasor}/${k.ad}/ (${dosya.name})`);
     }
     showMessage(msgEl, `"${k.kokKlasor}/${k.ad}/" klasörü silindi.`, "success");
-    await klasorListesiYukle();
+    await panelListeleriniTazele();
+    klasorListesiYukle();
     await icerikFormuKlasorSecimGuncelle();
   } catch (err) {
     showMessage(msgEl, `Hata: ${err.message}`, "error");
@@ -1674,6 +1724,7 @@ async function icerikKaydet(secenek = "a") {
     } else {
       await icerikSupabaseeYaz(tur, alan, gizliKod, govde, slug, dosyaYolu, msgEl);
     }
+    await panelListeleriniTazele();
     await icerikListesiYukle();
   } catch (err) {
     showMessage(msgEl, `Hata: ${err.message}`, "error");
@@ -2089,7 +2140,11 @@ let LISTE_FILTRE_TUR = "tum"; // 'tum' | 'blog' | 'proje'
 let LISTE_FILTRE_DURUM = "tum"; // 'tum' | 'yayinda' | 'gizli'
 
 function wireIcerikListe() {
-  document.getElementById("ic-liste-yenile-btn").addEventListener("click", icerikListesiYukle);
+  // "Yenile": PANEL_VERI önbelleğini TEK istekle tazeleyip listeyi ondan çizer.
+  document.getElementById("ic-liste-yenile-btn").addEventListener("click", async () => {
+    await panelListeleriniTazele();
+    icerikListesiYukle();
+  });
 
   const aramaEl = document.getElementById("ic-liste-arama");
   const temizleBtn = document.getElementById("ic-liste-arama-temizle");
@@ -2141,6 +2196,10 @@ function wireIcerikListe() {
  * listede görünmeye devam eder, geriye dönük uyumluluk için ayrıca bir
  * taşıma/migrasyon ZORUNLU DEĞİLDİR.
  */
+/** ESKİ (canlı) sürüm artık kullanılmıyor — bkz. icerikListesiYukle'nin
+ * PANEL_VERI önbelleğinden okuyan sürümü ve icerikOzetleriniCikar. Bu
+ * fonksiyon, önbellek herhangi bir sebeple boşsa (ör. panel-init hiç
+ * başarılı olmadıysa) elle çağrılabilecek bir yedek olarak bırakıldı. */
 async function koleksiyonDosyalariniListele(kokKlasor) {
   const kokIcerik = await ghGetContents(kokKlasor).catch(() => []);
   if (!Array.isArray(kokIcerik)) return [];
@@ -2199,25 +2258,19 @@ function taslakToItem(row) {
 
 async function icerikListesiYukle() {
   const el = document.getElementById("ic-liste");
-  if (!GH_BAGLI) {
+  if (!GH_BAGLI || !PANEL_VERI) {
     el.innerHTML = '<p class="muted">Önce "GitHub Bağlantısı" sekmesinden bağlantını doğrula.</p>';
     return;
   }
 
   el.innerHTML = '<p class="muted">Yükleniyor...</p>';
   try {
-    const [postDosyalari, projeDosyalari] = await Promise.all([
-      koleksiyonDosyalariniListele("_posts"),
-      koleksiyonDosyalariniListele("_projects"),
-    ]);
-
-    // Promise.allSettled: tek bir dosyanın okunması başarısız olursa
-    // (silinmiş, geçici ağ hatası, vb.) diğer tüm liste elemanlarını
-    // düşürmeden devam eder — sadece o öğe "okunamadı" olarak işaretlenir.
-    const [postDetaylari, projeDetaylari] = await Promise.all([
-      icerikOzetleriGuvenliGetir(postDosyalari, "blog"),
-      icerikOzetleriGuvenliGetir(projeDosyalari, "proje"),
-    ]);
+    // Artık GitHub'a AYRICA istek atmıyor — dosya listesi VE her dosyanın
+    // içeriği zaten PANEL_VERI önbelleğinde (bkz. panelVerisiniYukle ve
+    // worker.js'teki panelBaslangicVerisiGetir). Front-matter ayrıştırması
+    // burada, yerel olarak yapılır (icerikOzetleriniCikar).
+    const postDetaylari = icerikOzetleriniCikar(PANEL_VERI.koleksiyonlar?._posts?.dosyalar || [], "blog");
+    const projeDetaylari = icerikOzetleriniCikar(PANEL_VERI.koleksiyonlar?._projects?.dosyalar || [], "proje");
     postDetaylari.forEach((x) => (x.kaynak = "github"));
     projeDetaylari.forEach((x) => (x.kaynak = "github"));
 
@@ -2273,52 +2326,46 @@ async function icerikListesiYukle() {
 }
 
 /**
- * Bir dosya listesindeki her dosyanın front-matter özetini getirir.
- * Promise.allSettled kullanır: tek bir dosyanın okunması (silinmiş,
- * geçici ağ hatası vb. yüzünden) başarısız olsa bile diğer dosyalar
- * etkilenmez — başarısız olan öğe "okunamadı" rozetiyle listede kalır.
+ * PANEL_VERI önbelleğindeki dosya girdilerini (path, sha, content — bkz.
+ * panelVerisiniYukle) front-matter özetine çevirir. Eskiden bu, her dosya
+ * için AYRI bir GitHub isteği (icerikOzetiGetir) gerektiriyordu; artık
+ * içerik zaten /panel-init yanıtında geldiği için tamamen YEREL çalışır,
+ * hiçbir ağ isteği atmaz. Bir dosyanın content'i null ise (Worker'daki
+ * panelBaslangicVerisiGetir o dosyayı okuyamadıysa) "okunamadı" rozetiyle
+ * listede kalır — tek bir bozuk öğe tüm listeyi düşürmez.
  */
-async function icerikOzetleriGuvenliGetir(dosyalar, tur) {
-  const sonuclar = await Promise.allSettled(dosyalar.map((f) => icerikOzetiGetir(f, tur)));
-  return sonuclar.map((sonuc, i) => {
-    if (sonuc.status === "fulfilled") return sonuc.value;
-    const dosya = dosyalar[i];
-    return {
-      path: dosya.path,
-      sha: dosya.sha,
-      tur,
-      data: { title: `${dosya.name} (okunamadı: ${sonuc.reason?.message || "bilinmeyen hata"})` },
-      body: "",
-      okunamadi: true,
-    };
+function icerikOzetleriniCikar(dosyalar, tur) {
+  return dosyalar.map((dosya) => {
+    if (typeof dosya.content !== "string") {
+      return {
+        path: dosya.path,
+        sha: dosya.sha,
+        tur,
+        data: { title: `${dosya.name} (okunamadı)` },
+        body: "",
+        okunamadi: true,
+      };
+    }
+    try {
+      const ham = b64Decode(dosya.content.replace(/\n/g, ""));
+      const { data, body } = frontMatterOku(ham);
+      // Kart çiziminde ve sahiplik kontrolünde (icerikKendisineMiAit)
+      // kullanılan "Yazan:" alanı Supabase taslaklarında yazar_adi, GitHub
+      // dosyalarında ise front-matter'daki author alanı olarak tutuluyor —
+      // ikisini burada TEK bir alana (yazar_adi) eşitliyoruz.
+      if (!data.yazar_adi && data.author) data.yazar_adi = data.author;
+      return { path: dosya.path, sha: dosya.sha, tur, data, body };
+    } catch (err) {
+      return {
+        path: dosya.path,
+        sha: dosya.sha,
+        tur,
+        data: { title: `${dosya.name} (okunamadı: ${err.message})` },
+        body: "",
+        okunamadi: true,
+      };
+    }
   });
-}
-
-async function icerikOzetiGetir(dosya, tur) {
-  const detay = await ghGetContents(dosya.path);
-  if (!detay || typeof detay.content !== "string") {
-    // Beklenmedik durum: dosya listede vardı ama tekil GET'te içerik
-    // dönmedi (silinmiş/taşınmış olabilir, ya da GitHub API'nin o an
-    // "content" alanını atladığı nadir bir durum). Tüm listeyi
-    // düşürmek yerine bu öğeyi "okunamadı" olarak işaretleyip devam ediyoruz.
-    return {
-      path: dosya.path,
-      sha: dosya.sha,
-      tur,
-      data: { title: `${dosya.name} (okunamadı)` },
-      body: "",
-      okunamadi: true,
-    };
-  }
-  const ham = b64Decode(detay.content.replace(/\n/g, ""));
-  const { data, body } = frontMatterOku(ham);
-  // Kart çiziminde ve sahiplik kontrolünde (icerikKendisineMiAit) kullanılan
-  // "Yazan:" alanı Supabase taslaklarında yazar_adi, GitHub dosyalarında ise
-  // front-matter'daki author alanı olarak tutuluyor — ikisini burada TEK
-  // bir alana (yazar_adi) eşitliyoruz ki geri kalan kod hangi kaynaktan
-  // geldiğine bakmadan aynı alanı okuyabilsin.
-  if (!data.yazar_adi && data.author) data.yazar_adi = data.author;
-  return { path: dosya.path, sha: detay.sha, tur, data, body };
 }
 
 /**
@@ -2695,6 +2742,7 @@ async function taslagiYayinla(item, tur, btn) {
       if (error) console.error("Taslak satırı silinemedi (dosya GitHub'a başarıyla yayınlandı):", error);
     }
 
+    await panelListeleriniTazele();
     await icerikListesiYukle();
   } catch (err) {
     alert(`İşlem başarısız: ${err.message}`);
@@ -2754,6 +2802,7 @@ async function gitDenTaslagaTasi(item, tur, btn) {
 
     await ghDeleteFile(item.path, item.sha, `Supabase'e taşındı (yayından kaldırıldı): ${item.path}`);
     await klasorBosaldiysaGitkeepEkle(ustKlasorYolu(item.path));
+    await panelListeleriniTazele();
     await icerikListesiYukle();
   } catch (err) {
     alert(`İşlem başarısız: ${err.message}`);
@@ -2792,6 +2841,7 @@ async function icerikSil(item) {
     // güvence, tek başına yeterli olan asıl düzeltme değil).
     TUM_ICERIKLER = TUM_ICERIKLER.filter((i) => itemAnahtari(i) !== itemAnahtari(item));
     listeyiYenidenCiz();
+    await panelListeleriniTazele();
     await icerikListesiYukle();
   } catch (err) {
     alert(`Silinemedi: ${err.message}`);
@@ -2993,39 +3043,53 @@ function profilMimeTuruTahminEt(yol) {
   return `image/${tablo[uzanti] || "jpeg"}`;
 }
 
-async function profilFotoDurumYukle() {
+/**
+ * Profil fotoğrafı durumunu gösterir — artık GitHub'a AYRICA istek atmadan,
+ * PANEL_VERI önbelleğinden (config + profilFoto, bkz. panelVerisiniYukle)
+ * okur. Worker zaten SADECE admin için bu alanları dolduruyor (bkz.
+ * worker.js panelBaslangicVerisiGetir'deki güvenlik notu), o yüzden
+ * editor/manager'da PANEL_VERI.config/profilFoto her zaman null gelir.
+ */
+function profilFotoDurumYukle() {
   // editor/manager için bölüm DOM'dan tamamen kaldırılmış olabilir
   // (bkz. wireProfilFoto) — bu fonksiyon yine de wireBaglantiDogrula
   // tarafından role'e bakılmaksızın çağrılıyor, o yüzden burada da
   // ayrıca koruyoruz.
   const el = document.getElementById("pf-mevcut");
   if (!el || GIRIS_YAPAN_PROFIL?.role !== "admin") return;
-  el.innerHTML = '<p class="muted">Yükleniyor...</p>';
-  try {
-    const { yol } = await profilYapilandirmasiniOku();
-    PROFIL_YOLU = yol;
-    if (!PROFIL_YOLU) {
-      PROFIL_SHA = null;
-      el.innerHTML = '<p class="muted">Şu anda bir profil fotoğrafı yok (yapılandırmada tanımlı değil).</p>';
-      return;
-    }
-    const dosya = await ghGetContents(PROFIL_YOLU);
-    if (!dosya) {
-      PROFIL_SHA = null;
-      el.innerHTML = `<p class="muted">Şu anda bir profil fotoğrafı yok (yapılandırmadaki <code>${escapeHtml(
-        PROFIL_YOLU
-      )}</code> dosyası repoda bulunamadı).</p>`;
-      return;
-    }
-    PROFIL_SHA = dosya.sha;
-    const src =
-      dosya.download_url || `data:${profilMimeTuruTahminEt(PROFIL_YOLU)};base64,${dosya.content.replace(/\n/g, "")}`;
-    el.innerHTML = `<img src="${src}" alt="Mevcut profil fotoğrafı"><span class="muted">Mevcut dosya: <code>${escapeHtml(
-      PROFIL_YOLU
-    )}</code> (sha: ${escapeHtml(dosya.sha.slice(0, 8))}...)</span>`;
-  } catch (err) {
-    el.innerHTML = `<p class="muted">Durum okunamadı: ${escapeHtml(err.message)}</p>`;
+  if (!PANEL_VERI) {
+    el.innerHTML = '<p class="muted">Önce "GitHub Bağlantısı" sekmesinden bağlantını doğrula.</p>';
+    return;
   }
+  const configIcerik =
+    typeof PANEL_VERI.config?.content === "string" ? b64Decode(PANEL_VERI.config.content.replace(/\n/g, "")) : "";
+  const eslesme = configIcerik.match(PROFIL_IMAGE_SATIR_REGEX);
+  let yol = null;
+  if (eslesme) {
+    const deger = (eslesme[1] || "").trim().replace(/^["']|["']$/g, "").trim();
+    if (deger) yol = deger.replace(/^\/+/, "");
+  }
+  PROFIL_YOLU = yol;
+  if (!PROFIL_YOLU) {
+    PROFIL_SHA = null;
+    el.innerHTML = '<p class="muted">Şu anda bir profil fotoğrafı yok (yapılandırmada tanımlı değil).</p>';
+    return;
+  }
+  const dosya = PANEL_VERI.profilFoto && PANEL_VERI.profilFoto.path === PROFIL_YOLU ? PANEL_VERI.profilFoto : null;
+  if (!dosya || !dosya.sha) {
+    PROFIL_SHA = null;
+    el.innerHTML = `<p class="muted">Şu anda bir profil fotoğrafı yok (yapılandırmadaki <code>${escapeHtml(
+      PROFIL_YOLU
+    )}</code> dosyası repoda bulunamadı).</p>`;
+    return;
+  }
+  PROFIL_SHA = dosya.sha;
+  const src =
+    dosya.download_url ||
+    `data:${profilMimeTuruTahminEt(PROFIL_YOLU)};base64,${(dosya.content || "").replace(/\n/g, "")}`;
+  el.innerHTML = `<img src="${src}" alt="Mevcut profil fotoğrafı"><span class="muted">Mevcut dosya: <code>${escapeHtml(
+    PROFIL_YOLU
+  )}</code> (sha: ${escapeHtml(dosya.sha.slice(0, 8))}...)</span>`;
 }
 
 function dosyayiBase64eCevir(dosya) {
@@ -3087,7 +3151,8 @@ async function profilFotoYukle() {
 
     showMessage(msgEl, "İşlem başarıyla GitHub'a iletildi, 1-2 dakika içinde sitede güncellenecektir.", "success");
     dosyaInput.value = "";
-    await profilFotoDurumYukle();
+    await panelListeleriniTazele();
+    profilFotoDurumYukle();
   } catch (err) {
     showMessage(msgEl, `Yüklenemedi: ${err.message}`, "error");
   } finally {
@@ -3123,7 +3188,8 @@ async function profilFotoSil() {
       // _config.yml temizlenemedi; dosya yine de silindi, kritik değil.
     }
     showMessage(msgEl, "İşlem başarıyla GitHub'a iletildi, 1-2 dakika içinde sitede güncellenecektir.", "success");
-    await profilFotoDurumYukle();
+    await panelListeleriniTazele();
+    profilFotoDurumYukle();
   } catch (err) {
     showMessage(msgEl, `Silinemedi: ${err.message}`, "error");
   } finally {
