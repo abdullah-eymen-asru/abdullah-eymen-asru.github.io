@@ -57,7 +57,13 @@ function mesajListesiniCiz(listEl, mesajlar, benimId) {
     btn.addEventListener("click", async () => {
       const id = btn.dataset.id;
       if (!confirm("Bu mesajı silmek istediğine emin misin?")) return;
-      await supabase.from("messages").delete().eq("id", id);
+      // NOT: gerçek bir DELETE DEĞİL — bkz. supabase/migrations/0019_...sql.
+      // Mesaj karşı taraftan silinmez, sadece benim görünümümden kalkar.
+      const { error } = await supabase.rpc("mesaji_kendimden_gizle", { p_message_id: id });
+      if (error) {
+        alert("Mesaj silinemedi: " + error.message);
+        return;
+      }
       // Realtime aboneliği zaten listeyi güncelleyecek; yine de anında
       // tepki için elle de kaldıralım.
       listEl.querySelector(`[data-id="${id}"]`)?.remove();
@@ -84,13 +90,16 @@ function konusmaOgesiHtml({ id, baslikMetni, konu, sonMesaj, aktif }) {
     </div>`;
 }
 
-/** Bir konuşmayı (ve içindeki tüm mesajları — CASCADE ile otomatik) siler.
+/** Bir sohbeti SİLER — bkz. supabase/migrations/0019_mesajlarda_kisisel_silme.sql:
+ * bu GERÇEK bir DELETE değildir, sohbet sadece BENİM görünümümden kalkar;
+ * karşı taraf (üye ya da yönetici) kendi tarafında hâlâ görmeye devam eder.
+ * Bu ayrıntı kullanıcıya burada anlatılmıyor, sadece basit bir onay isteniyor.
  * Onay ister, hata olursa msgEl'de gösterir. Başarılıysa true döner. */
 async function konusmaSil(id, msgEl) {
-  if (!confirm("Bu sohbeti ve içindeki TÜM mesajları kalıcı olarak silmek istediğine emin misin? Bu işlem geri alınamaz.")) {
+  if (!confirm("Bu sohbeti silmek istediğine emin misin?")) {
     return false;
   }
-  const { error } = await supabase.from("conversations").delete().eq("id", id);
+  const { error } = await supabase.rpc("konusmayi_kendimden_gizle", { p_conversation_id: id });
   if (error) {
     showMessage(msgEl, "Sohbet silinemedi: " + error.message);
     return false;
