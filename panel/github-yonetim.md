@@ -364,4 +364,4 @@ permalink: "/panel/github-yonetim.html"
   </div>
 </div>
 
-<script type="module" src="{{ '/assets/js/github-yonetim.js' | relative_url }}"></script>
+<script type="module" src="{{ '/assets/js/github-yonetim/github-yonetim.js' | relative_url }}"></script>
