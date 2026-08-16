@@ -2,9 +2,11 @@
  * assets/js/github-yonetim.js — /panel/github-yonetim.html
  *
  * Jekyll/GitHub Pages için, 3. parti bir servise (Netlify vb.) ihtiyaç
- * duymadan çalışan tek sayfalık bir "mini CMS". Doğrudan GitHub REST
- * API'sine (repos/{owner}/{repo}/contents/{path}) istek atarak _posts/ ve
- * _projects/ klasörlerine commit atar, assets/profil.jpg dosyasını yönetir.
+ * duymadan çalışan tek sayfalık bir "mini CMS". GitHub REST API'sine
+ * (repos/{owner}/{repo}/contents/{path}) istek atarak _posts/ ve
+ * _projects/ klasörlerine commit atar, assets/profil.jpg dosyasını yönetir
+ * — ama GitHub'a ARTIK DOĞRUDAN DEĞİL, bir Cloudflare Worker ÜZERİNDEN
+ * (bkz. aşağıdaki "GÜVENLİK MİMARİSİ" notu).
  *
  * ÖNEMLİ — "YAYINDA DEĞİL" İÇERİK ARTIK GIT'E HİÇ COMMIT EDİLMİYOR:
  * Eskiden "Yayında" kapatılınca içerik yine GitHub'a, front-matter'da
@@ -60,33 +62,44 @@
  *       icerikKartiCiz). Onaylanınca içerik normal "Yayınla" butonuyla
  *       (admin veya manager/editor tarafından) GitHub'a/Supabase'e
  *       yayınlanabilir.
- *     - DÜRÜSTLÜK PAYI: manager/editor'a bu repo için yazma izni olan bir
- *       GitHub PAT verirsen, teknik olarak bu panelin DIŞINDA GitHub
- *       API'sine doğrudan da commit atabilir — bu, panelin GERÇEK bir
- *       güvenlik sınırı olmadığı, sadece bir kolaylık katmanı olduğu
- *       anlamına gelir (bkz. dosya başındaki PAT notu), bu özellik bunu
- *       değiştirmez.
+ *     - ESKİDEN BURADA "DÜRÜSTLÜK PAYI" diye bir not vardı: editor/manager'a
+ *       bu repo için yazma izinli bir GitHub PAT verirsen, panelin DIŞINDA
+ *       da GitHub API'sine doğrudan commit atabilir, dolayısıyla panelin
+ *       kendisi GERÇEK bir güvenlik sınırı değil sadece bir kolaylık
+ *       katmanıydı. Bu ARTIK DOĞRU DEĞİL — bkz. hemen aşağıdaki "GÜVENLİK
+ *       MİMARİSİ" notu: editor/manager'ın tarayıcısı PAT'a HİÇ erişemiyor,
+ *       tüm GitHub yazma işlemleri sunucu tarafında (Worker'da) hem kimlik
+ *       hem rol hem de YOL bazında zorunlu kılınıyor.
  *
- * GÜVENLİK NOTU — GitHub Personal Access Token (PAT):
- *   Token SADECE bu modülün belleğinde (PAT_BELLEK değişkeni) tutulur.
- *   localStorage/sessionStorage'a KASITLI OLARAK yazılmıyor — sayfa
- *   yenilendiğinde veya sekme kapatıldığında token kaybolur, bir dahaki
- *   girişte yeniden yapıştırman gerekir. Bu, kullanışlılıktan ziyade
- *   güvenliği önceliklendiren bilinçli bir tercih: tarayıcı depolaması
- *   (özellikle localStorage) bir XSS açığında kalıcı olarak sızdırılabilir,
- *   bellekteki bir değişken ise sayfa hayatta olduğu sürece de risklidir
- *   ama en azından hiçbir yerde KALICI olarak durmaz. Buna karşın GitHub
- *   kullanıcı adı ve repo adı gizli bilgi olmadığından, kolaylık için
- *   localStorage'da hatırlanır (bkz. ghAyarlariniYukle).
+ * GÜVENLİK MİMARİSİ — GitHub Personal Access Token (PAT) ARTIK TARAYICIYA HİÇ GİRMİYOR:
+ *   Eskiden bu modül, kullanıcının panelde yapıştırdığı bir PAT'ı tarayıcı
+ *   BELLEĞİNDE tutup GitHub API'sine doğrudan istek atıyordu (localStorage'a
+ *   yazılmıyordu ama sekme açıkken bellekte duruyordu — bir XSS açığında ya
+ *   da kötü niyetli bir tarayıcı uzantısında risk taşıyordu). Artık PAT
+ *   SADECE `cloudflare worker/github_icerik_worker/worker.js`'in Cloudflare
+ *   secret'ı olarak duruyor; bu dosyanın hiçbir satırında PAT YOK ve hiçbir
+ *   zaman olmayacak. Bu modül GitHub'a değil, o Worker'a istek atıyor —
+ *   kimlik kanıtı olarak kullanıcının zaten sahip olduğu Supabase oturum
+ *   token'ını (`supabase.auth.getSession()`) gönderiyor (bkz. ghRequest).
+ *   Worker bu token'ı doğrulayıp Supabase'teki ROLÜ okuyor ve HEM kimlik HEM
+ *   rol HEM DE hangi DOSYA YOLUNA (path) yazılmak istendiğini kontrol ediyor
+ *   (_posts//_projects/ → editor/manager/admin, assets//_config.yml →
+ *   sadece admin, başka her şey → reddedilir) — detaylar için Worker
+ *   dosyasının başındaki mimari notuna bak. Sonuç: panel artık gerçek bir
+ *   yetki sınırı, PAT hiçbir zaman tarayıcı belleğine bile girmiyor.
  *
- *   Fine-grained bir PAT oluşturup SADECE bu repo için "Contents: Read and
- *   write" iznini vermen hem yeterli hem de tüm hesaba erişen "classic"
- *   bir token kullanmaktan çok daha güvenli.
+ *   Worker'ın URL'i aşağıda GITHUB_PROXY_WORKER_URL sabitinde — Worker'ı
+ *   deploy ettikten sonra bu değeri kendi Worker adresinle değiştirmen
+ *   gerekir (bkz. Worker dosyasının başındaki ortam değişkeni listesi).
  */
 import { requireAuth } from "./auth-guard.js";
 import { escapeHtml, showMessage, supabase } from "./supabase-client.js";
 
-const GITHUB_API = "https://api.github.com";
+// ---- BURAYI DOLDUR: Worker deploy edildikten sonra aldığın URL ----
+// ör. "https://github-icerik-worker.KULLANICI-ADIN.workers.dev"
+// veya kendi domainine bağladıysan (Custom Domain) o adres.
+const GITHUB_PROXY_WORKER_URL = "https://github-icerik-worker.aeymena.workers.dev";
+// ---------------------------------------------------------------------
 // Profil fotoğrafının GERÇEK yolu artık sabit kodlanmıyor: her zaman
 // _config.yml içindeki `profile_image` alanından okunur. Böylece dosya
 // assets/profil.jpg, assets/profile.webp ya da başka bir isimle kayıtlı
@@ -97,8 +110,10 @@ const GITHUB_API = "https://api.github.com";
 const CONFIG_YOLU = "_config.yml";
 let PROFIL_YOLU = null;
 
-// Token SADECE bellekte — bkz. dosya başındaki güvenlik notu.
-let PAT_BELLEK = "";
+// Artık bir TOKEN değil, sadece "Worker'a bağlanıp rol/erişim testi
+// başarıyla geçti mi?" bilgisini tutan bir bayrak — bkz. dosya başındaki
+// GÜVENLİK MİMARİSİ notu ve wireBaglantiDogrula.
+let GH_BAGLI = false;
 
 // GitHub'da düzenlenen bir dosya varsa DUZENLENEN_YOL/DUZENLENEN_SHA dolu,
 // Supabase'te düzenlenen bir taslak varsa DUZENLENEN_TASLAK_ID dolu olur —
@@ -186,136 +201,95 @@ function wireSectionNav() {
 
 /* ---------------------------------------------------------------------- */
 /* GITHUB BAĞLANTI AYARLARI                                               */
+/* Owner/repo/PAT artık Worker'da (env değişkeni/secret) sabit — burada    */
+/* SADECE branch (gizli olmayan, opsiyonel) kalıyor.                       */
 /* ---------------------------------------------------------------------- */
 function ghAyarlariniYukle() {
-  const app = document.getElementById("app");
-  document.getElementById("gh-owner").value =
-    localStorage.getItem("gy_owner") || app.dataset.defaultOwner || "";
-  document.getElementById("gh-repo").value =
-    localStorage.getItem("gy_repo") || app.dataset.defaultRepo || "";
   document.getElementById("gh-branch").value = localStorage.getItem("gy_branch") || "";
 }
 
 function ghAyarlari() {
-  return {
-    owner: document.getElementById("gh-owner").value.trim(),
-    repo: document.getElementById("gh-repo").value.trim(),
-    branch: document.getElementById("gh-branch").value.trim(),
-  };
-}
-
-/*
- * Token yapıştırılırken (özellikle GitHub'ın kendi token sayfasından,
- * bir not/PDF'ten ya da bir mesajlaşma uygulamasından kopyalanırken) araya
- * görünmez satır sonu, sekme veya "non-breaking space" gibi boşluk
- * karakterleri karışabiliyor; bazı arayüzler uzun token'ı ekranda iki
- * satıra sararak gösteriyor ve kopyalarken o satır sonu da kopyalanıyor.
- * GitHub token'ları hiçbir zaman boşluk İÇERMEDİĞİNDEN, sadece baştaki/
- * sondaki değil, ARADAKİ tüm boşluk karakterlerini de güvenle
- * kırpabiliyoruz. Ayrıca bir kod bloğundan/JSON'dan kopyalarken sıkça
- * birlikte gelen tırnak/backtick işaretlerini de temizliyoruz. Bu satırlar
- * eklenmeden önce, ortasında gizli bir satır sonu olan bir token GitHub'a
- * OLDUĞU GİBİ gönderiliyordu — bazen tarayıcı bunu geçersiz bir header
- * değeri olarak reddedip belirsiz bir "TypeError" fırlatıyordu, bazen de
- * (satır sonu sessizce yutulup iki parça birleşince) sunucuya YANLIŞ ama
- * biçimsel olarak geçerli bir token gidiyor ve GitHub bunu "401 Bad
- * credentials" ile reddediyordu — kullanıcı token'ın doğru olduğundan emin
- * olsa bile.
- */
-function patTemizle(ham) {
-  return (ham || "").replace(/\s+/g, "").replace(/^[`'"]+|[`'"]+$/g, "");
+  return { branch: document.getElementById("gh-branch").value.trim() };
 }
 
 function wireBaglantiDogrula() {
-  document.getElementById("gh-baglan-btn").addEventListener("click", async () => {
-    const msgEl = document.getElementById("gh-baglanti-message");
-    const { owner, repo, branch } = ghAyarlari();
-    const patHam = document.getElementById("gh-pat").value;
-    const pat = patTemizle(patHam);
+  document.getElementById("gh-baglan-btn").addEventListener("click", () => ghBaglantisiniTestEt(true));
+  // Sayfa açılır açılmaz sessizce bir kez dene — kullanıcı artık hiçbir şey
+  // yapıştırmak zorunda değil (bkz. dosya başındaki GÜVENLİK MİMARİSİ notu),
+  // Supabase oturumu zaten var. Başarısız olursa (Worker henüz deploy
+  // edilmemiş, ağ sorunu vb.) sessizce geçilir — kullanıcı "Bağlantıyı
+  // Doğrula" butonuyla hatayı görüp elle tekrar deneyebilir.
+  ghBaglantisiniTestEt(false);
+}
 
-    if (!owner || !repo || !pat) {
-      showMessage(msgEl, "Kullanıcı adı, repo adı ve token gerekli.", "error");
-      return;
+async function ghBaglantisiniTestEt(hataGoster) {
+  const msgEl = document.getElementById("gh-baglanti-message");
+  const branch = document.getElementById("gh-branch").value.trim();
+  localStorage.setItem("gy_branch", branch);
+
+  const btn = document.getElementById("gh-baglan-btn");
+  btn.disabled = true;
+  btn.textContent = "Kontrol ediliyor...";
+  try {
+    const res = await ghRequest("");
+    if (!res.ok) {
+      throw new Error(await ghHataMesaji(res));
     }
-    // Temizleme bir şey değiştirdiyse (yani orijinalde gizli boşluk/tırnak
-    // varmış), giriş alanını da güncelleyelim ki kullanıcı neyin
-    // gönderildiğini görebilsin ve tekrar denediğinde aynı sorunu yaşamasın.
-    if (pat !== patHam) document.getElementById("gh-pat").value = pat;
-
-    PAT_BELLEK = pat;
-    localStorage.setItem("gy_owner", owner);
-    localStorage.setItem("gy_repo", repo);
-    localStorage.setItem("gy_branch", branch);
-
-    const btn = document.getElementById("gh-baglan-btn");
-    btn.disabled = true;
-    btn.textContent = "Kontrol ediliyor...";
-    try {
-      const res = await ghRequest("");
-      if (!res.ok) {
-        const temelMesaj = await ghHataMesaji(res);
-        if (res.status === 401) {
-          throw new Error(
-            `${temelMesaj} — GitHub token'ı reddetti. Kontrol et: (1) token süresi dolmuş ya da elle/GitHub tarafından ` +
-              `iptal edilmiş olabilir, yeni bir tane oluşturmayı dene; (2) fine-grained token oluşturuken "Resource owner" ` +
-              `olarak "${escapeHtml(owner)}" seçilip erişime "${escapeHtml(repo)}" reposu eklenmiş mi; (3) hesap bir ` +
-              `organizasyona bağlıysa, organizasyon fine-grained token'lara onay vermiş mi (Settings → Personal access ` +
-              `tokens). Kopyalarken araya karışmış boşluk/satır sonu artık otomatik temizleniyor, yine de token'ı GitHub'da ` +
-              `tekrar kopyalayıp deneyebilirsin.`
-          );
-        }
-        throw new Error(temelMesaj);
-      }
-      const repoData = await res.json();
-      const yazmaYetkisi = repoData.permissions?.push;
-      showMessage(
-        msgEl,
-        `Bağlantı doğrulandı — "${repoData.full_name}" (varsayılan branch: ${repoData.default_branch})` +
-          (yazmaYetkisi ? "" : " — UYARI: bu token ile yazma izniniz yok gibi görünüyor."),
-        yazmaYetkisi ? "success" : "error"
-      );
-      await profilFotoDurumYukle();
-      await icerikFormuKlasorSecimGuncelle();
-    } catch (err) {
-      PAT_BELLEK = "";
+    const repoData = await res.json();
+    const yazmaYetkisi = repoData.permissions?.push;
+    GH_BAGLI = true;
+    showMessage(
+      msgEl,
+      `Bağlantı doğrulandı — "${repoData.full_name}" (varsayılan branch: ${repoData.default_branch})` +
+        (yazmaYetkisi ? "" : " — UYARI: Worker'ın token'ı ile yazma izni yok gibi görünüyor."),
+      yazmaYetkisi ? "success" : "error"
+    );
+    await profilFotoDurumYukle();
+    await icerikFormuKlasorSecimGuncelle();
+  } catch (err) {
+    GH_BAGLI = false;
+    if (hataGoster) {
       showMessage(msgEl, `Bağlantı doğrulanamadı: ${err.message}`, "error");
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "Bağlantıyı Doğrula";
     }
-  });
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Bağlantıyı Doğrula";
+  }
 }
 
 /* ---------------------------------------------------------------------- */
-/* GITHUB REST API YARDIMCILARI                                           */
+/* GITHUB İÇERİK PROXY'Sİ (Cloudflare Worker) YARDIMCILARI                 */
 /* ---------------------------------------------------------------------- */
 function encodePath(yol) {
   return yol.split("/").map(encodeURIComponent).join("/");
 }
 
 async function ghRequest(path, options = {}) {
-  if (!PAT_BELLEK) throw new Error("Önce GitHub bağlantısını doğrula (PAT gerekli).");
-  const { owner, repo } = ghAyarlari();
-  if (!owner || !repo) throw new Error("GitHub kullanıcı adı ve repo adı gerekli.");
-  return fetch(`${GITHUB_API}/repos/${owner}/${repo}${path}`, {
+  // Owner/repo/PAT artık burada değil, Worker'da (env değişkeni/secret) —
+  // bkz. dosya başındaki GÜVENLİK MİMARİSİ notu. Kimlik kanıtı olarak
+  // GitHub'a değil, Worker'a Supabase oturum token'ını gönderiyoruz; Worker
+  // bunu doğrulayıp rol+yol kontrolünden geçirdikten SONRA kendi PAT'ıyla
+  // GitHub'a yönlendiriyor.
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error("Oturum bulunamadı, tekrar giriş yapmayı dene.");
+
+  return fetch(`${GITHUB_PROXY_WORKER_URL}${path}`, {
     ...options,
-    // ÖNEMLİ — "cache: no-store" OLMADAN tarayıcı, GitHub'ın Contents API
-    // yanıtlarını (aynı URL'ye tekrar istek atıldığında) kendi HTTP
-    // önbelleğinden döndürebiliyordu. Bu panel bir "canlı" içerik yönetim
-    // aracı olduğundan bu YIKICI bir sorundu: örn. bir klasör oluşturduktan
-    // hemen sonra listeyi tazelemek eski (klasörün henüz olmadığı) veriyi
+    // ÖNEMLİ — "cache: no-store" OLMADAN tarayıcı, önceki yanıtı (aynı
+    // URL'ye tekrar istek atıldığında) kendi HTTP önbelleğinden
+    // döndürebiliyordu. Bu panel bir "canlı" içerik yönetim aracı
+    // olduğundan bu YIKICI bir sorundu: örn. bir klasör oluşturduktan hemen
+    // sonra listeyi tazelemek eski (klasörün henüz olmadığı) veriyi
     // gösteriyordu; bir yazı sildikten sonra listeyi tazelemek dosyayı hâlâ
-    // orada gösterip tek tek okurken "okunamadı" hatası veriyordu (çünkü
-    // klasör listesi önbellekten geliyordu ama tekil dosya isteği gerçek
-    // GitHub'a gidip 404 dönüyordu); bir klasörün gerçekten boş olup
-    // olmadığı (silme butonunun aktif olup olmayacağı) da eski veriyle
-    // hesaplanabiliyordu. "no-store" ile HER istek doğrudan ağa gider,
-    // hiçbir ara katmanda önbelleklenmez.
+    // orada gösterip tek tek okurken "okunamadı" hatası veriyordu; bir
+    // klasörün gerçekten boş olup olmadığı (silme butonunun aktif olup
+    // olmayacağı) da eski veriyle hesaplanabiliyordu. "no-store" ile HER
+    // istek doğrudan ağa gider, hiçbir ara katmanda önbelleklenmez.
     cache: "no-store",
     headers: {
-      Authorization: `token ${PAT_BELLEK}`,
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
+      Authorization: `Bearer ${session.access_token}`,
       ...(options.headers || {}),
     },
   });
@@ -684,7 +658,7 @@ function klasorAdiTemizle(ad) {
  */
 async function icerikFormuKlasorSecimGuncelle() {
   const secim = document.getElementById("ic-klasor-secim");
-  if (!secim || !PAT_BELLEK) return;
+  if (!secim || !GH_BAGLI) return;
   const kokKlasor = kokKlasorAdi(icerikTuru());
   const oncekiDeger = secim.value;
   try {
@@ -807,7 +781,7 @@ function wireKlasorYonetimi() {
   wireKlasorSecici();
   // "Klasörler" sekmesine her tıklandığında (bağlantı doğrulanmışsa) listeyi tazele.
   document.querySelector('#gy-nav a[data-section="klasorler"]')?.addEventListener("click", () => {
-    if (PAT_BELLEK) klasorListesiYukle();
+    if (GH_BAGLI) klasorListesiYukle();
   });
 }
 
@@ -859,7 +833,7 @@ async function klasorListesiYukle() {
   const el = document.getElementById("kl-liste");
   if (!el) return;
   const kokKlasor = kokKlasorAdi(KLASOR_SEKME_TUR);
-  if (!PAT_BELLEK) {
+  if (!GH_BAGLI) {
     el.innerHTML = '<p class="muted">Önce "GitHub Bağlantısı" sekmesinden bağlantını doğrula.</p>';
     return;
   }
@@ -2164,7 +2138,7 @@ function taslakToItem(row) {
 
 async function icerikListesiYukle() {
   const el = document.getElementById("ic-liste");
-  if (!PAT_BELLEK) {
+  if (!GH_BAGLI) {
     el.innerHTML = '<p class="muted">Önce "GitHub Bağlantısı" sekmesinden bağlantını doğrula.</p>';
     return;
   }
@@ -2804,14 +2778,15 @@ async function icerikDuzenlemeyeYukle(item, tur) {
 /* SADECE role='admin' — editor VE manager (İçerik Sorumlusu) sitenin     */
 /* profil fotoğrafını DEĞİŞTİREMEZ/SİLEMEZ. Bu bölüm/nav linki onlar için  */
 /* DOM'dan tamamen kaldırılır (aşağıya bkz.); profilFotoYukle/profilFotoSil */
-/* içindeki ayrı rol kontrolleri ikinci bir savunma katmanıdır — asıl      */
-/* GERÇEK güvenlik sınırı yine de kullanıcıya verilen GitHub PAT'ın        */
-/* kapsamıdır (bkz. dosya başındaki PAT notu): bu buton/bölüm kaldırılsa   */
-/* bile, bir editor/manager'a bu repo için yazma izni olan bir PAT         */
-/* verirsen, GitHub API'sine bu panelin DIŞINDAN doğrudan commit atıp      */
-/* assets/ altındaki herhangi bir dosyayı (profil fotoğrafı dahil)         */
-/* teorik olarak değiştirebilir — bu kısıtlama o mimari sınırı ORTADAN     */
-/* KALDIRMAZ, sadece panelin KENDİ arayüzünden bu işlemi engeller.         */
+/* içindeki ayrı rol kontrolleri ikinci bir savunma katmanıdır — ASIL      */
+/* güvenlik sınırı artık GERÇEKTEN de burada: assets/ altına yazma isteği  */
+/* editor/manager'ın Supabase oturum token'ıyla Worker'a ulaşsa bile,      */
+/* Worker rolü tekrar kontrol edip SADECE admin için izin veriyor (bkz.    */
+/* cloudflare worker/github_icerik_worker/worker.js — "YOL (PATH)          */
+/* KISITLARI"). Eskiden burada, editor/manager'a verilen bir GitHub PAT'ın */
+/* bu paneli atlayıp assets/'e doğrudan yazabileceğine dair bir uyarı      */
+/* vardı — artık geçerli değil, çünkü PAT hiçbir zaman onların tarayıcısına*/
+/* girmiyor (bkz. dosya başındaki GÜVENLİK MİMARİSİ notu).                */
 /* ---------------------------------------------------------------------- */
 function wireProfilFoto() {
   const navLink = document.querySelector('#gy-nav a[data-section="profil-foto"]');
@@ -2951,7 +2926,7 @@ async function profilFotoYukle() {
     showMessage(msgEl, "Önce bir görsel seç.", "error");
     return;
   }
-  if (!PAT_BELLEK) {
+  if (!GH_BAGLI) {
     showMessage(msgEl, 'Önce "GitHub Bağlantısı" sekmesinden bağlantını doğrula.', "error");
     return;
   }
@@ -3004,7 +2979,7 @@ async function profilFotoSil() {
     return;
   }
 
-  if (!PAT_BELLEK) {
+  if (!GH_BAGLI) {
     showMessage(msgEl, 'Önce "GitHub Bağlantısı" sekmesinden bağlantını doğrula.', "error");
     return;
   }
