@@ -167,6 +167,22 @@
   <link rel="stylesheet" href="{{ '/assets/css/auth.css' | relative_url }}">
   {% endif %}
 
+  {% if page.uye_ayarlari_css %}
+  <!-- uye-ayarlari.css: SADECE panel/uye-ayarlari.md ister — admin.md'den
+        taşınan "Kullanıcılar & Roller" bölümünün istatistik şeridi/araç
+        çubuğu/kart-ızgarası/sayfalama stilleri. auth.css'in üzerine eklenir
+        (aynı CSS değişkenlerini kullanır), diğer sayfaları etkilemez. -->
+  <link rel="stylesheet" href="{{ '/assets/css/uye-ayarlari.css' | relative_url }}">
+  {% endif %}
+
+  {% if page.mesajlar_css %}
+  <!-- mesajlar.css: SADECE panel/mesajlar.md ister — panel.md/admin.md'den
+        taşınan sohbet sayfasını ".wrap"ın dar sütununun dışına, görünür
+        alanın ortasına ferah şekilde hizalar. Sohbet bileşenlerinin
+        kendisi (.msg-panel vb.) hâlâ auth.css'te. -->
+  <link rel="stylesheet" href="{{ '/assets/css/mesajlar.css' | relative_url }}">
+  {% endif %}
+
   {% if site.google_analytics_id and site.google_analytics_id != "" %}
   <!--
     Google Analytics — ÇEREZ ONAYINA BAĞLI (KVKK/GDPR): bu script artık
