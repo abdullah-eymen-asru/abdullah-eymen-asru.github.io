@@ -3,34 +3,39 @@
  * role='admin' HERŞEYE erişir. role='manager' (panelde "İçerik Sorumlusu")
  * de artık bu sayfaya girebilir ama SADECE "Özel İçerik Ekle/Düzenle",
  * "Mevcut Özel İçerikler" ve "R2 Dosya Paylaşımı" sekmelerine — bkz. aşağıda
- * init() içindeki TAM_YETKILI dalı. "Kullanıcılar & Roller", "Mesajlar" ve
- * "Hesabım" sekmeleri manager için DOM'dan gizlenir; bu sadece bir UX
- * katmanıdır, GERÇEK yetki sınırı veritabanı seviyesinde RLS ile (bkz.
+ * init() içindeki TAM_YETKILI dalı. "Hesabım" sekmesi manager için DOM'dan
+ * gizlenir; bu sadece bir UX katmanıdır, GERÇEK yetki sınırı veritabanı
+ * seviyesinde RLS ile (bkz.
  * supabase/migrations/0016_icerik_sorumlusu_rolu_ve_admin_adina_onay.sql —
  * profiles UPDATE, admin_set_user_role, mesajlaşma tabloları HÂLÂ sadece
  * admin'e açık) zaten sağlanıyor.
  *
- * Bölüm (section) bazlı gezinme (sol menü), üye arama (isim/mail), içerik
- * DÜZENLEME, içerik atarken üye başına son geçerlilik TARİH+SAAT'i (Türkiye
- * saatine göre) veya "Süresiz" seçeneği, atama listesinde de isim/e-posta
- * arama, her içerik için üye bazlı OKUNDU/erişim detayları, üye silme
- * (kendi hesabı dahil), süresi geçmiş erişimlerin otomatik temizliği ve
- * üye <-> yönetici mesajlaşma gelen kutusu.
+ * NOT (TAŞINDI): "Kullanıcılar & Roller" tablosu/e-posta değiştirme kutusu
+ * artık panel/uye-ayarlari.md + assets/js/uye-ayarlari.js içinde; "Mesajlar"
+ * (üye <-> yönetici sohbet gelen kutusu) artık panel/mesajlar.md +
+ * assets/js/mesajlar.js içinde — ikisi de 100+ üye/konuşma birikince bu
+ * sayfayı aşırı uzatmasın diye ayrı sayfalara taşındı. Bu dosya (admin.js)
+ * hâlâ TÜM kullanıcı listesini (loadUsers()) çeker ama SADECE "Erişim
+ * Verilecek Özel Üyeler / Yöneticiler" atama listesini (icerik-ekle
+ * sekmesi) doldurmak için — kullanıcı/rol YÖNETİMİ artık burada değil.
+ *
+ * Bölüm (section) bazlı gezinme (sol menü), içerik DÜZENLEME, içerik
+ * atarken üye başına son geçerlilik TARİH+SAAT'i (Türkiye saatine göre)
+ * veya "Süresiz" seçeneği, atama listesinde isim/e-posta arama, her içerik
+ * için üye bazlı OKUNDU/erişim detayları ve süresi geçmiş erişimlerin
+ * otomatik temizliği.
  *
  * NOT: "Hakkımda" metni düzenleme özelliği KALDIRILDI (istek üzerine) —
  * site geneli "Hakkımda" artık sadece repo içindeki
  * _includes/hakkimda-icerik.md dosyasından, doğrudan koda dokunarak
  * güncellenir.
  */
-import { supabase, showMessage, escapeHtml, kucukHarfeCevirTr, kullaniciAramayaUyuyorMu } from "./supabase-client.js";
+import { supabase, escapeHtml, kucukHarfeCevirTr, kullaniciAramayaUyuyorMu, showMessage } from "./supabase-client.js";
 import { requireAuth } from "./auth-guard.js";
-import { wireAdminChat } from "./chat.js";
 import { imzaliLinkUret } from "./dosya-paylasim.js";
 
 const DELETE_ACCOUNT_FUNCTION_URL =
   "https://eahvcirspmvntffzphye.supabase.co/functions/v1/delete-account";
-const ADMIN_CHANGE_EMAIL_FUNCTION_URL =
-  "https://eahvcirspmvntffzphye.supabase.co/functions/v1/admin-change-email";
 
 let TUM_KULLANICILAR = [];
 let DUZENLENEN_ICERIK_ID = null; // null: yeni içerik ekleniyor, doluysa düzenleniyor
@@ -64,8 +69,8 @@ async function init() {
   const adimlar = [
     ["süresi geçmiş erişim temizliği", () => temizleSuresiGecmisErisimler()],
     // loadUsers() manager için de gerekli: "Erişim Verilecek Özel Üyeler"
-    // atama listesini (icerik-ekle sekmesi) doldurur — kullanıcı/rol tablosu
-    // (kullanicilar sekmesi) kendisi manager'dan zaten gizleniyor.
+    // atama listesini (icerik-ekle sekmesi) doldurur — üye/rol YÖNETİMİNİN
+    // kendisi artık panel/uye-ayarlari.md içinde, admin-only.
     ["kullanıcı listesi", () => loadUsers()],
     ["içerik listesi", () => loadContents()],
     ["içerik atama arama", () => wireIcerikAtamaArama()],
@@ -73,17 +78,12 @@ async function init() {
     ["dosya paylaşım", () => wireR2DosyaPaylasim()],
   ];
 
-  // Sadece admin'e özel adımlar: kullanıcı arama (kullanicilar sekmesi),
-  // kendi hesabını silme + e-posta değiştirme (hesabım/kullanicilar
-  // sekmeleri) ve mesajlaşma (mesajlar sekmesi). manager bu sekmeleri hiç
-  // görmediği için bu adımları çalıştırmaya da gerek yok.
+  // Sadece admin'e özel adım: kendi hesabını silme (hesabim sekmesi).
+  // Üye/rol yönetimi ve mesajlaşma artık bu sayfada hiç yok (bkz. dosya
+  // başındaki not) — manager zaten bu bölümü hiç görmediği için burada
+  // ekstra bir dallanmaya gerek kalmadı.
   if (TAM_YETKILI) {
-    adimlar.push(
-      ["kullanıcı arama", () => wireUserSearch()],
-      ["kendi hesabını silme", () => wireCurrentAdminSelfDelete(session)],
-      ["e-posta değiştirme", () => wireAdminEmailChange()],
-      ["mesajlaşma", () => wireAdminChat(session.user.id)]
-    );
+    adimlar.push(["kendi hesabını silme", () => wireCurrentAdminSelfDelete(session)]);
   }
 
   for (const [ad, fn] of adimlar) {
@@ -96,23 +96,23 @@ async function init() {
 }
 
 /**
- * manager (İçerik Sorumlusu) girişinde: "Kullanıcılar & Roller", "Mesajlar"
- * ve "Hesabım" sekmelerini (hem üstteki nav linkini hem section'ın
- * kendisini) DOM'dan gizler ve varsayılan aktif sekmeyi "Özel İçerik
- * Ekle/Düzenle"ye çeker. Bu SADECE bir UX katmanıdır — gerçek yetki sınırı
- * RLS'te (bkz. dosya başındaki not).
+ * manager (İçerik Sorumlusu) girişinde: "Üye Ayarları" ve "Sohbet/Mesajlar"
+ * nav linklerini (artık ayrı sayfalara giden linkler) ve "Hesabım"
+ * sekmesini (hem üstteki nav linkini hem section'ın kendisini) DOM'dan
+ * gizler ve varsayılan aktif sekmeyi "Özel İçerik Ekle/Düzenle"ye çeker. Bu
+ * SADECE bir UX katmanıdır — gerçek yetki sınırı RLS'te (bkz. dosya
+ * başındaki not) ve /panel/uye-ayarlari.html'in kendi
+ * requireAuth({role:'admin'}) kontrolünde.
  */
 function kisitliManagerGorunumunuUygula() {
-  const gizlenecekSekmeler = ["kullanicilar", "mesajlar", "hesabim"];
+  document.getElementById("admin-nav-uye-ayarlari")?.setAttribute("hidden", "");
+  document.getElementById("admin-nav-mesajlar")?.setAttribute("hidden", "");
+
+  const gizlenecekSekmeler = ["hesabim"];
   gizlenecekSekmeler.forEach((id) => {
     document.querySelector(`#admin-nav a[data-section="${id}"]`)?.setAttribute("hidden", "");
     document.getElementById(id)?.setAttribute("hidden", "");
   });
-
-  const kullanicilarLink = document.querySelector('#admin-nav a[data-section="kullanicilar"]');
-  const icerikEkleLink = document.querySelector('#admin-nav a[data-section="icerik-ekle"]');
-  kullanicilarLink?.classList.remove("active");
-  icerikEkleLink?.classList.add("active");
 
   const baslik = document.querySelector("#app > h1");
   if (baslik) baslik.textContent = "Admin Paneli — İçerik Sorumlusu Görünümü";
@@ -123,7 +123,7 @@ function kisitliManagerGorunumunuUygula() {
     notu.className = "muted";
     notu.style.cssText = "margin:8px 0 16px;font-size:0.85rem;";
     notu.textContent =
-      "İçerik Sorumlusu rolündesin: sadece özel içerik ekleme/düzenleme ve R2 dosya paylaşımı bölümlerine erişimin var. Kullanıcı/rol yönetimi ve mesajlar sadece admin'e özeldir.";
+      "İçerik Sorumlusu rolündesin: sadece özel içerik ekleme/düzenleme ve R2 dosya paylaşımı bölümlerine erişimin var. Üye ayarları ve mesajlar sadece admin'e özeldir.";
     nav.insertAdjacentElement("afterend", notu);
   }
 }
@@ -171,7 +171,10 @@ async function temizleSuresiGecmisErisimler() {
 }
 
 /* ---------------------------------------------------------------------- */
-/* KULLANICI / ROL YÖNETİMİ + ARAMA                                       */
+/* KULLANICI LİSTESİ (sadece içerik atama listesini beslemek için)         */
+/* Üye/rol YÖNETİMİNİN kendisi (arama, isim/e-posta düzenleme, rol         */
+/* değiştirme, üye silme) artık panel/uye-ayarlari.md +                    */
+/* assets/js/uye-ayarlari.js içinde — bkz. dosya başındaki not.            */
 /* ---------------------------------------------------------------------- */
 async function loadUsers() {
   const { data, error } = await supabase
@@ -179,305 +182,34 @@ async function loadUsers() {
     .select("id, email, first_name, last_name, full_name, role, created_at, kvkk_onay_verildi, kvkk_onay_tarihi")
     .order("created_at", { ascending: false });
 
-  const tbody = document.getElementById("kullanici-tablo-govde");
   if (error) {
-    tbody.innerHTML = `<tr><td colspan="5">Kullanıcılar yüklenemedi: ${escapeHtml(error.message)}</td></tr>`;
+    console.error("Kullanıcı listesi yüklenemedi (atama listesi boş kalacak):", error);
     return;
   }
 
   TUM_KULLANICILAR = data || [];
-  renderUserTable(TUM_KULLANICILAR);
   renderContentAssigneeOptions(TUM_KULLANICILAR);
-  wireUserTableRealtime();
+  wireAtamaListesiRealtime();
 }
 
-// Admin paneli açıkken bir kullanıcı KENDİ panelinden Ad/Soyad ya da
-// e-postasını değiştirirse (ya da başka bir admin sekmesi bir değişiklik
-// yaparsa), bu admin sekmesi otomatik tazelenir. Önceden admin panelini
-// F5 ile YENİLEMEDEN değişiklikler görünmüyordu — bu "kullanıcı
-// güncelleme yaptığı halde sistemde değişmiyor" izlenimine yol açıyordu
-// (aslında veritabanı doğru güncelleniyordu, sadece admin ekranı bunu
-// canlı yansıtmıyordu). Aynı abonelik tekrar tekrar kurulmasın diye bir
+// Admin paneli açıkken bir üyenin rolü/adı başka bir yerden (ör.
+// panel/uye-ayarlari.html üzerinden, başka bir sekmede) değiştirilirse,
+// "Erişim Verilecek Özel Üyeler" atama listesi otomatik tazelenir — yoksa
+// admin burada F5 atmadan az önce "Özel Üye" yapılan birini atama
+// listesinde göremezdi. Aynı abonelik tekrar tekrar kurulmasın diye bir
 // bayrakla koruyoruz.
-let USER_TABLE_REALTIME_KURULDU = false;
-let USER_TABLE_REALTIME_TIMER = null;
-function wireUserTableRealtime() {
-  if (USER_TABLE_REALTIME_KURULDU) return;
-  USER_TABLE_REALTIME_KURULDU = true;
+let ATAMA_LISTESI_REALTIME_KURULDU = false;
+let ATAMA_LISTESI_REALTIME_TIMER = null;
+function wireAtamaListesiRealtime() {
+  if (ATAMA_LISTESI_REALTIME_KURULDU) return;
+  ATAMA_LISTESI_REALTIME_KURULDU = true;
   supabase
-    .channel("admin-profiles-degisiklik")
+    .channel("admin-icerik-atama-profiles-degisiklik")
     .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => {
-      // Admin şu an tablodaki bir ad/soyad kutusuna yazıyor olabilir —
-      // her postgres_changes event'inde ANINDA yeniden çizmek yerine kısa
-      // bir debounce ile bekliyoruz (arka arkaya gelen birden fazla
-      // değişiklik tek bir tazelemeye toplanır, aktif yazma sırasında
-      // focus kaybı riski azalır).
-      clearTimeout(USER_TABLE_REALTIME_TIMER);
-      USER_TABLE_REALTIME_TIMER = setTimeout(() => loadUsers(), 600);
+      clearTimeout(ATAMA_LISTESI_REALTIME_TIMER);
+      ATAMA_LISTESI_REALTIME_TIMER = setTimeout(() => loadUsers(), 600);
     })
     .subscribe();
-}
-
-function wireUserSearch() {
-  const input = document.getElementById("kullanici-arama");
-  if (!input) return;
-  input.addEventListener("input", () => {
-    const q = kucukHarfeCevirTr(input.value.trim());
-    if (!q) {
-      renderUserTable(TUM_KULLANICILAR);
-      return;
-    }
-    const filtrelenmis = TUM_KULLANICILAR.filter((u) => kullaniciAramayaUyuyorMu(u, q));
-    renderUserTable(filtrelenmis);
-  });
-}
-
-function renderUserTable(kullanicilar) {
-  const tbody = document.getElementById("kullanici-tablo-govde");
-
-  if (kullanicilar.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" class="muted">Eşleşen kullanıcı yok.</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = kullanicilar
-    .map(
-      (u) => `
-      <tr data-id="${u.id}">
-        <td>
-          <div class="admin-isim-duzenle" data-id="${u.id}">
-            <input class="admin-isim-input" data-alan="first_name" data-id="${u.id}" type="text" value="${escapeHtml(u.first_name || "")}" placeholder="Ad" style="width:48%;display:inline-block;">
-            <input class="admin-isim-input" data-alan="last_name" data-id="${u.id}" type="text" value="${escapeHtml(u.last_name || "")}" placeholder="Soyad" style="width:48%;display:inline-block;">
-          </div>
-          <span class="muted">${escapeHtml(u.email)}</span>
-        </td>
-        <td>${new Date(u.created_at).toLocaleDateString("tr-TR")}</td>
-        <td>
-          <select class="rol-select" data-id="${u.id}">
-            <option value="user" ${u.role === "user" ? "selected" : ""}>Üye</option>
-            <option value="special_user" ${u.role === "special_user" ? "selected" : ""}>Özel Üye</option>
-            <option value="editor" ${u.role === "editor" ? "selected" : ""}>Editör</option>
-            <option value="manager" ${u.role === "manager" ? "selected" : ""}>İçerik Sorumlusu</option>
-            <option value="admin" ${u.role === "admin" ? "selected" : ""}>Yönetici</option>
-          </select>
-        </td>
-        <td>${
-          u.kvkk_onay_verildi
-            ? `✓<br><span class="muted" style="font-size:0.78rem;">${new Date(u.kvkk_onay_tarihi).toLocaleDateString("tr-TR")}</span>`
-            : '<span class="muted">Yok</span>'
-        }</td>
-        <td>
-          <span class="rol-durum" data-id="${u.id}"></span>
-          <button class="btn-secondary tablo-aksiyon-btn eposta-degistir-btn" data-id="${u.id}" data-email="${escapeHtml(u.email)}" data-isim="${escapeHtml(u.full_name || u.email)}">E-posta Değiştir</button>
-          <button class="btn-danger tablo-aksiyon-btn uye-sil-btn" data-id="${u.id}" data-email="${escapeHtml(u.email)}">Sil</button>
-        </td>
-      </tr>`
-    )
-    .join("");
-
-  tbody.querySelectorAll(".rol-select").forEach((select) => {
-    select.addEventListener("change", async () => {
-      const userId = select.dataset.id;
-      const yeniRol = select.value;
-      const durum = tbody.querySelector(`.rol-durum[data-id="${userId}"]`);
-
-      const { error } = await supabase.rpc("admin_set_user_role", {
-        p_user_id: userId,
-        p_new_role: yeniRol,
-      });
-
-      durum.textContent = error ? "Hata!" : "Kaydedildi ✓";
-      durum.className = error ? "rol-durum rol-durum--hata" : "rol-durum rol-durum--ok";
-      if (error) console.error(error);
-      else {
-        const kullanici = TUM_KULLANICILAR.find((u) => u.id === userId);
-        if (kullanici) kullanici.role = yeniRol;
-        renderContentAssigneeOptions(TUM_KULLANICILAR);
-      }
-      setTimeout(() => (durum.textContent = ""), 2500);
-    });
-  });
-
-  // Admin, bir üyenin Ad/Soyadını doğrudan tablodan (ayrı ayrı) düzenleyip
-  // kaydedebilir. change/blur'da kaydediyoruz (her tuş vuruşunda değil).
-  // NOT: full_name'e artık hiçbir yerden YAZILMIYOR — o kolon
-  // first_name+last_name'den otomatik (generated) türetiliyor, bu isteğin
-  // dördüncü maddesi ("her yerde otomatik değişsin") tam olarak bunu
-  // sağlıyor: admin burada değiştirsin ya da kullanıcı kendi panelinden
-  // değiştirsin, full_name (ve dolayısıyla arama/gösterim) her yerde aynı
-  // anda güncel olur.
-  tbody.querySelectorAll(".admin-isim-input").forEach((input) => {
-    input.addEventListener("change", async () => {
-      const userId = input.dataset.id;
-      const alan = input.dataset.alan; // "first_name" | "last_name"
-      const deger = input.value.trim();
-      const durum = tbody.querySelector(`.rol-durum[data-id="${userId}"]`);
-
-      const { error } = await supabase
-        .from("profiles")
-        .update({ [alan]: deger || null })
-        .eq("id", userId);
-
-      if (durum) {
-        durum.textContent = error ? "Hata!" : "Kaydedildi ✓";
-        durum.className = error ? "rol-durum rol-durum--hata" : "rol-durum rol-durum--ok";
-        setTimeout(() => (durum.textContent = ""), 2500);
-      }
-      if (error) {
-        console.error("İsim güncellenemedi:", error);
-        return;
-      }
-      const kullanici = TUM_KULLANICILAR.find((u) => u.id === userId);
-      if (kullanici) {
-        kullanici[alan] = deger || null;
-        kullanici.full_name = [kullanici.first_name, kullanici.last_name].filter(Boolean).join(" ");
-      }
-    });
-  });
-
-  tbody.querySelectorAll(".uye-sil-btn").forEach((btn) => {
-    btn.addEventListener("click", () => uyeyiSil(btn.dataset.id, btn.dataset.email));
-  });
-
-  tbody.querySelectorAll(".eposta-degistir-btn").forEach((btn) => {
-    btn.addEventListener("click", () =>
-      adminEpostaKutusunuAc({ id: btn.dataset.id, email: btn.dataset.email, isim: btn.dataset.isim })
-    );
-  });
-}
-
-async function uyeyiSil(userId, email) {
-  if (!confirm(`${email} adlı üyeyi ve TÜM verilerini kalıcı olarak silmek istediğine emin misin? Bu işlem geri alınamaz.`)) {
-    return;
-  }
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  try {
-    const res = await fetch(DELETE_ACCOUNT_FUNCTION_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ hedef_kullanici_id: userId }),
-    });
-    const body = await res.json();
-    if (!res.ok) throw new Error(body.error || "Bilinmeyen hata");
-
-    TUM_KULLANICILAR = TUM_KULLANICILAR.filter((u) => u.id !== userId);
-    renderUserTable(TUM_KULLANICILAR);
-    renderContentAssigneeOptions(TUM_KULLANICILAR);
-  } catch (err) {
-    alert("Üye silinemedi: " + err.message);
-  }
-}
-
-/* ---------------------------------------------------------------------- */
-/* ADMİN'İN BİR ÜYENİN E-POSTASINI DEĞİŞTİRMESİ (ANINDA — MAİL BEKLEMEDEN) */
-/* Kullanıcının kendi panelindeki "E-posta Değiştir" ÇİFT onay ister (bkz. */
-/* panel.js); eski mailine erişimi kalmamış kullanıcılar için bu, admin    */
-/* panelinden açılan yedek yoldur — Edge Function admin-change-email,      */
-/* service_role ile email_confirm:true göndererek e-postayı HİÇBİR mail    */
-/* göndermeden anında değiştirir (bkz. o dosyadaki "DAVRANIŞ" notu — ilk   */
-/* sürümde "sadece yeni adrese mail gider" varsayılıyordu, bu yanlıştı).   */
-/* ---------------------------------------------------------------------- */
-function adminEpostaKutusunuAc({ id, email, isim }) {
-  const kutu = document.getElementById("admin-eposta-degistir-kutu");
-  const form = document.getElementById("admin-eposta-degistir-form");
-  const msg = document.getElementById("admin-eposta-message");
-  if (!kutu) return;
-
-  document.getElementById("admin-eposta-hedef-isim").textContent = `${isim} (${email})`;
-  document.getElementById("admin-eposta-hedef-id").value = id;
-  document.getElementById("admin-eposta-yeni").value = "";
-  if (msg) msg.hidden = true;
-  kutu.hidden = false;
-  kutu.scrollIntoView({ behavior: "smooth", block: "center" });
-  document.getElementById("admin-eposta-yeni")?.focus();
-}
-
-function wireAdminEmailChange() {
-  const form = document.getElementById("admin-eposta-degistir-form");
-  const iptalBtn = document.getElementById("admin-eposta-degistir-iptal-btn");
-  const kutu = document.getElementById("admin-eposta-degistir-kutu");
-  const msg = document.getElementById("admin-eposta-message");
-  if (!form) return;
-
-  iptalBtn?.addEventListener("click", () => {
-    kutu.hidden = true;
-  });
-
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const submitBtn = form.querySelector('button[type="submit"]');
-    const hedefId = document.getElementById("admin-eposta-hedef-id").value;
-    const yeniEposta = document.getElementById("admin-eposta-yeni").value.trim();
-
-    if (msg) msg.hidden = true;
-
-    if (!yeniEposta) {
-      showMessage(msg, "Yeni e-posta adresini gir.");
-      return;
-    }
-
-    submitBtn.disabled = true;
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      const res = await fetch(ADMIN_CHANGE_EMAIL_FUNCTION_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ hedef_kullanici_id: hedefId, yeni_eposta: yeniEposta }),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || "Bilinmeyen hata");
-
-      const oturumNotu = body.eski_oturumlar_sonlandirildi
-        ? "Kullanıcının eski oturumları sonlandırıldı, yeniden giriş yapması gerekecek."
-        : "Not: eski oturumlar sonlandırılamadı (bkz. konsol) — migration 0009'un çalıştırıldığından emin ol.";
-      const mailNotu = body.bildirim_maili_gonderildi
-        ? "Yeni adresine bilgilendirme e-postası gönderildi."
-        : "Not: bilgilendirme e-postası gönderilemedi (kullanıcıyı ayrıca haberdar etmek isteyebilirsin).";
-
-      showMessage(
-        msg,
-        `E-postası güncellendi: ${yeniEposta}. Hiçbir mail beklenmedi — değişiklik anında uygulandı. ${oturumNotu} ${mailNotu}`,
-        "success"
-      );
-
-      const kullanici = TUM_KULLANICILAR.find((u) => u.id === hedefId);
-      if (kullanici) kullanici.email = yeniEposta; // arayüzde de yansıt — değişiklik zaten kesinleşti (mail beklemiyor)
-    } catch (err) {
-      // fetch() Safari'de ağ/CORS hatalarında "Load failed", Chrome'da
-      // "Failed to fetch" mesajıyla TypeError fırlatır — bu durumda istek
-      // Edge Function'a HİÇ ULAŞMAMIŞ demektir (fonksiyonun kendi
-      // gövdesindeki hatalar buraya değil, yukarıdaki "body.error" dalına
-      // düşer). En sık nedenler: (1) fonksiyon henüz deploy edilmemiş,
-      // (2) ADMIN_CHANGE_EMAIL_FUNCTION_URL yanlış/eski proje referansını
-      // gösteriyor, (3) sitenin şu anki adresi Edge Function'daki
-      // ALLOWED_ORIGINS listesinde yok. Kullanıcıya (admin'e) genel
-      // "E-posta değiştirilemedi: Load failed" yerine bu üç ihtimali
-      // açıkça anlatıyoruz — bkz. README "admin-change-email 'Load
-      // failed' / CORS Hatası Alıyorum" bölümü.
-      const agHatasiMi = err instanceof TypeError;
-      showMessage(
-        msg,
-        agHatasiMi
-          ? `E-posta değiştirilemedi: sunucuya ulaşılamadı (${err.message}). Olası nedenler: Edge Function henüz deploy edilmemiş olabilir, ya da bu sitenin adresi fonksiyonun izin verilen listesinde olmayabilir (CORS). Bkz. README → "admin-change-email 'Load failed' Hatası Alıyorum".`
-          : "E-posta değiştirilemedi: " + err.message
-      );
-    } finally {
-      submitBtn.disabled = false;
-    }
-  });
 }
 
 /** Admin, kendi hesabını da (panelim sayfasındaki yolla aynı Edge Function
