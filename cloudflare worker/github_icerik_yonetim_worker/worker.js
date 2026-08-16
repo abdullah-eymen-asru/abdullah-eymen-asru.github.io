@@ -130,6 +130,17 @@ function frontMatterAlanlariniOku(ham) {
 }
 
 /**
+ * .gitkeep dosyalarının (front-matter TAŞIMAYAN, düz metin) içeriğinden
+ * "olusturan_id" satırını okur — bkz. assets/js/github-yonetim.js
+ * gitkeepIcerigiOlustur/gitkeepSahibiId (AYNI format, iki tarafta da
+ * bağımsız olarak okunuyor).
+ */
+function gitkeepSahipIdOku(ham) {
+  const m = ham.match(/^olusturan_id:\s*(.+)$/m);
+  return m ? m[1].trim() : null;
+}
+
+/**
  * Mevcut bir dosyanın front-matter'ı, kendisini düzenlemeye/silmeye
  * çalışan editor'e mi ait? Önce (varsa) GÜVENİLİR yazar_id alanı karşılaştırılır.
  * yazar_id hiç yoksa (bu alan eklenmeden ÖNCE yazılmış, çok eski bir dosya)
@@ -304,19 +315,25 @@ export default {
         //      kontrol uygulanmaz — yeni içerik zaten editor'ün kendisine
         //      ait olacaktır.
         // .gitkeep dosyaları (bkz. klasordekiGitkeepiTemizle/klasorBosaldiysaGitkeepEkle
-        // içinde github-yonetim.js) bir "yazar"a ait İÇERİK değil, boş klasörleri
-        // Git'te var etmek için konan teknik birer yer tutucudur — front-matter'ları
-        // (dolayısıyla yazar_id'leri) da yoktur, bu yüzden sahiplik kontrolünün
-        // DIŞINDA tutuluyorlar (aksi hâlde bir editor, kendi yeni içeriğini
-        // eklerken klasördeki .gitkeep'i temizleyemezdi).
+        // ve klasorOlustur/klasorSil içinde github-yonetim.js) içerik front-matter'ı
+        // TAŞIMAZ — bir yazının/projenin sahipliği yerine bir KLASÖRÜN sahipliğini
+        // (kim oluşturdu) gösterir ve düz metinde "olusturan_id: <uuid>" satırı
+        // olarak tutulur (bkz. gitkeepIcerigiOlustur). Bu yüzden ayrı bir okuyucuyla
+        // (gitkeepSahipIdOku) kontrol ediliyor.
         const gitkeepDosyasiMi = hedefYol === ".gitkeep" || hedefYol.endsWith("/.gitkeep");
-        if (!gitkeepDosyasiMi && rol === "editor" && (request.method === "PUT" || request.method === "DELETE")) {
+        if (rol === "editor" && (request.method === "PUT" || request.method === "DELETE")) {
           const mevcutDosya = await githubDosyaOku(env, hedefYol);
           if (mevcutDosya) {
-            const mevcutFrontMatter = frontMatterAlanlariniOku(mevcutDosya);
-            const sahipUyusuyorMu = editorSahibiMi(mevcutFrontMatter, userId, kullaniciAdi, kullaniciEmail);
+            const sahipUyusuyorMu = gitkeepDosyasiMi
+              ? gitkeepSahipIdOku(mevcutDosya) === userId
+              : editorSahibiMi(frontMatterAlanlariniOku(mevcutDosya), userId, kullaniciAdi, kullaniciEmail);
             if (!sahipUyusuyorMu) {
-              return jsonHata("Bu içeriği düzenleme/silme yetkin yok — başka bir yazara ait.", 403);
+              return jsonHata(
+                gitkeepDosyasiMi
+                  ? "Bu klasörü sadece oluşturan kişi silebilir."
+                  : "Bu içeriği düzenleme/silme yetkin yok — başka bir yazara ait.",
+                403
+              );
             }
           }
         }
