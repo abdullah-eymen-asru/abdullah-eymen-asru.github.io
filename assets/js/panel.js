@@ -11,7 +11,10 @@
  */
 import { supabase, showMessage, showSpamNotice, escapeHtml, turkceOtpHatasi, KVKK_METIN_SURUMU } from "./supabase-client.js";
 import { requireAuth } from "./auth-guard.js";
-import { wireUserChat } from "./chat.js";
+// NOT (TAŞINDI): Mesajlaşma (wireUserChat) artık bu sayfada değil — bkz.
+// panel/mesajlar.md + assets/js/mesajlar.js. "Yöneticiyle Mesajlaş" linki
+// artık doğrudan o sayfaya gider (bkz. panel.md), bu yüzden
+// wireEpostaYardimMesajLink() de kaldırıldı.
 
 const DELETE_ACCOUNT_FUNCTION_URL =
   "https://eahvcirspmvntffzphye.supabase.co/functions/v1/delete-account";
@@ -48,8 +51,6 @@ async function init() {
     ["KVKK", () => wireKvkk(profile)],
     ["2FA", () => wireMfa()],
     ["özel içerikler", () => loadOzelIcerikler()],
-    ["mesajlaşma", () => wireUserChat(profile)],
-    ["yöneticiyle mesajlaş linki", () => wireEpostaYardimMesajLink()],
   ];
 
   for (const [ad, fn] of adimlar) {
@@ -1167,32 +1168,6 @@ async function loadOzelIcerikler() {
       </a>`;
     })
     .join("");
-}
-
-/** "Eski Mailime Erişemiyorum" kutusundaki "Yöneticiyle Mesajlaş" linkine
- * tıklanınca, native anchor scroll'un (href="#chat-kullanici") ardından bir
- * sohbete odaklan — kullanıcı direkt yazmaya başlayabilsin. Artık mesajlar
- * çok-sohbetli olduğu için tek bir sabit metin kutusu yok: varsa EN SON
- * konuşmayı otomatik seçip mesaj alanına odaklanıyoruz; hiç sohbeti yoksa
- * "Yeni Sohbet" formunu açıp konuyu otomatik dolduruyoruz. */
-function wireEpostaYardimMesajLink() {
-  document.getElementById("eposta-yardim-mesaj-link")?.addEventListener("click", () => {
-    setTimeout(() => {
-      const ilkKonusma = document.querySelector("#chat-konusma-liste .msg-konusma-item");
-      if (ilkKonusma) {
-        ilkKonusma.click();
-        setTimeout(() => document.getElementById("chat-metin")?.focus(), 250);
-        return;
-      }
-      const yeniBtn = document.getElementById("chat-yeni-sohbet-btn");
-      const konuInput = document.getElementById("chat-yeni-sohbet-konu");
-      if (yeniBtn && konuInput) {
-        yeniBtn.click();
-        if (!konuInput.value) konuInput.value = "Eski e-postama erişemiyorum";
-        konuInput.focus();
-      }
-    }, 400);
-  });
 }
 
 function wireLogout() {
