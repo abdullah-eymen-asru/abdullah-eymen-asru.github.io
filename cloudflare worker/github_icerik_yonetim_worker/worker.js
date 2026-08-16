@@ -160,6 +160,147 @@ function editorSahibiMi(frontMatterAlanlari, userId, kullaniciAdi, kullaniciEmai
   return adaylar.includes(yazar);
 }
 
+/**
+ * TEK İSTEKLİ PANEL BAŞLANGIÇ UÇ NOKTASI — GET /panel-init
+ * -----------------------------------------------------------------------
+ * NEDEN: Panel (assets/js/github-yonetim.js) açılışta ayrı ayrı "bağlantı
+ * testi", "klasör listesi", "her klasörün içeriği", "her yazının/projenin
+ * front-matter'ı", "profil fotoğrafı durumu" için GitHub Contents API'sine
+ * DÜZİNELERCE ayrı istek atıyordu — bunların HER BİRİ bu Worker'a ayrı bir
+ * client isteği demekti, yani Cloudflare Workers'ın günlük istek kotasını
+ * (Free plan: 100.000/gün) sayfa her açıldığında/yenilendiğinde hızla
+ * tüketiyordu. Bu fonksiyon aynı veriyi TEK bir client isteğinde toplar:
+ * Worker kendi İÇİNDE (Cloudflare'ın "subrequest" limitine tabi, günlük
+ * istek KOTASINA DEĞİL) GitHub'a paralel istekler atar, sonucu TEK bir
+ * JSON gövdede birleştirip döner. Client artık sayfa açılışında SADECE bu
+ * uç noktayı çağırıyor (bkz. github-yonetim.js panelVerisiniYukle) — kota
+ * tüketimi kullanıcı başına, sayfa/yenileme başına 1 isteğe iner.
+ *
+ * GÜVENLİK: Bu uç nokta da diğerleri gibi kimlik+rol kontrolünden SONRA
+ * çalışır (çağıran fetch() içindeki 1-3. adımlar). assets//_config.yml
+ * (profil fotoğrafı + site yapılandırması) SADECE admin'e döner — editor/
+ * manager için `config` ve `profilFoto` alanları hep `null`'dur, tıpkı bu
+ * yolların /contents/ uç noktasında admin dışına tamamen kapalı olması
+ * gibi (bkz. yukarıdaki "yalnizAdminYolu" kontrolü) — sadece burada SUNUCU
+ * o veriyi hiç ÇEKMEDİĞİ için (client'a hiç gitmediği için) aynı sınır
+ * korunmuş oluyor.
+ */
+async function panelBaslangicVerisiGetir(env, branch, rol) {
+  const ghBasligi = {
+    Authorization: `token ${env.GITHUB_PAT}`,
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "User-Agent": "abdullah-eymen-asru-github-icerik-worker",
+  };
+  const cfSecenek = { cf: { cacheTtl: 0, cacheEverything: false } };
+  const ghYolu = (yol) => {
+    const q = branch ? `?ref=${encodeURIComponent(branch)}` : "";
+    return `${GITHUB_API}/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}${yol}${q}`;
+  };
+  /** GET atar; 404'ü de "hata değil, veri yok" (data: null) olarak döner —
+   * tek bir eksik dosya/klasör TÜM toplu isteği çökertmesin diye. */
+  const ghAl = async (yol) => {
+    try {
+      const res = await fetch(ghYolu(yol), { headers: ghBasligi, ...cfSecenek });
+      if (res.status === 404) return null;
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (_err) {
+      return null;
+    }
+  };
+  const yolKodla = (yol) => yol.split("/").map(encodeURIComponent).join("/");
+
+  /** Bir kök koleksiyonu ("_posts" ya da "_projects") tek seferde işler:
+   * alt klasörleri, her alt klasördeki .md dosyalarını (kök dahil), boş
+   * klasörlerin .gitkeep sahiplerini VE her .md dosyasının GERÇEK
+   * içeriğini (front-matter ayrıştırması client'ta yapılacak) paralel
+   * olarak toplar. */
+  const koleksiyonuIsle = async (kokKlasor) => {
+    const kokIcerik = await ghAl(`/contents/${kokKlasor}`);
+    const liste = Array.isArray(kokIcerik) ? kokIcerik : [];
+    const altKlasorler = liste.filter((f) => f.type === "dir");
+    const kokDosyalar = liste.filter((f) => f.type === "file" && f.name.endsWith(".md"));
+
+    const altIcerikler = await Promise.all(altKlasorler.map((k) => ghAl(`/contents/${yolKodla(k.path)}`)));
+
+    const klasorler = [];
+    const altDosyalar = [];
+    altKlasorler.forEach((k, i) => {
+      const icerik = Array.isArray(altIcerikler[i]) ? altIcerikler[i] : [];
+      const gercekDosyalar = icerik.filter((f) => f.type === "file" && f.name !== ".gitkeep");
+      icerik.filter((f) => f.type === "file" && f.name.endsWith(".md")).forEach((f) => altDosyalar.push(f));
+      klasorler.push({ name: k.name, path: k.path, dosyaSayisi: gercekDosyalar.length, sahipId: null, _bosMu: gercekDosyalar.length === 0 });
+    });
+
+    // Sadece BOŞ klasörler için .gitkeep içeriğini ayrıca oku (kim
+    // oluşturmuş — editor'ün kendi silme yetkisi için, bkz. dosya başı).
+    const bosKlasorler = klasorler.filter((k) => k._bosMu);
+    const gitkeepIcerikleri = await Promise.all(bosKlasorler.map((k) => ghAl(`/contents/${yolKodla(k.path)}/.gitkeep`)));
+    bosKlasorler.forEach((k, i) => {
+      const veri = gitkeepIcerikleri[i];
+      if (veri && typeof veri.content === "string") {
+        k.sahipId = gitkeepSahipIdOku(atob(veri.content.replace(/\n/g, "")));
+      }
+      delete k._bosMu;
+    });
+
+    const tumMdDosyalari = [...kokDosyalar, ...altDosyalar];
+    const detaylar = await Promise.all(tumMdDosyalari.map((f) => ghAl(`/contents/${yolKodla(f.path)}`)));
+    const dosyalar = tumMdDosyalari.map((f, i) => ({
+      path: f.path,
+      name: f.name,
+      sha: detaylar[i]?.sha || f.sha,
+      content: typeof detaylar[i]?.content === "string" ? detaylar[i].content : null,
+    }));
+
+    return { klasorler, dosyalar };
+  };
+
+  const [repo, posts, projects] = await Promise.all([
+    ghAl(""),
+    koleksiyonuIsle("_posts"),
+    koleksiyonuIsle("_projects"),
+  ]);
+
+  // assets/ ve _config.yml SADECE admin'e — bkz. dosya başı GÜVENLİK notu.
+  let config = null;
+  let profilFoto = null;
+  if (rol === "admin") {
+    const configVerisi = await ghAl(`/contents/${CONFIG_YOLU_SABIT}`);
+    if (configVerisi && typeof configVerisi.content === "string") {
+      config = { path: CONFIG_YOLU_SABIT, sha: configVerisi.sha, content: configVerisi.content };
+      const configIcerik = new TextDecoder("utf-8").decode(
+        Uint8Array.from(atob(configVerisi.content.replace(/\n/g, "")), (c) => c.charCodeAt(0))
+      );
+      const eslesme = configIcerik.match(PROFIL_IMAGE_SATIR_REGEX_WORKER);
+      let yol = null;
+      if (eslesme) {
+        const deger = (eslesme[1] || "").trim().replace(/^["']|["']$/g, "").trim();
+        if (deger) yol = deger.replace(/^\/+/, "");
+      }
+      if (yol) {
+        const fotoVerisi = await ghAl(`/contents/${yolKodla(yol)}`);
+        profilFoto = fotoVerisi
+          ? { path: yol, sha: fotoVerisi.sha, content: fotoVerisi.content, download_url: fotoVerisi.download_url || null }
+          : { path: yol, sha: null, content: null, download_url: null };
+      }
+    }
+  }
+
+  return {
+    repo: repo ? { full_name: repo.full_name, default_branch: repo.default_branch, permissions: repo.permissions } : null,
+    config,
+    profilFoto,
+    koleksiyonlar: { _posts: posts, _projects: projects },
+  };
+}
+
+// github-yonetim.js'teki PROFIL_IMAGE_SATIR_REGEX ile AYNI — sadece _config.yml
+// içindeki profile_image satırını bulmak için, panelBaslangicVerisiGetir'de kullanılır.
+const PROFIL_IMAGE_SATIR_REGEX_WORKER = /^profile_image:[ \t]*("[^"]*"|'[^']*'|[^#\r\n]*?)?[ \t]*(#.*)?$/m;
+const CONFIG_YOLU_SABIT = "_config.yml";
+
 export default {
   async fetch(request, env) {
     const origin = request.headers.get("Origin") || request.headers.get("Referer") || "";
@@ -259,6 +400,26 @@ export default {
     const icerikYoneticisiMi = rol === "editor" || rol === "manager" || rol === "admin";
     if (!icerikYoneticisiMi) {
       return jsonHata("Bu işlem için yetkin yok.", 403);
+    }
+
+    // 3.5 TEK İSTEKLİ TOPLU UÇ NOKTA — bkz. panelBaslangicVerisiGetir başındaki
+    //     mimari notu. Diğer /contents/... akışından TAMAMEN ayrı: GitHub'a
+    //     kendi içinde birden çok paralel istek atıp SONUCU TEK bir JSON'da
+    //     birleştirerek döner, böylece client sayfa açılışında/yenilemede bu
+    //     Worker'a sadece BİR istek atmış olur.
+    const urlOnKontrol = new URL(request.url);
+    if (urlOnKontrol.pathname === "/panel-init") {
+      if (request.method !== "GET") return jsonHata("Bu uç nokta sadece GET destekler.", 405);
+      try {
+        const branch = urlOnKontrol.searchParams.get("ref") || "";
+        const veri = await panelBaslangicVerisiGetir(env, branch, rol);
+        return new Response(JSON.stringify(veri), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (err) {
+        return jsonHata("Panel verisi alınamadı: " + err.message, 502);
+      }
     }
 
     // 4. YOL (PATH) KISITLARI — bkz. dosya başındaki mimari notu. `path`,
