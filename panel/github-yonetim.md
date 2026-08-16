@@ -10,16 +10,14 @@ permalink: "/panel/github-yonetim.html"
 
 <div class="loading-overlay" id="loading">Yükleniyor...</div>
 
-<div id="app" hidden
-     data-default-owner="{{ site.github_username }}"
-     data-default-repo="{{ site.github_username }}.github.io">
+<div id="app" hidden>
   <h1>GitHub İçerik Yönetimi</h1>
   <p class="muted">
     Bu panel, blog yazılarını ve akademik projeleri doğrudan bu GitHub deponuza
     (<code>_posts/</code> ve <code>_projects/</code>) commit ederek yayınlamanı
-    sağlar — 3. parti bir servis gerektirmez, doğrudan GitHub REST API'sini
-    kullanır. Üstteki Supabase tabanlı "Admin Paneli"nden tamamen bağımsız
-    çalışır; sadece sana (yöneticiye) özeldir.
+    sağlar — 3. parti bir servis gerektirmez. GitHub'a DOĞRUDAN değil, bir
+    Cloudflare Worker üzerinden konuşur (bkz. "GitHub Bağlantısı" sekmesi);
+    üstteki Supabase tabanlı "Admin Paneli"nden tamamen bağımsız çalışır.
   </p>
 
   <nav id="gy-nav" class="admin-tabs">
@@ -35,34 +33,18 @@ permalink: "/panel/github-yonetim.html"
       <section id="baglanti" class="panel-section">
         <h2>GitHub Bağlantısı</h2>
         <p class="muted">
-          Token yalnızca bu sekme açıkken tarayıcının belleğinde tutulur;
-          sayfayı yenilediğinde veya sekmeyi kapattığında otomatik olarak
-          silinir — hiçbir yerde (localStorage dahil) saklanmaz, bu yüzden
-          panele her girişte yeniden yapıştırman gerekir. Kullanıcı adı ve
-          repo adı gizli olmadığından, kolaylık için tarayıcında hatırlanır.
+          GitHub kullanıcı adı, repo adı ve yazma yetkisi olan token artık bu
+          panelde YOK — hiçbiri tarayıcına hiç girmiyor. Bunun yerine sitenin
+          Cloudflare Worker'ı (token'ı kendi sunucu-tarafı gizli anahtarı
+          olarak tutar) senin zaten sahip olduğun bu oturumu doğrulayıp
+          GitHub'a onun adına yazıyor — yani bağlantı otomatik kurulur, elle
+          bir şey yapıştırman gerekmez. Aşağıdaki durum mesajı sayfa
+          açıldığında kendiliğinden güncellenir; sorun yaşarsan butonla
+          tekrar deneyebilirsin.
         </p>
-        <div class="form-field">
-          <label for="gh-owner">GitHub Kullanıcı Adı</label>
-          <input id="gh-owner" type="text" placeholder="kullanici-adi" autocomplete="off">
-        </div>
-        <div class="form-field">
-          <label for="gh-repo">Repository Adı</label>
-          <input id="gh-repo" type="text" placeholder="kullanici-adi.github.io" autocomplete="off">
-        </div>
         <div class="form-field">
           <label for="gh-branch">Branch (opsiyonel — boş bırakılırsa reponun varsayılan branch'i kullanılır)</label>
           <input id="gh-branch" type="text" placeholder="main" autocomplete="off">
-        </div>
-        <div class="form-field">
-          <label for="gh-pat">GitHub Personal Access Token (PAT)</label>
-          <input id="gh-pat" type="password" autocomplete="off" placeholder="github_pat_xxxxxxxxxxxx">
-          <p class="muted" style="margin:4px 0 0;font-size:0.85rem;">
-            Fine-grained bir token oluşturup <strong>sadece bu repo</strong>
-            için <code>Contents: Read and write</code> iznini vermen yeterli
-            ve daha güvenli — tüm hesaba erişen "classic" token yerine bunu
-            tercih et.
-            <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Token oluştur →</a>
-          </p>
         </div>
         <button id="gh-baglan-btn" type="button" class="btn-primary" style="width:auto;">Bağlantıyı Doğrula</button>
         <div id="gh-baglanti-message" class="auth-message" hidden></div>
