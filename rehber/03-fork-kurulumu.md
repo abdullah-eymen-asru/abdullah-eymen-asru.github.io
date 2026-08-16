@@ -84,7 +84,7 @@ Aşağıdaki her blok bağımsızdır — sadece istemediğini sil, geri kalanı
 **Supabase kullanıcı sistemini (kayıt/giriş/panel/admin) kaldırmak istersen:**
 - `hesap/giris.md`, `hesap/kayit.md`, `hesap/sifremi-unuttum.md`, `hesap/sifre-guncelle.md`,
   `hesap/hesap-onayla.md`, `panel/panel.md`, `panel/admin.md`, `panel/ozel-icerik.md` dosyalarını sil
-- `assets/js/supabase-client.js`, `auth-guard.js`, `auth-pages.js`,
+- `assets/js/core/supabase-client.js`, `auth-guard.js`, `auth-pages.js`,
   `panel.js`, `admin.js`, `ozel-icerik.js`, `nav-auth.js` ve
   `assets/css/auth.css` dosyalarını sil
 - `supabase/` klasörünü (migrations + functions) tamamen sil
