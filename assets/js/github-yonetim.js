@@ -98,7 +98,7 @@ import { escapeHtml, showMessage, supabase } from "./supabase-client.js";
 // ---- BURAYI DOLDUR: Worker deploy edildikten sonra aldığın URL ----
 // ör. "https://github-icerik-worker.KULLANICI-ADIN.workers.dev"
 // veya kendi domainine bağladıysan (Custom Domain) o adres.
-const GITHUB_PROXY_WORKER_URL = "https://github-icerik-worker.aeymena.workers.dev";
+const GITHUB_PROXY_WORKER_URL = "https://github-icerik-yonetim.aeymena.workers.dev";
 // ---------------------------------------------------------------------
 // Profil fotoğrafının GERÇEK yolu artık sabit kodlanmıyor: her zaman
 // _config.yml içindeki `profile_image` alanından okunur. Böylece dosya
