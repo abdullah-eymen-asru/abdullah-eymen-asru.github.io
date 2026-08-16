@@ -31,6 +31,6 @@ permalink: "/hesap/hesap-onayla.html"
 </div>
 
 <script type="module">
-  import { initHesapOnaylaPage } from "{{ '/assets/js/auth-pages.js' | relative_url }}";
+  import { initHesapOnaylaPage } from "{{ '/assets/js/auth/auth-pages.js' | relative_url }}";
   initHesapOnaylaPage();
 </script>
