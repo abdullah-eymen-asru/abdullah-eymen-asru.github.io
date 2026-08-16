@@ -95,6 +95,18 @@ function renderHesapMenusu(container, role) {
   menu.hidden = true;
 
   const linkler = [{ href: "/panel/panel.html", etiket: "Panelim" }];
+  // Sohbet/Mesajlar artık ayrı, ortak bir sayfa (bkz. panel/mesajlar.md) —
+  // giriş yapmış HERKES görür: admin için o sayfa gelen kutusunu, diğer
+  // herkes için kendi yöneticiyle sohbet ekranını açar (karar
+  // assets/js/mesajlar.js içinde, role'e göre çalışma zamanında verilir).
+  linkler.push({ href: "/panel/mesajlar.html", etiket: "Sohbet / Mesajlar" });
+  // Üye Ayarları (eski "Kullanıcılar & Roller") artık ayrı bir sayfa (bkz.
+  // panel/uye-ayarlari.md) ve SADECE admin'e açık — manager (İçerik
+  // Sorumlusu) bu linki hiç görmez, doğrudan URL'yi yazsa bile o sayfanın
+  // kendi requireAuth({role:'admin'}) kontrolü onu geri gönderir.
+  if (role === "admin") {
+    linkler.push({ href: "/panel/uye-ayarlari.html", etiket: "Üye Ayarları" });
+  }
   // 'manager' (panelde "İçerik Sorumlusu") de admin paneline girebiliyor —
   // ama SADECE "Özel İçerik Ekle/Düzenle", "Mevcut Özel İçerikler" ve
   // "R2 Dosya Paylaşımı" sekmelerine (bkz. admin.js, panel/admin.md).
