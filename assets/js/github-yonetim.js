@@ -795,6 +795,27 @@ function wireKlasorYonetimi() {
  */
 const GITKEEP_ICERIK = "Bu dosya, GitHub'da boş klasörlerin var olabilmesi için buradadır. Silme.\n";
 
+/**
+ * .gitkeep dosyasının içeriğini, klasörü (yeniden) oluşturan kişinin
+ * kimliğini de taşıyacak şekilde üretir — TEK amacı, editor rolünün
+ * SADECE KENDİ oluşturduğu boş klasörleri silebilmesini sağlamaktır (bkz.
+ * klasorKartiCiz / klasorSil ve Worker'daki karşılığı). Bu bilgi olmadan
+ * (ör. bu değişiklikten ÖNCE oluşturulmuş eski .gitkeep dosyalarında)
+ * sahip bilinmiyor sayılır ve editor için silme varsayılan olarak
+ * KAPALI kalır (bkz. gitkeepSahibiId).
+ */
+function gitkeepIcerigiOlustur(sahipId) {
+  const satirlar = [GITKEEP_ICERIK.trimEnd()];
+  if (sahipId) satirlar.push(`olusturan_id: ${sahipId}`);
+  return satirlar.join("\n") + "\n";
+}
+
+/** Bir .gitkeep dosyasının düz metin içeriğinden "olusturan_id" değerini okur (yoksa null). */
+function gitkeepSahibiId(icerikMetni) {
+  const m = (icerikMetni || "").match(/^olusturan_id:\s*(.+)$/m);
+  return m ? m[1].trim() : null;
+}
+
 async function klasorOlustur() {
   const msgEl = document.getElementById("kl-message");
   const input = document.getElementById("kl-yeni-ad");
@@ -816,7 +837,11 @@ async function klasorOlustur() {
       showMessage(msgEl, `"${kokKlasor}/${ad}/" klasörü zaten var.`, "error");
       return;
     }
-    await ghPutFile(`${kokKlasor}/${ad}/.gitkeep`, b64Encode(GITKEEP_ICERIK), `Klasör oluşturuldu: ${kokKlasor}/${ad}/`);
+    await ghPutFile(
+      `${kokKlasor}/${ad}/.gitkeep`,
+      b64Encode(gitkeepIcerigiOlustur(GIRIS_YAPAN_PROFIL?.id)),
+      `Klasör oluşturuldu: ${kokKlasor}/${ad}/`
+    );
     input.value = "";
     showMessage(msgEl, `"${kokKlasor}/${ad}/" klasörü oluşturuldu.`, "success");
     await klasorListesiYukle();
@@ -848,12 +873,20 @@ async function klasorListesiYukle() {
     }
 
     // Her klasörün içindeki dosya sayısını (.gitkeep hariç) ayrıca çekmek
-    // gerekiyor, aksi halde "silinebilir mi" bilgisini gösteremeyiz.
+    // gerekiyor, aksi halde "silinebilir mi" bilgisini gösteremeyiz. Boş
+    // olan klasörler için ayrıca .gitkeep içeriğini de okuyup "kim
+    // oluşturmuş" bilgisini (sahipId) çıkarıyoruz — SADECE editor rolünün
+    // silme butonunu doğru kısıtlayabilmek için (bkz. klasorKartiCiz).
     const detaylar = await Promise.all(
       altKlasorler.map(async (klasor) => {
         const icerik = await ghGetContents(klasor.path).catch(() => []);
         const dosyalar = (icerik || []).filter((f) => f.type === "file" && f.name !== ".gitkeep");
-        return { ad: klasor.name, path: klasor.path, dosyaSayisi: dosyalar.length, kokKlasor };
+        let sahipId = null;
+        if (dosyalar.length === 0 && GIRIS_YAPAN_PROFIL?.role === "editor") {
+          const gitkeep = await ghGetContents(`${klasor.path}/.gitkeep`).catch(() => null);
+          if (gitkeep?.content) sahipId = gitkeepSahibiId(b64Decode(gitkeep.content.replace(/\n/g, "")));
+        }
+        return { ad: klasor.name, path: klasor.path, dosyaSayisi: dosyalar.length, kokKlasor, sahipId };
       })
     );
 
@@ -869,7 +902,20 @@ async function klasorListesiYukle() {
 function klasorKartiCiz(k) {
   const kart = document.createElement("div");
   kart.className = "gy-klasor-kart";
-  const silDevreDisi = k.dosyaSayisi > 0;
+  const dolu = k.dosyaSayisi > 0;
+  // editor rolü SADECE kendi oluşturduğu boş klasörleri silebilir; içerik
+  // sorumlusunun (manager) ya da admin'in oluşturduğu (ya da sahibi
+  // bilinmeyen, bu değişiklikten ÖNCE oluşturulmuş) boş klasörleri silemez.
+  // Gerçek sınır Worker'dadır (bkz. cloudflare worker/
+  // github_icerik_yonetim_worker/worker.js), burası sadece butonu önceden
+  // gizleyen bir kolaylık katmanı. manager/admin bu kısıttan etkilenmez.
+  const editorBaskasininKlasoruMu = GIRIS_YAPAN_PROFIL?.role === "editor" && k.sahipId !== GIRIS_YAPAN_PROFIL?.id;
+  const silDevreDisi = dolu || editorBaskasininKlasoruMu;
+  const silBaslik = dolu
+    ? "Önce içindeki dosyaları başka bir klasöre taşı ya da sil"
+    : editorBaskasininKlasoruMu
+    ? "Bu klasörü sadece oluşturan kişi (içerik sorumlusu/admin) silebilir"
+    : "";
   kart.innerHTML = `
     <div class="gy-klasor-kart-bilgi">
       <div class="gy-klasor-kart-baslik">📁 ${escapeHtml(k.kokKlasor)}/${escapeHtml(k.ad)}/</div>
@@ -877,9 +923,7 @@ function klasorKartiCiz(k) {
     </div>
     <div class="gy-klasor-kart-aksiyonlar">
       <button type="button" class="gy-klasor-yenidenadlandir-btn">Yeniden Adlandır</button>
-      <button type="button" class="gy-klasor-sil-btn" ${silDevreDisi ? "disabled" : ""} title="${
-    silDevreDisi ? "Önce içindeki dosyaları başka bir klasöre taşı ya da sil" : ""
-  }">Sil</button>
+      <button type="button" class="gy-klasor-sil-btn" ${silDevreDisi ? "disabled" : ""} title="${silBaslik}">Sil</button>
     </div>
   `;
   kart.querySelector(".gy-klasor-yenidenadlandir-btn").addEventListener("click", () => klasorYenidenAdlandir(k));
@@ -952,10 +996,16 @@ async function klasorYenidenAdlandir(k) {
   }
 }
 
-/** Sadece .gitkeep içeren (yani gerçekte BOŞ olan) bir klasörü siler. Doluysa buton zaten devre dışı bırakılmıştır ama yine de burada da kontrol edilir. */
+/** Sadece .gitkeep içeren (yani gerçekte BOŞ olan) bir klasörü siler. Doluysa VEYA
+ * (editor rolü için) başkasının oluşturduğu bir klasörse buton zaten devre dışı
+ * bırakılmıştır ama yine de burada da kontrol edilir (asıl sınır Worker'dadır). */
 async function klasorSil(k) {
   const msgEl = document.getElementById("kl-message");
   msgEl.hidden = true;
+  if (GIRIS_YAPAN_PROFIL?.role === "editor" && k.sahipId !== GIRIS_YAPAN_PROFIL?.id) {
+    showMessage(msgEl, "Bu klasörü sadece oluşturan kişi silebilir.", "error");
+    return;
+  }
   if (!confirm(`"${k.kokKlasor}/${k.ad}/" klasörü silinsin mi? Bu işlem geri alınamaz.`)) return;
   try {
     const icerik = await ghGetContents(k.path);
@@ -1323,7 +1373,9 @@ async function klasordekiGitkeepiTemizle(klasorYolu) {
   }
 }
 
-/** Bir dosya silindikten sonra klasörde başka hiç gerçek dosya kalmadıysa, klasörü korumak için .gitkeep geri ekler. */
+/** Bir dosya silindikten sonra klasörde başka hiç gerçek dosya kalmadıysa, klasörü korumak için .gitkeep geri ekler.
+ * Bu, klasörü fiilen (yeniden) boş hâle getiren kişinin "olusturan_id" olarak
+ * kaydedilmesi anlamına gelir — bkz. gitkeepIcerigiOlustur/klasorKartiCiz. */
 async function klasorBosaldiysaGitkeepEkle(klasorYolu) {
   try {
     const icerik = await ghGetContents(klasorYolu);
@@ -1331,7 +1383,11 @@ async function klasorBosaldiysaGitkeepEkle(klasorYolu) {
     if (!gercekVarMi) {
       const zatenVarMi = Array.isArray(icerik) && icerik.some((f) => f.name === ".gitkeep");
       if (!zatenVarMi) {
-        await ghPutFile(`${klasorYolu}/.gitkeep`, b64Encode(GITKEEP_ICERIK), `Klasör boşaldı, .gitkeep geri eklendi: ${klasorYolu}/`);
+        await ghPutFile(
+          `${klasorYolu}/.gitkeep`,
+          b64Encode(gitkeepIcerigiOlustur(GIRIS_YAPAN_PROFIL?.id)),
+          `Klasör boşaldı, .gitkeep geri eklendi: ${klasorYolu}/`
+        );
       }
     }
   } catch (err) {
