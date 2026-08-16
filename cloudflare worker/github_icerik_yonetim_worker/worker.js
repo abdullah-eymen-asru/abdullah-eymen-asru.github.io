@@ -178,8 +178,19 @@ export default {
         return jsonHata("Geçersiz yol.", 400);
       }
 
-      const icerikYolu = hedefYol.startsWith("_posts/") || hedefYol.startsWith("_projects/");
-      const yalnizAdminYolu = hedefYol.startsWith("assets/") || hedefYol === "_config.yml";
+      // NOT: "_posts"/"_projects" KÖK klasörünün KENDİSİ de listelenebiliyor
+      // olmalı (ör. klasorListesiYukle() -> ghGetContents("_posts")) — bu
+      // durumda hedefYol'un SONUNDA "/" yok, sadece "_posts/2026" gibi ALT
+      // yollarda var. Sadece startsWith("_posts/") kontrolü kök klasörün
+      // TAM ADINI (trailing slash'sız) reddediyordu, bu da "Klasörler" ve
+      // "Mevcut İçerikler" listelerinin sessizce boş görünmesine yol
+      // açıyordu (client'taki .catch(() => []) hatayı yutuyor) — düzeltildi.
+      const icerikYolu =
+        hedefYol === "_posts" ||
+        hedefYol.startsWith("_posts/") ||
+        hedefYol === "_projects" ||
+        hedefYol.startsWith("_projects/");
+      const yalnizAdminYolu = hedefYol === "assets" || hedefYol.startsWith("assets/") || hedefYol === "_config.yml";
 
       if (icerikYolu) {
         // editor/manager/admin — zaten icerikYoneticisiMi ile yukarıda kontrol edildi.
