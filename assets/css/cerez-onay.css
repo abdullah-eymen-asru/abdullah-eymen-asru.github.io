@@ -111,7 +111,7 @@
      (aşağıda) ayrıca yukarıdan aşağı küçülerek kapanır. "hidden"
      attribute'u display:none yaptığı için animasyonu JS tarafında
      bir "kapanıyor" sınıfıyla tetikleyip, geçiş bitince hidden
-     ekliyoruz (bkz. assets/js/cerez-onay.js -> panelKapat). */
+     ekliyoruz (bkz. assets/js/core/site-islemleri.js -> panelKapat). */
   opacity: 1;
   transition: opacity 0.18s ease;
 }
@@ -124,7 +124,7 @@
  * sayfa yüklenir yüklenmez (kullanıcı hiçbir butona basmadan) ekranda
  * beliriyordu. "display:none !important" ile bunu KESİN olarak
  * kapatıyoruz; JS zaten panelAc()'ta "hidden" attribute'unu kaldırıp
- * panelKapat()'ta geri ekliyor (bkz. assets/js/cerez-onay.js), burada
+ * panelKapat()'ta geri ekliyor (bkz. assets/js/core/site-islemleri.js), burada
  * sadece CSS'in bu attribute'a gerçekten uymasını garanti ediyoruz.
  */
 .cerez-panel-overlay[hidden] {
