@@ -456,6 +456,21 @@ erişemiyorum" bağlantısına tıklayıp doğru bir yedek kod girmek, hesaptaki
 `auth-pages.js` → `mfaKoduIste()`. Bu migration'ı da diğerleri gibi
 Supabase Dashboard → SQL Editor'den çalıştırman gerekiyor.
 
+**İçerik editörü kendi yazısı dışını göremez/düzenleyemez:**
+`supabase/migrations/0018_editor_sadece_kendi_icerigi.sql` — role='editor'
+artık `taslak_icerikler` tablosunda SADECE kendi oluşturduğu satırları
+görebilir/düzenleyebilir/silebilir; içerik sorumlusu (manager) ve admin'in
+gizli taslakları editöre hiç görünmez. manager ve admin bu kısıttan
+etkilenmez. GitHub'a commit edilmiş içerikler için AYNI kural hem panelde
+(`assets/js/github-yonetim.js`) hem de sunucu tarafında
+(`cloudflare worker/github_icerik_yonetim_worker/worker.js`) uygulanır —
+Worker'ı güncellediysen yeniden deploy etmeyi unutma.
+
+**Mesajlarda "sil" artık sadece kendi tarafından siler:**
+`supabase/migrations/0019_mesajlarda_kisisel_silme.sql` — bir sohbeti ya da
+tek bir mesajı silmek artık karşı taraftaki kopyayı ETKİLEMEZ, sadece
+silen kişinin kendi görünümünden kaldırır (bkz. dosyanın başındaki notlar).
+
 ---
 
 ## Adım 6 — CSP / `_headers` Kontrolü
