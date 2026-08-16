@@ -28,4 +28,4 @@ sitemap: false
   </div>
 </article>
 
-<script type="module" src="{{ '/assets/js/supabase-yazi.js' | relative_url }}"></script>
+<script type="module" src="{{ '/assets/js/github-yonetim/supabase-yazi.js' | relative_url }}"></script>
