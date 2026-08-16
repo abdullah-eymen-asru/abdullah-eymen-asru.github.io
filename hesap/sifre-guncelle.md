@@ -50,6 +50,6 @@ permalink: "/hesap/sifre-guncelle.html"
 </div>
 
 <script type="module">
-  import { initSifreGuncellePage } from "{{ '/assets/js/auth-pages.js' | relative_url }}";
+  import { initSifreGuncellePage } from "{{ '/assets/js/auth/auth-pages.js' | relative_url }}";
   initSifreGuncellePage();
 </script>
