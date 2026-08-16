@@ -140,7 +140,8 @@ onlara dokunmuyorsun.
   GitHub Pages adresini yaz
 - `robots.txt` içindeki `Sitemap:` satırını GitHub Pages adresine güncelle
   (Senaryo A'daki tabloyla aynı satır)
-- Cloudflare Worker'lardaki (`r2_storage_worker`, `izleme_okuma_worker`)
+- Cloudflare Worker'lardaki (`r2_storage_worker`, `izleme_okuma_worker`,
+  `github_icerik_worker`)
   ve Edge Function'lardaki (`delete-account`, `admin-change-email`)
   `pages.dev` referanslarını silmen ZORUNLU değil (kullanılmayan bir
   adresin izin listesinde durması zarar vermez), ama istersen temizlik
