@@ -44,7 +44,7 @@ permalink: "/icerik/akademik-projeler.html"
   // Jekyll projesi olsa bile toplamda 8'i geçebilir ya da tam tersi). Bu
   // yüzden hem Jekyll hem Supabase kartları DOM'a eklendikten SONRA, TEK
   // bir sayfalama kurulumu çalışıyor.
-  import { supabase, escapeHtml } from "{{ '/assets/js/supabase-client.js' | relative_url }}";
+  import { supabase, escapeHtml } from "{{ '/assets/js/core/supabase-client.js' | relative_url }}";
 
   const searchInput = document.getElementById("project-search");
   const list = document.getElementById("project-list");
