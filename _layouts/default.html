@@ -135,13 +135,13 @@
 
   <!-- ŞİFRE/TOKEN GÖSTER-GİZLE: site genelinde HER type="password" alanına
        (giriş/kayıt/panel şifreleri, panel > GitHub Yönetimi PAT token'ı vb.)
-       otomatik göz ikonu ekler — bkz. assets/js/sifre-goster.js. Sayfa
+       otomatik göz ikonu ekler — bkz. assets/js/auth/sifre-goster.js. Sayfa
        başına ayrı ayrı bağlamaya gerek kalmasın diye <head>'de "defer" ile
        tek seferde yükleniyor (defer: DOM ayrıştırması bitince, ama
        DOMContentLoaded'dan hemen önce çalışır). -->
-  <script defer src="{{ '/assets/js/sifre-goster.js' | relative_url }}"></script>
-  <!-- Çerez onay şeridi/paneli mantığı — bkz. assets/js/cerez-onay.js başındaki tasarım notları. -->
-  <script defer src="{{ '/assets/js/cerez-onay.js' | relative_url }}"></script>
+  <script defer src="{{ '/assets/js/auth/sifre-goster.js' | relative_url }}"></script>
+  <!-- Çerez onay şeridi/paneli mantığı — bkz. assets/js/core/site-islemleri.js başındaki tasarım notları. -->
+  <script defer src="{{ '/assets/js/core/site-islemleri.js' | relative_url }}"></script>
 
   {% if page.auth_css %}
   <!-- auth.css: giris/kayit/panel/admin sayfalarına özel stiller. Önceden
@@ -189,7 +189,7 @@
     sayfa yüklenir yüklenmez OTOMATİK ÇALIŞMAZ. Sadece bir FONKSİYON
     tanımlar; bu fonksiyon yalnızca ziyaretçi "Analitik Çerezler"i
     onayladığında (ya da daha önce onaylamışsa sayfa açılışında) bkz.
-    assets/js/cerez-onay.js tarafından çağrılır. Performans notu (Perf.
+    assets/js/core/site-islemleri.js tarafından çağrılır. Performans notu (Perf.
     Opt.) hâlâ geçerli: gerçekten çağrıldığında script yine ana thread'i
     bloklamadan (async) arka planda yüklenir.
   -->
@@ -251,7 +251,7 @@
         <!--
           HESAP MENÜSÜ: Eskiden burada her zaman ayrı ayrı görünen sabit
           "Giriş" ve "Panelim" linkleri vardı (çıkış yapmışken bile "Panelim"
-          görünüyordu). Artık TEK bir kapsayıcı var; assets/js/nav-auth.js
+          görünüyordu). Artık TEK bir kapsayıcı var; assets/js/auth/nav-auth.js
           oturum durumuna bakıp içini dolduruyor: çıkış yapmışken "Giriş
           Yap", giriş yapmışken "Hesabım ▾" (Panelim / Admin / Çıkış Yap)
           menüsü. Aşağıdaki statik link, JS henüz yüklenmeden önceki kısa an
@@ -279,7 +279,7 @@
     // sayfa yüklendikten sonra tarayıcının boş anında (requestIdleCallback) çağırıyoruz.
     window.addEventListener('load', () => {
       const loadAuth = () => {
-        import("{{ '/assets/js/nav-auth.js' | relative_url }}").then(m => {
+        import("{{ '/assets/js/auth/nav-auth.js' | relative_url }}").then(m => {
           if (m && typeof m.initAuthNav === "function") {
             m.initAuthNav();
           }
@@ -309,7 +309,7 @@
 
   <!--
     ÇEREZ ONAY ŞERİDİ — KVKK/GDPR uyumlu açık rıza. Sadece localStorage'da
-    kayıtlı bir tercih YOKSA gösterilir (bkz. assets/js/cerez-onay.js).
+    kayıtlı bir tercih YOKSA gösterilir (bkz. assets/js/core/site-islemleri.js).
     "hidden" JS'siz tarayıcılarda da varsayılan olarak gizli kalır; bu
     şerit tamamen JS ile açılıp kapatıldığı için, JS çalışmıyorsa hiçbir
     isteğe bağlı çerez zaten yüklenmez (varsayılan = kapalı ilkesi).
