@@ -562,7 +562,17 @@ async function wireAdminAdinaTalep() {
   sarmalayici.hidden = false;
 
   try {
-    const { data, error } = await supabase.from("profiles").select("id, full_name, email").eq("role", "admin");
+    // ÖNEMLİ: doğrudan `.from("profiles")...eq("role","admin")` KULLANMA —
+    // profiles tablosunun RLS'i (migration 0016 § 3) role='editor' için
+    // sadece KENDİ satırını görmesine izin verir, is_manager_or_admin()
+    // 'editor'ü kapsamaz. Bu yüzden editor için o sorgu HER ZAMAN boş
+    // dönerdi (RLS sessizce filtreler, hata fırlatmaz) — dropdown boş
+    // kalır, "Admin adına yayınla" işaretlenince ADMIN_ADINA_HEDEF.ad ""
+    // olur ve kayıt "Yazar bilgisi belirlenemedi" hatasıyla reddedilirdi.
+    // admin_listesi_getir() (migration 0020) editor/manager/admin'in
+    // hepsine açık dar kapsamlı bir RPC — RLS'i by-pass edip SADECE admin
+    // profillerinin id/full_name/email'ini döner.
+    const { data, error } = await supabase.rpc("admin_listesi_getir");
     if (error) throw error;
     const adminler = data || [];
     hedefSecim.innerHTML = adminler
@@ -570,9 +580,17 @@ async function wireAdminAdinaTalep() {
       .join("");
     // Tek admin varsa seçim kutusunu gizle, "X adına" metnini otomatik göster.
     hedefSecim.hidden = adminler.length <= 1;
+    // Hiç admin bulunamadıysa (RPC hatasız ama boş döndüyse) kutuyu
+    // işaretlenebilir bırakmanın anlamı yok — işaretlense bile ADMIN_ADINA_HEDEF.ad
+    // hep boş kalıp "Yazar bilgisi belirlenemedi" hatasına düşerdi. Kutuyu
+    // devre dışı bırakıp NEDENİNİ görünür bir ipucuyla açıklıyoruz.
+    kutu.disabled = adminler.length === 0;
+    kutu.title = adminler.length === 0 ? "Şu an sistemde admin rolüne sahip bir kullanıcı bulunamadı." : "";
   } catch (err) {
     console.error("Admin listesi yüklenemedi (admin adına yayınla):", err);
     hedefSecim.innerHTML = "";
+    kutu.disabled = true;
+    kutu.title = "Admin listesi yüklenemedi, sayfayı yenileyip tekrar dene.";
   }
 
   const uygula = () => {
