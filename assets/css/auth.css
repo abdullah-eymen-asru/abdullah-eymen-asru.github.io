@@ -894,7 +894,7 @@
 .okundu-manuel-btn:hover { border-color: var(--accent); }
 
 /* ---------------------------------------------------------------------- */
-/* ŞİFRE/TOKEN GÖSTER-GİZLE DÜĞMESİ — bkz. assets/js/sifre-goster.js      */
+/* ŞİFRE/TOKEN GÖSTER-GİZLE DÜĞMESİ — bkz. assets/js/auth/sifre-goster.js      */
 /* ---------------------------------------------------------------------- */
 /* .form-field .sifre-goster-sarmalayici input, aynı specificity'deki
    ".form-field input" kuralından (yukarıda) sonra tanımlı olduğu için değil,
