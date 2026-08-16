@@ -67,6 +67,88 @@
 
 const GITHUB_API = "https://api.github.com";
 
+/**
+ * Verilen yoldaki dosyanın GERÇEK (UTF-8) içeriğini GitHub'dan okuyup düz
+ * metin olarak döner — dosya yoksa (404) veya herhangi bir sebeple
+ * okunamazsa null döner (bu durumda çağıran, "dosya henüz yok, yeni
+ * oluşturuluyor" varsayar ve sahiplik kontrolünü atlar). SADECE § 4.1'deki
+ * editor sahiplik kontrolü için kullanılır — Worker'ın PUT/DELETE'i asıl
+ * GitHub'a yönlendirme mantığını (aşağıdaki "5." adım) ETKİLEMEZ, o adım
+ * kendi isteğini ayrıca atar.
+ */
+async function githubDosyaOku(env, yol) {
+  try {
+    const res = await fetch(
+      `${GITHUB_API}/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${yol
+        .split("/")
+        .map(encodeURIComponent)
+        .join("/")}`,
+      {
+        headers: {
+          Authorization: `token ${env.GITHUB_PAT}`,
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+          "User-Agent": "abdullah-eymen-asru-github-icerik-worker",
+        },
+        cf: { cacheTtl: 0, cacheEverything: false },
+      }
+    );
+    if (!res.ok) return null;
+    const veri = await res.json();
+    if (typeof veri.content !== "string") return null;
+    // GitHub base64 içeriği 60 karakterde bir satır sonu ekler.
+    const temizB64 = veri.content.replace(/\n/g, "");
+    // atob + UTF-8 çözümleme — assets/js/github-yonetim.js'teki b64Decode
+    // ile AYNI teknik (Worker ortamında da atob global olarak mevcut).
+    const binary = atob(temizB64);
+    const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+    return new TextDecoder("utf-8").decode(bytes);
+  } catch (_err) {
+    return null;
+  }
+}
+
+/**
+ * Basit front-matter alan okuyucu — assets/js/github-yonetim.js'teki
+ * frontMatterOku'nun SADE bir alt kümesi, burada sadece sahiplik kontrolü
+ * için gereken birkaç alana (yazar_id, author) ihtiyaç var.
+ */
+function frontMatterAlanlariniOku(ham) {
+  const eslesme = ham.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+  const alanlar = {};
+  if (!eslesme) return alanlar;
+  eslesme[1].split(/\r?\n/).forEach((satir) => {
+    const m = satir.match(/^([a-zA-Z_]+):\s?(.*)$/);
+    if (!m) return;
+    let deger = m[2].trim();
+    if (deger.startsWith('"') && deger.endsWith('"') && deger.length >= 2) {
+      deger = deger.slice(1, -1).replace(/\\"/g, '"');
+    }
+    alanlar[m[1]] = deger;
+  });
+  return alanlar;
+}
+
+/**
+ * Mevcut bir dosyanın front-matter'ı, kendisini düzenlemeye/silmeye
+ * çalışan editor'e mi ait? Önce (varsa) GÜVENİLİR yazar_id alanı karşılaştırılır.
+ * yazar_id hiç yoksa (bu alan eklenmeden ÖNCE yazılmış, çok eski bir dosya)
+ * isim/e-posta eşleşmesine düşülür — bu SADECE editor'ün KENDİ eski
+ * içeriğini erişilemez hâle getirmemek içindir, güvenlik AÇISINDAN daha
+ * zayıf bir kontroldür ama front-matter'daki "author" alanı zaten panel
+ * tarafından dolduruluyor olduğundan (editor kendi adı dışında bir şey
+ * yazamaz, bkz. wireYazarAlani) pratikte güvenilirdir.
+ */
+function editorSahibiMi(frontMatterAlanlari, userId, kullaniciAdi, kullaniciEmail) {
+  if (frontMatterAlanlari.yazar_id) return frontMatterAlanlari.yazar_id === userId;
+  const yazar = (frontMatterAlanlari.author || "").trim().toLocaleLowerCase("tr");
+  if (!yazar) return false;
+  const adaylar = [kullaniciAdi, kullaniciEmail]
+    .filter(Boolean)
+    .map((s) => s.trim().toLocaleLowerCase("tr"));
+  return adaylar.includes(yazar);
+}
+
 export default {
   async fetch(request, env) {
     const origin = request.headers.get("Origin") || request.headers.get("Referer") || "";
@@ -139,16 +221,26 @@ export default {
 
     // 3. ROL KONTROLÜ — panel/admin.md'deki requireAuth kurallarının AYNISI,
     //    burada sunucu tarafında (bkz. dosya başındaki mimari notu).
+    //    full_name/email de burada okunuyor — SADECE § 4.1'deki "editor
+    //    sahiplik kontrolü" için (front-matter'da yazar_id bulunmayan ÇOK
+    //    ESKİ dosyalarda isimle eşleştirme yapabilmek adına, bkz. orada).
     let rol = null;
+    let kullaniciAdi = null;
+    let kullaniciEmail = null;
     try {
-      const profilRes = await fetch(`${env.SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=role`, {
-        headers: {
-          apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-        },
-      });
+      const profilRes = await fetch(
+        `${env.SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=role,full_name,email`,
+        {
+          headers: {
+            apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+            Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          },
+        }
+      );
       const profilData = profilRes.ok ? await profilRes.json() : [];
       rol = profilData?.[0]?.role || null;
+      kullaniciAdi = profilData?.[0]?.full_name || null;
+      kullaniciEmail = profilData?.[0]?.email || null;
     } catch (_err) {
       return jsonHata("Rol bilgisi okunamadı.", 500);
     }
@@ -194,6 +286,40 @@ export default {
 
       if (icerikYolu) {
         // editor/manager/admin — zaten icerikYoneticisiMi ile yukarıda kontrol edildi.
+        //
+        // 4.1) SAHİPLİK KONTROLÜ — SADECE role='editor' İÇİN (manager ve
+        //      admin'e bu kısıt HİÇ uygulanmaz, migration 0016'daki gibi
+        //      "editor ile aynı yazma yetkisi" onlarda hâlâ TÜM içeriği
+        //      kapsıyor). Bir editor, _posts//_projects altında MEVCUT bir
+        //      dosyayı (PUT ile üzerine yazarak düzenleme/yeniden adlandırma
+        //      YA DA DELETE ile silme) değiştirmeye çalışıyorsa, o dosyanın
+        //      front-matter'ındaki yazar_id kendisine ait DEĞİLSE istek
+        //      burada, GitHub'a hiç gitmeden reddedilir. Bu, panelin kendi
+        //      buton gizleme kontrolünün (bkz. github-yonetim.js
+        //      icerikKendisineMiAit/icerikEditoreKapaliMi) GERÇEK sunucu
+        //      taraflı karşılığıdır — o istemci kontrolü sadece bir
+        //      kolaylık, ASIL yetki sınırı burasıdır (Worker'ın PAT'a tek
+        //      erişimi olan taraf olması gibi, bkz. dosya başı notu).
+        //      YENİ bir dosya oluşturuluyorsa (henüz GitHub'da yoksa) bu
+        //      kontrol uygulanmaz — yeni içerik zaten editor'ün kendisine
+        //      ait olacaktır.
+        // .gitkeep dosyaları (bkz. klasordekiGitkeepiTemizle/klasorBosaldiysaGitkeepEkle
+        // içinde github-yonetim.js) bir "yazar"a ait İÇERİK değil, boş klasörleri
+        // Git'te var etmek için konan teknik birer yer tutucudur — front-matter'ları
+        // (dolayısıyla yazar_id'leri) da yoktur, bu yüzden sahiplik kontrolünün
+        // DIŞINDA tutuluyorlar (aksi hâlde bir editor, kendi yeni içeriğini
+        // eklerken klasördeki .gitkeep'i temizleyemezdi).
+        const gitkeepDosyasiMi = hedefYol === ".gitkeep" || hedefYol.endsWith("/.gitkeep");
+        if (!gitkeepDosyasiMi && rol === "editor" && (request.method === "PUT" || request.method === "DELETE")) {
+          const mevcutDosya = await githubDosyaOku(env, hedefYol);
+          if (mevcutDosya) {
+            const mevcutFrontMatter = frontMatterAlanlariniOku(mevcutDosya);
+            const sahipUyusuyorMu = editorSahibiMi(mevcutFrontMatter, userId, kullaniciAdi, kullaniciEmail);
+            if (!sahipUyusuyorMu) {
+              return jsonHata("Bu içeriği düzenleme/silme yetkin yok — başka bir yazara ait.", 403);
+            }
+          }
+        }
       } else if (yalnizAdminYolu) {
         if (rol !== "admin") {
           return jsonHata("Bu dosya sadece admin tarafından değiştirilebilir.", 403);
