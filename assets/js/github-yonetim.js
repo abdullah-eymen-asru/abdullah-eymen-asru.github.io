@@ -1193,7 +1193,12 @@ function dosyaIcerigiOlustur(tur, alan, gizliKod, govde, yayinda = true) {
   const satirlar = ["---"];
   satirlar.push(fmSatiri("title", alan.title));
   satirlar.push(fmSatiri("author", alan.author));
-  satirlar.push(fmSatiri("date", alan.date, true));
+  // yazar_id: GitHub'a commit edilen dosyalarda da GÜVENİLİR bir sahiplik
+  // kimliği tutmak için eklendi (bkz. icerikKendisineMiAit / Worker'daki
+  // ownership kontrolü) — "author" sadece görüntülenen bir isim metnidir,
+  // taklit edilebilir; yazar_id ise panelin kendi doldurduğu gerçek
+  // Supabase kullanıcı id'sidir.
+  satirlar.push(fmSatiri("yazar_id", alan.yazarId));
 
   if (tur === "proje") {
     satirlar.push(fmSatiri("venue", alan.venue));
@@ -2251,11 +2256,58 @@ async function icerikOzetiGetir(dosya, tur) {
   }
   const ham = b64Decode(detay.content.replace(/\n/g, ""));
   const { data, body } = frontMatterOku(ham);
+  // Kart çiziminde ve sahiplik kontrolünde (icerikKendisineMiAit) kullanılan
+  // "Yazan:" alanı Supabase taslaklarında yazar_adi, GitHub dosyalarında ise
+  // front-matter'daki author alanı olarak tutuluyor — ikisini burada TEK
+  // bir alana (yazar_adi) eşitliyoruz ki geri kalan kod hangi kaynaktan
+  // geldiğine bakmadan aynı alanı okuyabilsin.
+  if (!data.yazar_adi && data.author) data.yazar_adi = data.author;
   return { path: dosya.path, sha: detay.sha, tur, data, body };
+}
+
+/**
+ * Bu öğe giriş yapan kullanıcıya mı ait? Önce (varsa) yazar_id karşılaştırması
+ * yapılır — bu GÜVENİLİR kimlik alanıdır (Supabase taslaklarında created_by/
+ * yazar_id, GitHub'a commit edilen dosyalarda front-matter'a eklenen
+ * yazar_id, bkz. dosyaIcerigiOlustur). yazar_id hiç yoksa (bu alan
+ * eklenmeden ÖNCE, eski sistemle yazılmış içerikler) isim eşleşmesine
+ * düşülür — TEK amacı editörün KENDİ eski içeriğini erişilemez hâle
+ * getirmemektir, bir GÜVENLİK sınırı olarak kullanılmaz (gerçek sunucu
+ * taraflı sınır Worker'dadır, bkz. cloudflare worker/
+ * github_icerik_yonetim_worker/worker.js).
+ */
+function icerikKendisineMiAit(item) {
+  if (!GIRIS_YAPAN_PROFIL) return false;
+  if (item.data.yazar_id) return item.data.yazar_id === GIRIS_YAPAN_PROFIL.id;
+  const kendiAdi = (GIRIS_YAPAN_PROFIL.full_name || GIRIS_YAPAN_PROFIL.email || "").trim().toLocaleLowerCase("tr");
+  const itemYazar = (item.data.yazar_adi || item.data.author || "").trim().toLocaleLowerCase("tr");
+  return !!kendiAdi && kendiAdi === itemYazar;
+}
+
+/**
+ * SADECE role='editor' için: üst rollere (manager/admin) ait GİZLİ (yayında
+ * olmayan) bir içerik mi? Editör böyle bir içeriği listede hiç görmemeli.
+ * Yayındaki (herkese açık) içerikler bu kısıtın dışındadır — onlar zaten
+ * sitede herkese görünür, editör sadece onları DÜZENLEYEMEZ/SİLEMEZ (bkz.
+ * icerikKartiCiz'deki ayrı kontrol). manager/admin bu fonksiyondan hiç
+ * etkilenmez (her zaman false döner).
+ *
+ * Supabase kaynaklı taslaklar için bu zaten veritabanı seviyesinde de
+ * (RLS, bkz. migration 0018) uygulanıyor — sorgu hiç dönmüyor. Buradaki
+ * kontrol asıl olarak GitHub'a eskiden "yayinda: false" ile commit edilmiş,
+ * artık üretilmeyen ama depoda kalmış olabilecek dosyalar İÇİNDİR (RLS
+ * bunları kapsayamaz, git geçmişi Supabase dışıdır).
+ */
+function icerikEditoreKapaliMi(item) {
+  if (GIRIS_YAPAN_PROFIL?.role !== "editor") return false;
+  const yayinda = item.data.yayinda !== false;
+  if (yayinda) return false;
+  return !icerikKendisineMiAit(item);
 }
 
 /** Bir içerik öğesinin arama kutusu, tür sekmesi ve durum sekmesiyle eşleşip eşleşmediğini kontrol eder. */
 function icerikFiltreyeUyuyorMu(item) {
+  if (icerikEditoreKapaliMi(item)) return false;
   if (LISTE_FILTRE_TUR !== "tum" && item.tur !== LISTE_FILTRE_TUR) return false;
 
   const yayinda = item.data.yayinda !== false;
@@ -2349,18 +2401,22 @@ function icerikKartiCiz(item, tur) {
 
   if (item.okunamadi) {
     // Dosya içeriği okunamadı (silinmiş/ağ hatası) — sadece dosya yolunu
-    // ve "Sil" seçeneğini gösteriyoruz; "Düzenle" anlamsız olur çünkü
-    // form doldurulacak içerik/başlık verisi yok.
+    // ve ("editor" rolü kendisine ait olmayan bir dosya için hariç) "Sil"
+    // seçeneğini gösteriyoruz; "Düzenle" anlamsız olur çünkü form
+    // doldurulacak içerik/başlık verisi yok. Yazar bilgisi okunamadığı
+    // için (front-matter parse edilemedi) editor için varsayılan "kendisine
+    // ait değil" sayılır — bkz. icerikKendisineMiAit.
+    const editorKisitliMi = GIRIS_YAPAN_PROFIL?.role === "editor" && !icerikKendisineMiAit(item);
     kart.innerHTML = `
       <div class="gy-icerik-kart-bilgi">
         <div class="gy-icerik-kart-baslik">${metniVurgula(item.data.title)}<span class="gy-rozet gy-rozet--gizli">Hata</span></div>
         <div class="gy-icerik-kart-meta">${metniVurgula(item.path)}</div>
       </div>
       <div class="gy-icerik-kart-aksiyonlar">
-        <button type="button" class="gy-sil-btn">Sil</button>
+        ${editorKisitliMi ? "" : '<button type="button" class="gy-sil-btn">Sil</button>'}
       </div>
     `;
-    kart.querySelector(".gy-sil-btn").addEventListener("click", () => icerikSil(item));
+    kart.querySelector(".gy-sil-btn")?.addEventListener("click", () => icerikSil(item));
     return kart;
   }
 
@@ -2449,6 +2505,19 @@ function icerikKartiCiz(item, tur) {
 
   const yolGoster = item.kaynak === "supabase" ? item.data.dosya_yolu || "(henüz GitHub'a commit edilmedi)" : item.path;
 
+  // İçerik editörü (role='editor') kendisine ait OLMAYAN bir içeriği (ör.
+  // içerik sorumlusunun ya da admin'in yayındaki bir yazısını) DÜZENLEYEMEZ
+  // / SİLEMEZ / yayın durumunu DEĞİŞTİREMEZ — sadece görebilir (yayındaysa).
+  // Gerçek sınır Supabase RLS'i (migration 0014/0018) ve Worker'dadır (bkz.
+  // cloudflare worker/github_icerik_yonetim_worker/worker.js); bu sadece
+  // butonları önceden gizleyerek kullanıcıyı zaten reddedilecek bir isteği
+  // denemekten caydıran bir kolaylık katmanıdır.
+  const editorKisitliMi = GIRIS_YAPAN_PROFIL?.role === "editor" && !icerikKendisineMiAit(item);
+  const duzenleSilBtnleri = editorKisitliMi
+    ? ""
+    : `<button type="button" class="gy-duzenle-btn">Düzenle</button>
+       <button type="button" class="gy-sil-btn">Sil</button>`;
+
   kart.innerHTML = `
     <div class="gy-icerik-kart-bilgi">
       <div class="gy-icerik-kart-baslik">${metniVurgula(item.data.title || yolGoster)}${rozet}${kaynakRozet}${supabaseYedekRozet}${onayRozet}</div>
@@ -2457,14 +2526,13 @@ function icerikKartiCiz(item, tur) {
     </div>
     <div class="gy-icerik-kart-aksiyonlar">
       ${onayBtns}
-      ${durumBtn}
+      ${editorKisitliMi ? "" : durumBtn}
       ${linkBtn}
-      <button type="button" class="gy-duzenle-btn">Düzenle</button>
-      <button type="button" class="gy-sil-btn">Sil</button>
+      ${duzenleSilBtnleri}
     </div>
   `;
-  kart.querySelector(".gy-duzenle-btn").addEventListener("click", () => icerikDuzenlemeyeYukle(item, tur));
-  kart.querySelector(".gy-sil-btn").addEventListener("click", () => icerikSil(item));
+  kart.querySelector(".gy-duzenle-btn")?.addEventListener("click", () => icerikDuzenlemeyeYukle(item, tur));
+  kart.querySelector(".gy-sil-btn")?.addEventListener("click", () => icerikSil(item));
   kart.querySelector(".gy-durum-degistir-btn")?.addEventListener("click", (e) => {
     if (e.currentTarget.disabled) return;
     if (item.kaynak === "supabase") {
