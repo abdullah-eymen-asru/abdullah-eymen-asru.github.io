@@ -13,10 +13,15 @@
  *   - public.messages: id, conversation_id, sender_id, body, created_at
  * RLS bunu güvenli hale getiriyor; burada sadece UI var.
  *
- * Bu dosya İKİ farklı sayfa için kullanılıyor:
- *   - wireUserChat()  -> panel/panel.md (normal/özel üye)
- *   - wireAdminChat() -> panel/admin.md (yönetici)
- * İkisi de aynı geniş "iki panelli" (sol: konuşma listesi, sağ: seçili
+ * Bu dosyanın fonksiyonları TEK bir ortak sayfadan çağrılıyor —
+ * panel/mesajlar.md + assets/js/mesajlar.js (eskiden panel.md/admin.md
+ * içine GÖMÜLÜYDÜ, 100+ üye/konuşma birikince sayfaları aşırı uzattığı ve
+ * "ortalanmış/düzgün durmadığı" için ayrı bir sayfaya taşındı):
+ *   - wireUserChat()  -> giriş yapan kişi admin DEĞİLSE (normal/özel üye)
+ *   - wireAdminChat() -> giriş yapan kişi admin İSE (yönetici gelen kutusu)
+ * mesajlar.js hangisinin çağrılacağına role göre karar verir, ikisi asla
+ * aynı anda DOM'da olmaz (aynı ID'leri paylaştıkları için). İkisi de aynı
+ * geniş "iki panelli" (sol: konuşma listesi, sağ: seçili
  * konuşmanın mesajları) düzeni paylaşır — bkz. assets/css/auth.css
  * ".msg-panel" bölümü. Dar ekranlarda (telefon) tek pane görünür, bir
  * konuşma seçilince "← Geri" butonuyla listeye dönülür.
