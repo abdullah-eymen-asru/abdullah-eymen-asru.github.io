@@ -15,7 +15,7 @@ permalink: "/hesap/kayit.html"
        ile kayıtta hem de aşağıdaki "Google ile Kayıt Ol" butonunda ortak
        kullanılıyor (Google'ın kendi ekranında KVKK onayı almadığımız için
        OAuth'u başlatmadan ÖNCE bunun işaretli olması zorunlu tutuluyor —
-       bkz. assets/js/auth-pages.js). form="kayit-form" ile aşağıdaki forma
+       bkz. assets/js/auth/auth-pages.js). form="kayit-form" ile aşağıdaki forma
        bağlı kaldığı için normal kayıt gönderiminde de değeri okunur. -->
   <div class="form-field">
     <label style="display:flex; gap:8px; align-items:flex-start; flex-direction:row; font-size:0.9rem; color:var(--text);">
@@ -64,6 +64,6 @@ permalink: "/hesap/kayit.html"
 </div>
 
 <script type="module">
-  import { initKayitPage } from "{{ '/assets/js/auth-pages.js' | relative_url }}";
+  import { initKayitPage } from "{{ '/assets/js/auth/auth-pages.js' | relative_url }}";
   initKayitPage();
 </script>
