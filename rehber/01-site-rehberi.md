@@ -475,25 +475,41 @@ durmaz.**
 
 ### GitHub bağlantısı ve token güvenliği
 
-Panelin üstündeki "GitHub Bağlantısı" sekmesinden şunları girmen gerekir:
+**Mimari değişti — artık PAT tarayıcına hiç girmiyor.** Panel GitHub'a
+doğrudan değil, bir Cloudflare Worker (`cloudflare worker/github_icerik_worker/`)
+üzerinden konuşur:
 
-- **GitHub Kullanıcı Adı** ve **Repository Adı** — gizli bilgi olmadığı
-  için kolaylık amacıyla tarayıcının `localStorage`'ında hatırlanır.
-- **Branch** (opsiyonel) — boş bırakırsan reponun varsayılan branch'i
-  kullanılır.
-- **GitHub Personal Access Token (PAT)** — **SADECE sekme açıkken
-  tarayıcı belleğinde tutulur, hiçbir yerde (localStorage dahil)
-  kalıcı olarak saklanmaz.** Sayfayı yenilediğinde veya sekmeyi
-  kapattığında token kaybolur, bir sonraki girişte yeniden yapıştırman
-  gerekir. Bu bilinçli bir tercih: localStorage'a yazmak daha
-  kullanışlı olurdu ama bir XSS açığında token'ın kalıcı olarak
-  sızdırılması riskini taşır.
-- **Fine-grained bir token oluştur** ve **sadece bu repo** için
-  `Contents: Read and write` iznini ver — tüm hesaba erişen "classic"
-  bir token kullanmaktan çok daha güvenlidir.
-  ([token oluşturma sayfası](https://github.com/settings/personal-access-tokens/new))
-- "Bağlantıyı Doğrula" butonu, token'ın gerçekten yazma iznine sahip
-  olup olmadığını (`permissions.push`) kontrol eder ve sonucu gösterir.
+- Worker, GitHub'a yazma izinli PAT'ı **kendi Cloudflare secret'ı** olarak
+  tutar — hiçbir zaman tarayıcıya, localStorage'a ya da bellek dahi olsa
+  panelin JS'ine gelmez.
+- Panel, kimlik kanıtı olarak (PAT yerine) senin zaten sahip olduğun
+  **Supabase oturum token'ını** Worker'a gönderir. Worker bu token'ı
+  doğrulayıp Supabase'teki rolünü okur ve HEM kimlik HEM rol HEM DE hangi
+  dosya yoluna yazılmak istendiğini kontrol eder: `_posts/`/`_projects/`
+  → editor/manager/admin, `assets/`/`_config.yml` → sadece admin, başka her
+  şey reddedilir (bkz. Worker dosyasının başındaki mimari notu).
+- Bu sayede panel artık GERÇEK bir yetki sınırı: bir editor/manager, PAT'a
+  hiçbir zaman erişemediği için panelin dışından da GitHub'a doğrudan commit
+  atamaz — eskiden burada yazan "kullanıcıya PAT verirsen panel sadece bir
+  kolaylık katmanıdır" uyarısı artık geçerli değil.
+- **Branch** (opsiyonel) hâlâ panelde girilebilir — gizli bir bilgi
+  olmadığı için kolaylık amacıyla tarayıcının `localStorage`'ında
+  hatırlanır; boş bırakırsan reponun varsayılan branch'i kullanılır.
+- "Bağlantıyı Doğrula" butonu artık elle bir şey yapıştırmanı GEREKTİRMEZ
+  — sayfa açılır açılmaz otomatik olarak dener; sadece sorun yaşarsan
+  (Worker deploy edilmemiş, ağ sorunu vb.) butonla tekrar deneyip hatayı
+  görebilirsin.
+- Worker'ı KENDİN deploy edip aşağıdaki ortam değişkenlerini/secret'larını
+  Cloudflare Dashboard'dan girmen gerekir (bkz. Worker dosyasının başındaki
+  liste): `GITHUB_OWNER`, `GITHUB_REPO`, `GITHUB_PAT` (fine-grained, SADECE
+  bu repo için `Contents: Read and write` izniyle — tüm hesaba erişen
+  "classic" token kullanmaktan çok daha güvenli), `SUPABASE_URL`,
+  `SUPABASE_SERVICE_ROLE_KEY`. Deploy ettikten sonra
+  `assets/js/github-yonetim.js`'teki `GITHUB_PROXY_WORKER_URL` sabitini
+  kendi Worker adresinle güncellemen gerekir (r2_storage_worker ile aynı
+  "BURAYI DOLDUR" konvansiyonu). "Bağlantıyı Doğrula" mesajı, token'ın
+  gerçekten yazma iznine sahip olup olmadığını (`permissions.push`) da
+  ayrıca kontrol edip gösterir.
 
 ### Teknik detay (dokunmana gerek yok ama bilgi için)
 
