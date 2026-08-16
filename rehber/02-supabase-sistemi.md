@@ -471,6 +471,24 @@ Worker'ı güncellediysen yeniden deploy etmeyi unutma.
 tek bir mesajı silmek artık karşı taraftaki kopyayı ETKİLEMEZ, sadece
 silen kişinin kendi görünümünden kaldırır (bkz. dosyanın başındaki notlar).
 
+**BUG DÜZELTMESİ — editor için "Admin adına yayınla" hiç çalışmıyordu:**
+`supabase/migrations/0020_admin_listesi_rpc_editor_erisimi.sql` ⚠️ **YENİ —
+Supabase Dashboard → SQL Editor'den çalıştırman gerekiyor.** Migration
+0016 § 3, `profiles` tablosunun SELECT RLS'ini `is_manager_or_admin()`'e
+bağlamıştı (admin + manager görebilir) — ama role='editor' için "Admin
+adına yayınla" kutusu da tam olarak manager ile aynı şekilde çalışması
+gerekiyordu (bkz. `github-yonetim.js` dosya başı notu). Sonuç: bir editor
+hedef admin listesini çekmeye çalıştığında RLS sessizce boş bir liste
+döndürüyordu (hata fırlatmıyordu), dropdown boş kalıyor, kutuyu
+işaretleyip kaydetmeye çalışınca panel "Yazar bilgisi belirlenemedi
+(profil adı boş)" hatası veriyor ve içerik hiçbir zaman admin onayına
+gitmiyordu. Bu migration, RLS'i gevşetmeden (editor'ün tüm profilleri
+görmesi gereksiz bir bilgi sızıntısı olurdu) sadece bu ihtiyaç için dar
+kapsamlı bir `admin_listesi_getir()` RPC'si ekliyor — içerik yönetebilen
+herkese (editor/manager/admin) SADECE admin profillerinin
+id/full_name/email'ini döner. `github-yonetim.js` → `wireAdminAdinaTalep()`
+artık doğrudan tablo sorgusu yerine bu RPC'yi çağırıyor.
+
 ---
 
 ## Adım 6 — CSP / `_headers` Kontrolü
