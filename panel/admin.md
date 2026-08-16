@@ -11,71 +11,26 @@ permalink: "/panel/admin.html"
 <div id="app" hidden>
   <h1>Admin Paneli</h1>
 
+  <!--
+    "Kullanıcılar & Roller" ve "Mesajlar" bölümleri BURADAN, ayrı sayfalara
+    taşındı (bkz. panel/uye-ayarlari.md ve panel/mesajlar.md başındaki
+    notlar). Sebep: üye sayısı 100+'a çıkınca bu iki bölüm sayfayı aşırı
+    uzatıyor, diğer bölümleri (içerik yönetimi, dosya paylaşımı) aşağı
+    itiyordu. Aşağıdaki iki sekme artık sayfa-içi anchor değil, DOĞRUDAN
+    o sayfalara giden linkler — bu yüzden data-section niteliği YOK (bkz.
+    admin.js -> wireSectionNav(), sadece data-section'lı linkleri
+    "sayfa içi kaydır" olarak ele alıyor; bunlar normal navigasyonla açılır).
+  -->
   <nav id="admin-nav" class="admin-tabs">
-    <a href="#kullanicilar" data-section="kullanicilar" class="active">👤 Kullanıcılar &amp; Roller</a>
-    <a href="#icerik-ekle" data-section="icerik-ekle">📝 Özel İçerik Ekle/Düzenle</a>
+    <a id="admin-nav-uye-ayarlari" href="{{ '/panel/uye-ayarlari.html' | relative_url }}">👤 Üye Ayarları</a>
+    <a href="#icerik-ekle" data-section="icerik-ekle" class="active">📝 Özel İçerik Ekle/Düzenle</a>
     <a href="#icerikler" data-section="icerikler">📚 Mevcut Özel İçerikler</a>
     <a href="#dosya-paylasim" data-section="dosya-paylasim">🔗 R2 Dosya Paylaşımı</a>
-    <a href="#mesajlar" data-section="mesajlar">💬 Mesajlar</a>
+    <a id="admin-nav-mesajlar" href="{{ '/panel/mesajlar.html' | relative_url }}">💬 Sohbet/Mesajlar</a>
     <a href="#hesabim" data-section="hesabim">⚙️ Hesabım</a>
   </nav>
 
   <div class="panel-grid">
-
-      <section id="kullanicilar" class="panel-section">
-        <h2>Kullanıcılar &amp; Roller</h2>
-        <p class="muted">Bir kullanıcının rolünü değiştirmek için aşağıdaki listeden seç — anında kaydedilir. İsim veya e-posta ile arayabilirsin.</p>
-        <div class="form-field">
-          <label for="kullanici-arama">Ara (isim veya e-posta)</label>
-          <input id="kullanici-arama" type="search" placeholder="ör. ayse@ornek.com veya Ayşe">
-        </div>
-        <p class="muted" style="font-size:0.85rem;">
-          Geniş ekranlarda tablo yana taşarsa "E-posta Değiştir" ve "Sil"
-          butonlarını görmek için sağa doğru kaydır (↔). Telefon gibi dar
-          ekranlarda her kullanıcı otomatik olarak kendi kartında, tüm
-          bilgiler ve butonlarla birlikte görünür.
-        </p>
-        <div class="rol-tablo-wrap" style="overflow-x:auto;">
-        <table class="rol-tablo">
-          <thead>
-            <tr><th>Kullanıcı</th><th>Kayıt</th><th>Rol</th><th>KVKK</th><th></th></tr>
-          </thead>
-          <tbody id="kullanici-tablo-govde">
-            <tr><td colspan="5">Yükleniyor...</td></tr>
-          </tbody>
-        </table>
-        </div>
-
-        <!-- "E-posta Değiştir" butonuna basılınca renderUserTable() bu alanı
-             doldurup gösterir: seçili kullanıcının adı + yeni e-posta formu.
-             E-posta hiçbir mail gönderilmeden ANINDA değişir, eski adres
-             gerekmez (bkz. admin.js -> wireAdminEmailChange() ve Edge
-             Function admin-change-email). -->
-        <div id="admin-eposta-degistir-kutu" class="panel-section" hidden style="margin-top:16px; background:var(--bg);">
-          <h3 style="margin-top:0;">E-postasını Değiştir: <span id="admin-eposta-hedef-isim"></span></h3>
-          <p class="muted">
-            Bu, kullanıcının kendi panelinden yaptığı değişiklikten FARKLIDIR:
-            e-posta <strong>hiçbir mail gönderilmeden, anında</strong> değişir
-            — ne eski ne yeni adrese onay maili gitmez, eski adrese erişim
-            gerekmez. Bu yüzden bu bölümü SADECE kullanıcı eski mailine
-            erişemediği için seninle iletişime geçtiyse ve kimliğini (ör.
-            panel üzerinden gönderdiği mesajla) doğruladıysan kullan — asıl
-            "kimlik doğrulama" adımı burada senin elle yaptığın kontroldür.
-          </p>
-          <form id="admin-eposta-degistir-form" novalidate>
-            <input type="hidden" id="admin-eposta-hedef-id">
-            <div class="form-field">
-              <label for="admin-eposta-yeni">Yeni E-posta</label>
-              <input id="admin-eposta-yeni" type="email" autocomplete="off" required>
-            </div>
-            <div style="display:flex; gap:10px;">
-              <button type="submit" class="btn-primary" style="width:auto;">E-postayı Şimdi Değiştir</button>
-              <button type="button" id="admin-eposta-degistir-iptal-btn" class="btn-secondary" style="width:auto;">Vazgeç</button>
-            </div>
-          </form>
-          <div id="admin-eposta-message" class="auth-message" hidden></div>
-        </div>
-      </section>
 
       <section id="icerik-ekle" class="panel-section">
         <h2 id="icerik-form-baslik">Yeni Özel İçerik / Makale Ekle</h2>
@@ -162,45 +117,12 @@ permalink: "/panel/admin.html"
         </div>
       </section>
 
-      <section id="mesajlar" class="panel-section panel-section--wide">
-        <h2>Mesajlar</h2>
-        <p class="muted">
-          Üyelerin sana gönderdiği tüm konuşmalar burada. Soldan bir konuşma
-          seç, ya da yukarıdan isim/e-posta ile üye arayıp onunla yeni bir
-          konuşma başlat.
-        </p>
-        <div id="chat-admin">
-          <div id="chat-panel-admin" class="msg-panel msg-panel--admin">
-            <aside class="msg-list-pane">
-              <div class="msg-list-header">
-                <input id="chat-uye-arama" type="search" class="msg-uye-arama" placeholder="Üye ara (isim veya e-posta)...">
-                <div id="chat-uye-arama-sonuc" class="msg-uye-arama-sonuc" hidden></div>
-              </div>
-              <div id="chat-konusma-liste" class="msg-konusma-liste"><p class="chat-bos">Yükleniyor...</p></div>
-            </aside>
-
-            <div class="msg-thread-pane">
-              <div class="msg-thread-header">
-                <button type="button" id="chat-geri-btn-admin" class="msg-geri-btn" aria-label="Sohbet listesine dön">←</button>
-                <span id="chat-thread-baslik-admin" class="msg-thread-baslik">Bir konuşma seç.</span>
-              </div>
-              <div id="chat-mesaj-liste-admin" class="chat-mesaj-liste"></div>
-              <form id="chat-form-admin" class="chat-form" novalidate hidden>
-                <textarea id="chat-metin-admin" placeholder="Yanıtını yaz..." required></textarea>
-                <button type="submit">Gönder</button>
-              </form>
-            </div>
-          </div>
-        </div>
-        <div id="chat-message-admin" class="auth-message" hidden></div>
-      </section>
-
       <section id="hesabim" class="panel-section danger-zone">
         <h2>Hesabım — Tehlikeli Bölge</h2>
         <p>
           Kendi yönetici hesabını da buradan silebilirsin. Diğer üyelerin
-          hesaplarını silmek için "Kullanıcılar &amp; Roller" bölümündeki
-          <strong>Sil</strong> butonunu kullan.
+          hesaplarını silmek için <a href="{{ '/panel/uye-ayarlari.html' | relative_url }}">Üye Ayarları</a>
+          sayfasındaki <strong>Sil</strong> butonunu kullan.
         </p>
         <p>Hesabını sildiğinde profilin ve özel içerik erişimlerin dahil TÜM
         verilerin kalıcı olarak silinir. Bu işlem geri alınamaz.</p>
