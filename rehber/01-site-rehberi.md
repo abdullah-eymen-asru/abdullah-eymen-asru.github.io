@@ -42,7 +42,7 @@ eder — sadece "tek bir sayfaya ait" `.md` dosyaları klasörlere ayrılmışt�
 **Bir sayfanın URL'ini değiştirmek istersen:** ilgili dosyanın
 front-matter'ındaki `permalink:` satırını değiştirmen yeterli, dosyayı
 taşımana gerek yok. Ama URL'i değiştirirsen, o sayfaya link veren tüm
-yerleri (nav menüsü `_layouts/default.html`, `assets/js/nav-auth.js`,
+yerleri (nav menüsü `_layouts/default.html`, `assets/js/auth/nav-auth.js`,
 `auth-guard.js`, `auth-pages.js` içindeki Supabase redirect URL'leri,
 ilgili diğer `.md` sayfalarındaki iç linkler) da elle güncellemen
 gerekir — aksi halde kırık link veya (giriş/şifre sıfırlama söz konusuysa)
@@ -327,21 +327,21 @@ içerik sistemini yönetir; `/panel/github-yonetim.html` ise bu deponun
 statik Jekyll içeriğini (blog yazıları, akademik projeler, profil
 fotoğrafı) yönetir. Erişim kontrolü ortak: bu sayfaya erişim de aynı
 `requireAuth({ role: 'admin' })` mekanizmasıyla korunur (bkz.
-`assets/js/auth-guard.js`), yani sadece Supabase'te `role: 'admin'` olan
+`assets/js/auth/auth-guard.js`), yani sadece Supabase'te `role: 'admin'` olan
 hesaplar görebilir — taslak tablosunun RLS politikası bunu veritabanı
 seviyesinde ayrıca zorunlu kılar. Header'daki **"Hesabım ▾"** menüsünde,
 adminsen "Admin Paneli" linkinin hemen altında **"GitHub İçerik
-Yönetimi"** olarak görünür (bkz. `assets/js/nav-auth.js`).
+Yönetimi"** olarak görünür (bkz. `assets/js/auth/nav-auth.js`).
 
 ### Paketteki dosyalar
 
 ```
-panel/github-yonetim.md                <- Jekyll sayfası (_layouts/default.html'i kullanır, admin-only)
-assets/js/github-yonetim.js            <- Panelin tüm mantığı
-assets/css/github-yonetim.css          <- Bu sayfaya özel ek stiller (auth.css'in üzerine eklenir)
-onizleme/index.md                      <- Jekyll sayfası: /onizleme/ — gizli ön izleme linklerinin açıldığı yer
-assets/js/onizleme.js                  <- /onizleme/ sayfasının mantığı (Supabase RPC'sini okur)
-supabase/migrations/0013_...sql        <- `taslak_icerikler` tablosu + RLS + `taslak_onizleme_getir` RPC'si
+panel/github-yonetim.md                          <- Jekyll sayfası (_layouts/default.html'i kullanır, admin-only)
+assets/js/github-yonetim/github-yonetim.js       <- Panelin tüm mantığı
+assets/css/github-yonetim.css                    <- Bu sayfaya özel ek stiller (auth.css'in üzerine eklenir)
+onizleme/index.md                                <- Jekyll sayfası: /onizleme/ — gizli ön izleme linklerinin açıldığı yer
+assets/js/github-yonetim/onizleme.js             <- /onizleme/ sayfasının mantığı (Supabase RPC'sini okur)
+supabase/migrations/0013_...sql                  <- `taslak_icerikler` tablosu + RLS + `taslak_onizleme_getir` RPC'si
 ```
 
 ### Supabase Taslak Sistemi — "Yayında değil" içerik artık GitHub'a hiç gitmiyor
@@ -361,7 +361,7 @@ durmaz.**
 - **Gizli ön izleme linki artık `/onizleme/?tur=<blog|proje>&kod=<kod>`
   formatındadır** (eski `/blog/on-izleme-XXXX/` formatı YERİNE — panel
   artık bu yeni formatta linkler üretir). `/onizleme/index.md` sayfası,
-  `assets/js/onizleme.js` aracılığıyla URL'deki tur+kod'u Supabase'teki
+  `assets/js/github-yonetim/onizleme.js` aracılığıyla URL'deki tur+kod'u Supabase'teki
   `taslak_onizleme_getir(p_tur, p_kod)` RPC'sine sorar; bu RPC
   `SECURITY DEFINER` olduğu için RLS'i by-pass eder ama SADECE tam
   eşleşen tek satırı ve sadece görüntüleme için gereken alanları
@@ -505,7 +505,7 @@ doğrudan değil, bir Cloudflare Worker (`cloudflare worker/github_icerik_worker
   bu repo için `Contents: Read and write` izniyle — tüm hesaba erişen
   "classic" token kullanmaktan çok daha güvenli), `SUPABASE_URL`,
   `SUPABASE_SERVICE_ROLE_KEY`. Deploy ettikten sonra
-  `assets/js/github-yonetim.js`'teki `GITHUB_PROXY_WORKER_URL` sabitini
+  `assets/js/github-yonetim/github-yonetim.js`'teki `GITHUB_PROXY_WORKER_URL` sabitini
   kendi Worker adresinle güncellemen gerekir (r2_storage_worker ile aynı
   "BURAYI DOLDUR" konvansiyonu). "Bağlantıyı Doğrula" mesajı, token'ın
   gerçekten yazma iznine sahip olup olmadığını (`permissions.push`) da
@@ -674,7 +674,7 @@ ayarı oluşturup `_includes/comments.html` içindeki ilgili
 | Dosya | Ne işe yarar |
 |---|---|
 | `_layouts/default.html` içinde `#auth-nav` | Nav'daki tek kapsayıcı — JS yüklenmeden önce görünen statik "Giriş Yap" linkini içerir (progressive enhancement / no-JS yedeği). |
-| `assets/js/nav-auth.js` | Sayfa açılışında oturumu kontrol edip `#auth-nav`'ın içeriğini dolduran script. Çıkış yapmışken tek bir "Giriş Yap" linki, giriş yapmışken "Hesabım ▾" açılır menüsü (Panelim, adminse Admin Paneli ve GitHub İçerik Yönetimi, Çıkış Yap) gösterir. Başka bir sekmede oturum açılıp kapandığında `onAuthStateChange` ile kendini günceller. |
+| `assets/js/auth/nav-auth.js` | Sayfa açılışında oturumu kontrol edip `#auth-nav`'ın içeriğini dolduran script. Çıkış yapmışken tek bir "Giriş Yap" linki, giriş yapmışken "Hesabım ▾" açılır menüsü (Panelim, adminse Admin Paneli ve GitHub İçerik Yönetimi, Çıkış Yap) gösterir. Başka bir sekmede oturum açılıp kapandığında `onAuthStateChange` ile kendini günceller. |
 | `assets/style.css` içinde `.auth-nav*` sınıfları | Açılır menünün görünümü — mevcut `nav a` stiliyle aynı renk değişkenlerini kullanır, açık/koyu temayla otomatik uyumludur. |
 
 Bu menü, sitenin Supabase kullanıcı sistemine bağlıdır — bkz. aşağıdaki
