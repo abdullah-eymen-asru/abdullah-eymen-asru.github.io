@@ -18,4 +18,4 @@ sitemap: false
   </div>
 </article>
 
-<script type="module" src="{{ '/assets/js/onizleme.js' | relative_url }}"></script>
+<script type="module" src="{{ '/assets/js/github-yonetim/onizleme.js' | relative_url }}"></script>
