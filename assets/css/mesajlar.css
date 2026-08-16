@@ -1,0 +1,26 @@
+/*
+ * assets/css/mesajlar.css — /panel/mesajlar.html
+ *
+ * Sohbet/Mesajlar artık kendi bağımsız sayfası. .msg-panel ve ilgili TÜM
+ * alt sınıflar (konuşma listesi, mesaj balonları, formlar vb.) auth.css'te
+ * zaten tanımlı ve burada AYNEN kullanılıyor — o yüzden bu dosya sohbet
+ * bileşenlerini yeniden tanımlamıyor. Bu dosyanın tek işi: sayfayı
+ * ".wrap"ın dar sütununun (860px) sınırından kurtarıp görünür alanın
+ * ortasına daha ferah şekilde hizalamak — auth.css'teki
+ * ".panel-section--wide" için zaten kanıtlanmış viewport-ortalama
+ * tekniğinin AYNISI (bkz. o bölümün başındaki not), burada sayfanın
+ * kendisine uygulanıyor.
+ */
+
+.mesajlar-baslik { margin-bottom: 18px; }
+.mesajlar-baslik h1 { margin: 0 0 6px; }
+.mesajlar-baslik p { margin: 0; max-width: 640px; }
+
+@media (min-width: 900px) {
+  .mesajlar-sayfa {
+    width: min(1180px, 96vw);
+    max-width: 96vw;
+    margin-left: calc(50% - 50vw + 2vw);
+    margin-right: calc(50% - 50vw + 2vw);
+  }
+}
