@@ -131,7 +131,7 @@ dosyası tam olarak bunları gideriyor.
 
 **"Yeni bir proje oluştursam mı, olmayacak mı diye?"**
 
-Hayır, gerek yok. Mevcut projendeki anahtarlar zaten `assets/js/supabase-client.js`
+Hayır, gerek yok. Mevcut projendeki anahtarlar zaten `assets/js/core/supabase-client.js`
 ve `assets/js/panel.js` içine işlenmiş durumda; yeniden başlarsan bu iki
 dosyayı, Google OAuth ayarlarını, e-posta şablonlarını ve Edge Function'ı
 BAŞTAN kurman gerekir. Önce aşağıdaki "Giriş Yapamıyorum" bölümündeki
@@ -174,7 +174,7 @@ olarak giriş yapamıyorsan, sırayla şunları kontrol et:
      ```
    Bu liste eksikse OAuth/e-posta linkleri tıklandığında "redirect not
    allowed" hatası alırsın, giriş formu kendisi çalışsa bile.
-3. **Anahtarlar güncel projeyle eşleşiyor mu?** `assets/js/supabase-client.js`
+3. **Anahtarlar güncel projeyle eşleşiyor mu?** `assets/js/core/supabase-client.js`
    içindeki `SUPABASE_URL` ve `SUPABASE_ANON_KEY`, Dashboard → **Project
    Settings → API** kısmındaki DEĞERLERLE birebir aynı olmalı. Farklı bir
    proje oluşturup denediysen ve eski anahtarlar hâlâ dosyada duruyorsa,
@@ -257,7 +257,7 @@ bölümü, madde 1).
    `panel/admin.md`, `panel/ozel-icerik.md` dosyaları zaten kendi
    klasörlerinde (`hesap/`, `panel/`) hazır geliyor — fork'ladıysan bunları
    olduğu gibi koru.
-2. `assets/js/supabase-client.js` içindeki iki değeri doldur (Dashboard →
+2. `assets/js/core/supabase-client.js` içindeki iki değeri doldur (Dashboard →
    **Project Settings → API**):
    ```js
    const SUPABASE_URL = "https://XXXXXXXXXXXX.supabase.co";
@@ -269,7 +269,7 @@ bölümü, madde 1).
 3. `assets/js/panel.js` içindeki `DELETE_ACCOUNT_FUNCTION_URL` değerini
    Adım 5'te deploy ettiğin Edge Function URL'iyle güncelle.
 4. Header menüsü (`_layouts/default.html` içindeki `#auth-nav`) zaten
-   otomatik — ayrıca link eklemene gerek yok, `assets/js/nav-auth.js`
+   otomatik — ayrıca link eklemene gerek yok, `assets/js/auth/nav-auth.js`
    oturum durumuna göre kendisi dolduruyor (bkz. "Header'daki Hesap Menüsü"
    bölümü, README'nin "Site Rehberi" kısmında).
 
@@ -462,7 +462,7 @@ artık `taslak_icerikler` tablosunda SADECE kendi oluşturduğu satırları
 görebilir/düzenleyebilir/silebilir; içerik sorumlusu (manager) ve admin'in
 gizli taslakları editöre hiç görünmez. manager ve admin bu kısıttan
 etkilenmez. GitHub'a commit edilmiş içerikler için AYNI kural hem panelde
-(`assets/js/github-yonetim.js`) hem de sunucu tarafında
+(`assets/js/github-yonetim/github-yonetim.js`) hem de sunucu tarafında
 (`cloudflare worker/github_icerik_yonetim_worker/worker.js`) uygulanır —
 Worker'ı güncellediysen yeniden deploy etmeyi unutma.
 
@@ -521,7 +521,7 @@ ekranda aynı uyarı **tutarlı bir şekilde** gösteriliyor:
 
 Teknik olarak:
 
-- Metin ve gösterme/gizleme mantığı **tek bir yerde**, `assets/js/supabase-client.js`
+- Metin ve gösterme/gizleme mantığı **tek bir yerde**, `assets/js/core/supabase-client.js`
   içindeki `showSpamNotice(el)` / `hideSpamNotice(el)` fonksiyonlarında
   toplanıyor — uyarı metnini değiştirmek istersen SADECE bu dosyayı
   düzenlemen yeterli, dört ayrı sayfada arama yapmana gerek yok.
@@ -615,7 +615,7 @@ daha sık istismar edilen bir saldırı olduğu için güvenlik tarafı seçildi
   (henüz değişmemiş) e-posta, yeni adres için **kullanıcının az önce
   girdiği** adres gönderilir; Supabase hangi tarafın onaylandığını buna
   göre ayırt eder.
-- `assets/js/auth-pages.js` → `initGirisPage()`: linkle gelindiğinde URL
+- `assets/js/auth/auth-pages.js` → `initGirisPage()`: linkle gelindiğinde URL
   hash'indeki `type=email_change` bilgisini okuyup "bu adres onaylandı,
   diğerini de onayla" mesajını gösterir (kesin "değişti" demez, çünkü tek
   link her zaman yeterli değildir).
@@ -900,14 +900,14 @@ linki bilen görebilir); "Yayınla" deyince Supabase'den GitHub'a taşınıp
 Supabase'den siliniyor; "Yayından Kaldır" deyince tam tersi oluyor.
 
 #### Değişen dosyalar
-- `assets/js/github-yonetim.js` (kaydetme/yayınlama/yayından kaldırma/silme/düzenleme akışlarının tamamı Supabase'i de kapsayacak şekilde yeniden yazıldı)
+- `assets/js/github-yonetim/github-yonetim.js` (kaydetme/yayınlama/yayından kaldırma/silme/düzenleme akışlarının tamamı Supabase'i de kapsayacak şekilde yeniden yazıldı)
 - `panel/github-yonetim.md` (dosya kendisi değişmedi, önceki turdaki "📁 Klasörler" sekmesiyle uyumlu çalışacak şekilde JS'teki değişiklikler test edildi)
 - `rehber/01-site-rehberi.md` (Bölüm 9'a güncelleme notu, Bölüm 10'a "Supabase Taslak Sistemi" alt başlığı eklendi)
 
 #### Eklenen dosyalar
 - `supabase/migrations/0013_taslak_icerikler_supabase_taslak_sistemi.sql` ⚠️ **YENİ — Supabase SQL Editor'de çalıştırman gerekiyor.**
 - `onizleme/index.md` — yeni Jekyll sayfası, `/onizleme/` adresinde (gizli ön izleme linklerinin gerçekte açıldığı yer)
-- `assets/js/onizleme.js` — `/onizleme/` sayfasının mantığı, Supabase'teki `taslak_onizleme_getir` RPC'sini çağırır
+- `assets/js/github-yonetim/onizleme.js` — `/onizleme/` sayfasının mantığı, Supabase'teki `taslak_onizleme_getir` RPC'sini çağırır
 
 #### Ne değişti, neden
 
@@ -929,7 +929,7 @@ Yeni ön izleme linki formatı: `/onizleme/?tur=blog&kod=XXXXXXXX` (eskisi:
 `/blog/on-izleme-XXXXXXXX/`). Daha önce paylaşılmış eski formatlı linkler
 artık çalışmaz — ama bu linkler zaten sadece `deneme3.md` ve
 `ornek-zamanlanmis-yazi.md` gibi depoda duran örnek/test dosyalarındaydı,
-gerçek bir taslağın linki değildi. `assets/js/github-yonetim.js`, eski
+gerçek bir taslağın linki değildi. `assets/js/github-yonetim/github-yonetim.js`, eski
 sistemden kalma (hâlâ `yayinda: false` ile GitHub'da duran) bir dosya
 bulursa kartında "Supabase'e Taşı" butonu gösterir — bu butona basmak o
 dosyayı da yeni sisteme (Supabase'e) taşır.
@@ -1036,10 +1036,10 @@ Bu dosya, ikinci turda bildirdiğin 6 sorun için yapılan değişikliklerin öz
 - `_layouts/default.html`
 - `assets/css/auth.css`
 - `assets/js/admin.js`
-- `assets/js/auth-guard.js`
-- `assets/js/auth-pages.js`
-- `assets/js/github-yonetim.js`
-- `assets/js/nav-auth.js`
+- `assets/js/auth/auth-guard.js`
+- `assets/js/auth/auth-pages.js`
+- `assets/js/github-yonetim/github-yonetim.js`
+- `assets/js/auth/nav-auth.js`
 - `assets/js/ozel-icerik.js`
 - `assets/js/panel.js`
 - `assets/style.css`
@@ -1110,9 +1110,9 @@ Bu dosya, bildirdiğin 5 sorun için yapılan değişikliklerin özetidir. Deği
 #### Değişen dosyalar
 - `assets/css/auth.css`
 - `assets/js/admin.js`
-- `assets/js/auth-guard.js`
-- `assets/js/auth-pages.js`
-- `assets/js/nav-auth.js`
+- `assets/js/auth/auth-guard.js`
+- `assets/js/auth/auth-pages.js`
+- `assets/js/auth/nav-auth.js`
 - `assets/js/panel.js`
 - `hesap/kayit.md`
 - `panel/panel.md`
