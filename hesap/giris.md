@@ -44,6 +44,6 @@ permalink: "/hesap/giris.html"
 </div>
 
 <script type="module">
-  import { initGirisPage } from "{{ '/assets/js/auth-pages.js' | relative_url }}";
+  import { initGirisPage } from "{{ '/assets/js/auth/auth-pages.js' | relative_url }}";
   initGirisPage();
 </script>
