@@ -27,6 +27,6 @@ permalink: "/hesap/sifremi-unuttum.html"
 </div>
 
 <script type="module">
-  import { initSifremiUnuttumPage } from "{{ '/assets/js/auth-pages.js' | relative_url }}";
+  import { initSifremiUnuttumPage } from "{{ '/assets/js/auth/auth-pages.js' | relative_url }}";
   initSifremiUnuttumPage();
 </script>
