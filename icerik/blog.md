@@ -191,7 +191,7 @@ baglaArama("notes-search", "notes-posts");
   // kutusu zaten ".searchable" + "data-search" üzerinden çalıştığı için
   // (bkz. yukarıdaki baglaArama), buraya eklenen kartlar otomatik olarak
   // aranabilir hâle gelir — ekstra bir kablolamaya gerek yok.
-  import { supabase, escapeHtml } from "{{ '/assets/js/supabase-client.js' | relative_url }}";
+  import { supabase, escapeHtml } from "{{ '/assets/js/core/supabase-client.js' | relative_url }}";
 
   (async function () {
     const list = document.getElementById("notes-posts");
