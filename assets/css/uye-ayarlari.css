@@ -1,0 +1,200 @@
+/*
+ * assets/css/uye-ayarlari.css — /panel/uye-ayarlari.html
+ *
+ * "Üye Ayarları" sayfasına özel stiller. auth.css'in ÜZERİNE eklenir (aynı
+ * CSS değişkenlerini kullanır: --text, --muted, --bg, --accent, --border,
+ * --card-bg, --tag-bg) ama admin.md'nin tek-sütunlu "panel-section" kart
+ * yığınından/dev <table>'ından BİLİNÇLİ olarak farklı bir düzen kurar:
+ * üstte özet istatistik şeridi, altında arama/rol filtresi/sayfalama araç
+ * çubuğu, sonra RESPONSIVE bir kart IZGARASI (grid) — 100+ üyede bile
+ * sayfa aşırı uzamasın diye sayfalama (pagination) ile bölünür.
+ */
+
+.uya-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.uya-header h1 { margin: 0 0 6px; }
+.uya-header p { margin: 0; max-width: 640px; }
+.uya-geri-btn {
+  width: auto;
+  flex-shrink: 0;
+  text-decoration: none;
+  display: inline-block;
+  white-space: nowrap;
+}
+
+/* ---- İstatistik şeridi ---- */
+.uya-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.uya-stat-kart {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 108px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card-bg);
+}
+.uya-stat-kart--toplam { border-color: var(--accent); }
+.uya-stat-sayi { font-size: 1.5rem; font-weight: 700; color: var(--accent); line-height: 1.15; }
+.uya-stat-etiket { font-size: 0.76rem; color: var(--muted); margin-top: 2px; text-align: center; }
+
+/* ---- Araç çubuğu: arama + rol filtresi + sayfa başına ---- */
+.uya-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-end;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card-bg);
+  margin-bottom: 10px;
+}
+.uya-toolbar .form-field { margin-bottom: 0; }
+.uya-arama-alani { flex: 2 1 240px; }
+.uya-filtre-alani { flex: 1 1 170px; }
+.uya-sayfa-boyutu-alani { flex: 0 1 120px; }
+
+.uya-sonuc-sayisi { margin: 0 0 14px; font-size: 0.85rem; }
+
+/* ---- Üye kartları ızgarası ---- */
+.uya-liste {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.uya-bos { grid-column: 1 / -1; }
+
+.uya-kart {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card-bg);
+}
+.uya-kart-ust {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.uya-avatar {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.uya-kart-kimlik {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.uya-isim-alani { display: flex; gap: 6px; }
+.uya-isim-input {
+  min-width: 0;
+  flex: 1;
+  padding: 5px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+}
+.uya-email {
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.uya-rol-etiket {
+  flex-shrink: 0;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: var(--tag-bg);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.uya-rol-etiket--admin { background: var(--accent); color: #fff; }
+.uya-rol-etiket--manager,
+.uya-rol-etiket--editor { background: var(--tag-bg); color: var(--text); border: 1px solid var(--accent); }
+.uya-rol-etiket--special_user { background: #eaf7ee; color: #1e6b3a; }
+[data-theme="dark"] .uya-rol-etiket--special_user { background: #123a22; color: #9ee3b6; }
+
+.uya-kart-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.uya-kart-alt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+.uya-rol-secim { min-width: 160px; }
+.uya-kart-aksiyonlar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ---- Sayfalama ---- */
+.uya-sayfalama {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 4px 0 24px;
+}
+.uya-sayfa-btn {
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.uya-sayfa-btn:hover:not(:disabled) { border-color: var(--accent); }
+.uya-sayfa-btn:disabled { opacity: 0.4; cursor: default; }
+.uya-sayfa-gosterge { font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
+
+@media (max-width: 560px) {
+  .uya-kart-alt { flex-direction: column; align-items: stretch; }
+  .uya-kart-aksiyonlar { justify-content: stretch; }
+  .uya-kart-aksiyonlar .tablo-aksiyon-btn { flex: 1; text-align: center; }
+}
