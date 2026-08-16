@@ -160,7 +160,7 @@ nav a.active {
   font-weight: 600;
 }
 
-/* HESAP MENÜSÜ (auth-nav) — bkz. _layouts/default.html ve assets/js/nav-auth.js
+/* HESAP MENÜSÜ (auth-nav) — bkz. _layouts/default.html ve assets/js/auth/nav-auth.js
    Giriş yapmışken/yapmamışken tek bir sekmede toplanan Giriş/Panelim/Admin/
    Çıkış linkleri. .auth-nav içindeki düz <a> (çıkış yapmışken "Giriş Yap")
    zaten yukarıdaki "nav a" kuralından stilini alıyor, ekstra bir şey
