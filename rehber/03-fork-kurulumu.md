@@ -84,8 +84,9 @@ Aşağıdaki her blok bağımsızdır — sadece istemediğini sil, geri kalanı
 **Supabase kullanıcı sistemini (kayıt/giriş/panel/admin) kaldırmak istersen:**
 - `hesap/giris.md`, `hesap/kayit.md`, `hesap/sifremi-unuttum.md`, `hesap/sifre-guncelle.md`,
   `hesap/hesap-onayla.md`, `panel/panel.md`, `panel/admin.md`, `panel/ozel-icerik.md` dosyalarını sil
-- `assets/js/core/supabase-client.js`, `auth-guard.js`, `auth-pages.js`,
-  `panel.js`, `admin.js`, `ozel-icerik.js`, `nav-auth.js` ve
+- `assets/js/core/supabase-client.js`, `assets/js/auth/auth-guard.js`,
+  `assets/js/auth/auth-pages.js`, `assets/js/auth/nav-auth.js`,
+  `assets/js/panel.js`, `assets/js/admin.js`, `assets/js/ozel-icerik.js` ve
   `assets/css/auth.css` dosyalarını sil
 - `supabase/` klasörünü (migrations + functions) tamamen sil
 - `_layouts/default.html` içindeki `#auth-nav` bloğunu ve onu başlatan
@@ -94,6 +95,32 @@ Aşağıdaki her blok bağımsızdır — sadece istemediğini sil, geri kalanı
 - Supabase Dashboard'dan projeyi de silmek istersen **Project Settings →
   General → Delete Project** üzerinden yapabilirsin (bu, koddan bağımsız,
   ayrı bir adım)
+- Bunu silersen `panel/github-yonetim.html` de (aşağıya bkz.) çalışmaz
+  hale gelir — Supabase oturumuna/rolüne bağımlı. O özelliği de
+  istemiyorsan aşağıdaki bloğu da uygula.
+
+**GitHub İçerik Yönetimi'ni (`panel/github-yonetim.html` mini CMS'i + onun
+Cloudflare Worker'ı) kaldırmak istersen:**
+- `panel/github-yonetim.md`, `onizleme/index.md`, `icerik/supabase-yazi.md`
+  dosyalarını sil
+- `assets/js/github-yonetim/` klasörünü (3 dosya: `github-yonetim.js`,
+  `onizleme.js`, `supabase-yazi.js`) tamamen sil
+- `assets/css/github-yonetim.css` dosyasını sil
+- `cloudflare worker/github_icerik_yonetim_worker/` klasörünü sil (ve
+  Cloudflare Dashboard'da o Worker'ı deploy ettiysen orada da sil)
+- `_layouts/default.html` içindeki "Hesabım" menüsünde (admin/editor/
+  manager'a görünen) GitHub İçerik Yönetimi linkini sil — bkz.
+  `assets/js/auth/nav-auth.js`
+- **Migration'lar konusunda dikkatli ol:** `taslak_icerikler` tablosu ve
+  editor/manager yayın onayı akışı `supabase/migrations/0013` ile `0018`
+  ve `0020` arasındaki dosyalara YAYILMIŞ durumda, ve bu dosyalar
+  birbirine (ör. 0016, 0014'ün eklediği bir kolona) bağımlı. Migration'ları
+  HENÜZ hiç çalıştırmadıysan bu dosyaları (0013, 0014, 0015, 0016, 0018,
+  0020) atlayabilirsin; ama zaten çalıştırdıysan (canlı bir Supabase
+  projen varsa) tek tek geri almaya ÇALIŞMA — bozulma riski yüksek. Bu
+  durumda en basit yol: özelliği koddan kaldır (yukarıdaki dosyaları sil)
+  ama veritabanı tablolarına/fonksiyonlarına DOKUNMA; kullanılmayan bir
+  tablo zarar vermez.
 
 ### 5. Cloudflare Pages mi, GitHub Pages mi? (Birincil Adres / Barındırma Seçimi)
 
@@ -141,29 +168,83 @@ onlara dokunmuyorsun.
 - `robots.txt` içindeki `Sitemap:` satırını GitHub Pages adresine güncelle
   (Senaryo A'daki tabloyla aynı satır)
 - Cloudflare Worker'lardaki (`r2_storage_worker`, `izleme_okuma_worker`,
-  `github_icerik_worker`)
+  `github_icerik_yonetim_worker`)
   ve Edge Function'lardaki (`delete-account`, `admin-change-email`)
   `pages.dev` referanslarını silmen ZORUNLU değil (kullanılmayan bir
   adresin izin listesinde durması zarar vermez), ama istersen temizlik
   için kaldırabilirsin.
 
-### 6. Secret / Gizli Anahtarlar — Nerede, Nasıl Tanımlanır
+### 6. GitHub İçerik Yönetimi Worker'ını Kurma (`panel/github-yonetim.html`)
 
-Bu projede kod içine **asla düz yazılmaması gereken** tek secret,
-Cloudflare Pages'i otomatik build tetikleyen deploy hook URL'idir.
-(Google Analytics ID ve giscus ayarları secret değildir, herkese açık
-görünebilir bilgilerdir, bu yüzden `_config.yml` içinde düz yazılıdır.)
+`panel/github-yonetim.html`, admin/editor/manager rolündeki kullanıcıların
+blog yazısı/akademik proje ekleyip GitHub'a commit ederek (ya da sadece
+Supabase'te) yayınlayabildiği bir mini CMS. Bu özelliği kullanacaksan
+(silmek istiyorsan yerine "Bölüm 4"teki ilgili bloğa bak), aşağıdaki
+Cloudflare Worker'ı **senin kendi Worker'ın olarak** deploy etmen
+gerekiyor — benim Worker'ım sadece benim GitHub token'ımla çalışır, seninki
+çalışmaz.
+
+**Neden bir Worker gerekiyor?** GitHub'a yazma izni olan bir Personal
+Access Token (PAT), hiçbir zaman tarayıcıya/panele girmiyor — sadece bu
+Worker'ın sunucu-taraflı bir secret'ı olarak duruyor. Panel, GitHub'a değil
+bu Worker'a, kimlik kanıtı olarak Supabase oturum token'ını göndererek
+istek atıyor; Worker o token'ı doğrulayıp rolünü (`editor`/`manager`/
+`admin`) kontrol ettikten SONRA kendi PAT'ıyla GitHub'a yazıyor. Tam
+mimari gerekçe için `cloudflare worker/github_icerik_yonetim_worker/worker.js`
+dosyasının başındaki yorumu oku — burada sadece KURULUM adımları var.
+
+| Adım | Ne yapmalısın |
+|---|---|
+| 1. Worker'ı oluştur | [dash.cloudflare.com](https://dash.cloudflare.com) → **Workers & Pages → Create → Create Worker** → bir isim ver (ör. `github-icerik-yonetim`) → Deploy (şimdilik varsayılan kodla) |
+| 2. Kodu yapıştır | Worker sayfası → **Edit code** (Quick Edit) → varsayılan kodu sil, `cloudflare worker/github_icerik_yonetim_worker/worker.js` dosyasının TAMAMINI yapıştır → **Deploy** |
+| 3. Fine-grained GitHub PAT oluştur | [github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new) → **Resource owner**: kendi kullanıcı adın → **Repository access**: "Only select repositories" → sadece kendi fork'unu seç → **Repository permissions → Contents**: "Read and write" → oluştur, token'ı (bir kez gösterilir) kopyala |
+| 4. Secret'ları gir | Worker → **Settings → Variables and Secrets → Add** (aşağıdaki tablo) |
+| 5. Worker URL'ini al ve panele yaz | Worker sayfasının üstündeki adresi (`https://<isim>.<hesabın>.workers.dev`) kopyala → `assets/js/github-yonetim/github-yonetim.js` içindeki `GITHUB_PROXY_WORKER_URL` sabitini bu adresle değiştir → commit'le |
+| 6. Test et | `/panel/github-yonetim.html`'e admin/editor/manager hesabıyla gir — "GitHub Bağlantısı" sekmesi otomatik doğrulanmayı dener; yeşil "Bağlantı doğrulandı" mesajı görürsen tamam |
+
+**Girmen gereken 5 değişken** (Worker → Settings → Variables and Secrets):
+
+| Değişken | Değer | Tip |
+|---|---|---|
+| `GITHUB_OWNER` | Kendi GitHub kullanıcı adın | Text |
+| `GITHUB_REPO` | Fork'unun repo adı (ör. `kullaniciadin.github.io`) | Text |
+| `GITHUB_PAT` | 3. adımda oluşturduğun fine-grained token | **Secret** |
+| `SUPABASE_URL` | `assets/js/core/supabase-client.js` içindeki `SUPABASE_URL` ile AYNI değer (gizli değil) | Text |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase Dashboard → **Project Settings → API** → "service_role" satırındaki anahtar | **Secret** |
+
+**⚠️ `SUPABASE_SERVICE_ROLE_KEY` özellikle önemli:** bu anahtar Supabase'teki
+Row Level Security'yi (RLS) TAMAMEN bypass eder — Worker'ın kimlik/rol
+kontrolü yapabilmesi için gerekli, ama ASLA `.js` dosyasına, ASLA bir
+commit'e, ASLA `_config.yml`'e yazma. Sadece Worker'ın "Secret" (Encrypt)
+alanına gir — Cloudflare bir kez kaydettikten sonra onu bile tekrar
+göstermez.
+
+**Bu özelliği istemiyorsan** yukarıdaki adımları hiç uygulama — panel
+sadece "Bağlantı doğrulanamadı" hatası gösterir, sitenin geri kalanı
+etkilenmez. Kalıcı olarak kaldırmak istersen "Bölüm 4 → GitHub İçerik
+Yönetimi'ni kaldırmak istersen" bloğuna bak (dosyaları/klasörü siler).
+
+### 7. Secret / Gizli Anahtarlar — Nerede, Nasıl Tanımlanır
+
+Bu projede kod içine **asla düz yazılmaması gereken** secret'lar:
+Cloudflare Pages'i otomatik build tetikleyen deploy hook URL'i, ve (Bölüm
+6'daki) GitHub İçerik Yönetimi Worker'ının `GITHUB_PAT` /
+`SUPABASE_SERVICE_ROLE_KEY` değerleri. (Google Analytics ID ve giscus
+ayarları secret değildir, herkese açık görünebilir bilgilerdir, bu yüzden
+`_config.yml` içinde düz yazılıdır.)
 
 | Secret adı | Nerede kullanılır | Nasıl oluşturulur | Nereye eklenir |
 |---|---|---|---|
 | `CLOUDFLARE_DEPLOY_HOOK_URL` | `.github/workflows/zamanlanmis-yayin.yml` | Cloudflare Pages projeni aç → **Settings → Builds & deployments → Deploy Hooks** → yeni bir hook oluştur, verdiği URL'i kopyala | GitHub repo'nda **Settings → Secrets and variables → Actions → New repository secret** → isim: `CLOUDFLARE_DEPLOY_HOOK_URL`, değer: kopyaladığın URL |
+| `GITHUB_PAT` | `cloudflare worker/github_icerik_yonetim_worker/worker.js` | Bkz. Bölüm 6, adım 3 | Worker → **Settings → Variables and Secrets** (Secret/Encrypt olarak) |
+| `SUPABASE_SERVICE_ROLE_KEY` | `cloudflare worker/github_icerik_yonetim_worker/worker.js` (ve varsa diğer Worker'ların — `r2_storage_worker`, `izleme_okuma_worker`) | Supabase Dashboard → **Project Settings → API** | İlgili Worker'ın **Settings → Variables and Secrets** (Secret/Encrypt olarak) |
 
 Bu projede kullanılan diğer üçüncü parti servisler (Google Analytics,
 giscus, Google Forms) API anahtarı değil, herkese açık/genel amaçlı ID'ler
 kullanır; bunları `_config.yml` veya ilgili `.md` dosyasına doğrudan
 yazman güvenlidir, GitHub Secrets'a eklemene gerek yoktur.
 
-### 7. Yayına Alma Sırası (Özet)
+### 8. Yayına Alma Sırası (Özet)
 
 1. Yukarıdaki `_config.yml` ve `_config_cloudflare.yml` alanlarını doldur
 2. `assets/data/schema.json` ve `llms.txt`'i kendi bilgilerinle yeniden yaz (Bölüm 2)
@@ -171,8 +252,9 @@ yazman güvenlidir, GitHub Secrets'a eklemene gerek yoktur.
 4. Cloudflare Pages'te yeni bir proje oluştur, bu repo'yu bağla
    - Build command: `bundle exec jekyll build --config _config.yml,_config_cloudflare.yml`
    - Build output directory: `_site`
-5. Zamanlanmış yayın özelliğini kullanacaksan `CLOUDFLARE_DEPLOY_HOOK_URL` secret'ını ekle (Bölüm 6)
-6. GitHub Pages'i de yedek olarak kullanacaksan repo **Settings → Pages** üzerinden aktif et
+5. Zamanlanmış yayın özelliğini kullanacaksan `CLOUDFLARE_DEPLOY_HOOK_URL` secret'ını ekle (Bölüm 7)
+6. GitHub İçerik Yönetimi'ni kullanacaksan Worker'ı kur (Bölüm 6)
+7. GitHub Pages'i de yedek olarak kullanacaksan repo **Settings → Pages** üzerinden aktif et
 
 ---
 
