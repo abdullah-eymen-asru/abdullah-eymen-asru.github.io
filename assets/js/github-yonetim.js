@@ -338,6 +338,21 @@ async function panelVerisiniYukle() {
  */
 async function panelListeleriniTazele() {
   if (!GH_BAGLI) return;
+  // BUG FİX (liste anlık güncellenmiyor / silinen içerik listede kalıyor):
+  // GitHub'ın Contents API'si bir commit/silme işleminden HEMEN sonra
+  // istendiğinde bazen hâlâ ESKİ (işlem öncesi) içeriği döndürüyor — bu,
+  // GitHub'ın kendi tarafındaki KISA SÜRELİ "eventual consistency"
+  // gecikmesi, bizim "cache: no-store" / cf.cacheTtl:0 önlemlerimizle
+  // ÇÖZÜLEMEZ (onlar sadece tarayıcı/Cloudflare önbelleğini devre dışı
+  // bırakıyor, GitHub'ın kendi arka ucunu değil). Sonuç: örn. icerikSil()
+  // önce öğeyi yerel TUM_ICERIKLER'den iyimser (optimistic) olarak
+  // kaldırıyor, AMA hemen ardından çağrılan icerikListesiYukle() taze
+  // sanılan (aslında hâlâ eski) PANEL_VERI'den TUM_ICERIKLER'i BAŞTAN
+  // kurunca silinen öğe listede "geri geliyor" gibi görünüyordu. Aynı
+  // şekilde yeni kaydedilen/yayınlanan bir içerik de bir sonraki
+  // yenilemede henüz görünmeyebiliyordu. Burada GitHub'a yayılma zamanı
+  // tanımak için okumadan önce kısa bir bekleme ekliyoruz.
+  await new Promise((resolve) => setTimeout(resolve, 900));
   try {
     await panelVerisiniYukle();
   } catch (err) {
@@ -2861,6 +2876,16 @@ async function icerikSil(item) {
     listeyiYenidenCiz();
     await panelListeleriniTazele();
     await icerikListesiYukle();
+    // EK GÜVENCE: panelListeleriniTazele'deki bekleme yeterli olmadıysa
+    // (ör. GitHub o an olağandışı yavaşsa) ve icerikListesiYukle silinen
+    // öğeyi hâlâ eski (silme öncesi) veriden geri getirdiyse, burada onu
+    // TEKRAR eleyip yeniden çiziyoruz — silinen bir öğe hiçbir koşulda
+    // listede "geri gelmiş" görünmemeli.
+    const anahtar = itemAnahtari(item);
+    if (TUM_ICERIKLER.some((i) => itemAnahtari(i) === anahtar)) {
+      TUM_ICERIKLER = TUM_ICERIKLER.filter((i) => itemAnahtari(i) !== anahtar);
+      listeyiYenidenCiz();
+    }
   } catch (err) {
     alert(`Silinemedi: ${err.message}`);
   }
