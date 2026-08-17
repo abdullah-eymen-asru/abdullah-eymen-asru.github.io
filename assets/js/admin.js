@@ -50,7 +50,7 @@ async function init() {
   // admin DEĞİL. Aşağıdaki dallanmalar bunu hem hangi adımların
   // çalıştırılacağını hem de hangi sekmelerin görüneceğini belirlemek için
   // kullanır.
-  const TAM_YETKILI = profile.role === "admin";
+  const TAM_YETKILI = profile.role === "admin" || profile.role === "owner";
   document.getElementById("loading")?.setAttribute("hidden", "");
   document.getElementById("app").hidden = false;
 
