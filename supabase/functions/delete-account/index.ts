@@ -120,9 +120,9 @@ Deno.serve(async (req) => {
       .eq("id", callerId)
       .single();
 
-    if (profileErr || callerProfile?.role !== "admin") {
+    if (profileErr || (callerProfile?.role !== "admin" && callerProfile?.role !== "owner")) {
       return new Response(
-        JSON.stringify({ error: "Yetkisiz işlem: sadece admin başka bir kullanıcıyı silebilir." }),
+        JSON.stringify({ error: "Yetkisiz işlem: sadece admin/owner başka bir kullanıcıyı silebilir." }),
         { status: 403, headers }
       );
     }
