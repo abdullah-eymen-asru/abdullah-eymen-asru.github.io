@@ -492,27 +492,38 @@
  *    bölümler için bu sınıf, bölümü görünür alanın (viewport) ortasına
  *    hizalayarak 860px sınırının DIŞINA taşırır — böylece daha büyük
  *    ekranlarda konuşma listesi + mesaj alanı yan yana rahatça sığar.
- *    "margin-left:50%; transform:translateX(-50%)" tekniği, ebeveyninin
- *    genişliğinden bağımsız olarak öğeyi VIEWPORT'A göre ortalar ve
- *    (calc(50vw) tekniklerinin aksine) yatay kaydırma çubuğu riski
- *    yaratmaz. Dar ekranlarda (mobil) normal tam genişlikte kalır.
+ *    "left:50%; transform:translateX(-50%)" tekniği, ebeveyninin
+ *    genişliğinden/ofsetinden bağımsız olarak öğeyi VIEWPORT'A göre
+ *    ortalar. Dar ekranlarda (mobil) normal tam genişlikte kalır.
+ *
+ *    NOT: "Mesajlar" artık kendi bağımsız sayfasında (panel/mesajlar.md)
+ *    ve aynı tekniği assets/css/mesajlar.css içindeki ".mesajlar-sayfa"
+ *    kullanıyor — bu sınıf şu an hiçbir şablonda KULLANILMIYOR, sadece
+ *    ileride benzer bir ihtiyaç çıkarsa diye burada tutuluyor.
  * ---------------------------------------------------------------------- */
 @media (min-width: 900px) {
   .panel-section--wide {
-    /* ÖNCEDEN: width: calc(100vw - 40px); margin-left: 50%; transform:
-       translateX(-50%); — bu, elemanı VIEWPORT genişliğine göre ortalıyordu.
-       Sorun: 100vw, dikey scrollbar'ın kapladığı alanı SAYMAZ (scrollbar
-       genişliği genelde ~15-17px) — bu yüzden gerçek kullanılabilir alandan
-       birkaç piksel daha geniş bir kutu oluşuyor, bu da sayfada anlık yatay
-       taşmaya ve "kayma" hissine yol açıyordu.
-       ŞİMDİ: aynı görsel efekti (bölümün 860px'lik .wrap sınırının dışına,
-       geniş ekranlarda daha ferah görünmesini) ebeveynin (.wrap) GERÇEK
-       genişliğine göre negatif margin ile veriyoruz — viewport/scrollbar
-       ölçümüne hiç bağımlı değil, taşma riski yok. */
+    /* BUG FİX: bir önceki sürüm burada "margin-left/right: calc(50% -
+       50vw + 2vw)" kullanıyordu (yukarıdaki açıklamanın VAAT ETTİĞİ
+       translateX tekniği DEĞİL — muhtemelen bir önceki düzeltme sırasında
+       yanlışlıkla bu formülle değiştirilmiş). Bu formül SADECE kutunun
+       genişliği ".wrap" ebeveyninin genişliğine EŞİTKEN doğru ortalar;
+       burada kutunun genişliği ebeveynden bağımsız (min(1180px, 96vw))
+       olduğundan "%" (ebeveyne göre) ile "vw" (viewport'a göre) terimleri
+       birbirini iptal etmiyor ve kutu geniş ekranlarda belirgin şekilde
+       SOLA kayıyordu (aynı hata assets/css/mesajlar.css'te de vardı, bkz.
+       o dosyadaki BUG FİX notu — orada da AYNI şekilde düzeltildi).
+       ÇÖZÜM: "left: 50%; transform: translateX(-50%)" — translateX'in
+       yüzdesi kutunun KENDİ genişliğine göre hesaplandığından ebeveynin
+       genişliği/ofseti matematikten tamamen düşer, viewport'a göre
+       gerçek ortalama elde edilir. Genişlik 100vw değil sabit
+       min(1180px, 96vw) olduğundan eski "100vw" tekniğindeki scrollbar
+       taşma riski de burada söz konusu değil. */
     width: min(1180px, 96vw);
     max-width: 96vw;
-    margin-left: calc(50% - 50vw + 2vw);
-    margin-right: calc(50% - 50vw + 2vw);
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
   }
 }
 
