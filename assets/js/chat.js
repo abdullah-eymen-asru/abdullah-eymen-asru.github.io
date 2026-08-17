@@ -28,6 +28,11 @@
  */
 import { supabase, escapeHtml, showMessage, kucukHarfeCevirTr, kullaniciAramayaUyuyorMu } from "./core/supabase-client.js";
 
+/** Bir hedef (admin/owner) rol kodunu ekranda gösterilecek etikete çevirir. */
+function hedefRolEtiketi(rol) {
+  return rol === "owner" ? "Site Sahibi" : "Yönetici";
+}
+
 function formatSaat(iso) {
   return new Date(iso).toLocaleString("tr-TR", {
     day: "2-digit",
@@ -143,17 +148,106 @@ export async function wireUserChat(profile) {
   const yeniKonuInput = document.getElementById("chat-yeni-sohbet-konu");
   const yeniIptalBtn = document.getElementById("chat-yeni-sohbet-iptal");
 
+  // "Kime?" (hedef admin/site sahibi) seçimi — bkz. supabase/migrations/
+  // 0025_mesaj_hedef_admin_secimi.sql. Seçim SADECE BİLGİ AMAÇLIDIR: hangi
+  // hedef seçilirse seçilsin konuşma yine paylaşımlı gelen kutusunda kalır,
+  // TÜM adminler ve site sahipleri görüp yanıtlayabilir (RLS değişmedi) —
+  // burada sadece "kiminle konuşmak istediğini" işaretlemiş oluyorsun.
+  const hedefEtiketEl = document.getElementById("chat-hedef-etiket");
+  const hedefDegistirBtn = document.getElementById("chat-hedef-degistir-btn");
+  const hedefModal = document.getElementById("chat-hedef-modal");
+  const hedefModalKapatBtn = document.getElementById("chat-hedef-modal-kapat");
+  const hedefAramaInput = document.getElementById("chat-hedef-arama");
+  const hedefListeEl = document.getElementById("chat-hedef-liste");
+  const hedefTemizleBtn = document.getElementById("chat-hedef-temizle-btn");
+  const hedefSekmeBtnler = hedefModal ? Array.from(hedefModal.querySelectorAll(".msg-hedef-sekme")) : [];
+
   let SECILI_KONUSMA = null;
   let KONUSMALAR = [];
+  let SECILI_HEDEF = null; // { id, ad, rol } — "Yeni Sohbet" formunda seçili hedef, null ise "fark etmez"
+  let HEDEF_ADAYLARI = []; // mesaj_hedef_listesi_getir() sonucu — { id, full_name, email, role }[]
+  let HEDEF_ADLARI = {}; // id -> görünen ad, konuşma listesi/başlığında göstermek için
+  let HEDEF_AKTIF_SEKME = "";
 
   function bosListeMesaji() {
     return `<p class="chat-bos">Henüz sohbetin yok. Yukarıdan <strong>+ Yeni Sohbet</strong> ile başlat.</p>`;
   }
 
+  async function hedefAdaylariniYukle() {
+    const { data, error } = await supabase.rpc("mesaj_hedef_listesi_getir");
+    HEDEF_ADAYLARI = error ? [] : data || [];
+    HEDEF_ADLARI = {};
+    HEDEF_ADAYLARI.forEach((a) => (HEDEF_ADLARI[a.id] = a.full_name || a.email));
+  }
+
+  function hedefEtiketiGuncelle() {
+    if (!hedefEtiketEl) return;
+    hedefEtiketEl.textContent = SECILI_HEDEF ? `${SECILI_HEDEF.ad} (${hedefRolEtiketi(SECILI_HEDEF.rol)})` : "Yönetici (fark etmez)";
+  }
+
+  function hedefListesiniCiz() {
+    if (!hedefListeEl) return;
+    const q = kucukHarfeCevirTr((hedefAramaInput?.value || "").trim());
+    const eslesenler = HEDEF_ADAYLARI.filter((a) => (!HEDEF_AKTIF_SEKME || a.role === HEDEF_AKTIF_SEKME) && kullaniciAramayaUyuyorMu(a, q));
+
+    if (eslesenler.length === 0) {
+      hedefListeEl.innerHTML = `<p class="chat-bos">Eşleşen kimse yok.</p>`;
+      return;
+    }
+    hedefListeEl.innerHTML = eslesenler
+      .map(
+        (a) => `
+      <button type="button" class="msg-uye-sonuc-item" data-id="${a.id}" data-ad="${escapeHtml(a.full_name || a.email)}" data-rol="${a.role}">
+        <span class="msg-uye-sonuc-isim">${escapeHtml(a.full_name || "—")} <span class="msg-hedef-rozet">${hedefRolEtiketi(a.role)}</span></span>
+        <span class="muted">${escapeHtml(a.email)}</span>
+      </button>`
+      )
+      .join("");
+    hedefListeEl.querySelectorAll(".msg-uye-sonuc-item").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        SECILI_HEDEF = { id: btn.dataset.id, ad: btn.dataset.ad, rol: btn.dataset.rol };
+        hedefEtiketiGuncelle();
+        hedefModalKapat();
+      });
+    });
+  }
+
+  function hedefModalAc() {
+    if (!hedefModal) return;
+    hedefModal.hidden = false;
+    if (hedefAramaInput) hedefAramaInput.value = "";
+    HEDEF_AKTIF_SEKME = "";
+    hedefSekmeBtnler.forEach((b) => b.classList.toggle("active", b.dataset.rol === ""));
+    hedefListesiniCiz();
+    setTimeout(() => hedefAramaInput?.focus(), 50);
+  }
+  function hedefModalKapat() {
+    if (hedefModal) hedefModal.hidden = true;
+  }
+
+  hedefDegistirBtn?.addEventListener("click", hedefModalAc);
+  hedefModalKapatBtn?.addEventListener("click", hedefModalKapat);
+  hedefModal?.addEventListener("click", (e) => {
+    if (e.target === hedefModal) hedefModalKapat();
+  });
+  hedefTemizleBtn?.addEventListener("click", () => {
+    SECILI_HEDEF = null;
+    hedefEtiketiGuncelle();
+    hedefModalKapat();
+  });
+  hedefSekmeBtnler.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      HEDEF_AKTIF_SEKME = btn.dataset.rol;
+      hedefSekmeBtnler.forEach((b) => b.classList.toggle("active", b === btn));
+      hedefListesiniCiz();
+    });
+  });
+  hedefAramaInput?.addEventListener("input", hedefListesiniCiz);
+
   async function konusmalariYukle() {
     const { data, error } = await supabase
       .from("conversations")
-      .select("id, konu, son_mesaj_at")
+      .select("id, konu, son_mesaj_at, hedef_admin_id")
       .eq("user_id", profile.id)
       .order("son_mesaj_at", { ascending: false });
 
@@ -167,15 +261,16 @@ export async function wireUserChat(profile) {
     listPaneEl.innerHTML =
       KONUSMALAR.length === 0
         ? bosListeMesaji()
-        : KONUSMALAR.map((k) =>
-            konusmaOgesiHtml({
+        : KONUSMALAR.map((k) => {
+            const hedefAdi = k.hedef_admin_id ? HEDEF_ADLARI[k.hedef_admin_id] : null;
+            return konusmaOgesiHtml({
               id: k.id,
               baslikMetni: k.konu,
-              konu: `Son güncelleme: ${formatSaat(k.son_mesaj_at)}`,
+              konu: hedefAdi ? `Kime: ${hedefAdi} · ${formatSaat(k.son_mesaj_at)}` : `Son güncelleme: ${formatSaat(k.son_mesaj_at)}`,
               sonMesaj: onizlemeler[k.id],
               aktif: k.id === SECILI_KONUSMA,
-            })
-          ).join("");
+            });
+          }).join("");
 
     listPaneEl.querySelectorAll(".msg-konusma-sec").forEach((btn) => {
       btn.addEventListener("click", () => konusmaSec(btn.dataset.id));
@@ -223,7 +318,8 @@ export async function wireUserChat(profile) {
   function konusmaSec(id) {
     SECILI_KONUSMA = id;
     const k = KONUSMALAR.find((x) => x.id === id);
-    baslikEl.textContent = k ? k.konu : "Sohbet";
+    const hedefAdi = k?.hedef_admin_id ? HEDEF_ADLARI[k.hedef_admin_id] : null;
+    baslikEl.textContent = k ? (hedefAdi ? `${k.konu} — Kime: ${hedefAdi}` : k.konu) : "Sohbet";
     form.hidden = false;
     yeniWrap.hidden = true;
     listPaneEl.querySelectorAll(".msg-konusma-item").forEach((b) => b.classList.toggle("active", b.dataset.id === id));
@@ -240,6 +336,8 @@ export async function wireUserChat(profile) {
   yeniIptalBtn?.addEventListener("click", () => {
     yeniWrap.hidden = true;
     yeniForm.reset();
+    SECILI_HEDEF = null;
+    hedefEtiketiGuncelle();
   });
 
   yeniForm?.addEventListener("submit", async (e) => {
@@ -248,7 +346,10 @@ export async function wireUserChat(profile) {
     if (!konu) return;
     const btn = yeniForm.querySelector('button[type="submit"]');
     btn.disabled = true;
-    const { data, error } = await supabase.rpc("baslat_konusma", { p_konu: konu });
+    const { data, error } = await supabase.rpc("baslat_konusma", {
+      p_konu: konu,
+      p_hedef_admin_id: SECILI_HEDEF?.id || null,
+    });
     btn.disabled = false;
     if (error) {
       showMessage(msg, "Sohbet başlatılamadı: " + error.message);
@@ -256,10 +357,14 @@ export async function wireUserChat(profile) {
     }
     yeniForm.reset();
     yeniWrap.hidden = true;
+    SECILI_HEDEF = null;
+    hedefEtiketiGuncelle();
+    await hedefAdaylariniYukle();
     await konusmalariYukle();
     konusmaSec(data);
   });
 
+  await hedefAdaylariniYukle();
   await konusmalariYukle();
 
   form.addEventListener("submit", async (e) => {
@@ -323,15 +428,15 @@ export async function wireAdminChat(adminId) {
   const aramaSonucEl = document.getElementById("chat-uye-arama-sonuc");
 
   let SECILI_KONUSMA = null;
-  let KONUSMALAR = []; // { id, user_id, konu, son_mesaj_at }
+  let KONUSMALAR = []; // { id, user_id, konu, son_mesaj_at, hedef_admin_id }
   let ONIZLEMELER = {};
-  let PROFIL_ADLARI = {}; // user_id -> "Ad Soyad (ya da e-posta)"
+  let PROFIL_ADLARI = {}; // user_id (ve hedef_admin_id) -> "Ad Soyad (ya da e-posta)"
   let SECILI_UYE = null; // admin arama sonucundan bir üye seçtiyse: { id, isim }
 
   async function konusmalariYukle() {
     const { data, error } = await supabase
       .from("conversations")
-      .select("id, user_id, konu, son_mesaj_at")
+      .select("id, user_id, konu, son_mesaj_at, hedef_admin_id")
       .order("son_mesaj_at", { ascending: false });
 
     if (error) {
@@ -340,7 +445,9 @@ export async function wireAdminChat(adminId) {
     }
     KONUSMALAR = data || [];
 
-    const idler = [...new Set(KONUSMALAR.map((k) => k.user_id))];
+    // Üye adları İÇİN user_id'leri, "kime yazmak istemiş" bilgisini
+    // göstermek için de hedef_admin_id'leri (varsa) TEK sorguda çekiyoruz.
+    const idler = [...new Set([...KONUSMALAR.map((k) => k.user_id), ...KONUSMALAR.map((k) => k.hedef_admin_id)].filter(Boolean))];
     if (idler.length > 0) {
       const { data: profiller } = await supabase.from("profiles").select("id, full_name, email").in("id", idler);
       PROFIL_ADLARI = {};
@@ -377,15 +484,16 @@ export async function wireAdminChat(adminId) {
       gosterilecekler.length === 0
         ? `<p class="chat-bos">${SECILI_UYE ? "Bu üyeyle henüz sohbet yok. Yukarıdan yeni bir tane başlatabilirsin." : "Henüz hiç mesaj yok."}</p>`
         : gosterilecekler
-            .map((k) =>
-              konusmaOgesiHtml({
+            .map((k) => {
+              const hedefAdi = k.hedef_admin_id ? PROFIL_ADLARI[k.hedef_admin_id] : null;
+              return konusmaOgesiHtml({
                 id: k.id,
                 baslikMetni: PROFIL_ADLARI[k.user_id] || "Bilinmeyen üye",
-                konu: k.konu,
+                konu: hedefAdi ? `${k.konu} · Kime: ${hedefAdi}` : k.konu,
                 sonMesaj: ONIZLEMELER[k.id],
                 aktif: k.id === SECILI_KONUSMA,
-              })
-            )
+              });
+            })
             .join("");
 
     listPaneEl.innerHTML = ustBar + `<div class="msg-konusma-liste-ic">${listeHtml}</div>`;
