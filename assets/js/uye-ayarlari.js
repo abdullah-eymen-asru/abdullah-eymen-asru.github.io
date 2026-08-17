@@ -31,6 +31,9 @@ const ROL_ETIKETLERI = {
   editor: "Editör",
   manager: "İçerik Sorumlusu",
   admin: "Yönetici",
+  // BUG FİX: 'owner' (Site Sahibi, migration 0021) bu haritada yoktu —
+  // üye listesinde owner'ın rolü ham "owner" metniyle görünüyordu.
+  owner: "Site Sahibi",
 };
 
 let TUM_KULLANICILAR = [];
@@ -263,6 +266,11 @@ function uyeKartHtml(u) {
             <option value="editor" ${u.role === "editor" ? "selected" : ""}>Editör</option>
             <option value="manager" ${u.role === "manager" ? "selected" : ""}>İçerik Sorumlusu</option>
             <option value="admin" ${u.role === "admin" ? "selected" : ""}>Yönetici</option>
+            ${
+              u.role === "owner"
+                ? `<option value="owner" selected disabled>Site Sahibi (buradan değiştirilemez)</option>`
+                : ""
+            }
           </select>
         </div>
         <div class="uya-kart-aksiyonlar">
