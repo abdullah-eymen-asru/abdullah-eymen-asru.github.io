@@ -3131,6 +3131,21 @@ function icerikKartiCiz(item, tur) {
   const hedefAdminVeyaOwnerMi =
     GIRIS_YAPAN_PROFIL?.role === "owner" ||
     (GIRIS_YAPAN_PROFIL?.role === "admin" && !!item.data.yazar_id && GIRIS_YAPAN_PROFIL?.id === item.data.yazar_id);
+  // MİGRATION 0028 § C: "admin adına" (admin_adina_talep) YA DA "Site
+  // Sahibi adına" (sahip_adina_talep) işaretli bir taslakta, hedef admin/
+  // owner ve içeriği GERÇEKTEN oluşturan (icerikKendisineMiAit) kişi
+  // DIŞINDAKİ hiçbir admin artık bu satırı düzenleyemez/silemez/yayın
+  // durumunu değiştiremez — veritabanı tarafı (taslak_update_own_or_admin/
+  // taslak_delete_own_or_admin RLS politikaları, migration 0028) zaten bunu
+  // reddeder, burada da Düzenle/Sil/Yayınla butonlarını gizleyerek
+  // kullanıcıyı reddedilecek bir işlemi denemekten önceden caydırıyoruz.
+  // owner bu kısıttan HER ZAMAN muaf (hedefAdminVeyaOwnerMi zaten owner'ı
+  // kapsıyor).
+  const digerAdminErisimEngelliMi =
+    GIRIS_YAPAN_PROFIL?.role === "admin" &&
+    (item.data.admin_adina_talep || item.data.sahip_adina_talep) &&
+    !hedefAdminVeyaOwnerMi &&
+    !icerikKendisineMiAit(item);
   // Admin onayı bekleyen/reddedilmiş bir "admin adına" talebi, hedef admin
   // ya da owner OLMAYAN biri gerçekten yayına alamaz — düğme devre dışı
   // bırakılıp sebebi title'da gösteriliyor (bkz. migration 0026'daki DB
@@ -3142,6 +3157,8 @@ function icerikKartiCiz(item, tur) {
     !hedefAdminVeyaOwnerMi;
   const kilitliOznitelik = onayEksikDegilMi
     ? `disabled title="Bu içerik, adına yazıldığı admin ${item.data.admin_onay_durumu === "reddedildi" ? "reddettiği için" : "onayı (ya da Site Sahibi onayı) bekleniyor olduğu için"} henüz yayınlanamaz."`
+    : digerAdminErisimEngelliMi
+    ? `disabled title="Bu içerik ${item.data.sahip_adina_talep ? "Site Sahibi" : "başka bir admin"} adına yayınlandı/talep edildi — sadece o kişi ya da Site Sahibi yayın durumunu değiştirebilir."`
     : "";
   if (item.kaynak === "supabase" && sadeceSupabaseYayinda) {
     durumBtn = `<button type="button" class="gy-durum-degistir-btn gy-durum-degistir-btn--yayinla" data-hedef="yayinla" ${kilitliOznitelik}>GitHub'a da Aktar</button>`;
@@ -3194,7 +3211,11 @@ function icerikKartiCiz(item, tur) {
   // butonları önceden gizleyerek kullanıcıyı zaten reddedilecek bir isteği
   // denemekten caydıran bir kolaylık katmanıdır.
   const editorKisitliMi = GIRIS_YAPAN_PROFIL?.role === "editor" && !icerikKendisineMiAit(item);
-  const duzenleSilBtnleri = editorKisitliMi
+  // MİGRATION 0028 § C: editor kısıtına ek olarak, "admin adına"/"Site
+  // Sahibi adına" işaretli bir taslakta hedef/owner/oluşturan DIŞINDAKİ bir
+  // admin de artık Düzenle/Sil butonlarını GÖRMEZ (bkz. digerAdminErisimEngelliMi
+  // yukarıda) — gerçek sınır yine Supabase RLS'idir (migration 0028).
+  const duzenleSilBtnleri = editorKisitliMi || digerAdminErisimEngelliMi
     ? ""
     : `<button type="button" class="gy-duzenle-btn">Düzenle</button>
        <button type="button" class="gy-sil-btn">Sil</button>`;
