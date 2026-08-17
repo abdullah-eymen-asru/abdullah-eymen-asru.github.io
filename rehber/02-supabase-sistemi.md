@@ -892,6 +892,46 @@ istemedim.
 
 Bu bölüm, siteye/Supabase kullanıcı sistemine sonradan yapılan düzeltmelerin tarih sırasıyla özetidir — hangi sorun bildirildi, kök nedeni neydi, nasıl çözüldü ve (varsa) senin elle yapman gereken adım neydi. Eskiden kökte ayrı `DEGISIKLIKLER_*.md` dosyaları halinde duruyordu, artık tek doğruluk kaynağı burası — en yeni turu en üstte bulursun.
 
+### 🗓️ 17.08.2026 (2. Tur) — Admin yetki devri kısıtlaması, denetim vakası silme ve hedef e-postası
+
+Üç ayrı istek/bildirimi kapsayan tur:
+
+1. **Adminler artık kimseyi "admin" yapamaz, sadece Site Sahibi (owner)
+   yapabilir** — `admin_set_user_role()` şimdiye kadar herhangi bir admin'in
+   başka bir üyeyi doğrudan `admin` yapmasına (ve zaten admin olan birinin
+   rolünü doğrudan değiştirmesine) izin veriyordu; bu, migration 0021'in
+   TÜM "karşılıklı denetim" (askıya alma + oylama/owner kararı) mimarisini
+   by-pass eden bir arka kapıydı. Artık bir admin'i **düşürmenin de tek
+   yolu** Admin Güvenliği sayfasındaki askıya alma + oylama/owner kararı
+   akışı — owner her iki kısıttan da muaf.
+2. **Denetim vakaları artık tek tek silinebiliyor — sadece owner.** Yeni
+   `denetim_vakasi_sil()` RPC'si (owner-only) tek bir vakayı (ve oylarını)
+   siler; açık ("askıda") vakalar silinemez. Audit log satırları
+   silinmiyor (denetim_id null'a düşer), silme işleminin kendisi de ayrıca
+   loglanıyor. Vaka listesi artık sayfalanıyor (10'ar) — çok vakalı
+   kurulumlarda sayfa taşmasın diye.
+3. **Denetim vakalarında hedef adminin e-postası da görünüyor** — isminin
+   yanında, "kim düşürüldü/askıya alındı" netleşsin diye
+   (`denetim_vakalarini_listele()` artık `hedef_email` de döndürüyor).
+
+(Not: "yetkisi düşen kişi anında normal üye olur, girebilir ama yetkisiz
+olur" davranışı zaten migration 0021'de vardı — `_admin_denetim_sonuclandir()`
+kalıcı düşürmede role'ü `'user'`e çekiyor, force-signout yapmıyor. 1.
+maddedeki kısıtlama sayesinde artık bu davranış bir admin'i düşürmenin TEK
+yolu olduğu için her durumda garanti ediliyor.)
+
+#### Değişen dosyalar
+- `assets/js/uye-ayarlari.js` (rol seçim kutusu: owner değilseniz "Yönetici" seçeneği yok ve zaten admin olan bir kart tamamen kilitli + açıklama notu; RPC hatası artık mesajıyla birlikte gösteriliyor ve seçim eski değerine dönüyor)
+- `assets/css/uye-ayarlari.css` (yeni `.uya-rol-notu` stili + admin-guvenlik.md'nin `.uya-kart` listeleri için boşluk düzeltmesi)
+- `assets/js/admin-guvenlik.js` (vaka listesi sayfalandı; her vaka kartında hedef e-postası + sadece owner'a görünen "🗑️ Vakayı Sil" butonu eklendi)
+- `panel/admin-guvenlik.md` (`uye_ayarlari_css: true` eklendi + sayfalama alanı + açıklama metni)
+- `rehber/02-supabase-sistemi.md` (bu changelog girdisi)
+
+#### Eklenen dosyalar
+- `supabase/migrations/0024_admin_yetki_devri_kisitlama_ve_vaka_silme.sql` ⚠️ **YENİ — Supabase SQL Editor'de çalıştırman gerekiyor (0001-0023'ten sonra).**
+
+---
+
 ### 🗓️ 17.08.2026 — Site Sahibi adına yayın onayı, owner rol yönetimi bug'ı ve özel içerik erişim hiyerarşisi
 
 Üç ayrı istek/bildirimi kapsayan tur:
