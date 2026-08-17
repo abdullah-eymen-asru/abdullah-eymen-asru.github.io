@@ -41,9 +41,15 @@ let ARAMA_METNI = "";
 let ROL_FILTRESI = "";
 let SAYFA = 1;
 let SAYFA_BOYUTU = 20;
+// Giriş yapan kişinin kendi profili — "Site Sahibi Yap" ve "Kendi Yetkimi
+// Düşür" butonlarının SADECE owner'a ve SADECE ilgili karta (kendi kartı /
+// kendisi olmayan kartlar) görünmesi için gerekiyor. requireAuth zaten bunu
+// dönüyordu, önceden burada sonuç kullanılmadan atılıyordu.
+let GIRIS_YAPAN_PROFIL = null;
 
 async function init() {
-  await requireAuth({ role: "admin" });
+  const { profile } = await requireAuth({ role: "admin" });
+  GIRIS_YAPAN_PROFIL = profile;
   document.getElementById("loading")?.setAttribute("hidden", "");
   document.getElementById("app").hidden = false;
 
@@ -275,11 +281,38 @@ function uyeKartHtml(u) {
         </div>
         <div class="uya-kart-aksiyonlar">
           <span class="rol-durum" data-id="${u.id}"></span>
+          ${sahipYapButonuHtml(u)}
+          ${kendiYetkimiDusurButonuHtml(u)}
           <button class="btn-secondary tablo-aksiyon-btn eposta-degistir-btn" data-id="${u.id}" data-email="${escapeHtml(u.email)}" data-isim="${escapeHtml(u.full_name || u.email)}">E-posta Değiştir</button>
           <button class="btn-danger tablo-aksiyon-btn uye-sil-btn" data-id="${u.id}" data-email="${escapeHtml(u.email)}">Sil</button>
         </div>
       </div>
     </div>`;
+}
+
+/**
+ * "Site Sahibi Yap" butonu — SADECE giriş yapan kişi owner ise VE hedef
+ * kart owner OLMAYAN bir üyeye aitse görünür (bkz. migration 0021
+ * owner_rolu_ver() RPC'si — daha önce bu RPC'yi çağıran hiçbir arayüz
+ * yoktu, "Başka birisini de site sahibi yapabilme yetkisi olsun" isteği
+ * bu butonla karşılanıyor).
+ */
+function sahipYapButonuHtml(u) {
+  if (GIRIS_YAPAN_PROFIL?.role !== "owner" || u.role === "owner") return "";
+  return `<button class="btn-secondary tablo-aksiyon-btn sahip-yap-btn" data-id="${u.id}" data-isim="${escapeHtml(u.full_name || u.email)}">👑 Site Sahibi Yap</button>`;
+}
+
+/**
+ * "Kendi Yetkimi Düşür" butonu — SADECE owner'ın KENDİ kartında görünür.
+ * admin_set_user_role() bilhassa role='owner' olan satırları reddettiği
+ * için (bkz. migration 0021) owner'ın kendi rolünü düşürebilmesi ayrı bir
+ * RPC (owner_kendi_rolunu_dusur) + ayrı bir arayüz gerektiriyor. "Site
+ * sahibi kendi yetkisini düşürürken uyarı mesajı alsın" isteği,
+ * kendiYetkimiDusur() içindeki confirm() penceresiyle karşılanıyor.
+ */
+function kendiYetkimiDusurButonuHtml(u) {
+  if (GIRIS_YAPAN_PROFIL?.role !== "owner" || u.id !== GIRIS_YAPAN_PROFIL?.id) return "";
+  return `<button class="btn-danger tablo-aksiyon-btn kendi-yetkimi-dusur-btn" data-id="${u.id}">⚠️ Kendi Yetkimi Düşür</button>`;
 }
 
 function wireKartOlaylari(liste) {
@@ -355,6 +388,74 @@ function wireKartOlaylari(liste) {
       adminEpostaKutusunuAc({ id: btn.dataset.id, email: btn.dataset.email, isim: btn.dataset.isim })
     );
   });
+
+  liste.querySelectorAll(".sahip-yap-btn").forEach((btn) => {
+    btn.addEventListener("click", () => sahipYap(btn.dataset.id, btn.dataset.isim, btn));
+  });
+
+  liste.querySelectorAll(".kendi-yetkimi-dusur-btn").forEach((btn) => {
+    btn.addEventListener("click", () => kendiYetkimiDusur(btn));
+  });
+}
+
+/* ---------------------------------------------------------------------- */
+/* SİTE SAHİBİ ATAMA / KENDİ YETKİSİNİ DÜŞÜRME                            */
+/* ---------------------------------------------------------------------- */
+async function sahipYap(userId, isim, btn) {
+  if (
+    !confirm(
+      `${isim} adlı üyeyi Site Sahibi (owner) yapmak üzeresin. Owner, admin'in TÜM yetkilerine ek olarak askıya alınamaz ve başka owner atayabilir — bu geri alınabilir bir işlem değildir (bir owner ancak kendi isteğiyle ya da başka bir owner tarafından değil, sadece kendi "Kendi Yetkimi Düşür" butonuyla düşürülebilir). Devam edilsin mi?`
+    )
+  ) {
+    return;
+  }
+
+  btn.disabled = true;
+  const { error } = await supabase.rpc("owner_rolu_ver", { p_user_id: userId });
+  btn.disabled = false;
+
+  if (error) {
+    alert("Site Sahibi yapılamadı: " + error.message);
+    return;
+  }
+  const kullanici = TUM_KULLANICILAR.find((u) => u.id === userId);
+  if (kullanici) kullanici.role = "owner";
+  renderStats(TUM_KULLANICILAR);
+  renderListe();
+}
+
+async function kendiYetkimiDusur(btn) {
+  const yeniRol = prompt(
+    "Kendi yetkini düşürmek üzeresin — bu işlemden sonra owner (Site Sahibi) yetkilerinin HİÇBİRİNE (adminleri askıya alma, denetim vakalarını tek başına karara bağlama, başka owner atama vb.) erişemeyeceksin. Hangi role düşmek istiyorsun? (admin / manager / editor / special_user / user)",
+    "admin"
+  );
+  if (!yeniRol) return;
+  const gecerliRoller = ["admin", "manager", "editor", "special_user", "user"];
+  if (!gecerliRoller.includes(yeniRol.trim())) {
+    alert("Geçersiz rol. Şunlardan biri olmalı: " + gecerliRoller.join(", "));
+    return;
+  }
+  if (
+    !confirm(
+      `SON UYARI: kendi Site Sahibi yetkini "${yeniRol}" rolüne düşürmek üzeresin. Bu işlem GERİ ALINAMAZ — yeniden owner olman için sistemde başka bir owner'ın seni tekrar atamsı gerekir. Emin misin?`
+    )
+  ) {
+    return;
+  }
+
+  btn.disabled = true;
+  const { error } = await supabase.rpc("owner_kendi_rolunu_dusur", { p_yeni_rol: yeniRol.trim() });
+  btn.disabled = false;
+
+  if (error) {
+    alert("Yetki düşürülemedi: " + error.message);
+    return;
+  }
+  // Kendi rolü artık owner değil — panel bu sayfayı kullanmaya devam
+  // edemez (requireAuth({role:'admin'}) yeni rol admin/owner değilse
+  // reddeder), o yüzden panelim sayfasına yönlendiriyoruz.
+  alert("Yetkin düşürüldü. Panelim sayfasına yönlendiriliyorsun.");
+  window.location.href = "/panel/panel.html";
 }
 
 /* ---------------------------------------------------------------------- */
