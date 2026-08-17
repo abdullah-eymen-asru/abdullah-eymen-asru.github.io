@@ -23,6 +23,7 @@ permalink: "/panel/admin.html"
   -->
   <nav id="admin-nav" class="admin-tabs">
     <a id="admin-nav-uye-ayarlari" href="{{ '/panel/uye-ayarlari.html' | relative_url }}">👤 Üye Ayarları</a>
+    <a id="admin-nav-guvenlik" href="{{ '/panel/admin-guvenlik.html' | relative_url }}">🛡️ Admin Güvenliği</a>
     <a href="#icerik-ekle" data-section="icerik-ekle" class="active">📝 Özel İçerik Ekle/Düzenle</a>
     <a href="#icerikler" data-section="icerikler">📚 Mevcut Özel İçerikler</a>
     <a href="#dosya-paylasim" data-section="dosya-paylasim">🔗 R2 Dosya Paylaşımı</a>
