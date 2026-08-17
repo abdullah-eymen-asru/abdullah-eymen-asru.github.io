@@ -6,10 +6,7 @@
  * zaten tanımlı ve burada AYNEN kullanılıyor — o yüzden bu dosya sohbet
  * bileşenlerini yeniden tanımlamıyor. Bu dosyanın tek işi: sayfayı
  * ".wrap"ın dar sütununun (860px) sınırından kurtarıp görünür alanın
- * ortasına daha ferah şekilde hizalamak — auth.css'teki
- * ".panel-section--wide" için zaten kanıtlanmış viewport-ortalama
- * tekniğinin AYNISI (bkz. o bölümün başındaki not), burada sayfanın
- * kendisine uygulanıyor.
+ * ortasına daha ferah şekilde hizalamak.
  */
 
 .mesajlar-baslik { margin-bottom: 18px; }
@@ -18,9 +15,28 @@
 
 @media (min-width: 900px) {
   .mesajlar-sayfa {
+    /* BUG FİX (masaüstünde tam ortada durmuyordu): önceki teknik
+       "margin-left/right: calc(50% - 50vw + 2vw)" idi. Bu formül SADECE
+       kutunun genişliği kendi ebeveyninin (.wrap, 860px) genişliğine EŞİTSE
+       doğru ortalar — ama burada kutunun genişliği ebeveynden bağımsız
+       (min(1180px, 96vw)), bu yüzden "%" (ebeveyne göre) ile "vw"
+       (viewport'a göre) terimleri birbirini doğru iptal etmiyordu. Sonuç:
+       geniş ekranlarda kutu belirgin şekilde SOLA kaymış duruyordu (ör.
+       1600px genişlikte ~350px'lik bir kayma).
+       ÇÖZÜM: "left: 50%; transform: translateX(-50%)" tekniği. Buradaki
+       fark: translateX'in yüzdesi kutunun KENDİ genişliğine göre
+       hesaplanır (ebeveyne göre değil) — bu da ebeveynin genişliğinden/
+       ofsetinden tamamen bağımsız, gerçek viewport-ortalı bir sonuç verir
+       (cebirsel olarak: final_left = ebeveyn_sol + 0.5*ebeveyn_genişlik -
+       0.5*kutu_genişlik = 0.5*(viewport_genişlik - kutu_genişlik), yani
+       ebeveynin konumu/genişliği matematikten tamamen düşüyor). Eski
+       "100vw" tabanlı teknikten farklı olarak burada genişlik viewport'a
+       değil "min(1180px, 96vw)"e sabit kaldığından dikey kaydırma
+       çubuğu (scrollbar gutter) kaynaklı taşma riski de yok. */
     width: min(1180px, 96vw);
     max-width: 96vw;
-    margin-left: calc(50% - 50vw + 2vw);
-    margin-right: calc(50% - 50vw + 2vw);
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
   }
 }
