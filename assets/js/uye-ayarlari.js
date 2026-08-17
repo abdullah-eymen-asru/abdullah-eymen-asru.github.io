@@ -266,18 +266,8 @@ function uyeKartHtml(u) {
       <div class="uya-kart-alt">
         <div class="form-field uya-rol-secim">
           <label>Rol</label>
-          <select class="rol-select" data-id="${u.id}">
-            <option value="user" ${u.role === "user" ? "selected" : ""}>Üye</option>
-            <option value="special_user" ${u.role === "special_user" ? "selected" : ""}>Özel Üye</option>
-            <option value="editor" ${u.role === "editor" ? "selected" : ""}>Editör</option>
-            <option value="manager" ${u.role === "manager" ? "selected" : ""}>İçerik Sorumlusu</option>
-            <option value="admin" ${u.role === "admin" ? "selected" : ""}>Yönetici</option>
-            ${
-              u.role === "owner"
-                ? `<option value="owner" selected disabled>Site Sahibi (buradan değiştirilemez)</option>`
-                : ""
-            }
-          </select>
+          ${rolSecimHtml(u)}
+          ${rolSecimNotuHtml(u)}
         </div>
         <div class="uya-kart-aksiyonlar">
           <span class="rol-durum" data-id="${u.id}"></span>
@@ -288,6 +278,54 @@ function uyeKartHtml(u) {
         </div>
       </div>
     </div>`;
+}
+
+/**
+ * Rol <select>'ini çizer. İki sunucu tarafı kısıtı (bkz. migration 0024
+ * admin_set_user_role) burada ayrıca istemci tarafında da uygulanıyor —
+ * sadece hata mesajı almak yerine, izin verilmeyen seçenekler baştan
+ * tıklanamaz/görünmez olsun diye:
+ *   1) Giriş yapan owner DEĞİLSE "Yönetici" seçeneği listede YOK — sıradan
+ *      bir admin kimseyi admin yapamaz.
+ *   2) Giriş yapan owner DEĞİLSE VE hedef zaten 'admin' ise, seçim kutusu
+ *      TAMAMEN devre dışı — bir admin başka bir admin'in rolünü buradan
+ *      değiştiremez, Admin Güvenliği sayfasındaki askıya alma/oylama
+ *      sürecini kullanması gerekir (bkz. rolSecimNotuHtml).
+ */
+function rolSecimHtml(u) {
+  const benOwnerMi = GIRIS_YAPAN_PROFIL?.role === "owner";
+  const hedefZatenAdminMi = u.role === "admin";
+  const devreDisi = hedefZatenAdminMi && !benOwnerMi;
+
+  const secenekler = [
+    { rol: "user", etiket: "Üye" },
+    { rol: "special_user", etiket: "Özel Üye" },
+    { rol: "editor", etiket: "Editör" },
+    { rol: "manager", etiket: "İçerik Sorumlusu" },
+    // "Yönetici" seçeneği sadece owner'a (ya da hedef zaten admin ise —
+    // değeri korumak için) gösterilir.
+    ...(benOwnerMi || hedefZatenAdminMi ? [{ rol: "admin", etiket: "Yönetici" }] : []),
+  ];
+
+  return `
+    <select class="rol-select" data-id="${u.id}" ${devreDisi ? "disabled" : ""}>
+      ${secenekler
+        .map(({ rol, etiket }) => `<option value="${rol}" ${u.role === rol ? "selected" : ""}>${etiket}</option>`)
+        .join("")}
+      ${
+        u.role === "owner"
+          ? `<option value="owner" selected disabled>Site Sahibi (buradan değiştirilemez)</option>`
+          : ""
+      }
+    </select>`;
+}
+
+/** rolSecimHtml() ile devre dışı bırakılan seçim kutusunun altına, NEDEN
+ * devre dışı olduğunu açıklayan küçük bir not ekler. */
+function rolSecimNotuHtml(u) {
+  const benOwnerMi = GIRIS_YAPAN_PROFIL?.role === "owner";
+  if (u.role !== "admin" || benOwnerMi) return "";
+  return `<p class="muted uya-rol-notu">Bir admin'in rolü buradan değiştirilemez — <a href="/panel/admin-guvenlik.html">Admin Güvenliği</a> sayfasından askıya alma/oylama süreci başlatılmalı.</p>`;
 }
 
 /**
@@ -334,6 +372,14 @@ function wireKartOlaylari(liste) {
       }
       if (error) {
         console.error(error);
+        // YENİ: migration 0024 kısıtları (admin'i sadece owner yapabilir/
+        // düşürebilir) burada bir RPC hatası olarak dönebilir — kullanıcıya
+        // sadece "Hata!" değil, asıl sebebi de göster ve seçim kutusunu
+        // eski değerine geri al (aksi halde arayüz, RPC'nin reddettiği
+        // değeri seçili gösterip yanıltıcı olurdu).
+        alert("Rol değiştirilemedi: " + error.message);
+        const kullaniciEski = TUM_KULLANICILAR.find((u) => u.id === userId);
+        if (kullaniciEski) select.value = kullaniciEski.role;
         return;
       }
       const kullanici = TUM_KULLANICILAR.find((u) => u.id === userId);
