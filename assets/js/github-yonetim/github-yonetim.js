@@ -627,7 +627,7 @@ async function wireYazarAlani() {
     return;
   }
 
-  // admin: içerik yönetebilen herkes (admin + editor + manager) arasından yazar seçebilir.
+  // admin/owner: içerik yönetebilen herkes (admin + owner + editor + manager) arasından yazar seçebilir.
   girdi.hidden = true;
   secim.hidden = false;
   secim.innerHTML = '<option value="">Yükleniyor…</option>';
@@ -635,11 +635,11 @@ async function wireYazarAlani() {
     const { data, error } = await supabase
       .from("profiles")
       .select("id, full_name, email, role")
-      .in("role", ["admin", "editor", "manager"])
+      .in("role", ["admin", "owner", "editor", "manager"])
       .order("full_name", { ascending: true });
     if (error) throw error;
 
-    const ROL_ETIKETI = { admin: "Yönetici", editor: "Editör", manager: "İçerik Sorumlusu" };
+    const ROL_ETIKETI = { admin: "Yönetici", owner: "Site Sahibi", editor: "Editör", manager: "İçerik Sorumlusu" };
     secim.innerHTML = (data || [])
       .map((p) => {
         const ad = p.full_name || p.email;
