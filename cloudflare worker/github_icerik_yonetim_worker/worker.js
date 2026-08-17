@@ -345,10 +345,13 @@ async function panelBaslangicVerisiGetir(env, branch, rol) {
   });
   [...posts.klasorler, ...projects.klasorler].forEach((k) => delete k._bosMu);
 
-  // assets/ ve _config.yml SADECE admin'e — bkz. dosya başı GÜVENLİK notu.
+  // assets/ ve _config.yml SADECE admin/owner'a — bkz. dosya başı GÜVENLİK
+  // notu. owner (Site Sahibi, migration 0021) admin'in tüm yetkilerini
+  // kapsar — BUG FİX: burada owner unutulmuştu, sadece "admin" kontrol
+  // ediliyordu.
   let config = null;
   let profilFoto = null;
-  if (rol === "admin") {
+  if (rol === "admin" || rol === "owner") {
     const configVerisi = await ghAl(`/contents/${CONFIG_YOLU_SABIT}`);
     if (configVerisi && typeof configVerisi.content === "string") {
       config = { path: CONFIG_YOLU_SABIT, sha: configVerisi.sha, content: configVerisi.content };
@@ -480,7 +483,11 @@ export default {
       return jsonHata("Rol bilgisi okunamadı.", 500);
     }
 
-    const icerikYoneticisiMi = rol === "editor" || rol === "manager" || rol === "admin";
+    // BUG FİX: 'owner' (Site Sahibi, migration 0021) burada eksikti — owner
+    // panelin dışından bu Worker'a doğrudan istek attığında (her PUT/DELETE/
+    // GET burada geçer) "Bu işlem için yetkin yok" hatası alıyordu, çünkü bu
+    // kontrol Supabase RLS'den TAMAMEN bağımsız, Worker'ın kendi rol listesi.
+    const icerikYoneticisiMi = rol === "editor" || rol === "manager" || rol === "admin" || rol === "owner";
     if (!icerikYoneticisiMi) {
       return jsonHata("Bu işlem için yetkin yok.", 403);
     }
@@ -582,7 +589,7 @@ export default {
           }
         }
       } else if (yalnizAdminYolu) {
-        if (rol !== "admin") {
+        if (rol !== "admin" && rol !== "owner") {
           return jsonHata("Bu dosya sadece admin tarafından değiştirilebilir.", 403);
         }
       } else {
