@@ -106,6 +106,7 @@ async function init() {
  */
 function kisitliManagerGorunumunuUygula() {
   document.getElementById("admin-nav-uye-ayarlari")?.setAttribute("hidden", "");
+  document.getElementById("admin-nav-guvenlik")?.setAttribute("hidden", "");
   document.getElementById("admin-nav-mesajlar")?.setAttribute("hidden", "");
 
   const gizlenecekSekmeler = ["hesabim"];
