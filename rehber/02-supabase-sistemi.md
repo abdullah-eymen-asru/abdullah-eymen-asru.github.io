@@ -892,6 +892,50 @@ istemedim.
 
 Bu bölüm, siteye/Supabase kullanıcı sistemine sonradan yapılan düzeltmelerin tarih sırasıyla özetidir — hangi sorun bildirildi, kök nedeni neydi, nasıl çözüldü ve (varsa) senin elle yapman gereken adım neydi. Eskiden kökte ayrı `DEGISIKLIKLER_*.md` dosyaları halinde duruyordu, artık tek doğruluk kaynağı burası — en yeni turu en üstte bulursun.
 
+### 🗓️ 17.08.2026 (4. Tur) — Admin artık Site Sahibi'nde değişiklik yapamaz, silme yetkisi sadece owner'da
+
+İstek: "Yönetici olanlar kendisinin üstü olan site sahibinde değişiklik
+yapamasın, silemesin veritabanında. Sadece e posta kurtarma seçeneği
+kalsın. Hatta site sahibi dışında kimse herhangi bir üyeyi silemesin."
+
+**§ A — Admin, Site Sahibi'nin profilini değiştiremez:** `profiles`
+tablosunun UPDATE RLS politikası şimdiye kadar `auth.uid() = id or
+is_admin()` idi — `is_admin()` hem `admin` hem `owner` rolünü kapsadığı
+için (migration 0021), herhangi bir admin owner'ın satırını (ör. Ad/Soyad)
+doğrudan güncelleyebiliyordu. Artık bir admin (owner DEĞİL) sadece
+`role <> 'owner'` olan satırları güncelleyebiliyor; owner'ın kendi
+satırına sadece kendisi (ya da başka bir owner) yazabilir. **Bilinçli
+istisna:** `admin-change-email` Edge Function'ı service_role ile çalıştığı
+için bu RLS'ten etkilenmiyor — kilitli kalmış (eski e-postasına erişimi
+olmayan) Site Sahibi dahil herkes için "e-posta kurtarma" admin
+panelinden hâlâ yapılabiliyor, istendiği gibi TEK istisna olarak
+bırakıldı.
+
+**§ B — Başka birini silme yetkisi sadece owner'da:** Eskiden hem
+`admin` hem `owner` rolündeki herkes `delete-account` Edge Function'ı
+üzerinden başka bir kullanıcıyı (hatta owner'ı bile) silebiliyordu. Artık
+**SADECE owner** kendisi dışında birini silebilir; sıradan bir admin artık
+hiç kimseyi (kendisi hariç) silemez. Herkesin **kendi** hesabını silme
+hakkı (kişisel bir hak) dokunulmadan duruyor.
+
+#### Değişen dosyalar
+- `supabase/functions/delete-account/index.ts` (başkasını silme yetkisi `admin`+`owner`'dan sadece `owner`'a daraltıldı)
+- `assets/js/uye-ayarlari.js` (Site Sahibi'nin kartındaki Ad/Soyad kutuları owner-dışı adminler için salt-okunur; "Sil" butonu artık sadece owner'a gösteriliyor)
+- `rehber/02-supabase-sistemi.md` (bu changelog girdisi)
+
+#### Eklenen dosyalar
+- `supabase/migrations/0027_admin_site_sahibini_degistiremez_sadece_owner_siler.sql` ⚠️ **YENİ — Supabase SQL Editor'de çalıştırman gerekiyor (0001-0026'dan sonra).**
+
+#### Uygulama adımları (senin yapman gerekenler)
+1. **Supabase Dashboard > SQL Editor**'de `0027_admin_site_sahibini_degistiremez_sadece_owner_siler.sql`'i çalıştır.
+2. `delete-account` fonksiyonunu yeniden deploy et:
+   ```
+   supabase functions deploy delete-account
+   ```
+3. Geri kalan dosyalar statik (JS) olduğu için siteyi her zamanki gibi yayınlaman yeterli.
+
+---
+
 ### 🗓️ 17.08.2026 (3. Tur) — "Admin adına" onayı sadece hedef admine (+ Site Sahibi'ne) daraltıldı
 
 İstek: "İçerik editörü bir admin adına yazı yazacaksa sadece o admin onay
