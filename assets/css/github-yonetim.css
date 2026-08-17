@@ -486,6 +486,32 @@
   background: var(--tag-bg);
 }
 
+/* Sayfalama çubuğu (bkz. assets/js/github-yonetim/github-yonetim.js sayfalamaCubuguCiz) */
+.gy-sayfalama {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 14px 0 22px;
+}
+.gy-sayfalama-btn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #3a3a3a);
+  background: var(--card-bg, transparent);
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.gy-sayfalama-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.gy-sayfalama-gosterge {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
 /* Profil fotoğrafı önizleme */
 .gy-profil-onizleme {
   display: flex;
