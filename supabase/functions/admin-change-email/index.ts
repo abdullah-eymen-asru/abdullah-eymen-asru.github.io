@@ -154,9 +154,9 @@ Deno.serve(async (req) => {
     .eq("id", callerId)
     .single();
 
-  if (profileErr || callerProfile?.role !== "admin") {
+  if (profileErr || (callerProfile?.role !== "admin" && callerProfile?.role !== "owner")) {
     return new Response(
-      JSON.stringify({ error: "Yetkisiz işlem: sadece admin bir üyenin e-postasını değiştirebilir." }),
+      JSON.stringify({ error: "Yetkisiz işlem: sadece admin/owner bir üyenin e-postasını değiştirebilir." }),
       { status: 403, headers }
     );
   }
