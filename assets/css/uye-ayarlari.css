@@ -164,6 +164,12 @@
   border-top: 1px dashed var(--border);
 }
 .uya-rol-secim { min-width: 160px; }
+/* Bir admin'in rolü sadece owner tarafından değiştirilebildiği için (bkz.
+   migration 0024), sıradan bir admin bir admin kartına baktığında rol
+   seçimi kilitlenir — bu notu göstererek "neden devre dışı" açıklanır. */
+.uya-rol-notu { margin: 4px 0 0; font-size: 0.74rem; max-width: 220px; }
+.uya-rol-notu a { color: var(--accent); }
+.rol-select:disabled { opacity: 0.55; cursor: not-allowed; }
 .uya-kart-aksiyonlar {
   display: flex;
   flex-wrap: wrap;
@@ -192,6 +198,15 @@
 .uya-sayfa-btn:hover:not(:disabled) { border-color: var(--accent); }
 .uya-sayfa-btn:disabled { opacity: 0.4; cursor: default; }
 .uya-sayfa-gosterge { font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
+
+/* panel/admin-guvenlik.md, "Adminler / Site Sahibi" ve "Denetim Vakaları"
+   bölümlerinde AYNI .uya-kart stilini kullanıyor ama .uya-liste grid'i
+   İÇİNDE DEĞİL (bkz. assets/js/admin-guvenlik.js) — grid'in sağladığı gap
+   olmadan kartlar birbirine yapışır, o yüzden burada kendi boşluklarını
+   tanımlıyoruz (member kartı ızgarasını etkilemesin diye kapsam sadece bu
+   iki konteynerle sınırlı). */
+#ag-admin-listesi .uya-kart,
+#ag-vaka-listesi .uya-kart { margin-bottom: 14px; }
 
 @media (max-width: 560px) {
   .uya-kart-alt { flex-direction: column; align-items: stretch; }
