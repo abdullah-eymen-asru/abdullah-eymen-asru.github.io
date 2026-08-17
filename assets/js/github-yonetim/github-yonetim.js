@@ -618,7 +618,7 @@ async function wireYazarAlani() {
 
   const kendiAdi = GIRIS_YAPAN_PROFIL.full_name || GIRIS_YAPAN_PROFIL.email || "";
 
-  if (GIRIS_YAPAN_PROFIL.role !== "admin") {
+  if (GIRIS_YAPAN_PROFIL.role !== "admin" && GIRIS_YAPAN_PROFIL.role !== "owner") {
     // editor: kendi adı dışında bir şey seçemez, alan salt okunur.
     secim.hidden = true;
     girdi.hidden = false;
@@ -2944,7 +2944,8 @@ function icerikKartiCiz(item, tur) {
   const onayEksikDegilMi =
     item.data.admin_adina_talep &&
     item.data.admin_onay_durumu !== "onaylandi" &&
-    GIRIS_YAPAN_PROFIL?.role !== "admin";
+    GIRIS_YAPAN_PROFIL?.role !== "admin" &&
+    GIRIS_YAPAN_PROFIL?.role !== "owner";
   const kilitliOznitelik = onayEksikDegilMi
     ? `disabled title="Bu içerik admin onayı ${item.data.admin_onay_durumu === "reddedildi" ? "reddedildiği için" : "bekleniyor olduğu için"} henüz yayınlanamaz."`
     : "";
@@ -2959,7 +2960,9 @@ function icerikKartiCiz(item, tur) {
   }
   // Admin, onay bekleyen bir talebi burada doğrudan onaylayabilir/reddedebilir.
   const onayBtns =
-    GIRIS_YAPAN_PROFIL?.role === "admin" && item.data.admin_adina_talep && item.data.admin_onay_durumu === "beklemede"
+    (GIRIS_YAPAN_PROFIL?.role === "admin" || GIRIS_YAPAN_PROFIL?.role === "owner") &&
+    item.data.admin_adina_talep &&
+    item.data.admin_onay_durumu === "beklemede"
       ? `<button type="button" class="gy-onay-btn" data-onay="1">✅ Onayla</button>
          <button type="button" class="gy-onay-btn gy-onay-btn--red" data-onay="0">❌ Reddet</button>`
       : "";
@@ -3036,7 +3039,7 @@ function icerikKartiCiz(item, tur) {
  * tarafından) gerçekten yayına alınabilir hâle gelir.
  */
 async function adminTaslakOnayla(item, tur, onay, btn) {
-  if (GIRIS_YAPAN_PROFIL?.role !== "admin" || !item.taslakId) return;
+  if ((GIRIS_YAPAN_PROFIL?.role !== "admin" && GIRIS_YAPAN_PROFIL?.role !== "owner") || !item.taslakId) return;
   btn.disabled = true;
   const oncekiMetin = btn.textContent;
   btn.textContent = "İşleniyor…";
@@ -3367,7 +3370,7 @@ function wireProfilFoto() {
   const navLink = document.querySelector('#gy-nav a[data-section="profil-foto"]');
   const bolum = document.getElementById("profil-foto");
 
-  if (GIRIS_YAPAN_PROFIL?.role !== "admin") {
+  if (GIRIS_YAPAN_PROFIL?.role !== "admin" && GIRIS_YAPAN_PROFIL?.role !== "owner") {
     navLink?.remove();
     bolum?.remove();
     return;
@@ -3457,7 +3460,7 @@ function profilFotoDurumYukle() {
   // tarafından role'e bakılmaksızın çağrılıyor, o yüzden burada da
   // ayrıca koruyoruz.
   const el = document.getElementById("pf-mevcut");
-  if (!el || GIRIS_YAPAN_PROFIL?.role !== "admin") return;
+  if (!el || (GIRIS_YAPAN_PROFIL?.role !== "admin" && GIRIS_YAPAN_PROFIL?.role !== "owner")) return;
   if (!PANEL_VERI) {
     el.innerHTML = '<p class="muted">Önce "GitHub Bağlantısı" sekmesinden bağlantını doğrula.</p>';
     return;
@@ -3504,7 +3507,7 @@ function dosyayiBase64eCevir(dosya) {
 
 async function profilFotoYukle() {
   const msgEl = document.getElementById("pf-message");
-  if (GIRIS_YAPAN_PROFIL?.role !== "admin") {
+  if (GIRIS_YAPAN_PROFIL?.role !== "admin" && GIRIS_YAPAN_PROFIL?.role !== "owner") {
     showMessage(msgEl, "Bu işlem için yetkin yok — profil fotoğrafını sadece admin değiştirebilir.", "error");
     return;
   }
@@ -3564,7 +3567,7 @@ async function profilFotoYukle() {
 
 async function profilFotoSil() {
   const msgEl = document.getElementById("pf-message");
-  if (GIRIS_YAPAN_PROFIL?.role !== "admin") {
+  if (GIRIS_YAPAN_PROFIL?.role !== "admin" && GIRIS_YAPAN_PROFIL?.role !== "owner") {
     showMessage(msgEl, "Bu işlem için yetkin yok — profil fotoğrafını sadece admin silebilir.", "error");
     return;
   }
