@@ -539,3 +539,13 @@
 }
 .gy-baglanti-durum--ok { color: #1e6b3a; }
 [data-theme="dark"] .gy-baglanti-durum--ok { color: #9ee3b6; }
+
+/*
+ * "Yazar" alanındaki arama kutusu (madde 5 — admin/owner için, önceden bir
+ * <select> listesiydi; yönetici/site sahibi sayısı arttıkça sayfayı
+ * şişirmesin diye arama kutusuna çevrildi). Sonuç dropdown'ı auth.css'teki
+ * ".msg-uye-arama-sonuc" (admin mesajlaşma üye araması) ile AYNI görünür —
+ * bu sarmalayıcı sadece ona bir "position: relative" referans noktası
+ * veriyor (auth.css bunu zaten "position: absolute" bekliyor).
+ */
+.gy-arama-wrap { position: relative; }
