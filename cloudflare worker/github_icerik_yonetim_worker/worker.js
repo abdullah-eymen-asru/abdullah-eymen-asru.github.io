@@ -141,6 +141,52 @@ function gitkeepSahipIdOku(ham) {
 }
 
 /**
+ * BUG FİX (bkz. "site sahibi adına onaysız yayın" raporu): front-matter'daki
+ * yazar_id (görünen yazar) bir OWNER'a (Site Sahibi) ya da ADMIN'e aitse ve
+ * bu isteği GERÇEKTEN gönderen (userId, giriş yapan kişi) o kişinin
+ * KENDİSİ DEĞİLSE, PUT/DELETE burada reddedilir — GitHub'a hiç gidilmez.
+ *
+ * NEDEN GEREKLİ: "Admin/Site Sahibi adına yayınla (onay gerekir)" onay
+ * süreci (migration 0016/0023, taslak_admin_onay_koru tetikleyicisi) SADECE
+ * Supabase'teki taslak_icerikler tablosuna yazarken devreye giriyordu. Ama
+ * "Doğrudan GitHub'a Aktar ve Yayınla" (Seçenek A) ve Seçenek B'nin GitHub
+ * commit adımı Supabase'e HİÇ dokunmadan doğrudan bu Worker'a (dolayısıyla
+ * GitHub'a) yazıyordu — yani bir admin, panelde "yazar" olarak Site
+ * Sahibi'ni (ya da başka bir admin'i) seçip normal "Yayınla" butonuna
+ * bastığında içerik ONAY SÜRECİNE HİÇ GİRMEDEN doğrudan GERÇEKTEN yayına
+ * (GitHub'a) alınabiliyordu — panel arayüzünde "Yayında" anahtarı gösteriyor
+ * olsa bile fiilen hiçbir onay yoktu. Bu, GERÇEK yetki sınırının (PAT'a tek
+ * erişimi olan bu Worker) atlanabildiği anlamına geliyordu.
+ *
+ * KURAL: sadece bir owner, owner adına (veya herhangi biri adına) doğrudan
+ * GitHub'a yazabilir. Bir admin YALNIZCA KENDİ adına doğrudan GitHub'a
+ * yazabilir — başka bir admin ya da owner adına yazmak istiyorsa bu Worker
+ * bunu reddeder; o talep yalnızca Supabase'teki onay akışından (bkz.
+ * taslak_admin_onay_koru + admin_taslak_onayla/sahip_taslak_onayla RPC'leri)
+ * geçip onaylandıktan SONRA, onaylanmış içerik "Yayınla" akışıyla GitHub'a
+ * taşınabilir; o noktada da yazar_id zaten owner/admin'in kendisi kalır ama
+ * gönderen KİŞİ (userId) hedefin kendisi ya da bir owner olmalıdır (aşağıya
+ * bkz. — onaylanmış bir taslağı GitHub'a taşımak hedefin ya da owner'ın
+ * işidir, bu da doğal olarak aynı kurala uyar).
+ */
+async function yazarHedefiOwnerVeyaAdminMi(env, yazarId) {
+  if (!yazarId) return null;
+  try {
+    const res = await fetch(`${env.SUPABASE_URL}/rest/v1/profiles?id=eq.${yazarId}&select=role`, {
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.[0]?.role || null;
+  } catch (_err) {
+    return null;
+  }
+}
+
+/**
  * Mevcut bir dosyanın front-matter'ı, kendisini düzenlemeye/silmeye
  * çalışan editor'e mi ait? Önce (varsa) GÜVENİLİR yazar_id alanı karşılaştırılır.
  * yazar_id hiç yoksa (bu alan eklenmeden ÖNCE yazılmış, çok eski bir dosya)
@@ -586,6 +632,52 @@ export default {
                 403
               );
             }
+          }
+        }
+
+        // 4.2) BUG FİX — "SİTE SAHİBİ/BAŞKA BİR ADMİN ADINA ONAYSIZ DOĞRUDAN
+        //      YAYIN" KISITI (bkz. yazarHedefiOwnerVeyaAdminMi başındaki not).
+        //      role='admin'/'manager' (owner HARİÇ — owner'a hiçbir kısıt
+        //      uygulanmaz, o zaten en üst yetkilidir) bir PUT ile _posts/
+        //      veya _projects/ altına yeni front-matter YAZIYORSA (gitkeep
+        //      hariç — gitkeep'in yazar_id kavramı yok), gönderilen İÇERİĞİN
+        //      front-matter'ındaki yazar_id, GÖNDEREN KİŞİNİN (userId)
+        //      KENDİSİ DEĞİLSE, bu Worker o hedefin rolüne bakar: hedef bir
+        //      owner ya da (gönderenden farklı) bir admin ise istek burada
+        //      reddedilir. Bu içerik SADECE Supabase taslak akışından
+        //      (onay süreci) geçip GitHub'a öyle taşınabilir.
+        if (
+          rol !== "owner" &&
+          !gitkeepDosyasiMi &&
+          (icerikYolu) &&
+          request.method === "PUT"
+        ) {
+          try {
+            const govdeKopyasi = request.clone();
+            const istekGovdesi = await govdeKopyasi.json();
+            const b64Icerik = istekGovdesi?.content;
+            if (typeof b64Icerik === "string") {
+              const binary = atob(b64Icerik.replace(/\n/g, ""));
+              const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+              const yeniIcerik = new TextDecoder("utf-8").decode(bytes);
+              const yeniAlanlar = frontMatterAlanlariniOku(yeniIcerik);
+              const hedefYazarId = yeniAlanlar.yazar_id || null;
+              if (hedefYazarId && hedefYazarId !== userId) {
+                const hedefRol = await yazarHedefiOwnerVeyaAdminMi(env, hedefYazarId);
+                if (hedefRol === "owner" || hedefRol === "admin") {
+                  return jsonHata(
+                    "Bu içerik Site Sahibi ya da başka bir Yönetici adına doğrudan GitHub'a yayınlanamaz — önce Supabase'teki onay sürecinden (\"Admin/Site Sahibi adına yayınla\") geçmesi gerekir.",
+                    403
+                  );
+                }
+              }
+            }
+          } catch (_err) {
+            // Front-matter ayrıştırılamadıysa (beklenmeyen bir gövde biçimi)
+            // güvenli tarafta kal: isteği burada REDDETMİYORUZ (bu blok bir
+            // ekstra kısıt katmanıdır, ana akışı bozmamalı) — ama bu durumda
+            // dahi rol kontrolü (icerikYoneticisiMi) ve editor sahiplik
+            // kontrolü zaten üstte uygulanmış durumda.
           }
         }
       } else if (yalnizAdminYolu) {
