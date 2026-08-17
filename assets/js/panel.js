@@ -86,10 +86,18 @@ function rolEtiketi(role) {
   // BUG FİX: bu haritada 'editor' hiç yoktu (fallback olarak ham 'editor'
   // metni görünüyordu) — 'manager' (İçerik Sorumlusu) rolü eklenirken o da
   // dahil edildi.
+  // BUG FİX: 'owner' de haritada yoktu — migration 0021 ile eklenen "Site
+  // Sahibi" rolündeki kullanıcılar "Panelim" sayfasında ham "owner" metnini
+  // görüyordu (fallback ?? role). Şimdi diğer roller gibi Türkçe etiketi var.
   return (
-    { admin: "Yönetici", special_user: "Özel Üye", user: "Üye", editor: "Editör", manager: "İçerik Sorumlusu" }[
-      role
-    ] ?? role
+    {
+      admin: "Yönetici",
+      owner: "Site Sahibi",
+      special_user: "Özel Üye",
+      user: "Üye",
+      editor: "Editör",
+      manager: "İçerik Sorumlusu",
+    }[role] ?? role
   );
 }
 
