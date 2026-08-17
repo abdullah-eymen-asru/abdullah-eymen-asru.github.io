@@ -613,8 +613,14 @@ function submitButonMetniGuncelle() {
 }
 
 /* ---------------------------------------------------------------------- */
-/* YAZAR ALANI — admin başka bir editör/admin adına yazabilir, editor      */
-/* sadece kendi adına yazabilir (salt okunur alan)                        */
+/* YAZAR ALANI — SADECE owner (Site Sahibi) serbest arama ile başka biri   */
+/* adına yazabilir; admin/manager/editor SADECE kendi adına yazabilir      */
+/* (salt okunur alan). BUG FİX (bkz. "site sahibi adına onaysız yayın"     */
+/* raporu): eskiden admin de owner ile AYNI şekilde herkesi (owner dahil)  */
+/* onaysız "yazar" seçebiliyordu — bkz. wireYazarAlani içindeki not.       */
+/* Bir admin başka bir admin/owner adına yazmak isterse artık (manager/    */
+/* editor'da olduğu gibi) "Admin/Site Sahibi adına yayınla (onay gerekir)" */
+/* kutusunu kullanmalı (bkz. wireAdminAdinaTalep).                         */
 /* ---------------------------------------------------------------------- */
 const YAZAR_ROL_ETIKETI = { admin: "Yönetici", owner: "Site Sahibi", editor: "Editör", manager: "İçerik Sorumlusu" };
 
@@ -671,8 +677,20 @@ async function wireYazarAlani() {
 
   const kendiAdi = GIRIS_YAPAN_PROFIL.full_name || GIRIS_YAPAN_PROFIL.email || "";
 
-  if (GIRIS_YAPAN_PROFIL.role !== "admin" && GIRIS_YAPAN_PROFIL.role !== "owner") {
-    // editor: kendi adı dışında bir şey seçemez, alan salt okunur.
+  // BUG FİX (bkz. "site sahibi adına onaysız yayın" raporu): bu arama
+  // kutusu SEÇİLEN kişiyi doğrudan `yazar_id` olarak forma yazıyor ve
+  // normal "Yayınla" (Seçenek A/B) butonları hiçbir onay süreci olmadan
+  // GitHub'a commit atıyor. Eskiden 'admin' de 'owner' ile AYNI şekilde bu
+  // kutuyu kullanıp Site Sahibi DAHİL herkesi onaysız "yazar" seçebiliyordu
+  // — bu ciddi bir yetki atlatma açığıydı (bkz. Worker'daki § 4.2 ve
+  // icerikKaydet'teki yeni kontrol, GERÇEK sunucu taraflı sınır zaten
+  // orada). Artık SADECE owner (Site Sahibi) bu serbest aramayı kullanabilir
+  // — admin de tıpkı editor gibi SADECE kendi adına yazabilir; başka bir
+  // admin/owner adına yazmak isterse (manager/editor'daki ile AYNI) "Admin/
+  // Site Sahibi adına yayınla (onay gerekir)" akışını kullanmalıdır (bkz.
+  // wireAdminAdinaTalep — artık admin'e de açık, aşağıda).
+  if (GIRIS_YAPAN_PROFIL.role !== "owner") {
+    // editor/manager/admin: kendi adı dışında bir şey seçemez, alan salt okunur.
     kutuWrap.hidden = true;
     girdi.hidden = false;
     girdi.value = kendiAdi;
@@ -680,7 +698,7 @@ async function wireYazarAlani() {
     return;
   }
 
-  // admin/owner: içerik yönetebilen herkes (admin + owner + editor + manager)
+  // Sadece owner: içerik yönetebilen herkes (admin + owner + editor + manager)
   // arasından isim/e-posta ile arayıp yazar seçebilir — önceden bir <select>
   // listesiydi, yönetici/site sahibi/editör sayısı arttıkça sayfayı
   // şişirmemek için arama kutusuna çevrildi (bkz. panel/github-yonetim.md).
@@ -752,7 +770,21 @@ async function wireAdminAdinaTalep() {
   const sarmalayici = document.getElementById("ic-admin-adina-wrap");
   if (!sarmalayici || !GIRIS_YAPAN_PROFIL) return;
 
-  if (GIRIS_YAPAN_PROFIL.role !== "manager" && GIRIS_YAPAN_PROFIL.role !== "editor") {
+  // BUG FİX (bkz. "site sahibi adına onaysız yayın" raporu): bu kutu
+  // eskiden SADECE manager/editor'e gösteriliyordu — "admin, owner (Site
+  // Sahibi) adına yazmak isterse onay akışına hiç girmeden doğrudan
+  // GitHub'a yazabiliyordu" açığının bir parçası buydu (bkz. wireYazarAlani
+  // ve icerikKaydet'teki ilgili düzeltmeler). Artık 'admin' de bu kutuyu
+  // görebilir — ama admin_listesi_getir() RPC'si (aşağıda) hem admin hem
+  // owner'ı döndürdüğü için admin'in hedef listesinde KENDİSİ de görünür;
+  // bu zararsızdır (kendi adına "onay" istemek anlamsız olur ama veritabanı
+  // tetikleyicisi zaten caller_is_admin=true olduğunda admin'in kendi
+  // talebini otomatik onaylı sayar, bkz. migration 0016 § 6) — asıl önemli
+  // olan admin'in artık owner ya da BAŞKA bir admin'i seçtiğinde bu akışa
+  // girmeye ZORLANMASI (bkz. wireYazarAlani'nin admin'i salt-okunur yapması).
+  // owner bu kutuyu hiç görmez: zaten kendi adına doğrudan yazma yetkisi
+  // var, onaya ihtiyacı yok.
+  if (GIRIS_YAPAN_PROFIL.role !== "manager" && GIRIS_YAPAN_PROFIL.role !== "editor" && GIRIS_YAPAN_PROFIL.role !== "admin") {
     sarmalayici.hidden = true;
     return;
   }
@@ -779,7 +811,14 @@ async function wireAdminAdinaTalep() {
     // id/full_name/email/role'ünü döner.
     const { data, error } = await supabase.rpc("admin_listesi_getir");
     if (error) throw error;
-    const hedefler = data || [];
+    // BUG FİX: admin_listesi_getir() çağıranın KENDİSİNİ de döndürebilir
+    // (rolü admin/owner ise) — bir kişinin kendi adına "onay bekleyen talep"
+    // açması anlamsız (zaten kendi içeriğini doğrudan yazabilir), bu yüzden
+    // hedef listesinden çağıranın kendi id'sini çıkarıyoruz. Bu SADECE
+    // arayüz kolaylığıdır; veritabanı tetikleyicisi (migration 0016 § 6)
+    // caller_is_admin/caller_is_owner true olduğunda talebi zaten otomatik
+    // onaylı sayar, güvenlik sınırı bu filtrelemeye bağlı DEĞİLDİR.
+    const hedefler = (data || []).filter((p) => p.id !== GIRIS_YAPAN_PROFIL.id);
     const ROL_ETIKETI_KISA = { admin: "Yönetici", owner: "Site Sahibi" };
     const secenekler = hedefler
       .map(
@@ -1915,6 +1954,40 @@ async function icerikKaydet(secenek = "a") {
   if (ADMIN_ADINA_HEDEF && !ADMIN_ADINA_HEDEF.id) {
     showMessage(msgEl, '"Admin/Site Sahibi adına yayınla" işaretli ama hedef seçilmedi.', "error");
     return;
+  }
+
+  // BUG FİX (bkz. "site sahibi adına onaysız yayın" raporu): bir admin
+  // (owner DEĞİL), "Yazar" arama kutusundan KENDİSİ DIŞINDA birini —
+  // özellikle Site Sahibi'ni (owner) ya da başka bir admin'i — seçip
+  // ADMIN_ADINA_HEDEF/onay kutusunu HİÇ işaretlemeden normal "Yayınla"
+  // butonlarından (Seçenek A/B, ikisi de GitHub'a commit atar) birine
+  // basarsa, içerik onay sürecine hiç girmeden doğrudan GERÇEKTEN yayına
+  // alınabiliyordu (asıl güvenlik sınırı olan Worker artık bunu ayrıca
+  // reddediyor, bkz. github_icerik_yonetim_worker/worker.js § 4.2 — ama
+  // burada da erken, anlaşılır bir istemci tarafı uyarısı veriyoruz, kötü
+  // niyetli olmayan bir adminin "neden reddedildi" diye şaşırmaması için).
+  // Not: manager/editor için bu senaryo zaten mümkün değil — "Yazar" alanı
+  // onlar için salt okunur (bkz. wireYazarAlani), sadece admin/owner
+  // başkasını seçebilir; owner'a bu kısıt hiç uygulanmaz (o zaten en üst
+  // yetkilidir, kendi adına ya da herkes adına doğrudan yayınlayabilir).
+  if (
+    GIRIS_YAPAN_PROFIL?.role === "admin" &&
+    !ADMIN_ADINA_HEDEF &&
+    yazar.id &&
+    yazar.id !== GIRIS_YAPAN_PROFIL.id &&
+    (secenek === "a" || secenek === "b") &&
+    document.getElementById("ic-yayinda")?.checked
+  ) {
+    const hedefProfil = (YAZAR_ADAYLARI || []).find((u) => u.id === yazar.id);
+    const hedefRolMu = hedefProfil?.role === "owner" || hedefProfil?.role === "admin";
+    if (hedefRolMu || !hedefProfil) {
+      showMessage(
+        msgEl,
+        `"${yazar.ad}" adına doğrudan yayınlayamazsın — bu, onay gerektiren bir işlemdir. Lütfen "Admin/Site Sahibi adına yayınla (onay gerekir)" kutusunu işaretleyip o akışı kullan.`,
+        "error"
+      );
+      return;
+    }
   }
 
   const slugGirdi = document.getElementById("ic-slug").value.trim();
