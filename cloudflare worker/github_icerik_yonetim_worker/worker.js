@@ -214,6 +214,45 @@ function editorSahibiMi(frontMatterAlanlari, userId, kullaniciAdi, kullaniciEmai
 }
 
 /**
+ * MİGRATION 0028 § C ("admin olan kişi owner adına içerik yayınlayınca ya
+ * da diğer herhangi bir admin adına içerik talebinde bulununca diğer
+ * hiçbir admin bu yazıları düzenleme/silme/yayınlama haklarına sahip
+ * olmasın"): bir admin (owner DEĞİL — owner bu kontrole hiç girmez, bkz.
+ * çağıran yer), _posts//_projects altında MEVCUT bir dosyayı (PUT/DELETE)
+ * değiştirmeye çalışıyorsa ve o dosya "admin adına" ya da "Site Sahibi
+ * adına" yayınlanmış bir içerikse, SADECE içeriği GERÇEKTEN oluşturan kişi
+ * (olusturan_id) ya da içeriğin adına yazıldığı hedef kişinin (yazar_id)
+ * kendisi bu dosyayı düzenleyebilir/silebilir.
+ *
+ * TESPİT YÖNTEMİ: front-matter'da ayrıca "admin_adina_talep"/
+ * "sahip_adina_talep" bayrağı TUTULMUYOR (bunlar sadece Supabase
+ * taslak_icerikler tablosunda var, bkz. dosyaIcerigiOlustur içindeki not) —
+ * ama "admin adına DEĞİLSE (normal durum) olusturan_id HER ZAMAN yazar_id
+ * ile aynıdır" kuralı (bkz. assets/js/github-yonetim.js dosyaIcerigiOlustur
+ * yorumu) güvenilir bir dolaylı sinyal sağlıyor: olusturan_id !== yazar_id
+ * İSE bu içerik birinin (editor/manager/başka bir admin) BAŞKA birinin
+ * (hedef admin/owner) adına yayınladığı içeriktir. Bu durumda olmayan
+ * (normal, kendi adına yazılmış) içerikte davranış HİÇ DEĞİŞMEZ — herhangi
+ * bir admin eskisi gibi düzenleyip silebilir.
+ *
+ * Bu, Supabase tarafındaki AYNI korumanın (migration 0028 § C,
+ * _taslak_admin_erisimi_var_mi + taslak_update_own_or_admin/
+ * taslak_delete_own_or_admin RLS politikaları) GitHub'a ZATEN commit
+ * edilmiş dosyalar için sunucu taraflı karşılığıdır — o politikalar sadece
+ * taslak_icerikler tablosuna uygulanır, bu tabloya hiç uğramayan (Seçenek
+ * A ile doğrudan commit edilmiş ya da onaylanıp GitHub'a taşınmış) dosyalar
+ * için tek gerçek sınır burasıdır.
+ */
+function adminBuIcerigeErisebilirMi(frontMatterAlanlari, userId) {
+  const olusturanId = frontMatterAlanlari.olusturan_id || null;
+  const yazarId = frontMatterAlanlari.yazar_id || null;
+  // Alanlardan biri eksikse (çok eski dosya) ya da ikisi eşitse (normal,
+  // "admin adına" OLMAYAN durum) hiçbir kısıt yok.
+  if (!olusturanId || !yazarId || olusturanId === yazarId) return true;
+  return userId === olusturanId || userId === yazarId;
+}
+
+/**
  * TEK İSTEKLİ PANEL BAŞLANGIÇ UÇ NOKTASI — GET /panel-init
  * -----------------------------------------------------------------------
  * NEDEN (client tarafı): Panel (assets/js/github-yonetim/github-yonetim.js)
@@ -595,22 +634,31 @@ export default {
       if (icerikYolu) {
         // editor/manager/admin — zaten icerikYoneticisiMi ile yukarıda kontrol edildi.
         //
-        // 4.1) SAHİPLİK KONTROLÜ — SADECE role='editor' İÇİN (manager ve
-        //      admin'e bu kısıt HİÇ uygulanmaz, migration 0016'daki gibi
-        //      "editor ile aynı yazma yetkisi" onlarda hâlâ TÜM içeriği
-        //      kapsıyor). Bir editor, _posts//_projects altında MEVCUT bir
+        // 4.1) SAHİPLİK KONTROLÜ — role='editor' İÇİN TAM (manager'a bu
+        //      kısıt HİÇ uygulanmaz, migration 0016'daki gibi "editor ile
+        //      aynı yazma yetkisi" onda hâlâ TÜM içeriği kapsıyor);
+        //      role='admin' İÇİN İSE SADECE "admin adına"/"Site Sahibi
+        //      adına" yayınlanmış içerikte (bkz. migration 0028 § C ve
+        //      adminBuIcerigeErisebilirMi yukarıda) — sıradan (kendi adına
+        //      yazılmış) içerikte bir admin'e HİÇBİR kısıt uygulanmaz,
+        //      TÜM içeriği eskisi gibi düzenleyip silebilir. owner ise bu
+        //      bloğa hiç girmez (rol === "editor" || rol === "admin"
+        //      koşulunun dışında kalır), her zaman kısıtsızdır.
+        //      Bir editor, _posts//_projects altında MEVCUT bir
         //      dosyayı (PUT ile üzerine yazarak düzenleme/yeniden adlandırma
         //      YA DA DELETE ile silme) değiştirmeye çalışıyorsa, o dosyanın
-        //      front-matter'ındaki yazar_id kendisine ait DEĞİLSE istek
+        //      front-matter'ındaki yazar_id kendisine ait DEĞİLSE; bir admin
+        //      ise (owner hariç) o dosya "admin adına"/"Site Sahibi adına"
+        //      yayınlanmış VE kendisi ne oluşturan ne hedef DEĞİLSE, istek
         //      burada, GitHub'a hiç gitmeden reddedilir. Bu, panelin kendi
         //      buton gizleme kontrolünün (bkz. github-yonetim.js
-        //      icerikKendisineMiAit/icerikEditoreKapaliMi) GERÇEK sunucu
-        //      taraflı karşılığıdır — o istemci kontrolü sadece bir
-        //      kolaylık, ASIL yetki sınırı burasıdır (Worker'ın PAT'a tek
-        //      erişimi olan taraf olması gibi, bkz. dosya başı notu).
-        //      YENİ bir dosya oluşturuluyorsa (henüz GitHub'da yoksa) bu
-        //      kontrol uygulanmaz — yeni içerik zaten editor'ün kendisine
-        //      ait olacaktır.
+        //      icerikKendisineMiAit/editorKisitliMi/digerAdminErisimEngelliMi)
+        //      GERÇEK sunucu taraflı karşılığıdır — o istemci kontrolü
+        //      sadece bir kolaylık, ASIL yetki sınırı burasıdır (Worker'ın
+        //      PAT'a tek erişimi olan taraf olması gibi, bkz. dosya başı
+        //      notu). YENİ bir dosya oluşturuluyorsa (henüz GitHub'da
+        //      yoksa) bu kontrol uygulanmaz — yeni içerik zaten
+        //      oluşturanın kendisine ait olacaktır.
         // .gitkeep dosyaları (bkz. klasordekiGitkeepiTemizle/klasorBosaldiysaGitkeepEkle
         // ve klasorOlustur/klasorSil içinde github-yonetim.js) içerik front-matter'ı
         // TAŞIMAZ — bir yazının/projenin sahipliği yerine bir KLASÖRÜN sahipliğini
@@ -618,16 +666,37 @@ export default {
         // olarak tutulur (bkz. gitkeepIcerigiOlustur). Bu yüzden ayrı bir okuyucuyla
         // (gitkeepSahipIdOku) kontrol ediliyor.
         const gitkeepDosyasiMi = hedefYol === ".gitkeep" || hedefYol.endsWith("/.gitkeep");
-        if (rol === "editor" && (request.method === "PUT" || request.method === "DELETE")) {
+        // MİGRATION 0028 § C: eskiden bu blok SADECE rol === "editor" için
+        // çalışıyordu ("manager ve admin'e bu kısıt HİÇ uygulanmaz" —
+        // yorum aşağıda buna göre güncellendi). Artık rol === "admin" da
+        // (owner HARİÇ, o bu kontrole hiç girmiyor) "admin adına"/"Site
+        // Sahibi adına" yayınlanmış dosyalarda (bkz. adminBuIcerigeErisebilirMi)
+        // AYNI şekilde sınırlanıyor — manager'a hâlâ HİÇBİR kısıt
+        // uygulanmıyor (migration 0016'daki "editor ile aynı yazma yetkisi,
+        // ama TÜM içeriği kapsar" tasarımı manager için değişmedi, bu
+        // istek sadece "diğer adminler" ile ilgili).
+        if ((rol === "editor" || rol === "admin") && (request.method === "PUT" || request.method === "DELETE")) {
           const mevcutDosya = await githubDosyaOku(env, hedefYol);
           if (mevcutDosya) {
-            const sahipUyusuyorMu = gitkeepDosyasiMi
-              ? gitkeepSahipIdOku(mevcutDosya) === userId
-              : editorSahibiMi(frontMatterAlanlariniOku(mevcutDosya), userId, kullaniciAdi, kullaniciEmail);
+            let sahipUyusuyorMu;
+            if (rol === "editor") {
+              sahipUyusuyorMu = gitkeepDosyasiMi
+                ? gitkeepSahipIdOku(mevcutDosya) === userId
+                : editorSahibiMi(frontMatterAlanlariniOku(mevcutDosya), userId, kullaniciAdi, kullaniciEmail);
+            } else {
+              // rol === "admin" — .gitkeep'in "admin adına" kavramı yok
+              // (klasör sahipliği farklı bir konudur, bkz. gitkeepSahipIdOku),
+              // bu yüzden gitkeep'lerde admin hâlâ kısıtsız.
+              sahipUyusuyorMu = gitkeepDosyasiMi
+                ? true
+                : adminBuIcerigeErisebilirMi(frontMatterAlanlariniOku(mevcutDosya), userId);
+            }
             if (!sahipUyusuyorMu) {
               return jsonHata(
                 gitkeepDosyasiMi
                   ? "Bu klasörü sadece oluşturan kişi silebilir."
+                  : rol === "admin"
+                  ? "Bu içerik başka bir admin ya da Site Sahibi adına yayınlandı — sadece o kişi ya da Site Sahibi bu içeriği düzenleyebilir/silebilir."
                   : "Bu içeriği düzenleme/silme yetkin yok — başka bir yazara ait.",
                 403
               );
