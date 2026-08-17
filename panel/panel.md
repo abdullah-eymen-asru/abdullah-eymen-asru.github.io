@@ -20,6 +20,11 @@ permalink: "/panel/panel.html"
   <div class="panel-grid">
 
     <section class="panel-section">
+      <h2>Özel İçeriklerim</h2>
+      <div id="ozel-icerik-list"><p class="muted">Yükleniyor...</p></div>
+    </section>
+
+    <section class="panel-section">
       <h2>Profil Bilgileri</h2>
       <form id="profil-form" novalidate>
         <div class="form-field">
@@ -187,11 +192,6 @@ permalink: "/panel/panel.html"
     <section class="panel-section">
       <h2>KVKK Onayı</h2>
       <div id="kvkk-durum"><p class="muted">Yükleniyor...</p></div>
-    </section>
-
-    <section class="panel-section">
-      <h2>Özel İçeriklerim</h2>
-      <div id="ozel-icerik-list"><p class="muted">Yükleniyor...</p></div>
     </section>
 
     <!-- Mesajlar bölümü BURADAN, ortak/bağımsız bir sayfaya taşındı (bkz.
