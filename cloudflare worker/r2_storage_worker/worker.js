@@ -152,8 +152,9 @@ export default {
     // uygulanmıyordu. Artık service_role anahtarıyla (zaten elimizde var,
     // aşağıda log yazarken de kullanılıyor) admin panelindeki RLS
     // mantığının AYNISINI burada da uyguluyoruz:
-    //   - Çağıran admin ise -> her zaman izinli.
-    //   - Değilse -> objectKey'in ilk klasör segmenti (content_id) için
+    //   - Çağıran role='user' DIŞINDA biriyse (special_user/editor/manager/
+    //     admin/owner) -> her zaman izinli (bkz. migration 0023 § D).
+    //   - role='user' ise -> objectKey'in ilk klasör segmenti (content_id) için
     //     content_access satırı var mı VE süresi dolmamış mı diye bakılır.
     const contentId = objectKey.split("/")[0];
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -174,12 +175,20 @@ export default {
       // content_access ataması aranmadan) erişebiliyor — bkz.
       // supabase/migrations/0016_..._admin_adina_onay.sql ve panel/admin.md.
       const rol = profilData?.[0]?.role;
-      // BUG FİX: 'owner' (Site Sahibi, migration 0021) burada eksikti — bu
-      // Worker Supabase RLS'den bağımsız kendi rol kontrolünü yapıyor,
-      // owner admin'in tüm yetkilerini kapsadığı halde burada unutulmuştu.
-      const isAdmin = rol === "admin" || rol === "manager" || rol === "owner";
+      // İSTEK (bkz. supabase/migrations/0023_..._erisim_duzeltmeleri.sql § D):
+      // özel içerik ve R2 storage erişimi artık SADECE admin/manager/owner
+      // için değil, role='user' (sıradan Üye) HARİÇ HERKES için blanket
+      // (content_access ataması aranmadan) açık olmalı — yani special_user
+      // ve editor de dahil. Hiyerarşi: Site Sahibi > Yönetici >
+      // İçerik Sorumlusu > Editör > Özel Üye > Üye. Bu Worker, Supabase
+      // RLS'den (has_content_access(), aynı migration'da güncellendi) BAĞIMSIZ
+      // kendi rol kontrolünü yaptığı için ikisinin de senkron güncellenmesi
+      // gerekiyor — biri güncellenip diğeri unutulursa iki taraf arasında
+      // tutarsızlık (ör. sayfada dosya görünür ama indirme linki 403 döner
+      // ya da tam tersi) oluşur.
+      const herkeseAcikRolMu = !!rol && rol !== "user";
 
-      if (!isAdmin) {
+      if (!herkeseAcikRolMu) {
         if (!uuidRegex.test(contentId)) {
           throw new Error("yetkisiz");
         }
