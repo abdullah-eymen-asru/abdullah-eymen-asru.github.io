@@ -117,7 +117,7 @@ async function init() {
 
   const icerik = document.getElementById("mesajlar-icerik");
   const aciklama = document.getElementById("mesajlar-aciklama");
-  const adminMi = profile.role === "admin";
+  const adminMi = profile.role === "admin" || profile.role === "owner";
 
   if (adminMi) {
     aciklama.textContent =
