@@ -93,7 +93,7 @@
  *   gerekir (bkz. Worker dosyasının başındaki ortam değişkeni listesi).
  */
 import { requireAuth } from "../auth/auth-guard.js";
-import { escapeHtml, showMessage, supabase } from "../core/supabase-client.js";
+import { escapeHtml, showMessage, supabase, kucukHarfeCevirTr, kullaniciAramayaUyuyorMu } from "../core/supabase-client.js";
 
 // ---- BURAYI DOLDUR: Worker deploy edildikten sonra aldığın URL ----
 // ör. "https://github-icerik-worker.KULLANICI-ADIN.workers.dev"
@@ -611,26 +611,80 @@ function submitButonMetniGuncelle() {
 /* YAZAR ALANI — admin başka bir editör/admin adına yazabilir, editor      */
 /* sadece kendi adına yazabilir (salt okunur alan)                        */
 /* ---------------------------------------------------------------------- */
+const YAZAR_ROL_ETIKETI = { admin: "Yönetici", owner: "Site Sahibi", editor: "Editör", manager: "İçerik Sorumlusu" };
+
+// admin/owner için yazar adayları (bir kez çekilir, her tuş vuruşunda
+// client-side filtrelenir — bkz. mesajlar.js/chat.js'teki AYNI desen).
+let YAZAR_ADAYLARI = null;
+// wireYazarAlani() form iptal edilince (bkz. duzenlemeyiIptalEt) TEKRAR
+// çağrılıyor — input/click olay dinleyicilerini SADECE ilk çağrıda bağlıyoruz,
+// yoksa her iptalde bir kopya daha eklenip aynı arama sonucu birden fazla kez
+// çizilir / kapatma tıklaması birden fazla kez tetiklenirdi.
+let YAZAR_OLAYLARI_BAGLANDI = false;
+
+/** Formdaki gizli id alanına + görünen arama kutusuna, seçilen kişiyi yazar. */
+function yazarSecimiUygula(id, ad) {
+  const idAlani = document.getElementById("ic-yazar-secili-id");
+  const arama = document.getElementById("ic-yazar-arama");
+  if (idAlani) idAlani.value = id || "";
+  if (arama) arama.value = ad || "";
+}
+
+function yazarSonuclariniCiz(sonucEl, adaylar, q) {
+  const eslesenler = adaylar.filter((u) => kullaniciAramayaUyuyorMu(u, q)).slice(0, 8);
+  if (eslesenler.length === 0) {
+    sonucEl.innerHTML = `<p class="chat-bos" style="padding:8px 10px;">Eşleşen kullanıcı yok.</p>`;
+    sonucEl.hidden = false;
+    return;
+  }
+  sonucEl.innerHTML = eslesenler
+    .map((u) => {
+      const ad = u.full_name || u.email;
+      return `
+      <button type="button" class="msg-uye-sonuc-item" data-id="${u.id}" data-ad="${escapeHtml(ad)}">
+        <span class="msg-uye-sonuc-isim">${escapeHtml(u.full_name || "—")} (${YAZAR_ROL_ETIKETI[u.role] || u.role})</span>
+        <span class="muted">${escapeHtml(u.email)}</span>
+      </button>`;
+    })
+    .join("");
+  sonucEl.hidden = false;
+  sonucEl.querySelectorAll(".msg-uye-sonuc-item").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      yazarSecimiUygula(btn.dataset.id, btn.dataset.ad);
+      sonucEl.hidden = true;
+      sonucEl.innerHTML = "";
+    });
+  });
+}
+
 async function wireYazarAlani() {
-  const secim = document.getElementById("ic-yazar-secim");
+  const kutuWrap = document.getElementById("ic-yazar-arama-kutusu");
+  const arama = document.getElementById("ic-yazar-arama");
+  const sonucEl = document.getElementById("ic-yazar-arama-sonuc");
   const girdi = document.getElementById("ic-yazar-adi");
-  if (!secim || !girdi || !GIRIS_YAPAN_PROFIL) return;
+  if (!kutuWrap || !arama || !sonucEl || !girdi || !GIRIS_YAPAN_PROFIL) return;
 
   const kendiAdi = GIRIS_YAPAN_PROFIL.full_name || GIRIS_YAPAN_PROFIL.email || "";
 
   if (GIRIS_YAPAN_PROFIL.role !== "admin" && GIRIS_YAPAN_PROFIL.role !== "owner") {
     // editor: kendi adı dışında bir şey seçemez, alan salt okunur.
-    secim.hidden = true;
+    kutuWrap.hidden = true;
     girdi.hidden = false;
     girdi.value = kendiAdi;
     girdi.readOnly = true;
     return;
   }
 
-  // admin/owner: içerik yönetebilen herkes (admin + owner + editor + manager) arasından yazar seçebilir.
+  // admin/owner: içerik yönetebilen herkes (admin + owner + editor + manager)
+  // arasından isim/e-posta ile arayıp yazar seçebilir — önceden bir <select>
+  // listesiydi, yönetici/site sahibi/editör sayısı arttıkça sayfayı
+  // şişirmemek için arama kutusuna çevrildi (bkz. panel/github-yonetim.md).
   girdi.hidden = true;
-  secim.hidden = false;
-  secim.innerHTML = '<option value="">Yükleniyor…</option>';
+  kutuWrap.hidden = false;
+
+  // Varsayılan: giriş yapan admin'in kendisi.
+  yazarSecimiUygula(GIRIS_YAPAN_PROFIL.id, kendiAdi);
+
   try {
     const { data, error } = await supabase
       .from("profiles")
@@ -638,21 +692,32 @@ async function wireYazarAlani() {
       .in("role", ["admin", "owner", "editor", "manager"])
       .order("full_name", { ascending: true });
     if (error) throw error;
-
-    const ROL_ETIKETI = { admin: "Yönetici", owner: "Site Sahibi", editor: "Editör", manager: "İçerik Sorumlusu" };
-    secim.innerHTML = (data || [])
-      .map((p) => {
-        const ad = p.full_name || p.email;
-        return `<option value="${p.id}" data-ad="${escapeHtml(ad)}">${escapeHtml(ad)} (${ROL_ETIKETI[p.role] || p.role})</option>`;
-      })
-      .join("");
-
-    // Varsayılan: giriş yapan admin'in kendisi.
-    if (GIRIS_YAPAN_PROFIL.id) secim.value = GIRIS_YAPAN_PROFIL.id;
-    if (!secim.value && secim.options.length > 0) secim.selectedIndex = 0;
+    YAZAR_ADAYLARI = data || [];
   } catch (err) {
     console.error("Yazar listesi yüklenemedi:", err);
-    secim.innerHTML = `<option value="${GIRIS_YAPAN_PROFIL.id || ""}">${escapeHtml(kendiAdi)}</option>`;
+    YAZAR_ADAYLARI = GIRIS_YAPAN_PROFIL.id ? [{ id: GIRIS_YAPAN_PROFIL.id, full_name: kendiAdi, email: GIRIS_YAPAN_PROFIL.email, role: GIRIS_YAPAN_PROFIL.role }] : [];
+  }
+
+  if (!YAZAR_OLAYLARI_BAGLANDI) {
+    YAZAR_OLAYLARI_BAGLANDI = true;
+    arama.addEventListener("input", () => {
+      const q = kucukHarfeCevirTr(arama.value.trim());
+      // Arama kutusu elle temizlenirse seçili yazar da temizlenir — böylece
+      // kaydedince, ekranda görünmeyen ESKİ bir seçim sessizce gönderilmez.
+      const idAlani = document.getElementById("ic-yazar-secili-id");
+      if (idAlani) idAlani.value = "";
+      if (!q) {
+        sonucEl.hidden = true;
+        sonucEl.innerHTML = "";
+        return;
+      }
+      yazarSonuclariniCiz(sonucEl, YAZAR_ADAYLARI || [], q);
+    });
+    document.addEventListener("click", (e) => {
+      if (!sonucEl.hidden && !sonucEl.contains(e.target) && e.target !== arama) {
+        sonucEl.hidden = true;
+      }
+    });
   }
 }
 
@@ -789,11 +854,12 @@ async function wireAdminAdinaTalep() {
 /** Formda o an seçili/girilmiş yazar bilgisini { id, ad } olarak döner. */
 function yazarBilgisiniAl() {
   if (ADMIN_ADINA_HEDEF) return ADMIN_ADINA_HEDEF;
-  const secim = document.getElementById("ic-yazar-secim");
+  const kutuWrap = document.getElementById("ic-yazar-arama-kutusu");
+  const idAlani = document.getElementById("ic-yazar-secili-id");
+  const arama = document.getElementById("ic-yazar-arama");
   const girdi = document.getElementById("ic-yazar-adi");
-  if (secim && !secim.hidden) {
-    const secili = secim.selectedOptions?.[0];
-    return { id: secim.value || null, ad: secili?.dataset.ad || secili?.textContent || "" };
+  if (kutuWrap && !kutuWrap.hidden) {
+    return { id: idAlani?.value || null, ad: arama?.value || "" };
   }
   return { id: GIRIS_YAPAN_PROFIL?.id || null, ad: girdi?.value || "" };
 }
@@ -3409,13 +3475,14 @@ async function icerikDuzenlemeyeYukle(item, tur) {
   }
   DUZENLENEN_OLUSTURAN_ID = item.data.olusturan_id || item.data.yazar_id || null;
 
-  // Yazar alanını içeriğin kayıtlı yazarına göre doldur (admin seçim
-  // kutusundaysa ilgili seçeneği işaretler; editor için zaten salt okunur
-  // ve her zaman kendi adını gösterir, bkz. wireYazarAlani).
-  const yazarSecim = document.getElementById("ic-yazar-secim");
-  if (yazarSecim && !yazarSecim.hidden && item.data.yazar_adi) {
-    const eslesenSecenek = Array.from(yazarSecim.options).find((o) => o.dataset.ad === item.data.yazar_adi);
-    if (eslesenSecenek) yazarSecim.value = eslesenSecenek.value;
+  // Yazar alanını içeriğin kayıtlı yazarına göre doldur (admin arama
+  // kutusundaysa, kayıtlı yazar_id hâlâ geçerli bir adaysa onu id+ad ile
+  // doldurur; editor için zaten salt okunur ve her zaman kendi adını
+  // gösterir, bkz. wireYazarAlani).
+  const yazarKutuWrap = document.getElementById("ic-yazar-arama-kutusu");
+  if (yazarKutuWrap && !yazarKutuWrap.hidden && item.data.yazar_adi) {
+    const adayId = item.data.yazar_id && (YAZAR_ADAYLARI || []).some((u) => u.id === item.data.yazar_id) ? item.data.yazar_id : null;
+    yazarSecimiUygula(adayId, item.data.yazar_adi);
   }
 
   // "Admin adına yayınla" durumunu geri yükle (sadece manager rolünde
