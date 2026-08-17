@@ -79,7 +79,7 @@ permalink: "/panel/github-yonetim.html"
           </div>
           <div class="form-field" id="ic-admin-adina-wrap" hidden>
             <label class="gy-toggle-satir" for="ic-admin-adina-kutu">
-              <span id="ic-admin-adina-etiket">Admin adına yayınla (onay gerekir)</span>
+              <span id="ic-admin-adina-etiket">Admin/Site Sahibi adına yayınla (onay gerekir)</span>
               <input id="ic-admin-adina-kutu" type="checkbox" role="switch">
             </label>
             <select id="ic-admin-adina-hedef" hidden></select>
