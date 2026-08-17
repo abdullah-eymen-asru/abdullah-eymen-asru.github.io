@@ -170,18 +170,47 @@ function editorSahibiMi(frontMatterAlanlari, userId, kullaniciAdi, kullaniciEmai
 /**
  * TEK İSTEKLİ PANEL BAŞLANGIÇ UÇ NOKTASI — GET /panel-init
  * -----------------------------------------------------------------------
- * NEDEN: Panel (assets/js/github-yonetim.js) açılışta ayrı ayrı "bağlantı
- * testi", "klasör listesi", "her klasörün içeriği", "her yazının/projenin
- * front-matter'ı", "profil fotoğrafı durumu" için GitHub Contents API'sine
- * DÜZİNELERCE ayrı istek atıyordu — bunların HER BİRİ bu Worker'a ayrı bir
- * client isteği demekti, yani Cloudflare Workers'ın günlük istek kotasını
- * (Free plan: 100.000/gün) sayfa her açıldığında/yenilendiğinde hızla
- * tüketiyordu. Bu fonksiyon aynı veriyi TEK bir client isteğinde toplar:
- * Worker kendi İÇİNDE (Cloudflare'ın "subrequest" limitine tabi, günlük
- * istek KOTASINA DEĞİL) GitHub'a paralel istekler atar, sonucu TEK bir
- * JSON gövdede birleştirip döner. Client artık sayfa açılışında SADECE bu
- * uç noktayı çağırıyor (bkz. github-yonetim.js panelVerisiniYukle) — kota
- * tüketimi kullanıcı başına, sayfa/yenileme başına 1 isteğe iner.
+ * NEDEN (client tarafı): Panel (assets/js/github-yonetim/github-yonetim.js)
+ * açılışta ayrı ayrı "bağlantı testi", "klasör listesi", "her klasörün
+ * içeriği", "her yazının/projenin front-matter'ı", "profil fotoğrafı
+ * durumu" için GitHub Contents API'sine DÜZİNELERCE ayrı istek atıyordu —
+ * bunların HER BİRİ bu Worker'a ayrı bir client isteği demekti, yani
+ * Cloudflare Workers'ın günlük istek kotasını (Free plan: 100.000/gün)
+ * sayfa her açıldığında/yenilendiğinde hızla tüketiyordu. Bu uç nokta aynı
+ * veriyi TEK bir client isteğinde toplar — client artık sayfa açılışında
+ * SADECE bu uç noktayı çağırıyor (bkz. github-yonetim.js panelVerisiniYukle),
+ * Worker kota tüketimi kullanıcı başına, sayfa/yenileme başına 1 isteğe iner.
+ *
+ * NEDEN (GitHub tarafı — GIT TREES API'YE GEÇİŞ): Worker'ın kendisi de
+ * kotasız DEĞİL — bu istek içinde GitHub'a attığı alt-istekler GitHub'ın
+ * KENDİ hız sınırlarına (özellikle Secondary Rate Limit'e) tabi. Eski
+ * sürüm burada "_posts"/"_projects" kökünü, sonra HER alt klasörü (yıl
+ * klasörleri vb.), sonra da HER TEK .md dosyasının içeriğini AYRI birer
+ * `/contents/...` isteğiyle okuyordu — içerik sayısı arttıkça bu, tek bir
+ * panel açılışında onlarca-yüzlerce paralel GitHub isteğine dönüşüyordu.
+ * Artık bunun yerine tüm repo ağacı TEK bir istekle çekiliyor:
+ *   GET /repos/{owner}/{repo}/git/trees/{branch}?recursive=1
+ * Bu uç nokta, verilen dal (branch) üzerindeki TÜM dosya/klasör yollarını
+ * (ve blob'lar için `sha`/`size`'ı) TEK bir yanıtta, git'in kendi iç ağaç
+ * yapısından (recursive=1 ile alt klasörler DAHİL) döner. `_posts`/
+ * `_projects` altındaki `.md` yollarını bu ağaçtan FİLTRELEYEREK hem
+ * "klasör listesi" hem "içerik listesi" (path/ad/sha/tip/yıl/boyut) HİÇ
+ * EK GitHub isteği ATMADAN çıkarılıyor — GitHub'a giden istek sayısı,
+ * içerik sayısından BAĞIMSIZ, sabit (repo bilgisi + ağaç + sadece
+ * gerçekten BOŞ klasörlerin .gitkeep sahibi + admin'de config/profil foto)
+ * kalıyor. Böylece Secondary Rate Limit riski içerik sayısı büyüdükçe
+ * ARTMIYOR.
+ *
+ * ÖNEMLİ — İÇERİK (content) ARTIK BURADA YOK: Bu uç nokta artık dosyaların
+ * GERÇEK içeriğini (front-matter/gövde) döndürmüyor, SADECE hafif bir
+ * envanter (path, name, sha, tip, yil, boyut) veriyor. Tam dosya içeriği,
+ * client'ta SADECE gerçekten gerekli olduğunda (listede görünür bir
+ * sayfadaki kartları zenginleştirmek ya da "Düzenle" ile açmak için)
+ * mevcut `/contents/<path>` uç noktasıyla TEK dosyalık okunuyor — bkz.
+ * github-yonetim.js icerikOzetleriniCikar/icerikIcerigiZenginlestir ve
+ * icerikDuzenlemeyeYukle. Bu, hem GitHub isteklerini hem Worker/GitHub
+ * yanıt gövdesinin boyutunu (yüzlerce dosyanın base64 içeriğini taşımak
+ * yerine sadece birkaç KB'lık bir liste) büyük ölçüde azaltıyor.
  *
  * GÜVENLİK: Bu uç nokta da diğerleri gibi kimlik+rol kontrolünden SONRA
  * çalışır (çağıran fetch() içindeki 1-3. adımlar). assets//_config.yml
@@ -190,7 +219,8 @@ function editorSahibiMi(frontMatterAlanlari, userId, kullaniciAdi, kullaniciEmai
  * yolların /contents/ uç noktasında admin dışına tamamen kapalı olması
  * gibi (bkz. yukarıdaki "yalnizAdminYolu" kontrolü) — sadece burada SUNUCU
  * o veriyi hiç ÇEKMEDİĞİ için (client'a hiç gitmediği için) aynı sınır
- * korunmuş oluyor.
+ * korunmuş oluyor. Ağaç filtrelemesi de AYNI kural setine (`_posts`/
+ * `_projects`) uygulanıyor; başka HİÇBİR yol client'a sızmıyor.
  */
 async function panelBaslangicVerisiGetir(env, branch, rol) {
   const ghBasligi = {
@@ -200,15 +230,14 @@ async function panelBaslangicVerisiGetir(env, branch, rol) {
     "User-Agent": "abdullah-eymen-asru-github-icerik-worker",
   };
   const cfSecenek = { cf: { cacheTtl: 0, cacheEverything: false } };
-  const ghYolu = (yol) => {
-    const q = branch ? `?ref=${encodeURIComponent(branch)}` : "";
-    return `${GITHUB_API}/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}${yol}${q}`;
-  };
+  const ghYolu = (yol, q = "") =>
+    `${GITHUB_API}/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}${yol}${q}`;
   /** GET atar; 404'ü de "hata değil, veri yok" (data: null) olarak döner —
    * tek bir eksik dosya/klasör TÜM toplu isteği çökertmesin diye. */
   const ghAl = async (yol) => {
     try {
-      const res = await fetch(ghYolu(yol), { headers: ghBasligi, ...cfSecenek });
+      const q = branch ? `?ref=${encodeURIComponent(branch)}` : "";
+      const res = await fetch(ghYolu(yol, q), { headers: ghBasligi, ...cfSecenek });
       if (res.status === 404) return null;
       if (!res.ok) return null;
       return await res.json();
@@ -218,57 +247,103 @@ async function panelBaslangicVerisiGetir(env, branch, rol) {
   };
   const yolKodla = (yol) => yol.split("/").map(encodeURIComponent).join("/");
 
-  /** Bir kök koleksiyonu ("_posts" ya da "_projects") tek seferde işler:
-   * alt klasörleri, her alt klasördeki .md dosyalarını (kök dahil), boş
-   * klasörlerin .gitkeep sahiplerini VE her .md dosyasının GERÇEK
-   * içeriğini (front-matter ayrıştırması client'ta yapılacak) paralel
-   * olarak toplar. */
-  const koleksiyonuIsle = async (kokKlasor) => {
-    const kokIcerik = await ghAl(`/contents/${kokKlasor}`);
-    const liste = Array.isArray(kokIcerik) ? kokIcerik : [];
-    const altKlasorler = liste.filter((f) => f.type === "dir");
-    const kokDosyalar = liste.filter((f) => f.type === "file" && f.name.endsWith(".md"));
+  // 1) Repo bilgisi — hem client'a dönen `repo` alanı için hem de (branch
+  //    parametresi boşsa) ağaç isteğinde kullanılacak varsayılan dalı
+  //    öğrenmek için gerekli, bu yüzden ağaçtan ÖNCE, tek başına çekiliyor.
+  const repo = await ghAl("");
+  const agacDali = branch || repo?.default_branch || "";
 
-    const altIcerikler = await Promise.all(altKlasorler.map((k) => ghAl(`/contents/${yolKodla(k.path)}`)));
-
-    const klasorler = [];
-    const altDosyalar = [];
-    altKlasorler.forEach((k, i) => {
-      const icerik = Array.isArray(altIcerikler[i]) ? altIcerikler[i] : [];
-      const gercekDosyalar = icerik.filter((f) => f.type === "file" && f.name !== ".gitkeep");
-      icerik.filter((f) => f.type === "file" && f.name.endsWith(".md")).forEach((f) => altDosyalar.push(f));
-      klasorler.push({ name: k.name, path: k.path, dosyaSayisi: gercekDosyalar.length, sahipId: null, _bosMu: gercekDosyalar.length === 0 });
-    });
-
-    // Sadece BOŞ klasörler için .gitkeep içeriğini ayrıca oku (kim
-    // oluşturmuş — editor'ün kendi silme yetkisi için, bkz. dosya başı).
-    const bosKlasorler = klasorler.filter((k) => k._bosMu);
-    const gitkeepIcerikleri = await Promise.all(bosKlasorler.map((k) => ghAl(`/contents/${yolKodla(k.path)}/.gitkeep`)));
-    bosKlasorler.forEach((k, i) => {
-      const veri = gitkeepIcerikleri[i];
-      if (veri && typeof veri.content === "string") {
-        k.sahipId = gitkeepSahipIdOku(atob(veri.content.replace(/\n/g, "")));
+  // 2) TEK istek: reponun TÜM ağacı (recursive=1) — bkz. dosya başı GIT
+  //    TREES API notu. `agac` boş kalırsa (istek başarısızsa ya da dal
+  //    bulunamadıysa) aşağıdaki filtrelemeler doğal olarak boş liste
+  //    üretir, panel çöküp kalmak yerine "içerik yok" gösterir.
+  let agac = [];
+  let agacKesildi = false;
+  if (agacDali) {
+    try {
+      const res = await fetch(
+        ghYolu(`/git/trees/${encodeURIComponent(agacDali)}`, "?recursive=1"),
+        { headers: ghBasligi, ...cfSecenek }
+      );
+      if (res.ok) {
+        const veri = await res.json();
+        agac = Array.isArray(veri.tree) ? veri.tree : [];
+        // GitHub çok büyük ağaçlarda (bu depo ölçeğinde pratikte
+        // beklenmez) sonucu kesip `truncated:true` döner — bu durumda
+        // client'ı uyarabilmek için bayrağı taşıyoruz, istek yine de
+        // (eksik de olsa) kullanılabilir kalır.
+        agacKesildi = veri.truncated === true;
       }
-      delete k._bosMu;
+    } catch (_err) {
+      // agac boş kalır — koleksiyonlar aşağıda doğal olarak {klasorler:[],dosyalar:[]} döner.
+    }
+  }
+
+  /** Verilen kök koleksiyonu ("_posts" ya da "_projects") için, HİÇBİR EK
+   * GitHub isteği ATMADAN, yukarıda tek seferde çekilmiş `agac`'tan:
+   *  - klasör listesini (ad, yol, doğrudan içindeki .md sayısı),
+   *  - hafif dosya listesini (path, name, sha, tip, yil, boyut — İÇERİK
+   *    YOK, bkz. dosya başı notu)
+   * çıkarır. Eski sürümdeki gibi yalnızca TEK seviye alt klasör (ör. yıl
+   * klasörü) varsayımı korunuyor — daha derin iç içe klasörler kök
+   * koleksiyon dosyası olarak sayılmaz (eski davranışla AYNI).
+   */
+  const koleksiyonuAgactanCikar = (kokKlasor) => {
+    const onEk = kokKlasor + "/";
+    const girdiler = agac.filter((g) => g.path === kokKlasor || g.path.startsWith(onEk));
+    const mdDosyalari = girdiler.filter((g) => g.type === "blob" && g.path.endsWith(".md"));
+
+    const altKlasorAdlari = new Set();
+    mdDosyalari.forEach((g) => {
+      const parcalar = g.path.slice(onEk.length).split("/");
+      if (parcalar.length >= 2) altKlasorAdlari.add(parcalar[0]);
     });
 
-    const tumMdDosyalari = [...kokDosyalar, ...altDosyalar];
-    const detaylar = await Promise.all(tumMdDosyalari.map((f) => ghAl(`/contents/${yolKodla(f.path)}`)));
-    const dosyalar = tumMdDosyalari.map((f, i) => ({
-      path: f.path,
-      name: f.name,
-      sha: detaylar[i]?.sha || f.sha,
-      content: typeof detaylar[i]?.content === "string" ? detaylar[i].content : null,
-    }));
+    const dosyalar = mdDosyalari.map((g) => {
+      const goreli = g.path.slice(onEk.length);
+      const parcalar = goreli.split("/");
+      const name = parcalar[parcalar.length - 1];
+      const tarihEslesme = name.match(/^(\d{4})-\d{2}-\d{2}-/);
+      const yil = tarihEslesme ? tarihEslesme[1] : /^\d{4}$/.test(parcalar[0] || "") ? parcalar[0] : null;
+      return {
+        path: g.path,
+        name,
+        sha: g.sha,
+        boyut: typeof g.size === "number" ? g.size : null,
+        yil,
+        tip: kokKlasor === "_posts" ? "blog" : "proje",
+      };
+    });
+
+    const klasorler = [...altKlasorAdlari].map((ad) => {
+      const klasorOnEk = onEk + ad + "/";
+      const dosyaSayisi = mdDosyalari.filter(
+        (g) => g.path.startsWith(klasorOnEk) && !g.path.slice(klasorOnEk.length).includes("/")
+      ).length;
+      return { name: ad, path: kokKlasor + "/" + ad, dosyaSayisi, sahipId: null, _bosMu: dosyaSayisi === 0 };
+    });
 
     return { klasorler, dosyalar };
   };
 
-  const [repo, posts, projects] = await Promise.all([
-    ghAl(""),
-    koleksiyonuIsle("_posts"),
-    koleksiyonuIsle("_projects"),
-  ]);
+  const posts = koleksiyonuAgactanCikar("_posts");
+  const projects = koleksiyonuAgactanCikar("_projects");
+
+  // Sadece GERÇEKTEN boş klasörler için .gitkeep içeriğini ayrıca oku (kim
+  // oluşturmuş — editor'ün kendi silme yetkisi için, bkz. dosya başı ve
+  // gitkeepSahipIdOku). Bu, ağaçtaki bir .gitkeep girdisinden SADECE `sha`
+  // gelir, İÇERİK gelmez — bu yüzden az sayıdaki boş klasör için (genelde
+  // 0-birkaç tane) hâlâ ayrı birer istek gerekiyor, ama bu artık İÇERİK
+  // SAYISINDAN bağımsız, sabit ve küçük bir maliyet.
+  const bosKlasorler = [...posts.klasorler, ...projects.klasorler].filter((k) => k._bosMu);
+  const gitkeepIcerikleri = await Promise.all(bosKlasorler.map((k) => ghAl(`/contents/${yolKodla(k.path)}/.gitkeep`)));
+  bosKlasorler.forEach((k, i) => {
+    const veri = gitkeepIcerikleri[i];
+    if (veri && typeof veri.content === "string") {
+      k.sahipId = gitkeepSahipIdOku(atob(veri.content.replace(/\n/g, "")));
+    }
+  });
+  [...posts.klasorler, ...projects.klasorler].forEach((k) => delete k._bosMu);
 
   // assets/ ve _config.yml SADECE admin'e — bkz. dosya başı GÜVENLİK notu.
   let config = null;
@@ -300,6 +375,7 @@ async function panelBaslangicVerisiGetir(env, branch, rol) {
     config,
     profilFoto,
     koleksiyonlar: { _posts: posts, _projects: projects },
+    agacKesildi,
   };
 }
 
