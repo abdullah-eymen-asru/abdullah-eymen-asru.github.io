@@ -28,6 +28,11 @@ function uyeMarkup() {
           </div>
           <div id="chat-yeni-sohbet-form-wrap" class="msg-yeni-form-wrap" hidden>
             <form id="chat-yeni-sohbet-form" novalidate>
+              <div class="msg-hedef-satir">
+                <span class="msg-hedef-satir-etiket">Kime:</span>
+                <span id="chat-hedef-etiket" class="msg-hedef-deger">Yönetici (fark etmez)</span>
+                <button type="button" id="chat-hedef-degistir-btn" class="msg-hedef-degistir-btn">Değiştir</button>
+              </div>
               <input id="chat-yeni-sohbet-konu" type="text" maxlength="120" placeholder="Konu (ör. Ödeme sorunu)" required>
               <div class="msg-yeni-form-btnler">
                 <button type="submit" class="btn-primary" style="width:auto;">Başlat</button>
@@ -51,6 +56,23 @@ function uyeMarkup() {
         </div>
       </div>
       <div id="chat-message" class="auth-message" hidden></div>
+    </div>
+
+    <div id="chat-hedef-modal" class="msg-hedef-modal-overlay" hidden>
+      <div class="msg-hedef-modal" role="dialog" aria-modal="true" aria-label="Kime mesaj atmak istiyorsun?">
+        <div class="msg-hedef-modal-baslik">
+          <span>Kime mesaj atmak istiyorsun?</span>
+          <button type="button" id="chat-hedef-modal-kapat" class="msg-hedef-modal-kapat" aria-label="Kapat">✕</button>
+        </div>
+        <div class="msg-hedef-sekme-bar">
+          <button type="button" class="msg-hedef-sekme active" data-rol="">Tümü</button>
+          <button type="button" class="msg-hedef-sekme" data-rol="admin">Yöneticiler</button>
+          <button type="button" class="msg-hedef-sekme" data-rol="owner">Site Sahipleri</button>
+        </div>
+        <input id="chat-hedef-arama" type="search" class="msg-uye-arama" placeholder="İsim veya e-posta ile ara...">
+        <button type="button" id="chat-hedef-temizle-btn" class="msg-hedef-herhangi-btn">Fark etmez — herhangi bir yönetici/site sahibi görsün</button>
+        <div id="chat-hedef-liste" class="msg-hedef-liste"><p class="chat-bos">Yükleniyor...</p></div>
+      </div>
     </div>`;
 }
 
