@@ -57,10 +57,15 @@
  *       caydıran bir KOLAYLIK katmanıdır. Bu tetikleyici zaten hem
  *       manager hem editor için (admin olmayan herkes için) aynı şekilde
  *       işliyordu, bu commit'te DEĞİŞMEDİ.
- *     - Admin, "Mevcut İçerikler" listesinde onay bekleyen kartlarda görünen
- *       "✅ Onayla" / "❌ Reddet" butonlarıyla karar verir (bkz.
- *       icerikKartiCiz). Onaylanınca içerik normal "Yayınla" butonuyla
- *       (admin veya manager/editor tarafından) GitHub'a/Supabase'e
+ *     - ÖNEMLİ (migration 0026 ile DARALTILDI): "Mevcut İçerikler"
+ *       listesindeki "✅ Onayla" / "❌ Reddet" butonları artık HERHANGİ bir
+ *       admin'e değil, SADECE içeriğin adına yazıldığı o admin'in kendisine
+ *       (yazar_id === giriş yapan kişi) YA DA Site Sahibi'ne (owner)
+ *       gösterilir/çalışır — başka bir admin bu taslağı görebilir ama
+ *       onaylayamaz/reddedemez (bkz. icerikKartiCiz + admin_taslak_onayla
+ *       RPC'si + veritabanı tetikleyicisi, taslak_admin_onay_koru).
+ *       Onaylanınca içerik normal "Yayınla" butonuyla (hedef admin, owner
+ *       veya isteği yapan manager/editor tarafından) GitHub'a/Supabase'e
  *       yayınlanabilir.
  *     - ESKİDEN BURADA "DÜRÜSTLÜK PAYI" diye bir not vardı: editor/manager'a
  *       bu repo için yazma izinli bir GitHub PAT verirsen, panelin DIŞINDA
@@ -2999,11 +3004,14 @@ function icerikKartiCiz(item, tur) {
   const supabaseYedekRozet = item.supabaseYedek
     ? `<span class="gy-rozet gy-rozet--gizli" title="Bu içeriğin GitHub'daki hâlinin yanında Supabase'te de bir yedek/arama kaydı var (Seçenek B ile yayınlandı).">🗄️ Supabase yedeği</span>`
     : "";
-  // "Admin adına yayınla" onay rozeti (bkz. migration 0016 / wireAdminAdinaTalep).
+  // "Admin adına yayınla" onay rozeti (bkz. migration 0016/0026 ve
+  // wireAdminAdinaTalep). Onay/red yetkisi SADECE adına yazılan admin'in
+  // kendisinde ya da owner'da olduğu için (migration 0026) tooltip metni de
+  // bunu netleştiriyor.
   const ONAY_ROZET = {
-    beklemede: '<span class="gy-rozet gy-rozet--gizli" title="Bu içerik Admin adına yayınlanmak üzere hazırlandı, admin onayı bekliyor.">⏳ Admin onayı bekliyor</span>',
-    onaylandi: '<span class="gy-rozet gy-rozet--yayinda" title="Admin bu içeriği kendi adına yayınlanması için onayladı.">✅ Admin onayladı</span>',
-    reddedildi: '<span class="gy-rozet gy-rozet--gizli" title="Admin bu içeriğin kendi adına yayınlanma talebini reddetti.">❌ Admin reddetti</span>',
+    beklemede: '<span class="gy-rozet gy-rozet--gizli" title="Bu içerik Admin adına yayınlanmak üzere hazırlandı; sadece o adına yazılan admin ya da Site Sahibi onaylayabilir.">⏳ Admin onayı bekliyor</span>',
+    onaylandi: '<span class="gy-rozet gy-rozet--yayinda" title="Adına yazıldığı admin (ya da Site Sahibi) bu içeriği kendi adına yayınlanması için onayladı.">✅ Admin onayladı</span>',
+    reddedildi: '<span class="gy-rozet gy-rozet--gizli" title="Adına yazıldığı admin (ya da Site Sahibi) bu içeriğin kendi adına yayınlanma talebini reddetti.">❌ Admin reddetti</span>',
   };
   const onayRozet = item.data.admin_adina_talep ? ONAY_ROZET[item.data.admin_onay_durumu] || "" : "";
   // "Site Sahibi adına yayınla" onay rozeti (bkz. migration 0023 § A).
@@ -3042,18 +3050,25 @@ function icerikKartiCiz(item, tur) {
   //    (aynı işlemi yapar — GitHub'daki dosya artık bu yeni sistemde bulunmaması gereken bir
   //    yerde durduğu için Supabase'e taşınır).
   let durumBtn;
-  // Admin onayı bekleyen/reddedilmiş bir "admin adına" talebi, admin
-  // OLMAYAN biri gerçekten yayına alamaz — düğme devre dışı bırakılıp
-  // sebebi title'da gösteriliyor (bkz. migration 0016 §6'daki DB
+  // "Admin adına" talebin hedefi bu kişi mi (yazar_id === giriş yapan) YA DA
+  // Site Sahibi (owner) mi? — migration 0026 ile onay/red yetkisi HERHANGİ
+  // bir admin'den, SADECE hedef admin + owner'a daraltıldı. Bu değişken hem
+  // yayınlama kilidinde hem Onayla/Reddet butonlarının gösteriminde
+  // kullanılıyor.
+  const hedefAdminVeyaOwnerMi =
+    GIRIS_YAPAN_PROFIL?.role === "owner" ||
+    (GIRIS_YAPAN_PROFIL?.role === "admin" && !!item.data.yazar_id && GIRIS_YAPAN_PROFIL?.id === item.data.yazar_id);
+  // Admin onayı bekleyen/reddedilmiş bir "admin adına" talebi, hedef admin
+  // ya da owner OLMAYAN biri gerçekten yayına alamaz — düğme devre dışı
+  // bırakılıp sebebi title'da gösteriliyor (bkz. migration 0026'daki DB
   // tetikleyicisi zaten aynı kuralı zorunlu kılıyor, bu sadece kullanıcıyı
   // önceden bilgilendiren bir kolaylık katmanı).
   const onayEksikDegilMi =
     item.data.admin_adina_talep &&
     item.data.admin_onay_durumu !== "onaylandi" &&
-    GIRIS_YAPAN_PROFIL?.role !== "admin" &&
-    GIRIS_YAPAN_PROFIL?.role !== "owner";
+    !hedefAdminVeyaOwnerMi;
   const kilitliOznitelik = onayEksikDegilMi
-    ? `disabled title="Bu içerik admin onayı ${item.data.admin_onay_durumu === "reddedildi" ? "reddedildiği için" : "bekleniyor olduğu için"} henüz yayınlanamaz."`
+    ? `disabled title="Bu içerik, adına yazıldığı admin ${item.data.admin_onay_durumu === "reddedildi" ? "reddettiği için" : "onayı (ya da Site Sahibi onayı) bekleniyor olduğu için"} henüz yayınlanamaz."`
     : "";
   if (item.kaynak === "supabase" && sadeceSupabaseYayinda) {
     durumBtn = `<button type="button" class="gy-durum-degistir-btn gy-durum-degistir-btn--yayinla" data-hedef="yayinla" ${kilitliOznitelik}>GitHub'a da Aktar</button>`;
@@ -3064,9 +3079,11 @@ function icerikKartiCiz(item, tur) {
   } else {
     durumBtn = '<button type="button" class="gy-durum-degistir-btn gy-durum-degistir-btn--yayinla" data-hedef="tasi">Supabase\'e Taşı</button>';
   }
-  // Admin/owner, "admin adına" onay bekleyen bir talebi burada doğrudan onaylayabilir/reddedebilir.
+  // SADECE bu içeriğin adına yazıldığı hedef admin ya da owner, "admin
+  // adına" onay bekleyen bir talebi burada doğrudan onaylayabilir/
+  // reddedebilir (migration 0026) — başka bir admin bu butonları GÖRMEZ.
   const onayBtns =
-    (GIRIS_YAPAN_PROFIL?.role === "admin" || GIRIS_YAPAN_PROFIL?.role === "owner") &&
+    hedefAdminVeyaOwnerMi &&
     item.data.admin_adina_talep &&
     item.data.admin_onay_durumu === "beklemede"
       ? `<button type="button" class="gy-onay-btn" data-onay="1">✅ Onayla</button>
@@ -3187,13 +3204,20 @@ function icerikKartiCiz(item, tur) {
  * başarılı olursa taslak satırını Supabase'den siler.
  */
 /**
- * Admin, "admin adına" onay bekleyen bir taslağı burada onaylar/reddeder
- * (bkz. admin_taslak_onayla RPC'si, migration 0016 §7). Onaylandıktan
- * sonra içerik normal "Yayınla" butonuyla (admin veya isteği yapan manager
- * tarafından) gerçekten yayına alınabilir hâle gelir.
+ * SADECE bu içeriğin adına yazıldığı hedef admin'in kendisi ya da Site
+ * Sahibi (owner), "admin adına" onay bekleyen bir taslağı burada
+ * onaylar/reddeder (bkz. admin_taslak_onayla RPC'si, migration 0026 —
+ * eskiden HERHANGİ bir admin onaylayabiliyordu, bu artık kapatıldı; RPC ve
+ * veritabanı tetikleyicisi de aynı kısıtlamayı zorunlu kılıyor, buradaki
+ * kontrol sadece önceden caydıran bir kolaylık katmanı). Onaylandıktan
+ * sonra içerik normal "Yayınla" butonuyla (hedef admin, owner veya isteği
+ * yapan manager/editor tarafından) gerçekten yayına alınabilir hâle gelir.
  */
 async function adminTaslakOnayla(item, tur, onay, btn) {
-  if ((GIRIS_YAPAN_PROFIL?.role !== "admin" && GIRIS_YAPAN_PROFIL?.role !== "owner") || !item.taslakId) return;
+  const yetkiliMi =
+    GIRIS_YAPAN_PROFIL?.role === "owner" ||
+    (GIRIS_YAPAN_PROFIL?.role === "admin" && !!item.data.yazar_id && GIRIS_YAPAN_PROFIL?.id === item.data.yazar_id);
+  if (!yetkiliMi || !item.taslakId) return;
   btn.disabled = true;
   const oncekiMetin = btn.textContent;
   btn.textContent = "İşleniyor…";
