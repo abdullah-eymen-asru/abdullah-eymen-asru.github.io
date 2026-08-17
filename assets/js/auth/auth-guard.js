@@ -21,12 +21,13 @@ import { supabase } from "../core/supabase-client.js";
 
 /**
  * @param {Object} opts
- * @param {'user'|'special_user'|'editor'|'manager'|'admin'|Array<string>|null} opts.role
+ * @param {'user'|'special_user'|'editor'|'manager'|'admin'|'owner'|Array<string>|null} opts.role
  *   null/undefined  -> sadece giriş yapmış olmak yeterli
- *   'special_user'  -> special_user VEYA admin erişebilir
- *   'editor'        -> editor VEYA admin erişebilir
- *   'manager'       -> manager (panelde "İçerik Sorumlusu") VEYA admin erişebilir
- *   'admin'         -> sadece admin erişebilir
+ *   'special_user'  -> special_user VEYA admin/owner erişebilir
+ *   'editor'        -> editor VEYA admin/owner erişebilir
+ *   'manager'       -> manager (panelde "İçerik Sorumlusu") VEYA admin/owner erişebilir
+ *   'admin'         -> admin VEYA owner erişebilir (owner, admin'in tüm yetkilerini
+ *                      kapsar — bkz. migration 0021, "Site Sahibi" rolü)
  *   ['editor','manager'] -> DİZİ de verilebilir: editor, manager VEYA admin
  *                           erişebilir (bkz. panel/github-yonetim.md — hem
  *                           editor hem manager aynı yazma yetkisini
@@ -78,10 +79,15 @@ export async function requireAuth({ role = null, redirectTo = "/hesap/giris.html
   // requireAuth() BAŞTAN çağrıldığı için o taze veri kayboluyor ve
   // "Henüz KVKK onayı vermemişsin" tekrar görünüyordu). Şimdi bu
   // kolonları da seçiyoruz.
+  // is_suspended: migration 0021 (Admin Güvenliği / "Site Sahibi" akışı) —
+  // bir admin başka bir admin tarafından askıya alınmışsa bu true olur.
+  // Veritabanı tarafı zaten is_admin() içinde bunu kapatıyor (RLS/RPC
+  // seviyesinde GERÇEK güvenlik orada), ama burada da kontrol ediyoruz ki
+  // askıdaki bir admin panel sayfasını en azından GÖRMESİN (aşağıya bak).
   const { data: profile, error } = await supabase
     .from("profiles")
     .select(
-      "id, email, first_name, last_name, full_name, role, kvkk_onay_verildi, kvkk_onay_versiyonu, kvkk_onay_tarihi"
+      "id, email, first_name, last_name, full_name, role, is_suspended, kvkk_onay_verildi, kvkk_onay_versiyonu, kvkk_onay_tarihi"
     )
     .eq("id", session.user.id)
     .single();
@@ -111,9 +117,18 @@ export async function requireAuth({ role = null, redirectTo = "/hesap/giris.html
   const roleOk =
     role === null ||
     izinliRoller.includes(profile.role) ||
-    profile.role === "admin"; // admin her zaman geçer
+    profile.role === "admin" || // admin her zaman geçer
+    profile.role === "owner"; // owner (Site Sahibi) de her zaman geçer — admin'in üst kümesi
 
-  if (!roleOk) {
+  // ASKIDAKİ ADMİN: rol hâlâ 'admin' olsa bile (kalıcı düşürme henüz
+  // sonuçlanmamış olabilir), migration 0021'deki is_admin() SQL tarafında
+  // bu kişiyi zaten tüm admin RPC/RLS'lerinden dışlıyor. Burada da erken
+  // kesip kafa karıştırıcı "her şey normal görünüyor ama hiçbir buton
+  // çalışmıyor" deneyimini önlüyoruz — owner ASLA askıya alınamayacağı
+  // için (bkz. migration) bu kontrol owner'ı etkilemez.
+  const askidaAdminEngeli = profile.role === "admin" && profile.is_suspended === true && role !== null;
+
+  if (!roleOk || askidaAdminEngeli) {
     // Giriş yapmış ama yetkisi yok -> panel sayfasına yolla, giriş sayfasına değil
     window.location.replace("/panel/panel.html?hata=yetkisiz");
     return new Promise(() => {});
