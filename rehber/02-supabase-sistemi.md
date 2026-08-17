@@ -892,6 +892,83 @@ istemedim.
 
 Bu bölüm, siteye/Supabase kullanıcı sistemine sonradan yapılan düzeltmelerin tarih sırasıyla özetidir — hangi sorun bildirildi, kök nedeni neydi, nasıl çözüldü ve (varsa) senin elle yapman gereken adım neydi. Eskiden kökte ayrı `DEGISIKLIKLER_*.md` dosyaları halinde duruyordu, artık tek doğruluk kaynağı burası — en yeni turu en üstte bulursun.
 
+### 🗓️ 17.08.2026 — Site Sahibi adına yayın onayı, owner rol yönetimi bug'ı ve özel içerik erişim hiyerarşisi
+
+Üç ayrı istek/bildirimi kapsayan tur:
+
+1. İçerik Sorumlusu (manager) ve Editör artık admin adına olduğu gibi
+   **Site Sahibi (owner) adına** da içerik yazıp onaya gönderebiliyor.
+   Admin adına taleplerde değişen bir şey yok (herhangi bir admin/owner
+   onayı yeterli). Site Sahibi adına taleplerde ise YA site sahibinin tek
+   başına onayı YA DA **adminlerin mutlak çoğunluğunun** (toplam admin
+   sayısının floor(n/2)+1'i) onay oyu yeterli.
+2. **BUG DÜZELTMESİ:** Site Sahibi, üye ayarlarında rol değiştirirken hata
+   alıyordu (ve kimseyi admin bile yapamıyordu). Kök neden:
+   `prevent_role_self_escalation()` tetikleyicisi (migration 0001) rolü
+   değiştirenin `profiles.role`'ünün TAM OLARAK `'admin'` string'ine eşit
+   olup olmadığına bakıyordu — migration 0021 `'owner'` rolünü eklerken bu
+   tetikleyiciyi güncellemeyi unutmuştu (migration 0022'nin "eksik yerler"
+   taraması da bunu atlamış). Ayrıca: owner artık kendi yetkisini
+   düşürebiliyor (uyarı penceresiyle) ve başka birini owner yapabiliyor
+   (RPC zaten migration 0021'de vardı, arayüzü bu turda eklendi).
+3. Özel içerik (`special_content`) ve R2 storage dosyaları artık SADECE
+   admin/owner/manager için değil, **role='user' (sıradan Üye) HARİÇ
+   HERKES** (special_user, editor, manager, admin, owner) için otomatik
+   görünür/indirilebilir — istenen hiyerarşi: Site Sahibi > Yönetici >
+   İçerik Sorumlusu > Editör > Özel Üye > Üye.
+
+#### Değişen dosyalar
+- `assets/js/uye-ayarlari.js` (giriş yapan profil artık saklanıyor; owner'a "👑 Site Sahibi Yap" ve kendi kartında "⚠️ Kendi Yetkimi Düşür" butonları eklendi)
+- `assets/js/github-yonetim/github-yonetim.js` ("Admin adına yayınla" hedef listesi owner'ları da kapsıyor; kaydetme akışına `sahip_adina_talep` desteği eklendi; Site Sahibi onay rozeti + owner'ın tek başına onay/red butonları + adminlerin oy ver/red ver butonları + canlı oy sayacı eklendi)
+- `panel/github-yonetim.md` ("Admin adına yayınla" etiketi "Admin/Site Sahibi adına yayınla" oldu)
+- `cloudflare worker/r2_storage_worker/worker.js` (blanket erişim kontrolü `role !== 'admin/manager/owner'` yerine `role !== 'user'` oldu — Supabase RLS'deki `has_content_access()` ile senkron)
+- `rehber/02-supabase-sistemi.md` (bu changelog girdisi)
+
+#### Eklenen dosyalar
+- `supabase/migrations/0023_rol_hiyerarsisi_onay_akislari_ve_erisim_duzeltmeleri.sql` ⚠️ **YENİ — Supabase SQL Editor'de çalıştırman gerekiyor.**
+
+#### Ne değişti, neden
+
+**§ B (owner rol değişikliği bug'ı) — en kritik olan bu.** `prevent_role_self_escalation()`
+artık literal `'admin'` karşılaştırması yerine `public.is_admin()` kullanıyor
+(admin VEYA owner VEYA askıda değil). Bu TEK satırlık değişiklik hem "hata
+alıyorum" hem "kimseyi admin yapamıyorum" şikayetlerinin ikisini de
+çözüyor — ikisi de aynı kök nedenden kaynaklanıyordu.
+
+**§ A (Site Sahibi adına yayın).** `taslak_icerikler` tablosuna
+`sahip_adina_talep` / `sahip_onay_durumu` / `sahip_onaylayan_id` /
+`sahip_onay_tarihi` kolonları eklendi (mevcut `admin_*` kolonlarının
+birebir eşi, ama AYRI — bir satır aynı anda hem admin hem owner adına
+OLAMAZ, `taslak_tek_talep_turu` kısıtı bunu zorluyor). Adminlerin oyları
+yeni `sahip_onay_oylari` tablosunda tutuluyor (aynı `admin_denetim_oylari`
+deseni). Çoğunluk hesaplaması TOPLAM admin sayısı üzerinden yapılıyor
+(sadece oy kullananlar üzerinden değil) — bu yüzden "mutlak çoğunluk".
+Panelde: owner için tek başına "✅ Onayla (Site Sahibi)" / "❌ Reddet (Site
+Sahibi)" butonları, sıradan adminler için "👍 Onay Ver" / "👎 Red Ver"
+(çoğunluğa ulaşılınca sunucu otomatik sonuçlandırıyor) butonları ve canlı
+"(X onay / Y red — gerekli: Z)" sayacı var.
+
+**§ C (owner kendi kendini düşürme + başkasını owner yapma).**
+`admin_set_user_role()` bilhassa `role='owner'` olan satırları reddediyor
+(bir admin'in owner'ı düşürebilmesini engellemek için) — bu owner'ın
+KENDİSİNİN de bu yoldan kendini düşürememesi anlamına geliyordu. Yeni
+`owner_kendi_rolunu_dusur(p_yeni_rol)` RPC'si (SADECE `auth.uid()`
+üzerinde çalışır) + `uye-ayarlari.js`'teki iki aşamalı `confirm()`/`prompt()`
+uyarı penceresi bunu çözüyor. `owner_rolu_ver()` RPC'si zaten migration
+0021'de vardı ama hiçbir arayüz onu çağırmıyordu — "👑 Site Sahibi Yap"
+butonu bu turda eklendi.
+
+**§ D (özel içerik erişim hiyerarşisi).** `has_content_access()` artık
+`role <> 'user'` olan HERKESE blanket (content_access ataması aranmadan)
+erişim veriyor. Bu fonksiyon hem `special_content` RLS politikasında hem
+`'ozel-dosyalar'` storage bucket politikasında zaten kullanıldığı için TEK
+bir değişiklik hem içerik sayfasını hem Supabase Storage indirmeyi otomatik
+kapsıyor. R2 Worker'ın (Cloudflare, Supabase RLS'den BAĞIMSIZ) kendi rol
+kontrolü ayrı bir kod tabanında olduğu için orası ayrıca (aynı mantıkla)
+güncellendi — ikisi senkron değilse dosya panelde görünüp indirme linkinde
+403 dönebilir ya da tam tersi olabilir, bu yüzden ikisi HER ZAMAN birlikte
+güncellenmeli.
+
 ### 🗓️ 15.08.2026 — "Yayında değil" içerik artık GitHub'a değil, Supabase'e gidiyor
 
 İstediğin değişiklik: blog/akademik proje taslakları "Yayında" kapalıyken
