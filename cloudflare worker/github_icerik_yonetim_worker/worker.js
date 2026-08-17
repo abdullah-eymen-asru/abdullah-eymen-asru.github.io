@@ -111,7 +111,7 @@ async function githubDosyaOku(env, yol) {
 /**
  * Basit front-matter alan okuyucu — assets/js/github-yonetim.js'teki
  * frontMatterOku'nun SADE bir alt kümesi, burada sadece sahiplik kontrolü
- * için gereken birkaç alana (yazar_id, author) ihtiyaç var.
+ * için gereken birkaç alana (olusturan_id, yazar_id, author) ihtiyaç var.
  */
 function frontMatterAlanlariniOku(ham) {
   const eslesme = ham.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
@@ -151,6 +151,13 @@ function gitkeepSahipIdOku(ham) {
  * yazamaz, bkz. wireYazarAlani) pratikte güvenilirdir.
  */
 function editorSahibiMi(frontMatterAlanlari, userId, kullaniciAdi, kullaniciEmail) {
+  // ÖNCELİK: olusturan_id — içeriği GERÇEKTEN oluşturan kişinin id'si.
+  // "Admin adına yayınla" akışında yazar_id (görünen yazar) hedef admin'i
+  // taşır, GERÇEK oluşturan (editor) DEĞİL — bu yüzden sahiplik/düzenleme
+  // hakkı önce buna bakmalı (bkz. github-yonetim.js icerikKendisineMiAit
+  // ve dosyaIcerigiOlustur). Bu alan hiç yoksa (bu değişiklikten önce
+  // yazılmış eski dosyalar) yazar_id'ye düşülür.
+  if (frontMatterAlanlari.olusturan_id) return frontMatterAlanlari.olusturan_id === userId;
   if (frontMatterAlanlari.yazar_id) return frontMatterAlanlari.yazar_id === userId;
   const yazar = (frontMatterAlanlari.author || "").trim().toLocaleLowerCase("tr");
   if (!yazar) return false;
