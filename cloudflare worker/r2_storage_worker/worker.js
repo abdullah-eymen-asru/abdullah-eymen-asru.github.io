@@ -174,7 +174,10 @@ export default {
       // content_access ataması aranmadan) erişebiliyor — bkz.
       // supabase/migrations/0016_..._admin_adina_onay.sql ve panel/admin.md.
       const rol = profilData?.[0]?.role;
-      const isAdmin = rol === "admin" || rol === "manager";
+      // BUG FİX: 'owner' (Site Sahibi, migration 0021) burada eksikti — bu
+      // Worker Supabase RLS'den bağımsız kendi rol kontrolünü yapıyor,
+      // owner admin'in tüm yetkilerini kapsadığı halde burada unutulmuştu.
+      const isAdmin = rol === "admin" || rol === "manager" || rol === "owner";
 
       if (!isAdmin) {
         if (!uuidRegex.test(contentId)) {
