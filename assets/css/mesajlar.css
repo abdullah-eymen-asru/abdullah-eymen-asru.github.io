@@ -13,6 +13,137 @@
 .mesajlar-baslik h1 { margin: 0 0 6px; }
 .mesajlar-baslik p { margin: 0; max-width: 640px; }
 
+/*
+ * "Kime?" satırı (Yeni Sohbet formunda) + hedef seçim penceresi (madde 4 —
+ * "mesaj atılacak kişiler olarak hem admin hem site sahipleri yer alsın,
+ * adminler arasından seç / site sahibi arasından seç diye açılır pencere ve
+ * arama kutusu olsun"). Modal görünümü assets/css/cerez-onay.css'teki
+ * ".cerez-panel-overlay/.cerez-panel" desenine bilinçli olarak benzetildi
+ * (sitedeki tek modal örneği oydu) ama bağımsız sınıf adlarıyla, o dosyaya
+ * dokunmadan.
+ */
+.msg-hedef-satir {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin-bottom: 10px;
+  font-size: 0.85rem;
+}
+.msg-hedef-satir-etiket { color: var(--muted); }
+.msg-hedef-deger { font-weight: 600; }
+.msg-hedef-degistir-btn {
+  margin-left: auto;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--tag-bg);
+  color: var(--text);
+  font-size: 0.76rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.msg-hedef-degistir-btn:hover { border-color: var(--accent); }
+
+.msg-hedef-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 970;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.45);
+}
+.msg-hedef-modal-overlay[hidden] { display: none !important; }
+
+.msg-hedef-modal {
+  width: 100%;
+  max-width: 440px;
+  max-height: min(600px, 82vh);
+  display: flex;
+  flex-direction: column;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);
+}
+
+.msg-hedef-modal-baslik {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.msg-hedef-modal-kapat {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+}
+
+.msg-hedef-sekme-bar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.msg-hedef-sekme {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--tag-bg);
+  color: var(--text);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.msg-hedef-sekme.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.msg-hedef-modal .msg-uye-arama { margin-bottom: 8px; }
+
+.msg-hedef-herhangi-btn {
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+}
+.msg-hedef-herhangi-btn:hover { border-color: var(--accent); }
+
+.msg-hedef-liste {
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.msg-hedef-liste .msg-uye-sonuc-item { border-bottom: 1px solid var(--border); }
+.msg-hedef-liste .msg-uye-sonuc-item:last-child { border-bottom: none; }
+.msg-hedef-rozet {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 7px;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+
 @media (min-width: 900px) {
   .mesajlar-sayfa {
     /* BUG FİX (masaüstünde tam ortada durmuyordu): önceki teknik
