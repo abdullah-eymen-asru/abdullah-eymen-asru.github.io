@@ -67,12 +67,19 @@ permalink: "/panel/github-yonetim.html"
             <input id="ic-title" type="text" required>
           </div>
           <div class="form-field" id="ic-yazar-wrap">
-            <label for="ic-yazar-adi">Yazar</label>
-            <select id="ic-yazar-secim" hidden></select>
+            <label for="ic-yazar-arama">Yazar</label>
+            <div id="ic-yazar-arama-kutusu" class="gy-arama-wrap" hidden>
+              <input id="ic-yazar-arama" type="text" class="msg-uye-arama" placeholder="İsim veya e-posta ile ara..." autocomplete="off">
+              <input type="hidden" id="ic-yazar-secili-id">
+              <div id="ic-yazar-arama-sonuc" class="msg-uye-arama-sonuc" hidden></div>
+            </div>
             <input id="ic-yazar-adi" type="text" placeholder="Yazar adı" autocomplete="off" readonly hidden>
             <p class="gy-yardim-metni">
               Yönetici (admin) iseniz, içerik yönetebilen (editör/İçerik
-              Sorumlusu/yönetici) kullanıcılar arasından yazar seçebilirsiniz.
+              Sorumlusu/yönetici) kullanıcılar arasından isim veya e-posta ile
+              arayıp yazar seçebilirsiniz — liste yerine arama kutusu
+              kullanılır, çünkü yönetici/site sahibi sayısı arttıkça
+              sayfayı uzun bir açılır listeyle şişirmemek için.
               Editör veya İçerik Sorumlusu iseniz bu alan otomatik olarak
               kendi adınızla dolar ve değiştirilemez.
             </p>
