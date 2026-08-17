@@ -13,9 +13,14 @@
  * RPC'leri çağıran bir arayüz katmanıdır:
  *   - guvenlik_admin_listesi_getir()  -> admin/owner listesi + askı durumu
  *   - denetim_vakalarini_listele()    -> açık + geçmiş vakalar + oy sayıları
+ *     + hedef adminin e-postası (bkz. migration 0024 § C)
  *   - admin_askiya_al(hedef, sebep)   -> "Acil Fren"
  *   - admin_denetim_oy_kullan(id, oy) -> çoğunluk oylaması
  *   - owner_denetim_karar(id, karar)  -> sadece owner, tek başına kapatır
+ *   - denetim_vakasi_sil(id)          -> SADECE owner, tek bir vakayı siler
+ *     (bkz. migration 0024 § B) — liste sayfalanmış (bkz. VAKA_SAYFA*
+ *     altındaki not) çünkü çok sayıda vaka birikince tek uzun liste sayfayı
+ *     taşırıyordu.
  */
 import { supabase, showMessage, escapeHtml } from "./core/supabase-client.js";
 import { requireAuth } from "./auth/auth-guard.js";
@@ -29,6 +34,14 @@ const DURUM_ETIKETLERI = {
 
 let BEN = null; // { session, profile }
 let ADMIN_LISTESI = [];
+
+// Denetim vakaları sayfalaması — bkz. dosya başındaki not: RPC zaten en
+// fazla 100 vaka döndürüyordu ama hepsini tek seferde çizmek, çok vakalı
+// kurulumlarda sayfayı aşırı uzatıp taşırıyordu. uye-ayarlari.js'teki
+// SAYFA/SAYFA_BOYUTU deseniyle AYNI, sadece bu sayfaya özel (ag- önekli).
+let TUM_VAKALAR = [];
+let VAKA_SAYFA = 1;
+const VAKA_SAYFA_BOYUTU = 10;
 
 async function init() {
   BEN = await requireAuth({ role: "admin" });
@@ -142,17 +155,65 @@ async function loadVakalar() {
   const { data, error } = await supabase.rpc("denetim_vakalarini_listele");
   if (error) {
     kutu.innerHTML = `<p class="muted">Vakalar yüklenemedi: ${escapeHtml(error.message)}</p>`;
+    renderVakaSayfalama(0, 0);
     return;
   }
-  const vakalar = data || [];
+  TUM_VAKALAR = data || [];
 
-  if (vakalar.length === 0) {
+  if (TUM_VAKALAR.length === 0) {
     kutu.innerHTML = `<p class="muted">Henüz hiç denetim vakası yok.</p>`;
+    renderVakaSayfalama(0, 0);
     return;
   }
 
-  kutu.innerHTML = vakalar.map((v) => vakaKartHtml(v)).join("");
+  renderVakaListesi();
+}
+
+function renderVakaListesi() {
+  const kutu = document.getElementById("ag-vaka-listesi");
+  if (!kutu) return;
+
+  const toplamSayfa = Math.max(1, Math.ceil(TUM_VAKALAR.length / VAKA_SAYFA_BOYUTU));
+  if (VAKA_SAYFA > toplamSayfa) VAKA_SAYFA = toplamSayfa;
+  const baslangic = (VAKA_SAYFA - 1) * VAKA_SAYFA_BOYUTU;
+  const sayfaVerisi = TUM_VAKALAR.slice(baslangic, baslangic + VAKA_SAYFA_BOYUTU);
+
+  kutu.innerHTML = sayfaVerisi.map((v) => vakaKartHtml(v)).join("");
   wireVakaOlaylari(kutu);
+
+  if (BEN.profile.role !== "owner") {
+    kutu.querySelectorAll(".sadece-owner").forEach((el) => el.setAttribute("hidden", ""));
+  }
+
+  renderVakaSayfalama(toplamSayfa, TUM_VAKALAR.length);
+}
+
+function renderVakaSayfalama(toplamSayfa, toplamSonuc) {
+  const alan = document.getElementById("ag-vaka-sayfalama");
+  if (!alan) return;
+
+  if (toplamSonuc === 0 || toplamSayfa <= 1) {
+    alan.innerHTML = "";
+    return;
+  }
+
+  alan.innerHTML = `
+    <button type="button" class="uya-sayfa-btn" id="ag-vaka-sayfa-onceki" ${VAKA_SAYFA <= 1 ? "disabled" : ""}>‹ Önceki</button>
+    <span class="uya-sayfa-gosterge">Sayfa ${VAKA_SAYFA} / ${toplamSayfa} (${toplamSonuc} vaka)</span>
+    <button type="button" class="uya-sayfa-btn" id="ag-vaka-sayfa-sonraki" ${VAKA_SAYFA >= toplamSayfa ? "disabled" : ""}>Sonraki ›</button>
+  `;
+
+  document.getElementById("ag-vaka-sayfa-onceki")?.addEventListener("click", () => {
+    if (VAKA_SAYFA <= 1) return;
+    VAKA_SAYFA--;
+    renderVakaListesi();
+    document.getElementById("ag-vaka-listesi")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  document.getElementById("ag-vaka-sayfa-sonraki")?.addEventListener("click", () => {
+    VAKA_SAYFA++;
+    renderVakaListesi();
+    document.getElementById("ag-vaka-listesi")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 }
 
 function vakaKartHtml(v) {
@@ -168,6 +229,7 @@ function vakaKartHtml(v) {
       <div class="uya-kart-ust">
         <div class="uya-kart-kimlik">
           <strong>${escapeHtml(v.hedef_ad || "—")}</strong>
+          ${v.hedef_email ? `<span class="uya-email muted">${escapeHtml(v.hedef_email)}</span>` : ""}
           <span class="muted">Başlatan: ${escapeHtml(v.baslatan_ad || "—")}</span>
         </div>
         <span class="uya-rol-etiket">${DURUM_ETIKETLERI[v.durum] || v.durum}</span>
@@ -191,6 +253,14 @@ function vakaKartHtml(v) {
         </div>`
           : askida && benKendiVakamMi
           ? `<p class="muted">Bu senin kendi vakan — kendi lehine/aleyhine oy kullanamazsın.</p>`
+          : ""
+      }
+      ${
+        !askida
+          ? `
+        <div class="uya-kart-aksiyonlar sadece-owner">
+          <button class="btn-danger tablo-aksiyon-btn ag-vaka-sil-btn" data-id="${v.id}">🗑️ Vakayı Sil</button>
+        </div>`
           : ""
       }
     </div>`;
@@ -229,6 +299,30 @@ function wireVakaOlaylari(kutu) {
         return;
       }
       await Promise.all([loadAdminListesi(), loadVakalar()]);
+    });
+  });
+
+  // Vaka silme (bkz. dosya başındaki not, migration 0024 § B) — SADECE
+  // owner'a görünür (sadece-owner sınıfı), tek seferde tek bir vaka siler.
+  kutu.querySelectorAll(".ag-vaka-sil-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (
+        !confirm(
+          "Bu denetim vakasını kalıcı olarak silmek üzeresin. Bu işlem GERİ ALINAMAZ (audit izinin kendisi ayrıca loglanır, ama bu vaka kartı bir daha görünmez). Emin misin?"
+        )
+      ) {
+        return;
+      }
+
+      btn.disabled = true;
+      const { error } = await supabase.rpc("denetim_vakasi_sil", { p_denetim_id: btn.dataset.id });
+      btn.disabled = false;
+
+      if (error) {
+        alert("Vaka silinemedi: " + error.message);
+        return;
+      }
+      await loadVakalar();
     });
   });
 }
