@@ -117,14 +117,85 @@ let GH_BAGLI = false;
 
 // TEK İSTEKLİ PANEL ÖNBELLEĞİ — bkz. panelVerisiniYukle. Worker'ın
 // /panel-init uç noktasından dönen TÜM sayfa verisini (repo bilgisi,
-// _posts//_projects klasörleri+dosyaları, profil fotoğrafı/config) tek
-// seferde tutar. Sayfa açılışında (ghBaglantisiniTestEt) VE her yazma
-// işleminden SONRA (bkz. panelListeleriniTazele) SADECE BİR istekle
-// tazelenir — klasör/içerik/profil-foto listeleme fonksiyonları artık
-// GitHub'a ayrı ayrı istek atmak yerine bu önbellekten okur (Cloudflare
-// Worker'ın günlük istek kotasını, bkz. worker.js panelBaslangicVerisiGetir
-// başındaki not, sayfa/yenileme başına 1 isteğe indirmek için).
+// _posts//_projects klasörleri+dosyaları — ARTIK HAFİF, İÇERİKSİZ, bkz.
+// worker.js panelBaslangicVerisiGetir başı —, profil fotoğrafı/config)
+// tek seferde tutar. GitHub'a ayrı ayrı istek atmak yerine klasör/içerik/
+// profil-foto listeleme fonksiyonları bu önbellekten okur.
 let PANEL_VERI = null;
+
+// SAYFALAR ARASI (sessionStorage) ÖNBELLEK — bkz. panelVerisiniOnbellekOku/
+// panelVerisiniOnbellegeYaz. PANEL_VERI'nin (yukarıdaki) YALNIZCA sekme
+// hayatı boyunca RAM'de tutulmasının aksine, bu önbellek panel kapatılıp
+// TEKRAR AÇILDIĞINDA (ör. panele başka bir sayfadan dönüldüğünde) da
+// hayatta kalır — böylece panel her açılışta Worker'a (ve onun üzerinden
+// GitHub'a) YENİDEN istek atmaz. SADECE şu durumlarda temizlenip taze veri
+// çekilir: (1) kullanıcı "Listeyi Yükle / Yenile" butonuna basarsa, (2) bir
+// yazma işlemi (içerik kaydet/sil/taşı, klasör oluştur/sil, profil fotoğrafı
+// değiştir vb.) TAMAMLANDIĞINDA (bkz. panelListeleriniTazele) — normal
+// panel açılışlarında/DOM yeniden kurulduğunda GEREKSİZ Worker isteği
+// atılmaz. Dal (branch) değişebileceği için anahtara dahil edilir.
+const PANEL_ONBELLEK_ANAHTAR_ONEKI = "gy_panel_init_v1:";
+// NOT (kullanıcı/rol izolasyonu): config/profilFoto SADECE admin için
+// dolu gelir (bkz. worker.js panelBaslangicVerisiGetir GÜVENLİK notu) —
+// aynı sekmede (sessionStorage sekme bazlıdır) farklı rollerde biri
+// çıkış yapıp başka biri giriş yaparsa önbelleğin YANLIŞ kullanıcıya ait
+// veriyle karışmaması için anahtara giriş yapan kullanıcının id'si de
+// dahil edilir.
+function panelOnbellekAnahtari(branch) {
+  return `${PANEL_ONBELLEK_ANAHTAR_ONEKI}${GIRIS_YAPAN_PROFIL?.id || "__anon__"}:${branch || "__default__"}`;
+}
+function panelVerisiniOnbellekOku(branch) {
+  try {
+    const ham = sessionStorage.getItem(panelOnbellekAnahtari(branch));
+    return ham ? JSON.parse(ham) : null;
+  } catch (_err) {
+    return null;
+  }
+}
+function panelVerisiniOnbellegeYaz(branch, veri) {
+  try {
+    sessionStorage.setItem(panelOnbellekAnahtari(branch), JSON.stringify(veri));
+  } catch (_err) {
+    // sessionStorage dolu/kapalı olabilir (gizli sekme vb.) — sessizce
+    // geçilir, panel yine de RAM önbelleğiyle (PANEL_VERI) çalışmaya devam eder.
+  }
+}
+function panelOnbellekleriniTemizle() {
+  try {
+    Object.keys(sessionStorage)
+      .filter((k) => k.startsWith(PANEL_ONBELLEK_ANAHTAR_ONEKI))
+      .forEach((k) => sessionStorage.removeItem(k));
+  } catch (_err) {
+    /* yoksay */
+  }
+}
+
+// TEK DOSYA İÇERİK ÖNBELLEĞİ — bkz. icerikIcerigiZenginlestir. Bir
+// dosyanın `sha`'sı içeriğiyle BİREBİR eşleniktir (içerik değişirse sha da
+// değişir) — bu yüzden içerik sha'ya göre anahtarlanıp süresiz (sekme
+// ömrü boyunca) güvenle önbelleklenebilir; ayrıca invalide etmeye HİÇ
+// gerek yok (bir dosya düzenlenip kaydedildiğinde yeni sha ile YENİ bir
+// anahtara yazılır, eskisi kendiliğinden kullanılmaz kalır).
+function icerikOnbellekAnahtari(sha) {
+  return `gy_ic_v1:${sha}`;
+}
+function icerikIcerigiOnbellektenOku(sha) {
+  if (!sha) return null;
+  try {
+    const ham = sessionStorage.getItem(icerikOnbellekAnahtari(sha));
+    return ham ? JSON.parse(ham) : null;
+  } catch (_err) {
+    return null;
+  }
+}
+function icerikIcerigiOnbellegeYaz(sha, data, body) {
+  if (!sha) return;
+  try {
+    sessionStorage.setItem(icerikOnbellekAnahtari(sha), JSON.stringify({ data, body }));
+  } catch (_err) {
+    /* sessionStorage dolu/kapalı olabilir — sessizce geçilir. */
+  }
+}
 
 // GitHub'da düzenlenen bir dosya varsa DUZENLENEN_YOL/DUZENLENEN_SHA dolu,
 // Supabase'te düzenlenen bir taslak varsa DUZENLENEN_TASLAK_ID dolu olur —
@@ -249,18 +320,21 @@ async function ghBaglantisiniTestEt(hataGoster) {
   btn.disabled = true;
   btn.textContent = "Kontrol ediliyor...";
   try {
-    // TEK istek: repo bilgisi + _posts//_projects klasörleri/dosyaları +
+    // ÖNCE sessionStorage önbelleğine bak (bkz. panelVerisiniYukleVeyaOnbellektenAl)
+    // — varsa Worker'a/GitHub'a HİÇ istek atılmaz. Yoksa TEK istekle çekilir:
+    // repo bilgisi + _posts//_projects klasörleri/dosyaları (hafif liste) +
     // config + profil fotoğrafı hepsi burada gelir (bkz. panelVerisiniYukle
     // ve worker.js'teki panelBaslangicVerisiGetir). Aşağıdaki dört
     // "...Yukle/Guncelle" çağrısı artık PANEL_VERI önbelleğinden okuyor,
     // GitHub'a AYRICA istek atmıyor.
-    const veri = await panelVerisiniYukle();
+    const { veri, onbellektenGeldi } = await panelVerisiniYukleVeyaOnbellektenAl();
     if (!veri.repo) throw new Error("Repo bilgisi alınamadı.");
     const yazmaYetkisi = veri.repo.permissions?.push;
     GH_BAGLI = true;
     showMessage(
       msgEl,
-      `Bağlantı doğrulandı — "${veri.repo.full_name}" (varsayılan branch: ${veri.repo.default_branch}) — tüm listeler tek istekle yüklendi.` +
+      `Bağlantı doğrulandı — "${veri.repo.full_name}" (varsayılan branch: ${veri.repo.default_branch}) — ` +
+        (onbellektenGeldi ? "listeler önbellekten yüklendi (Worker'a istek atılmadı)." : "tüm listeler tek istekle yüklendi.") +
         (yazmaYetkisi ? "" : " — UYARI: Worker'ın token'ı ile yazma izni yok gibi görünüyor."),
       yazmaYetkisi ? "success" : "error"
     );
@@ -320,11 +394,13 @@ async function ghRequest(path, options = {}) {
 
 /**
  * Worker'ın /panel-init uç noktasını çağırıp TÜM panel verisini (repo,
- * _posts//_projects klasörleri+dosyaları, config, profil fotoğrafı) TEK
- * bir istekte çeker ve PANEL_VERI önbelleğine yazar. Sayfa açılışında
- * (ghBaglantisiniTestEt) ve her yazma işleminden sonra (bkz.
- * panelListeleriniTazele) çağrılır — klasör/içerik/profil listeleme
- * fonksiyonlarının GitHub'a ayrı ayrı istek atmasının YERİNE geçer.
+ * _posts//_projects klasörleri+dosyaları — hafif, İÇERİKSİZ liste, bkz.
+ * worker.js panelBaslangicVerisiGetir başı —, config, profil fotoğrafı) TEK
+ * bir istekte çeker; PANEL_VERI (RAM) önbelleğine YAZAR ve sessionStorage'a
+ * da yazarak panel kapatılıp tekrar açıldığında da bu isteğin
+ * TEKRARLANMAMASINI sağlar (bkz. panelVerisiniYukleVeyaOnbellektenAl). Her
+ * zaman GERÇEK bir ağ isteği atar — "Yenile" ve yazma-sonrası tazeleme
+ * akışları BUNU çağırır.
  */
 async function panelVerisiniYukle() {
   const { branch } = ghAyarlari();
@@ -332,16 +408,46 @@ async function panelVerisiniYukle() {
   const res = await ghRequest(`/panel-init${q}`);
   if (!res.ok) throw new Error(await ghHataMesaji(res));
   PANEL_VERI = await res.json();
+  if (PANEL_VERI?.agacKesildi) {
+    // bkz. worker.js panelBaslangicVerisiGetir — GitHub git/trees yanıtı
+    // `truncated:true` döndürdüyse (repo ağacı GitHub'ın tek istekteki
+    // sınırından büyükse) liste eksik olabilir. Bu depo ölçeğinde
+    // beklenmez ama sessizce yanlış bir "tam liste" izlenimi vermemek için
+    // konsola not düşülür.
+    console.warn("github-yonetim.js: GitHub git/trees yanıtı kesildi (truncated) — liste eksik olabilir.");
+  }
+  panelVerisiniOnbellegeYaz(branch, PANEL_VERI);
   return PANEL_VERI;
+}
+
+/**
+ * Panel açılışında (ghBaglantisiniTestEt → silent test) çağrılır: ÖNCE
+ * sessionStorage'daki panel-init önbelleğine bakar — varsa Worker'a HİÇ
+ * istek atmadan onu kullanır (panel her açılışta/DOM yeniden kurulduğunda
+ * GEREKSİZ istek atılmasını önlemek için). Önbellek yoksa (ilk açılış,
+ * "Yenile"den sonra ya da bir yazma işleminden sonra temizlenmişse) normal
+ * ağ isteğine (panelVerisiniYukle) düşer.
+ */
+async function panelVerisiniYukleVeyaOnbellektenAl() {
+  const { branch } = ghAyarlari();
+  const onbellek = panelVerisiniOnbellekOku(branch);
+  if (onbellek) {
+    PANEL_VERI = onbellek;
+    return { veri: onbellek, onbellektenGeldi: true };
+  }
+  const veri = await panelVerisiniYukle();
+  return { veri, onbellektenGeldi: false };
 }
 
 /**
  * Bir yazma işleminden (klasör oluştur/sil/yeniden adlandır, içerik
  * kaydet/sil/yayınla, profil fotoğrafı değiştir) SONRA çağrılır: PANEL_VERI
- * önbelleğini TEK bir istekle tazeler. Başarısız olursa (ör. geçici ağ
- * sorunu) sessizce eski (bir önceki) önbellekle devam edilir — kullanıcının
- * az önce tamamladığı işlemin "başarılı" mesajını bir liste tazeleme hatası
- * bastırmasın diye.
+ * önbelleğini TEK bir istekle tazeler VE sessionStorage'daki panel-init
+ * önbelleğini bu taze veriyle GÜNCELLER (bkz. panelVerisiniYukle) — "sadece
+ * Yenile butonunda veya yazma sonrasında tazele" kuralının yazma tarafı bu.
+ * Başarısız olursa (ör. geçici ağ sorunu) sessizce eski (bir önceki)
+ * önbellekle devam edilir — kullanıcının az önce tamamladığı işlemin
+ * "başarılı" mesajını bir liste tazeleme hatası bastırmasın diye.
  */
 async function panelListeleriniTazele() {
   if (!GH_BAGLI) return;
@@ -2212,9 +2318,21 @@ let TUM_ICERIKLER = [];
 let LISTE_ARAMA = "";
 let LISTE_FILTRE_TUR = "tum"; // 'tum' | 'blog' | 'proje'
 let LISTE_FILTRE_DURUM = "tum"; // 'tum' | 'yayinda' | 'gizli'
+// CLIENT-SIDE SAYFALAMA — bkz. listeyiYenidenCiz/icerikListesiCiz. Worker
+// artık TÜM içeriklerin front-matter'ını değil sadece hafif bir envanteri
+// (path/ad/sha) döndürdüğü için (bkz. worker.js panelBaslangicVerisiGetir),
+// kart olarak GERÇEKTEN görünen (dolayısıyla front-matter'ı çekilecek)
+// öğe sayısını sınırlamak da önemli — bu yüzden liste sayfa başı
+// LISTE_SAYFA_BASI kadar öğe gösterir. Arama/filtre/tür sekmesi
+// değiştiğinde 1. sayfaya dönülür (bkz. ilgili event handler'lar).
+const LISTE_SAYFA_BASI = 12;
+let LISTE_SAYFA_BLOG = 1;
+let LISTE_SAYFA_PROJE = 1;
 
 function wireIcerikListe() {
-  // "Yenile": PANEL_VERI önbelleğini TEK istekle tazeleyip listeyi ondan çizer.
+  // "Yenile": sessionStorage önbelleğini TEK istekle tazeleyip listeyi
+  // ondan çizer — bkz. panelListeleriniTazele (artık sessionStorage'ı da
+  // günceller).
   document.getElementById("ic-liste-yenile-btn").addEventListener("click", async () => {
     await panelListeleriniTazele();
     icerikListesiYukle();
@@ -2225,12 +2343,16 @@ function wireIcerikListe() {
   aramaEl.addEventListener("input", () => {
     LISTE_ARAMA = aramaEl.value.trim().toLocaleLowerCase("tr");
     temizleBtn.hidden = aramaEl.value === "";
+    LISTE_SAYFA_BLOG = 1;
+    LISTE_SAYFA_PROJE = 1;
     listeyiYenidenCiz();
   });
   temizleBtn.addEventListener("click", () => {
     aramaEl.value = "";
     LISTE_ARAMA = "";
     temizleBtn.hidden = true;
+    LISTE_SAYFA_BLOG = 1;
+    LISTE_SAYFA_PROJE = 1;
     listeyiYenidenCiz();
     aramaEl.focus();
   });
@@ -2242,6 +2364,8 @@ function wireIcerikListe() {
         b.classList.toggle("active", b === btn);
         b.setAttribute("aria-selected", String(b === btn));
       });
+      LISTE_SAYFA_BLOG = 1;
+      LISTE_SAYFA_PROJE = 1;
       listeyiYenidenCiz();
     });
   });
@@ -2253,6 +2377,8 @@ function wireIcerikListe() {
         b.classList.toggle("active", b === btn);
         b.setAttribute("aria-selected", String(b === btn));
       });
+      LISTE_SAYFA_BLOG = 1;
+      LISTE_SAYFA_PROJE = 1;
       listeyiYenidenCiz();
     });
   });
@@ -2344,10 +2470,14 @@ async function icerikListesiYukle() {
 
   el.innerHTML = '<p class="muted">Yükleniyor...</p>';
   try {
-    // Artık GitHub'a AYRICA istek atmıyor — dosya listesi VE her dosyanın
-    // içeriği zaten PANEL_VERI önbelleğinde (bkz. panelVerisiniYukle ve
-    // worker.js'teki panelBaslangicVerisiGetir). Front-matter ayrıştırması
-    // burada, yerel olarak yapılır (icerikOzetleriniCikar).
+    // Artık GitHub'a AYRICA istek atmıyor — dosya ENVANTERİ (path/ad/sha,
+    // İÇERİKSİZ) zaten PANEL_VERI önbelleğinde (bkz. panelVerisiniYukle ve
+    // worker.js'teki panelBaslangicVerisiGetir — Git Trees API notu). Her
+    // öğe önce "hafif" (dosya adından türetilmiş başlık) olarak listelenir;
+    // GERÇEK front-matter'ı SADECE o öğe ekranda görünür bir sayfaya
+    // düştüğünde (bkz. icerikListesiCiz → icerikIcerigiZenginlestir) ya da
+    // "Düzenle"ye basıldığında tek tek, sha'ya göre önbellekli şekilde
+    // çekilir.
     const postDetaylari = icerikOzetleriniCikar(PANEL_VERI.koleksiyonlar?._posts?.dosyalar || [], "blog");
     const projeDetaylari = icerikOzetleriniCikar(PANEL_VERI.koleksiyonlar?._projects?.dosyalar || [], "proje");
     postDetaylari.forEach((x) => (x.kaynak = "github"));
@@ -2398,6 +2528,11 @@ async function icerikListesiYukle() {
     const projeTumu = [...projeDetaylari, ...supaProje].sort((a, b) => (b.data.date || "").localeCompare(a.data.date || ""));
 
     TUM_ICERIKLER = [...blogTumu, ...projeTumu];
+    // Liste TAMAMEN yeniden kurulduğunda (yeni yükleme/"Yenile"/bir yazma
+    // işlemi sonrası) sayfa numaraları da sıfırlanır — aksi halde bir
+    // öğe silindikten sonra artık var olmayan bir sayfada kalınabilirdi.
+    LISTE_SAYFA_BLOG = 1;
+    LISTE_SAYFA_PROJE = 1;
     listeyiYenidenCiz();
   } catch (err) {
     el.innerHTML = `<p class="muted">Liste yüklenemedi: ${escapeHtml(err.message)}</p>`;
@@ -2405,46 +2540,104 @@ async function icerikListesiYukle() {
 }
 
 /**
- * PANEL_VERI önbelleğindeki dosya girdilerini (path, sha, content — bkz.
- * panelVerisiniYukle) front-matter özetine çevirir. Eskiden bu, her dosya
- * için AYRI bir GitHub isteği (icerikOzetiGetir) gerektiriyordu; artık
- * içerik zaten /panel-init yanıtında geldiği için tamamen YEREL çalışır,
- * hiçbir ağ isteği atmaz. Bir dosyanın content'i null ise (Worker'daki
- * panelBaslangicVerisiGetir o dosyayı okuyamadıysa) "okunamadı" rozetiyle
- * listede kalır — tek bir bozuk öğe tüm listeyi düşürmez.
+ * PANEL_VERI önbelleğindeki HAFİF dosya girdilerini (path, name, sha —
+ * İÇERİK YOK, bkz. worker.js panelBaslangicVerisiGetir "Git Trees API'ye
+ * geçiş" notu) listeleme öğelerine çevirir. Ağa HİÇ istek atmaz — bir
+ * dosyanın front-matter'ı daha önce (bu sha ile) çekilip sessionStorage'a
+ * yazılmışsa oradan zengin olarak, yoksa SADECE dosya adından türetilmiş
+ * bir başlıkla ("hafif", bkz. dosyaAdindanHafifBaslikUret) döner. Hafif
+ * öğelerin GERÇEK içeriği, o öğe ekranda görünür bir sayfaya düştüğünde
+ * (icerikListesiCiz) ya da "Düzenle"ye basıldığında (icerikDuzenlemeyeYukle)
+ * icerikIcerigiZenginlestir ile tek tek çekilir.
  */
 function icerikOzetleriniCikar(dosyalar, tur) {
   return dosyalar.map((dosya) => {
-    if (typeof dosya.content !== "string") {
-      return {
-        path: dosya.path,
-        sha: dosya.sha,
-        tur,
-        data: { title: `${dosya.name} (okunamadı)` },
-        body: "",
-        okunamadi: true,
-      };
-    }
-    try {
-      const ham = b64Decode(dosya.content.replace(/\n/g, ""));
-      const { data, body } = frontMatterOku(ham);
+    const onbellek = icerikIcerigiOnbellektenOku(dosya.sha);
+    if (onbellek) {
+      const data = { ...onbellek.data };
       // Kart çiziminde ve sahiplik kontrolünde (icerikKendisineMiAit)
       // kullanılan "Yazan:" alanı Supabase taslaklarında yazar_adi, GitHub
       // dosyalarında ise front-matter'daki author alanı olarak tutuluyor —
       // ikisini burada TEK bir alana (yazar_adi) eşitliyoruz.
       if (!data.yazar_adi && data.author) data.yazar_adi = data.author;
-      return { path: dosya.path, sha: dosya.sha, tur, data, body };
-    } catch (err) {
-      return {
-        path: dosya.path,
-        sha: dosya.sha,
-        tur,
-        data: { title: `${dosya.name} (okunamadı: ${err.message})` },
-        body: "",
-        okunamadi: true,
-      };
+      return { path: dosya.path, sha: dosya.sha, tur, data, body: onbellek.body, hafif: false };
     }
+    return {
+      path: dosya.path,
+      sha: dosya.sha,
+      tur,
+      data: dosyaAdindanHafifBaslikUret(dosya, tur),
+      body: "",
+      hafif: true,
+    };
   });
+}
+
+/**
+ * Ağa hiç gitmeden, SADECE dosya adından/yolundan bir başlık + (bulunabiliyorsa)
+ * bir tarih türetir — hafif liste görünümü içindir (bkz. dosya başındaki not:
+ * içerik artık panel-init ile gelmiyor). Blog yazıları her zaman
+ * `YYYY-MM-DD-slug.md` biçiminde adlandırıldığı için (bkz.
+ * dosyaYoluHesapla) tarih güvenilir biçimde çıkarılabilir; projelerde tarih
+ * öneki opsiyonel olduğundan (yilOneki) sadece varsa kullanılır, yoksa
+ * klasörün yıl adı (varsa) ya da null döner. Gerçek front-matter'daki
+ * `title` alanından FARKLI olabilir — içerik çekildiğinde
+ * (icerikIcerigiZenginlestir) gerçek başlıkla/tarihle DEĞİŞTİRİLİR.
+ */
+function dosyaAdindanHafifBaslikUret(dosya, tur) {
+  let ad = dosya.name.replace(/\.md$/i, "");
+  let tarih = null;
+  const tamTarihEslesme = ad.match(/^(\d{4}-\d{2}-\d{2})-(.+)$/);
+  const yilOnekiEslesme = !tamTarihEslesme && ad.match(/^(\d{4})-(.+)$/);
+  if (tamTarihEslesme) {
+    tarih = tamTarihEslesme[1];
+    ad = tamTarihEslesme[2];
+  } else if (yilOnekiEslesme) {
+    tarih = `${yilOnekiEslesme[1]}-01-01`;
+    ad = yilOnekiEslesme[2];
+  } else if (dosya.yil) {
+    tarih = `${dosya.yil}-01-01`;
+  }
+  const baslikMetni = ad.replace(/[-_]+/g, " ").trim();
+  const baslik = baslikMetni
+    ? baslikMetni.charAt(0).toLocaleUpperCase("tr") + baslikMetni.slice(1)
+    : dosya.name;
+  return { title: baslik, date: tarih };
+}
+
+/**
+ * Ekranda GÖRÜNÜR bir sayfaya düşen tek bir GitHub öğesinin GERÇEK
+ * front-matter'ını tek bir `/contents/<path>` isteğiyle çeker (bkz.
+ * ghGetContents), sha'ya göre sessionStorage'a önbellekler (bkz.
+ * icerikIcerigiOnbellegeYaz — bu sha bir daha ASLA ağdan tekrar
+ * çekilmeyecektir, çünkü içerik değişirse sha da değişir) ve item'ı
+ * YERİNDE (aynı referans, kart yeniden çizildiğinde otomatik yansır)
+ * günceller. Zaten zenginleştirilmişse (`hafif:false`) ya da GitHub
+ * kaynaklı değilse (Supabase taslağı, içeriği zaten satırda geliyor)
+ * hiçbir şey yapmaz. Ağ hatası/silinmiş dosya durumunda "okunamadı"
+ * rozetiyle işaretler — tek bir bozuk öğe listeyi düşürmez.
+ */
+async function icerikIcerigiZenginlestir(item) {
+  if (!item.hafif || item.kaynak !== "github") return false;
+  try {
+    const dosya = await ghGetContents(item.path);
+    if (!dosya || typeof dosya.content !== "string") throw new Error("İçerik okunamadı.");
+    const ham = b64Decode(dosya.content.replace(/\n/g, ""));
+    const { data, body } = frontMatterOku(ham);
+    if (!data.yazar_adi && data.author) data.yazar_adi = data.author;
+    item.data = data;
+    item.body = body;
+    item.sha = dosya.sha || item.sha;
+    item.hafif = false;
+    icerikIcerigiOnbellegeYaz(item.sha, data, body);
+    return true;
+  } catch (err) {
+    item.data = { title: `${item.path.split("/").pop()} (okunamadı: ${err.message})` };
+    item.body = "";
+    item.hafif = false;
+    item.okunamadi = true;
+    return false;
+  }
 }
 
 /**
@@ -2584,8 +2777,78 @@ function icerikListesiCiz(baslik, liste, tur) {
   h.innerHTML = `${escapeHtml(baslik)} <span class="gy-liste-baslik-sayac">${liste.length}</span>`;
   wrap.appendChild(h);
 
-  liste.forEach((item) => wrap.appendChild(icerikKartiCiz(item, tur)));
+  // CLIENT-SIDE SAYFALAMA (sayfa başı LISTE_SAYFA_BASI öğe) — bkz. dosya
+  // başındaki not: Worker artık her öğenin front-matter'ını değil sadece
+  // hafif bir envanteri döndürüyor, bu yüzden EKRANDA GERÇEKTEN görünen
+  // (dolayısıyla içeriği tek tek çekilecek) öğe sayısını sınırlamak da
+  // Worker/GitHub isteklerini azaltmanın bir parçası.
+  const sayfaNo = tur === "blog" ? LISTE_SAYFA_BLOG : LISTE_SAYFA_PROJE;
+  const toplamSayfa = Math.max(1, Math.ceil(liste.length / LISTE_SAYFA_BASI));
+  const guvenliSayfaNo = Math.min(Math.max(1, sayfaNo), toplamSayfa);
+  if (guvenliSayfaNo !== sayfaNo) {
+    if (tur === "blog") LISTE_SAYFA_BLOG = guvenliSayfaNo;
+    else LISTE_SAYFA_PROJE = guvenliSayfaNo;
+  }
+  const baslangicIndeksi = (guvenliSayfaNo - 1) * LISTE_SAYFA_BASI;
+  const sayfaOgeleri = liste.slice(baslangicIndeksi, baslangicIndeksi + LISTE_SAYFA_BASI);
+
+  sayfaOgeleri.forEach((item) => wrap.appendChild(icerikKartiCiz(item, tur)));
+
+  if (toplamSayfa > 1) {
+    wrap.appendChild(sayfalamaCubuguCiz(tur, guvenliSayfaNo, toplamSayfa));
+  }
+
+  // Sadece BU SAYFADA görünen, henüz içeriği çekilmemiş ("hafif") GitHub
+  // öğelerini PARALEL olarak zenginleştir (bkz. icerikIcerigiZenginlestir)
+  // — sayfa dışındaki diğer onlarca/yüzlerce öğe için HİÇBİR istek
+  // atılmaz. Tamamlandığında, kullanıcı bu arada başka bir sayfaya/filtreye
+  // geçmediyse listeyi (dolayısıyla bu görünümü, artık zengin veriyle)
+  // yeniden çizer.
+  const zenginlestirilecekler = sayfaOgeleri.filter((it) => it.hafif && it.kaynak === "github");
+  if (zenginlestirilecekler.length > 0) {
+    Promise.all(zenginlestirilecekler.map((it) => icerikIcerigiZenginlestir(it))).then(() => {
+      const halaAyniSayfaMi = (tur === "blog" ? LISTE_SAYFA_BLOG : LISTE_SAYFA_PROJE) === guvenliSayfaNo;
+      if (halaAyniSayfaMi) listeyiYenidenCiz();
+    });
+  }
+
   return wrap;
+}
+
+/** "Önceki / Sayfa X / Y / Sonraki" sayfalama çubuğu — bkz. icerikListesiCiz. */
+function sayfalamaCubuguCiz(tur, sayfaNo, toplamSayfa) {
+  const cubuk = document.createElement("div");
+  cubuk.className = "gy-sayfalama";
+
+  const git = (yeniSayfa) => {
+    if (tur === "blog") LISTE_SAYFA_BLOG = yeniSayfa;
+    else LISTE_SAYFA_PROJE = yeniSayfa;
+    listeyiYenidenCiz();
+    document.getElementById("ic-liste")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const oncekiBtn = document.createElement("button");
+  oncekiBtn.type = "button";
+  oncekiBtn.className = "gy-sayfalama-btn";
+  oncekiBtn.textContent = "‹ Önceki";
+  oncekiBtn.disabled = sayfaNo <= 1;
+  oncekiBtn.addEventListener("click", () => git(Math.max(1, sayfaNo - 1)));
+
+  const gosterge = document.createElement("span");
+  gosterge.className = "gy-sayfalama-gosterge";
+  gosterge.textContent = `Sayfa ${sayfaNo} / ${toplamSayfa}`;
+
+  const sonrakiBtn = document.createElement("button");
+  sonrakiBtn.type = "button";
+  sonrakiBtn.className = "gy-sayfalama-btn";
+  sonrakiBtn.textContent = "Sonraki ›";
+  sonrakiBtn.disabled = sayfaNo >= toplamSayfa;
+  sonrakiBtn.addEventListener("click", () => git(Math.min(toplamSayfa, sayfaNo + 1)));
+
+  cubuk.appendChild(oncekiBtn);
+  cubuk.appendChild(gosterge);
+  cubuk.appendChild(sonrakiBtn);
+  return cubuk;
 }
 
 function icerikKartiCiz(item, tur) {
@@ -2615,7 +2878,15 @@ function icerikKartiCiz(item, tur) {
 
   const yayinda = item.data.yayinda !== false; // alan hiç yoksa yayında sayılır
   const sadeceSupabaseYayinda = item.kaynak === "supabase" && item.data.yayin_durumu === "sadece_supabase";
-  const rozet = yayinda
+  // "hafif" öğe: içeriği henüz çekilmedi, başlık SADECE dosya adından
+  // türetildi (bkz. dosyaAdindanHafifBaslikUret) — gerçek başlık/durum bir
+  // an içinde (icerikIcerigiZenginlestir tamamlanınca) yerini alacak.
+  const hafifRozet = item.hafif
+    ? '<span class="gy-rozet" title="Gerçek başlık/durum yükleniyor…">⏳ Önizleme</span>'
+    : "";
+  const rozet = item.hafif
+    ? ""
+    : yayinda
     ? '<span class="gy-rozet gy-rozet--yayinda">Yayında</span>'
     : '<span class="gy-rozet gy-rozet--gizli">Gizli</span>';
   const kaynakRozet =
@@ -2713,7 +2984,7 @@ function icerikKartiCiz(item, tur) {
 
   kart.innerHTML = `
     <div class="gy-icerik-kart-bilgi">
-      <div class="gy-icerik-kart-baslik">${metniVurgula(item.data.title || yolGoster)}${rozet}${kaynakRozet}${supabaseYedekRozet}${onayRozet}</div>
+      <div class="gy-icerik-kart-baslik">${metniVurgula(item.data.title || yolGoster)}${hafifRozet}${rozet}${kaynakRozet}${supabaseYedekRozet}${onayRozet}</div>
       <div class="gy-icerik-kart-meta">${escapeHtml(item.data.date || "")} · ${metniVurgula(yolGoster)}${yazarSatiri}</div>
       ${ozet}
     </div>
@@ -2962,6 +3233,22 @@ async function icerikSil(item) {
 }
 
 async function icerikDuzenlemeyeYukle(item, tur) {
+  // GitHub kaynaklı ve içeriği henüz çekilmemiş ("hafif") bir öğeyse —
+  // panel-init artık front-matter TAŞIMADIĞI için (bkz. worker.js Git
+  // Trees API notu) — düzenleme formunu doldurmadan ÖNCE TEK bir
+  // `/contents/<path>` isteğiyle gerçek içeriği çek (sha'ya göre
+  // sessionStorage'a önbellenir, bkz. icerikIcerigiZenginlestir). Zaten
+  // (bu sayfada görünüp) önceden zenginleştirilmişse ya da önbellekten
+  // gelmişse burası ağa hiç gitmez.
+  if (item.kaynak === "github" && item.hafif) {
+    const dm = document.getElementById("gh-baglanti-message");
+    const basarili = await icerikIcerigiZenginlestir(item);
+    if (!basarili) {
+      showMessage(dm, `"${item.path}" içeriği okunamadı, düzenlenemiyor.`, "error");
+      return;
+    }
+  }
+
   if (item.kaynak === "supabase") {
     DUZENLENEN_YOL = null;
     DUZENLENEN_SHA = null;
