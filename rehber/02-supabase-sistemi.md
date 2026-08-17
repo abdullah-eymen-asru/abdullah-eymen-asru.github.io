@@ -892,6 +892,39 @@ istemedim.
 
 Bu bölüm, siteye/Supabase kullanıcı sistemine sonradan yapılan düzeltmelerin tarih sırasıyla özetidir — hangi sorun bildirildi, kök nedeni neydi, nasıl çözüldü ve (varsa) senin elle yapman gereken adım neydi. Eskiden kökte ayrı `DEGISIKLIKLER_*.md` dosyaları halinde duruyordu, artık tek doğruluk kaynağı burası — en yeni turu en üstte bulursun.
 
+### 🗓️ 17.08.2026 (3. Tur) — "Admin adına" onayı sadece hedef admine (+ Site Sahibi'ne) daraltıldı
+
+İstek: "İçerik editörü bir admin adına yazı yazacaksa sadece o admin onay
+verebilsin (Site Sahibi de onay verebilsin). Aynı şekilde bir admin başka
+bir admin için yazı yazabilsin ama sadece o admin kabul/red edebilsin (Site
+Sahibi de kabul/red edebilsin)."
+
+**Önceki davranış (migration 0016/0023):** "Admin adına yayınla" onayı
+`public.is_admin()` true dönen **HERHANGİ** bir admin/owner tarafından
+verilebiliyordu — yani X admin'i adına yazılan bir taslağı Y admin'i de
+onaylayabiliyordu, hatta onay olmadan bile herhangi bir admin içeriği
+doğrudan yayına alabiliyordu (fiili yayın engeli sadece "çağıran admin mi"
+diye bakıyordu, "hedef admin mi" diye bakmıyordu).
+
+**Yeni davranış:** Bir "admin adına yayınla" talebini artık **SADECE**
+içeriğin adına yazıldığı o admin'in kendisi (`yazar_id === giriş yapan`)
+YA DA Site Sahibi (owner) onaylayabilir/reddedebilir/doğrudan yayınlayabilir.
+Hedef olmayan başka bir admin taslağı görebilir ama "Onayla"/"Reddet"
+butonlarını göremez; RPC'yi doğrudan çağırırsa ya da UPDATE ile bypass
+etmeye çalışırsa veritabanı tetikleyicisi isteği reddeder/durumu
+`beklemede`ye zorlar. "Site Sahibi adına" (`sahip_adina_talep`) akışına
+dokunulmadı — o hâlâ owner'ın tek başına kararı ya da adminlerin mutlak
+çoğunluk oyuyla sonuçlanıyor (ayrı, kasıtlı bir tasarım).
+
+#### Değişen dosyalar
+- `assets/js/github-yonetim/github-yonetim.js` ("Onayla"/"Reddet" butonları ve yayınlama kilidi artık sadece hedef admin/owner'a gösteriliyor/çalışıyor; `adminTaslakOnayla` istemci tarafı koruması ve rozet/tooltip metinleri güncellendi)
+- `rehber/02-supabase-sistemi.md` (bu changelog girdisi)
+
+#### Eklenen dosyalar
+- `supabase/migrations/0026_admin_adina_onay_sadece_hedef_admin.sql` ⚠️ **YENİ — Supabase SQL Editor'de çalıştırman gerekiyor (0001-0025'ten sonra).**
+
+---
+
 ### 🗓️ 17.08.2026 (2. Tur) — Admin yetki devri kısıtlaması, denetim vakası silme ve hedef e-postası
 
 Üç ayrı istek/bildirimi kapsayan tur:
