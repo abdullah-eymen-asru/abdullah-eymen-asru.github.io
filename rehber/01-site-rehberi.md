@@ -684,6 +684,47 @@ istersen"), bu menüyü de kaldırman gerekir.
 
 ---
 
+# 🔔 Admin Güvenlik Denetimi — Bildirim Worker'ı
+
+`panel/admin-guvenlik.md` sayfası, adminlerin birbirini denetleyip (askıya
+alma/oy kullanma/kalıcı düşürme gibi) karşılıklı kontrol ettiği bir sistemin
+panelidir (bkz. `supabase/migrations/0021_admin_karsilikli_denetim_owner_rolu.sql`).
+Bu vakalarda bir şey olduğunda (askıya alındı, oy kullanıldı, kalıcı
+düşürüldü, iptal edildi, süresi doldu) veritabanı bunu **anlık olarak** sana
+haber vermek ister — bunu yapan parça `cloudflare worker/admin_guvenlik_bildirim_worker/worker.js`.
+
+**Nasıl çalışıyor:**
+
+1. Migration 0021'deki `_denetim_bildirim_gonder()` fonksiyonu, ilgili bir
+   olay olduğunda `pg_net` ile `guvenlik_bildirim_ayarlari` tablosundaki
+   `webhook_url`'e async bir HTTP POST atar (yanıt beklenmez, bu yüzden
+   webhook kapalı/yavaş olsa bile askıya alma/oylama işlemi asla gecikmez).
+2. Bu POST isteğini karşılayan, deploy ettiğin `admin_guvenlik_bildirim_worker`
+   Worker'ıdır — gelen JSON'u okunabilir bir mesaja çevirip Telegram ve/veya
+   SMS (Twilio) ile iletir. Gerçek sırlar (bot token'ı, Twilio anahtarları)
+   sadece Worker'ın Cloudflare ortam değişkenlerinde durur — veritabanı bu
+   sırları hiç görmez (`r2_storage_worker` / `github_icerik_yonetim_worker`
+   ile aynı desen, bkz. bölüm 10).
+
+**Kurulum (özet — ayrıntı için worker dosyasının başındaki yorum):**
+
+| Adım | Ne yapılır |
+|---|---|
+| 1 | Cloudflare Dashboard'da yeni bir Worker oluştur, `worker.js` içeriğini yapıştır, deploy et. |
+| 2 | Worker'ın Settings → Variables and Secrets kısmına `GIZLI_YOL` (tahmin edilmesi zor rastgele bir segment, **Secret** olarak), ve en az `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` (SMS istersen Twilio değişkenlerini de) gir. |
+| 3 | Worker adresin + `/GIZLI_YOL` şeklindeki tam URL'i Supabase SQL Editor'de çalıştırarak kaydet: `update public.guvenlik_bildirim_ayarlari set webhook_url = '<WORKER_URL>', aktif = true where id = 1;` |
+| 4 | Bir denetim vakası tetikleyip Telegram'a bildirim gelip gelmediğini kontrol et; gelmezse Worker'ın Cloudflare "Logs" sekmesine bak. |
+
+`GIZLI_YOL` bir tür şifre gibi davranıyor çünkü Supabase'in `pg_net` isteği
+kimlik doğrulama header'ı eklemiyor — URL'in kendisi tahmin edilemez
+olduğu sürece isteği kimin attığı garanti altına alınmış oluyor. Bu değeri
+koda/repo'ya asla yazma, sadece Cloudflare'in Variables/Secrets kısmında tut.
+
+Telegram VEYA SMS'ten en az biri yapılandırılmalı; ikisi de boşsa Worker
+isteği 200 ile kabul eder ama hiçbir yere bildirim göndermez (loglar).
+
+---
+
 # 🔒 Güvenlik Notları (bilmen faydalı olur)
 
 - **CSP (`_layouts/default.html`, `<meta http-equiv="Content-Security-Policy">`):**
