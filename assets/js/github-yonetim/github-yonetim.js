@@ -136,6 +136,13 @@ let DUZENLENEN_TASLAK_ID = null;
 // Formda "Yayında değil" seçiliyken tekrar kaydedilirse bu kod KORUNUR,
 // böylece link değişmez. Yeni içerikte veya kod hiç üretilmemişse null.
 let DUZENLENEN_GIZLI_KOD = null;
+// Düzenlenen içeriğin GERÇEK oluşturanı (varsa) — bkz. icerikKendisineMiAit /
+// dosyaIcerigiOlustur'daki olusturan_id. Bunu korumazsak, örn. bir admin
+// editörün "admin adına" gönderdiği bir içeriği düzenleyip kaydettiğinde
+// sahiplik sessizce admin'e geçerdi (editör kendi içeriği üzerindeki
+// düzenleme/silme hakkını kaybederdi). Yeni içerikte null — bu durumda
+// icerikKaydet, formu gönderen kişiyi (GIRIS_YAPAN_PROFIL) oluşturan sayar.
+let DUZENLENEN_OLUSTURAN_ID = null;
 
 let PROFIL_SHA = null;
 
@@ -590,11 +597,26 @@ async function wireAdminAdinaTalep() {
     const { data, error } = await supabase.rpc("admin_listesi_getir");
     if (error) throw error;
     const adminler = data || [];
-    hedefSecim.innerHTML = adminler
+    const secenekler = adminler
       .map((p) => `<option value="${p.id}" data-ad="${escapeHtml(p.full_name || p.email)}">${escapeHtml(p.full_name || p.email)}</option>`)
       .join("");
-    // Tek admin varsa seçim kutusunu gizle, "X adına" metnini otomatik göster.
+    // 2+ admin varken bir PLACEHOLDER ekliyoruz — böylece kutuyu
+    // işaretleyen kişi, dropdown'ın alfabetik ilk admin'i SESSİZCE
+    // seçmesine güvenmek yerine hedefi BİLİNÇLİ olarak seçmek zorunda
+    // kalır (bkz. icerikKaydet'teki "hedef admin seçilmedi" kontrolü —
+    // bu placeholder'ın value'su boş olduğundan o kontrol devreye girer).
+    hedefSecim.innerHTML = adminler.length > 1 ? `<option value="">— Admin seç —</option>${secenekler}` : secenekler;
+    // Tek admin varsa seçim kutusunu gizle, checkbox etiketinde "X adına"
+    // metnini otomatik göster (birden çok adminde etiket sabit kalır,
+    // seçim dropdown'dan yapılır).
     hedefSecim.hidden = adminler.length <= 1;
+    const etiket = document.getElementById("ic-admin-adina-etiket");
+    if (etiket) {
+      etiket.textContent =
+        adminler.length === 1
+          ? `${adminler[0].full_name || adminler[0].email} adına yayınla (onay gerekir)`
+          : "Admin adına yayınla (onay gerekir)";
+    }
     // Hiç admin bulunamadıysa (RPC hatasız ama boş döndüyse) kutuyu
     // işaretlenebilir bırakmanın anlamı yok — işaretlense bile ADMIN_ADINA_HEDEF.ad
     // hep boş kalıp "Yazar bilgisi belirlenemedi" hatasına düşerdi. Kutuyu
@@ -1332,6 +1354,14 @@ function dosyaIcerigiOlustur(tur, alan, gizliKod, govde, yayinda = true) {
   // taklit edilebilir; yazar_id ise panelin kendi doldurduğu gerçek
   // Supabase kullanıcı id'sidir.
   satirlar.push(fmSatiri("yazar_id", alan.yazarId));
+  // olusturan_id: içeriği GERÇEKTEN oluşturan kişinin id'si — yazar_id'den
+  // FARKLI bir alan. "Admin adına yayınla" akışında yazar_id hedef admin'i
+  // taşır (görünen yazar odur) ama içeriği gerçekte oluşturan editor/manager
+  // hâlâ kendi id'siyle sahiplik/düzenleme hakkını korumalı (bkz.
+  // icerikKendisineMiAit ve Worker'daki editorSahibiMi — klasörlerdeki
+  // .gitkeep "olusturan_id" alanıyla AYNI mantık, bkz. gitkeepIcerigiOlustur).
+  // Admin-adına DEĞİLSE (normal durum) bu, yazar_id ile aynı kişidir.
+  satirlar.push(fmSatiri("olusturan_id", alan.olusturanId));
 
   if (tur === "proje") {
     satirlar.push(fmSatiri("venue", alan.venue));
@@ -1638,6 +1668,7 @@ function duzenlemeyiKapat() {
   DUZENLENEN_SHA = null;
   DUZENLENEN_TASLAK_ID = null;
   DUZENLENEN_GIZLI_KOD = null;
+  DUZENLENEN_OLUSTURAN_ID = null;
   document.getElementById("ic-iptal-btn").hidden = true;
   guncelleIcerikTuru();
   submitButonMetniGuncelle();
@@ -1703,7 +1734,17 @@ async function icerikKaydet(secenek = "a") {
   const yilOneki = tur === "proje" && document.getElementById("ic-yil-oneki").checked;
   const klasor = klasorSecimDegeriniAl();
 
-  const alan = { title, date, author: yazar.ad, yazarId: yazar.id, adminAdinaTalep: !!ADMIN_ADINA_HEDEF };
+  const alan = {
+    title,
+    date,
+    author: yazar.ad,
+    yazarId: yazar.id,
+    // Formu GÖNDEREN kişi her zaman GİRİŞ_YAPAN_PROFIL'dir — "admin adına
+    // yayınla" işaretliyken bile (o zaman yazar.id hedef admin'i taşır,
+    // olusturanId ise gerçek gönderen kalır). Bkz. dosyaIcerigiOlustur.
+    olusturanId: GIRIS_YAPAN_PROFIL?.id || null,
+    adminAdinaTalep: !!ADMIN_ADINA_HEDEF,
+  };
   if (tur === "proje") {
     alan.venue = document.getElementById("ic-venue").value.trim();
     alan.status = document.getElementById("ic-status").value;
@@ -2278,6 +2319,11 @@ function taslakToItem(row) {
       dosya_yolu: row.dosya_yolu,
       yazar_adi: row.yazar_adi,
       yazar_id: row.yazar_id,
+      // Gerçek oluşturan — bkz. icerikKendisineMiAit. "Admin adına yayınla"
+      // akışında yazar_id hedef admin'i taşıdığından, bu SATIR gerçekten
+      // oluşturan (created_by, migration 0013) olmadan editor kendi
+      // gönderdiği talebi kendi listesinde göremez/düzenleyemez hâle gelirdi.
+      olusturan_id: row.created_by,
       yayin_durumu: row.yayin_durumu,
       // "Admin adına yayınla" onay süreci (bkz. migration 0016) — manager
       // (İçerik Sorumlusu) rolündeki bir kullanıcı bu talebi işaretlediyse
@@ -2402,18 +2448,29 @@ function icerikOzetleriniCikar(dosyalar, tur) {
 }
 
 /**
- * Bu öğe giriş yapan kullanıcıya mı ait? Önce (varsa) yazar_id karşılaştırması
- * yapılır — bu GÜVENİLİR kimlik alanıdır (Supabase taslaklarında created_by/
- * yazar_id, GitHub'a commit edilen dosyalarda front-matter'a eklenen
- * yazar_id, bkz. dosyaIcerigiOlustur). yazar_id hiç yoksa (bu alan
- * eklenmeden ÖNCE, eski sistemle yazılmış içerikler) isim eşleşmesine
- * düşülür — TEK amacı editörün KENDİ eski içeriğini erişilemez hâle
- * getirmemektir, bir GÜVENLİK sınırı olarak kullanılmaz (gerçek sunucu
- * taraflı sınır Worker'dadır, bkz. cloudflare worker/
- * github_icerik_yonetim_worker/worker.js).
+ * Bu öğe giriş yapan kullanıcıya mı ait? Önce (varsa) olusturan_id
+ * karşılaştırılır — içeriği GERÇEKTEN oluşturan kişinin id'sidir (Supabase
+ * taslaklarında created_by, GitHub'a commit edilen dosyalarda front-matter'a
+ * eklenen olusturan_id, bkz. taslakToItem / dosyaIcerigiOlustur). Bu, "admin
+ * adına yayınla" akışında yazar_id'den (görünen yazar, hedef admin) BİLEREK
+ * farklı tutulur. olusturan_id hiç yoksa yazar_id'ye düşülür (bu alan
+ * eklenmeden ÖNCE, admin-adına özelliğinden ÖNCE yazılmış eski içerikler için
+ * olusturan_id == yazar_id zaten geçerliydi). yazar_id de yoksa (çok daha
+ * eski, hiçbir kimlik alanı taşımayan içerikler) isim eşleşmesine düşülür —
+ * TEK amacı editörün KENDİ eski içeriğini erişilemez hâle getirmemektir, bir
+ * GÜVENLİK sınırı olarak kullanılmaz (gerçek sunucu taraflı sınır
+ * Worker'dadır, bkz. cloudflare worker/github_icerik_yonetim_worker/worker.js).
  */
 function icerikKendisineMiAit(item) {
   if (!GIRIS_YAPAN_PROFIL) return false;
+  // ÖNCELİK: olusturan_id — içeriği GERÇEKTEN oluşturan kişi. "Admin adına
+  // yayınla" akışında yazar_id (görünen yazar) hedef admin'i taşır, GERÇEK
+  // oluşturan (editor/manager) DEĞİL — o yüzden editor kendi gönderdiği
+  // "admin adına" içeriği (Supabase'te onay beklerken VE GitHub'a
+  // yayınlandıktan sonra) hem listesinde görebilmeli hem düzenleyebilmeli/
+  // silebilmeli, tıpkı "📁 Klasörler" sekmesinde .gitkeep'in olusturan_id'siyle
+  // kendi oluşturduğu klasörleri yönetebilmesi gibi (bkz. klasorKartiCiz).
+  if (item.data.olusturan_id) return item.data.olusturan_id === GIRIS_YAPAN_PROFIL.id;
   if (item.data.yazar_id) return item.data.yazar_id === GIRIS_YAPAN_PROFIL.id;
   const kendiAdi = (GIRIS_YAPAN_PROFIL.full_name || GIRIS_YAPAN_PROFIL.email || "").trim().toLocaleLowerCase("tr");
   const itemYazar = (item.data.yazar_adi || item.data.author || "").trim().toLocaleLowerCase("tr");
@@ -2745,7 +2802,20 @@ async function taslagiYayinla(item, tur, btn) {
   const oncekiMetin = btn.textContent;
   btn.textContent = "İşleniyor...";
   try {
-    const alan = { title: item.data.title, date: item.data.date };
+    // BUG FİX (yazar bilgisi kayboluyordu): bu alan önceden sadece
+    // {title, date} taşıyordu — yani Supabase taslağı GitHub'a yayınlanınca
+    // front-matter'daki author/yazar_id/olusturan_id HİÇ yazılmıyordu.
+    // Sonuç: (1) yayınlanan yazıda "Yazan: X" hiç görünmüyordu, (2) editörün
+    // "admin adına" gönderdiği içerik, yayınlandıktan SONRA sahiplik
+    // bilgisini tamamen kaybediyor, editör artık onu ne düzenleyebiliyor ne
+    // silebiliyordu (bkz. icerikKendisineMiAit / Worker'daki editorSahibiMi).
+    const alan = {
+      title: item.data.title,
+      date: item.data.date,
+      author: item.data.yazar_adi || null,
+      yazarId: item.data.yazar_id || null,
+      olusturanId: item.data.olusturan_id || item.data.yazar_id || null,
+    };
     if (tur === "proje") {
       alan.venue = item.data.venue;
       alan.status = item.data.status;
@@ -2905,6 +2975,7 @@ async function icerikDuzenlemeyeYukle(item, tur) {
     // güncellenir (bkz. icerikSupabaseVeGithubaYaz).
     DUZENLENEN_TASLAK_ID = item.supabaseYedek ? item.taslakId : null;
   }
+  DUZENLENEN_OLUSTURAN_ID = item.data.olusturan_id || item.data.yazar_id || null;
 
   // Yazar alanını içeriğin kayıtlı yazarına göre doldur (admin seçim
   // kutusundaysa ilgili seçeneği işaretler; editor için zaten salt okunur
