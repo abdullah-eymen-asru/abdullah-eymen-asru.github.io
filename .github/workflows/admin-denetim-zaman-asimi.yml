@@ -1,0 +1,32 @@
+# Bu workflow, supabase/functions/admin-denetim-zaman-asimi Edge Function'ını
+# her 15 dakikada bir tetikler — migration 0021'deki "AŞAMA 2c — ZAMAN AŞIMI
+# (fail-safe)" adımının dışarıdan periyodik çalıştırıcısı. Aynı desen
+# zamanlanmis-yayin.yml'de de kullanılıyor (bkz. o dosyanın başındaki not).
+#
+# KURULUM (bir kereye mahsus):
+#   1) supabase functions deploy admin-denetim-zaman-asimi
+#   2) supabase secrets set CRON_SHARED_SECRET=<rastgele-uzun-bir-deger>
+#   3) GitHub repo -> Settings -> Secrets and variables -> Actions:
+#        ADMIN_DENETIM_FUNCTION_URL = https://<proje-ref>.supabase.co/functions/v1/admin-denetim-zaman-asimi
+#        ADMIN_DENETIM_CRON_SECRET  = (2. adımdaki AYNI değer)
+
+name: Admin Denetim — Zaman Aşımı Kontrolü
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # her 15 dakikada bir
+  workflow_dispatch: {}
+
+jobs:
+  zaman-asimini-isle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Zaman aşımı Edge Function'ını çağır
+        run: |
+          if [ -z "${{ secrets.ADMIN_DENETIM_FUNCTION_URL }}" ]; then
+            echo "::error::ADMIN_DENETIM_FUNCTION_URL secret'ı tanımlı değil. Bu dosyanın başındaki kurulum adımlarına bak."
+            exit 1
+          fi
+          curl -X POST "${{ secrets.ADMIN_DENETIM_FUNCTION_URL }}" \
+            -H "X-Cron-Secret: ${{ secrets.ADMIN_DENETIM_CRON_SECRET }}" \
+            --fail --silent --show-error
