@@ -240,22 +240,26 @@ function baslarHarfler(u) {
 }
 
 function uyeKartHtml(u) {
-  // MİGRATION 0027 § A: sıradan bir admin (owner DEĞİL) artık Site
-  // Sahibi'nin (owner) satırını hiçbir kolonda (isim dahil) doğrudan
-  // düzenleyemez — veritabanı RLS'i zaten bunu reddeder, burada da isim
-  // kutularını salt-okunur göstererek kullanıcıyı reddedilecek bir işlemi
-  // denemekten önceden caydırıyoruz (gerçek sınır veritabanındadır).
+  // MİGRATION 0028 § A (genişletilmiş — eskiden migration 0027 § A SADECE
+  // Site Sahibi'nin (owner) satırını koruyordu): sıradan bir admin (owner
+  // DEĞİL) artık HİÇBİR üyenin (owner, başka bir admin, manager, editor,
+  // special_user, user — fark etmez) Ad/Soyad kutularını doğrudan
+  // düzenleyemez; SADECE kendi satırındaki Ad/Soyad kendisine açık kalır.
+  // Veritabanı tetikleyicisi (prevent_isim_degisikligi_baskasi_tarafindan,
+  // migration 0028) zaten bunu reddeder — burada da isim kutularını
+  // salt-okunur göstererek kullanıcıyı reddedilecek bir işlemi denemekten
+  // önceden caydırıyoruz (gerçek sınır veritabanındadır).
   const benOwnerMi = GIRIS_YAPAN_PROFIL?.role === "owner";
-  const hedefOwnerMi = u.role === "owner";
-  const isimSalcOkunurMu = hedefOwnerMi && !benOwnerMi;
+  const kendiSatiriMi = !!GIRIS_YAPAN_PROFIL?.id && GIRIS_YAPAN_PROFIL.id === u.id;
+  const isimSalcOkunurMu = !benOwnerMi && !kendiSatiriMi;
   return `
     <div class="uya-kart" data-id="${u.id}">
       <div class="uya-kart-ust">
         <div class="uya-avatar" aria-hidden="true">${escapeHtml(baslarHarfler(u))}</div>
         <div class="uya-kart-kimlik">
           <div class="uya-isim-alani">
-            <input class="uya-isim-input" data-alan="first_name" data-id="${u.id}" type="text" value="${escapeHtml(u.first_name || "")}" placeholder="Ad" ${isimSalcOkunurMu ? `readonly title="Site Sahibi'nin adını sadece kendisi değiştirebilir."` : ""}>
-            <input class="uya-isim-input" data-alan="last_name" data-id="${u.id}" type="text" value="${escapeHtml(u.last_name || "")}" placeholder="Soyad" ${isimSalcOkunurMu ? `readonly title="Site Sahibi'nin soyadını sadece kendisi değiştirebilir."` : ""}>
+            <input class="uya-isim-input" data-alan="first_name" data-id="${u.id}" type="text" value="${escapeHtml(u.first_name || "")}" placeholder="Ad" ${isimSalcOkunurMu ? `readonly title="Bu üyenin adını sadece kendisi ya da Site Sahibi değiştirebilir."` : ""}>
+            <input class="uya-isim-input" data-alan="last_name" data-id="${u.id}" type="text" value="${escapeHtml(u.last_name || "")}" placeholder="Soyad" ${isimSalcOkunurMu ? `readonly title="Bu üyenin soyadını sadece kendisi ya da Site Sahibi değiştirebilir."` : ""}>
           </div>
           <span class="uya-email muted" title="${escapeHtml(u.email)}">${escapeHtml(u.email)}</span>
         </div>
