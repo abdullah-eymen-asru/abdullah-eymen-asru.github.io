@@ -104,7 +104,10 @@ function renderHesapMenusu(container, role) {
   // panel/uye-ayarlari.md) ve SADECE admin'e açık — manager (İçerik
   // Sorumlusu) bu linki hiç görmez, doğrudan URL'yi yazsa bile o sayfanın
   // kendi requireAuth({role:'admin'}) kontrolü onu geri gönderir.
-  if (role === "admin") {
+  // owner (Site Sahibi), admin'in tüm menü linklerini görmeli — bkz.
+  // migration 0021 ve auth-guard.js'teki "owner her zaman geçer" kuralı.
+  const adminGibi = role === "admin" || role === "owner";
+  if (adminGibi) {
     linkler.push({ href: "/panel/uye-ayarlari.html", etiket: "Üye Ayarları" });
   }
   // 'manager' (panelde "İçerik Sorumlusu") de admin paneline girebiliyor —
@@ -112,8 +115,13 @@ function renderHesapMenusu(container, role) {
   // "R2 Dosya Paylaşımı" sekmelerine (bkz. admin.js, panel/admin.md).
   // Linkin kendisi admin ile aynı, hangi sekmelerin görüneceğine admin.js
   // içeri girdikten sonra karar veriyor.
-  if (role === "admin" || role === "manager") {
+  if (adminGibi || role === "manager") {
     linkler.push({ href: "/panel/admin.html", etiket: "Admin Paneli" });
+  }
+  // Admin Güvenliği (karşılıklı denetim / askıya alma / owner kararı) —
+  // sadece admin/owner girebilir (bkz. admin-guvenlik.js).
+  if (adminGibi) {
+    linkler.push({ href: "/panel/admin-guvenlik.html", etiket: "🛡️ Admin Güvenliği" });
   }
   // GitHub Pages'in kendi statik içeriğini (blog/proje yazıları, profil
   // fotoğrafı) yönetmek için ayrı, bağımsız bir sayfa — bkz.
@@ -127,7 +135,7 @@ function renderHesapMenusu(container, role) {
   // requireAuth doğru kurulmuştu) menüde linki HİÇ görmüyorlardı, yani
   // panele ulaşmanın tek yolu URL'yi elle yazmaktı. Şimdi editor, manager
   // veya admin iken gösteriliyor.
-  if (role === "admin" || role === "editor" || role === "manager") {
+  if (adminGibi || role === "editor" || role === "manager") {
     linkler.push({ href: "/panel/github-yonetim.html", etiket: "GitHub İçerik Yönetimi" });
   }
 
