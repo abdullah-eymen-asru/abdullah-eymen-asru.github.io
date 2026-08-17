@@ -240,14 +240,22 @@ function baslarHarfler(u) {
 }
 
 function uyeKartHtml(u) {
+  // MİGRATION 0027 § A: sıradan bir admin (owner DEĞİL) artık Site
+  // Sahibi'nin (owner) satırını hiçbir kolonda (isim dahil) doğrudan
+  // düzenleyemez — veritabanı RLS'i zaten bunu reddeder, burada da isim
+  // kutularını salt-okunur göstererek kullanıcıyı reddedilecek bir işlemi
+  // denemekten önceden caydırıyoruz (gerçek sınır veritabanındadır).
+  const benOwnerMi = GIRIS_YAPAN_PROFIL?.role === "owner";
+  const hedefOwnerMi = u.role === "owner";
+  const isimSalcOkunurMu = hedefOwnerMi && !benOwnerMi;
   return `
     <div class="uya-kart" data-id="${u.id}">
       <div class="uya-kart-ust">
         <div class="uya-avatar" aria-hidden="true">${escapeHtml(baslarHarfler(u))}</div>
         <div class="uya-kart-kimlik">
           <div class="uya-isim-alani">
-            <input class="uya-isim-input" data-alan="first_name" data-id="${u.id}" type="text" value="${escapeHtml(u.first_name || "")}" placeholder="Ad">
-            <input class="uya-isim-input" data-alan="last_name" data-id="${u.id}" type="text" value="${escapeHtml(u.last_name || "")}" placeholder="Soyad">
+            <input class="uya-isim-input" data-alan="first_name" data-id="${u.id}" type="text" value="${escapeHtml(u.first_name || "")}" placeholder="Ad" ${isimSalcOkunurMu ? `readonly title="Site Sahibi'nin adını sadece kendisi değiştirebilir."` : ""}>
+            <input class="uya-isim-input" data-alan="last_name" data-id="${u.id}" type="text" value="${escapeHtml(u.last_name || "")}" placeholder="Soyad" ${isimSalcOkunurMu ? `readonly title="Site Sahibi'nin soyadını sadece kendisi değiştirebilir."` : ""}>
           </div>
           <span class="uya-email muted" title="${escapeHtml(u.email)}">${escapeHtml(u.email)}</span>
         </div>
@@ -274,10 +282,25 @@ function uyeKartHtml(u) {
           ${sahipYapButonuHtml(u)}
           ${kendiYetkimiDusurButonuHtml(u)}
           <button class="btn-secondary tablo-aksiyon-btn eposta-degistir-btn" data-id="${u.id}" data-email="${escapeHtml(u.email)}" data-isim="${escapeHtml(u.full_name || u.email)}">E-posta Değiştir</button>
-          <button class="btn-danger tablo-aksiyon-btn uye-sil-btn" data-id="${u.id}" data-email="${escapeHtml(u.email)}">Sil</button>
+          ${silButonuHtml(u)}
         </div>
       </div>
     </div>`;
+}
+
+/**
+ * "Sil" butonu — MİGRATION 0027 § B ile başka birini silme yetkisi
+ * SADECE owner'a daraltıldı (eskiden herhangi bir admin herhangi bir
+ * üyeyi, hatta owner'ı bile silebiliyordu). Bu yüzden bu buton artık
+ * SADECE giriş yapan owner ise gösterilir — sıradan bir admin bu butonu
+ * hiç görmez (Edge Function tarafı zaten aynı kısıtlamayı zorunlu kılıyor,
+ * bkz. supabase/functions/delete-account/index.ts). Herkesin KENDİ
+ * hesabını silme hakkı bu butondan BAĞIMSIZ, ayrı bir akıştır (Panelim /
+ * "Hesabım" sayfasındaki kendi hesabını silme özelliği) ve DOKUNULMADI.
+ */
+function silButonuHtml(u) {
+  if (GIRIS_YAPAN_PROFIL?.role !== "owner") return "";
+  return `<button class="btn-danger tablo-aksiyon-btn uye-sil-btn" data-id="${u.id}" data-email="${escapeHtml(u.email)}">Sil</button>`;
 }
 
 /**
@@ -396,8 +419,14 @@ function wireKartOlaylari(liste) {
   // Admin, bir üyenin Ad/Soyadını doğrudan karttan (ayrı ayrı) düzenleyip
   // kaydedebilir. change/blur'da kaydediyoruz (her tuş vuruşunda değil).
   // full_name kolonu first_name+last_name'den otomatik (generated) türetilir.
+  // MİGRATION 0027 § A: input zaten Site Sahibi'nin kartında owner-dışı
+  // biri için "readonly" render ediliyor (bkz. uyeKartHtml) — burada da
+  // aynı durumu ikinci bir güvence olarak kontrol ediyoruz (readonly
+  // özniteliği DOM'dan elle kaldırılsa bile veritabanı RLS'i zaten
+  // reddeder, ama gereksiz bir istek atmayalım).
   liste.querySelectorAll(".uya-isim-input").forEach((input) => {
     input.addEventListener("change", async () => {
+      if (input.readOnly) return;
       const userId = input.dataset.id;
       const alan = input.dataset.alan; // "first_name" | "last_name"
       const deger = input.value.trim();
