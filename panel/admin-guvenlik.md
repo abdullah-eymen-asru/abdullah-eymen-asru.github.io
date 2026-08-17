@@ -4,6 +4,7 @@ title: "Admin Güvenliği"
 yayinda: true
 auth_css: true
 permalink: "/panel/admin-guvenlik.html"
+uye_ayarlari_css: true
 ---
 
 <div class="loading-overlay" id="loading">Yükleniyor...</div>
@@ -49,7 +50,13 @@ permalink: "/panel/admin-guvenlik.html"
 
     <section class="panel-section">
       <h2>Denetim Vakaları</h2>
+      <p class="muted">
+        Vaka geçmişi sayfalanarak gösterilir. Kalıcı silme sadece Site
+        Sahibi'ne (owner) açıktır ve her vaka tek tek, geri alınamaz şekilde
+        silinir — açık ("askıda") vakalar önce sonuçlanmadan silinemez.
+      </p>
       <div id="ag-vaka-listesi"><p class="muted">Yükleniyor...</p></div>
+      <div class="uya-sayfalama" id="ag-vaka-sayfalama"></div>
     </section>
 
     <section class="panel-section">
