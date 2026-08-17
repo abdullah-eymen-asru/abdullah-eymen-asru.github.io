@@ -657,20 +657,26 @@ async function wireYazarAlani() {
 }
 
 /**
- * "Admin adına yayınla (onay gerekir)" özelliği — role='manager' (panelde
- * "İçerik Sorumlusu") VE role='editor' için aynı şekilde açık. admin bu
- * kutuyu hiç görmez: admin'in zaten kendi adına doğrudan yazma yetkisi
- * var, onaya ihtiyacı yok. Kutu işaretlenince:
- *   - Yazar, GİRİŞ YAPAN KİŞİ DEĞİL, seçilen admin olarak kaydedilir
- *     (bkz. yazarBilgisiniAl) ve satıra admin_adina_talep=true eklenir
- *     (bkz. icerikKaydet → icerikSupabaseeYaz/icerikSadeceSupabaseeYayinla/
+ * "Admin/Site Sahibi adına yayınla (onay gerekir)" özelliği — role='manager'
+ * (panelde "İçerik Sorumlusu") VE role='editor' için aynı şekilde açık.
+ * admin/owner bu kutuyu hiç görmez: zaten kendi adına doğrudan yazma
+ * yetkileri var, onaya ihtiyaçları yok. Kutu işaretlenince:
+ *   - Yazar, GİRİŞ YAPAN KİŞİ DEĞİL, seçilen admin/owner olarak kaydedilir
+ *     (bkz. yazarBilgisiniAl) ve satıra hedefin rolüne göre
+ *     admin_adina_talep=true YA DA sahip_adina_talep=true eklenir (bkz.
+ *     icerikKaydet → icerikSupabaseeYaz/icerikSadeceSupabaseeYayinla/
  *     icerikSupabaseVeGithubaYaz).
  *   - "Yayında" anahtarı kapatılıp kilitlenir ve "GitHub'a gizli commit et
  *     (eski yöntem)" seçeneği devre dışı bırakılır — içerik SADECE gizli
- *     bir Supabase taslağı olarak kaydedilebilir; admin onaylamadan
- *     GERÇEKTEN yayına alınamaz (veritabanı tetikleyicisi de bunu ayrıca
- *     zorunlu kılar, bkz. migration 0016 §6 — bu, o kuralın istemci
- *     tarafındaki bir kolaylık yansımasıdır, güvenlik sınırı DEĞİLDİR).
+ *     bir Supabase taslağı olarak kaydedilebilir; onaylanmadan GERÇEKTEN
+ *     yayına alınamaz (veritabanı tetikleyicisi de bunu ayrıca zorunlu
+ *     kılar, bkz. migration 0016 §6 ve migration 0023 § A.4 — bu, o
+ *     kuralın istemci tarafındaki bir kolaylık yansımasıdır, güvenlik
+ *     sınırı DEĞİLDİR).
+ *   - Site Sahibi (owner) hedef seçilirse onay süreci FARKLIDIR: ya owner
+ *     tek başına onaylar (sahip_taslak_onayla) ya da adminlerin MUTLAK
+ *     ÇOĞUNLUĞU onay oyu verir (admin_sahip_talebi_oy_kullan) — bkz.
+ *     migration 0023 § A.
  */
 async function wireAdminAdinaTalep() {
   const sarmalayici = document.getElementById("ic-admin-adina-wrap");
@@ -697,50 +703,61 @@ async function wireAdminAdinaTalep() {
     // dönerdi (RLS sessizce filtreler, hata fırlatmaz) — dropdown boş
     // kalır, "Admin adına yayınla" işaretlenince ADMIN_ADINA_HEDEF.ad ""
     // olur ve kayıt "Yazar bilgisi belirlenemedi" hatasıyla reddedilirdi.
-    // admin_listesi_getir() (migration 0020) editor/manager/admin'in
-    // hepsine açık dar kapsamlı bir RPC — RLS'i by-pass edip SADECE admin
-    // profillerinin id/full_name/email'ini döner.
+    // admin_listesi_getir() (migration 0020, 0023'te owner'ı da kapsayacak
+    // şekilde genişletildi) editor/manager/admin/owner'ın hepsine açık dar
+    // kapsamlı bir RPC — RLS'i by-pass edip admin VE owner profillerinin
+    // id/full_name/email/role'ünü döner.
     const { data, error } = await supabase.rpc("admin_listesi_getir");
     if (error) throw error;
-    const adminler = data || [];
-    const secenekler = adminler
-      .map((p) => `<option value="${p.id}" data-ad="${escapeHtml(p.full_name || p.email)}">${escapeHtml(p.full_name || p.email)}</option>`)
+    const hedefler = data || [];
+    const ROL_ETIKETI_KISA = { admin: "Yönetici", owner: "Site Sahibi" };
+    const secenekler = hedefler
+      .map(
+        (p) =>
+          `<option value="${p.id}" data-ad="${escapeHtml(p.full_name || p.email)}" data-rol="${p.role}">${escapeHtml(p.full_name || p.email)} (${ROL_ETIKETI_KISA[p.role] || p.role})</option>`
+      )
       .join("");
-    // 2+ admin varken bir PLACEHOLDER ekliyoruz — böylece kutuyu
-    // işaretleyen kişi, dropdown'ın alfabetik ilk admin'i SESSİZCE
+    // 2+ hedef varken bir PLACEHOLDER ekliyoruz — böylece kutuyu
+    // işaretleyen kişi, dropdown'ın alfabetik ilk hedefi SESSİZCE
     // seçmesine güvenmek yerine hedefi BİLİNÇLİ olarak seçmek zorunda
-    // kalır (bkz. icerikKaydet'teki "hedef admin seçilmedi" kontrolü —
-    // bu placeholder'ın value'su boş olduğundan o kontrol devreye girer).
-    hedefSecim.innerHTML = adminler.length > 1 ? `<option value="">— Admin seç —</option>${secenekler}` : secenekler;
-    // Tek admin varsa seçim kutusunu gizle, checkbox etiketinde "X adına"
-    // metnini otomatik göster (birden çok adminde etiket sabit kalır,
+    // kalır (bkz. icerikKaydet'teki "hedef seçilmedi" kontrolü — bu
+    // placeholder'ın value'su boş olduğundan o kontrol devreye girer).
+    hedefSecim.innerHTML = hedefler.length > 1 ? `<option value="">— Yönetici/Site Sahibi seç —</option>${secenekler}` : secenekler;
+    // Tek hedef varsa seçim kutusunu gizle, checkbox etiketinde "X adına"
+    // metnini otomatik göster (birden çok hedefte etiket sabit kalır,
     // seçim dropdown'dan yapılır).
-    hedefSecim.hidden = adminler.length <= 1;
+    hedefSecim.hidden = hedefler.length <= 1;
     const etiket = document.getElementById("ic-admin-adina-etiket");
     if (etiket) {
       etiket.textContent =
-        adminler.length === 1
-          ? `${adminler[0].full_name || adminler[0].email} adına yayınla (onay gerekir)`
-          : "Admin adına yayınla (onay gerekir)";
+        hedefler.length === 1
+          ? `${hedefler[0].full_name || hedefler[0].email} adına yayınla (onay gerekir)`
+          : "Yönetici/Site Sahibi adına yayınla (onay gerekir)";
     }
-    // Hiç admin bulunamadıysa (RPC hatasız ama boş döndüyse) kutuyu
+    // Hiç hedef bulunamadıysa (RPC hatasız ama boş döndüyse) kutuyu
     // işaretlenebilir bırakmanın anlamı yok — işaretlense bile ADMIN_ADINA_HEDEF.ad
     // hep boş kalıp "Yazar bilgisi belirlenemedi" hatasına düşerdi. Kutuyu
     // devre dışı bırakıp NEDENİNİ görünür bir ipucuyla açıklıyoruz.
-    kutu.disabled = adminler.length === 0;
-    kutu.title = adminler.length === 0 ? "Şu an sistemde admin rolüne sahip bir kullanıcı bulunamadı." : "";
+    kutu.disabled = hedefler.length === 0;
+    kutu.title = hedefler.length === 0 ? "Şu an sistemde admin/owner rolüne sahip bir kullanıcı bulunamadı." : "";
   } catch (err) {
-    console.error("Admin listesi yüklenemedi (admin adına yayınla):", err);
+    console.error("Admin/Site Sahibi listesi yüklenemedi (adına yayınla):", err);
     hedefSecim.innerHTML = "";
     kutu.disabled = true;
-    kutu.title = "Admin listesi yüklenemedi, sayfayı yenileyip tekrar dene.";
+    kutu.title = "Liste yüklenemedi, sayfayı yenileyip tekrar dene.";
   }
 
   const uygula = () => {
     const aktif = kutu.checked;
     hedefSecim.style.display = aktif && !hedefSecim.hidden ? "" : "none";
     ADMIN_ADINA_HEDEF = aktif
-      ? { id: hedefSecim.value || null, ad: hedefSecim.selectedOptions?.[0]?.dataset.ad || "" }
+      ? {
+          id: hedefSecim.value || null,
+          ad: hedefSecim.selectedOptions?.[0]?.dataset.ad || "",
+          // 'admin' ya da 'owner' — icerikKaydet'te hangi talep alanının
+          // (admin_adina_talep / sahip_adina_talep) yazılacağını belirler.
+          rol: hedefSecim.selectedOptions?.[0]?.dataset.rol || "admin",
+        }
       : null;
 
     // "Yayında" anahtarını kapat + kilitle: admin onaylamadan bu içerik
@@ -1825,7 +1842,7 @@ async function icerikKaydet(secenek = "a") {
     return;
   }
   if (ADMIN_ADINA_HEDEF && !ADMIN_ADINA_HEDEF.id) {
-    showMessage(msgEl, '"Admin adına yayınla" işaretli ama hedef admin seçilmedi.', "error");
+    showMessage(msgEl, '"Admin/Site Sahibi adına yayınla" işaretli ama hedef seçilmedi.', "error");
     return;
   }
 
@@ -1850,6 +1867,10 @@ async function icerikKaydet(secenek = "a") {
     // olusturanId ise gerçek gönderen kalır). Bkz. dosyaIcerigiOlustur.
     olusturanId: GIRIS_YAPAN_PROFIL?.id || null,
     adminAdinaTalep: !!ADMIN_ADINA_HEDEF,
+    // ADMIN_ADINA_HEDEF.rol 'admin' ya da 'owner' olabilir (bkz.
+    // wireAdminAdinaTalep) — hangi talep alanının (admin_adina_talep /
+    // sahip_adina_talep) işaretleneceğine bu belirliyor.
+    hedefRol: ADMIN_ADINA_HEDEF?.rol || null,
   };
   if (tur === "proje") {
     alan.venue = document.getElementById("ic-venue").value.trim();
@@ -2034,9 +2055,13 @@ async function icerikSupabaseeYaz(tur, alan, gizliKod, govde, slug, dosyaYolu, m
     yayin_durumu: "taslak",
     yazar_id: alan.yazarId || null,
     yazar_adi: alan.author || null,
-    // "Admin adına yayınla" onay süreci (bkz. migration 0016 / wireAdminAdinaTalep)
-    // — sunucu tarafındaki tetikleyici admin_onay_durumu'nu buna göre otomatik ayarlar.
-    admin_adina_talep: alan.adminAdinaTalep === true,
+    // "Admin/Site Sahibi adına yayınla" onay süreci (bkz. migration 0016 ve
+    // 0023 / wireAdminAdinaTalep) — sunucu tarafındaki tetikleyici
+    // admin_onay_durumu / sahip_onay_durumu'nu buna göre otomatik ayarlar.
+    // hedefRol 'owner' ise sahip_adina_talep, aksi halde (varsayılan
+    // 'admin') admin_adina_talep işaretlenir — ikisi birden asla true olmaz.
+    admin_adina_talep: alan.adminAdinaTalep === true && alan.hedefRol !== "owner",
+    sahip_adina_talep: alan.adminAdinaTalep === true && alan.hedefRol === "owner",
   };
 
   let taslakSonuc;
@@ -2133,9 +2158,13 @@ async function icerikSadeceSupabaseeYayinla(tur, alan, gizliKod, govde, slug, do
     yayin_durumu: "sadece_supabase",
     yazar_id: alan.yazarId || null,
     yazar_adi: alan.author || null,
-    // "Admin adına yayınla" onay süreci (bkz. migration 0016 / wireAdminAdinaTalep)
-    // — sunucu tarafındaki tetikleyici admin_onay_durumu'nu buna göre otomatik ayarlar.
-    admin_adina_talep: alan.adminAdinaTalep === true,
+    // "Admin/Site Sahibi adına yayınla" onay süreci (bkz. migration 0016 ve
+    // 0023 / wireAdminAdinaTalep) — sunucu tarafındaki tetikleyici
+    // admin_onay_durumu / sahip_onay_durumu'nu buna göre otomatik ayarlar.
+    // hedefRol 'owner' ise sahip_adina_talep, aksi halde (varsayılan
+    // 'admin') admin_adina_talep işaretlenir — ikisi birden asla true olmaz.
+    admin_adina_talep: alan.adminAdinaTalep === true && alan.hedefRol !== "owner",
+    sahip_adina_talep: alan.adminAdinaTalep === true && alan.hedefRol === "owner",
   };
 
   let taslakSonuc;
@@ -2226,9 +2255,13 @@ async function icerikSupabaseVeGithubaYaz(tur, alan, gizliKod, govde, slug, dosy
     yayin_durumu: "supabase_ve_github",
     yazar_id: alan.yazarId || null,
     yazar_adi: alan.author || null,
-    // "Admin adına yayınla" onay süreci (bkz. migration 0016 / wireAdminAdinaTalep)
-    // — sunucu tarafındaki tetikleyici admin_onay_durumu'nu buna göre otomatik ayarlar.
-    admin_adina_talep: alan.adminAdinaTalep === true,
+    // "Admin/Site Sahibi adına yayınla" onay süreci (bkz. migration 0016 ve
+    // 0023 / wireAdminAdinaTalep) — sunucu tarafındaki tetikleyici
+    // admin_onay_durumu / sahip_onay_durumu'nu buna göre otomatik ayarlar.
+    // hedefRol 'owner' ise sahip_adina_talep, aksi halde (varsayılan
+    // 'admin') admin_adina_talep işaretlenir — ikisi birden asla true olmaz.
+    admin_adina_talep: alan.adminAdinaTalep === true && alan.hedefRol !== "owner",
+    sahip_adina_talep: alan.adminAdinaTalep === true && alan.hedefRol === "owner",
   };
 
   let taslakSonuc;
@@ -2907,6 +2940,13 @@ function icerikKartiCiz(item, tur) {
     reddedildi: '<span class="gy-rozet gy-rozet--gizli" title="Admin bu içeriğin kendi adına yayınlanma talebini reddetti.">❌ Admin reddetti</span>',
   };
   const onayRozet = item.data.admin_adina_talep ? ONAY_ROZET[item.data.admin_onay_durumu] || "" : "";
+  // "Site Sahibi adına yayınla" onay rozeti (bkz. migration 0023 § A).
+  const SAHIP_ONAY_ROZET = {
+    beklemede: '<span class="gy-rozet gy-rozet--gizli" id="' + `gy-sahip-oy-${item.taslakId}` + '" title="Bu içerik Site Sahibi adına yayınlanmak üzere hazırlandı; Site Sahibi onayı YA DA adminlerin mutlak çoğunluğunun onay oyu bekleniyor.">⏳ Site Sahibi onayı bekliyor</span>',
+    onaylandi: '<span class="gy-rozet gy-rozet--yayinda" title="Site Sahibi (ya da adminlerin mutlak çoğunluğu) bu içeriği kendi adına yayınlanması için onayladı.">✅ Site Sahibi onayladı</span>',
+    reddedildi: '<span class="gy-rozet gy-rozet--gizli" title="Site Sahibi (ya da adminlerin mutlak çoğunluğu) bu içeriğin kendi adına yayınlanma talebini reddetti.">❌ Site Sahibi reddetti</span>',
+  };
+  const sahipOnayRozet = item.data.sahip_adina_talep ? SAHIP_ONAY_ROZET[item.data.sahip_onay_durumu] || "" : "";
   const ozet = item.data.summary
     ? `<div class="gy-icerik-kart-ozet">${metniVurgula(item.data.summary)}</div>`
     : "";
@@ -2958,13 +2998,31 @@ function icerikKartiCiz(item, tur) {
   } else {
     durumBtn = '<button type="button" class="gy-durum-degistir-btn gy-durum-degistir-btn--yayinla" data-hedef="tasi">Supabase\'e Taşı</button>';
   }
-  // Admin, onay bekleyen bir talebi burada doğrudan onaylayabilir/reddedebilir.
+  // Admin/owner, "admin adına" onay bekleyen bir talebi burada doğrudan onaylayabilir/reddedebilir.
   const onayBtns =
     (GIRIS_YAPAN_PROFIL?.role === "admin" || GIRIS_YAPAN_PROFIL?.role === "owner") &&
     item.data.admin_adina_talep &&
     item.data.admin_onay_durumu === "beklemede"
       ? `<button type="button" class="gy-onay-btn" data-onay="1">✅ Onayla</button>
          <button type="button" class="gy-onay-btn gy-onay-btn--red" data-onay="0">❌ Reddet</button>`
+      : "";
+  // "Site Sahibi adına" onay bekleyen bir talep için İKİ FARKLI aksiyon
+  // seti var (bkz. migration 0023 § A):
+  //   - owner ise: tek başına Onayla/Reddet (sahip_taslak_onayla RPC'si).
+  //   - sıradan admin ise (owner DEĞİL): Onay Ver/Red Ver OYU (adminlerin
+  //     MUTLAK ÇOĞUNLUĞU sağlanınca sunucu otomatik sonuçlandırır, bkz.
+  //     admin_sahip_talebi_oy_kullan RPC'si) — tek bir adminin oyu tek
+  //     başına yeterli DEĞİLDİR, bu yüzden buton metni kasıtlı olarak
+  //     "Onayla" değil "Onay Ver" diyor.
+  const sahipOnayBtns =
+    item.data.sahip_adina_talep && item.data.sahip_onay_durumu === "beklemede"
+      ? GIRIS_YAPAN_PROFIL?.role === "owner"
+        ? `<button type="button" class="gy-onay-btn gy-sahip-onay-btn" data-onay="1">✅ Onayla (Site Sahibi)</button>
+           <button type="button" class="gy-onay-btn gy-onay-btn--red gy-sahip-onay-btn" data-onay="0">❌ Reddet (Site Sahibi)</button>`
+        : GIRIS_YAPAN_PROFIL?.role === "admin"
+          ? `<button type="button" class="gy-onay-btn gy-sahip-oy-btn" data-oy="onay">👍 Onay Ver</button>
+             <button type="button" class="gy-onay-btn gy-onay-btn--red gy-sahip-oy-btn" data-oy="red">👎 Red Ver</button>`
+          : ""
       : "";
   const linkBtn = onizlemeLink
     ? `<button type="button" class="gy-link-kopyala-mini-btn" title="${escapeHtml(onizlemeLink)}">🔗 Linki Kopyala</button>`
@@ -2987,12 +3045,13 @@ function icerikKartiCiz(item, tur) {
 
   kart.innerHTML = `
     <div class="gy-icerik-kart-bilgi">
-      <div class="gy-icerik-kart-baslik">${metniVurgula(item.data.title || yolGoster)}${hafifRozet}${rozet}${kaynakRozet}${supabaseYedekRozet}${onayRozet}</div>
+      <div class="gy-icerik-kart-baslik">${metniVurgula(item.data.title || yolGoster)}${hafifRozet}${rozet}${kaynakRozet}${supabaseYedekRozet}${onayRozet}${sahipOnayRozet}</div>
       <div class="gy-icerik-kart-meta">${escapeHtml(item.data.date || "")} · ${metniVurgula(yolGoster)}${yazarSatiri}</div>
       ${ozet}
     </div>
     <div class="gy-icerik-kart-aksiyonlar">
       ${onayBtns}
+      ${sahipOnayBtns}
       ${editorKisitliMi ? "" : durumBtn}
       ${linkBtn}
       ${duzenleSilBtnleri}
@@ -3008,9 +3067,38 @@ function icerikKartiCiz(item, tur) {
       gitDenTaslagaTasi(item, tur, e.currentTarget);
     }
   });
-  kart.querySelectorAll(".gy-onay-btn").forEach((btn) => {
+  kart.querySelectorAll(".gy-onay-btn:not(.gy-sahip-onay-btn):not(.gy-sahip-oy-btn)").forEach((btn) => {
     btn.addEventListener("click", (e) => adminTaslakOnayla(item, tur, e.currentTarget.dataset.onay === "1", e.currentTarget));
   });
+  kart.querySelectorAll(".gy-sahip-onay-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => sahipTaslakOnayla(item, tur, e.currentTarget.dataset.onay === "1", e.currentTarget));
+  });
+  kart.querySelectorAll(".gy-sahip-oy-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => sahipTalebineOyVer(item, tur, e.currentTarget.dataset.oy, e.currentTarget));
+  });
+  // "Site Sahibi onayı bekliyor" rozetindeki metni, mevcut oy durumunu
+  // (X/Y admin onayladı) göstermek için zenginleştir — sadece admin/owner
+  // görebilir (sahip_onay_durumu_getir RPC'si zaten is_admin() zorunlu
+  // kılıyor, bkz. migration 0023 § A.6), bu yüzden diğer roller için
+  // sessizce atlanıyor.
+  if (
+    item.data.sahip_adina_talep &&
+    item.data.sahip_onay_durumu === "beklemede" &&
+    (GIRIS_YAPAN_PROFIL?.role === "admin" || GIRIS_YAPAN_PROFIL?.role === "owner") &&
+    item.taslakId
+  ) {
+    supabase
+      .rpc("sahip_onay_durumu_getir", { p_taslak_id: item.taslakId })
+      .then(({ data, error }) => {
+        if (error || !data?.[0]) return;
+        const { onay_sayisi, red_sayisi, gerekli_oy_sayisi } = data[0];
+        const rozetEl = kart.querySelector(`#gy-sahip-oy-${item.taslakId}`);
+        if (rozetEl) {
+          rozetEl.textContent = `⏳ Site Sahibi onayı bekliyor (${onay_sayisi} onay / ${red_sayisi} red — gerekli: ${gerekli_oy_sayisi})`;
+        }
+      })
+      .catch(() => {});
+  }
   const linkKopyalaBtn = kart.querySelector(".gy-link-kopyala-mini-btn");
   if (linkKopyalaBtn) {
     linkKopyalaBtn.addEventListener("click", async () => {
@@ -3052,6 +3140,60 @@ async function adminTaslakOnayla(item, tur, onay, btn) {
     await icerikListesiYukle();
   } catch (err) {
     console.error("Onay/red işlemi başarısız:", err);
+    alert(`İşlem başarısız: ${err.message}`);
+    btn.disabled = false;
+    btn.textContent = oncekiMetin;
+  }
+}
+
+/**
+ * Site Sahibi (owner), "site sahibi adına" onay bekleyen bir taslağı TEK
+ * BAŞINA onaylar/reddeder (bkz. sahip_taslak_onayla RPC'si, migration
+ * 0023 § A.5). Adminlerin çoğunluk oylamasından BAĞIMSIZ bir yol — owner
+ * her zaman tek başına sonuçlandırabilir.
+ */
+async function sahipTaslakOnayla(item, tur, onay, btn) {
+  if (GIRIS_YAPAN_PROFIL?.role !== "owner" || !item.taslakId) return;
+  btn.disabled = true;
+  const oncekiMetin = btn.textContent;
+  btn.textContent = "İşleniyor…";
+  try {
+    const { error } = await supabase.rpc("sahip_taslak_onayla", {
+      p_taslak_id: item.taslakId,
+      p_onay: onay,
+    });
+    if (error) throw error;
+    await icerikListesiYukle();
+  } catch (err) {
+    console.error("Site Sahibi onay/red işlemi başarısız:", err);
+    alert(`İşlem başarısız: ${err.message}`);
+    btn.disabled = false;
+    btn.textContent = oncekiMetin;
+  }
+}
+
+/**
+ * Sıradan bir admin (owner DEĞİL), "site sahibi adına" onay bekleyen bir
+ * taslağa OY VERİR — tek bir adminin oyu YETERLİ DEĞİLDİR, sunucu
+ * tarafındaki admin_sahip_talebi_oy_kullan RPC'si (migration 0023 § A.6)
+ * adminlerin MUTLAK ÇOĞUNLUĞUNA (toplam admin sayısının floor(n/2)+1'i)
+ * ulaşılınca durumu otomatik 'onaylandi'/'reddedildi' yapar; ulaşılmadıysa
+ * sadece oy kaydedilir ve liste "beklemede" görünmeye devam eder.
+ */
+async function sahipTalebineOyVer(item, tur, oy, btn) {
+  if (GIRIS_YAPAN_PROFIL?.role !== "admin" || !item.taslakId) return;
+  btn.disabled = true;
+  const oncekiMetin = btn.textContent;
+  btn.textContent = "İşleniyor…";
+  try {
+    const { error } = await supabase.rpc("admin_sahip_talebi_oy_kullan", {
+      p_taslak_id: item.taslakId,
+      p_oy: oy,
+    });
+    if (error) throw error;
+    await icerikListesiYukle();
+  } catch (err) {
+    console.error("Oy kaydedilemedi:", err);
     alert(`İşlem başarısız: ${err.message}`);
     btn.disabled = false;
     btn.textContent = oncekiMetin;
