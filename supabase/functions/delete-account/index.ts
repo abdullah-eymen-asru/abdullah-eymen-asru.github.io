@@ -6,15 +6,17 @@
 // birinin) satırını silebilmesi için "service_role" yetkisi gerekir; normal
 // (anon/authenticated) istemci anahtarı bunu YAPAMAZ (bilinçli bir güvenlik
 // kısıtı, yoksa herkes başkasının hesabını silebilirdi). Bu yüzden:
-//   1) Kullanıcı (veya admin) kendi tarayıcısından bu fonksiyonu KENDİ
+//   1) Kullanıcı (veya owner) kendi tarayıcısından bu fonksiyonu KENDİ
 //      oturum token'ıyla çağırır ("Authorization: Bearer <access_token>").
 //   2) Fonksiyon önce bu token'ın GERÇEKTEN kime ait olduğunu doğrular.
 //   3) İstek gövdesinde "hedef_kullanici_id" YOKSA -> çağıran kendi hesabını
-//      siler (eski davranış, herkes kullanabilir).
-//      "hedef_kullanici_id" VARSA -> sadece çağıran ADMİN ise, o hedefi
-//      siler (admin panelindeki "Üyeyi Sil" butonu bunu kullanır). Admin
-//      kendi id'sini hedef olarak gönderirse bu da "kendini sil" ile aynı
-//      sonucu verir — yani admin de KENDİ hesabını bu yoldan silebilir.
+//      siler (eski davranış, HERKES kendi hesabını silebilir — bu kişisel
+//      bir haktır, rol farketmez).
+//      "hedef_kullanici_id" VARSA VE kendi id'sinden FARKLIYSA -> yani
+//      BAŞKA birini silmeye çalışıyorsa, SADECE çağıran Site Sahibi
+//      (owner) ise izin verilir (bkz. migration 0027 § B — eskiden herhangi
+//      bir admin başka birini, hatta owner'ı bile silebiliyordu; bu artık
+//      KAPATILDI). Admin panelindeki "Üyeyi Sil" butonu bunu kullanır.
 //
 // Deploy:  supabase functions deploy delete-account
 // Secrets: SUPABASE_URL ve SUPABASE_SERVICE_ROLE_KEY, Supabase projelerinde
@@ -111,18 +113,24 @@ Deno.serve(async (req) => {
   // 2) Silinecek hedef kimliği belirle + yetki kontrolü.
   let targetId = callerId;
   if (hedefKullaniciId && hedefKullaniciId !== callerId) {
-    // Başkasını silmeye çalışıyor -> çağıran GERÇEKTEN admin mi diye
-    // veritabanından (service_role ile, RLS'i atlayarak ama biz burada
-    // sadece OKUYORUZ) doğrula. Çağıranın kendi beyanına asla güvenmiyoruz.
+    // Başkasını silmeye çalışıyor -> çağıran GERÇEKTEN Site Sahibi (owner)
+    // mi diye veritabanından (service_role ile, RLS'i atlayarak ama biz
+    // burada sadece OKUYORUZ) doğrula. Çağıranın kendi beyanına asla
+    // güvenmiyoruz.
+    //
+    // MİGRATION 0027 § B İLE DEĞİŞTİ: eskiden 'admin' rolü de yeterliydi —
+    // bu, bir admin'in başka bir üyeyi (hatta owner'ı bile) silebilmesi
+    // anlamına geliyordu. Artık BAŞKASINI SİLME yetkisi SADECE owner'da;
+    // sıradan bir admin artık hiç kimseyi (kendisi hariç) silemez.
     const { data: callerProfile, error: profileErr } = await adminClient
       .from("profiles")
       .select("role")
       .eq("id", callerId)
       .single();
 
-    if (profileErr || (callerProfile?.role !== "admin" && callerProfile?.role !== "owner")) {
+    if (profileErr || callerProfile?.role !== "owner") {
       return new Response(
-        JSON.stringify({ error: "Yetkisiz işlem: sadece admin/owner başka bir kullanıcıyı silebilir." }),
+        JSON.stringify({ error: "Yetkisiz işlem: başka bir kullanıcıyı sadece Site Sahibi (owner) silebilir." }),
         { status: 403, headers }
       );
     }
