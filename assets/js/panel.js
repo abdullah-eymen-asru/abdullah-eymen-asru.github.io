@@ -1079,7 +1079,7 @@ function wireDeleteAccount(session, profile) {
       return;
     }
     const ekstraUyari =
-      profile.role === "admin"
+      profile.role === "admin" || profile.role === "owner"
         ? "\n\nDİKKAT: Bu hesap bir YÖNETİCİ hesabıdır. Silersen ve başka bir admin yoksa siteyi yönetecek kimse kalmaz."
         : "";
     const sure = window.confirm(
