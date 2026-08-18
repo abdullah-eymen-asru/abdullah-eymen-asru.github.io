@@ -20,6 +20,15 @@ uye_ayarlari_css: true
     gerekir — bkz. aşağıdaki yardım metni.
   </p>
 
+  <!-- BUG FİX (eksik geri dönüş linki): bu sayfaya SADECE admin.md'deki
+       "🛡️ Admin Güvenliği" sekmesinden geliniyordu ve buradan admin.md'ye
+       dönmenin tek yolu tarayıcının GERİ tuşuydu — panel/uye-ayarlari.md'de
+       zaten var olan "← Admin Paneline Dön" linkinin AYNISI burada da
+       eksikti. Tutarlılık ve daha hızlı/"sekme gibi" gezinme için eklendi
+       (bkz. assets/css/uye-ayarlari.css -> .uya-geri-btn, bu sayfa zaten
+       uye_ayarlari_css: true ile bu stil dosyasını yüklüyor). -->
+  <a href="{{ '/panel/admin.html' | relative_url }}" class="btn-secondary uya-geri-btn">← Admin Paneline Dön</a>
+
   <div class="panel-grid">
 
     <section class="panel-section">
