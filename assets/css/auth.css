@@ -788,6 +788,13 @@
   color: var(--text);
   border-bottom-left-radius: 3px;
 }
+.chat-mesaj-gonderen {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  opacity: 0.85;
+  margin-bottom: 2px;
+}
 .chat-mesaj-meta {
   display: block;
   margin-top: 4px;
