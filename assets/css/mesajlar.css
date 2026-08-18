@@ -12,6 +12,10 @@
 .mesajlar-baslik { margin-bottom: 18px; }
 .mesajlar-baslik h1 { margin: 0 0 6px; }
 .mesajlar-baslik p { margin: 0; max-width: 640px; }
+/* Admin görünümünde JS ile eklenen "← Admin Paneline Dön" linki (bkz.
+   assets/js/mesajlar.js -> init()) — .uya-geri-btn zaten inline-block,
+   burada sadece açıklama paragrafından biraz ayırmak için üst boşluk. */
+.mesajlar-baslik .uya-geri-btn { margin-top: 10px; }
 
 /*
  * "Kime?" satırı (Yeni Sohbet formunda) + hedef seçim penceresi (madde 4 —
