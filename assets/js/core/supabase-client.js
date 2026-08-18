@@ -88,6 +88,22 @@ export function escapeHtml(str) {
     .replaceAll("'", "&#39;");
 }
 
+/**
+ * GÜVENLİK: veritabanından gelen bir "link" alanını <a href="..."> içine
+ * basmadan önce şema kontrolü. escapeHtml TEK BAŞINA yeterli DEĞİL —
+ * "javascript:..." gibi bir URI, tırnak/açı parantezi hiç kullanmadan
+ * href özniteliğinin İÇİNDE geçerli kalıp tıklanınca çalışabilir. Bu
+ * fonksiyon SADECE http:// ve https:// ile başlayan adreslere izin verir;
+ * biri projelerine (ör. akademik proje linki) böyle bir alanı kötü amaçlı
+ * doldurursa (ör. ele geçirilmiş bir editör/admin hesabı ile), o link
+ * artık HİÇ render edilmez (bkz. onizleme.js / supabase-yazi.js —
+ * "proje linki" render'ı burayı kullanır).
+ */
+export function guvenliDisUrlMi(url) {
+  if (!url || typeof url !== "string") return false;
+  return /^https?:\/\//i.test(url.trim());
+}
+
 /** Küçük bir toast/uyarı yardımcı fonksiyonu — auth.css ile stillenir. */
 export function showMessage(el, text, type = "error") {
   if (!el) return;
