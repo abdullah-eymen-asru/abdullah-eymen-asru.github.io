@@ -69,7 +69,7 @@ function uyeMarkup() {
           <button type="button" class="msg-hedef-sekme" data-rol="admin">Yöneticiler</button>
           <button type="button" class="msg-hedef-sekme" data-rol="owner">Site Sahipleri</button>
         </div>
-        <input id="chat-hedef-arama" type="search" class="msg-uye-arama" placeholder="İsim veya e-posta ile ara...">
+        <input id="chat-hedef-arama" type="search" class="msg-uye-arama" placeholder="İsim ile ara...">
         <button type="button" id="chat-hedef-temizle-btn" class="msg-hedef-herhangi-btn">Fark etmez — herhangi bir yönetici/site sahibi görsün</button>
         <div id="chat-hedef-liste" class="msg-hedef-liste"><p class="chat-bos">Yükleniyor...</p></div>
       </div>
