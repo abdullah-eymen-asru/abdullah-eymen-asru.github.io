@@ -42,22 +42,31 @@ function formatSaat(iso) {
   });
 }
 
-function mesajBalonuHtml(m, benimId) {
+function mesajBalonuHtml(m, benimId, gonderenAdlari) {
   const ben = m.sender_id === benimId;
   const silBtn = ben ? `<button type="button" class="chat-mesaj-sil" data-id="${m.id}">Sil</button>` : "";
+  // İSTEK: "Mesaj yazanın adı da mesaj giderken görünsün" — bkz. migration
+  // 0029_mesaj_hedef_admin_gorunurlugu_ve_gonderen_adi.sql notu. Artık bir
+  // konuşmaya hedef admin + owner İKİSİ de yanıt yazabildiği için (üye
+  // tarafında "karşı taraf" tek bir kişi değil olabilir), her balonun
+  // ÜSTÜNDE gönderenin adı gösteriliyor — kendi mesajlarımızda da (tutarlılık
+  // için) gösteriyoruz, gonderenAdlari haritası yoksa/eşleşme bulunamazsa
+  // sessizce atlanır (eski davranış).
+  const gonderenAdi = gonderenAdlari?.[m.sender_id];
+  const gonderenSatiri = gonderenAdi ? `<span class="chat-mesaj-gonderen">${escapeHtml(gonderenAdi)}</span>` : "";
   return `
     <div class="chat-mesaj ${ben ? "chat-mesaj--ben" : "chat-mesaj--karsi"}" data-id="${m.id}">
-      ${escapeHtml(m.body)}
+      ${gonderenSatiri}${escapeHtml(m.body)}
       <span class="chat-mesaj-meta">${formatSaat(m.created_at)}${silBtn}</span>
     </div>`;
 }
 
-function mesajListesiniCiz(listEl, mesajlar, benimId) {
+function mesajListesiniCiz(listEl, mesajlar, benimId, gonderenAdlari) {
   if (!mesajlar || mesajlar.length === 0) {
     listEl.innerHTML = `<p class="chat-bos">Henüz mesaj yok. İlk mesajı sen gönder.</p>`;
     return;
   }
-  listEl.innerHTML = mesajlar.map((m) => mesajBalonuHtml(m, benimId)).join("");
+  listEl.innerHTML = mesajlar.map((m) => mesajBalonuHtml(m, benimId, gonderenAdlari)).join("");
   listEl.querySelectorAll(".chat-mesaj-sil").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const id = btn.dataset.id;
@@ -125,6 +134,20 @@ async function sonMesajOnizlemeleriGetir(konusmaIdleri) {
     if (!(m.conversation_id in onizlemeler)) onizlemeler[m.conversation_id] = m.body;
   });
   return onizlemeler;
+}
+
+/** Bir mesaj listesindeki HER FARKLI gönderenin (üye, hedef admin, owner —
+ * artık bir konuşmaya BİRDEN FAZLA farklı kişi yanıt yazabiliyor, bkz.
+ * migration 0029) adını TEK sorguda getirir — "Mesaj yazanın adı da mesaj
+ * giderken görünsün" isteği için. sender_id -> "Ad Soyad" (yoksa e-posta)
+ * haritası döner. */
+async function gonderenAdlariniGetir(mesajlar) {
+  const adlar = {};
+  const idler = [...new Set((mesajlar || []).map((m) => m.sender_id))];
+  if (idler.length === 0) return adlar;
+  const { data } = await supabase.from("profiles").select("id, full_name, email").in("id", idler);
+  (data || []).forEach((p) => (adlar[p.id] = p.full_name || p.email));
+  return adlar;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -312,7 +335,8 @@ export async function wireUserChat(profile) {
       threadListEl.innerHTML = `<p class="chat-bos">Mesajlar yüklenemedi.</p>`;
       return;
     }
-    mesajListesiniCiz(threadListEl, data, profile.id);
+    const gonderenAdlari = await gonderenAdlariniGetir(data);
+    mesajListesiniCiz(threadListEl, data, profile.id, gonderenAdlari);
   }
 
   function konusmaSec(id) {
@@ -570,7 +594,8 @@ export async function wireAdminChat(adminId) {
       threadListEl.innerHTML = `<p class="chat-bos">Mesajlar yüklenemedi.</p>`;
       return;
     }
-    mesajListesiniCiz(threadListEl, data, adminId);
+    const gonderenAdlari = await gonderenAdlariniGetir(data);
+    mesajListesiniCiz(threadListEl, data, adminId, gonderenAdlari);
   }
 
   function konusmaSec(id) {
