@@ -8,7 +8,7 @@
  * GitHub tabanlı blog yazısı/proje gibi giriş yapmamış ziyaretçiler de
  * görebilmeli.
  */
-import { supabase, escapeHtml } from "../core/supabase-client.js";
+import { supabase, escapeHtml, guvenliDisUrlMi } from "../core/supabase-client.js";
 
 function relUrl(path) {
   const base = document.documentElement.dataset.baseurl || "";
@@ -72,7 +72,9 @@ async function init() {
 
     let html = `<h1>${escapeHtml(kayit.baslik)}</h1>${metaHtml}`;
     html += `<div class="project-body">${basitMarkdown(kayit.govde || "")}</div>`;
-    if (tur === "proje" && kayit.link) {
+    // GÜVENLİK: href'e basmadan önce şema kontrolü (bkz. supabase-client.js
+    // guvenliDisUrlMi yorumu) — "javascript:" gibi bir URI hiç render edilmez.
+    if (tur === "proje" && kayit.link && guvenliDisUrlMi(kayit.link)) {
       html += `<p style="margin-top:2em;"><a href="${escapeHtml(kayit.link)}" target="_blank" rel="noopener">→ ${escapeHtml(
         kayit.link_etiket || "Bağlantıyı görüntüle"
       )}</a></p>`;
