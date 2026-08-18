@@ -220,9 +220,8 @@ export async function wireUserChat(profile) {
     hedefListeEl.innerHTML = eslesenler
       .map(
         (a) => `
-      <button type="button" class="msg-uye-sonuc-item" data-id="${a.id}" data-ad="${escapeHtml(a.full_name || a.email)}" data-rol="${a.role}">
+      <button type="button" class="msg-uye-sonuc-item" data-id="${a.id}" data-ad="${escapeHtml(a.full_name || hedefRolEtiketi(a.role))}" data-rol="${a.role}">
         <span class="msg-uye-sonuc-isim">${escapeHtml(a.full_name || "—")} <span class="msg-hedef-rozet">${hedefRolEtiketi(a.role)}</span></span>
-        <span class="muted">${escapeHtml(a.email)}</span>
       </button>`
       )
       .join("");
@@ -646,9 +645,8 @@ export async function wireAdminChat(adminId) {
     aramaSonucEl.innerHTML = eslesenler
       .map(
         (u) => `
-      <button type="button" class="msg-uye-sonuc-item" data-id="${u.id}" data-isim="${escapeHtml(u.full_name || u.email)}">
+      <button type="button" class="msg-uye-sonuc-item" data-id="${u.id}" data-isim="${escapeHtml(u.full_name || "Üye")}">
         <span class="msg-uye-sonuc-isim">${escapeHtml(u.full_name || "—")}</span>
-        <span class="muted">${escapeHtml(u.email)}</span>
       </button>`
       )
       .join("");
