@@ -142,6 +142,12 @@
   <script defer src="{{ '/assets/js/auth/sifre-goster.js' | relative_url }}"></script>
   <!-- Çerez onay şeridi/paneli mantığı — bkz. assets/js/core/site-islemleri.js başındaki tasarım notları. -->
   <script defer src="{{ '/assets/js/core/site-islemleri.js' | relative_url }}"></script>
+  <!-- SEKMELER ARASI HIZLI/MODERN GEÇİŞ (üzerine gelince/dokununca ön-yükleme)
+       — bkz. assets/js/core/on-yukle-prefetch.js başındaki tasarım notları.
+       Görsel geçiş (crossfade) tarafı assets/style.css sonundaki
+       "@view-transition" kuralında. Site genelinde her sayfada yüklenir
+       çünkü panel sekmeleri arasındaki linkler farklı sayfalarda bulunur. -->
+  <script defer src="{{ '/assets/js/core/on-yukle-prefetch.js' | relative_url }}"></script>
 
   {% if page.auth_css %}
   <!-- auth.css: giris/kayit/panel/admin sayfalarına özel stiller. Önceden
