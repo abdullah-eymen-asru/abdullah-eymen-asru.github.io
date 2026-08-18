@@ -486,7 +486,16 @@ export default {
       "http://127.0.0.1:5500",
     ];
 
-    const isAllowedOrigin = allowedOrigins.some((o) => origin.startsWith(o)) || origin.includes(".pages.dev");
+    // GÜVENLİK DÜZELTMESİ — r2_storage_worker/worker.js'teki AYNI kontrolle
+    // birebir aynı iki açığı taşıyordu: `startsWith` bir ÖNEK eşleşmesi
+    // olduğu için "https://abdullah-eymen-asru.github.io.evil.com" gibi bir
+    // origin'i de kabul ediyordu, `.includes(".pages.dev")` ise Cloudflare
+    // Pages herkese açık bir servis olduğundan saldırganın kendi
+    // "*.pages.dev" sitesini bu kontrolden geçirmesine izin veriyordu. Bu
+    // Worker GET/PUT/DELETE ile GERÇEK GitHub içerik yazma/silme yetkisi
+    // verdiği için (r2 worker'dan bile daha hassas) burada TAM (===)
+    // eşleşme şart. Ayrıntılı gerekçe için bkz. r2_storage_worker/worker.js.
+    const isAllowedOrigin = allowedOrigins.includes(origin);
     const corsOrigin = isAllowedOrigin ? origin : "https://abdullah-eymen-asru.github.io";
 
     const corsHeaders = {
