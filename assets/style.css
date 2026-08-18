@@ -878,3 +878,51 @@ th { color: var(--muted); font-weight: 600; }
     align-self: center;
   }
 }
+
+/* ---------------------------------------------------------------------- *
+ * SAYFALAR ARASI (SEKMELER ARASI) HIZLI/MODERN GEÇİŞ — View Transitions
+ * -----------------------------------------------------------------------
+ * SORUN: Bu site statik bir Jekyll sitesi olduğu için panel içindeki
+ * "sekmeler" (ör. Admin Paneli -> Üye Ayarları -> Admin Güvenliği -> Sohbet)
+ * aslında AYRI SAYFALARDIR — her tıklamada tam bir sayfa yeniden yüklemesi
+ * olur. Tarayıcının varsayılan davranışı bunu SERT bir "beyaz an" (flash of
+ * blank page) ile yapar; bu, gerçek bir uygulama sekmesi gibi hissettirmez.
+ *
+ * ÇÖZÜM: "Cross-document View Transitions" (bkz. assets/js/core/
+ * on-yukle-prefetch.js dosyasındaki tamamlayıcı prefetch ile birlikte
+ * çalışır). Bu, ek bir framework/derleme adımı GEREKTİRMEYEN, tarayıcı
+ * yerleşik bir API'dir: aşağıdaki tek satır, destekleyen tarayıcılarda
+ * (Chrome/Edge 126+) AYNI ORİJİNDEKİ sayfalar arası her navigasyonu
+ * otomatik olarak yumuşak bir crossfade'e çevirir. Desteklemeyen
+ * tarayıcılarda (Firefox, Safari, eski Chrome) bu kural sessizce
+ * YOK SAYILIR ve site eskisi gibi (düz, anında) sayfa değişimiyle çalışmaya
+ * devam eder — hiçbir JS polyfill/fallback gerekmez, tamamen "progressive
+ * enhancement".
+ *
+ * "prefers-reduced-motion: reduce" tercihine SAYGI: hareket hassasiyeti
+ * olan ziyaretçiler için geçişi tamamen kapatıyoruz (aşağıdaki media query),
+ * tıpkı cerez-onay.css'teki aynı prensip gibi.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
+
+  /* Varsayılan cross-fade'i biraz daha "modern" hissettirmek için hafif bir
+     kayma ekliyoruz — çok belirgin olmayan, hızlı (180ms) bir hareket.
+     ::view-transition-old/-new, tarayıcının navigasyon öncesi/sonrası
+     ekran görüntülerini temsil eden sözde elemanlardır. */
+  ::view-transition-old(root) {
+    animation: sekme-cikis 0.16s ease-out both;
+  }
+  ::view-transition-new(root) {
+    animation: sekme-giris 0.18s ease-out both;
+  }
+
+  @keyframes sekme-cikis {
+    to { opacity: 0; transform: translateY(-4px); }
+  }
+  @keyframes sekme-giris {
+    from { opacity: 0; transform: translateY(4px); }
+  }
+}
