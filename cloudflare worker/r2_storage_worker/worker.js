@@ -41,7 +41,25 @@ export default {
       "http://127.0.0.1:5500",
     ];
 
-    const isAllowedOrigin = allowedOrigins.some((o) => origin.startsWith(o)) || origin.includes(".pages.dev");
+    // GÜVENLİK DÜZELTMESİ (Origin doğrulama açığı): burada ÖNCEDEN iki ayrı
+    // hata vardı:
+    //   1) `origin.startsWith(o)` — bu, "https://abdullah-eymen-asru.github.io"
+    //      ile başlayan HERHANGİ bir origin'i kabul ediyordu, ör. saldırganın
+    //      kontrolündeki "https://abdullah-eymen-asru.github.io.evil.com" bile
+    //      bu kontrolü geçerdi (startsWith yalnızca ÖNEKİ karşılaştırır, tüm
+    //      host'u DEĞİL).
+    //   2) `origin.includes(".pages.dev")` — bu, Cloudflare Pages'in HERKESE
+    //      AÇIK, ücretsiz bir servis olduğu ve *.pages.dev altında istediği
+    //      adı kaydedebildiği gerçeğini göz ardı ediyordu: saldırgan kendi
+    //      "her-hangi-bir-ad.pages.dev" sitesini kurup bu kontrolü sorunsuz
+    //      geçebilirdi. Bu Worker, geçerli bir Supabase oturum token'ı VE
+    //      (dosya indirmede) content_access yetkisi gerektirdiği için tek
+    //      başına istismar edilemez, ama savunma derinliği ilkesine aykırıydı
+    //      ve supabase/functions/*/index.ts'teki (bkz. ALLOWED_ORIGINS) daha
+    //      sıkı, TAM EŞLEŞME tabanlı yaklaşımla tutarsızdı.
+    // Düzeltme: listedeki adreslerle TAM (===) eşleşme aranır — ne önek
+    // eşleşmesi ne de ".pages.dev" için genel bir joker karakter.
+    const isAllowedOrigin = allowedOrigins.includes(origin);
     const corsOrigin = isAllowedOrigin ? origin : "https://abdullah-eymen-asru.github.io";
 
     const corsHeaders = {
