@@ -136,7 +136,7 @@ async function koleksiyonTablosuOlustur(config) {
       rows += `
         <tr class="searchable" data-search="${escapeHtml(searchTextKucuk)}" data-tur="${escapeHtml(kucukHarfeCevirTr(turDegeri))}">
           <td class="col-index">${index + 1}</td>
-          <td><a href="${escapeHtml(guvenliLink(item.url))}" target="_blank">${escapeHtml(item.title)}</a></td>
+          <td><a href="${escapeHtml(guvenliLink(item.url))}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a></td>
           ${hucreler}
         </tr>`;
     });
