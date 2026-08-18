@@ -13,7 +13,7 @@
  * gibi). Güvenlik, kodun tahmin edilemezliğinden (8 karakter, rastgele)
  * geliyor.
  */
-import { supabase, escapeHtml } from "../core/supabase-client.js";
+import { supabase, escapeHtml, guvenliDisUrlMi } from "../core/supabase-client.js";
 
 async function init() {
   const govdeEl = document.getElementById("onizleme-govde");
@@ -66,7 +66,9 @@ async function init() {
 
     let html = `<h1>${escapeHtml(kayit.baslik)}</h1>${metaHtml}`;
     html += `<div class="project-body">${basitMarkdown(kayit.govde || "")}</div>`;
-    if (tur === "proje" && kayit.link) {
+    // GÜVENLİK: href'e basmadan önce şema kontrolü (bkz. guvenliDisUrlMi
+    // yorumu) — "javascript:" gibi bir URI hiç render edilmez.
+    if (tur === "proje" && kayit.link && guvenliDisUrlMi(kayit.link)) {
       html += `<p style="margin-top:2em;"><a href="${escapeHtml(kayit.link)}" target="_blank" rel="noopener">→ ${escapeHtml(
         kayit.link_etiket || "Bağlantıyı görüntüle"
       )}</a></p>`;
