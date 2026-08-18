@@ -145,6 +145,26 @@ async function init() {
     aciklama.textContent =
       "Üyelerin sana gönderdiği tüm konuşmalar burada. Soldan bir konuşma seç, ya da yukarıdan isim/e-posta ile üye arayıp onunla yeni bir konuşma başlat.";
     icerik.innerHTML = adminMarkup();
+    // BUG FİX (eksik geri dönüş linki): bu sayfaya (mesajlar.html)
+    // ADMİN olarak gelindiğinde admin.md'ye dönmenin tek yolu tarayıcının
+    // GERİ tuşuydu — panel/uye-ayarlari.md ve panel/admin-guvenlik.md'deki
+    // "← Admin Paneline Dön" linkiyle tutarlı olması için burada da
+    // ekleniyor. SADECE admin/owner görünümünde eklenir (adminMi === true)
+    // çünkü bu sayfa aynı zamanda SIRADAN üyeler tarafından da kullanılıyor
+    // (bkz. dosya başındaki not) — normal bir üyeye "Admin Paneline Dön"
+    // linki göstermek hem anlamsız hem de kafa karıştırıcı olurdu (o
+    // sayfaya zaten girişi yok, requireAuth onu geri atardı).
+    const baslikWrap = document.querySelector(".mesajlar-baslik");
+    if (baslikWrap && !document.getElementById("mesajlar-admin-geri-btn")) {
+      const geriBtn = document.createElement("a");
+      geriBtn.id = "mesajlar-admin-geri-btn";
+      geriBtn.className = "btn-secondary uya-geri-btn";
+      // NOT: auth-guard.js'teki redirect'lerle AYNI şekilde absolute path
+      // hardcode edildi (bu site baseurl kullanmıyor, bkz. _config.yml).
+      geriBtn.href = "/panel/admin.html";
+      geriBtn.textContent = "← Admin Paneline Dön";
+      baslikWrap.appendChild(geriBtn);
+    }
     await wireAdminChat(session.user.id);
   } else {
     aciklama.textContent =
