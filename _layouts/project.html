@@ -32,10 +32,21 @@ layout: default
     {{ content }}
   </div>
 
+  {% comment %}
+    GÜVENLİK: page.link doğrudan href'e basılmadan önce şema kontrolü —
+    "javascript:..." gibi bir URI'nin çalışmaması için sadece http(s)://
+    ile başlayan bağlantılara izin veriyoruz (bkz. assets/js/core/
+    supabase-client.js içindeki guvenliDisUrlMi ile AYNI kural, burada
+    Jekyll/Liquid'de build zamanında uygulanıyor).
+  {% endcomment %}
   {% if page.link %}
-  <p style="margin-top:2em;">
-    <a href="{{ page.link }}" target="_blank">→ {{ page.link_label | default: "Bağlantıyı görüntüle" }}</a>
-  </p>
+    {% assign _link_on7 = page.link | slice: 0, 7 | downcase %}
+    {% assign _link_on8 = page.link | slice: 0, 8 | downcase %}
+    {% if _link_on7 == "http://" or _link_on8 == "https://" %}
+    <p style="margin-top:2em;">
+      <a href="{{ page.link | escape }}" target="_blank" rel="noopener">→ {{ page.link_label | default: "Bağlantıyı görüntüle" | escape }}</a>
+    </p>
+    {% endif %}
   {% endif %}
 
   {% include share.html %}
