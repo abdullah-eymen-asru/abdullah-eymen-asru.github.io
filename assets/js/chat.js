@@ -188,7 +188,11 @@ export async function wireUserChat(profile) {
   let SECILI_KONUSMA = null;
   let KONUSMALAR = [];
   let SECILI_HEDEF = null; // { id, ad, rol } — "Yeni Sohbet" formunda seçili hedef, null ise "fark etmez"
-  let HEDEF_ADAYLARI = []; // mesaj_hedef_listesi_getir() sonucu — { id, full_name, email, role }[]
+  // GÜVENLİK (bkz. migration 0030): mesaj_hedef_listesi_getir() artık email
+  // DÖNDÜRMÜYOR — normal bir üyenin admin/site sahibi e-postasını ne
+  // ekranda ne de ağ isteğinde (DevTools/Network) görebilmesi için. Bu
+  // yüzden HEDEF_ADAYLARI elemanlarında da email alanı YOK: { id, full_name, role }[].
+  let HEDEF_ADAYLARI = [];
   let HEDEF_ADLARI = {}; // id -> görünen ad, konuşma listesi/başlığında göstermek için
   let HEDEF_AKTIF_SEKME = "";
 
@@ -200,7 +204,7 @@ export async function wireUserChat(profile) {
     const { data, error } = await supabase.rpc("mesaj_hedef_listesi_getir");
     HEDEF_ADAYLARI = error ? [] : data || [];
     HEDEF_ADLARI = {};
-    HEDEF_ADAYLARI.forEach((a) => (HEDEF_ADLARI[a.id] = a.full_name || a.email));
+    HEDEF_ADAYLARI.forEach((a) => (HEDEF_ADLARI[a.id] = a.full_name || hedefRolEtiketi(a.role)));
   }
 
   function hedefEtiketiGuncelle() {
