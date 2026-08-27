@@ -138,6 +138,17 @@ function renderHesapMenusu(container, role) {
   if (adminGibi || role === "editor" || role === "manager") {
     linkler.push({ href: "/panel/github-yonetim.html", etiket: "GitHub İçerik Yönetimi" });
   }
+  // İzleme/Okuma Yönetimi — bkz. panel/izleme-okuma-yonetim.md /
+  // assets/js/izleme-okuma-yonetim/izleme-okuma-yonetim.js. Bu, GitHub
+  // İçerik Yönetimi'nin AKSİNE editor/manager/admin'e DEĞİL, SADECE
+  // 'owner' (Site Sahibi) rolüne açık — o pano site sahibinin kişisel
+  // izleme/okuma kaydı olduğu için (bir editöre devredilebilecek bir
+  // "site içeriği" değil). "admin her zaman geçer" kuralı BİLİNÇLİ
+  // OLARAK burada uygulanmıyor; requireAuth({role:'owner'}) da sayfanın
+  // kendisinde aynı şekilde SADECE owner'ı geçiriyor (bkz. o dosya).
+  if (role === "owner") {
+    linkler.push({ href: "/panel/izleme-okuma-yonetim.html", etiket: "🎬📚 İzleme/Okuma Yönetimi" });
+  }
 
   linkler.forEach(({ href, etiket }) => {
     const a = document.createElement("a");
