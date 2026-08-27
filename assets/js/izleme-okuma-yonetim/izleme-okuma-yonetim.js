@@ -27,7 +27,7 @@ import { requireAuth } from "../auth/auth-guard.js";
 import { showMessage, supabase } from "../core/supabase-client.js";
 
 // ---- BURAYI DOLDUR: Worker deploy edildikten sonra aldığın URL ----
-const IZLEME_OKUMA_WORKER_URL = "https://izleme-okuma-yonetim.aeymena.workers.dev";
+const IZLEME_OKUMA_WORKER_URL = "https://izleme-okuma-yonetim-worker.aeymena.workers.dev";
 // ---------------------------------------------------------------------
 
 const KOLEKSIYONLAR = {
