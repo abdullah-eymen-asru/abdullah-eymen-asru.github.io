@@ -115,6 +115,38 @@ Deploy" yapman gerekir.
 | Gizlenen "yerleşik" sütunlar | `YERLESIK_ALANLAR` seti | GitHub'ın otomatik eklediği sistem alanları (Assignees, Labels, Reviewers, Created, Updated, vb.) burada listeleniyor ve tabloya hiç girmiyor. GitHub ileride yeni bir sistem alanı eklerse ve sitede gereksiz bir sütun görürsen, o alanın adını (BİREBİR yazımla) bu sete ekle. |
 | `GITHUB_TOKEN` | **Kodun içinde YOK** | Cloudflare Dashboard > Settings > Variables and Secrets kısmından secret olarak eklenir. Asla dosyaya yazma. |
 
+## 5.1 `cloudflare worker/izleme_okuma_yonetim_worker/worker.js` — İzleme/Okuma panosuna YAZMA Worker'ı
+
+Yukarıdaki (§5) Worker sadece **okur** (herkese açık, siteyi besler). Bu
+Worker ise **yazar**: `/panel/izleme-okuma-yonetim.html` sayfasından
+gönderilen formu alıp `kutuphane_repo`'da yeni bir Issue açar, ilgili
+Projects panosuna ekler ve panodaki sütunları doldurur. Bu yüzden ayrı bir
+Cloudflare Worker olarak deploy edilmesi ve **ayrı bir secret seti**
+kullanması gerekiyor — okuma Worker'ıyla aynı PAT'ı paylaşmak, en az
+ayrıcalık ilkesini bozar (okuma Worker'ı asla yazma yapabilme ihtimaline
+sahip olmamalı).
+
+| Ortam Değişkeni/Secret | Nereden alınır |
+|---|---|
+| `GITHUB_TOKEN` | GitHub'da `kutuphane_repo` için **Issues: Read and write** + **Projects: Read and write** izinli bir Fine-grained PAT (ya da Classic PAT ile `repo` + `project` scope'u). Cloudflare Dashboard > Settings > Variables and Secrets kısmına **Secret** olarak eklenir. |
+| `SUPABASE_URL` | Supabase projenin URL'i (diğer Worker'larla aynı) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase Dashboard > Settings > API > `service_role` anahtarı (**Secret** olarak) |
+
+Deploy ettikten sonra Cloudflare'den aldığın adresi
+`assets/js/izleme-okuma-yonetim/izleme-okuma-yonetim.js` dosyasının
+başındaki `IZLEME_OKUMA_WORKER_URL` sabitine yapıştırman gerekir
+(r2_storage_worker / github_icerik_yonetim_worker ile aynı desen).
+
+**Erişim:** Bu sayfa ve Worker **SADECE `owner` (Site Sahibi) rolüne**
+açıktır — `editor`/`manager`/`admin` dahi giremez, çünkü bu pano site
+sahibinin kişisel izleme/okuma kaydıdır, bir editöre devredilebilecek bir
+"site içeriği" değildir. Kendi rolünü Supabase'te `profiles` tablosundan
+`owner` olarak ayarlaman gerekir (bkz. `supabase/site-sahibi-atama.sql`).
+
+**Label'lar:** Worker, issue açarken repoya otomatik olarak `izleme` /
+`okuma` etiketini ekler (yoksa kendisi oluşturur) — sen zaten bu isimlerle
+elle etiket oluşturmuşsan onu bozmadan kullanır.
+
 ## 6. `robots.txt`
 
 `Sitemap:` satırındaki adres, `_config.yml`'deki `url` ile aynı domaini
