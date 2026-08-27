@@ -1,0 +1,23 @@
+/*
+ * assets/css/izleme-okuma-yonetim.css
+ * Sadece izleme-okuma-yonetim.html sayfasına özel stiller.
+ * github-yonetim.css'teki paylaşılan sınıfları (.gy-klasor-tur-sekmeleri,
+ * .gy-klasor-tur-sekme, .gy-onizleme-kutusu, .gy-onizleme-baslik,
+ * .gy-link-kutu) olduğu gibi yeniden kullanır — bu dosya sadece dinamik
+ * form alanlarının düzenini (grid) tanımlar.
+ */
+
+#iy-nav {
+  margin-bottom: 18px;
+}
+
+#iy-alanlar-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+#iy-alanlar-container .form-field {
+  margin-bottom: 0;
+}
