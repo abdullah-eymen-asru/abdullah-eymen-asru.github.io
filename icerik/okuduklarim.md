@@ -17,6 +17,12 @@ permalink: "/icerik/okuduklarim.html"
   Repo'nun kendisine <a href="https://github.com/abdullah-eymen-asru/izleme-okuma-listem" target="_blank">buradan</a> ulaşabilirsin.
 </p>
 
+<!-- Sadece site sahibi (owner) girişliyken görünür — bkz.
+     assets/js/izleme-okuma-yonetim/izleme-okuma-yonetim-kisayol.js. Diğer
+     ziyaretçiler için bu script hiçbir şey render etmez, sayfa öncekiyle
+     birebir aynı görünür. -->
+<div id="izleme-okuma-yonetim-kisayol"></div>
+
 <div class="filter-row">
   <input
     type="text"
@@ -47,3 +53,4 @@ permalink: "/icerik/okuduklarim.html"
     sayfaBasinaKayit: 50
   });
 </script>
+<script type="module" src="{{ '/assets/js/izleme-okuma-yonetim/izleme-okuma-yonetim-kisayol.js' | relative_url }}"></script>
