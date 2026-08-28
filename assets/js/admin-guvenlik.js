@@ -21,6 +21,10 @@
  *     (bkz. migration 0024 § B) — liste sayfalanmış (bkz. VAKA_SAYFA*
  *     altındaki not) çünkü çok sayıda vaka birikince tek uzun liste sayfayı
  *     taşırıyordu.
+ *   - owner_kayitlari_ac_kapat(acik)  -> SADECE owner, üyelik kayıtlarını
+ *     (site_settings.kayitlar_acik) açar/kapatır (bkz. migration
+ *     0031_uyelik_kayitlarini_ac_kapat.sql). Bu sayfadaki ".sadece-owner"
+ *     bölümü ("Üyelik Kayıtları") admin'den de tamamen gizlenir.
  */
 import { supabase, showMessage, escapeHtml } from "./core/supabase-client.js";
 import { requireAuth } from "./auth/auth-guard.js";
@@ -53,8 +57,70 @@ async function init() {
   }
 
   wireAskiyaAlForm();
-  await Promise.all([loadAdminListesi(), loadVakalar()]);
+  wireKayitlarToggle();
+  await Promise.all([loadAdminListesi(), loadVakalar(), loadKayitDurumu()]);
   wireRealtime();
+}
+
+/* ---------------------------------------------------------------------- */
+/* ÜYELİK KAYITLARI AÇ/KAPAT — SADECE owner (bkz. panel/admin-guvenlik.md   */
+/* ".sadece-owner" bölümü ve migration 0031_uyelik_kayitlarini_ac_kapat.sql) */
+/* ---------------------------------------------------------------------- */
+async function loadKayitDurumu() {
+  const etiket = document.getElementById("ag-kayitlar-durum");
+  if (!etiket) return;
+
+  // site_settings herkese açık okunabilir (bkz. migration 0001
+  // "settings_select_anyone") — admin/owner ayrımı yapmaya gerek yok,
+  // düz select yeterli.
+  const { data, error } = await supabase
+    .from("site_settings")
+    .select("kayitlar_acik")
+    .eq("id", 1)
+    .single();
+
+  if (error || !data) {
+    etiket.textContent = "Okunamadı";
+    return;
+  }
+
+  etiket.textContent = data.kayitlar_acik !== false ? "🟢 Açık" : "🔴 Kapalı";
+}
+
+function wireKayitlarToggle() {
+  const acBtn = document.getElementById("ag-kayitlari-ac-btn");
+  const kapatBtn = document.getElementById("ag-kayitlari-kapat-btn");
+  const msg = document.getElementById("ag-kayitlar-message");
+  if (!acBtn || !kapatBtn) return;
+
+  async function ayarla(p_acik, btn) {
+    btn.disabled = true;
+    // owner_kayitlari_ac_kapat: SADECE owner çağırabilir (bkz. migration
+    // 0031) — admin bu RPC'yi çağırsa bile veritabanı reddeder, burada
+    // sadece bu düğmeleri ".sadece-owner" ile admin'den zaten gizliyoruz.
+    const { error } = await supabase.rpc("owner_kayitlari_ac_kapat", { p_acik });
+    btn.disabled = false;
+
+    if (error) {
+      showMessage(msg, "Değiştirilemedi: " + error.message, "error");
+      return;
+    }
+
+    showMessage(
+      msg,
+      p_acik ? "Üyelik kayıtları açıldı." : "Üyelik kayıtları kapatıldı — yeni hesap oluşturulamayacak.",
+      "success"
+    );
+    await loadKayitDurumu();
+  }
+
+  acBtn.addEventListener("click", () => ayarla(true, acBtn));
+  kapatBtn.addEventListener("click", () => {
+    if (!confirm("Üyelik kayıtlarını kapatmak istediğine emin misin? Kapalıyken kimse (Google ile de) yeni hesap oluşturamayacak.")) {
+      return;
+    }
+    ayarla(false, kapatBtn);
+  });
 }
 
 /* ---------------------------------------------------------------------- */
