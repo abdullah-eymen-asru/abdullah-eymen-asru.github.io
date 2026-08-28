@@ -896,16 +896,21 @@ Bu bölüm, siteye/Supabase kullanıcı sistemine sonradan yapılan düzeltmeler
 
 Genel bir güvenlik taraması istendi. Üçü de gerçek, istismar edilebilir açıktı (teorik değil):
 
-**1) KRİTİK — admin, owner hesabını tamamen ele geçirebiliyordu.**
+**1) KRİTİK — admin, owner hesabını tamamen ele geçirebiliyordu (ve başka bir
+admin'i de aynı yoldan ele geçirebiliyordu).**
 `supabase/functions/admin-change-email/index.ts` hedefin KİM olduğuna hiç
 bakmıyordu — sıradan bir admin, "Kullanıcılar & Roller" sayfasındaki
 (herkese açık, hiç gizlenmeyen) "E-posta Değiştir" butonuyla owner'ın
 e-postasını kendi kontrolündeki bir adrese çevirip (`email_confirm:true`
 ile ANINDA uygulanıyor, hiçbir onay beklenmiyor) ardından o adrese giden
-şifre sıfırlama linkiyle owner hesabını tamamen ele geçirebilirdi. Düzeltme:
-fonksiyon artık hedef owner ise VE çağıran owner değilse reddediyor
-(migration 0027 § A'nın "admin, owner'ın profiline dokunamaz" ilkesiyle
-aynı); panelde de buton owner'ın kartında artık admin'den gizleniyor
+şifre sıfırlama linkiyle owner hesabını tamamen ele geçirebilirdi. Sorulan
+takip sorusu üzerine ("admin sadece kendi altındaki üyeleri mi
+değiştirebiliyor?") AYNI açığın owner'a ek olarak BAŞKA bir admin için de
+geçerli olduğu fark edildi. Düzeltme: fonksiyon artık hedef admin VEYA
+owner ise VE çağıran owner DEĞİLSE (kendi hesabı hariç) reddediyor —
+`admin_set_user_role()`'daki (migration 0024) "bir admin başka bir admin'in
+rolünü doğrudan değiştiremez" emsaliyle AYNI kural; panelde de buton artık
+admin'in VE owner'ın kartında (kendi satırın hariç) admin'den gizleniyor
 (`assets/js/uye-ayarlari.js`).
 
 **2) YÜKSEK — askıya alınan admin, veritabanı seviyesinde HÂLÂ tam
