@@ -11,13 +11,19 @@
   margin-bottom: 18px;
 }
 
-#iy-alanlar-container {
+#iy-alanlar-container,
+#iy-duzenle-alanlar-container {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 14px;
   margin-bottom: 16px;
 }
 
-#iy-alanlar-container .form-field {
+#iy-alanlar-container .form-field,
+#iy-duzenle-alanlar-container .form-field {
   margin-bottom: 0;
+}
+
+#iy-mod-nav {
+  margin-bottom: 18px;
 }
