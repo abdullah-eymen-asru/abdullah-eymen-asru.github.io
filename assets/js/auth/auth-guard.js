@@ -28,12 +28,23 @@ import { supabase } from "../core/supabase-client.js";
  *   'manager'       -> manager (panelde "İçerik Sorumlusu") VEYA admin/owner erişebilir
  *   'admin'         -> admin VEYA owner erişebilir (owner, admin'in tüm yetkilerini
  *                      kapsar — bkz. migration 0021, "Site Sahibi" rolü)
+ *   'owner'         -> SADECE owner erişebilir — TEK İSTİSNA: "admin her
+ *                      zaman geçer" kuralı burada uygulanmaz, admin bu rolü
+ *                      İSTEYEN bir sayfaya giremez (bkz. panel/izleme-okuma-
+ *                      yonetim.md — "sadece owner, admin dahi giremez").
+ *                      owner, admin'in ÜST kümesi olduğu için diğer TÜM
+ *                      rollerde admin'i otomatik geçiriyoruz; ama tersi
+ *                      (admin'in owner'a özel bir sayfaya girmesi) asla
+ *                      doğru değil, bu yüzden sadece bu tek durumda o kural
+ *                      devre dışı bırakılıyor.
  *   ['editor','manager'] -> DİZİ de verilebilir: editor, manager VEYA admin
  *                           erişebilir (bkz. panel/github-yonetim.md — hem
  *                           editor hem manager aynı yazma yetkisini
  *                           paylaştığı için bu sayfaya ikisi de girebilmeli).
  *                           "admin her zaman geçer" kuralı dizi verilse de
- *                           geçerlidir.
+ *                           geçerlidir — ['owner'] TEK ELEMANLI dizi olarak
+ *                           verilse bile yukarıdaki 'owner' istisnası aynen
+ *                           uygulanır (bkz. aşağıdaki requestingOwnerOnly).
  * @param {string} opts.redirectTo - yetkisizse gidilecek sayfa
  */
 export async function requireAuth({ role = null, redirectTo = "/hesap/giris.html" } = {}) {
@@ -114,11 +125,27 @@ export async function requireAuth({ role = null, redirectTo = "/hesap/giris.html
   // hem editor hem manager (İçerik Sorumlusu) rolündeki kullanıcılara açık
   // olduğu için tek bir string ile "ya editor ya manager" ifade edilemiyordu.
   const izinliRoller = Array.isArray(role) ? role : role === null ? [] : [role];
+
+  // BUG FİX (owner-only sayfalara admin de girebiliyordu): aşağıdaki
+  // "admin her zaman geçer" kuralı, role:'owner' isteyen sayfalarda da
+  // (izinliRoller = ['owner']) koşulsuz uygulanıyordu — yani
+  // requireAuth({role:'owner'}) SADECE owner'a değil, fiilen admin'e de
+  // izin veriyordu. Oysa panel/izleme-okuma-yonetim.md gibi sayfalar (bkz.
+  // o dosyanın ve izleme-okuma-yonetim.js'in başındaki notlar) BİLEREK
+  // "sadece owner, admin dahi giremez" varsayımıyla yazılmış. owner,
+  // admin'in ÜST kümesi olduğu için (admin'e açık her yere owner de
+  // girebilir) bu yönde bir istisnaya hiç gerek yok — sorun SADECE ters
+  // yönde (admin'in owner'a özel bir sayfaya sızması). Bu yüzden "admin her
+  // zaman geçer" kuralını, İSTENEN rol(ler) TAM OLARAK ['owner'] ise devre
+  // dışı bırakıyoruz; diğer tüm rol isteklerinde (admin, editor, manager,
+  // special_user, ['editor','manager'] vb.) davranış DEĞİŞMEDİ.
+  const requestingOwnerOnly = izinliRoller.length === 1 && izinliRoller[0] === "owner";
+
   const roleOk =
     role === null ||
     izinliRoller.includes(profile.role) ||
-    profile.role === "admin" || // admin her zaman geçer
-    profile.role === "owner"; // owner (Site Sahibi) de her zaman geçer — admin'in üst kümesi
+    (!requestingOwnerOnly && profile.role === "admin") || // admin her zaman geçer — owner-only hariç
+    profile.role === "owner"; // owner (Site Sahibi) her durumda geçer — admin'in üst kümesi
 
   // ASKIDAKİ ADMİN: rol hâlâ 'admin' olsa bile (kalıcı düşürme henüz
   // sonuçlanmamış olabilir), migration 0021'deki is_admin() SQL tarafında
