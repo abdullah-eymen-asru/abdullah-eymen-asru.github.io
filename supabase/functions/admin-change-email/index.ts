@@ -24,11 +24,14 @@
 //   3) Çağıranın "profiles.role = 'admin'" olduğu veritabanından
 //      (service_role ile, çağıranın kendi beyanına GÜVENMEDEN) doğrulanır.
 //   4) Sadece o zaman hedef kullanıcının e-postası değiştirilir.
-//   5) YENİ (kritik düzeltme): hedef owner (Site Sahibi) ise, çağıran da
+//   5) YENİ (kritik düzeltme): hedef owner (Site Sahibi) İSE, çağıran da
 //      owner DEĞİLSE reddedilir — aksi hâlde sıradan bir admin, owner'ın
 //      e-postasını buraya yazıp ardından gönderilen şifre sıfırlama
 //      mailini kendi eline geçirerek owner hesabını tamamen ele
-//      geçirebilirdi (bkz. aşağıdaki "4) hedef gerçekten var mı" bloğu).
+//      geçirebilirdi. AYNI kısıt hedef başka bir ADMİN ise de geçerli
+//      (kendi hesabı hariç) — bkz. aşağıdaki "hiyerarşi" bloğu ve
+//      migration 0024'teki admin_set_user_role() emsali ("bir admin
+//      başka bir admin'in rolünü doğrudan değiştiremez").
 //
 // DAVRANIŞ
 //   `auth.admin.updateUserById(hedefId, { email: yeniEmail, email_confirm: true })`
@@ -192,16 +195,40 @@ Deno.serve(async (req) => {
   // tarafında da (assets/js/uye-ayarlari.js) "E-posta Değiştir" butonu
   // owner'ın kartında hiç gizlenmiyordu, yani bu gerçek arayüzden
   // tıklanabilir bir açıktı, sadece teorik bir API istismarı değildi.
-  // migration 0027 § A "admin, owner'ın profilini değiştiremez" ilkesiyle
-  // AYNI kural burada da (service_role ile RLS'i tamamen atlayan bu
-  // fonksiyonda) ayrıca uygulanıyor: hedef owner ise, çağıran da owner
-  // DEĞİLSE reddedilir. owner<->owner (iki owner varsa) ve owner'ın kendi
-  // e-postasını kendisi değiştirmesi (bu akış zaten normalde panelin
-  // kendi "E-posta Değiştir" çift-onaylı yoluyla yapılır ama burada da
-  // engellenmiyor) serbest bırakılıyor.
-  if (hedefKullanici.role === "owner" && callerProfile?.role !== "owner") {
+  // Aşağıdaki kontrol bunu hem owner hem de (kendi hesabı hariç) diğer
+  // admin'ler için kapsıyor, bkz. hemen altındaki blok.
+  // GÜVENLİK: hedef rolüne göre "kimin kimi değiştirebileceği" hiyerarşisi
+  // (bkz. supabase/migrations/0024_..._kisitlama_ve_vaka_silme.sql ->
+  // admin_set_user_role()'daki "YENİ KISIT 2": "bir admin başka bir admin'in
+  // rolünü doğrudan değiştiremez... Admin Güvenliği sayfasından askıya
+  // alma/oylama sürecini başlat"). E-posta değiştirmek de aynı sonucu
+  // (hedefin hesabına el koyabilme) doğurduğu için AYNI kısıt burada da
+  // uygulanıyor — yoksa bir admin, diğer bir admin'i (owner'ı değil ama)
+  // e-posta ele geçirme yoluyla etkisiz bırakabilirdi; bu da migration
+  // 0021'in "bir admin'i etkisiz bırakmanın TEK meşru yolu askıya
+  // alma/oylama süreci" ilkesini email-değiştirme üzerinden atlatırdı.
+  //   - Hedef owner  -> SADECE owner değiştirebilir (yukarıdaki § 5).
+  //   - Hedef admin  -> SADECE owner değiştirebilir; TEK istisna: admin
+  //     kendi hesabını hedeflemişse (kendi eski e-postasına erişimini
+  //     kaybetmiş bir admin'in KENDİSİ bu akışı normalde kullanmaz — zaten
+  //     oturumu varsa panelin normal "Panelim" akışını kullanır — ama
+  //     teoride mümkün olduğu için, "kendi hesabına dokunma" admin-admin
+  //     kısıtının kapsamı dışında tutuluyor).
+  //   - Hedef manager/editor/special_user/user -> herhangi bir admin/owner
+  //     değiştirebilir (değişmedi, bu roller admin'in altında).
+  const kendiHesabiMi = hedefKullanici.id === callerId;
+  if (
+    (hedefKullanici.role === "admin" || hedefKullanici.role === "owner") &&
+    !kendiHesabiMi &&
+    callerProfile?.role !== "owner"
+  ) {
     return new Response(
-      JSON.stringify({ error: "Yetkisiz işlem: Site Sahibi'nin (owner) e-postasını sadece owner değiştirebilir." }),
+      JSON.stringify({
+        error:
+          hedefKullanici.role === "owner"
+            ? "Yetkisiz işlem: Site Sahibi'nin (owner) e-postasını sadece owner değiştirebilir."
+            : "Yetkisiz işlem: bir admin başka bir admin'in e-postasını doğrudan değiştiremez. Bunun yerine Admin Güvenliği sayfasından askıya alma/oylama sürecini başlat.",
+      }),
       { status: 403, headers }
     );
   }
