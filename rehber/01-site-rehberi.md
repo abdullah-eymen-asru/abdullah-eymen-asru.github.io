@@ -147,6 +147,15 @@ sahibinin kişisel izleme/okuma kaydıdır, bir editöre devredilebilecek bir
 `okuma` etiketini ekler (yoksa kendisi oluşturur) — sen zaten bu isimlerle
 elle etiket oluşturmuşsan onu bozmadan kullanır.
 
+**Sayfanın iki bölümü:**
+- **Yeni Kayıt Ekle** — başlık + açıklama (issue body) + panodaki dinamik
+  alanları doldurup yeni bir issue açar.
+- **Mevcut Kayıtlar** — panodaki tüm kayıtları listeler; başlık, açıklama
+  ve alan değerleri içinde arama yapılabilir (arama tamamen tarayıcıda,
+  ilk yüklemeden sonra anlık çalışır). Bir kayda tıklayınca başlığını,
+  açıklamasını ve tüm alan değerlerini düzenleyip **Güncelle** ile GitHub'a
+  geri yazabilirsin.
+
 ## 6. `robots.txt`
 
 `Sitemap:` satırındaki adres, `_config.yml`'deki `url` ile aynı domaini
