@@ -24,6 +24,11 @@
 //   3) Çağıranın "profiles.role = 'admin'" olduğu veritabanından
 //      (service_role ile, çağıranın kendi beyanına GÜVENMEDEN) doğrulanır.
 //   4) Sadece o zaman hedef kullanıcının e-postası değiştirilir.
+//   5) YENİ (kritik düzeltme): hedef owner (Site Sahibi) ise, çağıran da
+//      owner DEĞİLSE reddedilir — aksi hâlde sıradan bir admin, owner'ın
+//      e-postasını buraya yazıp ardından gönderilen şifre sıfırlama
+//      mailini kendi eline geçirerek owner hesabını tamamen ele
+//      geçirebilirdi (bkz. aşağıdaki "4) hedef gerçekten var mı" bloğu).
 //
 // DAVRANIŞ
 //   `auth.admin.updateUserById(hedefId, { email: yeniEmail, email_confirm: true })`
@@ -165,7 +170,7 @@ Deno.serve(async (req) => {
   //    göndermeyi/olası hataları önceden yakalamak için)
   const { data: hedefKullanici, error: hedefErr } = await adminClient
     .from("profiles")
-    .select("id, email")
+    .select("id, email, role")
     .eq("id", hedefKullaniciId)
     .single();
 
@@ -175,6 +180,32 @@ Deno.serve(async (req) => {
       headers,
     });
   }
+
+  // GÜVENLİK AÇIĞI DÜZELTMESİ (kritik): bu satır ÖNCEDEN yoktu. Adım 2
+  // sadece "çağıran admin mi?" diye bakıyordu, hedefin KİM olduğuna hiç
+  // bakmıyordu — yani sıradan bir admin, owner'ın (Site Sahibi) e-postasını
+  // buradan değiştirip (email_confirm:true ile ANINDA, hiçbir onay
+  // beklemeden) hemen ardından gönderilen "şifre sıfırlama" mailinin KENDİ
+  // eline geçmesini sağlayıp owner hesabını TAMAMEN ele geçirebilirdi —
+  // migration 0021'in tüm "admin'ler birbirini denetler, owner tekil karar
+  // verir" güvenlik modelini baştan aşan bir yetki yükseltmeydi. Panel
+  // tarafında da (assets/js/uye-ayarlari.js) "E-posta Değiştir" butonu
+  // owner'ın kartında hiç gizlenmiyordu, yani bu gerçek arayüzden
+  // tıklanabilir bir açıktı, sadece teorik bir API istismarı değildi.
+  // migration 0027 § A "admin, owner'ın profilini değiştiremez" ilkesiyle
+  // AYNI kural burada da (service_role ile RLS'i tamamen atlayan bu
+  // fonksiyonda) ayrıca uygulanıyor: hedef owner ise, çağıran da owner
+  // DEĞİLSE reddedilir. owner<->owner (iki owner varsa) ve owner'ın kendi
+  // e-postasını kendisi değiştirmesi (bu akış zaten normalde panelin
+  // kendi "E-posta Değiştir" çift-onaylı yoluyla yapılır ama burada da
+  // engellenmiyor) serbest bırakılıyor.
+  if (hedefKullanici.role === "owner" && callerProfile?.role !== "owner") {
+    return new Response(
+      JSON.stringify({ error: "Yetkisiz işlem: Site Sahibi'nin (owner) e-postasını sadece owner değiştirebilir." }),
+      { status: 403, headers }
+    );
+  }
+
   if (hedefKullanici.email?.toLowerCase() === yeniEposta) {
     return new Response(
       JSON.stringify({ error: "Bu zaten kullanıcının kayıtlı e-posta adresi." }),
