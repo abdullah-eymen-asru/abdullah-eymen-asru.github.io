@@ -892,6 +892,63 @@ istemedim.
 
 Bu bölüm, siteye/Supabase kullanıcı sistemine sonradan yapılan düzeltmelerin tarih sırasıyla özetidir — hangi sorun bildirildi, kök nedeni neydi, nasıl çözüldü ve (varsa) senin elle yapman gereken adım neydi. Eskiden kökte ayrı `DEGISIKLIKLER_*.md` dosyaları halinde duruyordu, artık tek doğruluk kaynağı burası — en yeni turu en üstte bulursun.
 
+### 🗓️ 28.08.2026 — Üyelik kayıtlarını açma/kapatma yetkisi (sadece Site Sahibi)
+
+İstek: "Sadece site sahibinin yetkisinde olacak bir yetki: siteye üye
+alımlarını kapatıp açabilme. Kapalıyken veri tabanına yeni kayıt düşmesin
+— Google ile veya normal şekilde kayıt olurken engellenip bir uyarı ekranı
+çıksın. Sadece daha önceden zaten üye olanlar girebilsin."
+
+**Nasıl çalışıyor:** `site_settings` tablosuna bir `kayitlar_acik` (boolean,
+varsayılan `true`) kolonu eklendi. Asıl/bağlayıcı kilit veritabanı
+tarafında: `handle_new_user()` trigger'ı (auth.users'a her yeni satır
+eklendiğinde — e-posta/şifre kaydında da, hiç kayıtlı olmayan bir Google
+hesabıyla ilk kez gelindiğinde de tetiklenir) artık en başta bu bayrağa
+bakıyor; kapalıysa exception fırlatıp TÜM işlemi (auth.users'a yazılan
+satır dahil) geri alıyor — yani kapalıyken hiçbir yoldan yeni bir hesap
+satırı oluşmuyor. Bu trigger sadece **yeni** satırlarda çalıştığı için
+daha önceden (kayıtlar açıkken) zaten oluşmuş hesapların girişi hiç
+etkilenmiyor.
+
+`hesap/kayit.html` artık sayfa açılır açılmaz bu bayrağı okuyup
+(anonim ziyaretçiye de açık bir select politikasıyla) kapalıysa formu ve
+"Google ile Kayıt Ol" butonunu hiç göstermiyor, yerine bir uyarı ekranı
+gösteriyor — bu sadece kullanıcı deneyimi katmanı, asıl kilit yukarıdaki
+trigger'da. `hesap/giris.html` tarafında da, hiç kayıtlı olmayan bir Google
+hesabıyla "Giriş Yap"a tıklanıp trigger tarafından reddedilen özel durum
+ayrıca ele alınıp "bu Google hesabıyla kayıtlı kullanıcı bulunamadı ve
+üyelik kayıtları şu anda kapalı" gibi anlaşılır bir mesaja çevriliyor.
+
+**Yetki sadece Site Sahibi'nde:** `site_settings` tablosunun genel UPDATE
+politikası admin+owner'a (`is_admin()`) açık olduğu için (Hakkımda metni
+gibi diğer alanlar admin tarafından da düzenlenebilsin diye), RLS tek
+başına "bu KOLONU sadece owner değiştirebilsin" ayrımını yapamıyor —
+`prevent_role_self_escalation` (migration 0001) ile AYNI desende, sadece
+`kayitlar_acik` kolonu değiştiğinde `is_owner()` kontrolü yapan ayrı bir
+trigger eklendi. Panel de doğrudan `update` yerine, sadece owner'ın
+çağırabildiği `owner_kayitlari_ac_kapat(acik)` RPC'sini kullanıyor.
+Kontrol paneldeki **Admin Güvenliği** sayfasına, mevcut ".sadece-owner"
+deseniyle (owner-dışı adminlerden tamamen gizlenen) yeni bir "👥 Üyelik
+Kayıtları" bölümü olarak eklendi.
+
+#### Değişen dosyalar
+- `assets/js/core/supabase-client.js` (`kayitlarAcikMi()` yardımcı fonksiyonu + `KAYITLAR_KAPALI_ISARETI` sabiti eklendi)
+- `assets/js/auth/auth-pages.js` (`initKayitPage` kayıtlar kapalıyken formu gizliyor; `initGirisPage`'deki Google dönüşü hata dalı bu durumu ayırt ediyor)
+- `hesap/kayit.md` (form + Google butonu `#kayit-aktif-alan` içine alındı, `#kayit-kapali-uyari` uyarı kutusu eklendi)
+- `panel/admin-guvenlik.md` (owner-only "👥 Üyelik Kayıtları" bölümü)
+- `assets/js/admin-guvenlik.js` (durumu okuma + aç/kapat butonlarının bağlanması)
+- `rehber/02-supabase-sistemi.md` (bu changelog girdisi)
+
+#### Eklenen dosyalar
+- `supabase/migrations/0031_uyelik_kayitlarini_ac_kapat.sql` ⚠️ **YENİ — Supabase SQL Editor'de çalıştırman gerekiyor (0001-0030'dan sonra).**
+
+#### Uygulama adımları (senin yapman gerekenler)
+1. **Supabase Dashboard > SQL Editor**'de `0031_uyelik_kayitlarini_ac_kapat.sql`'i çalıştır.
+2. Geri kalan dosyalar statik (JS/Markdown) olduğu için siteyi her zamanki gibi yayınlaman yeterli.
+3. Test etmek için: owner hesabınla `/panel/admin-guvenlik.html`'e git, "👥 Üyelik Kayıtları" bölümünden "Kayıtları Kapat"a bas; sonra `/hesap/kayit.html`'i (mümkünse gizli sekmede) aç — formun yerine uyarı ekranını görmelisin. "Kayıtları Aç" ile geri aç.
+
+---
+
 ### 🗓️ 17.08.2026 (4. Tur) — Admin artık Site Sahibi'nde değişiklik yapamaz, silme yetkisi sadece owner'da
 
 İstek: "Yönetici olanlar kendisinin üstü olan site sahibinde değişiklik
