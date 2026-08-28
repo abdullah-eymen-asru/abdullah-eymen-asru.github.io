@@ -1,9 +1,9 @@
 // Cloudflare Worker — İzlediklerim/Okuduklarım panosuna YAZMA (yeni kayıt
-// ekleme) yetkisi verir. `izleme_okuma_worker/worker.js` ile KARIŞTIRMA:
-// o Worker sadece OKUR (herkese açık, siteyi besler) ve GITHUB_TOKEN'ı
-// "project" okuma izniyle yeterlidir. BU Worker ise GERÇEK bir yazma
-// işlemi yapar (yeni issue açar, panoya ekler, alanlarını doldurur), bu
-// yüzden:
+// ekleme, arama, güncelleme) yetkisi verir. `izleme_okuma_worker/worker.js`
+// ile KARIŞTIRMA: o Worker sadece OKUR (herkese açık, siteyi besler) ve
+// GITHUB_TOKEN'ı "project" okuma izniyle yeterlidir. BU Worker ise GERÇEK
+// bir yazma işlemi yapar (yeni issue açar, panoya ekler, alanlarını
+// doldurur, mevcut kayıtları arayıp günceller), bu yüzden:
 //
 //   1) SADECE 'owner' (Site Sahibi) rolüne izin verir — editor/manager/admin
 //      bile DAHİL DEĞİLDİR (github_icerik_yonetim_worker'daki gibi geniş bir
@@ -23,11 +23,18 @@
 //   2. Sayfa bu Worker'a kendi Supabase oturum token'ını Authorization
 //      header'ında göndererek POST atar.
 //   3. Worker: (a) token'ı Supabase'te doğrular, (b) rolün 'owner' olduğunu
-//      kontrol eder, (c) GitHub'da yeni bir Issue açar, (d) o Issue'yu
-//      ilgili Projects panosuna (izleme=2, okuma=3) ekler, (e) formda
-//      doldurulan alanları (Durum, Tür, Puan, ... ) panodaki ilgili
-//      custom field'lara yazar.
+//      kontrol eder, (c) GitHub'da yeni bir Issue açar (başlık + açıklama),
+//      (d) o Issue'yu ilgili Projects panosuna (izleme=2, okuma=3) ekler,
+//      (e) formda doldurulan alanları (Durum, Tür, Puan, ... ) panodaki
+//      ilgili custom field'lara yazar.
 //   4. Sonuç JSON olarak panele döner; PAT hiçbir zaman tarayıcıya gitmez.
+//
+// UÇ NOKTALAR:
+//   GET  /alanlar?project=izleme|okuma        -> panodaki field tanımları
+//   GET  /liste?project=...&q=...&sayfa=1     -> mevcut issue'ları ara/listele
+//   GET  /kayit/:number?project=...           -> tek bir kaydın güncel alan değerleri
+//   POST /kayit-ekle                          -> yeni issue aç + panoya ekle + alan doldur
+//   POST /kayit-guncelle                      -> mevcut issue'nun başlık/açıklama/alanlarını güncelle
 
 const GITHUB_LOGIN = "abdullah-eymen-asru";
 const REPO_OWNER = "abdullah-eymen-asru";
@@ -172,8 +179,8 @@ async function projeBilgisiGetir(token, projectNumber) {
 }
 
 const CREATE_ISSUE_MUTATION = `
-mutation($repositoryId: ID!, $title: String!, $labelIds: [ID!]) {
-  createIssue(input: { repositoryId: $repositoryId, title: $title, labelIds: $labelIds }) {
+mutation($repositoryId: ID!, $title: String!, $body: String, $labelIds: [ID!]) {
+  createIssue(input: { repositoryId: $repositoryId, title: $title, body: $body, labelIds: $labelIds }) {
     issue { id number url }
   }
 }
@@ -277,6 +284,103 @@ async function alanlariDoldur(token, project, projectDbId, itemId, alanlar) {
   return sonuclar;
 }
 
+// ---- ARAMA / LİSTELEME / TEKİL KAYIT OKUMA ----
+//
+// Not: Bu Worker'ın OKUMA amacıyla `izleme_okuma_worker/worker.js`'i
+// (herkese açık, salt okuma) TEKRAR KULLANMASI yerine burada AYRI, kendi
+// GraphQL sorgusu var — çünkü panelin ihtiyacı FARKLI: (a) issue'nun kendi
+// numarası + açıklaması (body) da lazım (herkese açık Worker'da bu YOK,
+// çünkü site sadece "Title"ı gösteriyor), (b) sonucun panoda GÖRÜNMEYEN
+// (henüz projeye eklenmemiş) issue'ları da kapsaması gerekebilir — ama bu
+// ilk sürümde basitlik için SADECE panoya eklenmiş item'lar listeleniyor,
+// tıpkı herkese açık tabloda olduğu gibi.
+const PROJE_ITEMS_QUERY = `
+query($login: String!, $number: Int!, $cursor: String) {
+  user(login: $login) {
+    projectV2(number: $number) {
+      items(first: 100, after: $cursor) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          id
+          content {
+            ... on Issue { number title url body state }
+          }
+          fieldValues(first: 30) {
+            nodes {
+              ... on ProjectV2ItemFieldTextValue { text field { ... on ProjectV2FieldCommon { name } } }
+              ... on ProjectV2ItemFieldNumberValue { number field { ... on ProjectV2FieldCommon { name } } }
+              ... on ProjectV2ItemFieldDateValue { date field { ... on ProjectV2FieldCommon { name } } }
+              ... on ProjectV2ItemFieldSingleSelectValue { name field { ... on ProjectV2FieldCommon { name } } }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+`;
+
+const YERLESIK_ALANLAR = new Set([
+  "Title", "Status", "Assignees", "Labels", "Linked pull requests", "Milestone",
+  "Repository", "Reviewers", "Parent issue", "Sub-issues progress", "Created", "Updated", "Closed",
+]);
+
+function fieldValuesToObject(fieldValues) {
+  const obj = {};
+  for (const fv of fieldValues.nodes) {
+    if (!fv || !fv.field || !fv.field.name) continue;
+    const key = fv.field.name;
+    if (YERLESIK_ALANLAR.has(key)) continue;
+    if (fv.text !== undefined) obj[key] = fv.text;
+    else if (fv.number !== undefined) obj[key] = fv.number;
+    else if (fv.date !== undefined) obj[key] = fv.date;
+    else if (fv.name !== undefined) obj[key] = fv.name;
+  }
+  return obj;
+}
+
+// Projedeki TÜM item'ları (issue + alan değerleri) çeker — sayfalama
+// dahil. Küçük/orta ölçekli bir kişisel koleksiyon için (yüzlerce kayıt)
+// bu maliyetsiz; binlerce kayda çıkarsa ileride sunucu taraflı arama
+// (GitHub'ın `search` sorgusu) tercih edilebilir.
+async function projeItemleriGetir(token, projectNumber) {
+  let items = [];
+  let cursor = null;
+  let hasNextPage = true;
+  while (hasNextPage) {
+    const data = await githubGraphql(token, PROJE_ITEMS_QUERY, {
+      login: GITHUB_LOGIN,
+      number: projectNumber,
+      cursor,
+    });
+    const project = data.user?.projectV2;
+    if (!project) throw new Error(`Proje bulunamadı: number=${projectNumber}`);
+    const sayfaItems = project.items.nodes
+      .filter((node) => node.content)
+      .map((node) => ({
+        itemId: node.id,
+        number: node.content.number,
+        title: node.content.title,
+        url: node.content.url,
+        body: node.content.body || "",
+        state: node.content.state,
+        alanlar: fieldValuesToObject(node.fieldValues),
+      }));
+    items = items.concat(sayfaItems);
+    hasNextPage = project.items.pageInfo.hasNextPage;
+    cursor = project.items.pageInfo.endCursor;
+  }
+  return items;
+}
+
+const UPDATE_ISSUE_MUTATION = `
+mutation($issueId: ID!, $title: String, $body: String) {
+  updateIssue(input: { id: $issueId, title: $title, body: $body }) {
+    issue { id number title body url }
+  }
+}
+`;
+
 export default {
   async fetch(request, env, ctx) {
     const origin = request.headers.get("Origin") || "";
@@ -373,7 +477,7 @@ export default {
         return jsonYanit({ message: "Geçersiz istek gövdesi (JSON bekleniyor)." }, 400, corsHeaders);
       }
 
-      const { project: projectKey, title, alanlar } = body || {};
+      const { project: projectKey, title, aciklama, alanlar } = body || {};
       const projectConfig = PROJECTS[projectKey];
       if (!projectConfig) {
         return jsonYanit({ message: "Geçersiz 'project' değeri (izleme|okuma bekleniyor)." }, 400, corsHeaders);
@@ -409,10 +513,11 @@ export default {
           labelIds = undefined; // label alınamazsa issue'yu etiketsiz açmaya devam et
         }
 
-        // c) Issue'yu oluştur.
+        // c) Issue'yu oluştur (açıklama/body opsiyonel).
         const issueData = await githubGraphql(env.GITHUB_TOKEN, CREATE_ISSUE_MUTATION, {
           repositoryId,
           title: title.trim(),
+          body: typeof aciklama === "string" && aciklama.trim() ? aciklama : undefined,
           labelIds,
         });
         const issue = issueData.createIssue.issue;
@@ -442,6 +547,120 @@ export default {
       } catch (err) {
         console.error("Worker hatası (/kayit-ekle):", err);
         return jsonYanit({ message: "Kayıt eklenemedi: " + err.message }, 502, corsHeaders);
+      }
+    }
+
+    // GET /liste?project=izleme|okuma&q=arama-metni — mevcut kayıtları
+    // arayıp listeler (issue numarası, başlık, açıklama, alan değerleri).
+    // "q" verilmezse projedeki TÜM kayıtları döner; verilirse başlık VEYA
+    // açıklama VEYA herhangi bir alan değeri içinde (büyük/küçük harf
+    // duyarsız) arama yapar — panelin arama kutusu tam olarak bunu
+    // kullanıyor (bkz. ilgili JS).
+    if (request.method === "GET" && url.pathname === "/liste") {
+      const projectKey = url.searchParams.get("project");
+      const projectConfig = PROJECTS[projectKey];
+      if (!projectConfig) return jsonYanit({ message: "Geçersiz 'project' parametresi." }, 400, corsHeaders);
+
+      const q = (url.searchParams.get("q") || "").trim().toLocaleLowerCase("tr");
+
+      try {
+        const tumItems = await projeItemleriGetir(env.GITHUB_TOKEN, projectConfig.number);
+        const items = q
+          ? tumItems.filter((it) => {
+              const arananMetin = [it.title, it.body, ...Object.values(it.alanlar || {})]
+                .filter((v) => v !== undefined && v !== null)
+                .join(" ")
+                .toLocaleLowerCase("tr");
+              return arananMetin.includes(q);
+            })
+          : tumItems;
+
+        // En yeni (en yüksek issue numarası) en üstte görünsün.
+        items.sort((a, b) => (b.number || 0) - (a.number || 0));
+
+        return jsonYanit({ count: items.length, items }, 200, corsHeaders);
+      } catch (err) {
+        console.error("Worker hatası (/liste):", err);
+        return jsonYanit({ message: "Liste alınamadı: " + err.message }, 502, corsHeaders);
+      }
+    }
+
+    // POST /kayit-guncelle — mevcut bir issue'nun başlığını/açıklamasını
+    // ve/veya panodaki alan değerlerini günceller. `number` GitHub issue
+    // numarasıdır (panelin "Mevcut Kayıtlar" listesinden seçilir).
+    if (request.method === "POST" && url.pathname === "/kayit-guncelle") {
+      let body;
+      try {
+        body = await request.json();
+      } catch (_err) {
+        return jsonYanit({ message: "Geçersiz istek gövdesi (JSON bekleniyor)." }, 400, corsHeaders);
+      }
+
+      const { project: projectKey, number, title, aciklama, alanlar } = body || {};
+      const projectConfig = PROJECTS[projectKey];
+      if (!projectConfig) {
+        return jsonYanit({ message: "Geçersiz 'project' değeri (izleme|okuma bekleniyor)." }, 400, corsHeaders);
+      }
+      if (!number || typeof number !== "number") {
+        return jsonYanit({ message: "Güncellenecek kaydın issue numarası ('number') zorunludur." }, 400, corsHeaders);
+      }
+
+      try {
+        // a) Issue'nun node ID'sini bul (updateIssue mutasyonu ID ister, numara değil).
+        const issueData = await githubGraphql(
+          env.GITHUB_TOKEN,
+          `query($owner: String!, $name: String!, $number: Int!) {
+            repository(owner: $owner, name: $name) { issue(number: $number) { id } }
+          }`,
+          { owner: REPO_OWNER, name: REPO_NAME, number }
+        );
+        const issueId = issueData.repository?.issue?.id;
+        if (!issueId) throw new Error(`#${number} numaralı issue bulunamadı.`);
+
+        // b) Başlık ve/veya açıklama verildiyse güncelle (ikisi de opsiyonel
+        //    — sadece alan değerlerini güncellemek isteyen bir istek de
+        //    geçerlidir, bu durumda updateIssue'ya hiç gitmeyiz).
+        let guncelIssue = null;
+        const yeniBaslik = typeof title === "string" && title.trim() ? title.trim() : undefined;
+        const yeniAciklama = typeof aciklama === "string" ? aciklama : undefined;
+        if (yeniBaslik !== undefined || yeniAciklama !== undefined) {
+          const updateData = await githubGraphql(env.GITHUB_TOKEN, UPDATE_ISSUE_MUTATION, {
+            issueId,
+            title: yeniBaslik,
+            body: yeniAciklama,
+          });
+          guncelIssue = updateData.updateIssue.issue;
+        }
+
+        // c) Proje bilgisini al, issue'nun panodaki item ID'sini bul.
+        const project = await projeBilgisiGetir(env.GITHUB_TOKEN, projectConfig.number);
+        const tumItems = await projeItemleriGetir(env.GITHUB_TOKEN, projectConfig.number);
+        const hedefItem = tumItems.find((it) => it.number === number);
+        if (!hedefItem) {
+          throw new Error(`#${number} numaralı kayıt bu panoda bulunamadı (panoya eklenmemiş olabilir).`);
+        }
+
+        // d) Alan değerlerini güncelle.
+        const alanSonuclari = alanlar && typeof alanlar === "object"
+          ? await alanlariDoldur(env.GITHUB_TOKEN, project, project.id, hedefItem.itemId, alanlar)
+          : [];
+
+        return jsonYanit(
+          {
+            basarili: true,
+            issue: {
+              number,
+              url: guncelIssue?.url || hedefItem.url,
+              title: guncelIssue?.title || hedefItem.title,
+            },
+            alanSonuclari,
+          },
+          200,
+          corsHeaders
+        );
+      } catch (err) {
+        console.error("Worker hatası (/kayit-guncelle):", err);
+        return jsonYanit({ message: "Kayıt güncellenemedi: " + err.message }, 502, corsHeaders);
       }
     }
 
