@@ -187,3 +187,38 @@ export function kullaniciAramayaUyuyorMu(kullanici, aramaKucuk) {
  * görür (bkz. panel.js).
  */
 export const KVKK_METIN_SURUMU = "2026-08";
+
+/*
+ * ÜYELİK KAYITLARI AÇIK/KAPALI (bkz. migration
+ * 0031_uyelik_kayitlarini_ac_kapat.sql) — SADECE owner (Site Sahibi)
+ * değiştirebilir (bkz. panel/admin-guvenlik.md, ".sadece-owner" bölümü).
+ * Kapalıyken veritabanı katmanı (handle_new_user trigger'ı) yeni hesap
+ * oluşumunu zaten KESİN olarak engeller; bu sabit + aşağıdaki yardımcı
+ * fonksiyon SADECE kullanıcı deneyimi içindir (bkz. hesap/kayit.md +
+ * auth-pages.js -> initKayitPage): formu göstermeden önce durumu kontrol
+ * eder, ayrıca trigger'ın fırlattığı hatayı tanımak için de kullanılır.
+ */
+export const KAYITLAR_KAPALI_ISARETI = "KAYITLAR_KAPALI";
+
+/**
+ * site_settings.kayitlar_acik'i okur. Bu satır herkese açık (anonim
+ * ziyaretçi dahil) okunabilir bir politikayla korunuyor (bkz. migration
+ * 0001 "settings_select_anyone"), o yüzden oturum açılmadan da çağrılabilir.
+ * Ağ hatası ya da satır hiç yoksa (olmamalı, tek satır garanti altında)
+ * GÜVENLİ TARAFTA kalıp true (açık) döner — bu fonksiyon sadece deneyim
+ * katmanı olduğu için, asıl bağlayıcı kural her zaman veritabanı
+ * trigger'ındadır; burada yanlışlıkla "false" dönüp kayıt formunu
+ * gereksiz yere gizlemekten kaçınıyoruz.
+ */
+export async function kayitlarAcikMi() {
+  const { data, error } = await supabase
+    .from("site_settings")
+    .select("kayitlar_acik")
+    .eq("id", 1)
+    .single();
+  if (error || !data) {
+    console.error("Kayıt durumu okunamadı, güvenli tarafta (açık) kalınıyor:", error);
+    return true;
+  }
+  return data.kayitlar_acik !== false;
+}
