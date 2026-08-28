@@ -49,6 +49,21 @@ const PROJECTS = {
   okuma: { number: 3, label: "okuma" },
 };
 
+// Panelin yazabildiği/gösterebildiği TEK field tipleri bunlar. GitHub'ın
+// "yerleşik" (built-in) alanları — Assignees, Labels, Reviewers, Milestone,
+// Repository, Linked pull requests, Parent issue, Sub-issues progress,
+// Created/Updated/Closed (tarih meta verisi), Title vb. — updateProjectV2ItemFieldValue
+// mutasyonu ile YAZILAMAZ (GitHub bunları "currently not supported"
+// hatasıyla reddeder) ve/veya tamamen farklı bir API gerektirir (ör.
+// Assignees issue'nun kendisine, addAssigneesToAssignable ile atanır). Bu
+// yüzden hem form kurulumunda (/alanlar) hem de değer yazarken
+// (alanlariDoldur) SADECE bu 4 dataType'a izin veriyoruz — isim bazlı bir
+// kara liste tutmak yerine (kırılgan: kullanıcı özel bir alana "Milestone"
+// adını verirse ya da GitHub yeni bir yerleşik tip eklerse çalışmaz), TİP
+// bazlı bir beyaz liste kullanmak GitHub'ın API'sinin kendi
+// sınıflandırmasına dayandığı için çok daha güvenilir.
+const YAZILABILIR_DATATYPE_SETI = new Set(["TEXT", "NUMBER", "DATE", "SINGLE_SELECT"]);
+
 const corsHeadersOlustur = (origin) => {
   const allowedOrigins = [
     "https://abdullah-eymen-asru.github.io",
@@ -226,26 +241,91 @@ mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
 }
 `;
 
+// Bir single-select alana YENİ bir seçenek ekler. GitHub'ın API'si
+// (updateProjectV2SingleSelectField) bir "ekle" mutasyonu SUNMUYOR —
+// alanın TÜM seçenek listesini olduğu gibi geri gönderip sonuna yeni
+// seçeneği eklemen gerekiyor, yoksa var olan seçenekler silinir. Bu
+// yüzden `mevcutSecenekler`i (id+name+color) olduğu gibi koruyup sadece
+// sona bir tane daha ekliyoruz. Renk için basit, döngüsel bir palet
+// kullanılıyor — GitHub'ın renk zorunluluğu var ama hangi renk olduğu
+// önemli değil, panelin kendisi renk göstermiyor.
+const RENK_PALETI = ["GRAY", "BLUE", "GREEN", "YELLOW", "ORANGE", "RED", "PINK", "PURPLE"];
+
+const ADD_SINGLE_SELECT_OPTION_MUTATION = `
+mutation($projectId: ID!, $fieldId: ID!, $options: [ProjectV2SingleSelectFieldOptionInput!]!) {
+  updateProjectV2SingleSelectField(input: { projectId: $projectId, fieldId: $fieldId, options: $options }) {
+    projectV2SingleSelectField { id name options { id name } }
+  }
+}
+`;
+
+async function tekSecimAlaninaYeniSecenekEkle(token, projectDbId, field, yeniSecenekAdi) {
+  const mevcutSecenekler = (field.options || []).map((o, i) => ({
+    name: o.name,
+    color: RENK_PALETI[i % RENK_PALETI.length],
+    description: "",
+  }));
+  // Yarış/tekrar durumunda aynı isimde ikinci bir seçenek oluşturmayalım.
+  const zatenVarMi = mevcutSecenekler.find((o) => o.name === yeniSecenekAdi);
+  if (zatenVarMi) return field.options.find((o) => o.name === yeniSecenekAdi);
+
+  const guncelListe = [
+    ...mevcutSecenekler,
+    { name: yeniSecenekAdi, color: RENK_PALETI[mevcutSecenekler.length % RENK_PALETI.length], description: "" },
+  ];
+  const data = await githubGraphql(token, ADD_SINGLE_SELECT_OPTION_MUTATION, {
+    projectId: projectDbId,
+    fieldId: field.id,
+    options: guncelListe,
+  });
+  const guncelField = data.updateProjectV2SingleSelectField.projectV2SingleSelectField;
+  // field.options'ı da bellekte güncelle ki aynı istekte aynı alana ikinci
+  // bir yeni seçenek daha eklenirse (teoride olası değil ama savunma
+  // amaçlı) tekrar API'ye gitmeden bulunabilsin.
+  field.options = guncelField.options;
+  return guncelField.options.find((o) => o.name === yeniSecenekAdi);
+}
+
 // `alanlar`: panelden gelen { "Durum": "İzleniyor", "Puan": 7, ... } gibi
 // düz bir obje. Her anahtar projedeki field adıyla BİREBİR eşleşmeli
 // (panel formu bu adları projeBilgisiGetir() sonucundan zaten dinamik
 // olarak üretiyor, bkz. ilgili JS). Tip (text/number/date/singleSelect)
 // projenin kendi field tanımından okunuyor — panel tarafında ayrıca tip
-// belirtmeye gerek yok.
+// belirtmeye gerek yok. Single-select bir alan için değer "__yeni__:<isim>"
+// formatındaysa (bkz. panelin "+ Yeni seçenek ekle" seçeneği), önce panoya
+// yeni bir seçenek eklenir, sonra o seçenek kayda uygulanır.
 async function alanlariDoldur(token, project, projectDbId, itemId, alanlar) {
   const sonuclar = [];
-  for (const [alanAdi, deger] of Object.entries(alanlar)) {
-    if (deger === undefined || deger === null || deger === "") continue;
+  for (const [alanAdi, ham] of Object.entries(alanlar)) {
+    if (ham === undefined || ham === null || ham === "") continue;
     const field = project.fields.nodes.find((f) => f && f.name === alanAdi);
     if (!field) {
       sonuclar.push({ alan: alanAdi, basarili: false, hata: "Panoda bu isimde bir alan yok." });
       continue;
     }
+    if (!YAZILABILIR_DATATYPE_SETI.has(field.dataType)) {
+      // Savunma amaçlı ikinci kontrol — /alanlar zaten bu tipleri forma
+      // hiç koymuyor, ama panelin gönderdiği isteğe güvenmek yerine burada
+      // da doğruluyoruz (bkz. YAZILABILIR_DATATYPE_SETI tanımındaki not).
+      sonuclar.push({ alan: alanAdi, basarili: false, hata: "Bu alan türü (" + field.dataType + ") panel üzerinden yazılamıyor." });
+      continue;
+    }
     try {
       if (field.dataType === "SINGLE_SELECT") {
-        const secenek = field.options?.find((o) => o.name === deger);
+        const YENI_SECENEK_ONEKI = "__yeni__:";
+        let secenek;
+        if (typeof ham === "string" && ham.startsWith(YENI_SECENEK_ONEKI)) {
+          const yeniAd = ham.slice(YENI_SECENEK_ONEKI.length).trim();
+          if (!yeniAd) {
+            sonuclar.push({ alan: alanAdi, basarili: false, hata: "Yeni seçenek adı boş olamaz." });
+            continue;
+          }
+          secenek = await tekSecimAlaninaYeniSecenekEkle(token, projectDbId, field, yeniAd);
+        } else {
+          secenek = field.options?.find((o) => o.name === ham);
+        }
         if (!secenek) {
-          sonuclar.push({ alan: alanAdi, basarili: false, hata: `"${deger}" seçeneği panoda tanımlı değil.` });
+          sonuclar.push({ alan: alanAdi, basarili: false, hata: `"${ham}" seçeneği panoda tanımlı değil.` });
           continue;
         }
         await githubGraphql(token, SET_SINGLE_SELECT_MUTATION, {
@@ -259,21 +339,21 @@ async function alanlariDoldur(token, project, projectDbId, itemId, alanlar) {
           projectId: projectDbId,
           itemId,
           fieldId: field.id,
-          number: Number(deger),
+          number: Number(ham),
         });
       } else if (field.dataType === "DATE") {
         await githubGraphql(token, SET_DATE_MUTATION, {
           projectId: projectDbId,
           itemId,
           fieldId: field.id,
-          date: deger,
+          date: ham,
         });
       } else {
         await githubGraphql(token, SET_TEXT_MUTATION, {
           projectId: projectDbId,
           itemId,
           fieldId: field.id,
-          text: String(deger),
+          text: String(ham),
         });
       }
       sonuclar.push({ alan: alanAdi, basarili: true });
@@ -320,17 +400,11 @@ query($login: String!, $number: Int!, $cursor: String) {
 }
 `;
 
-const YERLESIK_ALANLAR = new Set([
-  "Title", "Status", "Assignees", "Labels", "Linked pull requests", "Milestone",
-  "Repository", "Reviewers", "Parent issue", "Sub-issues progress", "Created", "Updated", "Closed",
-]);
-
 function fieldValuesToObject(fieldValues) {
   const obj = {};
   for (const fv of fieldValues.nodes) {
     if (!fv || !fv.field || !fv.field.name) continue;
     const key = fv.field.name;
-    if (YERLESIK_ALANLAR.has(key)) continue;
     if (fv.text !== undefined) obj[key] = fv.text;
     else if (fv.number !== undefined) obj[key] = fv.number;
     else if (fv.date !== undefined) obj[key] = fv.date;
@@ -447,7 +521,11 @@ export default {
 
     // GET /alanlar?project=izleme|okuma — panelin formu dinamik olarak
     // kurabilmesi için projedeki field adlarını/tiplerini/seçeneklerini
-    // döner (yazma yapmaz, sadece okur).
+    // döner (yazma yapmaz, sadece okur). SADECE panelin yazabildiği 4
+    // dataType (TEXT/NUMBER/DATE/SINGLE_SELECT) döner — Assignees, Labels,
+    // Reviewers, Milestone, Repository gibi GitHub'ın yerleşik alanları
+    // (updateProjectV2ItemFieldValue ile yazılamadıkları için) forma hiç
+    // girmez, bkz. YAZILABILIR_DATATYPE_SETI tanımının üstündeki not.
     if (request.method === "GET" && url.pathname === "/alanlar") {
       const projectKey = url.searchParams.get("project");
       const projectConfig = PROJECTS[projectKey];
@@ -455,7 +533,7 @@ export default {
       try {
         const project = await projeBilgisiGetir(env.GITHUB_TOKEN, projectConfig.number);
         const fields = project.fields.nodes
-          .filter((f) => f && f.name && f.name !== "Title" && f.name !== "Status")
+          .filter((f) => f && f.name && f.name !== "Title" && YAZILABILIR_DATATYPE_SETI.has(f.dataType))
           .map((f) => ({
             name: f.name,
             dataType: f.dataType,
