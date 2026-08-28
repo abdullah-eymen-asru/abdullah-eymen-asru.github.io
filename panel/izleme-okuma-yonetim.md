@@ -82,18 +82,7 @@ permalink: "/panel/izleme-okuma-yonetim.html"
         düzenleme formu açılır.
       </p>
 
-      <div class="gy-arama-kutu" style="margin-bottom:14px;">
-        <span class="gy-arama-ikon" aria-hidden="true">🔎</span>
-        <input id="iy-liste-arama" type="search" placeholder="Ara…" autocomplete="off">
-        <button type="button" id="iy-liste-arama-temizle" class="gy-arama-temizle" hidden aria-label="Aramayı temizle">✕</button>
-      </div>
-
-      <button id="iy-liste-yenile-btn" type="button" class="btn-primary" style="width:auto; margin-bottom:12px;">Listeyi Yükle / Yenile</button>
-
-      <div id="iy-liste"><p class="muted">Henüz yüklenmedi.</p></div>
-      <p id="iy-liste-sonuc-yok" class="muted" hidden>Aramanla eşleşen kayıt bulunamadı.</p>
-
-      <div id="iy-duzenle-kutu" class="gy-onizleme-kutusu" hidden style="margin-top:20px;">
+      <div id="iy-duzenle-kutu" class="gy-onizleme-kutusu" hidden style="margin-bottom:20px;">
         <div class="gy-onizleme-baslik" id="iy-duzenle-baslik">Kaydı Düzenle</div>
         <form id="iy-duzenle-form" novalidate>
           <div class="form-field">
@@ -112,6 +101,17 @@ permalink: "/panel/izleme-okuma-yonetim.html"
         </form>
         <div id="iy-duzenle-message" class="auth-message" hidden></div>
       </div>
+
+      <div class="gy-arama-kutu" style="margin-bottom:14px;">
+        <span class="gy-arama-ikon" aria-hidden="true">🔎</span>
+        <input id="iy-liste-arama" type="search" placeholder="Ara…" autocomplete="off">
+        <button type="button" id="iy-liste-arama-temizle" class="gy-arama-temizle" hidden aria-label="Aramayı temizle">✕</button>
+      </div>
+
+      <button id="iy-liste-yenile-btn" type="button" class="btn-primary" style="width:auto; margin-bottom:12px;">Listeyi Yükle / Yenile</button>
+
+      <div id="iy-liste"><p class="muted">Henüz yüklenmedi.</p></div>
+      <p id="iy-liste-sonuc-yok" class="muted" hidden>Aramanla eşleşen kayıt bulunamadı.</p>
     </section>
 
   </div>
