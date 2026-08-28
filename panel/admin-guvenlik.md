@@ -36,6 +36,32 @@ uye_ayarlari_css: true
       <div id="ag-admin-listesi"><p class="muted">Yükleniyor...</p></div>
     </section>
 
+    <!-- SADECE owner (Site Sahibi) görür/kullanır — bkz. admin-guvenlik.js
+         init() içindeki ".sadece-owner" gizleme mantığı (admin/manager bu
+         bölümü hiç görmez). Gerçek/bağlayıcı kısıt her zaman veritabanında
+         (migration 0031_uyelik_kayitlarini_ac_kapat.sql, owner_kayitlari_ac_kapat
+         RPC'si + trg_kayitlar_acik_sadece_owner trigger'ı) — bu bölüm sadece
+         arayüz katmanıdır. -->
+    <section class="panel-section sadece-owner">
+      <h2>👥 Üyelik Kayıtları</h2>
+      <p class="muted">
+        Kapatırsan veri tabanına yeni bir üye kaydı düşmez — Google ile de,
+        normal (e-posta/şifre) ile de kimse kayıt olamaz, kayıt sayfası
+        yerine bir uyarı ekranı görür. Daha önce hesap oluşturmuş kimseler
+        bundan ETKİLENMEZ, girişe devam edebilirler. Bu yetki sadece Site
+        Sahibi'ne (owner) aittir, admin bile değiştiremez.
+      </p>
+      <p>
+        Şu an durum:
+        <strong id="ag-kayitlar-durum">Yükleniyor...</strong>
+      </p>
+      <div style="display:flex; gap:10px;">
+        <button id="ag-kayitlari-kapat-btn" type="button" class="btn-danger" style="width:auto;">Kayıtları Kapat</button>
+        <button id="ag-kayitlari-ac-btn" type="button" class="btn-primary" style="width:auto;">Kayıtları Aç</button>
+      </div>
+      <div id="ag-kayitlar-message" class="auth-message" hidden></div>
+    </section>
+
     <section class="panel-section">
       <h2>🔴 Bir Admin'i Askıya Al ("Acil Fren")</h2>
       <p class="muted">
