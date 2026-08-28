@@ -559,9 +559,10 @@ export default {
     let rol = null;
     let kullaniciAdi = null;
     let kullaniciEmail = null;
+    let askidaMi = false;
     try {
       const profilRes = await fetch(
-        `${env.SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=role,full_name,email`,
+        `${env.SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=role,full_name,email,is_suspended`,
         {
           headers: {
             apikey: env.SUPABASE_SERVICE_ROLE_KEY,
@@ -573,8 +574,24 @@ export default {
       rol = profilData?.[0]?.role || null;
       kullaniciAdi = profilData?.[0]?.full_name || null;
       kullaniciEmail = profilData?.[0]?.email || null;
+      askidaMi = !!profilData?.[0]?.is_suspended;
     } catch (_err) {
       return jsonHata("Rol bilgisi okunamadı.", 500);
+    }
+
+    // GÜVENLİK AÇIĞI DÜZELTMESİ (kritik): bu kontrol ÖNCEDEN yoktu.
+    // migration 0021 § 2, is_admin()'i (ve ona bağlı TÜM RLS/RPC'leri)
+    // "askıya alınan admin ANINDA yetkisiz kalsın" garantisiyle tek bir
+    // yerde tanımlıyor — ama bu Worker Supabase RLS'i hiç kullanmıyor,
+    // kendi role='admin'/'editor'/'manager'/'owner' kontrolünü doğrudan
+    // service_role ile yapıyor, yani is_suspended'a hiç bakmıyordu. Sonuç:
+    // askıya alınmış bir admin, panel içindeki her yerde (RLS sayesinde)
+    // yetkisiz kalırken, bu Worker'a DOĞRUDAN istek atarak (panel hâlâ
+    // eski JWT'siyle) blog/proje içeriğini yazmaya/silmeye/yönetmeye devam
+    // edebiliyordu — migration 0021'in "askıya almak TÜM admin yetkili
+    // noktaları anında kapatır" garantisini bu TEK Worker baştan aşıyordu.
+    if (askidaMi && rol === "admin") {
+      return jsonHata("Hesabın askıya alındı, bu işlemi yapamazsın.", 403);
     }
 
     // BUG FİX: 'owner' (Site Sahibi, migration 0021) burada eksikti — owner
