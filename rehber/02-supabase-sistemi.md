@@ -892,6 +892,80 @@ istemedim.
 
 Bu bölüm, siteye/Supabase kullanıcı sistemine sonradan yapılan düzeltmelerin tarih sırasıyla özetidir — hangi sorun bildirildi, kök nedeni neydi, nasıl çözüldü ve (varsa) senin elle yapman gereken adım neydi. Eskiden kökte ayrı `DEGISIKLIKLER_*.md` dosyaları halinde duruyordu, artık tek doğruluk kaynağı burası — en yeni turu en üstte bulursun.
 
+### 🗓️ 29.08.2026 — GÜVENLİK TARAMASI: 3 gerçek açık bulundu ve düzeltildi
+
+Genel bir güvenlik taraması istendi. Üçü de gerçek, istismar edilebilir açıktı (teorik değil):
+
+**1) KRİTİK — admin, owner hesabını tamamen ele geçirebiliyordu.**
+`supabase/functions/admin-change-email/index.ts` hedefin KİM olduğuna hiç
+bakmıyordu — sıradan bir admin, "Kullanıcılar & Roller" sayfasındaki
+(herkese açık, hiç gizlenmeyen) "E-posta Değiştir" butonuyla owner'ın
+e-postasını kendi kontrolündeki bir adrese çevirip (`email_confirm:true`
+ile ANINDA uygulanıyor, hiçbir onay beklenmiyor) ardından o adrese giden
+şifre sıfırlama linkiyle owner hesabını tamamen ele geçirebilirdi. Düzeltme:
+fonksiyon artık hedef owner ise VE çağıran owner değilse reddediyor
+(migration 0027 § A'nın "admin, owner'ın profiline dokunamaz" ilkesiyle
+aynı); panelde de buton owner'ın kartında artık admin'den gizleniyor
+(`assets/js/uye-ayarlari.js`).
+
+**2) YÜKSEK — askıya alınan admin, veritabanı seviyesinde HÂLÂ tam
+yetkiliydi.** migration 0021, is_admin()'i "askıya alınca HER YERDE anında
+yetkisiz kalınır" garantisiyle tanımlamıştı ama bu YANLIŞTI: `is_editor_or_
+admin()`, `is_manager_or_admin()`, `has_content_access()`,
+`is_admin_or_owner_gorebilir()` ve `admin_force_signout_user()`
+fonksiyonlarının HİÇBİRİ `is_suspended`'a bakmıyordu. Yani askıya alınmış
+bir admin, panelin kendisini kullanamasa da, Supabase API'sine (RLS
+politikaları bu fonksiyonları kullanıyor) doğrudan istek atarak içerik
+yazma/silme, özel içerik erişimi, Admin Güvenliği listelerini görme ve
+başka kullanıcıları zorla çıkışa zorlama yetkilerini korumaya devam
+ediyordu. Düzeltme: bu beş fonksiyona da is_admin()'deki AYNI
+`coalesce(is_suspended,false)=false` kontrolü eklendi (bkz. migration 0032).
+
+**3) ORTA — Cloudflare Worker'lar da askıya almayı görmezden geliyordu.**
+`github_icerik_yonetim_worker.js` (GitHub içerik yönetimi) ve
+`r2_storage_worker.js` (özel dosya indirme) kendi rol kontrollerini
+Supabase RLS'den BAĞIMSIZ, doğrudan service_role ile yapıyor ve
+is_suspended'ı hiç sormuyordu — yukarıdaki (2) numaralı düzeltme bile bu
+ikisini kapsamıyordu. İkisine de is_suspended kontrolü eklendi.
+
+#### Değişen dosyalar
+- `supabase/functions/admin-change-email/index.ts`
+- `assets/js/uye-ayarlari.js`
+- `cloudflare worker/github_icerik_yonetim_worker/worker.js`
+- `cloudflare worker/r2_storage_worker/worker.js`
+- `rehber/02-supabase-sistemi.md` (bu changelog girdisi)
+
+#### Eklenen dosyalar
+- `supabase/migrations/0032_askiya_alinan_admin_tum_yerlerde_yetkisiz.sql` ⚠️ **YENİ — Supabase SQL Editor'de çalıştırman gerekiyor.**
+
+#### Uygulama adımları
+1. **Supabase Dashboard > SQL Editor**'de `0032_askiya_alinan_admin_tum_yerlerde_yetkisiz.sql`'i çalıştır.
+2. **Cloudflare Dashboard**'da `github_icerik_yonetim_worker` ve `r2_storage_worker`'ın kodunu bu güncel haliyle yeniden deploy et (Worker'lar ayrı deploy edilir, GitHub Pages/statik site yayınıyla otomatik güncellenmez).
+3. Geri kalan dosyalar (Edge Function, panel JS) her zamanki gibi yayınla — `admin-change-email` bir Supabase Edge Function olduğu için `supabase functions deploy admin-change-email` ile (ya da Dashboard'dan) ayrıca deploy edilmesi gerekir.
+
+---
+
+### 🗓️ 28.08.2026 (2. Tur) — BUG FİX: `requireAuth({role:'owner'})` fiilen admin'i de içeri alıyordu
+
+Bir önceki tur eklenen "Üyelik Kayıtları" bölümünü ".sadece-owner" ile
+admin'den gizlerken fark edildi: `auth-guard.js` içindeki `roleOk`
+hesabında "admin her zaman geçer" kuralı KOŞULSUZDU — yani
+`requireAuth({role:'owner'})` isteyen bir sayfa (ör.
+`panel/izleme-okuma-yonetim.md`, o dosyanın kendi yorumunda "sadece owner,
+admin dahi giremez" dediği halde) aslında admin'i de içeri alıyordu.
+Sadece client-side bir kontrol olduğu için (gerçek kısıt zaten veritabanı/
+RPC tarafında owner'a kilitliydi) bu bir güvenlik açığı değildi, ama
+sayfanın kendi belgelediği davranışla çelişiyordu. Artık "admin her zaman
+geçer" kuralı SADECE istenen rol tam olarak `'owner'` (ya da `['owner']`)
+olduğunda devre dışı — diğer tüm `requireAuth({role:...})` çağrılarının
+davranışı (admin'in editor/manager/special_user/admin sayfalarına girmesi)
+değişmedi.
+
+#### Değişen dosyalar
+- `assets/js/auth/auth-guard.js`
+
+---
+
 ### 🗓️ 28.08.2026 — Üyelik kayıtlarını açma/kapatma yetkisi (sadece Site Sahibi)
 
 İstek: "Sadece site sahibinin yetkisinde olacak bir yetki: siteye üye
