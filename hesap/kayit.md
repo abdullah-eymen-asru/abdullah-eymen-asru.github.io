@@ -11,6 +11,23 @@ permalink: "/hesap/kayit.html"
   <div id="auth-message" class="auth-message" hidden></div>
   <div id="auth-spam-notice" class="auth-spam-notice" hidden></div>
 
+  <!-- ÜYELİK KAYITLARI KAPALIYSA gösterilen uyarı ekranı — bkz.
+       assets/js/auth/auth-pages.js -> initKayitPage(). Sayfa açılır
+       açılmaz site_settings.kayitlar_acik kontrol edilir; kapalıysa bu
+       kutu gösterilir ve #kayit-aktif-alan (form + Google butonu + KVKK
+       onayı) TAMAMEN gizlenir. Gerçek/bağlayıcı kısıt her zaman
+       veritabanındadır (migration 0031) — bu sadece kullanıcı deneyimi. -->
+  <div id="kayit-kapali-uyari" hidden>
+    <p>
+      Üyelik kayıtları şu anda kapalı, yeni hesap oluşturulamıyor. Daha
+      önce hesap oluşturduysan
+      <a href="{{ '/hesap/giris.html' | relative_url }}">giriş yap</a>
+      sayfasından giriş yapmaya devam edebilirsin.
+    </p>
+  </div>
+
+  <div id="kayit-aktif-alan">
+
   <!-- KVKK onayı BİLEREK formun dışında, en üstte duruyor: hem e-posta/şifre
        ile kayıtta hem de aşağıdaki "Google ile Kayıt Ol" butonunda ortak
        kullanılıyor (Google'ın kendi ekranında KVKK onayı almadığımız için
@@ -61,6 +78,8 @@ permalink: "/hesap/kayit.html"
     <a href="{{ '/hesap/giris.html' | relative_url }}">Zaten hesabın var mı? Giriş yap</a>
     <a id="kod-ile-onayla-link" href="{{ '/hesap/hesap-onayla.html' | relative_url }}">Linke tıklayamıyor musun? Kodla onayla</a>
   </div>
+
+  </div><!-- #kayit-aktif-alan -->
 </div>
 
 <script type="module">
