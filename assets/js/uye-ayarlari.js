@@ -285,7 +285,7 @@ function uyeKartHtml(u) {
           <span class="rol-durum" data-id="${u.id}"></span>
           ${sahipYapButonuHtml(u)}
           ${kendiYetkimiDusurButonuHtml(u)}
-          <button class="btn-secondary tablo-aksiyon-btn eposta-degistir-btn" data-id="${u.id}" data-email="${escapeHtml(u.email)}" data-isim="${escapeHtml(u.full_name || u.email)}">E-posta Değiştir</button>
+          ${epostaDegistirButonuHtml(u)}
           ${silButonuHtml(u)}
         </div>
       </div>
@@ -305,6 +305,28 @@ function uyeKartHtml(u) {
 function silButonuHtml(u) {
   if (GIRIS_YAPAN_PROFIL?.role !== "owner") return "";
   return `<button class="btn-danger tablo-aksiyon-btn uye-sil-btn" data-id="${u.id}" data-email="${escapeHtml(u.email)}">Sil</button>`;
+}
+
+/**
+ * "E-posta Değiştir" butonu — GÜVENLİK AÇIĞI DÜZELTMESİ (kritik): bu buton
+ * ÖNCEDEN owner'ın VE diğer admin'lerin kartında da HİÇBİR kısıtlama
+ * olmadan görünüyordu, yani sıradan bir admin (owner DEĞİL) hem owner'ın
+ * hem de BAŞKA bir admin'in e-postasını değiştirip (Edge Function
+ * admin-change-email, email_confirm:true ile ANINDA uygular, hiçbir onay
+ * beklemez) ardından gönderilen şifre sıfırlama mailini kendi eline
+ * geçirerek o hesabı TAMAMEN ele geçirebilirdi. Kural artık
+ * admin_set_user_role()'daki emsalle (migration 0024, "bir admin başka bir
+ * admin'in rolünü doğrudan değiştiremez") AYNI: hedef admin VEYA owner ise
+ * VE kendi satırın DEĞİLSE, SADECE owner değiştirebilir. Gerçek/bağlayıcı
+ * kısıt artık supabase/functions/admin-change-email/index.ts içinde
+ * (service_role ile çalıştığı, yani RLS'i tamamen atladığı için asıl
+ * güvence orada olmak ZORUNDA) — bu sadece kullanıcı deneyimi katmanıdır.
+ */
+function epostaDegistirButonuHtml(u) {
+  const hedefUstDuzeyMi = u.role === "admin" || u.role === "owner";
+  const kendiSatiriMi = !!GIRIS_YAPAN_PROFIL?.id && GIRIS_YAPAN_PROFIL.id === u.id;
+  if (hedefUstDuzeyMi && !kendiSatiriMi && GIRIS_YAPAN_PROFIL?.role !== "owner") return "";
+  return `<button class="btn-secondary tablo-aksiyon-btn eposta-degistir-btn" data-id="${u.id}" data-email="${escapeHtml(u.email)}" data-isim="${escapeHtml(u.full_name || u.email)}">E-posta Değiştir</button>`;
 }
 
 /**
