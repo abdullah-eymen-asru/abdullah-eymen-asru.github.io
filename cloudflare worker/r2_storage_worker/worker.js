@@ -184,7 +184,7 @@ export default {
       };
 
       const profilRes = await fetch(
-        `${env.SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=role`,
+        `${env.SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=role,is_suspended`,
         { headers: restHeaders }
       );
       const profilData = profilRes.ok ? await profilRes.json() : [];
@@ -193,6 +193,7 @@ export default {
       // content_access ataması aranmadan) erişebiliyor — bkz.
       // supabase/migrations/0016_..._admin_adina_onay.sql ve panel/admin.md.
       const rol = profilData?.[0]?.role;
+      const askidaMi = !!profilData?.[0]?.is_suspended;
       // İSTEK (bkz. supabase/migrations/0023_..._erisim_duzeltmeleri.sql § D):
       // özel içerik ve R2 storage erişimi artık SADECE admin/manager/owner
       // için değil, role='user' (sıradan Üye) HARİÇ HERKES için blanket
@@ -204,7 +205,15 @@ export default {
       // gerekiyor — biri güncellenip diğeri unutulursa iki taraf arasında
       // tutarsızlık (ör. sayfada dosya görünür ama indirme linki 403 döner
       // ya da tam tersi) oluşur.
-      const herkeseAcikRolMu = !!rol && rol !== "user";
+      //
+      // GÜVENLİK AÇIĞI DÜZELTMESİ (bkz. migration
+      // 0032_askiya_alinan_admin_tum_yerlerde_yetkisiz.sql — has_content_
+      // access() tarafında AYNI düzeltme yapıldı): is_suspended hiç
+      // sorulmuyordu, yani askıya alınmış bir admin bu Worker'dan HER
+      // R2 dosyasını indirmeye devam edebiliyordu. Sadece 'admin' rolü
+      // askıya alınabildiği için (owner asla, diğerleri bu sisteme dahil
+      // değil) kontrolü tüm rollere uygulamak zararsız.
+      const herkeseAcikRolMu = !!rol && rol !== "user" && !askidaMi;
 
       if (!herkeseAcikRolMu) {
         if (!uuidRegex.test(contentId)) {
