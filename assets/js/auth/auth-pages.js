@@ -9,6 +9,8 @@ import {
   showMessage,
   showSpamNotice,
   KVKK_METIN_SURUMU,
+  KAYITLAR_KAPALI_ISARETI,
+  kayitlarAcikMi,
   turkceOtpHatasi,
   oturumHatirlamaTercihiniKaydet,
 } from "../core/supabase-client.js";
@@ -343,12 +345,33 @@ export function initGirisPage() {
       "success"
     );
   } else if (hashParams.get("error")) {
-    showMessage(msg, "Linkin süresi dolmuş veya geçersiz. Panelden yeni bir onay linki iste.");
-    // Google girişi sırasında kullanıcı OAuth ekranını iptal ettiyse ya da
-    // bir hata döndüyse, bir sonraki normal ziyarette yanlışlıkla tekrar
-    // "Google dönüşü" sanılmasın diye bekleyen bayrağı temizliyoruz.
+    // ÜYELİK KAYITLARI KAPALIYKEN "Google ile Giriş Yap"a hiç kayıtlı
+    // olmayan bir Google hesabıyla tıklanmışsa: Supabase bu e-postayı yeni
+    // bir kullanıcı olarak auth.users'a yazmaya çalışır, migration
+    // 0031'deki handle_new_user() trigger'ı bunu reddeder ve OAuth dönüşü
+    // buraya bir hata hash'iyle döner. Bu durumu genel "linkin süresi
+    // dolmuş" mesajından ayırmak için (GoTrue'nun hata metnini AYNEN
+    // yansıtacağı garanti olmadığından) durumu bağımsızca, güncel
+    // site_settings'ten tekrar sorup ayırt ediyoruz — sadece bu Google
+    // giriş akışı sırasındaysak (GOOGLE_GIRIS_INTENT_KEY) anlamlı.
+    const googleGirisimiSirasindaydi = sessionStorage.getItem(GOOGLE_GIRIS_INTENT_KEY) === "1";
     sessionStorage.removeItem(GOOGLE_GIRIS_INTENT_KEY);
     sessionStorage.removeItem(GOOGLE_GIRIS_DONUS_KEY);
+
+    if (googleGirisimiSirasindaydi) {
+      kayitlarAcikMi().then((acik) => {
+        if (!acik) {
+          showMessage(
+            msg,
+            'Bu Google hesabıyla kayıtlı bir kullanıcı bulunamadı ve üyelik kayıtları şu anda kapalı, yeni hesap oluşturulamıyor.'
+          );
+        } else {
+          showMessage(msg, "Linkin süresi dolmuş veya geçersiz. Panelden yeni bir onay linki iste.");
+        }
+      });
+    } else {
+      showMessage(msg, "Linkin süresi dolmuş veya geçersiz. Panelden yeni bir onay linki iste.");
+    }
   }
 
   // "Google ile Giriş Yap" butonuna tıklandıktan sonra Supabase bizi buraya
@@ -488,9 +511,29 @@ function googleGirisDonusunuIsle(msg) {
 /* ---------------------------------------------------------------------- */
 /* KAYIT SAYFASI (hesap/kayit.html)                                       */
 /* ---------------------------------------------------------------------- */
-export function initKayitPage() {
-  const form = document.getElementById("kayit-form");
+export async function initKayitPage() {
   const msg = document.getElementById("auth-message");
+  const aktifAlan = document.getElementById("kayit-aktif-alan");
+  const kapaliUyari = document.getElementById("kayit-kapali-uyari");
+
+  // ÜYELİK KAYITLARI KAPALI MI? (bkz. migration 0031 + supabase-client.js
+  // -> kayitlarAcikMi). Bu SADECE kullanıcı deneyimi katmanı — formu hiç
+  // göstermeyip erkenden çıkıyoruz ki kimse boşuna doldurmasın; asıl
+  // bağlayıcı kısıt veritabanındaki handle_new_user() trigger'ıdır (aşağıda
+  // form submit / Google buton dinleyicileri hiç bağlanmadığı için, formu
+  // DOM'dan gizlemek yetmiyormuş gibi bir durumda bile submit çalışmaz).
+  if (!(await kayitlarAcikMi())) {
+    aktifAlan?.setAttribute("hidden", "");
+    if (kapaliUyari) kapaliUyari.hidden = false;
+    // Google ile kayıt denemesi TAM BU SIRADA (kayıtlar kapanmadan hemen
+    // önce başlatılmış ve şimdi) reddedilmiş olabilir — bekleyen bayrağı
+    // temizliyoruz ki kayıtlar tekrar açıldığında bir sonraki ziyarette
+    // bu sayfa yanlışlıkla "Google dönüşü" sanıp işlemeye çalışmasın.
+    sessionStorage.removeItem(GOOGLE_KAYIT_INTENT_KEY);
+    return;
+  }
+
+  const form = document.getElementById("kayit-form");
   const googleBtn = document.getElementById("google-kayit-btn");
   // "Kod ile onayla" linki: kayıt başarılı olunca bu linkin href'ine
   // ?email=... ekliyoruz ki hesap-onayla.html açılınca e-posta alanı
@@ -557,6 +600,12 @@ export function initKayitPage() {
     if (error) {
       if (error.message.includes("already registered") || error.message.includes("already been registered")) {
         showMessage(msg, "Bu e-postayla zaten bir hesabın var, kayıt olmana gerek yok. Giriş yapmayı dene.");
+      } else if (error.message.includes(KAYITLAR_KAPALI_ISARETI)) {
+        // Sayfa açılırken kayıtlar açıktı ama tam bu sırada (nadir bir
+        // yarış durumu) owner kapattı — asıl bağlayıcı kontrol veritabanı
+        // trigger'ında (bkz. migration 0031), burada sadece kullanıcı
+        // dostu bir mesaja çeviriyoruz.
+        showMessage(msg, "Üyelik kayıtları az önce kapatıldı, kayıt tamamlanamadı.");
       } else {
         showMessage(msg, "Kayıt olunamadı: " + error.message);
       }
