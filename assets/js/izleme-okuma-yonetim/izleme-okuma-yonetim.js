@@ -94,7 +94,44 @@ function alanGirdiElemaniOlustur(alan, idOneki, mevcutDeger) {
       if (mevcutDeger !== undefined && String(mevcutDeger) === secenek) opt.selected = true;
       select.appendChild(opt);
     });
+
+    // "+ Yeni seçenek ekle…" — her single-select alanın sonuna eklenir.
+    // Seçildiğinde altında bir metin kutusu açılır; oraya yazılan değer
+    // gönderim anında "__yeni__:<isim>" olarak işaretlenip Worker'a
+    // gidiyor, Worker da o seçeneği PANOYA kalıcı olarak ekleyip kayda
+    // uyguluyor (bkz. worker.js — tekSecimAlaninaYeniSecenekEkle).
+    const yeniOpt = document.createElement("option");
+    yeniOpt.value = "__yeni_secenek_ac__";
+    yeniOpt.textContent = "+ Yeni seçenek ekle…";
+    select.appendChild(yeniOpt);
     wrap.appendChild(select);
+
+    const yeniSecenekInput = document.createElement("input");
+    yeniSecenekInput.type = "text";
+    yeniSecenekInput.placeholder = "Yeni seçenek adı…";
+    yeniSecenekInput.hidden = true;
+    yeniSecenekInput.style.marginTop = "8px";
+    wrap.appendChild(yeniSecenekInput);
+
+    select.addEventListener("change", () => {
+      if (select.value === "__yeni_secenek_ac__") {
+        yeniSecenekInput.hidden = false;
+        yeniSecenekInput.focus();
+        // select'in KENDİSİ artık "gerçek" bir değer taşımıyor — asıl
+        // değeri formdanAlanlariTopla() bu input'tan (data-alan-adi burada
+        // da var, aşağıda ayarlanıyor) okuyacak. select'in kendi
+        // data-alan-adi'nı GEÇİCİ olarak kaldırıyoruz ki iki eleman aynı
+        // anda toplanıp birbirini ezmesin.
+        delete select.dataset.alanAdi;
+        yeniSecenekInput.dataset.alanAdi = alan.name;
+        yeniSecenekInput.dataset.yeniSecenek = "true";
+      } else {
+        yeniSecenekInput.hidden = true;
+        yeniSecenekInput.value = "";
+        delete yeniSecenekInput.dataset.alanAdi;
+        select.dataset.alanAdi = alan.name;
+      }
+    });
   } else {
     const input = document.createElement("input");
     input.id = inputId;
@@ -121,7 +158,11 @@ function formdanAlanlariTopla(containerId) {
   container.querySelectorAll("[data-alan-adi]").forEach((el) => {
     const deger = el.value;
     if (deger !== "" && deger !== null && deger !== undefined) {
-      alanlar[el.dataset.alanAdi] = deger;
+      // "+ Yeni seçenek ekle…" seçilip yanına yazılan değer — Worker'a
+      // "__yeni__:<isim>" olarak gönderiyoruz, Worker bunu görünce önce
+      // panoya kalıcı bir seçenek olarak ekleyip sonra kayda uyguluyor
+      // (bkz. alanGirdiElemaniOlustur + worker.js).
+      alanlar[el.dataset.alanAdi] = el.dataset.yeniSecenek === "true" ? `__yeni__:${deger}` : deger;
     }
   });
   return alanlar;
@@ -318,7 +359,7 @@ async function duzenlemeFormunuAc(item) {
   const alanlarContainer = document.getElementById("iy-duzenle-alanlar-container");
   alanlarContainer.innerHTML = '<p class="muted">Alanlar yükleniyor…</p>';
   kutu.hidden = false;
-  kutu.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  kutu.scrollIntoView({ behavior: "smooth", block: "start" });
 
   try {
     // Alanlar zaten "ekle" modunda çekilmiş olabilir ama koleksiyon
