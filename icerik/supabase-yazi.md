@@ -20,12 +20,32 @@ sitemap: false
   satırlarına bakar) ve normal bir yazı gibi paylaşılabilir/indekslenebilir.
 -->
 
-<article class="project-detail" id="supabase-yazi-app">
+<article class="project-detail" id="supabase-yazi-app"
+  {% if site.adsense_client_id and site.adsense_client_id != "" %}
+  data-adsense-client="{{ site.adsense_client_id }}"
+  data-adsense-slot="{{ site.adsense_slot_icerik_alt }}"
+  {% endif %}>
   <a href="#" id="supabase-yazi-geri-link" class="back-link">← Geri</a>
 
   <div id="supabase-yazi-govde">
     <p class="loading">Yükleniyor...</p>
   </div>
 </article>
+
+{% if site.adsense_client_id and site.adsense_client_id != "" %}
+<script>
+  // bkz. assets/js/core/site-islemleri.js reklamUygula() — bu şablon TEK
+  // (hangi içeriğin gösterileceği ancak çalışma zamanında, bir RPC ile
+  // belli olan) bir sayfa olduğu için, sayfa açılışında otomatik reklam
+  // yüklemesi burada TETİKLENMEZ; supabase-yazi.js kendi çektiği kaydın
+  // `reklam` alanına bakıp uygunsa window.__cerezReklamYukle()'yi
+  // KENDİSİ, elle çağırır. Bu satır bu tetiklemeyi ("Reklam" onayı zaten
+  // verilmişse sayfa açılır açılmaz otomatik ateşlenecek genel kuralı)
+  // devre dışı bırakmak için var; site-islemleri.js deferred olduğu için
+  // (bkz. _layouts/default.html) bu inline script HER ZAMAN ondan önce
+  // çalışır.
+  window.__reklamOtomatikYuklemeKapali = true;
+</script>
+{% endif %}
 
 <script type="module" src="{{ '/assets/js/github-yonetim/supabase-yazi.js' | relative_url }}"></script>
