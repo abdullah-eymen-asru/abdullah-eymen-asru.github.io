@@ -24,6 +24,17 @@ comment on column public.taslak_icerikler.reklam is
 
 -- sadece_supabase_yazi_getir(): tek değişiklik, döndürülen kolonlara
 -- `reklam` eklendi — gövdenin geri kalanı migration 0015'teki hâliyle AYNI.
+--
+-- NOT (Postgres kısıtı): RETURNS TABLE listesine yeni bir sütun eklemek,
+-- fonksiyonun dönüş satır tipini değiştirir; CREATE OR REPLACE bunu KABUL
+-- ETMEZ ("cannot change return type of existing function... Row type
+-- defined by OUT parameters is different"). Önce DROP etmek gerekiyor —
+-- DROP, fonksiyona verilmiş GRANT'ları da SİLER, bu yüzden aşağıda
+-- yeniden CREATE ettikten hemen sonra migration 0015'teki grant satırı
+-- burada TEKRARLANIYOR (aksi hâlde anon/authenticated bu RPC'yi
+-- çağıramaz hâle gelirdi).
+drop function if exists public.sadece_supabase_yazi_getir(text, text);
+
 create or replace function public.sadece_supabase_yazi_getir(p_tur text, p_slug text)
 returns table (
   baslik      text,
@@ -50,6 +61,8 @@ as $$
     and t.tarih <= current_date
   limit 1;
 $$;
+
+grant execute on function public.sadece_supabase_yazi_getir(text, text) to anon, authenticated;
 
 -- ============================================================================
 -- BİTTİ. Test: panelden bir yazıda "Reklam" anahtarını kapatıp taslak olarak
