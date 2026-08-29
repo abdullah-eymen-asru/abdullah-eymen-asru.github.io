@@ -1,0 +1,10 @@
+---
+# Bu dosyanın front-matter'ı (boş da olsa) Jekyll'e onu Liquid ile işlemesini
+# söyler — düz bir .txt dosyası olsaydı aşağıdaki {{ }}/{% %} etiketleri
+# OLDUĞU GİBİ (işlenmemiş metin olarak) kopyalanırdı.
+permalink: /ads.txt
+---
+{% if site.adsense_client_id and site.adsense_client_id != "" %}
+{%- assign pub_id = site.adsense_client_id | remove: "ca-" -%}
+google.com, {{ pub_id }}, DIRECT, f08c47fec0942fa0
+{% endif -%}
