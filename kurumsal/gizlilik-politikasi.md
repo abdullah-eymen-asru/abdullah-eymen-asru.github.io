@@ -119,6 +119,19 @@ permalink: "/kurumsal/gizlilik-politikasi.html"
   çerez onayı olmadan hiçbir şekilde çalışmaz</strong> — açık rızanı
   vermeden Google Analytics çerezi kurulmaz.
 </p>
+<p>
+  Site, gelir elde etmek amacıyla <strong>Google AdSense</strong> reklam
+  ağını da kullanabilir (bazı sayfalarda hiç reklam bulunmayabilir). Bu
+  ağ etkinleştirildiğinde, Google ve reklam ortakları; siteyi ve
+  internetteki diğer siteleri ziyaretlerinize göre size ilginizi çekebilecek
+  reklamlar göstermek için çerez ve benzer teknolojiler kullanabilir.
+  Google'ın reklam çerezlerini nasıl kullandığı hakkında bilgi ve
+  kişiselleştirilmiş reklamlardan çıkma (opt-out) seçeneği için
+  <a href="https://adssettings.google.com/" target="_blank">Google Reklam Ayarları</a>'nı
+  ve <a href="https://policies.google.com/technologies/ads" target="_blank">Google'ın Reklamcılıkta Kullandığı Teknolojiler</a>
+  sayfasını ziyaret edebilirsiniz. <strong>Bu ağ da, aşağıdaki § 9'da
+  açıklanan çerez onayı olmadan hiçbir şekilde çalışmaz.</strong>
+</p>
 
 <h2>8. Yorumlar</h2>
 <p>
@@ -188,6 +201,24 @@ permalink: "/kurumsal/gizlilik-politikasi.html"
         gereği) SİLEMEZ — bunları kaldırmak istersen tarayıcının kendi
         "Site Verileri/Çerezler" ayarlarından o alan adlarını aramanız
         gerekir.
+      </td>
+    </tr>
+    <tr>
+      <td><strong>Reklam</strong></td>
+      <td>
+        Google AdSense; reklam gösterimi ve reklamların ilgi alanınıza
+        göre kişiselleştirilmesi için google.com/googlesyndication.com
+        alan adlarından çerez kurabilir (bkz. § 7).
+      </td>
+      <td>
+        Evet — reddedersen reklam script'i hiç yüklenmez, sayfada hiçbir
+        reklam (otomatik ya da yazı-içi) görünmez; sonradan kapatırsan
+        mevcut reklamlar kaldırılır. <strong>Önemli sınır:</strong> Giscus
+        ile aynı sebeple, google.com/googlesyndication.com alan adlarında
+        zaten oluşmuş çerezleri bu site SİLEMEZ — kaldırmak istersen
+        tarayıcının kendi "Site Verileri/Çerezler" ayarlarından o alan
+        adlarını aramanız ya da yukarıdaki Google Reklam Ayarları
+        sayfasını kullanmanız gerekir.
       </td>
     </tr>
   </tbody>
