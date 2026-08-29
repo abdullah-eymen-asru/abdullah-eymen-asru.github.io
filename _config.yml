@@ -11,6 +11,19 @@ okuma_projects_url: "https://github.com/users/abdullah-eymen-asru/projects/3/vie
 substack_url: "https://abdullaheymenasru.substack.com"
 substack_feed: "https://abdullaheymenasru.substack.com/feed"
 google_analytics_id: "G-DJ4M58RB0P"   # Google Analytics'ten alacağın Measurement ID
+
+# ADSENSE (reklam) — boşsa (varsayılan) reklam sisteminin TAMAMI (Otomatik
+# Reklamlar + manuel yazı-içi blok + çerez onay panelindeki "Reklam"
+# kategorisi) devre dışı kalır, hiçbir yerde görünmez. AdSense hesabın
+# onaylandığında buraya "ca-pub-XXXXXXXXXXXXXXXX" formatındaki yayıncı
+# kimliğini yaz — bkz. rehber/02-supabase-sistemi.md "AdSense hazırlığı"
+# girdisi.
+adsense_client_id: ""
+# Manuel yazı-içi reklam bloğu için AdSense'te oluşturacağın ayrı bir "Görüntülü
+# reklam" (display ad) birimi kimliği (sadece rakam, "data-ad-slot" değeri).
+# Boşsa yazı içine manuel blok eklenmez, sadece Otomatik Reklamlar çalışır
+# (adsense_client_id doluysa).
+adsense_slot_icerik_alt: ""
 profile_image: "/assets/profile.webp"   # örn: "/assets/profil.jpg" - fotoğrafı assets/ klasörüne yükleyip yolunu buraya yaz
 cloudflare_worker_url: "https://izleme-okuma-api.aeymena.workers.dev"   # Cloudflare Worker'ı deploy edince buraya yapıştır
 mirror_site_url: "https://abdullah-eymen-asru.pages.dev"   # İkincil/yedek kopya   # Aynı sitenin Cloudflare Pages'teki yedek kopyası
