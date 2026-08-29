@@ -1596,6 +1596,15 @@ function dosyaIcerigiOlustur(tur, alan, gizliKod, govde, yayinda = true) {
   // Admin-adına DEĞİLSE (normal durum) bu, yazar_id ile aynı kişidir.
   satirlar.push(fmSatiri("olusturan_id", alan.olusturanId));
 
+  // reklam: SADECE kapalıyken (alan.reklam === false) yazılır — açıkken
+  // front-matter'da hiç görünmez (bkz. rehber 02'deki "AdSense hazırlığı"
+  // girdisi). _layouts/default.html bu alanı `page.reklam == false` ile
+  // okur; site.adsense_client_id boşsa zaten hiçbir yerde reklam
+  // yüklenmediği için bu alanın o durumda bir etkisi olmaz.
+  if (alan.reklam === false) {
+    satirlar.push(fmSatiri("reklam", false, true));
+  }
+
   if (tur === "proje") {
     satirlar.push(fmSatiri("venue", alan.venue));
     satirlar.push(fmSatiri("status", alan.status));
@@ -1998,6 +2007,7 @@ async function icerikKaydet(secenek = "a") {
   }
 
   const yayinda = document.getElementById("ic-yayinda").checked;
+  const reklam = document.getElementById("ic-reklam")?.checked !== false;
   const yilOneki = tur === "proje" && document.getElementById("ic-yil-oneki").checked;
   const klasor = klasorSecimDegeriniAl();
 
@@ -2015,6 +2025,10 @@ async function icerikKaydet(secenek = "a") {
     // wireAdminAdinaTalep) — hangi talep alanının (admin_adina_talep /
     // sahip_adina_talep) işaretleneceğine bu belirliyor.
     hedefRol: ADMIN_ADINA_HEDEF?.rol || null,
+    // reklam: bkz. dosyaIcerigiOlustur başındaki not — sadece false iken
+    // front-matter'a yazılır (varsayılan = açık, front-matter'da hiç
+    // görünmez, mevcut minimalist konvansiyonla tutarlı).
+    reklam,
   };
   if (tur === "proje") {
     alan.venue = document.getElementById("ic-venue").value.trim();
@@ -2199,6 +2213,9 @@ async function icerikSupabaseeYaz(tur, alan, gizliKod, govde, slug, dosyaYolu, m
     yayin_durumu: "taslak",
     yazar_id: alan.yazarId || null,
     yazar_adi: alan.author || null,
+    // reklam: bkz. dosyaIcerigiOlustur başındaki not — draft GitHub'a
+    // yayınlandığında (taslagiYayinla) bu değer front-matter'a taşınır.
+    reklam: alan.reklam !== false,
     // "Admin/Site Sahibi adına yayınla" onay süreci (bkz. migration 0016 ve
     // 0023 / wireAdminAdinaTalep) — sunucu tarafındaki tetikleyici
     // admin_onay_durumu / sahip_onay_durumu'nu buna göre otomatik ayarlar.
@@ -2302,6 +2319,10 @@ async function icerikSadeceSupabaseeYayinla(tur, alan, gizliKod, govde, slug, do
     yayin_durumu: "sadece_supabase",
     yazar_id: alan.yazarId || null,
     yazar_adi: alan.author || null,
+    // reklam: icerik/supabase-yazi.js bunu sadece_supabase_yazi_getir()
+    // RPC'sinden okuyup manuel reklam bloğunu ona göre gösterir/gizler
+    // (bkz. migration'daki güncellenmiş RPC).
+    reklam: alan.reklam !== false,
     // "Admin/Site Sahibi adına yayınla" onay süreci (bkz. migration 0016 ve
     // 0023 / wireAdminAdinaTalep) — sunucu tarafındaki tetikleyici
     // admin_onay_durumu / sahip_onay_durumu'nu buna göre otomatik ayarlar.
@@ -2399,6 +2420,7 @@ async function icerikSupabaseVeGithubaYaz(tur, alan, gizliKod, govde, slug, dosy
     yayin_durumu: "supabase_ve_github",
     yazar_id: alan.yazarId || null,
     yazar_adi: alan.author || null,
+    reklam: alan.reklam !== false,
     // "Admin/Site Sahibi adına yayınla" onay süreci (bkz. migration 0016 ve
     // 0023 / wireAdminAdinaTalep) — sunucu tarafındaki tetikleyici
     // admin_onay_durumu / sahip_onay_durumu'nu buna göre otomatik ayarlar.
@@ -3415,6 +3437,7 @@ async function taslagiYayinla(item, tur, btn) {
       author: item.data.yazar_adi || null,
       yazarId: item.data.yazar_id || null,
       olusturanId: item.data.olusturan_id || item.data.yazar_id || null,
+      reklam: item.data.reklam !== false,
     };
     if (tur === "proje") {
       alan.venue = item.data.venue;
@@ -3496,6 +3519,9 @@ async function gitDenTaslagaTasi(item, tur, btn) {
       link_etiket: item.data.link_label || null,
       govde: item.body || "",
       onizleme_kod: gizliKod,
+      // reklam: GitHub'daki dosyanın front-matter'ındaki değeri (varsa)
+      // korunur — bkz. dosyaIcerigiOlustur/frontMatterOku.
+      reklam: item.data.reklam !== false,
       created_by: user?.id || null,
     };
     const { error: upsertHata } = await supabase
@@ -3655,6 +3681,7 @@ async function icerikDuzenlemeyeYukle(item, tur) {
   const yayinda = item.data.yayinda !== false;
   document.getElementById("ic-yayinda").checked = yayinda;
   document.getElementById("ic-gizli-hedef-wrap").hidden = yayinda;
+  document.getElementById("ic-reklam").checked = item.data.reklam !== false;
 
   // İçeriğin daha önce üretilmiş bir gizli ön izleme kodu varsa hatırla ve
   // göster. Permalink/onizleme_kod herhangi bir sebeple eksikse (elle
