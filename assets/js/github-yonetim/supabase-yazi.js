@@ -81,6 +81,34 @@ async function init() {
     }
 
     govdeEl.innerHTML = html;
+
+    // REKLAM (bkz. icerik/supabase-yazi.md ve assets/js/core/
+    // site-islemleri.js reklamUygula) — bu sayfa şablonu TEK olduğu için
+    // (hangi içerik gösterileceği ancak burada belli oluyor) reklam
+    // yüklemesi sayfa açılışında OTOMATİK tetiklenmiyor; kaydın kendi
+    // `reklam` alanına bakıp KENDİMİZ karar veriyoruz. Sadece ziyaretçi
+    // "Reklam" çerezlerini DAHA ÖNCE onaylamışsa gösteriyoruz — onay hiç
+    // verilmemişse (ya da reddedilmişse) burada YENİDEN sormuyoruz, sayfa
+    // en üstteki genel çerez şeridi/panelinden zaten yönetiliyor.
+    const appEl = document.getElementById("supabase-yazi-app");
+    const adsenseClient = appEl?.dataset.adsenseClient;
+    const adsenseSlot = appEl?.dataset.adsenseSlot;
+    const reklamOnayVarMi = !!(window.CerezTercihleri && window.CerezTercihleri.al()?.reklam);
+    if (adsenseClient && adsenseSlot && kayit.reklam !== false && reklamOnayVarMi) {
+      const reklamDiv = document.createElement("div");
+      reklamDiv.className = "reklam-alani reklam-yazi-alt";
+      reklamDiv.hidden = true;
+      const ins = document.createElement("ins");
+      ins.className = "adsbygoogle";
+      ins.style.display = "block";
+      ins.setAttribute("data-ad-client", adsenseClient);
+      ins.setAttribute("data-ad-slot", adsenseSlot);
+      ins.setAttribute("data-ad-format", "auto");
+      ins.setAttribute("data-full-width-responsive", "true");
+      reklamDiv.appendChild(ins);
+      govdeEl.after(reklamDiv);
+      if (typeof window.__cerezReklamYukle === "function") window.__cerezReklamYukle();
+    }
   } catch (err) {
     console.error("supabase-yazi.js init hatası:", err);
     govdeEl.innerHTML = `<p>Bir şeyler ters gitti, sayfayı yenilemeyi dene.</p>`;
