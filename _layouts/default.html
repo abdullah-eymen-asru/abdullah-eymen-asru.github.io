@@ -217,6 +217,73 @@
     };
   </script>
   {% endif %}
+
+  {% comment %}
+    REKLAM (AdSense) sayfa uygunluğu — bkz. assets/js/core/site-islemleri.js
+    reklamUygula() ve panel/github-yonetim.md "Reklam" anahtarı.
+      - /panel/, /hesap/, /onizleme/ SADECE burada, script TANIMI seviyesinde
+        tamamen dışlanır (giriş/admin/önizleme sayfalarında reklam script'i
+        hiç var olmamalı).
+      - page.reklam == false (bir yazı/projenin front-matter'ında) da AYNI
+        şekilde dışlanır.
+      - /icerik/supabase-yazi.html BİLEREK bu listede DEĞİL: o sayfanın
+        front-matter'ı yok (tek bir şablon, hangi içeriğin gösterileceğini
+        ancak ÇALIŞMA ZAMANINDA bir RPC ile öğrenir), bu yüzden script
+        TANIMI burada normal şekilde yüklenir ama OTOMATİK TETİKLENMEZ
+        (bkz. reklamUygula() içindeki window.__reklamOtomatikYuklemeKapali
+        kontrolü, o bayrak icerik/supabase-yazi.md'de set edilir) —
+        assets/js/github-yonetim/supabase-yazi.js kendi çektiği kaydın
+        reklam alanına bakıp uygunsa window.__cerezReklamYukle()'yi
+        KENDİSİ çağırır.
+  {% endcomment %}
+  {% assign reklam_sayfa_haric = false %}
+  {% if page.url contains '/panel/' or page.url contains '/hesap/' or page.url contains '/onizleme/' %}
+    {% assign reklam_sayfa_haric = true %}
+  {% endif %}
+  {% if page.reklam == false %}
+    {% assign reklam_sayfa_haric = true %}
+  {% endif %}
+
+  {% if site.adsense_client_id and site.adsense_client_id != "" and reklam_sayfa_haric == false %}
+  <!--
+    Google AdSense — GA ile AYNI ÇEREZ ONAYI deseni (KVKK/GDPR): sayfa
+    yüklenir yüklenmez OTOMATİK ÇALIŞMAZ, sadece bir FONKSİYON tanımlar;
+    ziyaretçi "Reklam" kategorisini onayladığında (ya da daha önce
+    onaylamışsa sayfa açılışında) assets/js/core/site-islemleri.js
+    tarafından çağrılır. Çağrıldığında hem Otomatik Reklamlar için gereken
+    tek script'i (client id ile) yükler HEM DE sayfadaki (varsa) manuel
+    yazı-içi reklam bloklarını (bkz. _layouts/post.html, .reklam-alani)
+    gösterip AdSense kuyruğuna ekler.
+  -->
+  <script>
+    window.__ADSENSE_CLIENT_ID__ = "{{ site.adsense_client_id }}";
+    window.__cerezReklamYukle = function () {
+      function slotlariGosterVePushEt() {
+        document.querySelectorAll(".reklam-alani[hidden]").forEach(function (el) {
+          el.removeAttribute("hidden");
+          try {
+            (window.adsbygoogle = window.adsbygoogle || []).push({});
+          } catch (e) {
+            // AdSense script'i henüz tam hazır değilse ya da reddederse
+            // (ör. hesap onaylanmamışsa) sessizce geç — sayfanın geri
+            // kalanını bozmasın.
+          }
+        });
+      }
+      if (window.__cerezReklamYuklendi) {
+        slotlariGosterVePushEt();
+        return;
+      }
+      window.__cerezReklamYuklendi = true;
+      var script = document.createElement("script");
+      script.async = true;
+      script.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ site.adsense_client_id }}";
+      script.crossOrigin = "anonymous";
+      script.onload = slotlariGosterVePushEt;
+      document.head.appendChild(script);
+    };
+  </script>
+  {% endif %}
   
   <!-- Schema.org Verisi (Google / Yandex Doğrulama Kodu) -->
   <script>
@@ -326,10 +393,11 @@
       <p>
         Bu site, temel işlevler (oturum, tema tercihi) için gerekli teknik
         depolamanın yanı sıra; açık rızanla ziyaretçi istatistikleri
-        (Google Analytics) ve yorum sistemi (Giscus/GitHub) için isteğe
-        bağlı çerezler/benzer teknolojiler kullanabilir. Tercihini
-        dilediğin zaman sayfa altındaki "Çerez Ayarları"ndan
-        değiştirebilir, istemediğin çerezleri kaldırabilirsin. Detaylar için
+        (Google Analytics), reklam (Google AdSense) ve yorum sistemi
+        (Giscus/GitHub) için isteğe bağlı çerezler/benzer teknolojiler
+        kullanabilir. Tercihini dilediğin zaman sayfa altındaki "Çerez
+        Ayarları"ndan değiştirebilir, istemediğin çerezleri
+        kaldırabilirsin. Detaylar için
         <a href="{{ '/kurumsal/gizlilik-politikasi.html' | relative_url }}">Gizlilik Politikası</a>.
       </p>
     </div>
@@ -376,6 +444,24 @@
           (ülke, cihaz, genel kullanım davranışı) toplanmasını sağlar.
           Kapatırsan, tarayıcında zaten kurulmuş olan Analytics
           çerezleri (_ga, _gid, _gat) hemen silinir.
+        </p>
+      </div>
+      {% endif %}
+
+      {% if site.adsense_client_id and site.adsense_client_id != "" %}
+      <div class="cerez-kategori">
+        <div class="cerez-kategori-baslik">
+          <label><input type="checkbox" id="cerez-reklam-kutu"> Reklam</label>
+        </div>
+        <p class="muted">
+          Google AdSense ile reklam gösterilmesini ve reklamların ilgi
+          alanına göre kişiselleştirilmesini sağlar. Kapatırsan sayfadaki
+          reklamlar (otomatik ve yazı-içi) kaldırılır; AdSense'e ait
+          (google.com/googlesyndication.com alan adlarında) hâlihazırda
+          kurulmuş olabilecek çerezler, farklı bir alan adına ait
+          oldukları için bu site tarafından silinemez — bunları kaldırmak
+          istersen tarayıcı ayarlarından temizlemen gerekir (bkz. Gizlilik
+          Politikası).
         </p>
       </div>
       {% endif %}
