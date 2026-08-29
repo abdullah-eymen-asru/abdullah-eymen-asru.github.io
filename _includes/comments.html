@@ -46,10 +46,11 @@
           '<p class="muted">Yorumları görüntülemek için "İşlevsel / Üçüncü Taraf" çerezlerini (Giscus – GitHub Discussions) kabul etmen gerekiyor.</p>' +
           '<button type="button" id="giscus-cerez-kabul-btn" class="cerez-btn-secondary">İşlevsel Çerezleri Kabul Et ve Yorumları Göster</button>';
         document.getElementById("giscus-cerez-kabul-btn")?.addEventListener("click", () => {
-          // Ziyaretçinin analitik tercihini BOZMADAN sadece işlevsel
-          // kategoriyi açıyoruz (analitik daha önce açıksa açık kalır).
-          const mevcut = (window.CerezTercihleri && window.CerezTercihleri.al()) || { analitik: false };
-          window.CerezTercihleri && window.CerezTercihleri.kaydet(mevcut.analitik, true);
+          // Ziyaretçinin analitik VE reklam tercihini BOZMADAN sadece
+          // işlevsel kategoriyi açıyoruz (ikisi de daha önce açıksa açık
+          // kalır) — bkz. assets/js/core/site-islemleri.js kaydetVeUygula.
+          const mevcut = (window.CerezTercihleri && window.CerezTercihleri.al()) || { analitik: false, reklam: false };
+          window.CerezTercihleri && window.CerezTercihleri.kaydet(mevcut.analitik, true, mevcut.reklam);
         });
       }
 
