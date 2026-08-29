@@ -11,8 +11,9 @@
  *      GERÇEK/AKTİF onay ister — hem KVKK Kurulu'nun çerez rehberi hem
  *      GDPR (ve ePrivacy) bunu şart koşar.
  *   2) GRANÜLER KATEGORİ: "Zorunlu" (kapatılamaz — oturum/tema gibi site
- *      işlevi için gerekli teknik depolama), "Analitik" (Google Analytics)
- *      ve "İşlevsel/Üçüncü Taraf" (Giscus/GitHub yorum widget'ı) ayrı ayrı
+ *      işlevi için gerekli teknik depolama), "Analitik" (Google Analytics),
+ *      "İşlevsel/Üçüncü Taraf" (Giscus/GitHub yorum widget'ı) ve "Reklam"
+ *      (Google AdSense — bkz. _config.yml adsense_client_id) ayrı ayrı
  *      açılıp kapatılabilir.
  *   3) KOLAY GERİ ÇEKME: sayfanın alt bilgisindeki "Çerez Ayarları"
  *      bağlantısı her an aynı paneli yeniden açar; kullanıcı istediği
@@ -32,7 +33,12 @@
 const CEREZ_ANAHTAR = "cerez_tercihleri";
 // Kategori tanımı veya metin ÖNEMLİ ÖLÇÜDE değişirse bu sürümü artır —
 // eski sürüme onay vermiş ziyaretçilere şerit yeniden gösterilir.
-const CEREZ_SURUM = "1";
+// v2 (2026-08): "Reklam" (AdSense) kategorisi eklendi — bu YENİ bir izin
+// istendiği için sürüm artırıldı, v1'de onay vermiş ziyaretçiler de
+// (reklam konusunda hiç soru sorulmamış oldukları için) şeridi tekrar
+// görür ve reklam dahil tüm kategoriler için yeniden AÇIK/net bir tercih
+// verir.
+const CEREZ_SURUM = "2";
 
 function cerezTercihleriniOku() {
   try {
@@ -46,12 +52,13 @@ function cerezTercihleriniOku() {
   }
 }
 
-function cerezTercihleriniYaz(analitik, islevsel) {
+function cerezTercihleriniYaz(analitik, islevsel, reklam) {
   const veri = {
     surum: CEREZ_SURUM,
     gerekli: true,
     analitik: !!analitik,
     islevsel: !!islevsel,
+    reklam: !!reklam,
     tarih: new Date().toISOString(),
   };
   try {
@@ -122,9 +129,68 @@ function islevselUygula(acik) {
   document.dispatchEvent(new CustomEvent("cerez-islevsel-degisti", { detail: { acik: !!acik } }));
 }
 
-function tercihleriUygula(veri) {
+/*
+ * AdSense reklamlarını AÇAR. Gerçek yükleme fonksiyonu (varsa) _layouts/
+ * default.html içinde window.__cerezReklamYukle olarak tanımlanır — bu
+ * dosya sadece onu (izin varsa) TETİKLER, AdSense script'inin/reklam
+ * bloklarının kendisini bilmez/barındırmaz (analitikUygula ile AYNI desen).
+ *
+ * @param {boolean} acik
+ * @param {boolean} otomatikMi - true ise bu çağrı SAYFA AÇILIŞINDA, daha
+ *   önce kaydedilmiş bir tercihin otomatik "replay"i yüzünden geliyor
+ *   (bkz. init() → tercihleriUygula(mevcut)); false ise ziyaretçi AZ ÖNCE,
+ *   bu sayfada bilfiil bir buton tıkladı (şerit/panel → kaydetVeUygula).
+ *
+ * window.__reklamOtomatikYuklemeKapali (SADECE otomatikMi=true iken
+ * etkili): /icerik/supabase-yazi.html (GitHub'a hiç commit edilmemiş,
+ * front-matter'ı build-time'da OKUNAMAYAN içerikler) tarafından, sayfa
+ * kendi <script>'inde set edilir — o sayfa hangi içeriğin gösterileceğini
+ * ancak ÇALIŞMA ZAMANINDA (bir RPC çağrısıyla) öğrenebildiği için, sayfa
+ * DAHA YENİ açılmışken (kayıt henüz gelmemişken) "bu içerikte reklam
+ * kapalı mı?" sorusu yanıtlanmadan otomatik reklam scripti (ve olası
+ * Otomatik Reklamlar taraması) TETİKLENMEZ — bunun yerine
+ * assets/js/github-yonetim/supabase-yazi.js kendi çektiği kaydın reklam
+ * alanına bakıp uygunsa window.__cerezReklamYukle()'yi KENDİSİ çağırır.
+ * AMA ziyaretçi bu sayfayı görüntülerken AKTİF OLARAK "Kabul Et"e
+ * tıklarsa (otomatikMi=false) bu bayrak ARTIK uygulanmaz — çünkü tıklama
+ * insan tepki süresi aldığı için (saniyeler), kayıt RPC'si (milisaniyeler)
+ * o ana kadar zaten gelmiş ve supabase-yazi.js (varsa) reklam <div>'ini
+ * DOM'a çoktan eklemiş olur; bu durumda otomatikMi=true'daki gibi
+ * ERTELEMEK, tıklamadan sonra reklamın HİÇ görünmemesi gibi ayrı (ve daha
+ * kötü) bir hataya yol açardı. Kapatma (aşağıdaki `else` dalı) bu
+ * bayraktan hiçbir zaman etkilenmez — izin geri çekilirse her sayfada
+ * aynı şekilde geçerli olmalı.
+ */
+function reklamUygula(acik, otomatikMi) {
+  if (acik) {
+    if (otomatikMi && window.__reklamOtomatikYuklemeKapali) return;
+    if (typeof window.__cerezReklamYukle === "function") window.__cerezReklamYukle();
+    return;
+  }
+  // KAPAT: script zaten yüklenmişse bile Google'ın Otomatik Reklamlar için
+  // resmi olarak desteklediği "sayfa düzeyinde reklamları devre dışı
+  // bırak" ayarını gönder (yeni sayfa/görünüm oluşturmaz); manuel blok(lar)
+  // varsa da gizle. AdSense'in KENDİ (google.com/googlesyndication.com
+  // alan adlarına ait) çerezleri, GA'daki gibi bu siteden silinemez —
+  // bunlar zaten script hiç yüklenmediyse/artık tetiklenmediyse yeni veri
+  // toplamaya devam etmez; halihazırda kurulmuş olanlar için Gizlilik
+  // Politikası'ndaki tarayıcı-ayarları notu geçerlidir (Giscus ile aynı
+  // üçüncü-taraf sınırı).
+  try {
+    (window.adsbygoogle = window.adsbygoogle || []).push({
+      google_ad_client: window.__ADSENSE_CLIENT_ID__,
+      enable_page_level_ads: false,
+    });
+  } catch (e) {
+    // script hiç yüklenmemişse adsbygoogle push'u no-op'tur, hata değil.
+  }
+  document.querySelectorAll(".reklam-alani").forEach((el) => el.setAttribute("hidden", ""));
+}
+
+function tercihleriUygula(veri, otomatikMi) {
   analitikUygula(veri.analitik);
   islevselUygula(veri.islevsel);
+  reklamUygula(veri.reklam, !!otomatikMi);
 }
 
 /* ---- Şerit (banner) ve ayrıntılı panel görünürlüğü ---- */
@@ -138,8 +204,10 @@ function panelAc() {
   const veri = cerezTercihleriniOku();
   const analitikKutu = document.getElementById("cerez-analitik-kutu");
   const islevselKutu = document.getElementById("cerez-islevsel-kutu");
+  const reklamKutu = document.getElementById("cerez-reklam-kutu");
   if (analitikKutu) analitikKutu.checked = veri ? !!veri.analitik : false;
   if (islevselKutu) islevselKutu.checked = veri ? !!veri.islevsel : false;
+  if (reklamKutu) reklamKutu.checked = veri ? !!veri.reklam : false;
   const overlay = document.getElementById("cerez-panel-overlay");
   if (!overlay) return;
   // Önceki bir kapanış animasyonundan kalmış olabilecek sınıfı temizle,
@@ -178,8 +246,8 @@ function panelKapat() {
   setTimeout(bitir, 250); // reduced-motion veya geçişin atlandığı durumlar için güvenlik ağı
 }
 
-function kaydetVeUygula(analitik, islevsel) {
-  const veri = cerezTercihleriniYaz(analitik, islevsel);
+function kaydetVeUygula(analitik, islevsel, reklam) {
+  const veri = cerezTercihleriniYaz(analitik, islevsel, reklam);
   tercihleriUygula(veri);
   bannerGizle();
   return veri;
@@ -195,7 +263,7 @@ function init() {
 
   const mevcut = cerezTercihleriniOku();
   if (mevcut) {
-    tercihleriUygula(mevcut);
+    tercihleriUygula(mevcut, true);
   } else {
     // Onay hiç verilmemiş: şerit gösterilir, isteğe bağlı hiçbir şey
     // yüklenmez (bkz. dosya başındaki "varsayılan = kapalı" ilkesi).
@@ -203,10 +271,10 @@ function init() {
   }
 
   document.getElementById("cerez-tumunu-kabul")?.addEventListener("click", () => {
-    kaydetVeUygula(true, true);
+    kaydetVeUygula(true, true, true);
   });
   document.getElementById("cerez-sadece-zorunlu")?.addEventListener("click", () => {
-    kaydetVeUygula(false, false);
+    kaydetVeUygula(false, false, false);
   });
   document.getElementById("cerez-ayarlari-yonet")?.addEventListener("click", panelAc);
   document.getElementById("cerez-ayarlar-ac-btn")?.addEventListener("click", (e) => {
@@ -218,13 +286,14 @@ function init() {
     if (e.target.id === "cerez-panel-overlay") panelKapat();
   });
   document.getElementById("cerez-panel-reddet")?.addEventListener("click", () => {
-    kaydetVeUygula(false, false);
+    kaydetVeUygula(false, false, false);
     panelKapat();
   });
   document.getElementById("cerez-panel-kaydet")?.addEventListener("click", () => {
     const analitik = document.getElementById("cerez-analitik-kutu")?.checked;
     const islevsel = document.getElementById("cerez-islevsel-kutu")?.checked;
-    kaydetVeUygula(analitik, islevsel);
+    const reklam = document.getElementById("cerez-reklam-kutu")?.checked;
+    kaydetVeUygula(analitik, islevsel, reklam);
     panelKapat();
   });
   document.addEventListener("keydown", (e) => {
