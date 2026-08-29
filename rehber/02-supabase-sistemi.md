@@ -892,6 +892,91 @@ istemedim.
 
 Bu bölüm, siteye/Supabase kullanıcı sistemine sonradan yapılan düzeltmelerin tarih sırasıyla özetidir — hangi sorun bildirildi, kök nedeni neydi, nasıl çözüldü ve (varsa) senin elle yapman gereken adım neydi. Eskiden kökte ayrı `DEGISIKLIKLER_*.md` dosyaları halinde duruyordu, artık tek doğruluk kaynağı burası — en yeni turu en üstte bulursun.
 
+### 🗓️ 29.08.2026 (2. Tur) — AdSense hazırlığı: Otomatik Reklamlar + yazı-içi manuel blok + yazı bazında aç/kapat
+
+İstek: siteyi herhangi bir AdSense reklamı ekleyebilmeye hazırlamak;
+"Otomatik Reklamlar" (Google yerleşimi kendi seçer) VE manuel reklam
+blokları BİRLİKTE; KVKK/GDPR çerez onayına (mevcut Zorunlu/Analitik/
+İşlevsel sistemine) YENİ bir "Reklam" kategorisi olarak bağlı, onaysız hiç
+yüklenmesin; GitHub yönetim panelinden YAZI BAZINDA açık/kapalı
+seçilebilsin.
+
+**Nasıl çalışıyor — GA ile AYNI "varsayılan kapalı" deseni:** `_config.yml`'e
+`adsense_client_id` (boşsa TÜM reklam sistemi devre dışı) ve
+`adsense_slot_icerik_alt` (manuel yazı-içi reklam biriminin slot ID'si,
+boşsa sadece Otomatik Reklamlar çalışır) eklendi. `_layouts/default.html`
+sayfa açılışında OTOMATİK hiçbir şey yüklemez, sadece bir
+`window.__cerezReklamYukle` fonksiyonu tanımlar; bu fonksiyon SADECE
+ziyaretçi "Reklam" kategorisini onayladığında (ya da daha önce onaylamışsa
+sayfa açılışında) `assets/js/core/site-islemleri.js` tarafından çağrılır —
+tıpkı Google Analytics'in zaten çalıştığı yöntemle.
+
+**Yeni "Reklam" çerez kategorisi:** `site-islemleri.js`'teki tercih modeli
+(analitik, işlevsel) üçüncü bir alana (`reklam`) genişletildi;
+`CEREZ_SURUM` "1"den "2"ye çıkarıldı — bu YENİ bir izin istendiği için,
+v1'de onay vermiş ziyaretçilere de şerit yeniden gösterilip reklam dahil
+net bir tercih soruluyor. Çerez paneline (bkz. `_layouts/default.html`)
+Analytics'in hemen altına aynı görünümde bir "Reklam" kategorisi eklendi
+(sadece `adsense_client_id` doluysa görünür). Giscus'un kendi "yorumları
+etkinleştir" kısayolu (`_includes/comments.html`) artık ziyaretçinin
+reklam tercihini de bozmadan koruyor.
+
+**Sayfa uygunluğu:** `/panel/`, `/hesap/`, `/onizleme/` sayfalarında reklam
+script'i hiçbir zaman tanımlanmaz bile (giriş/admin/önizleme sayfalarında
+reklam olmamalı). Bir yazı/projenin front-matter'ında `reklam: false` varsa
+o SAYFANIN kendisinde de (Otomatik Reklamlar dahil) hiç yüklenmez.
+
+**Yazı bazında aç/kapat (panel):** `panel/github-yonetim.md`'ye "Yayında"
+anahtarının hemen altına aynı görünümde bir "Reklam" anahtarı eklendi.
+GitHub'a commit edilen içerikler için tercih doğrudan front-matter'da
+(`reklam: false`, sadece kapalıyken yazılır) tutulur. Taslak
+(`taslak_icerikler`) aşamasında ya da "Sadece Supabase'te Yayınla" ile
+GitHub'a hiç commit edilmeden kalan içerikler için de aynı tercih artık
+korunuyor (bkz. migration 0033) — taslak düzenlenirken, GitHub'a
+yayınlanırken (`taslagiYayinla`) ve GitHub'dan taslağa geri alınırken
+(`gitDenTaslagaTasi`) kaybolmuyor.
+
+**Manuel yazı-içi blok:** yeni `_includes/reklam-yazi-alt.html`,
+`_layouts/post.html` ve `_layouts/project.html`'de yorumlardan hemen önce
+ekleniyor (sadece `adsense_slot_icerik_alt` doluysa ve o yazının/projenin
+`reklam` alanı `false` değilse).
+
+**"Sadece Supabase'te Yayınla" içerikleri (`icerik/supabase-yazi.html`):**
+bu şablon TEK olduğu için (hangi içerik gösterileceği ancak çalışma
+zamanında bir RPC ile belli oluyor) front-matter tabanlı Liquid kontrolü
+mümkün değil — `icerik/supabase-yazi.md` sayfa açılışındaki OTOMATİK
+tetiklemeyi `window.__reklamOtomatikYuklemeKapali` ile bilerek engelliyor,
+`assets/js/github-yonetim/supabase-yazi.js` kaydı çektikten SONRA
+`reklam !== false` ise reklam bloğunu kendisi ekleyip
+`window.__cerezReklamYukle()`'yi çağırıyor. Ayrıca `reklamUygula()`'ya bir
+`otomatikMi` parametresi eklendi: bu erteleme SADECE sayfa açılışında
+daha önce kaydedilmiş bir tercihin otomatik "replay"inde uygulanır; ziyaretçi
+sayfadayken AKTİF olarak "Kabul Et"e tıklarsa (insan tepki süresi içinde
+kayıt RPC'si zaten tamamlanmış olacağından) hemen uygulanır — aksi hâlde
+tıklamadan sonra reklamın hiç görünmemesi gibi ayrı bir hataya yol açardı.
+
+#### Değişen dosyalar
+- `_config.yml`
+- `assets/js/core/site-islemleri.js`
+- `_layouts/default.html`
+- `_layouts/post.html`, `_layouts/project.html`
+- `_includes/comments.html`
+- `icerik/supabase-yazi.md`
+- `assets/js/github-yonetim/supabase-yazi.js`
+- `panel/github-yonetim.md`
+- `assets/js/github-yonetim/github-yonetim.js`
+
+#### Eklenen dosyalar
+- `_includes/reklam-yazi-alt.html`
+- `supabase/migrations/0033_reklam_icerik_bazinda_ac_kapat.sql` ⚠️ **YENİ — Supabase SQL Editor'de çalıştırman gerekiyor.**
+
+#### Uygulama adımları
+1. **Supabase Dashboard > SQL Editor**'de `0033_reklam_icerik_bazinda_ac_kapat.sql`'i çalıştır.
+2. AdSense hesabın onaylandığında `_config.yml`'deki `adsense_client_id`'yi (ve istersen `adsense_slot_icerik_alt`'ı) doldurup siteyi yayınla — boş bıraktığın sürece reklam sisteminin TAMAMI (çerez kategorisi dahil) görünmez kalır.
+3. Test: `adsense_client_id`'yi geçici bir değerle doldurup bir yazıda "Reklam" anahtarını kapat, o yazıda reklam script'inin (Ağ sekmesinde `adsbygoogle.js` isteği) hiç atılmadığını, başka bir yazıda ise (çerez onayı verildikten sonra) atıldığını doğrula.
+
+---
+
 ### 🗓️ 29.08.2026 — GÜVENLİK TARAMASI: 3 gerçek açık bulundu ve düzeltildi
 
 Genel bir güvenlik taraması istendi. Üçü de gerçek, istismar edilebilir açıktı (teorik değil):
