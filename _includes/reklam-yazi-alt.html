@@ -1,0 +1,26 @@
+{% comment %}
+  _includes/reklam-yazi-alt.html — yazı/proje içeriğinin SONUNA, yorumlardan
+  ÖNCE yerleştirilen manuel AdSense reklam bloğu (bkz. _layouts/post.html,
+  _layouts/project.html). Çerez onayına bağlı (KVKK/GDPR) — bkz.
+  assets/js/core/site-islemleri.js reklamUygula() ve _layouts/default.html
+  içindeki window.__cerezReklamYukle: onay verilmeden bu <div> "hidden"
+  kalır, <ins> AdSense kuyruğuna hiç eklenmez.
+
+  Üç koşulun HEPSİ sağlanmalı:
+    1) site.adsense_client_id doldurulmuş (AdSense hiç aktif değilse).
+    2) site.adsense_slot_icerik_alt doldurulmuş (bu SPESİFİK reklam birimi
+       tanımlanmamışsa manuel blok hiç eklenmez — Otomatik Reklamlar
+       yine de _layouts/default.html üzerinden çalışabilir).
+    3) page.reklam != false — bkz. panel/github-yonetim.md "Reklam"
+       anahtarı, bu yazıya/projeye özel kapatma.
+{% endcomment %}
+{% if site.adsense_client_id and site.adsense_client_id != "" and site.adsense_slot_icerik_alt and site.adsense_slot_icerik_alt != "" and page.reklam != false %}
+<div class="reklam-alani reklam-yazi-alt" hidden>
+  <ins class="adsbygoogle"
+       style="display:block"
+       data-ad-client="{{ site.adsense_client_id }}"
+       data-ad-slot="{{ site.adsense_slot_icerik_alt }}"
+       data-ad-format="auto"
+       data-full-width-responsive="true"></ins>
+</div>
+{% endif %}
