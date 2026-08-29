@@ -211,6 +211,25 @@ permalink: "/panel/github-yonetim.html"
               </span>
             </label>
           </div>
+          <div class="form-field">
+            <label class="gy-toggle-satir" for="ic-reklam">
+              <span class="gy-toggle">
+                <input id="ic-reklam" type="checkbox" checked role="switch">
+                <span class="gy-toggle-track"><span class="gy-toggle-thumb"></span></span>
+              </span>
+              <span class="gy-toggle-metin">
+                <strong>Reklam</strong>
+                <span class="muted">
+                  Site genelinde reklam açıksa (bkz. <code>_config.yml</code> →
+                  <code>adsense_client_id</code>) bu yazıda/projede de gösterilir.
+                  Kapatırsan bu İÇERİĞE ÖZEL olarak (diğer yazılar etkilenmeden)
+                  hem otomatik hem manuel reklamlar hiç yüklenmez — ör. hassas/
+                  özel bir konu için. Site genelinde reklam hiç açık değilse bu
+                  anahtarın bir etkisi olmaz.
+                </span>
+              </span>
+            </label>
+          </div>
           <div class="form-field" id="ic-gizli-hedef-wrap" hidden>
             <label>Yayında değilken nerede saklansın?</label>
             <div class="gy-tip-secim">
