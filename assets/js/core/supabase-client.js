@@ -14,9 +14,35 @@ const SUPABASE_URL = "https://eahvcirspmvntffzphye.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVhaHZjaXJzcG12bnRmZnpwaHllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxOTgxODMsImV4cCI6MjEwMTc3NDE4M30._f-GKSsffxFo66w3g0NJfmOWEhlsjU4Y6mlcTlcPJ2E"; // "anon public" anahtarı
 // -----------------------------------------------------------------------
 
-// Supabase JS SDK'yı CDN'den ESM olarak yüklüyoruz (build sistemi gerekmez,
-// GitHub Pages / Cloudflare Pages gibi saf statik hosting ile tam uyumlu).
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+// Supabase JS SDK — artık CDN'den (esm.sh) ESM import DEĞİL, YEREL vendor
+// dosyasından (assets/js/vendor/supabase.js, Supabase'in resmi UMD build'i)
+// alınıyor. Bu build build sistemi gerektirmez, GitHub Pages / Cloudflare
+// Pages gibi saf statik hosting ile hâlâ tam uyumludur.
+//
+// DEĞİŞİKLİK SEBEBİ (WebView uyumluluğu): önceki `import ... from
+// "https://esm.sh/..."` STATİK bir modül import'uydu. Android WebView
+// içinde bu istek zaman aşımına uğradığında/engellendiğinde modül HİÇ
+// değerlendirilemiyor — bu da bu dosyayı import eden HER script'in
+// (panel.js, auth-guard.js, akademik-projeler.md, blog.md, ...) tamamen
+// çalışmadan iptal olmasına ve #loading ekranının sonsuza dek "Yükleniyor…"
+// durumunda kalmasına yol açıyordu. UMD bundle harici bir import zincirine
+// bağımlı olmadığı (tek dosya, self-contained) için bu riski ortadan
+// kaldırıyor.
+//
+// Vendor dosyası _layouts/default.html <head>'inde
+//   <script defer src="{{ '/assets/js/vendor/supabase.js' | relative_url }}"></script>
+// ile, document sırasına göre TÜM type="module" scriptlerinden önce
+// yükleniyor (defer'lı klasik scriptler ile modül scriptleri, spec gereği
+// belge sırasına göre ve DOMContentLoaded'dan önce çalışır) — yani
+// aşağıdaki window.supabase, bu satır çalıştığında HER ZAMAN hazırdır.
+if (!window.supabase || typeof window.supabase.createClient !== "function") {
+  throw new Error(
+    "Supabase JS bulunamadı: assets/js/vendor/supabase.js eksik ya da " +
+      "_layouts/default.html'deki <script defer> etiketinden sonra " +
+      "çalıştırılmış olabilir."
+  );
+}
+const { createClient } = window.supabase;
 
 /*
  * "OTURUMUMU HATIRLA" (bkz. hesap/giris.md + assets/js/auth/auth-pages.js)
@@ -36,14 +62,50 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
  */
 const OTURUM_HATIRLA_ANAHTARI = "aea_oturumu_hatirla"; // "0" ise sessionStorage kullanılır.
 
+// WEBVIEW UYUMLULUĞU: Android WebView'lerde DOM Storage (localStorage/
+// sessionStorage) uygulama tarafından setDomStorageEnabled(true) ile
+// AÇIKÇA etkinleştirilmediği sürece VARSAYILAN OLARAK KAPALIDIR. Kapalıyken
+// localStorage/sessionStorage'a erişim SecurityError fırlatır. Bu dosya
+// modül seviyesinde (top-level) createClient() çağrısı sırasında SDK
+// storage.getItem()'ı hemen çağırdığı için, bu hata try/catch'siz
+// yakalanmazsa TÜM modül değerlendirmesi başarısız olur — yani bu dosyayı
+// import eden HER script (panel.js, auth-guard.js, vs.) hiç çalışmaz ve
+// #loading ekranı sonsuza dek takılı kalır (esm.sh CDN import hatasıyla
+// AYNI sonuç sınıfı, farklı bir kök neden). Bu yüzden depo erişimi burada
+// try/catch ile sarmalanıp, storage kullanılamıyorsa sessizce "oturum
+// hatırlanamıyor" moduna (bellekte kalan oturum) düşülüyor.
 function aktifOturumDeposu() {
-  return localStorage.getItem(OTURUM_HATIRLA_ANAHTARI) === "0" ? sessionStorage : localStorage;
+  try {
+    return localStorage.getItem(OTURUM_HATIRLA_ANAHTARI) === "0" ? sessionStorage : localStorage;
+  } catch {
+    return null;
+  }
 }
 
 const dinamikOturumDeposu = {
-  getItem: (anahtar) => aktifOturumDeposu().getItem(anahtar),
-  setItem: (anahtar, deger) => aktifOturumDeposu().setItem(anahtar, deger),
-  removeItem: (anahtar) => aktifOturumDeposu().removeItem(anahtar),
+  getItem: (anahtar) => {
+    try {
+      return aktifOturumDeposu()?.getItem(anahtar) ?? null;
+    } catch {
+      return null;
+    }
+  },
+  setItem: (anahtar, deger) => {
+    try {
+      aktifOturumDeposu()?.setItem(anahtar, deger);
+    } catch {
+      // Depo kullanılamıyor (WebView'de DOM Storage kapalı, gizli sekme,
+      // kota dolu vb.) — oturum bu ziyaret boyunca bellekte kalır ama
+      // sayfalar arası/kalıcı olarak saklanamaz. Kritik değil, sessizce geç.
+    }
+  },
+  removeItem: (anahtar) => {
+    try {
+      aktifOturumDeposu()?.removeItem(anahtar);
+    } catch {
+      // yukarıdaki ile aynı sebep — sessizce geç.
+    }
+  },
 };
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -67,13 +129,15 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
  * oturumu sessizce geri getirebilirdi.
  */
 export function oturumHatirlamaTercihiniKaydet(hatirla) {
-  localStorage.setItem(OTURUM_HATIRLA_ANAHTARI, hatirla ? "1" : "0");
   try {
+    localStorage.setItem(OTURUM_HATIRLA_ANAHTARI, hatirla ? "1" : "0");
     const projeRef = new URL(SUPABASE_URL).hostname.split(".")[0];
     const digerDepo = hatirla ? sessionStorage : localStorage;
     digerDepo.removeItem(`sb-${projeRef}-auth-token`);
   } catch {
-    // SUPABASE_URL ayrıştırılamazsa (olmamalı) sessizce geç — kritik değil.
+    // localStorage/sessionStorage kullanılamıyor (WebView'de DOM Storage
+    // kapalı vb.) YA DA SUPABASE_URL ayrıştırılamadı — sessizce geç,
+    // kritik değil (oturum bellekte kalmaya devam eder).
   }
 }
 
