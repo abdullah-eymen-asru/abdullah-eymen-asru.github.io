@@ -20,6 +20,42 @@ const REDIRECT_AFTER_LOGIN = "/panel/panel.html";
 // geri döndürür; Supabase SDK URL'deki token'ı otomatik yakalar.
 const SITE_ORIGIN = window.location.origin;
 
+/*
+ * GÜVENLİK AÇIĞI DÜZELTMESİ — açık yönlendirme (open redirect)
+ * ---------------------------------------------------------------------
+ * ÖNCEDEN: giris.html'e gelen ?donus=... parametresi HİÇBİR doğrulama
+ * yapılmadan doğrudan window.location.href'e atanıyordu (hem normal
+ * giriş hem Google girişi hem 2FA sonrası yönlendirmede). Biri
+ *   .../hesap/giris.html?donus=https://sahte-site.com
+ * linkini paylaşırsa, kurban GERÇEK bilgileriyle GERÇEK domain'de
+ * giriş yapıyor (bu adım tamamen normal ve güvenli) ama giriş
+ * başarılı olur olmaz tarayıcı saldırganın sitesine yönlendiriliyordu
+ * — link gerçek domain'den geldiği için "oturumun sona erdi, tekrar
+ * giriş yap" gibi bir phishing sayfasına yönlendirmek için ideal bir
+ * yüzeydi.
+ *
+ * ÇÖZÜM: yönlendirmeden hemen önce hedefin AYNI ORİJİNE ait, göreli
+ * bir path olduğu doğrulanır — protokolü/host'u farklı olan (ör.
+ * "https://sahte-site.com"), protokolce göreli (ör. "//sahte-site.com"
+ * — tarayıcı bunu da mutlak URL olarak yorumlar) ya da ayrıştırılamayan
+ * her değer reddedilip yerine panele (REDIRECT_AFTER_LOGIN) düşülür.
+ * new URL(hedef, SITE_ORIGIN) kullanımı bilerek seçildi: "/panel/x"
+ * gibi göreli path'leri SITE_ORIGIN ile tamamlayıp doğru şekilde
+ * çözerken, "https://evil.com" gibi mutlak bir URL verilirse origin'i
+ * KENDİ origin'i olarak kalır (base'i görmezden gelir) — bu yüzden
+ * sonuçtaki origin'i SITE_ORIGIN ile karşılaştırmak yeterli ve güvenli.
+ */
+function guvenliDonusHedefi(ham) {
+  if (!ham) return REDIRECT_AFTER_LOGIN;
+  try {
+    const cozulen = new URL(ham, SITE_ORIGIN);
+    if (cozulen.origin !== SITE_ORIGIN) return REDIRECT_AFTER_LOGIN;
+    return cozulen.pathname + cozulen.search + cozulen.hash;
+  } catch {
+    return REDIRECT_AFTER_LOGIN;
+  }
+}
+
 const DELETE_ACCOUNT_FUNCTION_URL =
   "https://eahvcirspmvntffzphye.supabase.co/functions/v1/delete-account";
 
@@ -438,13 +474,13 @@ export function initGirisPage() {
     // yönlendirmeden ÖNCE authenticator kodu istenir (bkz.
     // mfaGerekirseDogrulaVeYonlendir başındaki ayrıntılı açıklama).
     const params = new URLSearchParams(window.location.search);
-    const hedef = params.get("donus") || REDIRECT_AFTER_LOGIN;
+    const hedef = guvenliDonusHedefi(params.get("donus"));
     await mfaGerekirseDogrulaVeYonlendir(msg, hedef);
   });
 
   googleBtn?.addEventListener("click", async () => {
     const params = new URLSearchParams(window.location.search);
-    const donus = params.get("donus") || REDIRECT_AFTER_LOGIN;
+    const donus = guvenliDonusHedefi(params.get("donus"));
     // Hedefi (donus) hemen kullanmıyoruz — redirectTo'yu bilerek bu sayfaya
     // sabitliyoruz ki OAuth dönüşünde "kayıtlı mı" kontrolünü yapabilelim;
     // hedefi sessionStorage'da saklayıp kontrolden SONRA oraya gideceğiz.
@@ -490,7 +526,7 @@ function googleGirisDonusunuIsle(msg) {
     tamamlandi = true;
     authListener?.subscription?.unsubscribe();
     sessionStorage.removeItem(GOOGLE_GIRIS_INTENT_KEY);
-    const donus = sessionStorage.getItem(GOOGLE_GIRIS_DONUS_KEY) || REDIRECT_AFTER_LOGIN;
+    const donus = guvenliDonusHedefi(sessionStorage.getItem(GOOGLE_GIRIS_DONUS_KEY));
     sessionStorage.removeItem(GOOGLE_GIRIS_DONUS_KEY);
 
     const { data: profile, error } = await supabase
