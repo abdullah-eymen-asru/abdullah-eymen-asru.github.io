@@ -7,9 +7,17 @@
 # üzerinden ayarlandığında bu ikisi SESSİZCE YOK SAYILIR. Bu yüzden
 # clickjacking koruması burada, header seviyesinde de tanımlanıyor.
 #
-# NOT: Bu dosya sadece Cloudflare Pages build'inde çalışır. GitHub Pages
-# (mirror_site_url) tarafında bu header'lar uygulanmaz — GitHub Pages özel
-# HTTP header ayarlamayı desteklemiyor, bu platformun bir kısıtlaması.
+# NOT: Bu dosya sadece Cloudflare Pages build'inde çalışır. _config.yml'deki
+# KANONİK adres (url) GitHub Pages (abdullah-eymen-asru.github.io) — yani bu
+# header'ların HİÇ uygulanmadığı platform, tam olarak sitenin birincil/
+# indekslenen adresi. mirror_site_url (Cloudflare Pages, bu dosyanın
+# çalıştığı yer) ikincil bir kopya. GitHub Pages özel HTTP header ayarlamayı
+# desteklemediği için bu platform kısıtlamasını kod tarafında tamamen
+# gideremiyoruz; X-Frame-Options/frame-ancestors eksikliğini KISMEN telafi
+# eden bir JS tabanlı frame-busting script'i _layouts/default.html'in
+# <head> başına eklendi (bkz. orada "CLICKJACKING KORUMASI" notu) — bu,
+# gerçek bir HTTP header kadar güçlü değildir (JS devre dışıysa çalışmaz)
+# ama GitHub Pages için mevcut TEK tarayıcı-taraflı savunma katmanıdır.
 
 # Cloudflare Pages HTTP Header Configuration
 
