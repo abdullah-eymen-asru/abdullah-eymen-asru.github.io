@@ -26,22 +26,33 @@ export async function initAuthNav() {
   const container = document.getElementById("auth-nav");
   if (!container) return;
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  // WEBVIEW UYUMLULUĞU: aşağıdaki Supabase çağrıları ağ hatasıyla (WebView
+  // içinde geçici bağlantı sorunu vb.) reject olabilir. try/catch
+  // olmadan bu, çağıran yerdeki .catch()'e düşse bile container'ı hiç
+  // güncellemeden bırakırdı — statik "Giriş Yap" linki (progressive
+  // enhancement) zaten yerinde olduğu için görsel bir kilitlenme
+  // OLMUYOR, ama tutarlılık için burada da açıkça ele alınıyor.
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-  if (!session) {
-    renderGirisLinki(container);
-  } else {
-    // Rolü öğrenmek için tek satır bir profil sorgusu — admin linkini
-    // sadece gerçekten adminse göstermek için (RLS zaten korur, bu sadece
-    // menüyü gereksiz linklerle kalabalıklaştırmamak için).
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", session.user.id)
-      .single();
-    renderHesapMenusu(container, profile?.role ?? "user");
+    if (!session) {
+      renderGirisLinki(container);
+    } else {
+      // Rolü öğrenmek için tek satır bir profil sorgusu — admin linkini
+      // sadece gerçekten adminse göstermek için (RLS zaten korur, bu sadece
+      // menüyü gereksiz linklerle kalabalıklaştırmamak için).
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", session.user.id)
+        .single();
+      renderHesapMenusu(container, profile?.role ?? "user");
+    }
+  } catch (err) {
+    console.error("initAuthNav() başarısız (ağ hatası olabilir):", err);
+    return;
   }
 
   // Başka bir sekmede giriş/çıkış yapılırsa bu sekmedeki menü de güncellensin.
