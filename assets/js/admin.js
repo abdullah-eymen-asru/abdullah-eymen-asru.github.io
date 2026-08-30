@@ -682,7 +682,9 @@ function wireR2DosyaPaylasim() {
   if (!btn) return; // Worker URL'i henüz ayarlanmadıysa bile bölüm sayfada durur
 
   const keyInput = document.getElementById("r2-dosya-key");
-  const sureInput = document.getElementById("r2-gecerlilik-saniye");
+  const saatInput = document.getElementById("r2-gecerlilik-saat");
+  const dakikaInput = document.getElementById("r2-gecerlilik-dakika");
+  const saniyeInput = document.getElementById("r2-gecerlilik-saniye");
   const msg = document.getElementById("r2-link-sonuc");
   const kutuWrap = document.getElementById("r2-link-kutu-wrap");
   const kutu = document.getElementById("r2-link-kutu");
@@ -694,7 +696,11 @@ function wireR2DosyaPaylasim() {
       kutuWrap.hidden = true;
       return;
     }
-    const expiresIn = Math.max(60, parseInt(sureInput.value, 10) || 3600);
+    // Saat + dakika + saniye alanlarını tek bir toplam saniyeye çeviriyoruz.
+    const saat = Math.max(0, parseInt(saatInput.value, 10) || 0);
+    const dakika = Math.max(0, parseInt(dakikaInput.value, 10) || 0);
+    const saniye = Math.max(0, parseInt(saniyeInput.value, 10) || 0);
+    const expiresIn = Math.max(60, saat * 3600 + dakika * 60 + saniye);
 
     btn.disabled = true;
     btn.textContent = "Üretiliyor...";
