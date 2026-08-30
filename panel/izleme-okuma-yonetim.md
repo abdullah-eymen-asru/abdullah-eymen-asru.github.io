@@ -69,7 +69,7 @@ permalink: "/panel/izleme-okuma-yonetim.html"
         <div class="gy-onizleme-baslik">✅ Kayıt eklendi</div>
         <p class="muted" id="iy-basari-metin"></p>
         <div class="gy-link-kutu">
-          <a id="iy-basari-issue-link" href="#" target="_blank" rel="noopener" class="btn-secondary" style="width:auto; text-decoration:none; display:inline-block; text-align:center;">GitHub'da Issue'yu Aç</a>
+          <a id="iy-basari-issue-link" href="#" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="width:auto; text-decoration:none; display:inline-block; text-align:center;">GitHub'da Issue'yu Aç</a>
         </div>
       </div>
     </section>
