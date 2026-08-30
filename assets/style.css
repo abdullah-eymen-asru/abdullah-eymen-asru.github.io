@@ -903,6 +903,26 @@ th { color: var(--muted); font-weight: 600; }
  * olan ziyaretçiler için geçişi tamamen kapatıyoruz (aşağıdaki media query),
  * tıpkı cerez-onay.css'teki aynı prensip gibi.
  */
+/*
+ * ANDROID WEBVIEW UYUMSUZLUĞU: Bazı WebView/Chromium sürümlerinde
+ * (native log'da "No SurfaceAnimationManager for token" hatası olarak
+ * görülür) aşağıdaki "@view-transition { navigation: auto; }" kuralı
+ * düzgün çalışmıyor: view-transition pseudo-elementleri native
+ * tarafta oluşturulamıyor ve bu bazı durumlarda ::view-transition-old
+ * animasyonunun opacity:0 bitiş karesinin (animation: ... both) GERÇEK
+ * sayfa içeriğine sızıp sayfanın kalıcı olarak boş/beyaz kalmasına yol
+ * açabiliyor.
+ *
+ * "@view-transition" bir üst-seviye (top-level) at-rule olduğu için
+ * bir selector'ün içine gömülüp koşullu hale getirilemez (CSS nesting
+ * kuralları buna izin vermez). Bu yüzden WebView tespiti ve engelleme
+ * "_layouts/default.html" içindeki inline script tarafından yapılıyor:
+ * WebView tespit edilirse <html> etiketine "is-android-webview" class'ı
+ * eklenir VE aynı script, bu @view-transition kuralını geçersiz kılan
+ * (override eden) bir <style> etiketini <head>'e ekler. Böylece
+ * WebView'de transition hiç tetiklenmez, normal tarayıcılarda ise
+ * (Chrome, Firefox, Safari, Edge) hiçbir şey değişmez.
+ */
 @media (prefers-reduced-motion: no-preference) {
   @view-transition {
     navigation: auto;
@@ -911,11 +931,13 @@ th { color: var(--muted); font-weight: 600; }
   /* Varsayılan cross-fade'i biraz daha "modern" hissettirmek için hafif bir
      kayma ekliyoruz — çok belirgin olmayan, hızlı (180ms) bir hareket.
      ::view-transition-old/-new, tarayıcının navigasyon öncesi/sonrası
-     ekran görüntülerini temsil eden sözde elemanlardır. */
-  ::view-transition-old(root) {
+     ekran görüntülerini temsil eden sözde elemanlardır. WebView'de bu
+     kurallar da "is-android-webview" class'ı ile birlikte enjekte
+     edilen <style> tarafından etkisiz hale getirilir. */
+  html:not(.is-android-webview) ::view-transition-old(root) {
     animation: sekme-cikis 0.16s ease-out both;
   }
-  ::view-transition-new(root) {
+  html:not(.is-android-webview) ::view-transition-new(root) {
     animation: sekme-giris 0.18s ease-out both;
   }
 
