@@ -225,6 +225,58 @@ function bannerGizle() {
   document.getElementById("cerez-banner")?.setAttribute("hidden", "");
   document.body.style.paddingBottom = "";
 }
+
+/* ---- Mobil üst menü (nav) kaydırma ipucu ----
+ * BAĞLAM: Mobilde sekmeler artık tek satırda yatay kaydırmalı (bkz.
+ * style.css .nav-links-scroll). Sorun: siteyi ilk defa gören biri, bunun
+ * kaydırılabilir olduğunu nereden bilecek? İki ipucu veriyoruz:
+ *   1) Sağ kenarda CSS mask ile sürekli bir "soluklaşma" (bkz. style.css
+ *      .nav-links-scroll — burada sadece kaydırma SONA erdiğinde
+ *      ".nav-scroll-sonda" sınıfıyla bu maskeyi kaldırıyoruz, yoksa son
+ *      sekme hep soluk/"tıklanamaz" görünür kalırdı).
+ *   2) Sayfa ilk açıldığında, bar bir kere kendiliğinden hafifçe sağa
+ *      kayıp geri döner ("nudge") — dokunmadan önce hareketle de kaydırma
+ *      ipucu verir. localStorage'da bir bayrakla SADECE BİR KEZ (tarayıcı
+ *      başına) gösterilir, tekrar tekrar can sıkmasın diye.
+ *      prefers-reduced-motion açıksa hiç oynatılmaz.
+ */
+function navKaydirmaIpuclariniKur() {
+  const scrollEl = document.querySelector(".nav-links-scroll");
+  if (!scrollEl) return;
+
+  function sondaMi() {
+    return scrollEl.scrollWidth - scrollEl.clientWidth - scrollEl.scrollLeft <= 2;
+  }
+  function durumuGuncelle() {
+    const kaydirmayaGerekYok = scrollEl.scrollWidth <= scrollEl.clientWidth + 2;
+    scrollEl.classList.toggle("nav-scroll-sonda", kaydirmayaGerekYok || sondaMi());
+  }
+  durumuGuncelle();
+  scrollEl.addEventListener("scroll", durumuGuncelle, { passive: true });
+  window.addEventListener("resize", durumuGuncelle);
+
+  const IPUCU_ANAHTARI = "aea_nav_kaydirma_ipucu_gosterildi";
+  const azaltilmisHareket = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let dahaOnceGosterildi = true;
+  try {
+    dahaOnceGosterildi = localStorage.getItem(IPUCU_ANAHTARI) === "1";
+  } catch {
+    // localStorage kapalıysa (bkz. supabase-client.js'teki benzer not)
+    // ipucunu sadece bu oturumda tekrar tekrar göstermemiş oluruz; zararsız.
+  }
+
+  if (!azaltilmisHareket && !dahaOnceGosterildi && scrollEl.scrollWidth > scrollEl.clientWidth + 2) {
+    setTimeout(() => {
+      scrollEl.scrollTo({ left: 36, behavior: "smooth" });
+      setTimeout(() => scrollEl.scrollTo({ left: 0, behavior: "smooth" }), 500);
+    }, 700);
+    try {
+      localStorage.setItem(IPUCU_ANAHTARI, "1");
+    } catch {
+      // yazılamıyorsa bir daha deneriz, sorun değil.
+    }
+  }
+}
 function panelAc() {
   const veri = cerezTercihleriniOku();
   const analitikKutu = document.getElementById("cerez-analitik-kutu");
@@ -285,6 +337,8 @@ function init() {
   // açabilir. Tek seferlik çalışmayı garanti ediyoruz.
   if (window.__cerezOnayBaslatildi) return;
   window.__cerezOnayBaslatildi = true;
+
+  navKaydirmaIpuclariniKur();
 
   const mevcut = cerezTercihleriniOku();
   if (mevcut) {
