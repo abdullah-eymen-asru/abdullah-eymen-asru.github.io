@@ -23,25 +23,33 @@ async function init() {
   const container = document.getElementById("izleme-okuma-yonetim-kisayol");
   if (!container) return;
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session) return;
+  // WEBVIEW UYUMLULUĞU: bu script sadece EKLEMELİ bir kolaylık katmanı —
+  // hata durumunda sayfanın geri kalanını etkilememesi, sadece butonun
+  // görünmemesiyle sonuçlanması gerekiyor (unhandled promise rejection
+  // yerine).
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) return;
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", session.user.id)
-    .single();
-  if (profile?.role !== "owner") return;
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", session.user.id)
+      .single();
+    if (profile?.role !== "owner") return;
 
-  const base = document.documentElement.dataset.baseurl || "";
-  const a = document.createElement("a");
-  a.href = base + "/panel/izleme-okuma-yonetim.html";
-  a.className = "btn-primary";
-  a.style.cssText = "width:auto; display:inline-block; text-decoration:none; margin-bottom:14px;";
-  a.textContent = "➕ Yeni Kayıt Ekle (Site Sahibi)";
-  container.appendChild(a);
+    const base = document.documentElement.dataset.baseurl || "";
+    const a = document.createElement("a");
+    a.href = base + "/panel/izleme-okuma-yonetim.html";
+    a.className = "btn-primary";
+    a.style.cssText = "width:auto; display:inline-block; text-decoration:none; margin-bottom:14px;";
+    a.textContent = "➕ Yeni Kayıt Ekle (Site Sahibi)";
+    container.appendChild(a);
+  } catch (err) {
+    console.error("izleme-okuma-yonetim-kisayol.js başarısız (buton gösterilmeyecek):", err);
+  }
 }
 
 init();
