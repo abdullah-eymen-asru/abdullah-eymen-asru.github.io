@@ -207,7 +207,7 @@ function basitMarkdown(md) {
       let satir = blok
         .replaceAll(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
         .replaceAll(/\*(.+?)\*/g, "<em>$1</em>")
-        .replaceAll(/\[(.+?)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+        .replaceAll(/\[(.+?)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
         .replaceAll(/\n/g, "<br>");
       return `<p>${satir}</p>`;
     })
