@@ -39,6 +39,33 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const CRON_SHARED_SECRET = Deno.env.get("CRON_SHARED_SECRET");
 
+// GÜVENLİK AÇIĞI DÜZELTMESİ: aşağıdaki karşılaştırma ÖNCEDEN düz
+// `gelenSir !== CRON_SHARED_SECRET` idi. JS'in string eşitlik kontrolü
+// ilk farklı karakterde erken çıkar — bu, teorik olarak yanıt süresinden
+// sırrın kaç karakterinin doğru tahmin edildiğine dair bilgi sızdırabilecek
+// bir zamanlama yan-kanalı (timing attack) bırakır. Her iki değeri
+// SHA-256 ile hash'leyip SABİT uzunluktaki (32 bayt) özetleri baytlarını
+// XOR'layarak karşılaştırıyoruz — hem uzunluk farkı hem erken çıkış artık
+// gözlemlenebilir bir zamanlama farkı yaratmıyor. Bu uç noktanın pratik
+// riski zaten düşüktü (yalnızca zararsız bir bakım RPC'sini tetikliyor,
+// asıl yetki veritabanı tarafında kilitli) ama savunma derinliği için
+// düzeltildi; admin_guvenlik_bildirim_worker/worker.js'teki
+// sabitZamanliEsitMi() ile AYNI desen.
+async function sabitZamanliEsitMi(a: string, b: string): Promise<boolean> {
+  const enc = new TextEncoder();
+  const [ozetA, ozetB] = await Promise.all([
+    crypto.subtle.digest("SHA-256", enc.encode(a)),
+    crypto.subtle.digest("SHA-256", enc.encode(b)),
+  ]);
+  const baytA = new Uint8Array(ozetA);
+  const baytB = new Uint8Array(ozetB);
+  let fark = 0;
+  for (let i = 0; i < baytA.length; i++) {
+    fark |= baytA[i] ^ baytB[i];
+  }
+  return fark === 0;
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST" && req.method !== "GET") {
     return new Response(JSON.stringify({ error: "Sadece GET/POST." }), { status: 405 });
@@ -49,7 +76,8 @@ Deno.serve(async (req) => {
   // — production'da MUTLAKA ayarlanmalı.
   if (CRON_SHARED_SECRET) {
     const gelenSir = req.headers.get("x-cron-secret");
-    if (gelenSir !== CRON_SHARED_SECRET) {
+    const gecerliMi = gelenSir ? await sabitZamanliEsitMi(gelenSir, CRON_SHARED_SECRET) : false;
+    if (!gecerliMi) {
       return new Response(JSON.stringify({ error: "Yetkisiz." }), { status: 401 });
     }
   } else {
