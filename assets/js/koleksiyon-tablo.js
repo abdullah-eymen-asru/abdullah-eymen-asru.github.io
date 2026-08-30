@@ -71,12 +71,20 @@ async function koleksiyonTablosuOlustur(config) {
   const gizliAlanlar = new Set(["id", "url", "state", ...(config.gizliAlanlar || [])]);
   const sayfaBasinaKayit = config.sayfaBasinaKayit || 50;
 
+  // WEBVIEW UYUMLULUĞU: aynı-origin bir istek olsa bile bazı WebView'lerde
+  // ağ bağlantısı (ör. captive portal, flaky Wi-Fi) fetch()'i reddetmeden
+  // süresiz askıda bırakabilir. AbortController ile 10 sn'lik açık bir
+  // zaman aşımı koyup catch bloğunun HER durumda tetiklenmesini, "Liste
+  // yükleniyor…" durumunun sonsuza dek sürmemesini sağlıyoruz.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+
   try {
     // cache: "no-store" -> tarayıcı bu isteği kendi önbelleğinden ASLA
     // karşılamaz, her sayfa yenilemesinde gerçekten taze veri ister.
     // Worker tarafında zaten kısa süreli (60sn) bir Cloudflare önbelleği
     // var, o yeterli hız/güvenlik dengesini sağlıyor.
-    const res = await fetch(config.jsonUrl, { cache: "no-store" });
+    const res = await fetch(config.jsonUrl, { cache: "no-store", signal: controller.signal });
     if (!res.ok) throw new Error("JSON yüklenemedi: " + res.status);
     const data = await res.json();
     const items = Array.isArray(data.items) ? data.items : [];
@@ -260,7 +268,13 @@ async function koleksiyonTablosuOlustur(config) {
     tabloyuCiz(); // ilk çizim
 
   } catch (err) {
-    container.innerHTML = '<p class="error">Liste yüklenemedi. Lütfen daha sonra tekrar dene.</p>';
+    const mesaj =
+      err.name === "AbortError"
+        ? "Liste zaman aşımına uğradı."
+        : "Liste yüklenemedi.";
+    container.innerHTML = `<p class="error">${mesaj} Lütfen daha sonra tekrar dene.</p>`;
     console.error(err);
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
