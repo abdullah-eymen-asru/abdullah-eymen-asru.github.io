@@ -1,14 +1,14 @@
 <div class="share-buttons">
   <span class="share-label">Paylaş:</span>
-  <a class="share-btn" target="_blank" rel="noopener"
+  <a class="share-btn" target="_blank" rel="noopener noreferrer"
      href="https://wa.me/?text={{ page.title | url_encode }}%20{{ page.url | absolute_url | url_encode }}">
     WhatsApp
   </a>
-  <a class="share-btn" target="_blank" rel="noopener"
+  <a class="share-btn" target="_blank" rel="noopener noreferrer"
      href="https://twitter.com/intent/tweet?text={{ page.title | url_encode }}&url={{ page.url | absolute_url | url_encode }}">
     X
   </a>
-  <a class="share-btn" target="_blank" rel="noopener"
+  <a class="share-btn" target="_blank" rel="noopener noreferrer"
      href="https://www.linkedin.com/sharing/share-offsite/?url={{ page.url | absolute_url | url_encode }}">
     LinkedIn
   </a>
@@ -20,9 +20,24 @@
     const btn = document.getElementById("copy-link-btn");
     if (!btn) return;
     btn.addEventListener("click", () => {
+      // WEBVIEW UYUMLULUĞU: navigator.clipboard bazı WebView'lerde hiç
+      // tanımlı olmayabilir (izin verilmemiş) ya da writeText() reddedilebilir
+      // — bu durumda önceden hiçbir geri bildirim olmadan sessizce
+      // başarısız oluyordu. Artık her iki durumda da kullanıcıya bir mesaj
+      // gösteriyoruz.
+      if (!navigator.clipboard || !navigator.clipboard.writeText) {
+        const original = btn.textContent;
+        btn.textContent = "Kopyalanamadı";
+        setTimeout(() => { btn.textContent = original; }, 1800);
+        return;
+      }
       navigator.clipboard.writeText(window.location.href).then(() => {
         const original = btn.textContent;
         btn.textContent = "Kopyalandı ✓";
+        setTimeout(() => { btn.textContent = original; }, 1800);
+      }).catch(() => {
+        const original = btn.textContent;
+        btn.textContent = "Kopyalanamadı";
         setTimeout(() => { btn.textContent = original; }, 1800);
       });
     });
