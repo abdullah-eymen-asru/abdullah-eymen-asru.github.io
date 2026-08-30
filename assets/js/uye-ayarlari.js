@@ -18,7 +18,7 @@
  * (admin-change-email, delete-account) — sadece görünüm/gezinme farklı.
  */
 import { supabase, showMessage, escapeHtml, kucukHarfeCevirTr, kullaniciAramayaUyuyorMu } from "./core/supabase-client.js";
-import { requireAuth } from "./auth/auth-guard.js";
+import { requireAuthOrShowError } from "./auth/auth-guard.js";
 
 const DELETE_ACCOUNT_FUNCTION_URL =
   "https://eahvcirspmvntffzphye.supabase.co/functions/v1/delete-account";
@@ -48,7 +48,7 @@ let SAYFA_BOYUTU = 20;
 let GIRIS_YAPAN_PROFIL = null;
 
 async function init() {
-  const { profile } = await requireAuth({ role: "admin" });
+  const { profile } = await requireAuthOrShowError({ role: "admin" });
   GIRIS_YAPAN_PROFIL = profile;
   document.getElementById("loading")?.setAttribute("hidden", "");
   document.getElementById("app").hidden = false;
