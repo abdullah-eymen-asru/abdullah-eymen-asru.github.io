@@ -58,7 +58,20 @@ async function init() {
 
   wireAskiyaAlForm();
   wireKayitlarToggle();
-  await Promise.all([loadAdminListesi(), loadVakalar(), loadKayitDurumu()]);
+  // KARARLILIK: Promise.all([...]) önceden kullanılıyordu — bunlardan
+  // BİRİ bile hata fırlatırsa (ör. beklenmeyen bir istisna) Promise.all
+  // hemen reddolur, wireRealtime() HİÇ çalışmaz VE henüz başarıyla
+  // tamamlanabilecek diğer bölümlerin varsa geç gelen DOM güncellemeleri
+  // de "yarım" bir izlenim bırakabilir. Promise.allSettled ile her
+  // bölüm birbirinden BAĞIMSIZ ele alınıyor — biri başarısız olsa bile
+  // diğerleri ve wireRealtime() normal çalışmaya devam ediyor (panel.js/
+  // admin.js'teki "her bölüm bağımsız" prensibiyle tutarlı).
+  const sonuclar = await Promise.allSettled([loadAdminListesi(), loadVakalar(), loadKayitDurumu()]);
+  sonuclar.forEach((sonuc, i) => {
+    if (sonuc.status === "rejected") {
+      console.error(`admin-guvenlik.js: init adım ${i} başarısız:`, sonuc.reason);
+    }
+  });
   wireRealtime();
 }
 
