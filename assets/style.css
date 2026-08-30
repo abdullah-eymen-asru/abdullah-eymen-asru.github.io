@@ -894,6 +894,18 @@ th { color: var(--muted); font-weight: 600; }
     flex-wrap: nowrap;
     align-items: center;
     gap: 4px;
+    /* KRİTİK: nav da (üst öğesi olan .wrap sütun yönlü flex container
+       olduğu için) varsayılan "min-width: auto" ile İÇERİĞİNİN doğal
+       (sıkışmamış) genişliğinden KÜÇÜLEMİYORDU — bu da nav'ın kendisinin
+       stretch ile 100% genişliğe değil, çocuklarının toplam doğal
+       genişliğine (ör. 590px, 390px'lik ekranda taşarak) sabitlenmesine
+       yol açıyordu: nav-links-scroll'un "overflow-x:auto"su devreye bile
+       girmiyordu çünkü onu saran nav zaten taşmıştı. min-width:0 bu
+       otomatik-minimum davranışını kapatıp nav'ın gerçekten ekran
+       genişliğine sıkışmasını, böylece nav-links-scroll'un kendi içinde
+       yatay kaydırmalı hale gelmesini sağlıyor. */
+    min-width: 0;
+    width: 100%;
   }
 
   .nav-links-scroll {
