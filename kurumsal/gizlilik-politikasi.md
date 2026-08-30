@@ -62,7 +62,7 @@ permalink: "/kurumsal/gizlilik-politikasi.html"
   kendi güvenlik ve gizlilik politikaları çerçevesinde veri işleyen
   (veri işleyen sıfatıyla) bağımsız bir üçüncü taraf hizmet sağlayıcıdır;
   detaylar için
-  <a href="https://supabase.com/privacy" target="_blank">Supabase Gizlilik Politikası</a>'na
+  <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer">Supabase Gizlilik Politikası</a>'na
   bakabilirsiniz. Özel içerik eklerindeki bazı büyük dosyalar, boyut
   sınırları nedeniyle Cloudflare R2 gibi harici bir depolama hizmetinde de
   barındırılabilir; bu durumda ilgili dosyaya erişim, ayrıca paylaşılan
@@ -127,8 +127,8 @@ permalink: "/kurumsal/gizlilik-politikasi.html"
   reklamlar göstermek için çerez ve benzer teknolojiler kullanabilir.
   Google'ın reklam çerezlerini nasıl kullandığı hakkında bilgi ve
   kişiselleştirilmiş reklamlardan çıkma (opt-out) seçeneği için
-  <a href="https://adssettings.google.com/" target="_blank">Google Reklam Ayarları</a>'nı
-  ve <a href="https://policies.google.com/technologies/ads" target="_blank">Google'ın Reklamcılıkta Kullandığı Teknolojiler</a>
+  <a href="https://adssettings.google.com/" target="_blank" rel="noopener noreferrer">Google Reklam Ayarları</a>'nı
+  ve <a href="https://policies.google.com/technologies/ads" target="_blank" rel="noopener noreferrer">Google'ın Reklamcılıkta Kullandığı Teknolojiler</a>
   sayfasını ziyaret edebilirsiniz. <strong>Bu ağ da, aşağıdaki § 9'da
   açıklanan çerez onayı olmadan hiçbir şekilde çalışmaz.</strong>
 </p>
@@ -235,7 +235,7 @@ permalink: "/kurumsal/gizlilik-politikasi.html"
 <p>
   İletişim sayfasındaki form Google Forms üzerinden çalışır, form
   yanıtları Google'ın altyapısında saklanır. Detaylar için
-  <a href="https://policies.google.com/privacy" target="_blank">Google'ın gizlilik politikasına</a>
+  <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google'ın gizlilik politikasına</a>
   bakabilirsin.
 </p>
 
