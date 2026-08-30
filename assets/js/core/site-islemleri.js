@@ -193,12 +193,37 @@ function tercihleriUygula(veri, otomatikMi) {
   reklamUygula(veri.reklam, !!otomatikMi);
 }
 
-/* ---- Şerit (banner) ve ayrıntılı panel görünürlüğü ---- */
+/* ---- Şerit (banner) ve ayrıntılı panel görünürlüğü ----
+ * BUG FİX: Şerit "position: fixed; bottom: 0" olduğu için normal sayfa
+ * akışında yer kaplamıyordu; bu yüzden altındaki içerik (ör. Gizlilik
+ * Politikası sayfasındaki tablo/son paragraf, ya da herhangi bir
+ * sayfanın alt bilgisi) şeridin ARKASINDA kalıp mobilde "farklı"/eksik
+ * görünebiliyordu — özellikle mobilde şerit metni sarmaladığı için
+ * masaüstünden çok daha yüksek olduğunda. bannerBoslukAyarla(), şerit
+ * her görünür olduğunda GERÇEK (render edilmiş) yüksekliğini ölçüp
+ * <body>'e o kadar padding-bottom ekler; şerit kapanınca kaldırır.
+ * Pencere yeniden boyutlandığında (mobil klavye, döndürme, metin
+ * sarmalamasının değişmesi) da yeniden ölçer.
+ */
+function bannerBoslukAyarla() {
+  const banner = document.getElementById("cerez-banner");
+  if (!banner || banner.hasAttribute("hidden")) {
+    document.body.style.paddingBottom = "";
+    return;
+  }
+  document.body.style.paddingBottom = banner.offsetHeight + "px";
+}
 function bannerGoster() {
   document.getElementById("cerez-banner")?.removeAttribute("hidden");
+  bannerBoslukAyarla();
+  if (!window.__cerezBannerResizeBagli) {
+    window.__cerezBannerResizeBagli = true;
+    window.addEventListener("resize", bannerBoslukAyarla);
+  }
 }
 function bannerGizle() {
   document.getElementById("cerez-banner")?.setAttribute("hidden", "");
+  document.body.style.paddingBottom = "";
 }
 function panelAc() {
   const veri = cerezTercihleriniOku();
