@@ -499,9 +499,12 @@ Mevcut `_headers` dosyandaki CSP zaten şunu içeriyor:
 connect-src 'self' https:; ...
 ```
 
-`https:` joker değeri tüm HTTPS kaynaklarına (Supabase API'si, `esm.sh`
-üzerinden yüklenen Supabase JS SDK dahil) izin verdiği için **hiçbir
-değişiklik yapmana gerek yok**.
+`https:` joker değeri tüm HTTPS kaynaklarına (Supabase API'si dahil)
+izin verdiği için **hiçbir değişiklik yapmana gerek yok**. (Not: Supabase
+JS SDK artık `esm.sh` CDN'inden DEĞİL, yerel `assets/js/vendor/
+supabase.js` dosyasından yükleniyor — bkz. `assets/js/core/
+supabase-client.js` başındaki not — bu yüzden CSP'de `esm.sh` için ayrıca
+bir izin gerekmiyor.)
 
 ---
 
