@@ -38,7 +38,7 @@ permalink: "/hesap/kayit.html"
     <label style="display:flex; gap:8px; align-items:flex-start; flex-direction:row; font-size:0.9rem; color:var(--text);">
       <input id="kvkk_onay" name="kvkk_onay" type="checkbox" form="kayit-form" required style="margin-top:3px;">
       <span>
-        <a href="{{ '/kurumsal/gizlilik-politikasi.html' | relative_url }}" target="_blank">KVKK Aydınlatma Metni ve Gizlilik Politikası</a>'nı
+        <a href="{{ '/kurumsal/gizlilik-politikasi.html' | relative_url }}" target="_blank" rel="noopener noreferrer">KVKK Aydınlatma Metni ve Gizlilik Politikası</a>'nı
         okudum, 6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında kişisel
         verilerimin belirtilen şekilde işlenmesine açık rıza gösteriyorum.
       </span>
