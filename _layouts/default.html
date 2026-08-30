@@ -84,17 +84,21 @@
   {% elsif page.date and page.date > site.time %}
     {% assign henuz_yayinlanmadi = true %}
   {% endif %}
-  {% if henuz_yayinlanmadi %}
+  {% if henuz_yayinlanmadi or page.gizli_sayfa %}
   <!--
-    ZAMANLANMIŞ/GİZLİ İÇERİK: Bu sayfa "yayinda: false" olarak işaretli
-    YA DA "date" alanı henüz gelmemiş (ileri tarihli/zamanlanmış).
-    Arama motorlarının bu sayfayı indekslememesi için noindex ekleniyor.
+    ZAMANLANMIŞ/GİZLİ İÇERİK YA DA HESAP/PANEL SAYFASI: Bu sayfa
+    "yayinda: false" olarak işaretli, "date" alanı henüz gelmemiş
+    (ileri tarihli/zamanlanmış) YA DA /panel/ ya da /hesap/ altında
+    ("gizli_sayfa: true" — bkz. _config.yml defaults). Arama
+    motorlarının bu sayfayı indekslememesi için noindex ekleniyor.
     Sayfanın kendisi yine de build ediliyor (bkz. _config.yml'deki
     "future: true" notu) — bilinçli bir tercih, çünkü gizli önizleme
     linkinin çalışabilmesi için sayfanın var olması gerekiyor. Gerçek
     gizlilik, sayfanın normal listelerden/feed'den/sitemap'ten çıkarılmış
     olmasından ve URL'in tahmin edilemez olmasından geliyor — bkz.
-    README'deki "Zamanlanmış ve gizli yazılar" bölümü.
+    README'deki "Zamanlanmış ve gizli yazılar" bölümü. /panel/ ve
+    /hesap/ sayfalarının GERÇEK korunması zaten RLS + auth-guard.js'te —
+    buradaki noindex sadece gereksiz arama motoru keşfini engelliyor.
   -->
   <meta name="robots" content="noindex, nofollow">
   {% endif %}
@@ -458,18 +462,23 @@
     "hidden" JS'siz tarayıcılarda da varsayılan olarak gizli kalır; bu
     şerit tamamen JS ile açılıp kapatıldığı için, JS çalışmıyorsa hiçbir
     isteğe bağlı çerez zaten yüklenmez (varsayılan = kapalı ilkesi).
+
+    METİN KISALTMASI: Önceden burada kategorilerin (Analitik/Reklam/Giscus)
+    tek tek sayıldığı 5 cümlelik uzun bir paragraf vardı; mobilde bu tek
+    başına şeridi ekranın ~%30-40'ını kaplayacak kadar uzatıyordu. O
+    ayrıntı hiçbir bilgi kaybı olmadan zaten İKİ yerde duruyor: (1) "Ayarları
+    Yönet" panelindeki her kategorinin kendi açıklaması, (2) Gizlilik
+    Politikası sayfasındaki tablo. Bu yüzden şeritteki metni TEK cümleye
+    indirip ayrıntıyı bu iki yere bırakıyoruz — özellik kaybı yok, sadece
+    varsayılan görünüm çok daha kısa.
   -->
   <div id="cerez-banner" class="cerez-banner" hidden role="region" aria-label="Çerez onayı">
     <div class="cerez-banner-metin">
       <strong>Çerez Kullanımı</strong>
       <p>
-        Bu site, temel işlevler (oturum, tema tercihi) için gerekli teknik
-        depolamanın yanı sıra; açık rızanla ziyaretçi istatistikleri
-        (Google Analytics), reklam (Google AdSense) ve yorum sistemi
-        (Giscus/GitHub) için isteğe bağlı çerezler/benzer teknolojiler
-        kullanabilir. Tercihini dilediğin zaman sayfa altındaki "Çerez
-        Ayarları"ndan değiştirebilir, istemediğin çerezleri
-        kaldırabilirsin. Detaylar için
+        Zorunlu teknik depolamaya ek olarak, açık rızanla istatistik/reklam/
+        yorum çerezleri kullanabiliriz — kategorileri "Ayarları Yönet"den
+        tek tek aç/kapat, ayrıntı için
         <a href="{{ '/kurumsal/gizlilik-politikasi.html' | relative_url }}">Gizlilik Politikası</a>.
       </p>
     </div>
