@@ -105,8 +105,22 @@ permalink: "/panel/admin.html"
           <input id="r2-dosya-key" type="text" placeholder="ör. 3f2504e0-4f89-.../rapor.pdf">
         </div>
         <div class="form-field">
-          <label for="r2-gecerlilik-saniye">Geçerlilik Süresi (saniye)</label>
-          <input id="r2-gecerlilik-saniye" type="number" min="60" step="60" value="3600">
+          <label>Geçerlilik Süresi</label>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <span style="display:flex; align-items:center; gap:4px;">
+              <input id="r2-gecerlilik-saat" type="number" min="0" step="1" value="1" style="width:70px;">
+              <label for="r2-gecerlilik-saat" class="muted" style="margin:0;">saat</label>
+            </span>
+            <span style="display:flex; align-items:center; gap:4px;">
+              <input id="r2-gecerlilik-dakika" type="number" min="0" max="59" step="1" value="0" style="width:70px;">
+              <label for="r2-gecerlilik-dakika" class="muted" style="margin:0;">dk</label>
+            </span>
+            <span style="display:flex; align-items:center; gap:4px;">
+              <input id="r2-gecerlilik-saniye" type="number" min="0" max="59" step="1" value="0" style="width:70px;">
+              <label for="r2-gecerlilik-saniye" class="muted" style="margin:0;">sn</label>
+            </span>
+          </div>
+          <p class="muted" style="margin-top:4px;">ör. 2 saat 3 dk 5 sn için: saat=2, dk=3, sn=5. En az 60 saniye olmalı.</p>
         </div>
         <button id="r2-link-uret-btn" type="button" class="btn-primary" style="width:auto;">
           İmzalı Link Üret
