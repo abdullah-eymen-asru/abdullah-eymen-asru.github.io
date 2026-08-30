@@ -146,6 +146,38 @@
   </script>
 
   <link rel="stylesheet" href="{{ '/assets/style.css' | relative_url }}">
+
+  <script>
+    // ANDROID WEBVIEW TESPİTİ (View Transitions güvenlik ağı):
+    // Android WebView'in User-Agent'ı her zaman ";  wv)" işaretini
+    // içerir (Chrome for Android'de bu işaret YOKTUR, sadece gömülü
+    // WebView'lerde bulunur — bu Google'ın resmi WebView tanımlama
+    // yöntemidir). Bazı WebView/Chromium sürümlerinde CSS
+    // "@view-transition { navigation: auto; }" özelliği native tarafta
+    // düzgün çalışmıyor ("No SurfaceAnimationManager for token" hatası
+    // olarak Logcat'te görülür) ve bu, ::view-transition-old(root)
+    // animasyonunun "opacity: 0" bitiş karesinin (animation: ... both
+    // fill-mode) GERÇEK sayfa içeriğine sızıp sayfanın kalıcı olarak
+    // boş/beyaz kalmasına yol açabiliyor.
+    //
+    // "@view-transition" bir üst-seviye at-rule olduğu için bir
+    // selector içine gömülüp koşullu hale getirilemez; bunun yerine
+    // BURADA, style.css'in <link>'inden SONRA (yukarıda) çalışan bu
+    // script içinde ayrı bir <style> etiketiyle "navigation: none"
+    // değeriyle override ediyoruz — CSS'te aynı at-rule, DOM'a
+    // SONRADAN eklenen bildirim tarafından geçersiz kılınır. Bu
+    // yüzden bu script'in style.css linkinden SONRA gelmesi ŞARTTIR;
+    // yukarı taşınırsa override çalışmaz.
+    (function () {
+      if (/;\s*wv\)/.test(navigator.userAgent)) {
+        document.documentElement.classList.add("is-android-webview");
+        const style = document.createElement("style");
+        style.textContent = "@view-transition { navigation: none; }";
+        document.head.appendChild(style);
+      }
+    })();
+  </script>
+
   <!-- Çerez onay şeridi/paneli: site genelinde her sayfada yüklenir
        (bkz. assets/css/cerez-onay.css başındaki not). -->
   <link rel="stylesheet" href="{{ '/assets/css/cerez-onay.css' | relative_url }}">
