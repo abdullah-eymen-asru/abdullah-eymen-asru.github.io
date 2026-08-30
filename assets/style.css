@@ -503,6 +503,25 @@ th { color: var(--muted); font-weight: 600; }
   border: none;
 }
 
+/* .gform-iframe: Google Forms embed'inin yüksekliği burada, cihaza göre
+   iki ayrı sabit değerle veriliyor (bkz. kurumsal/iletisim.md'deki not).
+   Google, iframe'in KENDİ genişliğine göre alanları masaüstünde yan yana/
+   kompakt, dar ekranlarda ise tek sütunda alt alta dizer — bu da formu
+   mobilde ÇOK daha uzun yapar. Tek bir sabit yükseklik kullanmak ya
+   masaüstünde gereksiz boşluk bırakır ya da mobilde formun altını kesip
+   iframe'in kendi içinde ikinci bir kaydırma çubuğu çıkarır. Bu iki değer
+   şu anki formun soru sayısına göre BOL tutulmuş tahminlerdir — hâlâ iframe
+   içi kaydırma görürsen sayıyı büyüt, altta çok boşluk varsa küçült. */
+.gform-iframe {
+  height: 1250px;
+}
+
+@media (max-width: 640px) {
+  .gform-iframe {
+    height: 1900px;
+  }
+}
+
 .site-footer {
   border-top: 1px solid var(--border);
   padding: 20px 0;
