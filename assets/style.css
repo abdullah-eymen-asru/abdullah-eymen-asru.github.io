@@ -141,6 +141,11 @@ nav {
   flex-grow: 1;
 }
 
+/* Masaüstünde bu kapsayıcı "görünmez" — içindeki linkler doğrudan
+   nav'ın flex öğesi gibi davranır, mevcut düzen birebir korunur.
+   Mobil override'ı için bkz. @media (max-width: 640px) aşağıda. */
+.nav-links-scroll { display: contents; }
+
 nav a {
   margin-left: 4px;
   padding: 7px 12px;
@@ -356,6 +361,26 @@ th, td {
 }
 
 th { color: var(--muted); font-weight: 600; }
+
+/* .tablo-kaydir: şu an yalnızca Gizlilik Politikası sayfasındaki 3
+   sütunlu (Kategori/Amaç/Kapatılabilir mi?) tablo için kullanılıyor.
+   Masaüstünde hiçbir görsel fark yaratmaz (tablo zaten width:100%
+   ile sayfaya sığıyor). Dar/mobil ekranlarda ise üç sütun tek
+   satırda sıkışıp metnin okunmaz hale gelmesi yerine, tabloya makul
+   bir minimum genişlik verip kutuyu yatay kaydırmalı yapıyoruz —
+   içerik/özellik kaybı olmadan, sayfanın geri kalanının düzenini de
+   bozmadan. */
+@media (max-width: 640px) {
+  .tablo-kaydir {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-top: 1.2em;
+  }
+  .tablo-kaydir table {
+    margin-top: 0;
+    min-width: 560px;
+  }
+}
 
 .tag {
   display: inline-block;
@@ -856,22 +881,47 @@ th { color: var(--muted); font-weight: 600; }
     text-align: center;
   }
 
+  /* BUG FİX: nav (Anasayfa/Blog/İletişim/Akademik Projeler/İzlediklerim/
+     Okuduklarım/Giriş Yap) önceden flex-wrap ile mobilde 3-4 satıra
+     bölünüyor, bu da tüm sekme barının ekranın yarısına yakın bir
+     dikey alan kaplamasına yol açıyordu. Hiçbir sekmeyi kaldırmadan,
+     linkleri (.nav-links-scroll) TEK SATIRDA yatay kaydırmalı (swipe)
+     bir bara çeviriyoruz — mobilde çok sık görülen ve tüm sekmelerin
+     erişilebilir kalmasını sağlayan bir düzen. Hesap menüsü (#auth-nav)
+     kasıtlı olarak bu kaydırma kutusunun DIŞINDA/yanında sabit kalıyor
+     ki açılır menüsü kırpılmasın (bkz. default.html'deki not). */
   nav {
-    justify-content: center;
-    gap: 2px;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 4px;
   }
+
+  .nav-links-scroll {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Firefox: kaydırma çubuğunu görsel olarak gizle */
+    gap: 2px;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .nav-links-scroll::-webkit-scrollbar { display: none; } /* Chrome/Safari */
 
   nav a {
     margin-left: 0;
     padding: 6px 9px;
     font-size: 0.87rem;
+    white-space: nowrap;
+    flex: 0 0 auto;
   }
 
-  .auth-nav { margin-left: 0; }
+  .auth-nav { margin-left: 0; flex: 0 0 auto; }
   .auth-nav-btn {
     margin-left: 0;
     padding: 6px 9px;
     font-size: 0.87rem;
+    white-space: nowrap;
   }
 
   .theme-toggle {
