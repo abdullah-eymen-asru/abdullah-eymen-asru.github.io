@@ -10,7 +10,7 @@
  * istendiği için). Ad Soyad hâlâ düzenlenebilir.
  */
 import { supabase, showMessage, showSpamNotice, escapeHtml, turkceOtpHatasi, KVKK_METIN_SURUMU } from "./core/supabase-client.js";
-import { requireAuth } from "./auth/auth-guard.js";
+import { requireAuthOrShowError } from "./auth/auth-guard.js";
 // NOT (TAŞINDI): Mesajlaşma (wireUserChat) artık bu sayfada değil — bkz.
 // panel/mesajlar.md + assets/js/mesajlar.js. "Yöneticiyle Mesajlaş" linki
 // artık doğrudan o sayfaya gider (bkz. panel.md), bu yüzden
@@ -29,7 +29,7 @@ async function init() {
   // bu.
   wireLogout();
 
-  const { session, profile } = await requireAuth({ role: null });
+  const { session, profile } = await requireAuthOrShowError({ role: null });
   document.getElementById("loading")?.setAttribute("hidden", "");
   document.getElementById("app").hidden = false;
 
@@ -663,7 +663,7 @@ function wireKvkk(profile) {
     <label style="display:flex; gap:8px; align-items:flex-start; margin:10px 0;">
       <input type="checkbox" id="kvkk-checkbox" style="margin-top:3px;">
       <span>
-        <a href="/kurumsal/gizlilik-politikasi.html" target="_blank">KVKK Aydınlatma Metni ve Gizlilik Politikası</a>'nı
+        <a href="/kurumsal/gizlilik-politikasi.html" target="_blank" rel="noopener noreferrer">KVKK Aydınlatma Metni ve Gizlilik Politikası</a>'nı
         okudum, kişisel verilerimin belirtilen şekilde işlenmesine açık rıza gösteriyorum.
       </span>
     </label>
