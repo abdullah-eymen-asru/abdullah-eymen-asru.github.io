@@ -97,7 +97,7 @@
  *   deploy ettikten sonra bu değeri kendi Worker adresinle değiştirmen
  *   gerekir (bkz. Worker dosyasının başındaki ortam değişkeni listesi).
  */
-import { requireAuth } from "../auth/auth-guard.js";
+import { requireAuthOrShowError } from "../auth/auth-guard.js";
 import { escapeHtml, showMessage, supabase, kucukHarfeCevirTr, kullaniciAramayaUyuyorMu } from "../core/supabase-client.js";
 
 // ---- BURAYI DOLDUR: Worker deploy edildikten sonra aldığın URL ----
@@ -232,7 +232,7 @@ let GIRIS_YAPAN_PROFIL = null;
 let ADMIN_ADINA_HEDEF = null;
 
 async function init() {
-  const { profile } = await requireAuth({ role: ["editor", "manager"] });
+  const { profile } = await requireAuthOrShowError({ role: ["editor", "manager"] });
   GIRIS_YAPAN_PROFIL = profile;
   document.getElementById("loading")?.setAttribute("hidden", "");
   document.getElementById("app").hidden = false;
