@@ -7,14 +7,14 @@ permalink: "/icerik/izlediklerim.html"
 <h1>İzlediklerim</h1>
 <p>
   İzlediğim film ve dizileri
-  <a href="{{ site.izleme_projects_url }}" target="_blank">GitHub Projects panosunda</a>
+  <a href="{{ site.izleme_projects_url }}" target="_blank" rel="noopener noreferrer">GitHub Projects panosunda</a>
   kayıt altına alıyorum. Bu tablo, panoya her yeni kayıt eklendiğinde
   <strong>anlık olarak</strong> güncellenir — sayfayı her açtığında en güncel
   veriyi görürsün.
 </p>
 
 <p class="format-hint">
-  Repo'nun kendisine <a href="https://github.com/abdullah-eymen-asru/izleme-okuma-listem" target="_blank">buradan</a> ulaşabilirsin.
+  Repo'nun kendisine <a href="https://github.com/abdullah-eymen-asru/izleme-okuma-listem" target="_blank" rel="noopener noreferrer">buradan</a> ulaşabilirsin.
 </p>
 
 <!-- Sadece site sahibi (owner) girişliyken görünür — bkz.
