@@ -4,13 +4,20 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- PERFORMANCE / PRECONNECT OPTİMİZASYONU:
-       Ağ gecikmelerini düşürmek (LCP/FCP süresini iyileştirmek) için dış kaynak 
-       sunucularına (esm.sh) önceden bağlantı (DNS + SSL el sıkışması) kuruluyor. -->
-  <link rel="preconnect" href="https://esm.sh" crossorigin>
-  <link rel="dns-prefetch" href="https://esm.sh">
-  <!-- OPTİMİZASYON (Kritik İstek Zinciri): Supabase kütüphanesinin önceden indirilip zincir gecikmesinin azaltılması için modulepreload eklendi. -->
-  <link rel="modulepreload" href="https://esm.sh/@supabase/supabase-js@2.45.4">
+  <!-- Supabase JS SDK (UMD, YEREL vendor) — WEBVIEW UYUMLULUĞU:
+       Önceden esm.sh CDN'inden modül olarak yükleniyordu; WebView içinde bu
+       istek zaman aşımına uğrayıp/engellenip #loading ekranının sonsuza dek
+       takılı kalmasına yol açabiliyordu (bkz. assets/js/core/
+       supabase-client.js başındaki uzun not). Artık tek dosyalık, harici
+       import zinciri OLMAYAN resmi UMD build'i yerelden (assets/js/vendor/
+       supabase.js) yüklüyoruz. `defer` ile YÜKLENİYOR ama type="module"
+       DEĞİL — bu bilerek böyle: klasik defer scriptler ile modül
+       scriptleri, belge sırasına göre ve DOMContentLoaded'dan önce
+       çalıştığı için, bu <head>'deki script HER ZAMAN daha sonraki
+       type="module" scriptlerinden önce window.supabase'i set etmiş olur.
+       (esm.sh preconnect/dns-prefetch/modulepreload optimizasyonları
+       kaldırıldı — artık dış bir CDN'e hiç istek atılmıyor.) -->
+  <script defer src="{{ '/assets/js/vendor/supabase.js' | relative_url }}"></script>
 
   <!--
     SAMSUNG INTERNET / ANDROID CHROME "ZORLA KARARTMA" SORUNU:
@@ -121,7 +128,17 @@
     // data-theme'i açıkça yazıyoruz ("light" değeri de dahil), böylece
     // sayfa "kararsız" bir durumda hiç kalmıyor.
     (function () {
-      const saved = localStorage.getItem("theme");
+      // WEBVIEW UYUMLULUĞU: localStorage, DOM Storage kapalıysa (bkz.
+      // assets/js/core/supabase-client.js başındaki not) SecurityError
+      // fırlatabilir. Bu <head>'deki İLK script olduğu için try/catch'siz
+      // bir hata burada teması hiç ayarlamadan bu scripti keserdi — kritik
+      // değil ama gereksiz, bu yüzden korunuyor.
+      let saved = null;
+      try {
+        saved = localStorage.getItem("theme");
+      } catch {
+        // sessizce geç, sistem tercihine düş
+      }
       const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
       const theme = saved || (systemDark ? "dark" : "light");
       document.documentElement.setAttribute("data-theme", theme);
@@ -352,11 +369,22 @@
     // sayfa yüklendikten sonra tarayıcının boş anında (requestIdleCallback) çağırıyoruz.
     window.addEventListener('load', () => {
       const loadAuth = () => {
-        import("{{ '/assets/js/auth/nav-auth.js' | relative_url }}").then(m => {
-          if (m && typeof m.initAuthNav === "function") {
-            m.initAuthNav();
-          }
-        });
+        import("{{ '/assets/js/auth/nav-auth.js' | relative_url }}")
+          .then(m => {
+            if (m && typeof m.initAuthNav === "function") {
+              m.initAuthNav();
+            }
+          })
+          .catch(err => {
+            // WEBVIEW UYUMLULUĞU: dinamik import ağ hatasıyla (ya da
+            // içindeki supabase-client.js importu başarısız olursa)
+            // reject olabilir. Bu .catch() olmadan bu bir "unhandled
+            // promise rejection" olarak kalırdı. Kritik değil: nav'daki
+            // statik "Giriş Yap" linki (progressive enhancement) zaten
+            // yerinde duruyor, sadece dinamik "Hesabım" menüsüne
+            // yükseltilemiyor.
+            console.error("nav-auth.js yüklenemedi:", err);
+          });
       };
       if ('requestIdleCallback' in window) {
         requestIdleCallback(loadAuth);
@@ -492,8 +520,17 @@
 
   <script>
     (function () {
-      // Ziyaretçi daha önce şeridi kapattıysa bir daha gösterme
-      if (localStorage.getItem("lang-notice-dismissed") === "true") return;
+      // WEBVIEW UYUMLULUĞU: localStorage erişimi DOM Storage kapalı
+      // WebView'lerde SecurityError fırlatabilir — try/catch olmadan bu
+      // hata şeridin hiç kontrol edilmemesine yol açardı (kritik değil,
+      // ama sessizce geçmesi daha doğru).
+      let zatenKapatilmis = false;
+      try {
+        zatenKapatilmis = localStorage.getItem("lang-notice-dismissed") === "true";
+      } catch {
+        // storage yoksa her ziyarette tekrar gösterilir — kabul edilebilir.
+      }
+      if (zatenKapatilmis) return;
 
       // Tarayıcının dil ayarı Türkçe ile başlamıyorsa (örn. "en", "de", "fr") şeridi göster
       const browserLang = (navigator.language || "").toLowerCase();
@@ -503,7 +540,11 @@
 
         document.getElementById("lang-notice-close").addEventListener("click", () => {
           notice.style.display = "none";
-          localStorage.setItem("lang-notice-dismissed", "true");
+          try {
+            localStorage.setItem("lang-notice-dismissed", "true");
+          } catch {
+            // sessizce geç — bir sonraki ziyarette şerit tekrar görünür.
+          }
         });
       }
     })();
@@ -569,10 +610,17 @@
         // karartma sezgisiyle doldurmaya çalışmasını önlüyor.
         if (aktifKoyu) {
           document.documentElement.setAttribute("data-theme", "light");
-          localStorage.setItem("theme", "light");
         } else {
           document.documentElement.setAttribute("data-theme", "dark");
-          localStorage.setItem("theme", "dark");
+        }
+        // WEBVIEW UYUMLULUĞU: DOM Storage kapalı WebView'lerde
+        // localStorage.setItem SecurityError fırlatabilir — bu durumda
+        // tema bu ziyaret için değişmeye devam eder, sadece bir sonraki
+        // ziyarette hatırlanmaz (kritik değil).
+        try {
+          localStorage.setItem("theme", aktifKoyu ? "light" : "dark");
+        } catch {
+          // sessizce geç
         }
         guncelIkon();
         guncelThemeColor(!aktifKoyu);
