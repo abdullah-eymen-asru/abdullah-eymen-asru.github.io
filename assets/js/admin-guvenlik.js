@@ -27,7 +27,7 @@
  *     bölümü ("Üyelik Kayıtları") admin'den de tamamen gizlenir.
  */
 import { supabase, showMessage, escapeHtml } from "./core/supabase-client.js";
-import { requireAuth } from "./auth/auth-guard.js";
+import { requireAuthOrShowError } from "./auth/auth-guard.js";
 
 const DURUM_ETIKETLERI = {
   askida: "🔴 Askıda — karar bekleniyor",
@@ -48,7 +48,7 @@ let VAKA_SAYFA = 1;
 const VAKA_SAYFA_BOYUTU = 10;
 
 async function init() {
-  BEN = await requireAuth({ role: "admin" });
+  BEN = await requireAuthOrShowError({ role: "admin" });
   document.getElementById("loading")?.setAttribute("hidden", "");
   document.getElementById("app").hidden = false;
 
