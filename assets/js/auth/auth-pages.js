@@ -286,7 +286,20 @@ async function mfaKoduIste(msg, hedefUrl) {
     }
 
     dogrulaBtn.disabled = true;
-    const basarili = yedekKodModu ? await yedekKodIleDogrula(kod) : await totpIleDogrula(kod);
+    // KARARLILIK: mfa.challenge/mfa.verify (auth.* metodları) ağ
+    // hatasında reject olabilir — try/catch olmadan buton sonsuza dek
+    // "disabled" kalırdı (bkz. giris.html'deki aynı düzeltme).
+    let basarili;
+    try {
+      basarili = yedekKodModu ? await yedekKodIleDogrula(kod) : await totpIleDogrula(kod);
+    } catch (err) {
+      console.error("2FA doğrulama beklenmedik hata:", err);
+      showMessage(msg, "Doğrulanamadı: bağlantı sorunu olabilir, tekrar dene.");
+      dogrulaBtn.disabled = false;
+      kodInput.value = "";
+      kodInput.focus();
+      return;
+    }
     dogrulaBtn.disabled = false;
 
     if (!basarili) {
@@ -393,9 +406,20 @@ export function initGirisPage() {
     // içindeki oturumHatirlamaTercihiniKaydet() açıklaması.
     oturumHatirlamaTercihiniKaydet(document.getElementById("remember-me")?.checked ?? true);
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
-    submitBtn.disabled = false;
+    // KARARLILIK: supabase.auth.* metodları (rpc()/from() sorgularının
+    // aksine) bir AĞ HATASINDA REJECT olabilir. try/catch olmadan bu
+    // durumda "submitBtn.disabled = false" satırı hiç çalışmaz ve buton
+    // hiçbir hata mesajı olmadan SONSUZA DEK devre dışı kalırdı.
+    let data, error;
+    try {
+      ({ data, error } = await supabase.auth.signInWithPassword({ email, password }));
+    } catch (err) {
+      console.error("signInWithPassword() beklenmedik hata:", err);
+      showMessage(msg, "Giriş yapılamadı: bağlantı sorunu olabilir, tekrar dene.");
+      return;
+    } finally {
+      submitBtn.disabled = false;
+    }
 
     if (error) {
       // Supabase hata mesajlarını kullanıcı dostu Türkçeye çeviriyoruz.
@@ -582,20 +606,31 @@ export async function initKayitPage() {
     }
 
     submitBtn.disabled = true;
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          first_name: firstName, // handle_new_user() trigger'ı bunu profiles.first_name'e kopyalar
-          last_name: lastName,   // handle_new_user() trigger'ı bunu profiles.last_name'e kopyalar
-          kvkk_onay: true,
-          kvkk_versiyon: KVKK_METIN_SURUMU,
+    // KARARLILIK: bkz. giris.html'deki signInWithPassword yorumu — auth.*
+    // metodları ağ hatasında reject olabilir, try/catch olmadan buton
+    // sonsuza dek "disabled" kalırdı.
+    let data, error;
+    try {
+      ({ data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: firstName, // handle_new_user() trigger'ı bunu profiles.first_name'e kopyalar
+            last_name: lastName,   // handle_new_user() trigger'ı bunu profiles.last_name'e kopyalar
+            kvkk_onay: true,
+            kvkk_versiyon: KVKK_METIN_SURUMU,
+          },
+          emailRedirectTo: `${SITE_ORIGIN}/hesap/giris.html`,
         },
-        emailRedirectTo: `${SITE_ORIGIN}/hesap/giris.html`,
-      },
-    });
-    submitBtn.disabled = false;
+      }));
+    } catch (err) {
+      console.error("signUp() beklenmedik hata:", err);
+      showMessage(msg, "Kayıt olunamadı: bağlantı sorunu olabilir, tekrar dene.");
+      return;
+    } finally {
+      submitBtn.disabled = false;
+    }
 
     if (error) {
       if (error.message.includes("already registered") || error.message.includes("already been registered")) {
@@ -756,8 +791,18 @@ export function initHesapOnaylaPage() {
     // type: "signup" → bu, kayıt onay maili için üretilen kodun/linkin
     // doğrulama türüdür. Başarılı olursa hesap doğrulanır VE kullanıcı
     // otomatik olarak oturum açmış olur (linke tıklamakla aynı sonuç).
-    const { error } = await supabase.auth.verifyOtp({ email, token, type: "signup" });
-    submitBtn.disabled = false;
+    // KARARLILIK: try/catch olmadan bir ağ hatasında buton sonsuza dek
+    // "disabled" kalırdı (bkz. giris.html'deki aynı düzeltme).
+    let error;
+    try {
+      ({ error } = await supabase.auth.verifyOtp({ email, token, type: "signup" }));
+    } catch (err) {
+      console.error("verifyOtp() beklenmedik hata:", err);
+      showMessage(msg, "Hesap onaylanamadı: bağlantı sorunu olabilir, tekrar dene.");
+      return;
+    } finally {
+      submitBtn.disabled = false;
+    }
 
     if (error) {
       showMessage(msg, "Hesap onaylanamadı: " + turkceOtpHatasi(error.message));
@@ -782,10 +827,19 @@ export function initSifremiUnuttumPage() {
     const email = form.email.value.trim();
 
     submitBtn.disabled = true;
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${SITE_ORIGIN}/hesap/sifre-guncelle.html`,
-    });
-    submitBtn.disabled = false;
+    // KARARLILIK: bkz. giris.html'deki signInWithPassword yorumu.
+    let error;
+    try {
+      ({ error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${SITE_ORIGIN}/hesap/sifre-guncelle.html`,
+      }));
+    } catch (err) {
+      console.error("resetPasswordForEmail() beklenmedik hata:", err);
+      showMessage(msg, "İstek gönderilemedi: bağlantı sorunu olabilir, tekrar dene.");
+      return;
+    } finally {
+      submitBtn.disabled = false;
+    }
 
     // NOT: Kullanıcı numarası taraması (email enumeration) yapılabilmesin
     // diye e-posta var/yok fark etmeksizin HER ZAMAN aynı mesajı gösteriyoruz.
@@ -856,8 +910,17 @@ export function initSifreGuncellePage() {
     // e-postadaki linkin taşıdığı token ile aynı geçerlilik süresine
     // sahiptir; link süresi dolmuşsa kod da dolmuş olur (ikisi de aynı
     // "Email OTP expiration" ayarına bağlı).
-    const { error } = await supabase.auth.verifyOtp({ email, token, type: "recovery" });
-    submitBtn.disabled = false;
+    // KARARLILIK: bkz. giris.html'deki signInWithPassword yorumu.
+    let error;
+    try {
+      ({ error } = await supabase.auth.verifyOtp({ email, token, type: "recovery" }));
+    } catch (err) {
+      console.error("verifyOtp() (recovery) beklenmedik hata:", err);
+      showMessage(msg, "Kod doğrulanamadı: bağlantı sorunu olabilir, tekrar dene.");
+      return;
+    } finally {
+      submitBtn.disabled = false;
+    }
 
     if (error) {
       showMessage(msg, "Kod doğrulanamadı: " + turkceOtpHatasi(error.message));
@@ -891,10 +954,18 @@ export function initSifreGuncellePage() {
 
   setTimeout(async () => {
     if (sessionHazir) return;
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) suresiDolmusEkraniGoster();
+    // KARARLILIK: getSession() ağ hatasında reject olabilir — try/catch
+    // olmadan bu durumda kullanıcı hiçbir geri bildirim almadan (ne şifre
+    // formu ne "süresi doldu" ekranı görünür) sayfada asılı kalırdı.
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) suresiDolmusEkraniGoster();
+    } catch (err) {
+      console.error("getSession() beklenmedik hata:", err);
+      suresiDolmusEkraniGoster();
+    }
   }, 2500);
 
   form?.addEventListener("submit", async (e) => {
@@ -916,8 +987,17 @@ export function initSifreGuncellePage() {
     // detectSessionInUrl: true sayesinde, e-postadaki linkten gelindiğinde
     // Supabase SDK URL'deki recovery token'ını otomatik olarak geçici bir
     // oturuma çeviriyor. Bu noktada updateUser çağırmak yeterli.
-    const { error } = await supabase.auth.updateUser({ password });
-    submitBtn.disabled = false;
+    // KARARLILIK: bkz. giris.html'deki signInWithPassword yorumu.
+    let error;
+    try {
+      ({ error } = await supabase.auth.updateUser({ password }));
+    } catch (err) {
+      console.error("updateUser() beklenmedik hata:", err);
+      showMessage(msg, "Şifre güncellenemedi: bağlantı sorunu olabilir, tekrar dene.");
+      return;
+    } finally {
+      submitBtn.disabled = false;
+    }
 
     if (error) {
       // Link süresi dolmuş/kullanılmışsa updateUser "Auth session missing!"
@@ -936,8 +1016,15 @@ export function initSifreGuncellePage() {
     // Böylece biri hesabı ele geçirmişse şifre değiştirilir değiştirilmez
     // erişimi kesilir. Bu tarayıcıdaki oturum etkilenmez, kullanıcı panele
     // yönlendirilmeye devam eder.
-    const { error: signOutError } = await supabase.auth.signOut({ scope: "others" });
-    if (signOutError) console.error("Diğer oturumlardan çıkış yapılamadı:", signOutError);
+    // KARARLILIK: bu adım try/catch'e alındı — önceden reject olursa
+    // kullanıcı şifresi GERÇEKTEN değişmiş olsa bile hiçbir başarı mesajı/
+    // yönlendirme görmüyordu.
+    try {
+      const { error: signOutError } = await supabase.auth.signOut({ scope: "others" });
+      if (signOutError) console.error("Diğer oturumlardan çıkış yapılamadı:", signOutError);
+    } catch (err) {
+      console.error("signOut({scope:'others'}) beklenmedik hata:", err);
+    }
 
     showMessage(msg, "Şifren güncellendi! Diğer cihazlardaki oturumların kapatıldı. Panele yönlendiriliyorsun...", "success");
     setTimeout(() => (window.location.href = "/panel/panel.html"), 1500);
