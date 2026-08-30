@@ -6,7 +6,7 @@ permalink: "/icerik/blog.html"
 
 <h1>Blog</h1>
 <p>
-  Yazılarımı <a href="{{ site.substack_url }}" target="_blank">Substack</a> üzerinde
+  Yazılarımı <a href="{{ site.substack_url }}" target="_blank" rel="noopener noreferrer">Substack</a> üzerinde
   yayınlıyorum.
 </p>
 
@@ -61,13 +61,33 @@ permalink: "/icerik/blog.html"
   const container = document.getElementById("substack-posts");
   const searchBox = document.getElementById("substack-search");
 
+  // WEBVIEW UYUMLULUĞU: fetch() bazı Android WebView'lerinde ağ/CORS
+  // engellemesinde ne reddedilir ne sonuçlanır — süresiz ASKIDA kalabilir
+  // (yalnızca "TypeError: Failed to fetch" fırlatması garanti değildir).
+  // AbortController ile 10 sn'lik açık bir zaman aşımı koyuyoruz ki catch
+  // bloğu HER durumda (ağ hatası, CORS, timeout) tetiklensin ve "Yazılar
+  // yükleniyor…" ekranda sonsuza dek asılı kalmasın; sayfanın geri kalanı
+  // (Notlarım sütunu vb.) bundan bağımsız sorunsuz render olmaya devam eder.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+
   try {
-    const res = await fetch(proxyUrl);
+    const res = await fetch(proxyUrl, { signal: controller.signal });
     if (!res.ok) throw new Error("Proxy isteği başarısız: " + res.status);
     const xmlText = await res.text();
 
     const parser = new DOMParser();
     const xml = parser.parseFromString(xmlText, "application/xml");
+
+    // DOMParser bozuk XML'de hata FIRLATMAZ, <parsererror> düğümü içeren
+    // bir belge döner — bunu ayrıca kontrol ediyoruz (proxy bazen HTML
+    // hata sayfası ya da JSON döndürebiliyor, bu durumda querySelectorAll
+    // sessizce boş dizi döner ve aşağıdaki kontrol zaten yakalar, ama
+    // açıkça kontrol etmek hatayı konsolda daha anlaşılır kılıyor).
+    if (xml.querySelector("parsererror")) {
+      throw new Error("Feed XML olarak ayrıştırılamadı");
+    }
+
     const items = Array.from(xml.querySelectorAll("item"));
 
     if (items.length === 0) {
@@ -126,7 +146,7 @@ permalink: "/icerik/blog.html"
       // arama için başlık+özet küçük harfe çevrilip veri olarak saklanıyor
       card.dataset.search = (title + " " + plain).toLowerCase();
       card.innerHTML = `
-        <h3><a href="${escapeHtml(guvenliLink(link))}" target="_blank">${escapeHtml(title)}</a></h3>
+        <h3><a href="${escapeHtml(guvenliLink(link))}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)}</a></h3>
         <div class="meta">${escapeHtml(date)}</div>
         <p>${escapeHtml(plain)}…</p>
       `;
@@ -138,10 +158,17 @@ permalink: "/icerik/blog.html"
     searchBox.placeholder = "Yazı ara…";
 
   } catch (err) {
+    // Timeout (AbortError) dahil HER hata türünde container'daki "yükleniyor"
+    // metni kaldırılıp yerine kullanıcının ilerleyebileceği bir mesaj
+    // konuyor — sayfa sonsuza dek "Yazılar yükleniyor…" durumunda kalmıyor.
+    const mesaj =
+      err.name === "AbortError" ? "Yazılar zaman aşımına uğradı." : "Yazılar otomatik yüklenemedi.";
     container.innerHTML =
-      '<p class="error">Yazılar otomatik yüklenemedi. ' +
-      '<a href="{{ site.substack_url }}" target="_blank">Substack sayfamı buradan ziyaret edebilirsin</a>.</p>';
+      `<p class="error">${mesaj} ` +
+      '<a href="{{ site.substack_url }}" target="_blank" rel="noopener noreferrer">Substack sayfamı buradan ziyaret edebilirsin</a>.</p>';
     console.error(err);
+  } finally {
+    clearTimeout(timeoutId);
   }
 })();
 
