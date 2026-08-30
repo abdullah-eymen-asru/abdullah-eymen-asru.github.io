@@ -31,7 +31,7 @@
  * güncellenir.
  */
 import { supabase, escapeHtml, kucukHarfeCevirTr, kullaniciAramayaUyuyorMu, showMessage } from "./core/supabase-client.js";
-import { requireAuth } from "./auth/auth-guard.js";
+import { requireAuthOrShowError } from "./auth/auth-guard.js";
 import { imzaliLinkUret } from "./dosya-paylasim.js";
 
 const DELETE_ACCOUNT_FUNCTION_URL =
@@ -45,7 +45,7 @@ let DUZENLENEN_ICERIK_ID = null; // null: yeni içerik ekleniyor, doluysa düzen
 let ATAMA_DURUMU = new Map();
 
 async function init() {
-  const { session, profile } = await requireAuth({ role: ["admin", "manager"] });
+  const { session, profile } = await requireAuthOrShowError({ role: ["admin", "manager"] });
   // TAM_YETKILI=false demek: giren kişi 'manager' (İçerik Sorumlusu) —
   // admin DEĞİL. Aşağıdaki dallanmalar bunu hem hangi adımların
   // çalıştırılacağını hem de hangi sekmelerin görüneceğini belirlemek için
