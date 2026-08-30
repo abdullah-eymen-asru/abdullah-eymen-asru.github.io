@@ -4,6 +4,46 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+  <!--
+    GÜVENLİK — CLICKJACKING KORUMASI (GitHub Pages telafisi):
+    _headers dosyasındaki "X-Frame-Options: SAMEORIGIN" ve CSP'nin
+    "frame-ancestors" direktifi SADECE gerçek bir HTTP header olarak
+    gönderildiğinde işe yarar (bkz. _headers dosya başı notu) — ama bu
+    header'lar SADECE Cloudflare Pages build'inde uygulanıyor. Bu sitenin
+    KANONİK adresi (_config.yml -> url) GitHub Pages
+    (abdullah-eymen-asru.github.io) olduğu ve GitHub Pages özel HTTP
+    header ayarlamayı DESTEKLEMEDİĞİ için, o adresten gelen ziyaretçiler
+    için X-Frame-Options/frame-ancestors hiç uygulanmıyordu — site,
+    login/2FA/mesajlaşma gibi hassas panelleri olan bir yapıda, başka bir
+    sitenin gizli bir <iframe> içine gömüp tıklama avlaması (clickjacking)
+    riskine GitHub Pages tarafında tamamen açıktı.
+
+    DÜZELTME: klasik "frame-busting" script'i — sayfa bir iframe İÇİNDE
+    render ediliyorsa (window.top !== window.self) üst pencereyi bu
+    sayfanın kendi adresine yönlendirir, böylece saldırganın iframe'i
+    boşalır/geçersiz kalır. Bu teknik HTTP header kadar güçlü değildir
+    (JS engellenirse çalışmaz) ama header'ın hiç var olmadığı GitHub Pages
+    için TEK mümkün olan tarayıcı-taraflı savunma katmanıdır — bu yüzden
+    <head>'in EN BAŞINA, `defer` OLMADAN (senkron, DOM'un geri kalanı
+    render edilmeden HEMEN çalışacak şekilde) konuldu. Cloudflare Pages
+    tarafında (gerçek header zaten SAMEORIGIN dışını en baştan engellediği
+    için) bu script pratikte hiç tetiklenmez, sadece GitHub Pages için bir
+    güvenlik ağıdır.
+  -->
+  <script>
+    try {
+      if (window.top !== window.self) {
+        window.top.location = window.self.location;
+      }
+    } catch (_err) {
+      // Çapraz-origin bir üst pencereden erişim engellenmiş olabilir
+      // (tarayıcının kendi same-origin politikası) — bu durumda üst
+      // pencereye dokunulamaz, ama site zaten hassas formların üstüne
+      // "tıklama kilidi" gerektiren ek bir JS kontrolü YOK; bu script
+      // ekstra bir savunma katmanıdır, tek koruma değildir.
+    }
+  </script>
+
   <!-- Supabase JS SDK (UMD, YEREL vendor) — WEBVIEW UYUMLULUĞU:
        Önceden esm.sh CDN'inden modül olarak yükleniyordu; WebView içinde bu
        istek zaman aşımına uğrayıp/engellenip #loading ekranının sonsuza dek
