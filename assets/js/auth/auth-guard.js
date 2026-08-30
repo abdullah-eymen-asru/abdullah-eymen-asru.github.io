@@ -164,6 +164,48 @@ export async function requireAuth({ role = null, redirectTo = "/hesap/giris.html
   return { session, profile };
 }
 
+/**
+ * requireAuth()'un sarmalayıcısı — page-init script'lerindeki (panel.js,
+ * admin.js, github-yonetim.js, izleme-okuma-yonetim.js, mesajlar.js,
+ * admin-guvenlik.js, uye-ayarlari.js) tekrar eden kalıbı tek yerde toplar.
+ *
+ * BUG: requireAuth() içindeki supabase.auth.getSession() / mfa kontrolü /
+ * profiles sorgusu bir AĞ HATASI (WebView'de CORS/DNS/timeout, Supabase'e
+ * geçici ulaşılamaması vb.) yüzünden REJECT olursa, bunu çağıran sayfa
+ * script'i (await requireAuth(...) satırından sonrası) hiç çalışmıyordu —
+ * yani #loading'i gizleyip #app'i gösteren satır hiçbir zaman
+ * çalıştırılmıyor ve sayfa SONSUZA DEK "Yükleniyor..." ekranında kilitli
+ * kalıyordu. (ozel-icerik.js bunu kendi try/catch'iyle zaten
+ * yakalıyordu; bu sarmalayıcı aynı düzeltmeyi TÜM sayfalara tek yerden
+ * uyguluyor.)
+ *
+ * requireAuth() zaten yetkisizlik/oturumsuzluk durumunda kendi içinde
+ * redirect edip sonsuz bir promise döndürüyor (bkz. yukarısı) — o akış
+ * burada DEĞİŞMİYOR. Bu sarmalayıcı SADECE gerçek bir istisna (network,
+ * beklenmeyen hata) fırlatıldığında devreye girip kullanıcıya "yeniden
+ * dene" seçeneği sunuyor.
+ */
+export async function requireAuthOrShowError(opts) {
+  try {
+    return await requireAuth(opts);
+  } catch (err) {
+    console.error("requireAuth() başarısız (ağ hatası olabilir):", err);
+    const loading = document.getElementById("loading");
+    if (loading) {
+      loading.hidden = false;
+      loading.innerHTML =
+        "Sayfa yüklenemedi. Bağlantını kontrol edip " +
+        '<a href="javascript:location.reload()">yeniden dene</a>.';
+    }
+    // requireAuth() kendi hata dallarındaki davranışla tutarlı olsun diye
+    // (redirect sonrası "sonsuza kadar bekleyen" promise) burada da
+    // çağıran init() fonksiyonunun devam ETMEMESİ için sonsuz bir promise
+    // döndürüyoruz — session/profile burada zaten yok, devam etmeye
+    // çalışmak sadece konsolu ek TypeError'larla kirletirdi.
+    return new Promise(() => {});
+  }
+}
+
 function redirectWithReturnUrl(target) {
   const url = new URL(target, window.location.origin);
   url.searchParams.set("donus", window.location.pathname);
