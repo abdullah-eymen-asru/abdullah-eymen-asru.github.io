@@ -155,6 +155,7 @@ permalink: "/kurumsal/gizlilik-politikasi.html"
   "Ayarları Yönet" panelinden ilgili kategoriyi işaretleyip kaydedersen
   etkinleşir.
 </p>
+<div class="tablo-kaydir">
 <table>
   <thead>
     <tr><th>Kategori</th><th>Amaç</th><th>Kapatılabilir mi?</th></tr>
@@ -223,6 +224,7 @@ permalink: "/kurumsal/gizlilik-politikasi.html"
     </tr>
   </tbody>
 </table>
+</div>
 <p>
   Tercihini istediğin zaman, sayfanın altındaki
   <strong>"🍪 Çerez Ayarları"</strong> bağlantısıyla yeniden açabilir,
