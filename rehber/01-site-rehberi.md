@@ -752,14 +752,21 @@ haber vermek ister — bunu yapan parça `cloudflare worker/admin_guvenlik_bildi
 | Adım | Ne yapılır |
 |---|---|
 | 1 | Cloudflare Dashboard'da yeni bir Worker oluştur, `worker.js` içeriğini yapıştır, deploy et. |
-| 2 | Worker'ın Settings → Variables and Secrets kısmına `GIZLI_YOL` (tahmin edilmesi zor rastgele bir segment, **Secret** olarak), ve en az `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` (SMS istersen Twilio değişkenlerini de) gir. |
-| 3 | Worker adresin + `/GIZLI_YOL` şeklindeki tam URL'i Supabase SQL Editor'de çalıştırarak kaydet: `update public.guvenlik_bildirim_ayarlari set webhook_url = '<WORKER_URL>', aktif = true where id = 1;` |
+| 2 | Worker'ın Settings → Variables and Secrets kısmına `GIZLI_YOL` (tahmin edilmesi zor rastgele bir segment) ve `WEBHOOK_SHARED_SECRET` (rastgele, uzun bir sır — ör. `openssl rand -hex 32`), ikisi de **Secret** olarak; ayrıca en az `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` (SMS istersen Twilio değişkenlerini de) gir. |
+| 3 | Migration `0034_guvenlik_bildirim_paylasilan_sir.sql`'i uyguladıktan sonra, Supabase SQL Editor'de Worker adresin + `/GIZLI_YOL` şeklindeki tam URL'i VE 2. adımdaki `WEBHOOK_SHARED_SECRET` ile AYNI değeri kaydet: `update public.guvenlik_bildirim_ayarlari set webhook_url = '<WORKER_URL>', webhook_secret = '<WEBHOOK_SHARED_SECRET İLE AYNI DEĞER>', aktif = true where id = 1;` |
 | 4 | Bir denetim vakası tetikleyip Telegram'a bildirim gelip gelmediğini kontrol et; gelmezse Worker'ın Cloudflare "Logs" sekmesine bak. |
 
-`GIZLI_YOL` bir tür şifre gibi davranıyor çünkü Supabase'in `pg_net` isteği
-kimlik doğrulama header'ı eklemiyor — URL'in kendisi tahmin edilemez
-olduğu sürece isteği kimin attığı garanti altına alınmış oluyor. Bu değeri
-koda/repo'ya asla yazma, sadece Cloudflare'in Variables/Secrets kısmında tut.
+`GIZLI_YOL`, URL'i tahmin edilmesi zor kılan bir katman ama TEK BAŞINA
+kriptografik bir doğrulama değil — sızarsa (tarayıcı geçmişi, Analytics
+ekranı, kazara paylaşım) o adresi bilen herkes sahte bildirim tetikleyebilir.
+Bu yüzden asıl doğrulama artık `WEBHOOK_SHARED_SECRET`: `_denetim_bildirim_gonder()`
+fonksiyonu her istekte bunu `X-Webhook-Secret` header'ı olarak gönderir,
+Worker da bunu sabit zamanlı (timing-safe) karşılaştırarak doğrular —
+eşleşmezse istek `GIZLI_YOL` doğru olsa bile 401 ile reddedilir. Her iki
+değeri de (GIZLI_YOL ve WEBHOOK_SHARED_SECRET) koda/repo'ya asla yazma,
+sadece Cloudflare'in Variables/Secrets kısmında tut. `WEBHOOK_SHARED_SECRET`
+ayarlanmadan da worker eski (sadece GIZLI_YOL) davranışıyla çalışmaya devam
+eder — ama production'da MUTLAKA ayarlanmalı.
 
 Telegram VEYA SMS'ten en az biri yapılandırılmalı; ikisi de boşsa Worker
 isteği 200 ile kabul eder ama hiçbir yere bildirim göndermez (loglar).
