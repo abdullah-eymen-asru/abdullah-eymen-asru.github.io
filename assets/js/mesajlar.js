@@ -15,7 +15,7 @@
  * rolü belirlendikten SONRA, tek bir görünümün HTML'i innerHTML ile basılıp
  * chat.js'in ilgili fonksiyonu çağrılıyor.
  */
-import { requireAuth } from "./auth/auth-guard.js";
+import { requireAuthOrShowError } from "./auth/auth-guard.js";
 import { wireUserChat, wireAdminChat } from "./chat.js";
 
 function uyeMarkup() {
@@ -133,7 +133,7 @@ function konuOnDoldurmayiUygula() {
 }
 
 async function init() {
-  const { session, profile } = await requireAuth({ role: null });
+  const { session, profile } = await requireAuthOrShowError({ role: null });
   document.getElementById("loading")?.setAttribute("hidden", "");
   document.getElementById("app").hidden = false;
 
