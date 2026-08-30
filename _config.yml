@@ -1,5 +1,16 @@
 title: "Abdullah Eymen Asru"
 description: "Akademik portfolyo ve blog"
+
+# GÜVENLİK/KARARLILIK NOTU: build ortamının sistem locale'i (LANG/LC_ALL)
+# UTF-8 olmayabiliyor (özellikle bazı CI/Cloudflare Pages build imajlarında) —
+# bu durumda Jekyll, Türkçe karakter (ş, ğ, ç, ö, ü, ı, İ) içeren dosya
+# yollarını/permalink'leri işlerken
+# "Encoding::UndefinedConversionError: ... from ASCII-8BIT to UTF-8" hatasıyla
+# çöküyor. Bu satır Jekyll'e dosyaları her koşulda UTF-8 olarak okumasını
+# açıkça söyler — build ortamının locale ayarından bağımsız çalışır. Asıl
+# kalıcı çözüm Cloudflare Pages panelinde LANG/LANGUAGE/LC_ALL=C.UTF-8 ortam
+# değişkenlerini eklemek; bu satır ona ek bir güvence katmanıdır.
+encoding: "UTF-8"
 baseurl: ""
 url: "https://abdullah-eymen-asru.github.io"   # Birincil site - Google bu adresi indeksler
 
