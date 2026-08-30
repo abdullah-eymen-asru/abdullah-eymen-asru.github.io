@@ -107,3 +107,25 @@ defaults:
       type: "projects"
     values:
       layout: "project"
+  # GÜVENLİK/GİZLİLİK: /panel/ (admin, GitHub içerik yönetimi, mesajlar,
+  # izleme-okuma yönetimi, üye ayarları vb.) ve /hesap/ (giriş, kayıt, şifre
+  # sıfırlama) sayfaları GERÇEK yetkilendirmesini zaten RLS + auth-guard.js
+  # üzerinden alıyor (bkz. o dosyalardaki notlar) — ama bu URL'lerin Google
+  # gibi arama motorlarında indekslenip aratılabilir/keşfedilebilir hale
+  # gelmesinin (ör. "site:... inurl:panel") hiçbir faydası yok, sadece
+  # gereksiz keşif (recon) kolaylığı sağlıyor. Bu yüzden bu iki klasördeki
+  # TÜM sayfalara varsayılan olarak "sitemap: false" (jekyll-sitemap bu
+  # sayfaları sitemap.xml'e hiç eklemez) ve "gizli_sayfa: true" (bkz.
+  # _layouts/default.html — bu sayfalara <meta name="robots" content=
+  # "noindex, nofollow"> ekletir) veriyoruz. Sayfa build edilmeye devam
+  # eder (linkler yine çalışır), sadece arama motorlarına kapatılır.
+  - scope:
+      path: "panel"
+    values:
+      sitemap: false
+      gizli_sayfa: true
+  - scope:
+      path: "hesap"
+    values:
+      sitemap: false
+      gizli_sayfa: true
