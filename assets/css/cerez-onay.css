@@ -246,20 +246,50 @@
 /* Panel açıkken arka planın kaydırılmasını engelle (mobilde de) */
 body.cerez-panel-acik { overflow: hidden; }
 
-/* ---- Mobil / dar ekran: her cihazda uyumlu görünüm ---- */
+/* ---- Mobil / dar ekran: her cihazda uyumlu görünüm ----
+   ÖNCEKİ SORUN: şerit mobilde metni tam boyutta (0.88rem, geniş
+   satır aralığıyla) gösterip 3 butonu alt alta tam genişlikte
+   diziyordu; uzun KVKK metniyle birleşince şerit ekranın yarısına
+   yakın bir yer kaplıyor, ayrıca sabit (position:fixed) olduğu için
+   altındaki sayfa içeriğinin bir kısmını da örtüyordu. Burada metni
+   biraz küçültüp sıkılaştırıyoruz, iki ikincil butonu yan yana tek
+   satıra alıyoruz (birincil buton altta tam genişlik kalıyor) ve
+   şeridin kendisine bir tavan yükseklik + iç kaydırma koyuyoruz ki
+   çok kısa ekranlarda (yatay mod telefon vb.) bile asla ekranın
+   yarısından fazlasını kaplamasın; hiçbir buton/metin kaldırılmadı,
+   sadece daha az dikey yer kaplayacak şekilde diziliyor. Sayfa
+   içeriğinin şeridin ARKASINDA kalmaması için ise site-islemleri.js
+   şerit görünürken <body>'e şeridin gerçek yüksekliği kadar
+   padding-bottom ekliyor (bkz. o dosyadaki "bannerBoslukAyarla"). */
 @media (max-width: 640px) {
   .cerez-banner {
     padding: 14px 16px;
+    max-height: 45vh;
+    overflow-y: auto;
+    gap: 10px;
   }
+  .cerez-banner-metin { font-size: 0.82rem; }
+  .cerez-banner-metin p { line-height: 1.35; }
   .cerez-banner-aksiyonlar {
     width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
   }
-  .cerez-banner-aksiyonlar .cerez-btn-primary,
-  .cerez-banner-aksiyonlar .cerez-btn-secondary {
-    flex: 1 1 auto;
+  .cerez-banner-aksiyonlar .cerez-btn-secondary { flex: initial; }
+  .cerez-banner-aksiyonlar .cerez-btn-primary {
+    grid-column: 1 / -1;
+    flex: initial;
   }
   .cerez-panel {
     padding: 18px 16px;
     max-height: 90vh;
   }
+}
+
+/* Çok dar ekranlarda (küçük telefonlar) iki ikincil butonu da tek
+   sütuna indir; grid zaten taşmayı engelliyordu, bu sadece okunurluk
+   içindir. */
+@media (max-width: 360px) {
+  .cerez-banner-aksiyonlar { grid-template-columns: 1fr; }
 }
