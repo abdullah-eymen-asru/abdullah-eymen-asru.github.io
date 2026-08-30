@@ -28,7 +28,7 @@
  * İKİ MOD: "ekle" (yeni kayıt) ve "mevcut" (ara + düzenle) — bkz.
  * #iy-mod-nav. İkisi de aynı aktif koleksiyona (izleme/okuma) göre çalışır.
  */
-import { requireAuth } from "../auth/auth-guard.js";
+import { requireAuthOrShowError } from "../auth/auth-guard.js";
 import { showMessage, kucukHarfeCevirTr, supabase } from "../core/supabase-client.js";
 
 // ---- BURAYI DOLDUR: Worker deploy edildikten sonra aldığın URL ----
@@ -525,7 +525,7 @@ async function init() {
   // SADECE owner — bkz. dosya başındaki mimari notu. requireAuth,
   // yetkisiz kullanıcıyı zaten /panel/panel.html?hata=yetkisiz adresine
   // yönlendirir, bu satırdan sonrası owner olmayan biri için hiç çalışmaz.
-  await requireAuth({ role: "owner" });
+  await requireAuthOrShowError({ role: "owner" });
 
   document.getElementById("loading").remove();
   document.getElementById("app").hidden = false;
