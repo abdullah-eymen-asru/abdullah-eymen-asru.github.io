@@ -917,6 +917,23 @@ th { color: var(--muted); font-weight: 600; }
     gap: 2px;
     flex: 1 1 auto;
     min-width: 0;
+    /* KAYDIRILABİLİRLİK İPUCU: ilk defa gören biri, metnin sağ kenarda
+       "bitmiş" mi yoksa "kesilmiş" mi olduğunu ayırt edemeyebilir. Sağ
+       kenarı yumuşakça saydamlaştıran bir maske ekleyerek "burada daha
+       fazlası var, kaydır" hissi veriyoruz — klasik bir mobil liste/tab
+       bar deseni. Kaydırma gerçekten sona erdiğinde (bkz. site-islemleri.js
+       navKaydirmaIpucunuGuncelle) ".nav-scroll-sonda" sınıfıyla maske
+       kaldırılıyor ki son sekme solgun görünüp "tıklanamaz" hissi vermesin.
+       Ayrıca sayfa ilk açıldığında (bkz. aynı fonksiyon) bar birkaç
+       saniyeliğine hafifçe sağa/sola oynatılarak "bu kaydırılabilir"
+       mesajı bir kez daha, hareketle de veriliyor (prefers-reduced-motion
+       kapalıysa atlanır). */
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+  }
+  .nav-links-scroll.nav-scroll-sonda {
+    -webkit-mask-image: none;
+    mask-image: none;
   }
   .nav-links-scroll::-webkit-scrollbar { display: none; } /* Chrome/Safari */
 
