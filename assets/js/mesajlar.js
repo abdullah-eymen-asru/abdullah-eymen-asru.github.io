@@ -165,13 +165,39 @@ async function init() {
       geriBtn.textContent = "← Admin Paneline Dön";
       baslikWrap.appendChild(geriBtn);
     }
-    await wireAdminChat(session.user.id);
+    await wireAdminChatGuvenli(session.user.id);
   } else {
     aciklama.textContent =
       'Site yöneticisiyle yazışabilirsin — farklı konularda istediğin kadar ayrı sohbet açabilirsin (ör. "Ödeme sorunu", "Şifre yardımı").';
     icerik.innerHTML = uyeMarkup();
-    await wireUserChat(profile);
+    await wireUserChatGuvenli(profile);
     konuOnDoldurmayiUygula();
+  }
+}
+
+// KARARLILIK: wireAdminChat()/wireUserChat() beklenmedik bir hata
+// fırlatırsa (ör. bir DOM elemanı beklenmeyen şekilde eksikse), önceden
+// bu hata init()'i tamamen keserdi — ama #loading zaten gizlenmiş ve
+// #app zaten gösterilmiş OLDUĞU için kullanıcı içerideki "Yükleniyor…"
+// yer tutucularının (chat-konusma-liste, chat-mesaj-liste) sonsuza dek
+// öyle kaldığını görürdü. panel.js'teki "her bölüm bağımsız" prensibiyle
+// tutarlı olması için burada da yakalayıp görünür bir hata gösteriyoruz.
+async function wireAdminChatGuvenli(adminId) {
+  try {
+    await wireAdminChat(adminId);
+  } catch (err) {
+    console.error("mesajlar.js: wireAdminChat başarısız:", err);
+    const el = document.getElementById("chat-konusma-liste");
+    if (el) el.innerHTML = `<p class="chat-bos">Sohbetler yüklenemedi. Sayfayı yenilemeyi dene.</p>`;
+  }
+}
+async function wireUserChatGuvenli(profile) {
+  try {
+    await wireUserChat(profile);
+  } catch (err) {
+    console.error("mesajlar.js: wireUserChat başarısız:", err);
+    const el = document.getElementById("chat-konusma-liste");
+    if (el) el.innerHTML = `<p class="chat-bos">Sohbetler yüklenemedi. Sayfayı yenilemeyi dene.</p>`;
   }
 }
 
