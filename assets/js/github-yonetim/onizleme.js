@@ -69,7 +69,7 @@ async function init() {
     // GÜVENLİK: href'e basmadan önce şema kontrolü (bkz. guvenliDisUrlMi
     // yorumu) — "javascript:" gibi bir URI hiç render edilmez.
     if (tur === "proje" && kayit.link && guvenliDisUrlMi(kayit.link)) {
-      html += `<p style="margin-top:2em;"><a href="${escapeHtml(kayit.link)}" target="_blank" rel="noopener">→ ${escapeHtml(
+      html += `<p style="margin-top:2em;"><a href="${escapeHtml(kayit.link)}" target="_blank" rel="noopener noreferrer">→ ${escapeHtml(
         kayit.link_etiket || "Bağlantıyı görüntüle"
       )}</a></p>`;
     }
@@ -94,7 +94,7 @@ function basitMarkdown(md) {
       let satir = blok
         .replaceAll(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
         .replaceAll(/\*(.+?)\*/g, "<em>$1</em>")
-        .replaceAll(/\[(.+?)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+        .replaceAll(/\[(.+?)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
         .replaceAll(/\n/g, "<br>");
       return `<p>${satir}</p>`;
     })
