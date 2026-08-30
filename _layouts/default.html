@@ -364,12 +364,24 @@
     <div class="wrap">
       <a class="brand" href="{{ '/' | relative_url }}">{{ site.title }}</a>
       <nav>
-        <a href="{{ '/' | relative_url }}" {% if page.url == '/' or page.url == '/index.html' %}class="active"{% endif %}>Anasayfa</a>
-        <a href="{{ '/icerik/blog.html' | relative_url }}" {% if page.url contains 'blog' %}class="active"{% endif %}>Blog</a>
-        <a href="{{ '/kurumsal/iletisim.html' | relative_url }}" {% if page.url contains 'iletisim' %}class="active"{% endif %}>İletişim</a>
-        <a href="{{ '/icerik/akademik-projeler.html' | relative_url }}" {% if page.url contains 'akademik-projeler' or page.url contains '/projects/' %}class="active"{% endif %}>Akademik Projeler</a>
-        <a href="{{ '/icerik/izlediklerim.html' | relative_url }}" {% if page.url contains 'izlediklerim' %}class="active"{% endif %}>İzlediklerim</a>
-        <a href="{{ '/icerik/okuduklarim.html' | relative_url }}" {% if page.url contains 'okuduklarim' %}class="active"{% endif %}>Okuduklarım</a>
+        <!--
+          .nav-links-scroll: masaüstünde "display:contents" ile görünmez
+          (linkler doğrudan nav'ın flex öğesiymiş gibi davranır, eski
+          düzen aynen korunur); mobilde ise (bkz. style.css @media
+          max-width:640px) TEK SATIRDA yatay kaydırmalı bir bara
+          dönüşür. Bunu ayrı bir kapsayıcıya alma sebebi: hesap menüsü
+          (#auth-nav) açılır menüsünü bu kaydırma kutusunun DIŞINDA
+          tutmak — aksi halde dropdown, kaydırma kutusunun taşma
+          kırpmasına takılıp mobilde görünmez/kesik çıkardı.
+        -->
+        <div class="nav-links-scroll">
+          <a href="{{ '/' | relative_url }}" {% if page.url == '/' or page.url == '/index.html' %}class="active"{% endif %}>Anasayfa</a>
+          <a href="{{ '/icerik/blog.html' | relative_url }}" {% if page.url contains 'blog' %}class="active"{% endif %}>Blog</a>
+          <a href="{{ '/kurumsal/iletisim.html' | relative_url }}" {% if page.url contains 'iletisim' %}class="active"{% endif %}>İletişim</a>
+          <a href="{{ '/icerik/akademik-projeler.html' | relative_url }}" {% if page.url contains 'akademik-projeler' or page.url contains '/projects/' %}class="active"{% endif %}>Akademik Projeler</a>
+          <a href="{{ '/icerik/izlediklerim.html' | relative_url }}" {% if page.url contains 'izlediklerim' %}class="active"{% endif %}>İzlediklerim</a>
+          <a href="{{ '/icerik/okuduklarim.html' | relative_url }}" {% if page.url contains 'okuduklarim' %}class="active"{% endif %}>Okuduklarım</a>
+        </div>
         <!--
           HESAP MENÜSÜ: Eskiden burada her zaman ayrı ayrı görünen sabit
           "Giriş" ve "Panelim" linkleri vardı (çıkış yapmışken bile "Panelim"
