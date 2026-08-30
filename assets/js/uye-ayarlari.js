@@ -58,7 +58,18 @@ async function init() {
   wireSayfaBoyutu();
   wireAdminEmailChange();
 
-  await loadUsers();
+  // KARARLILIK: loadUsers() önceden try/catch'siz çağrılıyordu — beklenmedik
+  // bir hata (ör. bir Supabase çağrısı istisna fırlatırsa) fırlarsa,
+  // #uya-liste'deki statik "Yükleniyor..." metni SONSUZA DEK öyle kalırdı
+  // (panel.js/admin.js'teki "her bölüm bağımsız" prensibiyle tutarlı hale
+  // getirildi).
+  try {
+    await loadUsers();
+  } catch (err) {
+    console.error("uye-ayarlari.js: loadUsers() başarısız:", err);
+    const liste = document.getElementById("uya-liste");
+    if (liste) liste.innerHTML = '<p class="muted">Liste yüklenemedi. Sayfayı yenilemeyi dene.</p>';
+  }
   wireRealtime();
 }
 
