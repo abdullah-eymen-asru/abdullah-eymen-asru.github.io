@@ -18,17 +18,17 @@ title: Anasayfa
       {% assign label = parts[1] %}
       {% assign link = site.social[key] %}
       {% if link and link != "" %}
-        <a href="{{ link }}" target="_blank">{{ label }}</a>
+        <a href="{{ link }}" target="_blank" rel="noopener noreferrer">{{ label }}</a>
       {% endif %}
     {% endfor %}
-    <a href="{{ site.substack_url }}" target="_blank">Substack</a>
+    <a href="{{ site.substack_url }}" target="_blank" rel="noopener noreferrer">Substack</a>
   </div>
 
   {% if site.mirror_site_url and site.mirror_site_url != "" %}
   <p class="format-hint" style="margin-top: 1.2em;">
     Bu site iki adreste eşzamanlı olarak yayınlanıyor:
-    <a href="{{ site.url }}" target="_blank">{{ site.url }}</a> ·
-    <a href="{{ site.mirror_site_url }}" target="_blank">{{ site.mirror_site_url }}</a>
+    <a href="{{ site.url }}" target="_blank" rel="noopener noreferrer">{{ site.url }}</a> ·
+    <a href="{{ site.mirror_site_url }}" target="_blank" rel="noopener noreferrer">{{ site.mirror_site_url }}</a>
   </p>
   {% endif %}
 </div>
