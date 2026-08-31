@@ -62,7 +62,7 @@ permalink: "/panel/panel.html"
       <!-- İstek gönderildikten sonra initEpostaDegistir() bu alanı doldurup
            gösterir: hem eski hem yeni adres için ayrı durum satırı + "linke
            tıklayamıyorsan kodla onayla" formu (yedek yol). -->
-      <div id="eposta-onay-alani" hidden style="margin-top:18px;">
+      <div class="csp-mt-18" id="eposta-onay-alani" hidden>
         <div class="eposta-onay-satiri">
           <div class="eposta-onay-baslik">
             <span id="eposta-onay-eski-durum" class="eposta-onay-rozet">Bekleniyor</span>
@@ -97,7 +97,7 @@ permalink: "/panel/panel.html"
           </form>
         </div>
 
-        <p class="muted" style="font-size:0.85rem; margin-top:8px;">
+        <p class="muted csp-mt8-fs085">
           Eski adresine artık erişimin yoksa değişikliği tamamlayamazsın —
           bu, hesabının kötüye kullanılmasını önlemek için bilinçli bir
           kısıtlamadır. Aşağıdaki "Eski Mailime Erişemiyorum" kutusundan
@@ -125,19 +125,19 @@ permalink: "/panel/panel.html"
         güncelleyebilir; işlem bittiğinde ekstra bir onay yapmana gerek
         kalmadan yeni adresinle giriş yapabilirsin. Yöneticiye ulaşmak için:
       </p>
-      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <div class="csp-flex-gap10-wrap">
         <!-- Mesajlar artık ayrı bir sayfada (bkz. panel/mesajlar.md) — bu
              link doğrudan oraya gider ve ?konu= ile "Yeni Sohbet" formunu
              önceden doldurur (bkz. assets/js/mesajlar.js ->
              konuOnDoldurmayiUygula()). -->
-        <a href="{{ '/panel/mesajlar.html' | relative_url }}?konu=Eski%20e-postama%20eri%C5%9Femiyorum" id="eposta-yardim-mesaj-link" class="btn-primary" style="width:auto; text-decoration:none; display:inline-block; text-align:center;">
+        <a href="{{ '/panel/mesajlar.html' | relative_url }}?konu=Eski%20e-postama%20eri%C5%9Femiyorum" id="eposta-yardim-mesaj-link" class="btn-primary csp-inline-block-link">
           Yöneticiyle Mesajlaş
         </a>
-        <a href="{{ '/kurumsal/iletisim.html' | relative_url }}" class="btn-secondary" style="width:auto; text-decoration:none; display:inline-block; text-align:center;">
+        <a href="{{ '/kurumsal/iletisim.html' | relative_url }}" class="btn-secondary csp-inline-block-link">
           İletişim Formuna Git
         </a>
       </div>
-      <p class="muted" style="font-size:0.85rem; margin-top:10px;">
+      <p class="muted csp-mt10-fs085">
         Mesajında yeni e-posta adresini ve kimliğini doğrulayacak bilgileri
         (ör. kayıtlı ad-soyadın) belirtmen, yöneticinin işlemi hızlıca
         yapabilmesini sağlar. Yönetici işlemi tamamladıktan sonra sana
