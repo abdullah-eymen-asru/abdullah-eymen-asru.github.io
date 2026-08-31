@@ -26,16 +26,16 @@ permalink: "/hesap/sifre-guncelle.html"
        initSifreGuncellePage() formu gizleyip bunu gösterir. -->
   <div id="auth-expired" hidden>
     <p class="muted">Bu linkle şifre güncellenemiyor. Yeni bir sıfırlama linki isteyebilirsin.</p>
-    <a class="btn-primary" href="{{ '/hesap/sifremi-unuttum.html' | relative_url }}" style="display:block; text-align:center; text-decoration:none; box-sizing:border-box;">Yeni Sıfırlama Linki İste</a>
+    <a class="btn-primary csp-block-center-link" href="{{ '/hesap/sifremi-unuttum.html' | relative_url }}">Yeni Sıfırlama Linki İste</a>
   </div>
 
   <!-- Link çalışmıyorsa (tıklayamıyor, e-posta uygulaması linki önden
        tüketmiş, vb.) alternatif yol: mailde linkle birlikte gelen kodu
        elle girerek de aynı işlemi tamamlayabilir. initSifreGuncellePage()
        yönetir. -->
-  <div class="auth-otp-wrap" style="margin-top:18px;">
+  <div class="auth-otp-wrap csp-mt-18">
     <button type="button" id="auth-otp-toggle" class="btn-secondary">Linke tıklayamıyor musun? Kod ile devam et</button>
-    <form id="auth-otp-form" novalidate hidden style="margin-top:14px;">
+    <form class="csp-mt-14" id="auth-otp-form" novalidate hidden>
       <div class="form-field">
         <label for="otp_email">E-posta</label>
         <input id="otp_email" name="otp_email" type="email" autocomplete="email" required>
