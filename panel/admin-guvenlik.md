@@ -55,9 +55,9 @@ uye_ayarlari_css: true
         Şu an durum:
         <strong id="ag-kayitlar-durum">Yükleniyor...</strong>
       </p>
-      <div style="display:flex; gap:10px;">
-        <button id="ag-kayitlari-kapat-btn" type="button" class="btn-danger" style="width:auto;">Kayıtları Kapat</button>
-        <button id="ag-kayitlari-ac-btn" type="button" class="btn-primary" style="width:auto;">Kayıtları Aç</button>
+      <div class="csp-flex-gap10">
+        <button id="ag-kayitlari-kapat-btn" type="button" class="btn-danger csp-w-auto">Kayıtları Kapat</button>
+        <button id="ag-kayitlari-ac-btn" type="button" class="btn-primary csp-w-auto">Kayıtları Aç</button>
       </div>
       <div id="ag-kayitlar-message" class="auth-message" hidden></div>
     </section>
