@@ -47,6 +47,13 @@ const OLAY_METINLERI = {
   suresi_doldu_geri_acildi: "⏱️ Karar süresi doldu — hesap OTOMATİK olarak geri açıldı",
 };
 
+// admin_denetim_oy_kullan()'ın gönderdiği ham "dusur"/"geri_ac" değerini
+// okunabilir Türkçe metne çevirir (bkz. migration 0036).
+const OY_METINLERI = {
+  dusur: "Düşür",
+  geri_ac: "Geri Aç",
+};
+
 // Zaman damgasını Türkiye saatine (Europe/Istanbul) çevirir. Geçersiz/eksik
 // bir değer gelirse olduğu gibi geri döner (mesajın tamamen bozulmaması için).
 function turkiyeSaati(isoString) {
@@ -100,14 +107,26 @@ export default {
     const baslik = OLAY_METINLERI[yuk.olay] || `Admin denetim olayı: ${yuk.olay}`;
     const hedefAdi = yuk.hedef_admin_ad_soyad || yuk.hedef_admin_email || yuk.hedef_admin_id || "-";
     const vakaKisa = yuk.denetim_id ? String(yuk.denetim_id).slice(0, 8) : "-";
-    const mesaj = [
-      baslik,
-      `Admin: ${hedefAdi}`,
+
+    const mesajSatirlari = [baslik, `Admin: ${hedefAdi}`];
+
+    // oy_kullanildi olayına özel: kim, neye oy verdi (bkz. migration 0036 —
+    // sadece ilk oy ya da GERÇEKTEN değişen bir oy bu olayı tetikler, aynı
+    // oyun tekrarında bildirim zaten gönderilmiyor).
+    if (yuk.olay === "oy_kullanildi" && yuk.oy_veren_ad_soyad) {
+      const oyMetni = OY_METINLERI[yuk.oy] || yuk.oy || "-";
+      const degisimNotu = yuk.oy_degisti ? " (oyunu değiştirdi)" : "";
+      mesajSatirlari.push(`Oy veren: ${yuk.oy_veren_ad_soyad} → ${oyMetni}${degisimNotu}`);
+    }
+
+    mesajSatirlari.push(
       `Sebep: ${yuk.sebep || "-"}`,
       `Durum: ${yuk.durum || "-"}`,
       `Vaka: ${vakaKisa}`,
-      `Zaman: ${turkiyeSaati(yuk.zaman)}`,
-    ].join("\n");
+      `Zaman: ${turkiyeSaati(yuk.zaman)}`
+    );
+
+    const mesaj = mesajSatirlari.join("\n");
 
     const gonderimSonuclari = await Promise.allSettled([
       telegramGonder(env, mesaj),
