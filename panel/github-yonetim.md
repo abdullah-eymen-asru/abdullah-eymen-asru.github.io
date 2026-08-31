@@ -46,7 +46,7 @@ permalink: "/panel/github-yonetim.html"
           <label for="gh-branch">Branch (opsiyonel — boş bırakılırsa reponun varsayılan branch'i kullanılır)</label>
           <input id="gh-branch" type="text" placeholder="main" autocomplete="off">
         </div>
-        <button id="gh-baglan-btn" type="button" class="btn-primary" style="width:auto;">Bağlantıyı Doğrula</button>
+        <button id="gh-baglan-btn" type="button" class="btn-primary csp-w-auto">Bağlantıyı Doğrula</button>
         <div id="gh-baglanti-message" class="auth-message" hidden></div>
       </section>
 
@@ -112,7 +112,7 @@ permalink: "/panel/github-yonetim.html"
               <option value="__auto__">Otomatik — tarihe göre yıl klasörü (örn. _posts/2026/)</option>
               <option value="__yeni__">➕ Yeni klasör oluştur…</option>
             </select>
-            <input id="ic-klasor-yeni-ad" type="text" placeholder="örn. seyahat ya da 2027" autocomplete="off" hidden style="margin-top:8px;">
+            <input class="csp-mt-8" id="ic-klasor-yeni-ad" type="text" placeholder="örn. seyahat ya da 2027" autocomplete="off" hidden>
             <p class="gy-yardim-metni" id="ic-klasor-yardim">
               "Otomatik" seçiliyken dosya, yukarıdaki tarihin yılına göre
               (<code>_posts/&lt;yıl&gt;/</code>) kaydedilir — hiçbir şey
@@ -292,11 +292,11 @@ permalink: "/panel/github-yonetim.html"
             paylaşılabilir. Sonradan istersen "Mevcut İçerikler" listesinden
             aynı yazıyı GitHub'a da aktarabilirsin.
           </p>
-          <div style="display:flex; gap:10px; flex-wrap: wrap;">
-            <button type="submit" id="ic-submit-btn" class="btn-primary" style="width:auto;">🅰️ Doğrudan GitHub'a Aktar ve Yayınla</button>
-            <button type="button" id="ic-submit-b-btn" class="btn-primary" style="width:auto;" hidden>🅱️ Supabase'e Kaydet ve GitHub ile Yayınla</button>
-            <button type="button" id="ic-submit-c-btn" class="btn-secondary" style="width:auto;" hidden>🅲️ Sadece Supabase'te Yayınla (GitHub'a Commit Atma)</button>
-            <button type="button" id="ic-iptal-btn" class="btn-danger" style="width:auto;" hidden>Düzenlemeyi İptal Et</button>
+          <div class="csp-flex-gap10-wrap">
+            <button type="submit" id="ic-submit-btn" class="btn-primary csp-w-auto">🅰️ Doğrudan GitHub'a Aktar ve Yayınla</button>
+            <button type="button" id="ic-submit-b-btn" class="btn-primary csp-w-auto" hidden>🅱️ Supabase'e Kaydet ve GitHub ile Yayınla</button>
+            <button type="button" id="ic-submit-c-btn" class="btn-secondary csp-w-auto" hidden>🅲️ Sadece Supabase'te Yayınla (GitHub'a Commit Atma)</button>
+            <button type="button" id="ic-iptal-btn" class="btn-danger csp-w-auto" hidden>Düzenlemeyi İptal Et</button>
           </div>
         </form>
         <div id="ic-message" class="auth-message" hidden></div>
@@ -305,7 +305,7 @@ permalink: "/panel/github-yonetim.html"
       <section id="icerikler" class="panel-section">
         <h2>Mevcut İçerikler</h2>
         <p class="muted">Önce "GitHub Bağlantısı" sekmesinden bağlantını doğrula, sonra listeyi yükle.</p>
-        <button id="ic-liste-yenile-btn" type="button" class="btn-primary" style="width:auto; margin-bottom:12px;">Listeyi Yükle / Yenile</button>
+        <button id="ic-liste-yenile-btn" type="button" class="btn-primary csp-w-auto csp-mb-12">Listeyi Yükle / Yenile</button>
 
         <div class="gy-liste-araclar">
           <div class="gy-arama-kutu">
@@ -352,11 +352,11 @@ permalink: "/panel/github-yonetim.html"
           <button type="button" class="gy-klasor-tur-sekme" data-klasor-tur="proje" role="tab" aria-selected="false">🎓 Akademik Proje (<code>_projects/</code>)</button>
         </div>
 
-        <button id="kl-liste-yenile-btn" type="button" class="btn-primary" style="width:auto; margin-bottom:12px;">Klasörleri Yükle / Yenile</button>
+        <button id="kl-liste-yenile-btn" type="button" class="btn-primary csp-w-auto csp-mb-12">Klasörleri Yükle / Yenile</button>
 
         <div class="gy-klasor-olustur">
           <input id="kl-yeni-ad" type="text" placeholder="Yeni klasör adı (örn. 2027 ya da seyahat)" autocomplete="off">
-          <button id="kl-olustur-btn" type="button" class="btn-primary" style="width:auto;">➕ Klasör Oluştur</button>
+          <button id="kl-olustur-btn" type="button" class="btn-primary csp-w-auto">➕ Klasör Oluştur</button>
         </div>
         <div id="kl-message" class="auth-message" hidden></div>
 
@@ -380,9 +380,9 @@ permalink: "/panel/github-yonetim.html"
           <label for="pf-dosya">Yeni Fotoğraf Seç</label>
           <input id="pf-dosya" type="file" accept="image/*">
         </div>
-        <div style="display:flex; gap:10px; flex-wrap: wrap;">
-          <button id="pf-yukle-btn" type="button" class="btn-primary" style="width:auto;">Yükle / Değiştir</button>
-          <button id="pf-sil-btn" type="button" class="btn-danger" style="width:auto;">Profil Fotoğrafını Sil</button>
+        <div class="csp-flex-gap10-wrap">
+          <button id="pf-yukle-btn" type="button" class="btn-primary csp-w-auto">Yükle / Değiştir</button>
+          <button id="pf-sil-btn" type="button" class="btn-danger csp-w-auto">Profil Fotoğrafını Sil</button>
         </div>
         <div id="pf-message" class="auth-message" hidden></div>
       </section>
