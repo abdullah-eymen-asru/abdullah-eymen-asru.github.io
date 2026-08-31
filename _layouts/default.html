@@ -119,11 +119,20 @@
     plugin/Flash tarzı içerik yüklenmesini, diğeri sayfaya enjekte
     edilebilecek bir <base> etiketiyle tüm göreli linklerin başka bir
     siteye yönlendirilmesini engeller.
+
+    connect-src'de wss: ŞEMASI GEREKLİ: Supabase Realtime (canlı
+    bildirimler, admin-guvenlik.js -> wireRealtime gibi) düz https:
+    DEĞİL, wss:// (WebSocket Secure) üzerinden bağlanıyor — CSP'de
+    connect-src sadece https: içerirse tarayıcı bu WebSocket bağlantısını
+    "insecure operation" hatasıyla SESSİZCE REDDEDER (canlı
+    bildirim/senkronizasyon özellikleri sayfa hiç hata vermeden çalışmaz
+    hale gelir). https: ve wss: CSP'de AYRI şemalardır, biri diğerini
+    kapsamaz.
   -->
 <meta http-equiv="Content-Security-Policy" content="
     default-src 'self' https:;
     base-uri 'self';
-    connect-src 'self' https:;
+    connect-src 'self' https: wss:;
     img-src 'self' data: https: blob:;
     font-src 'self' data: https:;
     frame-src 'self' https:;
