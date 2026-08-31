@@ -1,7 +1,33 @@
 <div class="lang-tabs">
-  <button type="button" class="lang-tab-btn active" data-lang="en" onclick="document.querySelectorAll('.lang-panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.lang-tab-btn').forEach(b=>b.classList.remove('active'));document.getElementById('lang-en').classList.add('active');this.classList.add('active');">🇬🇧 English</button>
-  <button type="button" class="lang-tab-btn" data-lang="tr" onclick="document.querySelectorAll('.lang-panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.lang-tab-btn').forEach(b=>b.classList.remove('active'));document.getElementById('lang-tr').classList.add('active');this.classList.add('active');">🇹🇷 Türkçe</button>
+  <button type="button" class="lang-tab-btn active" data-lang="en">🇬🇧 English</button>
+  <button type="button" class="lang-tab-btn" data-lang="tr">🇹🇷 Türkçe</button>
 </div>
+
+<script>
+  (function () {
+    // NOT: Bu buton için eskiden onclick="..." inline attribute'u
+    // kullanılıyordu. CSP'nin script-src'si sadece <script> ELEMENT
+    // içeriklerini SHA-256 hash'leyip izin veriyor (bkz.
+    // _plugins/csp_hash_enjekte.rb) — inline event handler ATTRIBUTE'ları
+    // ('unsafe-hashes' gerektirir) kapsam dışı, bu yüzden onclick sessizce
+    // bloklanıyor ve butonlar tıklanınca hiçbir şey olmuyordu. Çözüm:
+    // mantığı gerçek bir <script> elementine taşımak — bu blok build
+    // sırasında otomatik hash'lenip CSP'ye eklenir.
+    document.querySelectorAll(".lang-tab-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var lang = btn.getAttribute("data-lang");
+        document.querySelectorAll(".lang-panel").forEach(function (p) {
+          p.classList.remove("active");
+        });
+        document.querySelectorAll(".lang-tab-btn").forEach(function (b) {
+          b.classList.remove("active");
+        });
+        document.getElementById("lang-" + lang).classList.add("active");
+        btn.classList.add("active");
+      });
+    });
+  })();
+</script>
 
 <div id="lang-en" class="lang-panel active">
   <h2>🎯 About Me</h2>
