@@ -65,7 +65,7 @@ permalink: "/panel/admin.html"
           <div class="form-field">
             <label for="harici_dosya_url">50GB gibi çok büyük dosya için harici link (opsiyonel)</label>
             <input id="harici_dosya_url" name="harici_dosya_url" type="url" placeholder="https://pub-xxxx.r2.dev/dosya-adi.zip">
-            <p class="muted" style="margin:2px 0 0;font-size:0.85rem;">
+            <p class="muted csp-m-2-0-0-fs085">
               Dosyayı Supabase yerine Cloudflare R2'ye yüklediysen oradan aldığın linki buraya yapıştır.
               Yukarıdaki "Ek Dosya" alanıyla aynı anda kullanma.
             </p>
@@ -77,9 +77,9 @@ permalink: "/panel/admin.html"
             </div>
             <div id="icerik-atama-liste" class="atama-liste"><p class="muted">Yükleniyor...</p></div>
           </div>
-          <div style="display:flex; gap:10px;">
-            <button type="submit" id="icerik-form-submit-btn" class="btn-primary" style="width:auto;">Yayınla ve Ata</button>
-            <button type="button" id="icerik-duzenle-iptal-btn" class="btn-danger" style="width:auto;" hidden>Düzenlemeyi İptal Et</button>
+          <div class="csp-flex-gap10">
+            <button type="submit" id="icerik-form-submit-btn" class="btn-primary csp-w-auto">Yayınla ve Ata</button>
+            <button type="button" id="icerik-duzenle-iptal-btn" class="btn-danger csp-w-auto" hidden>Düzenlemeyi İptal Et</button>
           </div>
         </form>
         <div id="icerik-message" class="auth-message" hidden></div>
@@ -106,27 +106,27 @@ permalink: "/panel/admin.html"
         </div>
         <div class="form-field">
           <label>Geçerlilik Süresi</label>
-          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-            <span style="display:flex; align-items:center; gap:4px;">
-              <input id="r2-gecerlilik-saat" type="number" min="0" step="1" value="1" style="width:70px;">
-              <label for="r2-gecerlilik-saat" class="muted" style="margin:0;">saat</label>
+          <div class="csp-flex-gap8-center-wrap">
+            <span class="csp-flex-gap4-center">
+              <input class="csp-w-70" id="r2-gecerlilik-saat" type="number" min="0" step="1" value="1">
+              <label for="r2-gecerlilik-saat" class="muted csp-m-0">saat</label>
             </span>
-            <span style="display:flex; align-items:center; gap:4px;">
-              <input id="r2-gecerlilik-dakika" type="number" min="0" max="59" step="1" value="0" style="width:70px;">
-              <label for="r2-gecerlilik-dakika" class="muted" style="margin:0;">dk</label>
+            <span class="csp-flex-gap4-center">
+              <input class="csp-w-70" id="r2-gecerlilik-dakika" type="number" min="0" max="59" step="1" value="0">
+              <label for="r2-gecerlilik-dakika" class="muted csp-m-0">dk</label>
             </span>
-            <span style="display:flex; align-items:center; gap:4px;">
-              <input id="r2-gecerlilik-saniye" type="number" min="0" max="59" step="1" value="0" style="width:70px;">
-              <label for="r2-gecerlilik-saniye" class="muted" style="margin:0;">sn</label>
+            <span class="csp-flex-gap4-center">
+              <input class="csp-w-70" id="r2-gecerlilik-saniye" type="number" min="0" max="59" step="1" value="0">
+              <label for="r2-gecerlilik-saniye" class="muted csp-m-0">sn</label>
             </span>
           </div>
-          <p class="muted" style="margin-top:4px;">ör. 2 saat 3 dk 5 sn için: saat=2, dk=3, sn=5. En az 60 saniye olmalı.</p>
+          <p class="muted csp-mt-4">ör. 2 saat 3 dk 5 sn için: saat=2, dk=3, sn=5. En az 60 saniye olmalı.</p>
         </div>
-        <button id="r2-link-uret-btn" type="button" class="btn-primary" style="width:auto;">
+        <button id="r2-link-uret-btn" type="button" class="btn-primary csp-w-auto">
           İmzalı Link Üret
         </button>
         <div id="r2-link-sonuc" class="auth-message" hidden></div>
-        <div id="r2-link-kutu-wrap" class="form-field" hidden style="margin-top:10px;">
+        <div id="r2-link-kutu-wrap" class="form-field csp-mt-10" hidden>
           <label for="r2-link-kutu">Üretilen Link (seçip kopyalayabilirsin)</label>
           <input id="r2-link-kutu" type="text" readonly onclick="this.select()">
         </div>
@@ -147,7 +147,7 @@ permalink: "/panel/admin.html"
         </div>
         <button id="admin-kendi-hesap-sil-btn" type="button" class="btn-danger">Hesabımı Kalıcı Olarak Sil</button>
         <div id="admin-kendi-hesap-sil-message" class="auth-message" hidden></div>
-        <p style="margin-top:16px;"><a href="{{ '/panel/panel.html' | relative_url }}">← Panelim sayfasına git (şifre değiştir, 2FA, KVKK)</a></p>
+        <p class="csp-mt-16"><a href="{{ '/panel/panel.html' | relative_url }}">← Panelim sayfasına git (şifre değiştir, 2FA, KVKK)</a></p>
       </section>
 
   </div>
