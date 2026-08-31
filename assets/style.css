@@ -89,6 +89,20 @@ a:visited { color: var(--accent); }
 }
 
 .lang-notice {
+  /* GÜVENLİK (CSP): önceden bu gizleme _layouts/default.html'de
+     style="display:none;" INLINE ATTRIBUTE'U ile yapılıyordu — CSP'den
+     style-src 'unsafe-inline' kaldırılınca bu, 'unsafe-hashes' gerektiren
+     bir inline style attribute hash'i olurdu (attribute hash'leri normal
+     <style> hash'lerinden farklı olarak 'unsafe-hashes' anahtar
+     kelimesini ZORUNLU kılar — bkz. MDN CSP dokümantasyonu). Bunun yerine
+     varsayılan gizli durumu BURADA, normal bir CSS kuralıyla tanımlıyoruz;
+     JS tarafı (_layouts/default.html) hâlâ notice.style.display = "block"
+     / "none" ile DOM property'sini değiştiriyor — bu, HTML'deki statik
+     style="..." ATTRIBUTE'ünden FARKLI bir mekanizmadır ve CSP'nin
+     style-src kısıtlamasına HİÇ tabi değildir (CSSOM üzerinden property
+     ataması, tarayıcının inline-style-injection kontrolünün kapsamı
+     dışındadır) — yani JS tarafında hiçbir değişiklik gerekmedi. */
+  display: none;
   background: var(--lang-notice-bg);
   border-bottom: 1px solid var(--lang-notice-border);
   color: var(--lang-notice-text);
@@ -249,7 +263,22 @@ nav a.active {
 h1 { font-size: 1.9rem; margin-bottom: 0.3em; }
 h2 { font-size: 1.3rem; margin-top: 2em; }
 
+/* GÜVENLİK (CSP): _layouts/project.html'deki <p style="margin-top:2em;">
+   inline attribute'unun yerine — bkz. .lang-notice yukarısındaki aynı
+   gerekçe (inline style attribute hash'leri 'unsafe-hashes' gerektirir,
+   normal bir CSS class'ı ise hiçbir CSP tavizi gerektirmez). */
+.proje-baglanti-alani { margin-top: 2em; }
+
 .hero { margin-bottom: 2.5em; }
+
+/* GÜVENLİK (CSP) + ADSENSE: Google'ın resmi <ins class="adsbygoogle"
+   style="display:block" ...> deseni yerine — bkz. _includes/
+   reklam-yazi-alt.html. AdSense'in adsbygoogle.js script'i bu elementin
+   render edilmiş "display" DEĞERİNE bakar (computed style), inline
+   attribute'un KENDİSİNE değil — yani display:block'u normal bir CSS
+   class'ıyla vermek AdSense entegrasyonunu HİÇ bozmaz, ve inline style
+   attribute'unun CSP'de 'unsafe-hashes' gerektirmesini önler. */
+.adsbygoogle-blok { display: block; }
 
 .profile-photo {
   width: 108px;
