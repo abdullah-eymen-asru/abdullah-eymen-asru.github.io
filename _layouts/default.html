@@ -209,6 +209,32 @@
 
   <link rel="stylesheet" href="{{ '/assets/style.css' | relative_url }}">
 
+  <!-- GÜVENLİK (CSP) + ANDROID WEBVIEW UYUMLULUĞU: bu <style> etiketi
+       ÖNCEDEN JS ile (document.createElement("style")) ÇALIŞMA ZAMANINDA
+       oluşturuluyordu — ama dinamik oluşturulan bir <style> elementinin
+       İÇERİĞİ build zamanında statik HTML'de GÖRÜNMEZ, bu yüzden
+       _plugins/csp_hash_enjekte.rb onu hash'leyip style-src'ye ekleyemez
+       ve tarayıcı CSP'yi ihlal ettiği için elementi SESSİZCE ENGELLERDİ.
+
+       Çözüm: <style> etiketini BAŞTAN statik HTML'e yazıp
+       media="not all" ile devre dışı bırakıyoruz. NOT: <style disabled>
+       HTML ATTRIBUTE'U OLARAK KULLANILMADI çünkü öyle bir attribute
+       HİÇ YOK (MDN: "there is no corresponding disabled attribute on
+       the HTML <style> element" — sadece bir JS PROPERTY'si olarak
+       var) ve WebKit/Safari'de bu property bazı durumlarda tutarsız
+       davranan bilinen bir eski bug'a sahip (bkz. WebKit bug #25287).
+       media="not all" ise CSS spesifikasyonunun resmi, GARANTİLİ
+       desteklenen bir media-query mekanizmasıdır: "not all" hiçbir
+       media türüyle eşleşmez, bu yüzden stil sheet hiçbir cihazda
+       UYGULANMAZ — ama DOM'da/CSSOM'da hazır bekler. JS artık yeni
+       bir eleman OLUŞTURMUYOR, sadece BU statik elementin `media`
+       attribute'unu WebView tespit edilirse KALDIRIYOR (aşağıdaki
+       script'e bakın) — bu, bir HTML attribute'unu SİLME işlemidir,
+       inline style ENJEKTE ETMEK DEĞİLDİR, dolayısıyla CSP'nin
+       kapsamı dışındadır. Elementin İÇERİĞİ ise artık statik olduğu
+       için plugin onu otomatik hash'leyip style-src'ye ekliyor. -->
+  <style id="webview-view-transition-override" media="not all">@view-transition { navigation: none; }</style>
+
   <script>
     // ANDROID WEBVIEW TESPİTİ (View Transitions güvenlik ağı):
     // Android WebView'in User-Agent'ı her zaman ";  wv)" işaretini
@@ -224,18 +250,15 @@
     //
     // "@view-transition" bir üst-seviye at-rule olduğu için bir
     // selector içine gömülüp koşullu hale getirilemez; bunun yerine
-    // BURADA, style.css'in <link>'inden SONRA (yukarıda) çalışan bu
-    // script içinde ayrı bir <style> etiketiyle "navigation: none"
-    // değeriyle override ediyoruz — CSS'te aynı at-rule, DOM'a
-    // SONRADAN eklenen bildirim tarafından geçersiz kılınır. Bu
-    // yüzden bu script'in style.css linkinden SONRA gelmesi ŞARTTIR;
-    // yukarı taşınırsa override çalışmaz.
+    // yukarıdaki (style.css'in <link>'inden SONRA gelen, bu SIRALAMA
+    // ŞARTTIR) statik ama media="not all" ile devre dışı <style>
+    // etiketini, WebView tespit edilirse `media` attribute'unu
+    // KALDIRARAK etkinleştiriyoruz — CSS'te aynı at-rule, DOM'da
+    // SONRADAN etkinleştirilen bildirim tarafından geçersiz kılınır.
     (function () {
       if (/;\s*wv\)/.test(navigator.userAgent)) {
         document.documentElement.classList.add("is-android-webview");
-        const style = document.createElement("style");
-        style.textContent = "@view-transition { navigation: none; }";
-        document.head.appendChild(style);
+        document.getElementById("webview-view-transition-override").removeAttribute("media");
       }
     })();
   </script>
@@ -415,7 +438,7 @@
   </script>
 </head>
 <body>
-  <div id="lang-notice" style="display:none;" class="lang-notice">
+  <div id="lang-notice" class="lang-notice">
     This site is in Turkish. Use your browser's translate feature (usually a
     globe/translate icon in the address bar, or right-click → Translate) to
     read it in your language.
