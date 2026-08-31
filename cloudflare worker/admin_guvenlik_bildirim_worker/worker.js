@@ -12,63 +12,18 @@
  * SADECE burada, Cloudflare Worker ortam değişkenlerinde durur; veritabanı
  * bu sırları asla görmez.
  *
- * GELEN İSTEĞİ DOĞRULAMA — GÜVENLİK AÇIĞI DÜZELTMESİ (bkz. migration
- * 0034_guvenlik_bildirim_paylasilan_sir.sql): bu Worker ÖNCEDEN SADECE
- * URL'in tahmin edilmesi zor bir path segmenti (GIZLI_YOL) içermesine
- * güveniyordu — kriptografik bir doğrulama YOKTU. GIZLI_YOL bir şekilde
- * sızarsa (tarayıcı geçmişi, Cloudflare Analytics/Logs ekranı, kazara
- * paylaşılan bir ekran görüntüsü) o adresi bilen HERKES rastgele bir JSON
- * gövdesiyle POST atıp sahte "bir admin askıya alındı" gibi Telegram/SMS
- * bildirimleri tetikleyebilirdi. Artık migration 0034 ile
- * public._denetim_bildirim_gonder() isteğe "X-Webhook-Secret" header'ı
- * EKLİYOR (guvenlik_bildirim_ayarlari.webhook_secret sütunundan) ve bu
- * Worker aşağıda bunu WEBHOOK_SHARED_SECRET ortam değişkeniyle SABİT
- * ZAMANLI (timing-safe) karşılaştırıyor — admin-denetim-zaman-asimi Edge
- * Function'ındaki AYNI desen. GIZLI_YOL kontrolü de KALDIRILMADI (savunma
- * derinliği): İKİ katman da geçilmeden istek işlenmez.
+ * GELEN İSTEĞİ DOĞRULAMA (bkz. migration 0034): X-Webhook-Secret header'ı
+ * WEBHOOK_SHARED_SECRET ile sabit zamanlı karşılaştırılır. GIZLI_YOL
+ * kontrolü de KALDIRILMADI (savunma derinliği).
  *
- * Gerekli ortam değişkenleri (Cloudflare Dashboard > Worker > Settings
- * > Variables and Secrets):
- *   GIZLI_YOL               URL'e eklenecek tahmin edilmesi zor bir segment
- *                            (ör. "x7f3-admin-guvenlik") — worker sadece
- *                            /GIZLI_YOL isteğine cevap verir, başka her şeye 404.
- *   WEBHOOK_SHARED_SECRET    migration 0034'teki
- *                            guvenlik_bildirim_ayarlari.webhook_secret ile
- *                            AYNI değer (Encrypt/Secret). Ayarlanmamışsa bu
- *                            Worker eski davranışa (sadece GIZLI_YOL) geri
- *                            düşer ve loga uyarı yazar — production'da
- *                            MUTLAKA ayarlanmalı.
- *   TELEGRAM_BOT_TOKEN       (opsiyonel) Telegram bot token'ı
- *   TELEGRAM_CHAT_ID         (opsiyonel) bildirimin gideceği chat/kanal id'si
- *   TWILIO_ACCOUNT_SID       (opsiyonel) SMS için Twilio hesap SID'i
- *   TWILIO_AUTH_TOKEN        (opsiyonel) Twilio auth token       (Encrypt/Secret)
- *   TWILIO_FROM_NUMBER       (opsiyonel) Twilio gönderen numara
- *   TWILIO_TO_NUMBER         (opsiyonel) bildirimin gideceği numara
+ * Gerekli ortam değişkenleri: GIZLI_YOL, WEBHOOK_SHARED_SECRET,
+ * TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, (opsiyonel) TWILIO_*.
  *
- * En az bir kanal (Telegram VEYA SMS) yapılandırılmalı; ikisi de boşsa
- * Worker isteği 200 ile kabul eder ama hiçbir yere iletmez (loglar).
- *
- * KURULUM:
- *   1) Bu dosyayı Cloudflare Dashboard'da yeni bir Worker'a yapıştır, yukarıdaki
- *      ortam değişkenlerini gir (WEBHOOK_SHARED_SECRET dahil), deploy et.
- *   2) Supabase'de:
- *        update public.guvenlik_bildirim_ayarlari
- *        set webhook_url    = 'https://<worker-adresin>.workers.dev/<GIZLI_YOL>',
- *            webhook_secret = '<WEBHOOK_SHARED_SECRET İLE AYNI DEĞER>',
- *            aktif          = true
- *        where id = 1;
+ * DEĞİŞİKLİK (bkz. migration 0035): mesaj artık hedef adminin ad-soyadını
+ * gösteriyor, Vaka ID kısaltıldı (ilk 8 karakter yeterli, tamamı gerekmiyor),
+ * ve Zaman alanı Türkiye saatine (Europe/Istanbul) çevrilerek gösteriliyor.
  */
 
-/**
- * Sabit zamanlı (timing-safe) sır karşılaştırması. Düz `===`/`!==`
- * kullanmak teorik bir zamanlama yan-kanalı (timing attack) bırakır: string
- * karşılaştırması ilk farklı karakterde erken çıkar, bu da yanıt süresinden
- * doğru sırrın kaç karakterinin tutturulduğuna dair (çok küçük de olsa) bilgi
- * sızdırabilir. Her iki değeri SHA-256 ile hash'leyip SABİT uzunluktaki
- * (32 bayt) özetleri baytlarını XOR'layarak karşılaştırıyoruz — hem uzunluk
- * farkı hem erken çıkış artık gözlemlenebilir bir zamanlama farkı yaratmıyor.
- * (admin-denetim-zaman-asimi/index.ts'teki AYNI desen.)
- */
 async function sabitZamanliEsitMi(a, b) {
   const enc = new TextEncoder();
   const [ozetA, ozetB] = await Promise.all([
@@ -92,6 +47,25 @@ const OLAY_METINLERI = {
   suresi_doldu_geri_acildi: "⏱️ Karar süresi doldu — hesap OTOMATİK olarak geri açıldı",
 };
 
+// Zaman damgasını Türkiye saatine (Europe/Istanbul) çevirir. Geçersiz/eksik
+// bir değer gelirse olduğu gibi geri döner (mesajın tamamen bozulmaması için).
+function turkiyeSaati(isoString) {
+  if (!isoString) return "-";
+  const tarih = new Date(isoString);
+  if (isNaN(tarih.getTime())) return isoString;
+  return (
+    new Intl.DateTimeFormat("tr-TR", {
+      timeZone: "Europe/Istanbul",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    }).format(tarih) + " (TR)"
+  );
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -103,15 +77,6 @@ export default {
       return new Response("Sadece POST.", { status: 405 });
     }
 
-    // GÜVENLİK (bkz. dosya başı notu / migration 0034): GIZLI_YOL tek
-    // başına kriptografik bir doğrulama DEĞİL, sadece URL'i tahmin
-    // edilmesi zorlaştırır. WEBHOOK_SHARED_SECRET ayarlıysa, isteğin
-    // public._denetim_bildirim_gonder()'ın gönderdiği "X-Webhook-Secret"
-    // header'ını taşıması ve bunun değerinin SABİT ZAMANLI olarak
-    // eşleşmesi ZORUNLU — aksi halde GIZLI_YOL sızmış olsa bile istek
-    // reddedilir. WEBHOOK_SHARED_SECRET ayarlanmamışsa (henüz migration
-    // 0034 kurulumu tamamlanmadıysa) eski davranışa geri düşülür ve loga
-    // uyarı yazılır — production'da MUTLAKA ayarlanmalı.
     if (env.WEBHOOK_SHARED_SECRET) {
       const gelenSir = request.headers.get("X-Webhook-Secret");
       const gecerliMi = gelenSir ? await sabitZamanliEsitMi(gelenSir, env.WEBHOOK_SHARED_SECRET) : false;
@@ -133,12 +98,15 @@ export default {
     }
 
     const baslik = OLAY_METINLERI[yuk.olay] || `Admin denetim olayı: ${yuk.olay}`;
+    const hedefAdi = yuk.hedef_admin_ad_soyad || yuk.hedef_admin_email || yuk.hedef_admin_id || "-";
+    const vakaKisa = yuk.denetim_id ? String(yuk.denetim_id).slice(0, 8) : "-";
     const mesaj = [
       baslik,
+      `Admin: ${hedefAdi}`,
       `Sebep: ${yuk.sebep || "-"}`,
       `Durum: ${yuk.durum || "-"}`,
-      `Vaka: ${yuk.denetim_id || "-"}`,
-      `Zaman: ${yuk.zaman || new Date().toISOString()}`,
+      `Vaka: ${vakaKisa}`,
+      `Zaman: ${turkiyeSaati(yuk.zaman)}`,
     ].join("\n");
 
     const gonderimSonuclari = await Promise.allSettled([
@@ -169,7 +137,7 @@ async function smsGonder(env, mesaj) {
   const body = new URLSearchParams({
     From: env.TWILIO_FROM_NUMBER,
     To: env.TWILIO_TO_NUMBER,
-    Body: mesaj.slice(0, 300), // SMS uzunluk sınırı
+    Body: mesaj.slice(0, 300),
   });
   const res = await fetch(
     `https://api.twilio.com/2010-04-01/Accounts/${env.TWILIO_ACCOUNT_SID}/Messages.json`,
