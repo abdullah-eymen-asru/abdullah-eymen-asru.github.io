@@ -128,6 +128,17 @@
     bildirim/senkronizasyon özellikleri sayfa hiç hata vermeden çalışmaz
     hale gelir). https: ve wss: CSP'de AYRI şemalardır, biri diğerini
     kapsamaz.
+
+    UMAMI (cloud.umami.is) İÇİN AYRI BİR DOMAIN EKLENMEDİ: script-src ve
+    connect-src şu an https: şemasının TAMAMINA (belirli domain'lerle
+    sınırlamadan) izin veriyor, bu yüzden cloud.umami.is zaten kapsam
+    içinde — script hem yüklenebilir hem kendi analitik verisini
+    gönderebilir. İLERİDE CSP'yi belirli domain'lerle sınırlamaya
+    (script-src 'self' https://belirli-domain.com gibi) geçirirseniz,
+    cloud.umami.is'i hem script-src'ye (script yüklemek için) hem
+    connect-src'ye (Umami'nin sayfa görüntülenme verisini POST etmesi
+    için) EKLEMEYİ UNUTMAYIN — aksi halde analitik sessizce çalışmaz
+    hale gelir.
   -->
 <meta http-equiv="Content-Security-Policy" content="
     default-src 'self' https:;
@@ -360,6 +371,16 @@
     };
   </script>
   {% endif %}
+
+  <!--
+    Umami — ÇEREZSİZ/ANONİM ANALİTİK, ONAY GEREKTİRMEZ: Google Analytics'in
+    aksine (bkz. yukarısı) bu script çerez kullanmıyor ve kişisel veri
+    toplamıyor (Umami'nin kendi belgelerine göre), bu yüzden KVKK/GDPR
+    çerez onay akışına BAĞLANMADI — sayfa her yüklendiğinde doğrudan
+    çalışır. data-website-id, Umami Cloud'daki bu site için sabit bir
+    ortak (gizli olmayan) tanımlayıcıdır, secret DEĞİLDİR.
+  -->
+  <script defer src="https://cloud.umami.is/script.js" data-website-id="c3b6124c-704e-47e4-89d4-43daa0e264b9"></script>
 
   {% comment %}
     REKLAM (AdSense) sayfa uygunluğu — bkz. assets/js/core/site-islemleri.js
