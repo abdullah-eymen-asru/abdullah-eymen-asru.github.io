@@ -27,12 +27,27 @@
 #   2) Bu plugin, :site, :post_write kancasıyla (yani TÜM dosyalar diske
 #      yazıldıktan SONRA) devreye girer, _site altındaki her .html dosyasını
 #      tekrar okur.
-#   3) O dosyadaki her <script>...</script> bloğunu (src= olanlar HARİÇ —
-#      onlar zaten CSP'nin script-src 'self'/https: kısmına tabi, hash
-#      gerektirmezler) bulup İÇERİĞİNİN SHA-256 hash'ini hesaplar.
+#   3) O dosyadaki her <script>...</script> VE <style>...</style> bloğunu
+#      (src= olan <script>'ler HARİÇ — onlar zaten CSP'nin script-src
+#      'self'/https: kısmına tabi, hash gerektirmezler) bulup İÇERİĞİNİN
+#      SHA-256 hash'ini hesaplar.
 #   4) O dosyada bir CSP <meta http-equiv="Content-Security-Policy"> etiketi
 #      varsa, "'unsafe-inline'" ve "'unsafe-eval'" ifadelerini SİLİP yerine
-#      o SAYFAYA ÖZGÜ hash listesini ekler, dosyayı GÜNCEL hâliyle geri yazar.
+#      o SAYFAYA ÖZGÜ hash listesini (script-src VE style-src için AYRI
+#      AYRI) ekler, dosyayı GÜNCEL hâliyle geri yazar.
+#
+# STYLE-SRC NEDEN AYRICA GEREKLİ: sitede tema/dil bildirimi gibi birkaç
+# yer, önceden HTML'de style="..." INLINE ATTRIBUTE'U kullanıyordu — bunlar
+# hepsi CSS class'larına çevrildi (bkz. assets/style.css'teki ".lang-notice",
+# ".proje-baglanti-alani", ".adsbygoogle-blok" yorumları), çünkü inline
+# style ATTRIBUTE'LERİ için CSP hash mekanizması 'unsafe-hashes' anahtar
+# kelimesini de GEREKTİRİR (attribute hash'leri, <style> ELEMENT hash'lerinden
+# FARKLI bir CSP alt-mekanizmasıdır) — 'unsafe-hashes' başlı başına ayrı bir
+# taviz olacağından, mümkün olduğunda class'a çevirmek daha temiz. Geriye
+# kalan TEK durum (_layouts/default.html'deki Android WebView view-transition
+# override'ı) statik bir <style media="not all"> elementi olarak yazıldı —
+# bu SIRADAN bir <style> ELEMENTİ olduğu için 'unsafe-hashes' GEREKMEZ,
+# normal hash mekanizması yeterlidir.
 #
 # NEDEN SAYFA BAŞINA (GLOBAL DEĞİL): AdSense/GA scriptleri sadece
 # site.adsense_client_id/google_analytics_id doluysa render edilir, ve
@@ -79,6 +94,28 @@ require "digest"
 # eskimiş bir hash listesi kalma riski yoktur.
 
 module CspHashEnjekte
+  # KRİTİK DÜZELTME — HTML YORUMLARI regex'i YANILTABİLİR: bu dosyanın
+  # kendisi (ve projedeki diğer .html dosyaları) açıklama amacıyla HTML
+  # yorumları (<!-- ... -->) İÇİNDE "<style>" veya "<script>" gibi LİTERAL
+  # METİNLER barındırabiliyor (ör. "NOT: <style disabled> HTML ATTRIBUTE'U
+  # OLARAK KULLANILMADI..." açıklaması). SCRIPT_TAG_REGEX/STYLE_TAG_REGEX
+  # bu yorum metnini GERÇEK bir açılış etiketi sanıp, oradan asıl etikete
+  # kadar olan HER ŞEYİ (yorumun geri kalanı dahil) script/style GÖVDESİ
+  # olarak yanlış yakalayabilir — bu durumda hesaplanan hash tarayıcının
+  # hesapladığından FARKLI olur ve script/style SESSİZCE BLOKLANIR (build
+  # başarılı görünür ama üretimde site bozuk çalışır, bu en tehlikeli tür
+  # hatadır). Bu yüzden hash hesaplamadan ÖNCE tüm HTML yorumlarını
+  # içerikten TAMAMEN çıkarıyoruz — yorumlar zaten tarayıcıya gönderilen
+  # gerçek script/style içeriğinin bir PARÇASI DEĞİL, sadece kaynak kod
+  # belgelemesi, bu yüzden çıkarılmaları hash sonucunu ETKİLEMEZ (asıl
+  # <script>/<style> içeriği aynı kalır), sadece regex'in kafasının
+  # karışmasını önler.
+  HTML_YORUM_REGEX = /<!--.*?-->/m
+
+  def self.yorumlari_cikar(html)
+    html.gsub(HTML_YORUM_REGEX, "")
+  end
+
   # src= OLMAYAN <script> bloklarını yakalar (type="module" dahil — module
   # scriptler de script-src kısıtlamasına tabidir, hash'siz/nonce'suz
   # 'unsafe-inline' olmadan çalışmazlar). type="application/ld+json" gibi
@@ -88,10 +125,18 @@ module CspHashEnjekte
   # kontrolüdür, ld+json zaten 'script' olarak parse edilir ama execute
   # edilmez).
   SCRIPT_TAG_REGEX = /<script(?![^>]*\bsrc=)([^>]*)>(.*?)<\/script>/mi
+
+  # src= (href=) OLMAYAN <style> bloklarını yakalar. Not: <style> etiketinin
+  # kendisinde zaten bir src/href attribute'u OLMAZ (harici CSS <link> ile
+  # gelir, <style> HER ZAMAN inline'dır) — yine de ileride bir tarayıcı
+  # uzantısı böyle bir attribute eklerse diye script regex'iyle TUTARLI bir
+  # desen kullanıyoruz.
+  STYLE_TAG_REGEX = /<style([^>]*)>(.*?)<\/style>/mi
+
   CSP_META_REGEX = /(<meta\s+http-equiv=["']Content-Security-Policy["']\s+content=")([^"]*)("\s*>)/mi
   HEADERS_CSP_REGEX = /(Content-Security-Policy:\s*)([^\r\n]*)/i
 
-  def self.headers_dosyasini_guncelle(site_dizini, tum_hashler)
+  def self.headers_dosyasini_guncelle(site_dizini, tum_script_hashler, tum_style_hashler)
     headers_yolu = File.join(site_dizini, "_headers")
     return unless File.exist?(headers_yolu)
 
@@ -100,54 +145,65 @@ module CspHashEnjekte
 
     icerik.sub!(HEADERS_CSP_REGEX) do
       onek, csp_satiri = $1, $2
-      guncel_csp = csp_icinde_script_src_guncelle(csp_satiri, tum_hashler)
+      guncel_csp = csp_satiri
+      guncel_csp = csp_icinde_yonerge_guncelle(guncel_csp, "script-src", tum_script_hashler)
+      guncel_csp = csp_icinde_yonerge_guncelle(guncel_csp, "style-src", tum_style_hashler)
       "#{onek}#{guncel_csp}"
     end
 
     File.write(headers_yolu, icerik, encoding: "UTF-8")
   end
 
-  def self.sayfa_icin_hash_listesi_uret(html)
+  def self.etiket_icin_hash_listesi_uret(html, etiket_regex)
+    # ÖNEMLİ: yorumları ÖNCE çıkarıyoruz (bkz. HTML_YORUM_REGEX yukarıdaki
+    # ayrıntılı gerekçe) — aksi halde bir yorumun İÇİNDEKİ "<script>"/
+    # "<style>" literal metni gerçek bir etiket sanılıp yanlış (ve
+    # tarayıcının hesaplayacağından FARKLI) bir hash üretilebilir.
+    temiz_html = yorumlari_cikar(html)
     hashler = []
-    html.scan(SCRIPT_TAG_REGEX) do |_attrs, govde|
+    temiz_html.scan(etiket_regex) do |_attrs, govde|
       # Baş/son boşluk farkları tarayıcının hash hesaplamasını ETKİLEMEZ
-      # (CSP spesifikasyonu script içeriğini OLDUĞU GİBİ, trim'siz hash'ler)
-      # — biz de govde'yi OLDUĞU GİBİ (hiç dokunmadan) hash'liyoruz, aksi
-      # halde tarayıcının hesapladığı hash ile bizimki UYUŞMAZ ve script
-      # sessizce bloklanır.
+      # (CSP spesifikasyonu içeriği OLDUĞU GİBİ, trim'siz hash'ler) — biz
+      # de govde'yi OLDUĞU GİBİ (hiç dokunmadan) hash'liyoruz, aksi halde
+      # tarayıcının hesapladığı hash ile bizimki UYUŞMAZ ve
+      # script/style sessizce bloklanır.
       ozet = Digest::SHA256.base64digest(govde)
       hashler << "'sha256-#{ozet}'"
     end
     hashler.uniq
   end
 
-  def self.csp_icinde_script_src_guncelle(csp_icerik, hashler)
-    # script-src YOKSA default-src'nin script-src'yi de kapsadığı
-    # varsayılır (CSP fallback kuralı) — bu durumda default-src'ye
-    # dokunmak yerine AYRI bir script-src ekleriz (script-src varsa o,
-    # yoksa default-src script çalıştırmayı kontrol eder). Proje şu an
-    # default-src üzerinden 'unsafe-inline'/'unsafe-eval' taşıyor, bu
-    # yüzden birincil senaryo budur.
-    if csp_icerik =~ /script-src\s+([^;]*)/i
-      # Zaten ayrı bir script-src yönergesi varsa (ileride eklenirse) onu
-      # güncelle: unsafe-inline/unsafe-eval'i çıkar, hash'leri ekle.
+  def self.sayfa_icin_hash_listesi_uret(html)
+    # GERİYE UYUMLULUK: eski çağrı yeri (sadece script) için korunuyor.
+    etiket_icin_hash_listesi_uret(html, SCRIPT_TAG_REGEX)
+  end
+
+  def self.csp_icinde_yonerge_guncelle(csp_icerik, yonerge_adi, hashler)
+    # Bu sayfada/dosyada o türden (script/style) hiç inline blok yoksa
+    # hashler boş olur — bu durumda default-src/mevcut yönergeye
+    # DOKUNMUYORUZ (boş bir "script-src ;" eklemek her şeyi bloklardı).
+    return csp_icerik if hashler.empty? && !(csp_icerik =~ /#{yonerge_adi}\s+/i)
+
+    if csp_icerik =~ /#{yonerge_adi}\s+([^;]*)/i
+      # Zaten ayrı bir yönerge varsa (ileride eklenirse) onu güncelle:
+      # unsafe-inline/unsafe-eval'i çıkar, hash'leri ekle.
       eski = $1
       yeni = (eski.split(/\s+/) - ["'unsafe-inline'", "'unsafe-eval'"] + hashler).uniq.join(" ")
-      csp_icerik.sub(/script-src\s+[^;]*/i, "script-src #{yeni}")
+      csp_icerik.sub(/#{yonerge_adi}\s+[^;]*/i, "#{yonerge_adi} #{yeni}")
     else
-      # script-src yok -> default-src'den unsafe-inline/unsafe-eval'i
-      # çıkarıp AYRI bir script-src yönergesi ekliyoruz (default-src'nin
-      # geri kalanı -- ör. 'self' https: -- ayrıca script-src'ye de
-      # taşınır, çünkü script-src eklenince default-src ARTIK script'ler
-      # için fallback olarak kullanılmaz, CSP spesifikasyonu gereği).
+      # Yönerge yok -> default-src'den unsafe-inline/unsafe-eval'i çıkarıp
+      # AYRI bir yönerge ekliyoruz (default-src'nin geri kalanı -- ör.
+      # 'self' https: -- ayrıca yeni yönergeye de taşınır, çünkü o
+      # yönerge eklenince default-src ARTIK o tür kaynaklar için fallback
+      # olarak kullanılmaz, CSP spesifikasyonu gereği).
       if csp_icerik =~ /default-src\s+([^;]*)/i
         temel = $1.split(/\s+/) - ["'unsafe-inline'", "'unsafe-eval'"]
         yeni_default = temel.join(" ")
-        yeni_script_src = (temel + hashler).uniq.join(" ")
+        yeni_yonerge_degeri = (temel + hashler).uniq.join(" ")
         guncellenmis = csp_icerik.sub(/default-src\s+[^;]*/i, "default-src #{yeni_default}")
-        # script-src'yi default-src'den hemen sonra ekle (yönerge sırası
-        # CSP semantiğini etkilemez, sadece okunabilirlik için).
-        guncellenmis.sub(/(default-src\s+[^;]*;)/i, "\\1 script-src #{yeni_script_src};")
+        # Yeni yönergeyi default-src'den hemen sonra ekle (sıra CSP
+        # semantiğini etkilemez, sadece okunabilirlik için).
+        guncellenmis.sub(/(default-src\s+[^;]*;)/i, "\\1 #{yonerge_adi} #{yeni_yonerge_degeri};")
       else
         csp_icerik
       end
@@ -172,25 +228,29 @@ module CspHashEnjekte
     html_dosyalari = Dir.glob(File.join(site_dizini, "**", "*.html"))
 
     guncellenen_sayfa_sayisi = 0
-    tum_hashler_birlesimi = []
+    tum_script_hashler_birlesimi = []
+    tum_style_hashler_birlesimi = []
 
     html_dosyalari.each do |dosya_yolu|
       icerik = File.read(dosya_yolu, encoding: "UTF-8")
 
       # _headers birleşimi İÇİN, o sayfada <meta> CSP'si olmasa bile
-      # (teoride olmamalı, ama savunmacı davranıyoruz) inline scriptlerin
-      # hash'lerini yine de topluyoruz — _headers TÜM site için tek bir
-      # CSP taşıdığından, herhangi bir sayfadaki herhangi bir inline
-      # script'in hash'i o birleşime dahil olmalı.
-      tum_hashler_birlesimi.concat(sayfa_icin_hash_listesi_uret(icerik))
+      # (teoride olmamalı, ama savunmacı davranıyoruz) inline
+      # script/style'ların hash'lerini yine de topluyoruz — _headers TÜM
+      # site için tek bir CSP taşıdığından, herhangi bir sayfadaki
+      # herhangi bir inline bloğun hash'i o birleşime dahil olmalı.
+      script_hashler = etiket_icin_hash_listesi_uret(icerik, SCRIPT_TAG_REGEX)
+      style_hashler = etiket_icin_hash_listesi_uret(icerik, STYLE_TAG_REGEX)
+      tum_script_hashler_birlesimi.concat(script_hashler)
+      tum_style_hashler_birlesimi.concat(style_hashler)
 
       next unless icerik =~ CSP_META_REGEX
 
-      hashler = sayfa_icin_hash_listesi_uret(icerik)
-
       icerik.sub!(CSP_META_REGEX) do
         onek, csp_icerik, sonek = $1, $2, $3
-        guncel_csp = csp_icinde_script_src_guncelle(csp_icerik, hashler)
+        guncel_csp = csp_icerik
+        guncel_csp = csp_icinde_yonerge_guncelle(guncel_csp, "script-src", script_hashler)
+        guncel_csp = csp_icinde_yonerge_guncelle(guncel_csp, "style-src", style_hashler)
         "#{onek}#{guncel_csp}#{sonek}"
       end
 
@@ -198,9 +258,10 @@ module CspHashEnjekte
       guncellenen_sayfa_sayisi += 1
     end
 
-    tum_hashler_birlesimi.uniq!
-    headers_dosyasini_guncelle(site_dizini, tum_hashler_birlesimi)
+    tum_script_hashler_birlesimi.uniq!
+    tum_style_hashler_birlesimi.uniq!
+    headers_dosyasini_guncelle(site_dizini, tum_script_hashler_birlesimi, tum_style_hashler_birlesimi)
 
-    Jekyll.logger.info "CSP Hash Enjekte:", "#{guncellenen_sayfa_sayisi} sayfada inline script hash'leri CSP'ye eklendi, 'unsafe-inline'/'unsafe-eval' kaldırıldı (#{tum_hashler_birlesimi.length} benzersiz hash, _headers dahil)."
+    Jekyll.logger.info "CSP Hash Enjekte:", "#{guncellenen_sayfa_sayisi} sayfada inline script/style hash'leri CSP'ye eklendi, 'unsafe-inline'/'unsafe-eval' kaldırıldı (#{tum_script_hashler_birlesimi.length} script + #{tum_style_hashler_birlesimi.length} style hash'i, _headers dahil)."
   end
 end
