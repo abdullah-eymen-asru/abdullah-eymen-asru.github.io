@@ -62,14 +62,14 @@ permalink: "/panel/izleme-okuma-yonetim.html"
           <p class="muted">Alanlar yükleniyor…</p>
         </div>
 
-        <button type="submit" id="iy-submit-btn" class="btn-primary" style="width:auto;">➕ Kaydı Ekle</button>
+        <button type="submit" id="iy-submit-btn" class="btn-primary csp-w-auto">➕ Kaydı Ekle</button>
       </form>
       <div id="iy-message" class="auth-message" hidden></div>
       <div id="iy-basari-kutu" class="gy-onizleme-kutusu" hidden>
         <div class="gy-onizleme-baslik">✅ Kayıt eklendi</div>
         <p class="muted" id="iy-basari-metin"></p>
         <div class="gy-link-kutu">
-          <a id="iy-basari-issue-link" href="#" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="width:auto; text-decoration:none; display:inline-block; text-align:center;">GitHub'da Issue'yu Aç</a>
+          <a id="iy-basari-issue-link" href="#" target="_blank" rel="noopener noreferrer" class="btn-secondary csp-inline-block-link">GitHub'da Issue'yu Aç</a>
         </div>
       </div>
     </section>
@@ -82,7 +82,7 @@ permalink: "/panel/izleme-okuma-yonetim.html"
         düzenleme formu açılır.
       </p>
 
-      <div id="iy-duzenle-kutu" class="gy-onizleme-kutusu" hidden style="margin-bottom:20px;">
+      <div id="iy-duzenle-kutu" class="gy-onizleme-kutusu csp-mb-20" hidden>
         <div class="gy-onizleme-baslik" id="iy-duzenle-baslik">Kaydı Düzenle</div>
         <form id="iy-duzenle-form" novalidate>
           <div class="form-field">
@@ -94,21 +94,21 @@ permalink: "/panel/izleme-okuma-yonetim.html"
             <textarea id="iy-duzenle-aciklama" rows="4" placeholder="Notlar, alıntı, kısa yorum…"></textarea>
           </div>
           <div id="iy-duzenle-alanlar-container"></div>
-          <div style="display:flex; gap:10px; flex-wrap:wrap;">
-            <button type="submit" id="iy-duzenle-submit-btn" class="btn-primary" style="width:auto;">💾 Güncelle</button>
-            <button type="button" id="iy-duzenle-iptal-btn" class="btn-secondary" style="width:auto;">İptal</button>
+          <div class="csp-flex-gap10-wrap">
+            <button type="submit" id="iy-duzenle-submit-btn" class="btn-primary csp-w-auto">💾 Güncelle</button>
+            <button type="button" id="iy-duzenle-iptal-btn" class="btn-secondary csp-w-auto">İptal</button>
           </div>
         </form>
         <div id="iy-duzenle-message" class="auth-message" hidden></div>
       </div>
 
-      <div class="gy-arama-kutu" style="margin-bottom:14px;">
+      <div class="gy-arama-kutu csp-mb-14">
         <span class="gy-arama-ikon" aria-hidden="true">🔎</span>
         <input id="iy-liste-arama" type="search" placeholder="Ara…" autocomplete="off">
         <button type="button" id="iy-liste-arama-temizle" class="gy-arama-temizle" hidden aria-label="Aramayı temizle">✕</button>
       </div>
 
-      <button id="iy-liste-yenile-btn" type="button" class="btn-primary" style="width:auto; margin-bottom:12px;">Listeyi Yükle / Yenile</button>
+      <button id="iy-liste-yenile-btn" type="button" class="btn-primary csp-w-auto csp-mb-12">Listeyi Yükle / Yenile</button>
 
       <div id="iy-liste"><p class="muted">Henüz yüklenmedi.</p></div>
       <p id="iy-liste-sonuc-yok" class="muted" hidden>Aramanla eşleşen kayıt bulunamadı.</p>
