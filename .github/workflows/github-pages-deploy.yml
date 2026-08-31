@@ -1,0 +1,108 @@
+# Bu workflow'un amacı: GitHub Pages'i, GitHub'ın kendi native (safe mode)
+# Jekyll build'i yerine, BU repo'daki tam Ruby/Jekyll ortamıyla (özel
+# plugin desteğiyle) build edip deploy etmek.
+#
+# NEDEN GEREKLİ (safe mode kısıtı):
+# GitHub Pages, bir repo'yu push aldığında normalde KENDİ sunucularında,
+# "safe mode" adı verilen kısıtlı bir Jekyll build'i çalıştırır. Bu mod,
+# güvenlik gerekçesiyle _plugins/ klasöründeki ÖZEL (whitelist dışı)
+# Ruby pluginlerini ÇALIŞTIRMAZ — sadece GitHub'ın önceden onayladığı
+# birkaç plugin (jekyll-sitemap gibi) izinlidir. Projedeki
+# _plugins/csp_hash_enjekte.rb (bkz. o dosyanın başındaki ayrıntılı
+# açıklama) tam olarak böyle özel bir plugin: build sonrası HTML'deki
+# inline <script> bloklarının SHA-256 hash'ini hesaplayıp CSP'ye ekliyor,
+# böylece 'unsafe-inline'/'unsafe-eval' CSP'den tamamen kaldırılabiliyor.
+# GitHub'ın safe-mode build'i bu plugin'i SESSİZCE YOK SAYARDI — yani CSP
+# sıkılaştırması sadece Cloudflare Pages'te işlerdi, kanonik adres olan
+# GitHub Pages'te İŞLEMEZDİ.
+#
+# ÇÖZÜM: GitHub'ın resmi actions/jekyll-build-pages + actions/deploy-pages
+# action'larını kullanarak, build'i GitHub'ın kendi runner'ında (safe mode
+# OLMADAN, bu repodaki Gemfile'a göre TAM Ruby ortamıyla) çalıştırıp,
+# sonucu (tüm pluginler devrede, hash'ler enjekte edilmiş hâliyle) GitHub
+# Pages'e deploy ediyoruz. Bu, GitHub'ın plugin gereksinimi olan Jekyll
+# siteleri için RESMİ önerdiği yöntemdir.
+#
+# KURULUM (bir kereye mahsus):
+#   1. Repo Settings → Pages → "Build and deployment" → "Source" kısmını
+#      "Deploy from a branch" yerine "GitHub Actions" olarak değiştir.
+#      (Bu adım atlanırsa GitHub Pages eski native build'i kullanmaya
+#      devam eder, bu workflow deploy adımında hata verir.)
+#   2. Bu dosyayı push'ladıktan sonra Actions sekmesinde çalıştığını
+#      göreceksin — main branch'e her push'ta otomatik tetiklenir.
+#
+# NOT: Cloudflare Pages tarafında hiçbir değişiklik gerekmiyor — o zaten
+# kendi tam Jekyll build'ini çalıştırıyor, _plugins/ orada zaten
+# çalışıyordu.
+
+name: GitHub Pages Build ve Deploy (plugin destekli)
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch: {}
+    # Actions sekmesinden elle "Run workflow" ile de tetiklenebilsin diye.
+
+# GITHUB_TOKEN'ın Pages'e deploy edebilmesi için gereken izinler.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Aynı anda birden fazla deploy'un çakışmasını önler; yeni bir push
+# gelirse devam eden eski deploy'u iptal eder (yarım kalmış eski bir
+# sürümün yanlışlıkla canlıda kalmasını engeller).
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repo'yu çek
+        uses: actions/checkout@v4
+
+      - name: Ruby ortamını kur (Gemfile'a göre)
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          # bundler-cache: true -> gem'leri otomatik kurar VE önbelleğe
+          # alır, her build'de yeniden indirmez.
+
+      - name: GitHub Pages ortam bilgisini al
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Jekyll ile build al (TÜM pluginler dahil, safe mode YOK)
+        # --baseurl: bu proje bir KULLANICI sitesi olduğu için
+        # (abdullah-eymen-asru.github.io, bir alt-yol DEĞİL kök domain)
+        # _config.yml'deki baseurl zaten "" (boş) — configure-pages
+        # action'ı da bu durumda base_path olarak boş string döndürür,
+        # yani bu parametre burada zararsız/no-op'tur. Proje ileride bir
+        # PROJE sitesine (kullaniciadi.github.io/repo-adi gibi bir alt
+        # yola) dönüştürülürse bu satır otomatik doğru değeri alır,
+        # elle değiştirmeye gerek kalmaz.
+        run: |
+          bundle exec jekyll build \
+            --destination "_site" \
+            --baseurl "${{ steps.pages.outputs.base_path }}"
+        env:
+          JEKYLL_ENV: production
+
+      - name: Build çıktısını Pages'e yükle
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "_site"
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: GitHub Pages'e deploy et
+        id: deployment
+        uses: actions/deploy-pages@v4
