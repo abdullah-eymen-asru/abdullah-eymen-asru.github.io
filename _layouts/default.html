@@ -94,17 +94,34 @@
     (bkz. assets/js/koleksiyon-tablo.js), ama CSP; ileride bir yerde bir
     kaçış hatası olursa bile tarayıcının çalıştırabileceği script/frame/
     bağlantı kaynaklarını SADECE bu sitenin gerçekten ihtiyaç duyduğu
-    adreslerle sınırlar. 'unsafe-inline' script-src'de var çünkü sayfada
-    (tema anahtarı, dil şeridi, giscus yükleyici gibi) inline <script>
-    blokları kullanılıyor — statik bir Jekyll sitesinde nonce/hash tabanlı
-    CSP kurmak build sistemi gerektirir, bu basit kurulumla uyumlu değil.
-    object-src 'none' ve base-uri 'self' yine de önemli iki ekstra kilit:
-    biri eski plugin/Flash tarzı içerik yüklenmesini, diğeri sayfaya
-    enjekte edilebilecek bir <base> etiketiyle tüm göreli linklerin
-    başka bir siteye yönlendirilmesini engeller.
+    adreslerle sınırlar.
+
+    'unsafe-inline'/'unsafe-eval' KALDIRILDI (önceden buradaydı): sayfada
+    (tema anahtarı, giscus yükleyici, GA/AdSense gibi) birkaç sabit inline
+    <script> bloğu kullanılıyor, ama bunların hiçbiri çalışma zamanında
+    kullanıcı/veritabanı verisiyle değişmiyor — tek "değişken" kısımları
+    _config.yml'deki build-time sabitleri, ve onlar da HTML diske
+    yazılmadan önce Liquid tarafından çözülüyor. Bu yüzden artık build
+    sonrası bir adım (bkz. _plugins/csp_hash_enjekte.rb) her sayfanın
+    NİHAİ HTML'indeki inline scriptlerin SHA-256 hash'ini hesaplayıp bu
+    CSP'ye ekliyor ve 'unsafe-inline'/'unsafe-eval'i siliyor — tarayıcı
+    yalnızca tam olarak bu hash'lerle eşleşen scriptleri çalıştırır,
+    ileride bir XSS açığıyla enjekte edilen HİÇBİR inline script çalışmaz.
+    Bu plugin GitHub Pages'in kendi (safe mode) build'inde ÇALIŞMAZ, bu
+    yüzden proje artık GitHub Actions ile build edilip GitHub Pages'e
+    deploy ediliyor (bkz. .github/workflows/github-pages-deploy.yml);
+    Cloudflare Pages zaten tam Jekyll build'i çalıştırdığı için orada da
+    otomatik işler. Aşağıdaki content="" içinde unsafe-inline/unsafe-eval
+    KASITLI OLARAK YOK — build script'i onları arayıp silmeye çalışmaz,
+    kaynağın kendisi zaten temiz; hash'ler SADECE build çıktısına eklenir.
+
+    object-src 'none' ve base-uri 'self' iki ekstra kilit: biri eski
+    plugin/Flash tarzı içerik yüklenmesini, diğeri sayfaya enjekte
+    edilebilecek bir <base> etiketiyle tüm göreli linklerin başka bir
+    siteye yönlendirilmesini engeller.
   -->
 <meta http-equiv="Content-Security-Policy" content="
-    default-src 'self' https: 'unsafe-inline' 'unsafe-eval';
+    default-src 'self' https:;
     base-uri 'self';
     connect-src 'self' https:;
     img-src 'self' data: https: blob:;
