@@ -1075,3 +1075,60 @@ th { color: var(--muted); font-weight: 600; }
     from { opacity: 0; transform: translateY(4px); }
   }
 }
+
+/* ============================================================
+   GÜVENLİK (CSP) — INLINE style="..." ATTRIBUTE'LARININ YERİNE
+   YARDIMCI (UTILITY) CLASS'LAR
+   ============================================================
+   Panel/hesap sayfalarının Markdown gövdelerinde (panel/*.md,
+   hesap/*.md, index.md, index-bakim.md) onlarca yerde küçük, tekrar
+   eden inline style="..." attribute'u kullanılıyordu (ör. "genişliği
+   içeriğe göre daralt", "üstten boşluk ekle", "yatay flex düzen").
+   CSP'den 'unsafe-inline' kaldırıldıktan sonra bu ATTRIBUTE'LAR artık
+   çalışmıyor — inline style ATTRIBUTE hash'leri (normal <style>
+   ELEMENT hash'lerinden farklı olarak) CSP'nin 'unsafe-hashes' anahtar
+   kelimesini de gerektiriyor, ki bu başlı başına ayrı bir tavizdir ve
+   düzinelerce farklı attribute değerini teker teker hash'lemek build
+   sürecini kırılganlaştırırdı. Bunun yerine, HER BENZERSİZ stil
+   kombinasyonu için burada anlamlı isimli bir class tanımlandı;
+   sayfalardaki style="..." attribute'ları bu class'larla değiştirildi.
+   Bu class'lar SADECE bu amaçla var, başka bir yerde YENİDEN
+   KULLANILMASI beklenmiyor — yeni bir sayfa yeni bir inline stil
+   ihtiyacı doğurursa, var olan bir class'a UYMUYORSA buraya yeni bir
+   tane eklemek, kaynağa TEKRAR style="..." yazmaktan HER ZAMAN daha
+   güvenlidir. */
+
+.csp-w-auto { width: auto; }
+
+.csp-flex-gap10 { display: flex; gap: 10px; }
+.csp-flex-gap10-wrap { display: flex; gap: 10px; flex-wrap: wrap; }
+.csp-flex-gap8-center-wrap { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.csp-flex-gap8-center-row { display: flex; gap: 8px; align-items: center; flex-direction: row; font-size: 0.9rem; color: var(--text); }
+.csp-flex-gap8-start-row { display: flex; gap: 8px; align-items: flex-start; flex-direction: row; font-size: 0.9rem; color: var(--text); }
+.csp-flex-gap4-center { display: flex; align-items: center; gap: 4px; }
+.csp-inline-block-link { width: auto; text-decoration: none; display: inline-block; text-align: center; }
+.csp-inline-block-link-2 { width: auto; display: inline-block; text-decoration: none; }
+.csp-block-center-link { display: block; text-align: center; text-decoration: none; box-sizing: border-box; }
+
+.csp-w-70 { width: 70px; }
+.csp-m-0 { margin: 0; }
+.csp-mb-12 { margin-bottom: 12px; }
+.csp-mb-14 { margin-bottom: 14px; }
+.csp-mb-20 { margin-bottom: 20px; }
+.csp-mt-0 { margin-top: 0; }
+.csp-mt-3 { margin-top: 3px; }
+.csp-mt-4 { margin-top: 4px; }
+.csp-mt-6 { margin-top: 6px; }
+.csp-mt-8 { margin-top: 8px; }
+.csp-mt-10 { margin-top: 10px; }
+.csp-mt-14 { margin-top: 14px; }
+.csp-mt-16 { margin-top: 16px; }
+.csp-mt-18 { margin-top: 18px; }
+.csp-mt-24 { margin-top: 24px; }
+.csp-mt-32 { margin-top: 32px; }
+.csp-mt-1-2em { margin-top: 1.2em; }
+.csp-m-2-0-0-fs085 { margin: 2px 0 0; font-size: 0.85rem; }
+.csp-mt8-fs085 { font-size: 0.85rem; margin-top: 8px; }
+.csp-mt10-fs085 { font-size: 0.85rem; margin-top: 10px; }
+
+.csp-bakim-body { text-align: center; font-family: sans-serif; margin-top: 100px; }
