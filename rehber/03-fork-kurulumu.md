@@ -254,7 +254,16 @@ yazman güvenlidir, GitHub Secrets'a eklemene gerek yoktur.
    - Build output directory: `_site`
 5. Zamanlanmış yayın özelliğini kullanacaksan `CLOUDFLARE_DEPLOY_HOOK_URL` secret'ını ekle (Bölüm 7)
 6. GitHub İçerik Yönetimi'ni kullanacaksan Worker'ı kur (Bölüm 6)
-7. GitHub Pages'i de yedek olarak kullanacaksan repo **Settings → Pages** üzerinden aktif et
+7. GitHub Pages'i de kullanacaksan repo **Settings → Pages → Build and
+   deployment → Source** kısmını **"GitHub Actions"** olarak seç (ARTIK
+   "Deploy from a branch" DEĞİL — proje `.github/workflows/
+   github-pages-deploy.yml` ile kendi Ruby/Jekyll ortamında build alıp
+   deploy ediyor; bunun nedeni, CSP'den `unsafe-inline`/`unsafe-eval`'i
+   kaldıran `_plugins/csp_hash_enjekte.rb` gibi özel pluginlerin, GitHub'ın
+   kendi "safe mode" build'inde ÇALIŞMAMASI — bkz. o dosyanın ve
+   workflow'un başındaki ayrıntılı açıklamalar). Bu adım atlanırsa/eski
+   "Deploy from a branch" seçili kalırsa, workflow'un deploy adımı hata
+   verir.
 
 ---
 
