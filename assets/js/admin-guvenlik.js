@@ -36,6 +36,14 @@ const DURUM_ETIKETLERI = {
   suresi_doldu_geri_acildi: "⏱️ Süresi doldu, otomatik geri açıldı",
 };
 
+// v.ben_oyum ("dusur"/"geri_ac") değerini "Oyumu Geri Al" butonunda
+// okunabilir Türkçe metne çevirir (bkz. migration 0037 — RPC artık çağıran
+// kişinin kendi oyunu da döndürüyor).
+const OY_ETIKETLERI = {
+  dusur: "Kalıcı Düşür",
+  geri_ac: "Geri Aç",
+};
+
 let BEN = null; // { session, profile }
 let ADMIN_LISTESI = [];
 
@@ -325,6 +333,11 @@ function vakaKartHtml(v) {
         <div class="uya-kart-aksiyonlar">
           <button class="btn-danger tablo-aksiyon-btn ag-oy-btn" data-id="${v.id}" data-oy="dusur">Kalıcı Düşür (oy ver)</button>
           <button class="btn-secondary tablo-aksiyon-btn ag-oy-btn" data-id="${v.id}" data-oy="geri_ac">Geri Aç (oy ver)</button>
+          ${
+            v.ben_oyum
+              ? `<button class="btn-secondary tablo-aksiyon-btn ag-oy-geri-al-btn" data-id="${v.id}">↩️ Oyumu Geri Al (şu an: ${OY_ETIKETLERI[v.ben_oyum] || v.ben_oyum})</button>`
+              : ""
+          }
           <span class="sadece-owner">
             <button class="btn-danger tablo-aksiyon-btn ag-owner-karar-btn" data-id="${v.id}" data-karar="dusur">Owner: Kesin Düşür</button>
             <button class="btn-secondary tablo-aksiyon-btn ag-owner-karar-btn" data-id="${v.id}" data-karar="iptal">Owner: Kesin İptal</button>
@@ -354,6 +367,26 @@ function wireVakaOlaylari(kutu) {
       });
       if (error) {
         alert("Oy kaydedilemedi: " + error.message);
+        return;
+      }
+      await Promise.all([loadAdminListesi(), loadVakalar()]);
+    });
+  });
+
+  // Oy geri alma (bkz. migration 0037) — sadece daha önce oy kullanmış
+  // kişide görünen buton (vakaKartHtml içinde v.ben_oyum kontrolü var).
+  kutu.querySelectorAll(".ag-oy-geri-al-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Bu vakadaki oyunu geri almak istediğine emin misin?")) return;
+
+      btn.disabled = true;
+      const { error } = await supabase.rpc("admin_denetim_oy_geri_al", {
+        p_denetim_id: btn.dataset.id,
+      });
+      btn.disabled = false;
+
+      if (error) {
+        alert("Oy geri alınamadı: " + error.message);
         return;
       }
       await Promise.all([loadAdminListesi(), loadVakalar()]);
