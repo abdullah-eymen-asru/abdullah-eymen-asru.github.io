@@ -81,8 +81,8 @@ permalink: "/panel/uye-ayarlari.html"
        hiçbir mail gönderilmeden ANINDA değişir, eski adres gerekmez (bkz.
        uye-ayarlari.js -> wireAdminEmailChange() ve Edge Function
        admin-change-email). -->
-  <div id="admin-eposta-degistir-kutu" class="panel-section" hidden style="margin-top:16px;">
-    <h3 style="margin-top:0;">E-postasını Değiştir: <span id="admin-eposta-hedef-isim"></span></h3>
+  <div id="admin-eposta-degistir-kutu" class="panel-section csp-mt-16" hidden>
+    <h3 class="csp-mt-0">E-postasını Değiştir: <span id="admin-eposta-hedef-isim"></span></h3>
     <p class="muted">
       Bu, kullanıcının kendi panelinden yaptığı değişiklikten FARKLIDIR:
       e-posta <strong>hiçbir mail gönderilmeden, anında</strong> değişir —
@@ -98,9 +98,9 @@ permalink: "/panel/uye-ayarlari.html"
         <label for="admin-eposta-yeni">Yeni E-posta</label>
         <input id="admin-eposta-yeni" type="email" autocomplete="off" required>
       </div>
-      <div style="display:flex; gap:10px;">
-        <button type="submit" class="btn-primary" style="width:auto;">E-postayı Şimdi Değiştir</button>
-        <button type="button" id="admin-eposta-degistir-iptal-btn" class="btn-secondary" style="width:auto;">Vazgeç</button>
+      <div class="csp-flex-gap10">
+        <button type="submit" class="btn-primary csp-w-auto">E-postayı Şimdi Değiştir</button>
+        <button type="button" id="admin-eposta-degistir-iptal-btn" class="btn-secondary csp-w-auto">Vazgeç</button>
       </div>
     </form>
     <div id="admin-eposta-message" class="auth-message" hidden></div>
