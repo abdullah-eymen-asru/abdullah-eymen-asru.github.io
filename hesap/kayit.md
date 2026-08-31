@@ -35,8 +35,8 @@ permalink: "/hesap/kayit.html"
        bkz. assets/js/auth/auth-pages.js). form="kayit-form" ile aşağıdaki forma
        bağlı kaldığı için normal kayıt gönderiminde de değeri okunur. -->
   <div class="form-field">
-    <label style="display:flex; gap:8px; align-items:flex-start; flex-direction:row; font-size:0.9rem; color:var(--text);">
-      <input id="kvkk_onay" name="kvkk_onay" type="checkbox" form="kayit-form" required style="margin-top:3px;">
+    <label class="csp-flex-gap8-start-row">
+      <input class="csp-mt-3" id="kvkk_onay" name="kvkk_onay" type="checkbox" form="kayit-form" required>
       <span>
         <a href="{{ '/kurumsal/gizlilik-politikasi.html' | relative_url }}" target="_blank" rel="noopener noreferrer">KVKK Aydınlatma Metni ve Gizlilik Politikası</a>'nı
         okudum, 6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında kişisel
