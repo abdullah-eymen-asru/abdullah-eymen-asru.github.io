@@ -25,7 +25,7 @@ title: Anasayfa
   </div>
 
   {% if site.mirror_site_url and site.mirror_site_url != "" %}
-  <p class="format-hint" style="margin-top: 1.2em;">
+  <p class="format-hint csp-mt-1-2em">
     Bu site iki adreste eşzamanlı olarak yayınlanıyor:
     <a href="{{ site.url }}" target="_blank" rel="noopener noreferrer">{{ site.url }}</a> ·
     <a href="{{ site.mirror_site_url }}" target="_blank" rel="noopener noreferrer">{{ site.mirror_site_url }}</a>
