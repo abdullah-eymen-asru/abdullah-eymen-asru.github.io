@@ -42,6 +42,7 @@ async function sabitZamanliEsitMi(a, b) {
 const OLAY_METINLERI = {
   askiya_alindi: "🔴 ACİL: Bir admin ASKIYA ALINDI",
   oy_kullanildi: "🗳️ Admin denetim vakasına oy kullanıldı",
+  oy_geri_alindi: "↩️ Bir oy geri alındı",
   kalici_dusuruldu: "⛔ Bir admin KALICI OLARAK DÜŞÜRÜLDÜ",
   iptal_edildi: "✅ Askıya alma İPTAL EDİLDİ, yetki iade edildi",
   suresi_doldu_geri_acildi: "⏱️ Karar süresi doldu — hesap OTOMATİK olarak geri açıldı",
@@ -106,9 +107,10 @@ export default {
 
     const baslik = OLAY_METINLERI[yuk.olay] || `Admin denetim olayı: ${yuk.olay}`;
     const hedefAdi = yuk.hedef_admin_ad_soyad || yuk.hedef_admin_email || yuk.hedef_admin_id || "-";
+    const baslatanAdi = yuk.baslatan_admin_ad_soyad || "-";
     const vakaKisa = yuk.denetim_id ? String(yuk.denetim_id).slice(0, 8) : "-";
 
-    const mesajSatirlari = [baslik, `Admin: ${hedefAdi}`];
+    const mesajSatirlari = [baslik, `Admin: ${hedefAdi}`, `Başlatan: ${baslatanAdi}`];
 
     // oy_kullanildi olayına özel: kim, neye oy verdi (bkz. migration 0036 —
     // sadece ilk oy ya da GERÇEKTEN değişen bir oy bu olayı tetikler, aynı
@@ -117,6 +119,13 @@ export default {
       const oyMetni = OY_METINLERI[yuk.oy] || yuk.oy || "-";
       const degisimNotu = yuk.oy_degisti ? " (oyunu değiştirdi)" : "";
       mesajSatirlari.push(`Oy veren: ${yuk.oy_veren_ad_soyad} → ${oyMetni}${degisimNotu}`);
+    }
+
+    // oy_geri_alindi olayına özel (bkz. migration 0037): kim, hangi oyunu
+    // geri aldı.
+    if (yuk.olay === "oy_geri_alindi" && yuk.oy_veren_ad_soyad) {
+      const eskiOyMetni = OY_METINLERI[yuk.eski_oy] || yuk.eski_oy || "-";
+      mesajSatirlari.push(`Oyunu geri alan: ${yuk.oy_veren_ad_soyad} (önceki oy: ${eskiOyMetni})`);
     }
 
     mesajSatirlari.push(
