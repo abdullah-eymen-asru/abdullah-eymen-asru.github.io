@@ -179,11 +179,21 @@ module CspHashEnjekte
   end
 
   def self.csp_icinde_yonerge_guncelle(csp_icerik, yonerge_adi, hashler)
-    # Bu sayfada/dosyada o türden (script/style) hiç inline blok yoksa
-    # hashler boş olur — bu durumda default-src/mevcut yönergeye
-    # DOKUNMUYORUZ (boş bir "script-src ;" eklemek her şeyi bloklardı).
-    return csp_icerik if hashler.empty? && !(csp_icerik =~ /#{yonerge_adi}\s+/i)
-
+    # KRİTİK DÜZELTME: önceden hashler BOŞSA (o sayfada hiç inline
+    # script/style YOKSA) bu fonksiyon default-src'ye/mevcut yönergeye HİÇ
+    # dokunmuyordu. Ama proje genelinde (bkz. panel/*.md, hesap/*.md gibi
+    # SAYFA GÖVDESİ Markdown dosyaları) hâlâ birkaç yerde inline
+    # style="..." attribute'u kalmış olabilir — bu durumda "hashler boş"
+    # demek "o sayfada style-src'ye hiç gerek yok" ANLAMINA GELMEZ, sadece
+    # <style> ELEMENTİ yok demektir; <link rel="stylesheet"> gibi harici
+    # stiller yine de style-src'nin 'self'/https: TEMEL değerlerine
+    # ihtiyaç duyar. Bu yüzden artık hashler boş olsa bile, default-src'de
+    # bu tür kaynak varsa (yani default-src zaten CSS'i kapsıyorsa) AYNI
+    # temel kaynaklarla (hash'siz) bir style-src/script-src yönergesi
+    # EKLİYORUZ — bu, "hiçbir şey eklenmeseydi zaten default-src fallback
+    # olurdu" davranışıyla AYNI izin setini korur, sadece unsafe-inline'ın
+    # kaldırılmış olmasının YAN ETKİSİ olarak default-src'nin GENİŞLİĞİNİ
+    # style-src'ye de DEVREN aktarmış oluyoruz.
     if csp_icerik =~ /#{yonerge_adi}\s+([^;]*)/i
       # Zaten ayrı bir yönerge varsa (ileride eklenirse) onu güncelle:
       # unsafe-inline/unsafe-eval'i çıkar, hash'leri ekle.
@@ -195,7 +205,10 @@ module CspHashEnjekte
       # AYRI bir yönerge ekliyoruz (default-src'nin geri kalanı -- ör.
       # 'self' https: -- ayrıca yeni yönergeye de taşınır, çünkü o
       # yönerge eklenince default-src ARTIK o tür kaynaklar için fallback
-      # olarak kullanılmaz, CSP spesifikasyonu gereği).
+      # olarak kullanılmaz, CSP spesifikasyonu gereği). hashler boş olsa
+      # bile bu ekleme YAPILIR (yukarıdaki gerekçeye bakın) — TEK istisna,
+      # default-src'nin kendisi de yoksa (bu durumda eklenecek "temel"
+      # bir değer olmaz).
       if csp_icerik =~ /default-src\s+([^;]*)/i
         temel = $1.split(/\s+/) - ["'unsafe-inline'", "'unsafe-eval'"]
         yeni_default = temel.join(" ")
