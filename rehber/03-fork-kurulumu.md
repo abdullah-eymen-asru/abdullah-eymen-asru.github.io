@@ -22,7 +22,8 @@ Bu dosyadaki `# ---- BURAYI DOLDUR ----` ile başlayan blok içindeki
 | `github_username` | Kendi GitHub kullanıcı adın |
 | `kutuphane_repo` | Kendi izleme/okuma verisini tutacağın repo (bu özelliği kullanmayacaksan bkz. "Bölüm 4 — Silme") |
 | `izleme_projects_url` / `okuma_projects_url` | Kendi GitHub Projects panolarının linki |
-| `substack_url` / `substack_feed` | Kendi Substack adresin (kullanmıyorsan bkz. "Bölüm 4") |
+| `substack_url` | Kendi Substack adresin (kullanmıyorsan bkz. "Bölüm 4") |
+| `substack_feed` | **Sadece bilgi amaçlı** — asıl RSS adresi `cloudflare worker/substack_feed_proxy_worker/worker.js` içindeki `FEED_URL` sabitinde; onu da kendi feed'inle güncellemen gerekiyor (bkz. "Bölüm 6b") |
 | `google_analytics_id` | Kendi Google Analytics Measurement ID'in (G-XXXXXXX) |
 | `profile_image` | `assets/` klasörüne kendi fotoğrafını yükleyip yolunu yaz |
 | `cloudflare_worker_url` | Kendi Cloudflare Worker adresin (kullanmıyorsan bkz. "Bölüm 4") |
@@ -168,7 +169,7 @@ onlara dokunmuyorsun.
 - `robots.txt` içindeki `Sitemap:` satırını GitHub Pages adresine güncelle
   (Senaryo A'daki tabloyla aynı satır)
 - Cloudflare Worker'lardaki (`r2_storage_worker`, `izleme_okuma_worker`,
-  `github_icerik_yonetim_worker`)
+  `github_icerik_yonetim_worker`, `substack_feed_proxy_worker`)
   ve Edge Function'lardaki (`delete-account`, `admin-change-email`)
   `pages.dev` referanslarını silmen ZORUNLU değil (kullanılmayan bir
   adresin izin listesinde durması zarar vermez), ama istersen temizlik
@@ -224,6 +225,28 @@ sadece "Bağlantı doğrulanamadı" hatası gösterir, sitenin geri kalanı
 etkilenmez. Kalıcı olarak kaldırmak istersen "Bölüm 4 → GitHub İçerik
 Yönetimi'ni kaldırmak istersen" bloğuna bak (dosyaları/klasörü siler).
 
+### 6b. Substack Feed Proxy Worker'ını Kurma (`icerik/blog.html`)
+
+Blog sayfasındaki "Substack Yazıları" sütunu, Substack'in RSS feed'ini
+CORS izni vermediği için tarayıcıdan doğrudan çekemiyor — bu yüzden feed'i
+senin adına çekip CORS başlığı ekleyen küçük bir Worker'a ihtiyaç var
+(neden gerektiğine dair ayrıntı için `cloudflare worker/substack_feed_proxy_worker/worker.js`
+dosyasının başındaki açıklamaya bak). Secret gerekmez, herkese açık bir
+feed olduğu için kimlik doğrulama da yok.
+
+| Adım | Ne yapmalısın |
+|---|---|
+| 1. Worker'ı oluştur | [dash.cloudflare.com](https://dash.cloudflare.com) → **Workers & Pages → Create → Create Worker** → bir isim ver (ör. `substack-feed-proxy`) → Deploy (şimdilik varsayılan kodla) |
+| 2. Kodu yapıştır | Worker sayfası → **Edit code** (Quick Edit) → varsayılan kodu sil, `cloudflare worker/substack_feed_proxy_worker/worker.js` dosyasının TAMAMINI yapıştır — ama önce dosyanın başındaki `FEED_URL` sabitini KENDİ Substack feed adresinle değiştir → **Deploy** |
+| 3. Worker URL'ini al ve blog sayfasına yaz | Worker sayfasının üstündeki adresi (`https://<isim>.<hesabın>.workers.dev`) kopyala → `icerik/blog.md` içindeki `SUBSTACK_FEED_PROXY_WORKER_URL` sabitini bu adresle değiştir → commit'le |
+
+**Bu özelliği istemiyorsan** (Substack kullanmıyorsan) yukarıdaki adımları
+hiç uygulama — "Substack Yazıları" sütunu sadece bir hata mesajı gösterir,
+sitenin geri kalanı etkilenmez. Kalıcı olarak kaldırmak istersen
+`icerik/blog.md`'deki Substack sütununu ve ilgili `<script>` bloğunu,
+`cloudflare worker/substack_feed_proxy_worker/` klasörünü ve `_config.yml`
+içindeki `substack_url`/`substack_feed` satırlarını sil.
+
 ### 7. Secret / Gizli Anahtarlar — Nerede, Nasıl Tanımlanır
 
 Bu projede kod içine **asla düz yazılmaması gereken** secret'lar:
@@ -254,6 +277,7 @@ yazman güvenlidir, GitHub Secrets'a eklemene gerek yoktur.
    - Build output directory: `_site`
 5. Zamanlanmış yayın özelliğini kullanacaksan `CLOUDFLARE_DEPLOY_HOOK_URL` secret'ını ekle (Bölüm 7)
 6. GitHub İçerik Yönetimi'ni kullanacaksan Worker'ı kur (Bölüm 6)
+6b. Substack kullanacaksan feed proxy Worker'ını kur (Bölüm 6b)
 7. GitHub Pages'i de kullanacaksan repo **Settings → Pages → Build and
    deployment → Source** kısmını **"GitHub Actions"** olarak seç (ARTIK
    "Deploy from a branch" DEĞİL — proje `.github/workflows/
