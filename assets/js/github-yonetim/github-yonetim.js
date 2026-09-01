@@ -1861,6 +1861,17 @@ function wireYayindaCanliOnizleme() {
   });
 
   document.getElementById("ic-onizleme-kod").addEventListener("input", onizlemeLinkGuncelle);
+
+  // NOT: Bu input eskiden onclick="this.select()" inline attribute'u
+  // kullanıyordu — CSP'nin script-src'si inline event handler
+  // attribute'larını (yalnızca <script> ELEMENT içeriklerini hash'liyor,
+  // bkz. _plugins/csp_hash_enjekte.rb) izin vermediği için tıklama
+  // sessizce hiçbir şey yapmıyordu. Aynı davranış burada gerçek bir
+  // addEventListener ile sağlanıyor.
+  document.getElementById("ic-onizleme-link").addEventListener("click", function () {
+    this.select();
+  });
+
   document.getElementById("ic-onizleme-yenile-btn").addEventListener("click", () => {
     document.getElementById("ic-onizleme-kod").value = rastgeleKod(8);
     onizlemeLinkGuncelle();
