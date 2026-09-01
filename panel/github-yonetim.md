@@ -272,7 +272,7 @@ permalink: "/panel/github-yonetim.html"
               <button type="button" id="ic-onizleme-yenile-btn" class="gy-link-kopyala-btn" title="Yeni rastgele kod üret">🎲 Yenile</button>
             </div>
             <div class="gy-link-kutu">
-              <input type="text" id="ic-onizleme-link" readonly onclick="this.select()">
+              <input type="text" id="ic-onizleme-link" readonly>
               <button type="button" id="ic-onizleme-kopyala-btn" class="gy-link-kopyala-btn">Kopyala</button>
             </div>
           </div>
