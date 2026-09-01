@@ -63,7 +63,8 @@ değerler burada. En sık dokunacağın dosya.
 | `github_username` | GitHub kullanıcı adın |
 | `kutuphane_repo` | İzlediklerim/okuduklarım verisinin tutulduğu ayrı repo |
 | `izleme_projects_url` / `okuma_projects_url` | GitHub Projects panolarının linkleri |
-| `substack_url` / `substack_feed` | Substack blog adresin ve RSS feed'i |
+| `substack_url` | Substack blog adresin |
+| `substack_feed` | RSS feed adresin — **sadece referans amaçlı**, blog sayfasının kullandığı asıl adres `cloudflare worker/substack_feed_proxy_worker/worker.js` içindeki `FEED_URL` sabitinde (bkz. bölüm 5 ve `03-fork-kurulumu.md` Bölüm 6b) |
 | `google_analytics_id` | Google Analytics ölçüm kimliği |
 | `profile_image` | Profil fotoğrafın (`assets/`e yükleyip yolunu buraya yaz) |
 | `cloudflare_worker_url` | İzleme/okuma verisini çeken Worker'ın adresi |
@@ -155,6 +156,21 @@ elle etiket oluşturmuşsan onu bozmadan kullanır.
   ilk yüklemeden sonra anlık çalışır). Bir kayda tıklayınca başlığını,
   açıklamasını ve tüm alan değerlerini düzenleyip **Güncelle** ile GitHub'a
   geri yazabilirsin.
+
+## 5.2 `cloudflare worker/substack_feed_proxy_worker/worker.js` — Substack RSS feed proxy'si
+
+Substack'in RSS feed'i tarayıcıdan doğrudan çekilemiyor (CORS izni
+vermiyor); bu Worker feed'i sunucu tarafında çekip CORS başlığı ekleyerek
+geri döndürüyor. Daha önce bunun yerine ücretsiz, herkese açık bir üçüncü
+parti proxy (`api.allorigins.win`) kullanılıyordu — o servisin uptime
+garantisi olmadığı ve zaman zaman tamamen kesildiği için (Substack
+yazılarının hiç yüklenmemesine yol açan hata) kendi Worker'ımızla
+değiştirildi.
+
+Genel bir CORS proxy'si DEĞİLDİR — yalnızca dosyanın başındaki `FEED_URL`
+sabitinde tanımlı, sabit tek bir adresi çeker; rastgele bir URL parametresi
+kabul etmez. Secret gerekmez. Kurulum adımları için `03-fork-kurulumu.md`
+Bölüm 6b'ye bak.
 
 ## 6. `robots.txt`
 
