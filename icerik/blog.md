@@ -56,8 +56,15 @@ permalink: "/icerik/blog.html"
 
 <script>
 (async function () {
-  const feedUrl = "{{ site.substack_feed }}";
-  const proxyUrl = "https://api.allorigins.win/raw?url=" + encodeURIComponent(feedUrl);
+  // NOT: Bu bölüm eskiden Substack feed'ini ücretsiz, herkese açık bir
+  // üçüncü parti CORS proxy'si (api.allorigins.win) üzerinden çekiyordu.
+  // O servisin uptime garantisi yok ve zaman zaman tamamen kesiliyor
+  // (500 hatası) — yazıların hiç yüklenmemesinin sebebi buydu. Artık
+  // kendi Cloudflare Worker'ımız üzerinden çekiliyor (bkz.
+  // cloudflare worker/substack_feed_proxy_worker/worker.js), böylece
+  // güvenilmez bir dış servise bağımlılık ortadan kalkıyor.
+  const SUBSTACK_FEED_PROXY_WORKER_URL = "https://substack-feed-proxy.aeymena.workers.dev";
+  const proxyUrl = SUBSTACK_FEED_PROXY_WORKER_URL;
   const container = document.getElementById("substack-posts");
   const searchBox = document.getElementById("substack-search");
 
@@ -115,10 +122,9 @@ permalink: "/icerik/blog.html"
     }
 
     // Ekstra savunma katmanı: link http(s):// ile başlamalı VE içinde
-    // boşluk/kontrol karakteri olmamalı. Bu özellikle burada önemli çünkü
-    // RSS içeriği bir ÜÇÜNCÜ PARTİ proxy'den (api.allorigins.win) geçiyor —
-    // proxy'ye veya Substack'e güvenmek yerine, gelen link'i kendi
-    // tarafımızda da doğruluyoruz.
+    // boşluk/kontrol karakteri olmamalı. RSS içeriği kendi Worker'ımızdan
+    // geçse de, kaynağı (Substack) tam kontrolümüzde olmadığı için gelen
+    // link'i kendi tarafımızda da doğruluyoruz.
     function guvenliLink(url) {
       if (typeof url !== "string") return "#";
       const trimmed = url.trim();
