@@ -128,7 +128,7 @@ permalink: "/panel/admin.html"
         <div id="r2-link-sonuc" class="auth-message" hidden></div>
         <div id="r2-link-kutu-wrap" class="form-field csp-mt-10" hidden>
           <label for="r2-link-kutu">Üretilen Link (seçip kopyalayabilirsin)</label>
-          <input id="r2-link-kutu" type="text" readonly onclick="this.select()">
+          <input id="r2-link-kutu" type="text" readonly>
         </div>
       </section>
 
