@@ -689,6 +689,16 @@ function wireR2DosyaPaylasim() {
   const kutuWrap = document.getElementById("r2-link-kutu-wrap");
   const kutu = document.getElementById("r2-link-kutu");
 
+  // NOT: Bu input eskiden onclick="this.select()" inline attribute'u
+  // kullanıyordu — CSP'nin script-src'si inline event handler
+  // attribute'larını (yalnızca <script> ELEMENT içeriklerini hash'liyor,
+  // bkz. _plugins/csp_hash_enjekte.rb) izin vermediği için tıklama
+  // sessizce hiçbir şey yapmıyordu. Aynı davranış burada gerçek bir
+  // addEventListener ile sağlanıyor.
+  kutu.addEventListener("click", function () {
+    this.select();
+  });
+
   btn.addEventListener("click", async () => {
     const dosyaAdi = keyInput.value.trim();
     if (!dosyaAdi) {
