@@ -63,7 +63,7 @@ permalink: "/icerik/blog.html"
   // kendi Cloudflare Worker'ımız üzerinden çekiliyor (bkz.
   // cloudflare worker/substack_feed_proxy_worker/worker.js), böylece
   // güvenilmez bir dış servise bağımlılık ortadan kalkıyor.
-  const SUBSTACK_FEED_PROXY_WORKER_URL = "https://substack-feed-proxy.aeymena.workers.dev";
+  const SUBSTACK_FEED_PROXY_WORKER_URL = "https://substack-feed-proxy-worker.aeymena.workers.dev";
   const proxyUrl = SUBSTACK_FEED_PROXY_WORKER_URL;
   const container = document.getElementById("substack-posts");
   const searchBox = document.getElementById("substack-search");
