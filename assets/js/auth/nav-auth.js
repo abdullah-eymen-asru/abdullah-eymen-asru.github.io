@@ -15,59 +15,117 @@
  *                        Panelim, (adminse) Admin Paneli, (adminse) GitHub
  *                        İçerik Yönetimi, Çıkış Yap
  *
- * _layouts/default.html içinde <div id="auth-nav"> boş bir kapsayıcı olarak
- * durur; JS yüklenmeden önce görünen tek bir statik "Giriş" linki (no-JS /
- * yavaş bağlantı için "progressive enhancement") bu script çalışır çalışmaz
- * yerini buradaki dinamik menüye bırakır.
+ * _layouts/default.html içinde <div id="auth-nav"> statik bir yedek
+ * içerik ("Giriş Yap" linki + görünmez bir "Hesabım ▾" iskeleti, bkz.
+ * assets/js/auth/nav-auth-hint.js) ile durur; bu script çalışır çalışmaz
+ * yerini buradaki dinamik menüye bırakır (progressive enhancement).
+ *
+ * BUG FİX — "Hesabım ▾" ÜÇ KEZ ÜST ÜSTE GÖRÜNÜYORDU (ekran görüntüsü ile
+ * bildirildi): eski kodda İKİ AYRI kod yolu #auth-nav'a içerik ekliyordu —
+ * (1) initAuthNav()'ın ilk çağrısındaki dal, container'ı HİÇ TEMİZLEMEDEN
+ * doğrudan renderHesapMenusu/renderGirisLinki'yi ÇAĞIRIYORDU (statik yedek
+ * HTML'in üzerine EKLEME yapıyordu, onun yerine geçmiyordu), (2) Supabase
+ * v2'nin onAuthStateChange'i abone olunur olunmaz MEVCUT durumla bir kez
+ * (bazı durumlarda birden fazla: INITIAL_SESSION, sonra SIGNED_IN gibi)
+ * KENDİLİĞİNDEN tetiklenir — bu dal container.innerHTML="" ile TEMİZLİYORDU
+ * ama bu temizleme, profil sorgusunun (async) SONUCUNU beklemeden, olay
+ * tetiklenir tetiklenmez yapılıyordu; iki olay üst üste (henüz biri DOM'a
+ * yazmadan) gelirse ikisi de "temizle" yapıp sonra ayrı ayrı EKLEME
+ * yapabiliyor, net sonuç DOM'da birden fazla ".auth-nav-dropdown" birikmesi
+ * oluyordu. Aşağıdaki menuyuGuncelle(), artan bir "nesil" (generation)
+ * sayacıyla bunu KÖKTEN engelliyor: temizleme ve ekleme HER ZAMAN TEK bir
+ * atomik adımda, ASYNC iş (profil sorgusu) bittikten SONRA yapılıyor; o
+ * bekleme sırasında DAHA YENİ bir istek başlamışsa (nesil ilerlemişse) eski
+ * sonuç sessizce atılıyor, DOM'a hiç yazılmıyor.
  */
 import { supabase } from "../core/supabase-client.js";
+
+// "HESABIM ▾" TİTREMESİ (FOUC) DÜZELTMESİ — parça 3/3 (bkz. nav-auth-hint.js
+// ve nav-auth-init.js). Oturum durumu KESİNLEŞTİĞİNDE (giriş/çıkış) bu
+// ipucuyu güncelliyoruz ki BİR SONRAKİ sayfa yüklemesinde (ya da bu
+// sekmedeki bir sonraki tam yenilemede) nav-auth-hint.js daha ilk boyada
+// doğru yedek görünümü (Hesabım ▾ ya da Giriş Yap) seçebilsin. Bu SADECE
+// görsel bir yedek/ipucudur — gerçek yetkilendirme HER ZAMAN aşağıdaki
+// gerçek Supabase oturum/rol kontrolünden gelir.
+function hintYaz(girisYapilmisMi) {
+  try {
+    if (girisYapilmisMi) {
+      localStorage.setItem("aea_auth_hint", "in");
+    } else {
+      localStorage.removeItem("aea_auth_hint");
+    }
+  } catch (_err) {
+    // localStorage kapalıysa ipucu kaydedilemez — kritik değil, bir
+    // sonraki sayfa yüklemesinde yine varsayılan (Giriş Yap) yedek
+    // gösterilir, nav-auth.js gerçek durumu yine de doğru çözer.
+  }
+}
 
 export async function initAuthNav() {
   const container = document.getElementById("auth-nav");
   if (!container) return;
 
-  // WEBVIEW UYUMLULUĞU: aşağıdaki Supabase çağrıları ağ hatasıyla (WebView
-  // içinde geçici bağlantı sorunu vb.) reject olabilir. try/catch
-  // olmadan bu, çağıran yerdeki .catch()'e düşse bile container'ı hiç
-  // güncellemeden bırakırdı — statik "Giriş Yap" linki (progressive
-  // enhancement) zaten yerinde olduğu için görsel bir kilitlenme
-  // OLMUYOR, ama tutarlılık için burada da açıkça ele alınıyor.
-  try {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+  let renderNesli = 0;
 
+  // Verilen session'a göre menüyü GERÇEKTEN DOM'a yazan tek yer burasıdır
+  // — hem ilk yüklemede hem her onAuthStateChange olayında AYNI fonksiyon
+  // çağrılır, böylece "iki farklı kod yolu" riski (yukarıdaki BUG FİX
+  // notuna bakın) bir daha oluşamaz.
+  async function menuyuGuncelle(session) {
+    const buNesil = ++renderNesli;
+
+    let yeniIcerik;
     if (!session) {
-      renderGirisLinki(container);
+      yeniIcerik = { tur: "giris" };
     } else {
       // Rolü öğrenmek için tek satır bir profil sorgusu — admin linkini
-      // sadece gerçekten adminse göstermek için (RLS zaten korur, bu sadece
-      // menüyü gereksiz linklerle kalabalıklaştırmamak için).
+      // sadece gerçekten adminse göstermek için (RLS zaten korur, bu
+      // sadece menüyü gereksiz linklerle kalabalıklaştırmamak için).
       const { data: profile } = await supabase
         .from("profiles")
         .select("role")
         .eq("id", session.user.id)
         .single();
-      renderHesapMenusu(container, profile?.role ?? "user");
+      yeniIcerik = { tur: "hesap", role: profile?.role ?? "user" };
     }
-  } catch (err) {
-    console.error("initAuthNav() başarısız (ağ hatası olabilir):", err);
-    return;
-  }
 
-  // Başka bir sekmede giriş/çıkış yapılırsa bu sekmedeki menü de güncellensin.
-  supabase.auth.onAuthStateChange((_event, yeniSession) => {
+    // YARIŞ DURUMU KORUMASI: yukarıdaki await sırasında DAHA YENİ bir
+    // menuyuGuncelle() çağrısı (ör. arka arkaya gelen bir onAuthStateChange
+    // olayı) başlamışsa, bizim nesilimiz artık "bayat"tır — bu sonucu DOM'a
+    // hiç yazmadan sessizce atıyoruz; en güncel çağrı zaten kendi sonucunu
+    // (ya da o da bayatlarsa ONDAN sonraki) uygulayacaktır.
+    if (buNesil !== renderNesli) return;
+
     container.innerHTML = "";
-    if (!yeniSession) {
+    hintYaz(yeniIcerik.tur === "hesap");
+    if (yeniIcerik.tur === "giris") {
       renderGirisLinki(container);
     } else {
-      supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", yeniSession.user.id)
-        .single()
-        .then(({ data }) => renderHesapMenusu(container, data?.role ?? "user"));
+      renderHesapMenusu(container, yeniIcerik.role);
     }
+  }
+
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    await menuyuGuncelle(session);
+  } catch (err) {
+    // WEBVIEW UYUMLULUĞU: yukarıdaki Supabase çağrısı ağ hatasıyla (WebView
+    // içinde geçici bağlantı sorunu vb.) reject olabilir. Statik yedek
+    // (nav-auth-hint.js'in seçtiği "Giriş Yap" ya da "Hesabım ▾" iskeleti)
+    // zaten yerinde olduğu için görsel bir kilitlenme OLMUYOR, sadece
+    // dinamik/etkileşimli menüye yükseltilemiyor.
+    console.error("initAuthNav() başarısız (ağ hatası olabilir):", err);
+  }
+
+  // Başka bir sekmede giriş/çıkış yapılırsa (ya da Supabase abone olunur
+  // olunmaz mevcut durumu kendiliğinden bildirirse) bu sekmedeki menü de
+  // AYNI menuyuGuncelle() üzerinden, aynı yarış-durumu korumasıyla güncellenir.
+  supabase.auth.onAuthStateChange((_event, yeniSession) => {
+    menuyuGuncelle(yeniSession).catch((err) => {
+      console.error("Hesap menüsü güncellenemedi (ağ hatası olabilir):", err);
+    });
   });
 }
 
