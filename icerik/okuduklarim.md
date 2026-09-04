@@ -5,6 +5,12 @@ permalink: "/icerik/okuduklarim.html"
 ---
 
 <h1>Okuduklarım</h1>
+
+<div class="listeler-sekmeler">
+  <a href="/icerik/izlediklerim.html" class="sekme-btn">🎬 İzlediklerim</a>
+  <a href="/icerik/okuduklarim.html" class="sekme-btn aktif">📚 Okuduklarım</a>
+</div>
+
 <p>
   Okuduğum kitapları
   <a href="{{ site.okuma_projects_url }}" target="_blank" rel="noopener noreferrer">GitHub Projects panosunda</a>
