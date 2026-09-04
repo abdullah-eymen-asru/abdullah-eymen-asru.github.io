@@ -1,0 +1,138 @@
+{% comment %}
+  _includes/atif-kutusu.html
+  ---------------------------------------------------------------
+  Bu yazıya/projeye APA 7, Chicago (CMS 17) ve MLA 9 formatında
+  akademik atıf üreten sekmeli kutu. Yazar/başlık/site adı/URL/
+  yayın tarihi TAMAMEN Jekyll Liquid ile build-time'da (statik
+  build sırasında) üretilir — harici bir API veya kütüphane YOK.
+
+  "Erişim tarihi" tek istisna: bu değer, ziyaretçinin O ANKİ
+  gerçek tarihi olmalı (build tarihi değil), bu yüzden aşağıdaki
+  inline <script> bloğu tarafından sayfa yüklenirken tarayıcıda
+  hesaplanıp dolduruluyor. Bu script hiçbir kullanıcı/veritabanı
+  verisi TAŞIMIYOR (share.html'deki "linki kopyala" scriptiyle
+  aynı sınıf) — bu yüzden _plugins/csp_hash_enjekte.rb tarafından
+  build sırasında otomatik SHA-256 hash'lenip CSP'ye eklenir,
+  'unsafe-inline' gerekmez. İçeride SADECE addEventListener
+  kullanılıyor, hiçbir inline onclick/style YOK.
+{% endcomment %}
+
+{% assign atif_yazar = page.author | default: site.title | escape %}
+{% assign atif_baslik = page.title | escape %}
+{% assign atif_site = site.title | escape %}
+{% assign atif_url = site.url | append: page.url | escape %}
+
+{% assign aylar_tr = "Ocak,Şubat,Mart,Nisan,Mayıs,Haziran,Temmuz,Ağustos,Eylül,Ekim,Kasım,Aralık" | split: "," %}
+{% assign atif_ay_index = page.date | date: "%-m" | minus: 1 %}
+{% assign atif_ay_adi = aylar_tr[atif_ay_index] %}
+{% assign atif_gun = page.date | date: "%-d" %}
+{% assign atif_yil = page.date | date: "%Y" %}
+{% assign atif_yayin_tarihi = atif_gun | append: " " | append: atif_ay_adi | append: " " | append: atif_yil %}
+
+<section class="atif-kutusu" aria-label="Bu içeriğe atıf verme">
+  <h2 class="atif-baslik">Bu İçeriğe Atıf Verin</h2>
+
+  <div class="atif-sekmeler" role="tablist">
+    <button type="button" class="atif-sekme-buton aktif" data-atif-sekme="apa" role="tab" aria-selected="true">APA 7</button>
+    <button type="button" class="atif-sekme-buton" data-atif-sekme="chicago" role="tab" aria-selected="false">Chicago</button>
+    <button type="button" class="atif-sekme-buton" data-atif-sekme="mla" role="tab" aria-selected="false">MLA 9</button>
+  </div>
+
+  <div class="atif-metin-alani" data-atif-panel="apa" role="tabpanel">
+    <p class="atif-metin">{{ atif_yazar }}. ({{ atif_yil }}). <em>{{ atif_baslik }}</em>. {{ atif_site }}. <span data-atif-erisim>Erişim tarihi hesaplanıyor…</span> tarihinde <a href="{{ atif_url }}">{{ atif_url }}</a> adresinden erişildi.</p>
+  </div>
+
+  <div class="atif-metin-alani" data-atif-panel="chicago" hidden role="tabpanel">
+    <p class="atif-metin">{{ atif_yazar }}. "{{ atif_baslik }}." {{ atif_site }}. Son güncelleme {{ atif_yayin_tarihi }}. Erişim tarihi <span data-atif-erisim>hesaplanıyor…</span>. {{ atif_url }}.</p>
+  </div>
+
+  <div class="atif-metin-alani" data-atif-panel="mla" hidden role="tabpanel">
+    <p class="atif-metin">{{ atif_yazar }}. "{{ atif_baslik }}." <em>{{ atif_site }}</em>, {{ atif_yayin_tarihi }}, {{ atif_url }}. Erişim tarihi <span data-atif-erisim>hesaplanıyor…</span>.</p>
+  </div>
+
+  <div class="atif-alt-satir">
+    <button type="button" class="atif-kopyala-buton" data-atif-kopyala>Atıfı Kopyala</button>
+    <span class="atif-kopyalandi-bildirim" data-atif-bildirim hidden>Kopyalandı ✓</span>
+  </div>
+
+  <p class="atif-not">Format otomatik oluşturulmuştur; gerektiğinde elle düzenleyebilirsiniz.</p>
+</section>
+
+<script>
+  (function () {
+    var kutu = document.currentScript.previousElementSibling;
+    if (!kutu || !kutu.classList.contains("atif-kutusu")) {
+      kutu = document.querySelector(".atif-kutusu");
+    }
+    if (!kutu) return;
+
+    var aylarTr = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+      "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+
+    // Erişim tarihini (ziyaretçinin O ANKİ tarayıcı tarihi) doldur —
+    // build tarihi DEĞİL, sayfa her açıldığında yeniden hesaplanır.
+    var bugun = new Date();
+    var erisimMetni = bugun.getDate() + " " + aylarTr[bugun.getMonth()] + " " + bugun.getFullYear();
+    var erisimSpanlari = kutu.querySelectorAll("[data-atif-erisim]");
+    for (var i = 0; i < erisimSpanlari.length; i++) {
+      erisimSpanlari[i].textContent = erisimMetni;
+    }
+
+    // Sekme geçişi
+    var sekmeButonlari = kutu.querySelectorAll("[data-atif-sekme]");
+    var paneller = kutu.querySelectorAll("[data-atif-panel]");
+    sekmeButonlari.forEach(function (buton) {
+      buton.addEventListener("click", function () {
+        var secilen = buton.getAttribute("data-atif-sekme");
+
+        sekmeButonlari.forEach(function (b) {
+          var aktifMi = b === buton;
+          b.classList.toggle("aktif", aktifMi);
+          b.setAttribute("aria-selected", aktifMi ? "true" : "false");
+        });
+
+        paneller.forEach(function (p) {
+          p.hidden = p.getAttribute("data-atif-panel") !== secilen;
+        });
+      });
+    });
+
+    // Kopyalama
+    var kopyalaButon = kutu.querySelector("[data-atif-kopyala]");
+    var bildirim = kutu.querySelector("[data-atif-bildirim]");
+    if (kopyalaButon) {
+      kopyalaButon.addEventListener("click", function () {
+        var aktifPanel = kutu.querySelector("[data-atif-panel]:not([hidden])");
+        if (!aktifPanel) return;
+        var metin = aktifPanel.querySelector(".atif-metin").textContent;
+
+        // WEBVIEW UYUMLULUĞU: share.html'deki "linki kopyala" ile aynı
+        // desen — navigator.clipboard bazı WebView'lerde tanımsız/reddedilir
+        // olabilir, bu durumda sessizce başarısız olmak yerine bildirim
+        // metnini değiştiriyoruz.
+        if (!navigator.clipboard || !navigator.clipboard.writeText) {
+          if (bildirim) {
+            bildirim.textContent = "Kopyalanamadı";
+            bildirim.hidden = false;
+            setTimeout(function () { bildirim.hidden = true; }, 1800);
+          }
+          return;
+        }
+
+        navigator.clipboard.writeText(metin).then(function () {
+          if (bildirim) {
+            bildirim.textContent = "Kopyalandı ✓";
+            bildirim.hidden = false;
+            setTimeout(function () { bildirim.hidden = true; }, 1800);
+          }
+        }).catch(function () {
+          if (bildirim) {
+            bildirim.textContent = "Kopyalanamadı";
+            bildirim.hidden = false;
+            setTimeout(function () { bildirim.hidden = true; }, 1800);
+          }
+        });
+      });
+    }
+  })();
+</script>
