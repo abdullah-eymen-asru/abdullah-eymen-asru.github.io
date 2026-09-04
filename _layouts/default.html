@@ -44,6 +44,12 @@
     }
   </script>
 
+  <!-- GOOGLE CONSENT MODE v2 — VARSAYILAN DURUM: bu, sayfadaki GA4/AdSense
+       ile ilgili HERHANGİ bir başka script'ten (aşağıdaki ga4-loader.js
+       dahil) ÖNCE, defer/async OLMADAN (senkron) çalışmalıdır — ayrıntılı
+       gerekçe için bkz. assets/js/core/consent-mode.js dosyasının başı. -->
+  <script src="{{ '/assets/js/core/consent-mode.js' | relative_url }}"></script>
+
   <!-- Supabase JS SDK (UMD, YEREL vendor) — WEBVIEW UYUMLULUĞU:
        Önceden esm.sh CDN'inden modül olarak yükleniyordu; WebView içinde bu
        istek zaman aşımına uğrayıp/engellenip #loading ekranının sonsuza dek
@@ -97,7 +103,7 @@
     adreslerle sınırlar.
 
     'unsafe-inline'/'unsafe-eval' KALDIRILDI (önceden buradaydı): sayfada
-    (tema anahtarı, giscus yükleyici, GA/AdSense gibi) birkaç sabit inline
+    (tema anahtarı, giscus yükleyici, AdSense yükleyici gibi) birkaç sabit inline
     <script> bloğu kullanılıyor, ama bunların hiçbiri çalışma zamanında
     kullanıcı/veritabanı verisiyle değişmiyor — tek "değişken" kısımları
     _config.yml'deki build-time sabitleri, ve onlar da HTML diske
@@ -227,6 +233,14 @@
     })();
   </script>
 
+  <!-- "HESABIM ▾" TİTREMESİ (FOUC/Layout Shift) ÖNLEYİCİ: tema script'iyle
+       AYNI desen — sayfa çizilmeden önce, önceki ziyaretten kalan "muhtemelen
+       giriş yapılmış" ipucunu <html>'e erken yazar. Ayrıntılı gerekçe için
+       bkz. assets/js/auth/nav-auth-hint.js. Bu da senkron (defer YOK)
+       olmalı, aksi halde <body>'deki #auth-nav'dan SONRA çalışıp ilk boyaya
+       yetişemez. -->
+  <script src="{{ '/assets/js/auth/nav-auth-hint.js' | relative_url }}"></script>
+
   <link rel="stylesheet" href="{{ '/assets/style.css' | relative_url }}">
 
   <!-- GÜVENLİK (CSP) + ANDROID WEBVIEW UYUMLULUĞU: bu <style> etiketi
@@ -345,31 +359,27 @@
 
   {% if site.google_analytics_id and site.google_analytics_id != "" %}
   <!--
-    Google Analytics — ÇEREZ ONAYINA BAĞLI (KVKK/GDPR): bu script artık
-    sayfa yüklenir yüklenmez OTOMATİK ÇALIŞMAZ. Sadece bir FONKSİYON
-    tanımlar; bu fonksiyon yalnızca ziyaretçi "Analitik Çerezler"i
+    Google Analytics — ÇEREZ ONAYINA BAĞLI (KVKK/GDPR) + CONSENT MODE v2:
+    bu script artık sayfa yüklenir yüklenmez OTOMATİK ÇALIŞMAZ. Sadece bir
+    FONKSİYON tanımlar; bu fonksiyon yalnızca ziyaretçi "Analitik Çerezler"i
     onayladığında (ya da daha önce onaylamışsa sayfa açılışında) bkz.
-    assets/js/core/site-islemleri.js tarafından çağrılır. Performans notu (Perf.
-    Opt.) hâlâ geçerli: gerçekten çağrıldığında script yine ana thread'i
-    bloklamadan (async) arka planda yüklenir.
-  -->
-  <script>
-    window.__GA_MEASUREMENT_ID__ = "{{ site.google_analytics_id }}";
-    window.__cerezAnalitikYukle = function () {
-      if (window.__cerezAnalitikYuklendi) return;
-      window.__cerezAnalitikYuklendi = true;
-      var script = document.createElement('script');
-      script.src = 'https://www.googletagmanager.com/gtag/js?id={{ site.google_analytics_id }}';
-      script.async = true;
-      document.head.appendChild(script);
+    assets/js/core/site-islemleri.js tarafından çağrılır. Performans notu
+    (Perf. Opt.) hâlâ geçerli: gerçekten çağrıldığında script yine ana
+    thread'i bloklamadan (async) arka planda yüklenir.
 
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      window.gtag = gtag;
-      gtag('js', new Date());
-      gtag('config', '{{ site.google_analytics_id }}');
-    };
-  </script>
+    SIFIR INLINE SCRIPT: ölçüm ID'si artık bir <script> GÖVDESİNE Liquid ile
+    gömülmüyor — aşağıdaki "data-ga-id" niteliği üzerinden, sıradan (ve CSP
+    script-src'nin hiç kapsamadığı) bir HTML attribute değeri olarak
+    assets/js/core/ga4-loader.js'e taşınıyor (bkz. o dosyanın başındaki not).
+    Bu script, sayfadaki gtag('consent','default', ...) çağrısını yapan
+    assets/js/core/consent-mode.js'ten SONRA (defer olduğu ve consent-mode.js
+    senkron/daha erken olduğu için garantili) yüklenir.
+  -->
+  <script
+    defer
+    src="{{ '/assets/js/core/ga4-loader.js' | relative_url }}"
+    data-ga-id="{{ site.google_analytics_id }}"
+  ></script>
   {% endif %}
 
   <!--
@@ -502,12 +512,28 @@
           görünüyordu). Artık TEK bir kapsayıcı var; assets/js/auth/nav-auth.js
           oturum durumuna bakıp içini dolduruyor: çıkış yapmışken "Giriş
           Yap", giriş yapmışken "Hesabım ▾" (Panelim / Admin / Çıkış Yap)
-          menüsü. Aşağıdaki statik link, JS henüz yüklenmeden önceki kısa an
-          için ve JS'siz tarayıcılar için bir yedek (progressive enhancement)
-          — nav-auth.js çalışır çalışmaz üzerine yazılır.
+          menüsü. nav-auth.js çalışır çalışmaz aşağıdaki YEDEK içeriğin
+          TAMAMININ (ikisi de) yerini gerçek/etkileşimli menüye bırakır.
+
+          İKİ statik yedek elemanı VAR (tek değil), "titreme"yi (FOUC/CLS)
+          önlemek için — bkz. assets/js/auth/nav-auth-hint.js:
+            1) .auth-nav-fallback-giris: normal/varsayılan durum, JS'siz
+               tarayıcılar için de TIKLANABİLİR gerçek bir link.
+            2) .auth-nav-fallback-hesap: sadece <html data-auth-hint="in">
+               iken (önceki ziyarette oturum açık olduğu ipucu varsa)
+               style.css tarafından GÖRÜNÜR kılınan, aynı boyuttaki ama
+               henüz tıklanamaz bir metin — böylece zaten giriş yapmış bir
+               ziyaretçi için ilk boyada DOĞRUDAN "Hesabım ▾" görünür,
+               "Giriş Yap"tan sonradan DÖNÜŞMEZ (bu dönüşüm hem "titreme"
+               hem de yan taraftaki tema düğmesini iten bir Layout Shift'in
+               kök nedeniydi).
         -->
         <div id="auth-nav" class="auth-nav">
-          <a href="{{ '/hesap/giris.html' | relative_url }}" {% if page.url contains 'giris' or page.url contains 'kayit' %}class="active"{% endif %}>Giriş Yap</a>
+          <a
+            class="auth-nav-fallback-giris{% if page.url contains 'giris' or page.url contains 'kayit' %} active{% endif %}"
+            href="{{ '/hesap/giris.html' | relative_url }}"
+          >Giriş Yap</a>
+          <span class="auth-nav-fallback-hesap" aria-hidden="true">Hesabım ▾</span>
         </div>
       </nav>
       <button id="theme-toggle" class="theme-toggle" type="button" role="switch" aria-checked="false" aria-label="Koyu temaya geç" title="Koyu / açık tema">
@@ -521,62 +547,19 @@
     </div>
   </header>
 
-  <script type="module">
-    // PERFORMANS OPTİMİZASYONU (Çözüm 2 - Yol A):
-    // Oturum menüsü kütüphanesini ilk sayfa çizimini (LCP/FCP) engellememesi için
-    // sayfa yüklendikten sonra tarayıcının boş anında (requestIdleCallback) çağırıyoruz.
-    window.addEventListener('load', () => {
-      const loadAuth = () => {
-        import("{{ '/assets/js/auth/nav-auth.js' | relative_url }}")
-          .then(m => {
-            if (m && typeof m.initAuthNav === "function") {
-              m.initAuthNav();
-            }
-          })
-          .catch(err => {
-            // WEBVIEW UYUMLULUĞU: dinamik import ağ hatasıyla (ya da
-            // içindeki supabase-client.js importu başarısız olursa)
-            // reject olabilir. Bu .catch() olmadan bu bir "unhandled
-            // promise rejection" olarak kalırdı. Kritik değil: nav'daki
-            // statik "Giriş Yap" linki (progressive enhancement) zaten
-            // yerinde duruyor, sadece dinamik "Hesabım" menüsüne
-            // yükseltilemiyor.
-            console.error("nav-auth.js yüklenemedi:", err);
-          });
-      };
-      if ('requestIdleCallback' in window) {
-        requestIdleCallback(loadAuth);
-      } else {
-        setTimeout(loadAuth, 1000);
-      }
-    });
-  </script>
+  <!-- PERFORMANS + "GEÇ RENDER" DÜZELTMESİ: eskiden burada, hesap menüsünü
+       window "load" + requestIdleCallback/1sn setTimeout arkasına saklayan
+       INLINE bir <script type="module"> vardı — bkz. assets/js/auth/
+       nav-auth-init.js başındaki not: bu katmanlar GEREKSİZDİ (module
+       script'ler zaten ertelenmiş/non-blocking çalışır) ve "Hesabım"ın
+       olması gerekenden çok geç belirmesine yol açıyordu. Artık sıradan,
+       harici (src=) bir modül script — hem sıfır-inline-script kısıtına
+       uyuyor hem de initAuthNav()'ı gereksiz gecikme olmadan çağırıyor. -->
+  <script type="module" src="{{ '/assets/js/auth/nav-auth-init.js' | relative_url }}"></script>
 
   <main class="wrap content">
     {{ content }}
   </main>
-
-  {% comment %}
-    OKUMA ARAÇLARI (ilerleme çubuğu + seçim baloncuğu) — sadece "yazı
-    içeriği" gösteren sayfalarda yüklenir: GitHub'a commit edilmiş blog
-    yazıları/projeler (layout: post/project), GitHub'a hiç commit
-    edilmeden Supabase'te yayınlanan yazılar (icerik/supabase-yazi.md) ve
-    gizli ön izleme (onizleme/index.md). Diğer sayfalarda (anasayfa, liste
-    sayfaları, panel vb.) gereksiz yere yüklenmesin diye page.layout VE
-    page.permalink birlikte kontrol ediliyor — supabase-yazi.md ve
-    onizleme/index.md, gövdeyi çalışma zamanında (RPC ile) doldurduğu için
-    layout: default kullanıyor, page.layout ile ayırt edilemiyorlar.
-  {% endcomment %}
-  {% assign _okuma_araclari_sayfasi = false %}
-  {% if page.layout == "post" or page.layout == "project" %}
-    {% assign _okuma_araclari_sayfasi = true %}
-  {% elsif page.permalink == "/icerik/supabase-yazi.html" or page.permalink == "/onizleme/" %}
-    {% assign _okuma_araclari_sayfasi = true %}
-  {% endif %}
-  {% if _okuma_araclari_sayfasi %}
-  <script defer src="{{ '/assets/js/okuma-araclari/okuma-ilerleme-cubugu.js' | relative_url }}"></script>
-  <script defer src="{{ '/assets/js/okuma-araclari/secim-baloncugu.js' | relative_url }}"></script>
-  {% endif %}
 
   <footer class="site-footer">
     <div class="wrap">
