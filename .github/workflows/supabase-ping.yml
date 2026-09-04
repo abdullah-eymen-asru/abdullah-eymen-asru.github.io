@@ -8,20 +8,28 @@
 # dolabilir ve proje duraklatılır — bu da siteye ilk gelen kullanıcının
 # giriş/panel işlevlerinin aniden çalışmamasına yol açar.
 #
-# ÇÖZÜM: Bu workflow haftada bir kez, Supabase REST API köküne (`/rest/v1/`)
-# hafif bir GET isteği atıyor. Bu istek herhangi bir tabloya veya RLS
-# politikasına bağımlı değildir (sadece anon key ile kimlik doğrulaması
-# yapılır), bu yüzden RLS kuralları değişse bile workflow kırılmaz.
+# ÇÖZÜM: Bu workflow haftada bir kez, Supabase REST API kök endpoint'ine
+# (`/rest/v1/`) hafif bir GET isteği atıyor.
+#
+# NEDEN service_role KEY (anon DEĞİL): Supabase, `/rest/v1/` kök
+# endpoint'ini (OpenAPI/introspection şeması) SADECE `service_role`
+# anahtarıyla erişime açık tutuyor — `anon` key ile bu endpoint HER ZAMAN
+# "UNAUTHORIZED_INVALID_API_KEY_TYPE" ile 401 döner, anahtar doğru olsa
+# bile (bkz. proje geçmişi: bu hata pratikte doğrulandı). Bu yüzden burada
+# İSTİSNAİ olarak service_role kullanılıyor — bu anahtar SADECE GitHub'ın
+# şifreli secret deposunda tutuluyor, workflow logunda ASLA görünmüyor
+# (--silent) ve hiçbir veri okumuyor/yazmıyor, sadece API'nin ayakta
+# olduğunu doğrulayan zararsız bir "yoklama" isteği atıyor.
 #
 # KURULUM (bir kereye mahsus):
 #   GitHub repo -> Settings -> Secrets and variables -> Actions:
-#     SUPABASE_URL       = https://<proje-ref>.supabase.co
-#     SUPABASE_ANON_KEY  = (Supabase Dashboard -> Project Settings -> API
-#                            -> "anon public" key)
-#
-# Not: Bu workflow SADECE Supabase'i uyanık tutmak içindir; herhangi bir
-# veri okumaz/yazmaz, sadece REST API'nin ayakta olup olmadığını kontrol
-# eden zararsız bir "yoklama" isteğidir.
+#     SUPABASE_URL               = https://<proje-ref>.supabase.co
+#     SUPABASE_SERVICE_ROLE_KEY  = (Supabase Dashboard -> Project Settings
+#                                    -> API -> "service_role secret" key —
+#                                    bu anahtarı ASLA istemci/tarayıcı
+#                                    tarafı koduna veya herkese açık bir
+#                                    yere koyma, SADECE bu GitHub secret'ı
+#                                    içinde kalmalı)
 
 name: Supabase Uyanık Tutma (Haftalık Ping)
 
@@ -43,14 +51,14 @@ jobs:
             echo "::error::SUPABASE_URL secret'ı tanımlı değil. Bu dosyanın başındaki kurulum adımlarına bak."
             exit 1
           fi
-          if [ -z "${{ secrets.SUPABASE_ANON_KEY }}" ]; then
-            echo "::error::SUPABASE_ANON_KEY secret'ı tanımlı değil. Bu dosyanın başındaki kurulum adımlarına bak."
+          if [ -z "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ]; then
+            echo "::error::SUPABASE_SERVICE_ROLE_KEY secret'ı tanımlı değil. Bu dosyanın başındaki kurulum adımlarına bak."
             exit 1
           fi
 
       - name: Supabase REST API'ye hafif GET ping'i gönder
         run: |
           curl "${{ secrets.SUPABASE_URL }}/rest/v1/" \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
             --fail --silent --show-error --output /dev/null
