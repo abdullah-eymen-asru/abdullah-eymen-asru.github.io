@@ -1214,6 +1214,12 @@ th { color: var(--muted); font-weight: 600; }
   color: var(--text);
 }
 
+.atif-dil-secici {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
 .atif-sekmeler {
   display: flex;
   gap: 6px;
