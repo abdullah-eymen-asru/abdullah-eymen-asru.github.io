@@ -1,45 +1,153 @@
-<div class="share-buttons">
+<div class="share-buttons" id="share-buttons">
   <span class="share-label">Paylaş:</span>
-  <a class="share-btn" target="_blank" rel="noopener noreferrer"
-     href="https://wa.me/?text={{ page.title | url_encode }}%20{{ page.url | absolute_url | url_encode }}">
-    WhatsApp
-  </a>
-  <a class="share-btn" target="_blank" rel="noopener noreferrer"
-     href="https://twitter.com/intent/tweet?text={{ page.title | url_encode }}&url={{ page.url | absolute_url | url_encode }}">
-    X
-  </a>
-  <a class="share-btn" target="_blank" rel="noopener noreferrer"
-     href="https://www.linkedin.com/sharing/share-offsite/?url={{ page.url | absolute_url | url_encode }}">
-    LinkedIn
-  </a>
+  <a class="share-btn" data-share="whatsapp" target="_blank" rel="noopener noreferrer" href="#">WhatsApp</a>
+  <a class="share-btn" data-share="x" target="_blank" rel="noopener noreferrer" href="#">X</a>
+  <a class="share-btn" data-share="linkedin" target="_blank" rel="noopener noreferrer" href="#">LinkedIn</a>
+  <a class="share-btn" data-share="telegram" target="_blank" rel="noopener noreferrer" href="#">Telegram</a>
+  <a class="share-btn" data-share="facebook" target="_blank" rel="noopener noreferrer" href="#">Facebook</a>
+  <a class="share-btn" data-share="reddit" target="_blank" rel="noopener noreferrer" href="#">Reddit</a>
+  <a class="share-btn" data-share="pinterest" target="_blank" rel="noopener noreferrer" href="#">Pinterest</a>
+  <button class="share-btn" id="native-share-btn" type="button" hidden>📤 Paylaş</button>
   <button class="share-btn" id="copy-link-btn" type="button">Linki Kopyala</button>
 </div>
+<p class="share-alinti-notu" id="share-alinti-notu" hidden>
+  Seçtiğin alıntıyla paylaşılacak: <span id="share-alinti-onizleme"></span>
+</p>
 
 <script>
   (function () {
-    const btn = document.getElementById("copy-link-btn");
-    if (!btn) return;
-    btn.addEventListener("click", () => {
-      // WEBVIEW UYUMLULUĞU: navigator.clipboard bazı WebView'lerde hiç
-      // tanımlı olmayabilir (izin verilmemiş) ya da writeText() reddedilebilir
-      // — bu durumda önceden hiçbir geri bildirim olmadan sessizce
-      // başarısız oluyordu. Artık her iki durumda da kullanıcıya bir mesaj
-      // gösteriyoruz.
-      if (!navigator.clipboard || !navigator.clipboard.writeText) {
-        const original = btn.textContent;
-        btn.textContent = "Kopyalanamadı";
-        setTimeout(() => { btn.textContent = original; }, 1800);
-        return;
+    const wrap = document.getElementById("share-buttons");
+    if (!wrap) return;
+
+    const sayfaBasligi = {{ page.title | jsonify }};
+    const sayfaUrlYedek = {{ page.url | absolute_url | jsonify }};
+
+    /*
+     * ALINTI PAYLAŞIMI (bkz. assets/js/okuma-araclari/secim-baloncugu.js):
+     * yazı gövdesinde bir metin seçilip "❝ Kopyala" baloncuğundan
+     * kopyalandığında, o alıntı burada (sessionStorage üzerinden, SADECE bu
+     * sekme/sayfa için) hatırlanır. Bu paylaş kutusundaki linkler o an
+     * SAYFAYA GİRİLDİĞİNDE ve her tıklamadan HEMEN ÖNCE yeniden üretilir —
+     * "alıntı" varsa metne tırnak içinde eklenir, yoksa (ya da sayfa
+     * değiştiyse / süresi geçtiyse) sade sayfa başlığı+linki kullanılır.
+     * Gerçek URL, atif-kutusu.html'deki AYNI gerekçeyle (site aynı anda
+     * github.io + pages.dev üzerinden yayınlandığı için) window.location'dan
+     * okunuyor, build-time site.url'e GÜVENİLMİYOR.
+     */
+    const ALINTI_ANAHTARI = "paylas-alinti:" + window.location.pathname;
+
+    function aktifAlintiyiOku() {
+      try {
+        const ham = sessionStorage.getItem(ALINTI_ANAHTARI);
+        if (!ham) return "";
+        const kayit = JSON.parse(ham);
+        // 10 dakikadan eski bir alıntı "bayat" sayılır — kullanıcı çoktan
+        // başka bir cümle seçmiş/vazgeçmiş olabilir, sonsuza kadar
+        // yapışık kalmasın.
+        if (!kayit || typeof kayit.metin !== "string" || Date.now() - kayit.zaman > 10 * 60 * 1000) return "";
+        return kayit.metin;
+      } catch (e) {
+        return "";
       }
-      navigator.clipboard.writeText(window.location.href).then(() => {
-        const original = btn.textContent;
-        btn.textContent = "Kopyalandı ✓";
-        setTimeout(() => { btn.textContent = original; }, 1800);
-      }).catch(() => {
-        const original = btn.textContent;
-        btn.textContent = "Kopyalanamadı";
-        setTimeout(() => { btn.textContent = original; }, 1800);
+    }
+
+    const gercekUrl = window.location.origin + window.location.pathname;
+    const notuEl = document.getElementById("share-alinti-notu");
+    const onizlemeEl = document.getElementById("share-alinti-onizleme");
+
+    function paylasimMetniUret() {
+      const alinti = aktifAlintiyiOku();
+      if (alinti) {
+        return `"${alinti}" — ${sayfaBasligi}`;
+      }
+      return sayfaBasligi;
+    }
+
+    function notuGuncelle() {
+      const alinti = aktifAlintiyiOku();
+      if (alinti) {
+        onizlemeEl.textContent = alinti.length > 90 ? `${alinti.slice(0, 89)}…` : alinti;
+        notuEl.hidden = false;
+      } else {
+        notuEl.hidden = true;
+      }
+    }
+
+    // Sayfa açıldığında ve her "storage"/odak değişiminde notu güncelle —
+    // kullanıcı bir alıntı kopyaladıktan sonra tekrar bu bölüme
+    // kaydırdığında (ya da sekmeye geri döndüğünde) not güncel kalsın.
+    notuGuncelle();
+    window.addEventListener("focus", notuGuncelle);
+    document.addEventListener("secim-alinti-guncellendi", notuGuncelle);
+
+    const LINK_URETICI = {
+      whatsapp: (metin, url) => `https://wa.me/?text=${encodeURIComponent(metin + " " + url)}`,
+      x: (metin, url) => `https://twitter.com/intent/tweet?text=${encodeURIComponent(metin)}&url=${encodeURIComponent(url)}`,
+      linkedin: (_metin, url) => `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
+      telegram: (metin, url) => `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(metin)}`,
+      facebook: (_metin, url) => `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
+      reddit: (metin, url) => `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(metin)}`,
+      pinterest: (metin, url) => `https://pinterest.com/pin/create/button/?url=${encodeURIComponent(url)}&description=${encodeURIComponent(metin)}`,
+    };
+
+    // Her linkin href'i TIKLAMADAN HEMEN ÖNCE (click sırasında) yeniden
+    // hesaplanır — statik bir href yerine bu yöntem tercih edildi çünkü
+    // kullanıcı sayfayı açık tutup FARKLI cümleler seçtikçe (veya seçimi
+    // kaldırdıkça) her linkin hedefi güncel kalmalı, sayfayı yenilemesi
+    // gerekmemeli.
+    wrap.querySelectorAll("[data-share]").forEach((a) => {
+      a.addEventListener("click", () => {
+        const uretici = LINK_URETICI[a.dataset.share];
+        if (!uretici) return;
+        a.href = uretici(paylasimMetniUret(), gercekUrl || sayfaUrlYedek);
       });
     });
+
+    // NATIVE PAYLAŞIM (Web Share API) — sadece destekleyen tarayıcılarda
+    // (çoğunlukla mobil) gösterilir; masaüstü Safari/Chrome gibi
+    // desteklemeyenlerde buton hiç görünmez, boşuna tıklanabilir bir
+    // buton bırakmamak için.
+    const nativeBtn = document.getElementById("native-share-btn");
+    if (nativeBtn && navigator.share) {
+      nativeBtn.hidden = false;
+      nativeBtn.addEventListener("click", () => {
+        navigator
+          .share({
+            title: sayfaBasligi,
+            text: paylasimMetniUret(),
+            url: gercekUrl || sayfaUrlYedek,
+          })
+          .catch(() => {
+            // Kullanıcı paylaşım panelini iptal etti ya da tarayıcı
+            // reddetti — sessizce yok say, bir hata değil.
+          });
+      });
+    }
+
+    const copyBtn = document.getElementById("copy-link-btn");
+    if (copyBtn) {
+      copyBtn.addEventListener("click", () => {
+        const hedefUrl = gercekUrl || sayfaUrlYedek;
+        // WEBVIEW UYUMLULUĞU: navigator.clipboard bazı WebView'lerde hiç
+        // tanımlı olmayabilir (izin verilmemiş) ya da writeText() reddedilebilir
+        // — bu durumda kullanıcıya bir mesaj gösteriyoruz, sessizce
+        // başarısız olmuyoruz.
+        if (!navigator.clipboard || !navigator.clipboard.writeText) {
+          const original = copyBtn.textContent;
+          copyBtn.textContent = "Kopyalanamadı";
+          setTimeout(() => { copyBtn.textContent = original; }, 1800);
+          return;
+        }
+        navigator.clipboard.writeText(hedefUrl).then(() => {
+          const original = copyBtn.textContent;
+          copyBtn.textContent = "Kopyalandı ✓";
+          setTimeout(() => { copyBtn.textContent = original; }, 1800);
+        }).catch(() => {
+          const original = copyBtn.textContent;
+          copyBtn.textContent = "Kopyalanamadı";
+          setTimeout(() => { copyBtn.textContent = original; }, 1800);
+        });
+      });
+    }
   })();
 </script>
