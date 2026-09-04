@@ -1441,16 +1441,23 @@ th { color: var(--muted); font-weight: 600; }
 }
 
 /* ============================================================
-   METİN SEÇİNCE ÇIKAN MİKRO PAYLAŞ/ALINTILA BALONCUĞU
+   METİN SEÇİNCE ÇIKAN MİKRO KOPYALAMA BALONCUĞU
    ============================================================
    bkz. assets/js/okuma-araclari/secim-baloncugu.js. Konum (--baloncuk-ust /
    --baloncuk-sol), JS'in .style.setProperty() ile verdiği CSS custom
    property'lerden geliyor — inline style="" ATTRIBUTE'U kullanılmıyor.
-   translateX(-50%) ile baloncuk, seçimin ORTASINA göre ortalanıyor. */
+   translateX(-50%) ile baloncuk, seçimin ORTASINA göre ortalanıyor.
+
+   position: fixed BİLEREK kullanılıyor (absolute DEĞİL) — absolute,
+   sayfadaki herhangi bir ata elementte transform/filter gibi yeni bir
+   "containing block" oluşturan bir özellik varsa konumu O elemente göre
+   hesaplar ve baloncuğu ekranın yanlış bir köşesine yapıştırabilir; fixed
+   ise HER ZAMAN viewport'a göre konumlanır, ara kapsayıcılardan bağımsız
+   çalışır (bkz. secim-baloncugu.js başındaki ayrıntılı gerekçe). */
 .secim-baloncugu {
   --baloncuk-ust: 0px;
   --baloncuk-sol: 0px;
-  position: absolute;
+  position: fixed;
   top: var(--baloncuk-ust);
   left: var(--baloncuk-sol);
   transform: translateX(-50%);
@@ -1507,3 +1514,25 @@ th { color: var(--muted); font-weight: 600; }
 [data-theme="dark"] .secim-baloncugu-btn:hover {
   background: var(--tag-bg);
 }
+
+/* ============================================================
+   ALINTI PAYLAŞIM NOTU (sayfa sonu paylaş kutusunun hemen üstünde)
+   ============================================================
+   bkz. _includes/share.html — yazıda bir alıntı kopyalandıysa, sayfa
+   sonundaki paylaş butonlarının o alıntıyla paylaşım yapacağını
+   hatırlatan küçük bir not. */
+.share-alinti-notu {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--accent);
+  background: var(--tag-bg);
+  color: var(--muted);
+  font-size: 0.85rem;
+  border-radius: 0 6px 6px 0;
+}
+
+.share-alinti-notu span {
+  color: var(--text);
+  font-style: italic;
+}
+
