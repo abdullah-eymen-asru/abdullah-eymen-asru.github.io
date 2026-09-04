@@ -97,12 +97,37 @@ function onekleCerezleriSil(onekler) {
 }
 
 /*
+ * GOOGLE CONSENT MODE v2 — GÜNCELLEME (UPDATE) SİNYALİ.
+ * assets/js/core/consent-mode.js sayfa açılışında dört sinyali de
+ * "denied" olarak varsayılana ayarlar; ziyaretçi bir kategoriyi
+ * kabul/red ettiğinde (ya da önceden verdiği tercih sayfa açılışında
+ * "replay" edildiğinde, bkz. init() -> tercihleriUygula) GERÇEK durumu
+ * buradan gtag('consent','update', ...) ile bildiriyoruz. Bu çağrı,
+ * GA4 script'i (varsa) yüklenmeden HEMEN ÖNCE yapılır (bkz. çağıran
+ * fonksiyonların sırası aşağıda) — GA4'ün gönderdiği HER hit bu yüzden
+ * her zaman güncel bir izin durumu taşır, "sinyal yok" uyarısının kök
+ * nedeni budur ve bu sırayla giderilir.
+ *
+ * typeof window.gtag === "function" kontrolü: consent-mode.js normalde
+ * bu dosyadan önce yüklenip window.gtag'i tanımlar, ama savunmacı
+ * davranıp o script bir sebeple hiç çalışmamışsa (ör. ağ hatası) sessizce
+ * atlıyoruz — çerez tercihi yine de localStorage'a kaydedilip
+ * uygulanmaya devam eder, sadece Google'a giden sinyal eksik kalır.
+ */
+function consentGuncelle(izinler) {
+  if (typeof window.gtag === "function") {
+    window.gtag("consent", "update", izinler);
+  }
+}
+
+/*
  * Google Analytics'i AÇAR. Gerçek yükleme fonksiyonu (varsa) _layouts/
- * default.html içinde window.__cerezAnalitikYukle olarak tanımlanır —
- * bu dosya sadece onu (izin varsa) TETİKLER, GA script'inin kendisini
- * bilmez/barındırmaz.
+ * default.html içinde (assets/js/core/ga4-loader.js tarafından)
+ * window.__cerezAnalitikYukle olarak tanımlanır — bu dosya sadece onu
+ * (izin varsa) TETİKLER, GA script'inin kendisini bilmez/barındırmaz.
  */
 function analitikUygula(acik) {
+  consentGuncelle({ analytics_storage: acik ? "granted" : "denied" });
   if (acik) {
     if (typeof window.__cerezAnalitikYukle === "function") window.__cerezAnalitikYukle();
     return;
@@ -162,6 +187,16 @@ function islevselUygula(acik) {
  * aynı şekilde geçerli olmalı.
  */
 function reklamUygula(acik, otomatikMi) {
+  // Consent Mode v2'nin "Reklam" kategorisiyle ilişkili üç sinyali:
+  // ad_storage (reklam çerezleri), ad_user_data (kullanıcı verisinin
+  // reklam amaçlı Google'a gönderilmesi) ve ad_personalization
+  // (kişiselleştirilmiş reklam). Üçü de bu sitede TEK bir "Reklam"
+  // onay kutusuna bağlı olduğu için birlikte güncelleniyor.
+  consentGuncelle({
+    ad_storage: acik ? "granted" : "denied",
+    ad_user_data: acik ? "granted" : "denied",
+    ad_personalization: acik ? "granted" : "denied",
+  });
   if (acik) {
     if (otomatikMi && window.__reklamOtomatikYuklemeKapali) return;
     if (typeof window.__cerezReklamYukle === "function") window.__cerezReklamYukle();
