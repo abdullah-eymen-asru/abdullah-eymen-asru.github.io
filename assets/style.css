@@ -1190,3 +1190,104 @@ th { color: var(--muted); font-weight: 600; }
 .csp-mt10-fs085 { font-size: 0.85rem; margin-top: 10px; }
 
 .csp-bakim-body { text-align: center; font-family: sans-serif; margin-top: 100px; }
+
+/* ============================================================
+   AKADEMİK ATIF KUTUSU (APA 7 / Chicago / MLA 9)
+   ============================================================
+   bkz. _includes/atif-kutusu.html — sekme geçişi ve "Kopyala"
+   butonu, o include'un SONUNDAKİ inline <script> bloğu tarafından
+   (yalnızca addEventListener ile, hiç inline onclick/style
+   attribute'u OLMADAN) yönetiliyor; bu script build sırasında
+   _plugins/csp_hash_enjekte.rb tarafından otomatik hash'lenir. */
+
+.atif-kutusu {
+  margin-top: 40px;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-bg);
+}
+
+.atif-baslik {
+  font-size: 1rem;
+  margin: 0 0 14px;
+  color: var(--text);
+}
+
+.atif-sekmeler {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.atif-sekme-buton {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--muted);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.atif-sekme-buton.aktif {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.atif-metin-alani {
+  margin-bottom: 12px;
+}
+
+.atif-metin-alani[hidden] {
+  display: none;
+}
+
+.atif-metin {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--text);
+  word-break: break-word;
+  margin: 0;
+}
+
+.atif-alt-satir {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.atif-kopyala-buton {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.atif-kopyala-buton:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.atif-kopyalandi-bildirim {
+  margin-left: 6px;
+  font-size: 0.85rem;
+  color: var(--accent);
+}
+
+.atif-kopyalandi-bildirim[hidden] {
+  display: none;
+}
+
+.atif-not {
+  margin: 12px 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
