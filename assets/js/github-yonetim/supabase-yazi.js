@@ -9,6 +9,7 @@
  * görebilmeli.
  */
 import { supabase, escapeHtml, guvenliDisUrlMi } from "../core/supabase-client.js";
+import { okumaSuresiHesapla, pdfButonuHtml, tocOlustur } from "../okuma-araclari/okuma-meta-yardimci.js";
 
 function relUrl(path) {
   const base = document.documentElement.dataset.baseurl || "";
@@ -51,6 +52,8 @@ async function init() {
 
     document.title = kayit.baslik;
 
+    const okumaSuresiMetni = okumaSuresiHesapla(kayit.govde);
+
     let metaHtml = "";
     if (tur === "proje") {
       const parcalar = [];
@@ -58,6 +61,7 @@ async function init() {
       if (kayit.tarih) parcalar.push(new Date(kayit.tarih).getFullYear());
       if (kayit.durum) parcalar.push(`<span class="tag">${escapeHtml(kayit.durum)}</span>`);
       if (kayit.yazar_adi) parcalar.push(`Yazan: ${escapeHtml(kayit.yazar_adi)}`);
+      parcalar.push(okumaSuresiMetni);
       metaHtml = `<div class="meta">${parcalar.join(" · ")}</div>`;
     } else {
       const parcalar = [];
@@ -67,20 +71,31 @@ async function init() {
         );
       }
       if (kayit.yazar_adi) parcalar.push(`Yazan: ${escapeHtml(kayit.yazar_adi)}`);
+      parcalar.push(okumaSuresiMetni);
       metaHtml = `<div class="meta">${parcalar.join(" · ")}</div>`;
     }
 
     let html = `<h1>${escapeHtml(kayit.baslik)}</h1>${metaHtml}`;
+    html += pdfButonuHtml(kayit.pdf_url, escapeHtml);
     html += `<div class="project-body">${basitMarkdown(kayit.govde || "")}</div>`;
     // GÜVENLİK: href'e basmadan önce şema kontrolü (bkz. supabase-client.js
     // guvenliDisUrlMi yorumu) — "javascript:" gibi bir URI hiç render edilmez.
     if (tur === "proje" && kayit.link && guvenliDisUrlMi(kayit.link)) {
-      html += `<p style="margin-top:2em;"><a href="${escapeHtml(kayit.link)}" target="_blank" rel="noopener noreferrer">→ ${escapeHtml(
+      html += `<p class="proje-baglanti-alani"><a href="${escapeHtml(kayit.link)}" target="_blank" rel="noopener noreferrer">→ ${escapeHtml(
         kayit.link_etiket || "Bağlantıyı görüntüle"
       )}</a></p>`;
     }
 
     govdeEl.innerHTML = html;
+
+    // İÇİNDEKİLER: gövde DOM'a yazıldıktan SONRA (h2/h3'ler artık gerçek
+    // elementler olarak var) üretilip, .project-body'nin HEMEN ÖNÜNE
+    // (yazının en başına, PDF butonundan sonra) ekleniyor — bkz.
+    // _layouts/post.html'deki <details class="akademik-toc"> ile aynı yer.
+    const tocElementi = tocOlustur(govdeEl.querySelector(".project-body"), kayit.toc === true);
+    if (tocElementi) {
+      govdeEl.querySelector(".project-body").before(tocElementi);
+    }
 
     // REKLAM (bkz. icerik/supabase-yazi.md ve assets/js/core/
     // site-islemleri.js reklamUygula) — bu sayfa şablonu TEK olduğu için
