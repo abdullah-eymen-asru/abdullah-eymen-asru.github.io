@@ -5,6 +5,12 @@ permalink: "/icerik/izlediklerim.html"
 ---
 
 <h1>İzlediklerim</h1>
+
+<div class="listeler-sekmeler">
+  <a href="/icerik/izlediklerim.html" class="sekme-btn aktif">🎬 İzlediklerim</a>
+  <a href="/icerik/okuduklarim.html" class="sekme-btn">📚 Okuduklarım</a>
+</div>
+
 <p>
   İzlediğim film ve dizileri
   <a href="{{ site.izleme_projects_url }}" target="_blank" rel="noopener noreferrer">GitHub Projects panosunda</a>
