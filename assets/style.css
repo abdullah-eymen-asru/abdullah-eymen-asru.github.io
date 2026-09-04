@@ -242,9 +242,49 @@ nav a.active {
    Çıkış linkleri. .auth-nav içindeki düz <a> (çıkış yapmışken "Giriş Yap")
    zaten yukarıdaki "nav a" kuralından stilini alıyor, ekstra bir şey
    gerekmiyor — burada sadece dropdown (Hesabım ▾) durumunu stilliyoruz. */
-.auth-nav { position: relative; margin-left: 4px; }
+.auth-nav {
+  position: relative;
+  margin-left: 4px;
+  /* "TİTREME" (FOUC/Layout Shift) DÜZELTMESİ: bu kapsayıcı içindeki iki
+     yedek durum ("Giriş Yap" ~ dar, "Hesabım ▾" ~ geniş) ve JS'in
+     sonradan yazdığı gerçek ".auth-nav-dropdown" AYNI min-width'i
+     paylaşır (bkz. .auth-nav-fallback-giris/.auth-nav-fallback-hesap/
+     .auth-nav-btn padding+font-size değerleri birebir aynı). Böylece
+     "Giriş Yap" -> "Hesabım ▾" geçişinde (ya da yedekten gerçek menüye
+     geçişte) yan taraftaki tema düğmesini itecek bir genişlik/CLS
+     oluşmaz — sadece metin/içerik değişir, kutunun kapladığı alan sabit
+     kalır. */
+  display: inline-flex;
+  justify-content: flex-end;
+}
 
 .auth-nav-dropdown { position: relative; }
+
+/* HESAP MENÜSÜ YEDEKLERİ (nav-auth.js çalışana kadarki geçici durum) —
+   bkz. _layouts/default.html #auth-nav içindeki yorum ve assets/js/auth/
+   nav-auth-hint.js. Normalde SADECE biri görünür: .auth-nav-fallback-giris
+   (varsayılan) ya da .auth-nav-fallback-hesap (SADECE
+   html[data-auth-hint="in"] iken, aşağıya bakın). İkisi de "nav a" /
+   ".auth-nav-btn" ile AYNI padding/font-size'ı kullanır ki nav-auth.js
+   gerçek menüyü yazdığında hiçbir boyut sıçraması olmasın. */
+.auth-nav-fallback-hesap {
+  display: none;
+  margin-left: 4px;
+  padding: 7px 12px;
+  color: var(--muted);
+  font-size: 0.93rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* SADECE bir önceki ziyarette oturum açık olduğu ipucu varsa (bkz.
+   nav-auth-hint.js): "Giriş Yap" yedeğini gizleyip onun yerine "Hesabım ▾"
+   GÖRÜNÜMLÜ (ama JS gelene kadar tıklanamaz) yedeği göster. Bu, zaten
+   giriş yapmış bir ziyaretçinin sayfa her açıldığında kısa bir an
+   "Giriş Yap" görüp hemen "Hesabım ▾"ya dönüşmesini (asıl "titreme"
+   şikayeti) ortadan kaldırır. */
+html[data-auth-hint="in"] .auth-nav-fallback-giris { display: none; }
+html[data-auth-hint="in"] .auth-nav-fallback-hesap { display: inline-block; }
 
 .auth-nav-btn {
   margin-left: 4px;
@@ -1052,7 +1092,8 @@ th { color: var(--muted); font-weight: 600; }
   }
 
   .auth-nav { margin-left: 0; flex: 0 0 auto; }
-  .auth-nav-btn {
+  .auth-nav-btn,
+  .auth-nav-fallback-hesap {
     margin-left: 0;
     padding: 6px 9px;
     font-size: 0.87rem;
@@ -1190,349 +1231,3 @@ th { color: var(--muted); font-weight: 600; }
 .csp-mt10-fs085 { font-size: 0.85rem; margin-top: 10px; }
 
 .csp-bakim-body { text-align: center; font-family: sans-serif; margin-top: 100px; }
-
-/* ============================================================
-   AKADEMİK ATIF KUTUSU (APA 7 / Chicago / MLA 9)
-   ============================================================
-   bkz. _includes/atif-kutusu.html — sekme geçişi ve "Kopyala"
-   butonu, o include'un SONUNDAKİ inline <script> bloğu tarafından
-   (yalnızca addEventListener ile, hiç inline onclick/style
-   attribute'u OLMADAN) yönetiliyor; bu script build sırasında
-   _plugins/csp_hash_enjekte.rb tarafından otomatik hash'lenir. */
-
-.atif-kutusu {
-  margin-top: 40px;
-  padding: 18px 20px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--card-bg);
-}
-
-.atif-baslik {
-  font-size: 1rem;
-  margin: 0 0 14px;
-  color: var(--text);
-}
-
-.atif-dil-secici {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 10px;
-}
-
-.atif-sekmeler {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-
-.atif-sekme-buton {
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--muted);
-  border-radius: 6px;
-  padding: 6px 12px;
-  font-size: 0.85rem;
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.atif-sekme-buton.aktif {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-
-.atif-metin-alani {
-  margin-bottom: 12px;
-}
-
-.atif-metin-alani[hidden] {
-  display: none;
-}
-
-.atif-metin {
-  font-size: 0.9rem;
-  line-height: 1.6;
-  color: var(--text);
-  word-break: break-word;
-  margin: 0;
-}
-
-.atif-alt-satir {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.atif-kopyala-buton {
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
-  border-radius: 6px;
-  padding: 6px 14px;
-  font-size: 0.85rem;
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.atif-kopyala-buton:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.atif-kopyalandi-bildirim {
-  margin-left: 6px;
-  font-size: 0.85rem;
-  color: var(--accent);
-}
-
-.atif-kopyalandi-bildirim[hidden] {
-  display: none;
-}
-
-.atif-not {
-  margin: 12px 0 0;
-  font-size: 0.78rem;
-  color: var(--muted);
-}
-
-/* ============================================================
-   OKUMA İLERLEME ÇUBUĞU (Scroll Progress Bar)
-   ============================================================
-   bkz. assets/js/okuma-araclari/okuma-ilerleme-cubugu.js — sayfanın
-   tepesinde sabit, 2px'lik minimalist çubuk. Dolgunun genişliği inline
-   style="" ATTRIBUTE'U ile DEĞİL, JS'in .style.setProperty() ile verdiği
-   --ilerleme CSS custom property'siyle (0 ile 1 arası) kontrol edilir;
-   burada sadece bu değeri bir scaleX() dönüşümüne çeviriyoruz. transform
-   kullanmak (width yerine) tarayıcıya yeniden layout hesaplattırmaz,
-   sadece compositor katmanında ölçekler — kaydırma sırasında EN PÜRÜZSÜZ
-   sonucu verir. */
-.okuma-ilerleme-cubugu {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background: transparent;
-  z-index: 1000;
-  /* Sayfanın en üstündeki diğer sabit unsurlarla (varsa) çakışmaması için
-     pointer-events kapalı — çubuk sadece görsel bir gösterge, tıklanabilir
-     bir öğe değil. */
-  pointer-events: none;
-}
-
-.okuma-ilerleme-cubugu-dolgu {
-  --ilerleme: 0;
-  height: 100%;
-  width: 100%;
-  transform-origin: left;
-  transform: scaleX(var(--ilerleme));
-  background: var(--accent);
-  will-change: transform;
-}
-
-/* ============================================================
-   PDF İNDİRME BUTONU
-   ============================================================
-   bkz. _layouts/post.html / project.html (page.pdf_url front-matter) ve
-   assets/js/okuma-araclari/okuma-meta-yardimci.js pdfButonuHtml()
-   (Supabase-only sayfalar için). Akademik/kurumsal görünüm: köşeli değil
-   ama belirgin bir çerçeve, ince bir vurgu tonuyla. */
-.pdf-indir-alani {
-  margin: 0 0 1.5em;
-}
-
-.pdf-indir-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 18px;
-  border: 1px solid var(--accent);
-  border-radius: 6px;
-  background: var(--tag-bg);
-  color: var(--accent);
-  text-decoration: none;
-  font-size: 0.9rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  transition: background-color 0.15s ease, color 0.15s ease;
-}
-
-.pdf-indir-btn:hover {
-  background: var(--accent);
-  color: var(--bg);
-}
-
-/* ============================================================
-   İÇİNDEKİLER (TOC)
-   ============================================================
-   bkz. _layouts/post.html / project.html (<details class="akademik-toc">
-   içinde Kramdown {:toc}) ve assets/js/okuma-araclari/okuma-meta-yardimci.js
-   tocOlustur() (Supabase-only sayfalarda tarayıcıda üretilen eşdeğeri —
-   AYNI class adlarını kullanır, böylece görsel olarak birebir aynı çıkar).
-   Kramdown'ın ürettiği liste, kendi iç içe <ul>/<li> yapısını kullanır;
-   client-side üretici ise düz bir <ul class="toc-liste"> üretir — ikisi
-   de aynı kurallardan faydalanabilsin diye seçiciler genel tutuluyor. */
-.akademik-toc {
-  margin: 0 0 1.8em;
-  padding: 4px 18px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--card-bg);
-}
-
-.akademik-toc summary {
-  cursor: pointer;
-  padding: 10px 0;
-  font-weight: 600;
-  color: var(--text);
-  list-style: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Varsayılan disclosure oku (Safari/Chrome farklı render eder) yerine,
-   tüm tarayıcılarda tutarlı görünen kendi okumuzu çiziyoruz. */
-.akademik-toc summary::-webkit-details-marker {
-  display: none;
-}
-
-.akademik-toc summary::before {
-  content: "▸";
-  color: var(--accent);
-  transition: transform 0.15s ease;
-  font-size: 0.85em;
-}
-
-.akademik-toc[open] summary::before {
-  transform: rotate(90deg);
-}
-
-.akademik-toc ul,
-.akademik-toc .toc-liste {
-  margin: 0 0 12px;
-  padding-left: 22px;
-  font-size: 0.92rem;
-  line-height: 1.9;
-}
-
-.akademik-toc li {
-  color: var(--muted);
-}
-
-.akademik-toc li.toc-alt-baslik,
-.akademik-toc ul ul li {
-  list-style-type: circle;
-  margin-left: 10px;
-  font-size: 0.95em;
-}
-
-.akademik-toc a {
-  color: var(--text);
-  text-decoration: none;
-}
-
-.akademik-toc a:hover {
-  color: var(--accent);
-  text-decoration: underline;
-}
-
-/* ============================================================
-   METİN SEÇİNCE ÇIKAN MİKRO KOPYALAMA BALONCUĞU
-   ============================================================
-   bkz. assets/js/okuma-araclari/secim-baloncugu.js. Konum (--baloncuk-ust /
-   --baloncuk-sol), JS'in .style.setProperty() ile verdiği CSS custom
-   property'lerden geliyor — inline style="" ATTRIBUTE'U kullanılmıyor.
-   translateX(-50%) ile baloncuk, seçimin ORTASINA göre ortalanıyor.
-
-   position: fixed BİLEREK kullanılıyor (absolute DEĞİL) — absolute,
-   sayfadaki herhangi bir ata elementte transform/filter gibi yeni bir
-   "containing block" oluşturan bir özellik varsa konumu O elemente göre
-   hesaplar ve baloncuğu ekranın yanlış bir köşesine yapıştırabilir; fixed
-   ise HER ZAMAN viewport'a göre konumlanır, ara kapsayıcılardan bağımsız
-   çalışır (bkz. secim-baloncugu.js başındaki ayrıntılı gerekçe). */
-.secim-baloncugu {
-  --baloncuk-ust: 0px;
-  --baloncuk-sol: 0px;
-  position: fixed;
-  top: var(--baloncuk-ust);
-  left: var(--baloncuk-sol);
-  transform: translateX(-50%);
-  z-index: 900;
-  display: flex;
-  gap: 4px;
-  padding: 6px;
-  border-radius: 8px;
-  background: var(--text);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
-  animation: secim-baloncugu-belir 0.12s ease;
-}
-
-[data-theme="dark"] .secim-baloncugu {
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-}
-
-@keyframes secim-baloncugu-belir {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-}
-
-.secim-baloncugu-btn {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 12px;
-  border: none;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--bg);
-  font-size: 0.82rem;
-  font-family: inherit;
-  font-weight: 500;
-  text-decoration: none;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-[data-theme="dark"] .secim-baloncugu-btn {
-  color: var(--text);
-}
-
-.secim-baloncugu-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-}
-
-[data-theme="dark"] .secim-baloncugu-btn:hover {
-  background: var(--tag-bg);
-}
-
-/* ============================================================
-   ALINTI PAYLAŞIM NOTU (sayfa sonu paylaş kutusunun hemen üstünde)
-   ============================================================
-   bkz. _includes/share.html — yazıda bir alıntı kopyalandıysa, sayfa
-   sonundaki paylaş butonlarının o alıntıyla paylaşım yapacağını
-   hatırlatan küçük bir not. */
-.share-alinti-notu {
-  margin: 10px 0 0;
-  padding: 8px 12px;
-  border-left: 3px solid var(--accent);
-  background: var(--tag-bg);
-  color: var(--muted);
-  font-size: 0.85rem;
-  border-radius: 0 6px 6px 0;
-}
-
-.share-alinti-notu span {
-  color: var(--text);
-  font-style: italic;
-}
-
