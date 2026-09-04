@@ -556,6 +556,28 @@
     {{ content }}
   </main>
 
+  {% comment %}
+    OKUMA ARAÇLARI (ilerleme çubuğu + seçim baloncuğu) — sadece "yazı
+    içeriği" gösteren sayfalarda yüklenir: GitHub'a commit edilmiş blog
+    yazıları/projeler (layout: post/project), GitHub'a hiç commit
+    edilmeden Supabase'te yayınlanan yazılar (icerik/supabase-yazi.md) ve
+    gizli ön izleme (onizleme/index.md). Diğer sayfalarda (anasayfa, liste
+    sayfaları, panel vb.) gereksiz yere yüklenmesin diye page.layout VE
+    page.permalink birlikte kontrol ediliyor — supabase-yazi.md ve
+    onizleme/index.md, gövdeyi çalışma zamanında (RPC ile) doldurduğu için
+    layout: default kullanıyor, page.layout ile ayırt edilemiyorlar.
+  {% endcomment %}
+  {% assign _okuma_araclari_sayfasi = false %}
+  {% if page.layout == "post" or page.layout == "project" %}
+    {% assign _okuma_araclari_sayfasi = true %}
+  {% elsif page.permalink == "/icerik/supabase-yazi.html" or page.permalink == "/onizleme/" %}
+    {% assign _okuma_araclari_sayfasi = true %}
+  {% endif %}
+  {% if _okuma_araclari_sayfasi %}
+  <script defer src="{{ '/assets/js/okuma-araclari/okuma-ilerleme-cubugu.js' | relative_url }}"></script>
+  <script defer src="{{ '/assets/js/okuma-araclari/secim-baloncugu.js' | relative_url }}"></script>
+  {% endif %}
+
   <footer class="site-footer">
     <div class="wrap">
       <p>
