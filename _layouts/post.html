@@ -21,10 +21,37 @@ layout: default
 
   <h1>{{ page.title }}</h1>
 
+  {% comment %}
+    OKUMA SÜRESİ: içerik kelime sayısı / dakikada ortalama 200 kelime + 1
+    (küsuratı yukarı yuvarlamaya yakın, en az "1 dk" göstermek için).
+  {% endcomment %}
+  {% assign _okuma_suresi = page.content | number_of_words | divided_by: 200 | plus: 1 %}
+
   <div class="meta">
     {{ page.date | date: "%d %B %Y" }}
     {% if page.author %} · Yazan: {{ page.author }}{% endif %}
+    · {{ _okuma_suresi }} dk okuma
   </div>
+
+  {% if page.pdf_url %}
+    {% assign _pdf_on7 = page.pdf_url | slice: 0, 7 | downcase %}
+    {% assign _pdf_on8 = page.pdf_url | slice: 0, 8 | downcase %}
+    {% if _pdf_on7 == "http://" or _pdf_on8 == "https://" %}
+    <p class="pdf-indir-alani">
+      <a href="{{ page.pdf_url | escape }}" class="pdf-indir-btn" target="_blank" rel="noopener noreferrer">
+        📄 PDF İndir
+      </a>
+    </p>
+    {% endif %}
+  {% endif %}
+
+  {% if page.toc %}
+  <details class="akademik-toc">
+    <summary>İçindekiler</summary>
+    * TOC
+    {:toc}
+  </details>
+  {% endif %}
 
   <div class="project-body">
     {{ content }}
