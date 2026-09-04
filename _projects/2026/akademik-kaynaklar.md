@@ -3,6 +3,7 @@ title: "Video Kaynakçaları ve Veri Analizleri"
 author: "Abdullah Eymen Asru"
 yazar_id: "1b251ffa-d81f-473d-89eb-83baf66364f6"
 olusturan_id: "1b251ffa-d81f-473d-89eb-83baf66364f6"
+reklam: false
 venue: "Kaynakça (Bibliography)"
 status: "Yayınlandı"
 summary: "Araştırmalarını yaptığım akademik çalışmaların kaynakçaları."
