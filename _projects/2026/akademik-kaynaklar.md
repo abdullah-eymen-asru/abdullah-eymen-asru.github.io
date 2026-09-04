@@ -1,14 +1,15 @@
 ---
 title: "Video Kaynakçaları ve Veri Analizleri"
-date: 2026-06-22
+author: "Abdullah Eymen Asru"
+yazar_id: "1b251ffa-d81f-473d-89eb-83baf66364f6"
+olusturan_id: "1b251ffa-d81f-473d-89eb-83baf66364f6"
 venue: "Kaynakça (Bibliography)"
 status: "Yayınlandı"
 summary: "Araştırmalarını yaptığım akademik çalışmaların kaynakçaları."
 link: "https://github.com/abdullah-eymen-asru/Akademik-Kaynaklar"
 link_label: "Kaynakçaları Görüntüle (See Bibliography)"
-yayinda: true            # zamanlanmış/gizli proje için — bkz. rehber/01-site-rehberi.md § 9
-sitemap: true             # yayinda:false ile BİRLİKTE yazılmalı — bkz. rehber/01-site-rehberi.md § 9
-permalink:   # gizli linkin adresi — bkz. rehber/01-site-rehberi.md § 9
+yayinda: true
+sitemap: true
 ---
 
 Bu depo, YouTube kanalımda yayınladığım jeopolitik analizler, açık kaynak istihbaratı (OSINT) raporları ve veri odaklı araştırmaların arkasındaki akademik kaynakçaları ve veri setlerini barındırmaktadır. 
