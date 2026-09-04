@@ -230,6 +230,33 @@ permalink: "/panel/github-yonetim.html"
               </span>
             </label>
           </div>
+          <div class="form-field">
+            <label class="gy-toggle-satir" for="ic-toc">
+              <span class="gy-toggle">
+                <input id="ic-toc" type="checkbox" role="switch">
+                <span class="gy-toggle-track"><span class="gy-toggle-thumb"></span></span>
+              </span>
+              <span class="gy-toggle-metin">
+                <strong>İçindekiler</strong>
+                <span class="muted">
+                  Açarsan yazının/projenin en başında, başlıkları ("##"/"###")
+                  otomatik listeleyen katlanabilir bir İçindekiler kutusu
+                  gösterilir. Uzun, alt başlıklara ayrılmış içerikler için
+                  önerilir; kısa yazılarda kapalı bırakabilirsin.
+                </span>
+              </span>
+            </label>
+          </div>
+          <div class="form-field">
+            <label for="ic-pdf-url">PDF Bağlantısı (opsiyonel)</label>
+            <input id="ic-pdf-url" type="url" placeholder="https://.../rapor.pdf">
+            <p class="gy-yardim-metni">
+              Doluysa yazının/projenin başında akademik/kurumsal görünümlü bir
+              "📄 PDF İndir" butonu çıkar — ör. tam metin makale, rapor ya da
+              sunum PDF'i için. Sadece <code>https://</code> ile başlayan
+              adresler kabul edilir.
+            </p>
+          </div>
           <div class="form-field" id="ic-gizli-hedef-wrap" hidden>
             <label>Yayında değilken nerede saklansın?</label>
             <div class="gy-tip-secim">
