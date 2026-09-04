@@ -1605,6 +1605,19 @@ function dosyaIcerigiOlustur(tur, alan, gizliKod, govde, yayinda = true) {
     satirlar.push(fmSatiri("reklam", false, true));
   }
 
+  // toc: SADECE açıkken (alan.toc === true) yazılır — kapalıyken front-
+  // matter'da hiç görünmez (Kramdown/_layouts/post.html ve project.html
+  // `page.toc` ile okur, hem blog hem proje için geçerli). pdf_url ise
+  // doluysa yazılır; şema kontrolü (http/https) hem burada (kullanıcıya
+  // anında geri bildirim için, bkz. formdanAlanlariOku) hem de
+  // _layouts/post.html / project.html'de Liquid ile TEKRAR yapılır.
+  if (alan.toc === true) {
+    satirlar.push(fmSatiri("toc", true, true));
+  }
+  if (alan.pdf_url) {
+    satirlar.push(fmSatiri("pdf_url", alan.pdf_url));
+  }
+
   if (tur === "proje") {
     satirlar.push(fmSatiri("venue", alan.venue));
     satirlar.push(fmSatiri("status", alan.status));
@@ -2019,8 +2032,20 @@ async function icerikKaydet(secenek = "a") {
 
   const yayinda = document.getElementById("ic-yayinda").checked;
   const reklam = document.getElementById("ic-reklam")?.checked !== false;
+  // toc/pdf_url: bkz. dosyaIcerigiOlustur başındaki not — hem blog hem
+  // proje için geçerli, tur'a göre dallanmaz (reklam ile aynı desen).
+  // pdf_url'de şema kontrolü burada da yapılıyor ki kullanıcı "http(s)
+  // olmayan" bir değer yazdığında sessizce yok sayılmak yerine anında
+  // (submit sırasında) haberdar olsun (bkz. birazdan eklenen kontrol).
+  const toc = !!document.getElementById("ic-toc")?.checked;
+  const pdfUrlHam = document.getElementById("ic-pdf-url")?.value.trim() || "";
   const yilOneki = tur === "proje" && document.getElementById("ic-yil-oneki").checked;
   const klasor = klasorSecimDegeriniAl();
+
+  if (pdfUrlHam && !/^https?:\/\//i.test(pdfUrlHam)) {
+    showMessage(msgEl, "PDF Bağlantısı sadece http:// veya https:// ile başlayabilir.", "error");
+    return;
+  }
 
   const alan = {
     title,
@@ -2040,6 +2065,8 @@ async function icerikKaydet(secenek = "a") {
     // front-matter'a yazılır (varsayılan = açık, front-matter'da hiç
     // görünmez, mevcut minimalist konvansiyonla tutarlı).
     reklam,
+    toc,
+    pdf_url: pdfUrlHam,
   };
   if (tur === "proje") {
     alan.venue = document.getElementById("ic-venue").value.trim();
@@ -2227,6 +2254,10 @@ async function icerikSupabaseeYaz(tur, alan, gizliKod, govde, slug, dosyaYolu, m
     // reklam: bkz. dosyaIcerigiOlustur başındaki not — draft GitHub'a
     // yayınlandığında (taslagiYayinla) bu değer front-matter'a taşınır.
     reklam: alan.reklam !== false,
+    // toc/pdf_url: aynı şekilde draft GitHub'a yayınlandığında front-
+    // matter'a taşınır (bkz. taslagiYayinla) — bkz. migration 0040.
+    toc: alan.toc === true,
+    pdf_url: alan.pdf_url || null,
     // "Admin/Site Sahibi adına yayınla" onay süreci (bkz. migration 0016 ve
     // 0023 / wireAdminAdinaTalep) — sunucu tarafındaki tetikleyici
     // admin_onay_durumu / sahip_onay_durumu'nu buna göre otomatik ayarlar.
@@ -2334,6 +2365,11 @@ async function icerikSadeceSupabaseeYayinla(tur, alan, gizliKod, govde, slug, do
     // RPC'sinden okuyup manuel reklam bloğunu ona göre gösterir/gizler
     // (bkz. migration'daki güncellenmiş RPC).
     reklam: alan.reklam !== false,
+    // toc/pdf_url: aynı RPC'den okunup icerik/supabase-yazi.js tarafından
+    // İçindekiler bloğu / PDF İndir butonu üretmek için kullanılır (bkz.
+    // assets/js/okuma-araclari/okuma-meta-yardimci.js ve migration 0040).
+    toc: alan.toc === true,
+    pdf_url: alan.pdf_url || null,
     // "Admin/Site Sahibi adına yayınla" onay süreci (bkz. migration 0016 ve
     // 0023 / wireAdminAdinaTalep) — sunucu tarafındaki tetikleyici
     // admin_onay_durumu / sahip_onay_durumu'nu buna göre otomatik ayarlar.
@@ -2432,6 +2468,8 @@ async function icerikSupabaseVeGithubaYaz(tur, alan, gizliKod, govde, slug, dosy
     yazar_id: alan.yazarId || null,
     yazar_adi: alan.author || null,
     reklam: alan.reklam !== false,
+    toc: alan.toc === true,
+    pdf_url: alan.pdf_url || null,
     // "Admin/Site Sahibi adına yayınla" onay süreci (bkz. migration 0016 ve
     // 0023 / wireAdminAdinaTalep) — sunucu tarafındaki tetikleyici
     // admin_onay_durumu / sahip_onay_durumu'nu buna göre otomatik ayarlar.
@@ -3449,6 +3487,8 @@ async function taslagiYayinla(item, tur, btn) {
       yazarId: item.data.yazar_id || null,
       olusturanId: item.data.olusturan_id || item.data.yazar_id || null,
       reklam: item.data.reklam !== false,
+      toc: item.data.toc === true,
+      pdf_url: item.data.pdf_url || null,
     };
     if (tur === "proje") {
       alan.venue = item.data.venue;
@@ -3530,9 +3570,11 @@ async function gitDenTaslagaTasi(item, tur, btn) {
       link_etiket: item.data.link_label || null,
       govde: item.body || "",
       onizleme_kod: gizliKod,
-      // reklam: GitHub'daki dosyanın front-matter'ındaki değeri (varsa)
-      // korunur — bkz. dosyaIcerigiOlustur/frontMatterOku.
+      // reklam/toc/pdf_url: GitHub'daki dosyanın front-matter'ındaki değeri
+      // (varsa) korunur — bkz. dosyaIcerigiOlustur/frontMatterOku.
       reklam: item.data.reklam !== false,
+      toc: item.data.toc === true,
+      pdf_url: item.data.pdf_url || null,
       created_by: user?.id || null,
     };
     const { error: upsertHata } = await supabase
@@ -3693,6 +3735,8 @@ async function icerikDuzenlemeyeYukle(item, tur) {
   document.getElementById("ic-yayinda").checked = yayinda;
   document.getElementById("ic-gizli-hedef-wrap").hidden = yayinda;
   document.getElementById("ic-reklam").checked = item.data.reklam !== false;
+  document.getElementById("ic-toc").checked = item.data.toc === true;
+  document.getElementById("ic-pdf-url").value = item.data.pdf_url || "";
 
   // İçeriğin daha önce üretilmiş bir gizli ön izleme kodu varsa hatırla ve
   // göster. Permalink/onizleme_kod herhangi bir sebeple eksikse (elle
