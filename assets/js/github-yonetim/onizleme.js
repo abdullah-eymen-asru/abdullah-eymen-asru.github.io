@@ -14,6 +14,7 @@
  * geliyor.
  */
 import { supabase, escapeHtml, guvenliDisUrlMi } from "../core/supabase-client.js";
+import { okumaSuresiHesapla, pdfButonuHtml, tocOlustur } from "../okuma-araclari/okuma-meta-yardimci.js";
 
 async function init() {
   const govdeEl = document.getElementById("onizleme-govde");
@@ -49,32 +50,46 @@ async function init() {
 
     document.title = `${kayit.baslik} · Ön İzleme`;
 
+    const okumaSuresiMetni = okumaSuresiHesapla(kayit.govde);
+
     let metaHtml = "";
     if (tur === "proje") {
       const parcalar = [];
       if (kayit.venue) parcalar.push(escapeHtml(kayit.venue));
       if (kayit.tarih) parcalar.push(new Date(kayit.tarih).getFullYear());
       if (kayit.durum) parcalar.push(`<span class="tag">${escapeHtml(kayit.durum)}</span>`);
+      parcalar.push(okumaSuresiMetni);
       metaHtml = `<div class="meta">${parcalar.join(" · ")}</div>`;
-    } else if (kayit.tarih) {
-      metaHtml = `<div class="meta">${new Date(kayit.tarih).toLocaleDateString("tr-TR", {
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-      })}</div>`;
+    } else {
+      const parcalar = [];
+      if (kayit.tarih) {
+        parcalar.push(
+          new Date(kayit.tarih).toLocaleDateString("tr-TR", { day: "2-digit", month: "long", year: "numeric" })
+        );
+      }
+      parcalar.push(okumaSuresiMetni);
+      metaHtml = `<div class="meta">${parcalar.join(" · ")}</div>`;
     }
 
     let html = `<h1>${escapeHtml(kayit.baslik)}</h1>${metaHtml}`;
+    html += pdfButonuHtml(kayit.pdf_url, escapeHtml);
     html += `<div class="project-body">${basitMarkdown(kayit.govde || "")}</div>`;
     // GÜVENLİK: href'e basmadan önce şema kontrolü (bkz. guvenliDisUrlMi
     // yorumu) — "javascript:" gibi bir URI hiç render edilmez.
     if (tur === "proje" && kayit.link && guvenliDisUrlMi(kayit.link)) {
-      html += `<p style="margin-top:2em;"><a href="${escapeHtml(kayit.link)}" target="_blank" rel="noopener noreferrer">→ ${escapeHtml(
+      html += `<p class="proje-baglanti-alani"><a href="${escapeHtml(kayit.link)}" target="_blank" rel="noopener noreferrer">→ ${escapeHtml(
         kayit.link_etiket || "Bağlantıyı görüntüle"
       )}</a></p>`;
     }
 
     govdeEl.innerHTML = html;
+
+    // İÇİNDEKİLER: bkz. supabase-yazi.js'deki AYNI mantık — gövde DOM'a
+    // yazıldıktan SONRA üretilip .project-body'nin hemen önüne eklenir.
+    const tocElementi = tocOlustur(govdeEl.querySelector(".project-body"), kayit.toc === true);
+    if (tocElementi) {
+      govdeEl.querySelector(".project-body").before(tocElementi);
+    }
   } catch (err) {
     console.error("onizleme.js init hatası:", err);
     if (uyariEl) uyariEl.hidden = true;
