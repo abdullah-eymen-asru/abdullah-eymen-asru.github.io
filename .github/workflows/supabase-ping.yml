@@ -1,0 +1,56 @@
+# Bu workflow'un TEK amacı: Supabase projesinin ücretsiz (free-tier) planda
+# ~7 gün API trafiği almadığı için otomatik olarak "pause" (uyku) moduna
+# geçmesini engellemek.
+#
+# SORUN: Proje çoğu zaman sadece kullanıcı giriş/kayıt olduğunda veya panel
+# üzerinden içerik yönetildiğinde Supabase'e istek atıyor. Trafiğin az
+# olduğu dönemlerde (ör. tatil, düşük ziyaretçi) 7 günlük sessizlik limiti
+# dolabilir ve proje duraklatılır — bu da siteye ilk gelen kullanıcının
+# giriş/panel işlevlerinin aniden çalışmamasına yol açar.
+#
+# ÇÖZÜM: Bu workflow haftada bir kez, Supabase REST API köküne (`/rest/v1/`)
+# hafif bir GET isteği atıyor. Bu istek herhangi bir tabloya veya RLS
+# politikasına bağımlı değildir (sadece anon key ile kimlik doğrulaması
+# yapılır), bu yüzden RLS kuralları değişse bile workflow kırılmaz.
+#
+# KURULUM (bir kereye mahsus):
+#   GitHub repo -> Settings -> Secrets and variables -> Actions:
+#     SUPABASE_URL       = https://<proje-ref>.supabase.co
+#     SUPABASE_ANON_KEY  = (Supabase Dashboard -> Project Settings -> API
+#                            -> "anon public" key)
+#
+# Not: Bu workflow SADECE Supabase'i uyanık tutmak içindir; herhangi bir
+# veri okumaz/yazmaz, sadece REST API'nin ayakta olup olmadığını kontrol
+# eden zararsız bir "yoklama" isteğidir.
+
+name: Supabase Uyanık Tutma (Haftalık Ping)
+
+on:
+  schedule:
+    # Her Pazartesi UTC 05:00 (Türkiye Saati ile 08:00).
+    # 7 günlük pause limitinin çok altında kalması için haftalık.
+    - cron: "0 5 * * 1"
+  workflow_dispatch: {}
+    # Actions sekmesinden elle "Run workflow" ile de tetiklenebilsin diye.
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gerekli secret'ların tanımlı olduğunu doğrula
+        run: |
+          if [ -z "${{ secrets.SUPABASE_URL }}" ]; then
+            echo "::error::SUPABASE_URL secret'ı tanımlı değil. Bu dosyanın başındaki kurulum adımlarına bak."
+            exit 1
+          fi
+          if [ -z "${{ secrets.SUPABASE_ANON_KEY }}" ]; then
+            echo "::error::SUPABASE_ANON_KEY secret'ı tanımlı değil. Bu dosyanın başındaki kurulum adımlarına bak."
+            exit 1
+          fi
+
+      - name: Supabase REST API'ye hafif GET ping'i gönder
+        run: |
+          curl "${{ secrets.SUPABASE_URL }}/rest/v1/" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            --fail --silent --show-error --output /dev/null
