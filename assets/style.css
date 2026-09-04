@@ -179,6 +179,64 @@ nav a.active {
   font-weight: 600;
 }
 
+/* "Listelerim" alt sekmeleri (İzlediklerim / Okuduklarım) — nav'daki
+   "İzlediklerim" ve "Okuduklarım" linkleri tek bir "Listelerim" linkinde
+   birleştiği için, iki sayfa arasında hangisinde olduğumuzu ve diğerine
+   nasıl geçileceğini gösteren sayfa-içi sekme çubuğu. İki ayrı statik
+   sayfa (izlediklerim.html / okuduklarim.html) arasında düz <a> linkiyle
+   geçiş yapar; herhangi bir JS'e ihtiyaç duymaz. */
+.listeler-sekmeler {
+  display: flex;
+  gap: 8px;
+  margin: 14px 0 22px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0;
+}
+
+.sekme-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: 8px 8px 0 0;
+  text-decoration: none;
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  border-bottom: none;
+  /* Sekme çubuğunun alt çizgisiyle aynı hizada, aktif olmayan sekmeler
+     için 2px'lik şeffaf bir "yer tutucu" alt kenarlık — aktif sekmeye
+     geçildiğinde dikey konum kaymasın diye. */
+  margin-bottom: -1px;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.sekme-btn:hover {
+  color: var(--text);
+  background: var(--tag-bg);
+}
+
+.sekme-btn.aktif {
+  color: var(--accent);
+  background: var(--card-bg);
+  border-color: var(--border);
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .listeler-sekmeler {
+    gap: 6px;
+  }
+
+  .sekme-btn {
+    flex: 1;
+    justify-content: center;
+    padding: 9px 8px;
+    font-size: 0.88rem;
+  }
+}
+
 /* HESAP MENÜSÜ (auth-nav) — bkz. _layouts/default.html ve assets/js/auth/nav-auth.js
    Giriş yapmışken/yapmamışken tek bir sekmede toplanan Giriş/Panelim/Admin/
    Çıkış linkleri. .auth-nav içindeki düz <a> (çıkış yapmışken "Giriş Yap")
