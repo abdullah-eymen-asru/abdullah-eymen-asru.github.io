@@ -494,8 +494,7 @@
           <a href="{{ '/icerik/blog.html' | relative_url }}" {% if page.url contains 'blog' %}class="active"{% endif %}>Blog</a>
           <a href="{{ '/kurumsal/iletisim.html' | relative_url }}" {% if page.url contains 'iletisim' %}class="active"{% endif %}>İletişim</a>
           <a href="{{ '/icerik/akademik-projeler.html' | relative_url }}" {% if page.url contains 'akademik-projeler' or page.url contains '/projects/' %}class="active"{% endif %}>Akademik Projeler</a>
-          <a href="{{ '/icerik/izlediklerim.html' | relative_url }}" {% if page.url contains 'izlediklerim' %}class="active"{% endif %}>İzlediklerim</a>
-          <a href="{{ '/icerik/okuduklarim.html' | relative_url }}" {% if page.url contains 'okuduklarim' %}class="active"{% endif %}>Okuduklarım</a>
+          <a href="{{ '/icerik/izlediklerim.html' | relative_url }}" {% if page.url contains 'izlediklerim' or page.url contains 'okuduklarim' %}class="active"{% endif %}>Listelerim</a>
         </div>
         <!--
           HESAP MENÜSÜ: Eskiden burada her zaman ayrı ayrı görünen sabit
