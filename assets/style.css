@@ -1297,3 +1297,213 @@ th { color: var(--muted); font-weight: 600; }
   font-size: 0.78rem;
   color: var(--muted);
 }
+
+/* ============================================================
+   OKUMA İLERLEME ÇUBUĞU (Scroll Progress Bar)
+   ============================================================
+   bkz. assets/js/okuma-araclari/okuma-ilerleme-cubugu.js — sayfanın
+   tepesinde sabit, 2px'lik minimalist çubuk. Dolgunun genişliği inline
+   style="" ATTRIBUTE'U ile DEĞİL, JS'in .style.setProperty() ile verdiği
+   --ilerleme CSS custom property'siyle (0 ile 1 arası) kontrol edilir;
+   burada sadece bu değeri bir scaleX() dönüşümüne çeviriyoruz. transform
+   kullanmak (width yerine) tarayıcıya yeniden layout hesaplattırmaz,
+   sadece compositor katmanında ölçekler — kaydırma sırasında EN PÜRÜZSÜZ
+   sonucu verir. */
+.okuma-ilerleme-cubugu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: transparent;
+  z-index: 1000;
+  /* Sayfanın en üstündeki diğer sabit unsurlarla (varsa) çakışmaması için
+     pointer-events kapalı — çubuk sadece görsel bir gösterge, tıklanabilir
+     bir öğe değil. */
+  pointer-events: none;
+}
+
+.okuma-ilerleme-cubugu-dolgu {
+  --ilerleme: 0;
+  height: 100%;
+  width: 100%;
+  transform-origin: left;
+  transform: scaleX(var(--ilerleme));
+  background: var(--accent);
+  will-change: transform;
+}
+
+/* ============================================================
+   PDF İNDİRME BUTONU
+   ============================================================
+   bkz. _layouts/post.html / project.html (page.pdf_url front-matter) ve
+   assets/js/okuma-araclari/okuma-meta-yardimci.js pdfButonuHtml()
+   (Supabase-only sayfalar için). Akademik/kurumsal görünüm: köşeli değil
+   ama belirgin bir çerçeve, ince bir vurgu tonuyla. */
+.pdf-indir-alani {
+  margin: 0 0 1.5em;
+}
+
+.pdf-indir-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--tag-bg);
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.pdf-indir-btn:hover {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+/* ============================================================
+   İÇİNDEKİLER (TOC)
+   ============================================================
+   bkz. _layouts/post.html / project.html (<details class="akademik-toc">
+   içinde Kramdown {:toc}) ve assets/js/okuma-araclari/okuma-meta-yardimci.js
+   tocOlustur() (Supabase-only sayfalarda tarayıcıda üretilen eşdeğeri —
+   AYNI class adlarını kullanır, böylece görsel olarak birebir aynı çıkar).
+   Kramdown'ın ürettiği liste, kendi iç içe <ul>/<li> yapısını kullanır;
+   client-side üretici ise düz bir <ul class="toc-liste"> üretir — ikisi
+   de aynı kurallardan faydalanabilsin diye seçiciler genel tutuluyor. */
+.akademik-toc {
+  margin: 0 0 1.8em;
+  padding: 4px 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-bg);
+}
+
+.akademik-toc summary {
+  cursor: pointer;
+  padding: 10px 0;
+  font-weight: 600;
+  color: var(--text);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Varsayılan disclosure oku (Safari/Chrome farklı render eder) yerine,
+   tüm tarayıcılarda tutarlı görünen kendi okumuzu çiziyoruz. */
+.akademik-toc summary::-webkit-details-marker {
+  display: none;
+}
+
+.akademik-toc summary::before {
+  content: "▸";
+  color: var(--accent);
+  transition: transform 0.15s ease;
+  font-size: 0.85em;
+}
+
+.akademik-toc[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.akademik-toc ul,
+.akademik-toc .toc-liste {
+  margin: 0 0 12px;
+  padding-left: 22px;
+  font-size: 0.92rem;
+  line-height: 1.9;
+}
+
+.akademik-toc li {
+  color: var(--muted);
+}
+
+.akademik-toc li.toc-alt-baslik,
+.akademik-toc ul ul li {
+  list-style-type: circle;
+  margin-left: 10px;
+  font-size: 0.95em;
+}
+
+.akademik-toc a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.akademik-toc a:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+/* ============================================================
+   METİN SEÇİNCE ÇIKAN MİKRO PAYLAŞ/ALINTILA BALONCUĞU
+   ============================================================
+   bkz. assets/js/okuma-araclari/secim-baloncugu.js. Konum (--baloncuk-ust /
+   --baloncuk-sol), JS'in .style.setProperty() ile verdiği CSS custom
+   property'lerden geliyor — inline style="" ATTRIBUTE'U kullanılmıyor.
+   translateX(-50%) ile baloncuk, seçimin ORTASINA göre ortalanıyor. */
+.secim-baloncugu {
+  --baloncuk-ust: 0px;
+  --baloncuk-sol: 0px;
+  position: absolute;
+  top: var(--baloncuk-ust);
+  left: var(--baloncuk-sol);
+  transform: translateX(-50%);
+  z-index: 900;
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 8px;
+  background: var(--text);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+  animation: secim-baloncugu-belir 0.12s ease;
+}
+
+[data-theme="dark"] .secim-baloncugu {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+}
+
+@keyframes secim-baloncugu-belir {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.secim-baloncugu-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--bg);
+  font-size: 0.82rem;
+  font-family: inherit;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+[data-theme="dark"] .secim-baloncugu-btn {
+  color: var(--text);
+}
+
+.secim-baloncugu-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+[data-theme="dark"] .secim-baloncugu-btn:hover {
+  background: var(--tag-bg);
+}
