@@ -112,6 +112,37 @@ permalink: "/panel/github-yonetim.html"
             </p>
           </div>
           <div class="form-field">
+            <label class="gy-toggle-satir" for="ic-akademik">
+              <span class="gy-toggle">
+                <input id="ic-akademik" type="checkbox" role="switch">
+                <span class="gy-toggle-track"><span class="gy-toggle-thumb"></span></span>
+              </span>
+              <span class="gy-toggle-metin">
+                <strong>Akademik Yazı / Atıf Kutusu Göster</strong>
+                <span class="muted">
+                  İşaretlersen sayfanın sonunda çok dilli (TR/EN) APA 7,
+                  Chicago 17, MLA 9 ve BibTeX formatında otomatik bir atıf
+                  kutusu (<code>_includes/atif-kutusu.html</code>) görünür.
+                  Kapalıyken front-matter'a hiç yazılmaz ve atıf kutusu bu
+                  içerikte hiç render edilmez.
+                </span>
+              </span>
+            </label>
+          </div>
+          <div class="form-field" id="ic-last-modified-at-wrap" hidden>
+            <label for="ic-last-modified-at">Atıf Kutusu — Güncelleme Tarihi (last_modified_at, isteğe bağlı)</label>
+            <input id="ic-last-modified-at" type="date">
+            <p class="gy-yardim-metni">
+              Sadece yukarıdaki "Akademik Yazı" kutusu açıkken görünür.
+              Doluysa atıf kutusundaki APA/Chicago/MLA/BibTeX formatlarının
+              hepsinde "güncellendi / son güncelleme / versiyon" bilgisi
+              olarak (dile göre biçimlendirilerek) eklenir; yukarıdaki genel
+              "Güncellenme tarihi" (<code>guncelleme_tarihi</code>) alanından
+              BAĞIMSIZDIR ve doluysa ona ÖNCELİKLİDİR. Boş bırakılırsa atıf
+              kutusu, doluysa yukarıdaki genel güncelleme tarihini kullanır.
+            </p>
+          </div>
+          <div class="form-field">
             <label for="ic-slug">Dosya adı / slug (boş bırakılırsa başlıktan otomatik üretilir)</label>
             <input id="ic-slug" type="text" placeholder="ornek-yazi-basligi" autocomplete="off">
           </div>
