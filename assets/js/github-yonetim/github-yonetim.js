@@ -1580,6 +1580,23 @@ function fmSatiri(anahtar, deger, ciplak = false) {
 function dosyaIcerigiOlustur(tur, alan, gizliKod, govde, yayinda = true) {
   const satirlar = ["---"];
   satirlar.push(fmSatiri("title", alan.title));
+  // date: ÖNEMLİ — ÇIPLAK (tırnaksız) yazılıyor ki Jekyll bunu bir YAML
+  // Date/Time nesnesi olarak parse etsin (tırnaklı olsaydı düz metin
+  // sayılır, page.date | date: "..." filtreleri ve atif-kutusu.html /
+  // _layouts/post.html+project.html'deki tüm tarih hesapları bozulurdu).
+  // ESKİDEN bu alan HİÇ yazılmıyordu — dosya sadece adındaki
+  // (YYYY-MM-DD-slug.md) tarihe güveniyordu, bu da SADECE _posts/ için
+  // (Jekyll'in kendi otomatik tarih çıkarımı sayesinde) tesadüfen
+  // çalışıyordu; _projects/ için hiç çalışmıyordu VE panel bir içeriği
+  // her açıp yeniden kaydettiğinde (frontMatterOku gerçek dosyadan okuduğu
+  // için) "date" alanı boş geldiğinden orijinal yayın tarihi kayboluyordu.
+  // Artık açıkça yazılıp okunduğu için bu döngü kırıldı.
+  satirlar.push(fmSatiri("date", alan.date, true));
+  // guncelleme_tarihi: TAMAMEN İSTEĞE BAĞLI, "date" ile AYNI mantıkla
+  // (çıplak/tarih olarak) yazılır ama SADECE doluysa — panelde kullanıcı
+  // bu kutuyu boş bırakırsa front-matter'da hiç görünmez (bkz. reklam/toc/
+  // pdf_url ile aynı "opsiyonel alan" konvansiyonu).
+  satirlar.push(fmSatiri("guncelleme_tarihi", alan.guncellemeTarihi, true));
   satirlar.push(fmSatiri("author", alan.author));
   // yazar_id: GitHub'a commit edilen dosyalarda da GÜVENİLİR bir sahiplik
   // kimliği tutmak için eklendi (bkz. icerikKendisineMiAit / Worker'daki
@@ -1973,6 +1990,10 @@ async function icerikKaydet(secenek = "a") {
   const tur = icerikTuru();
   const title = document.getElementById("ic-title").value.trim();
   const date = document.getElementById("ic-date").value;
+  // guncellemeTarihi TAMAMEN İSTEĞE BAĞLI — boşsa front-matter'a hiç
+  // yazılmaz (bkz. dosyaIcerigiOlustur), "date" (orijinal yayın tarihi)
+  // alanından BAĞIMSIZDIR, onu asla değiştirmez/ezmez.
+  const guncellemeTarihi = document.getElementById("ic-guncelleme-tarihi")?.value || "";
 
   if (!title || !date) {
     showMessage(msgEl, "Başlık ve tarih zorunludur.", "error");
@@ -2050,6 +2071,7 @@ async function icerikKaydet(secenek = "a") {
   const alan = {
     title,
     date,
+    guncellemeTarihi,
     author: yazar.ad,
     yazarId: yazar.id,
     // Formu GÖNDEREN kişi her zaman GİRİŞ_YAPAN_PROFIL'dir — "admin adına
@@ -2239,6 +2261,7 @@ async function icerikSupabaseeYaz(tur, alan, gizliKod, govde, slug, dosyaYolu, m
     tur,
     baslik: alan.title,
     tarih: alan.date,
+    guncelleme_tarihi: alan.guncellemeTarihi || null,
     slug,
     dosya_yolu: dosyaYolu,
     venue: alan.venue || null,
@@ -2346,6 +2369,7 @@ async function icerikSadeceSupabaseeYayinla(tur, alan, gizliKod, govde, slug, do
     tur,
     baslik: alan.title,
     tarih: alan.date,
+    guncelleme_tarihi: alan.guncellemeTarihi || null,
     slug,
     dosya_yolu: dosyaYolu,
     venue: alan.venue || null,
@@ -2455,6 +2479,7 @@ async function icerikSupabaseVeGithubaYaz(tur, alan, gizliKod, govde, slug, dosy
     tur,
     baslik: alan.title,
     tarih: alan.date,
+    guncelleme_tarihi: alan.guncellemeTarihi || null,
     slug,
     dosya_yolu: dosyaYolu,
     venue: alan.venue || null,
@@ -2676,6 +2701,7 @@ function taslakToItem(row) {
     data: {
       title: row.baslik,
       date: row.tarih,
+      guncelleme_tarihi: row.guncelleme_tarihi,
       venue: row.venue,
       status: row.durum,
       summary: row.ozet,
@@ -3483,6 +3509,7 @@ async function taslagiYayinla(item, tur, btn) {
     const alan = {
       title: item.data.title,
       date: item.data.date,
+      guncellemeTarihi: item.data.guncelleme_tarihi || null,
       author: item.data.yazar_adi || null,
       yazarId: item.data.yazar_id || null,
       olusturanId: item.data.olusturan_id || item.data.yazar_id || null,
@@ -3698,12 +3725,31 @@ async function icerikDuzenlemeyeYukle(item, tur) {
   await guncelleIcerikTuru();
 
   document.getElementById("ic-title").value = item.data.title || "";
-  document.getElementById("ic-date").value = item.data.date || "";
 
   // Supabase taslaklarında slug doğrudan saklanır (bkz. taslakToItem);
   // GitHub dosyalarında dosya adından geri çıkarılır.
   const yolKaynagi = item.kaynak === "supabase" ? item.data.dosya_yolu || "" : item.path;
   const dosyaAdi = yolKaynagi.split("/").pop().replace(/\.md$/, "");
+
+  // TARİH: artık dosyaIcerigiOlustur her zaman açık bir "date" alanı
+  // yazıyor (bkz. o fonksiyondaki not), o yüzden normal şartlarda
+  // item.data.date DOLU gelir ve orijinal yayın tarihi olduğu gibi
+  // korunur. GERİYE DÖNÜK UYUMLULUK: bu düzeltmeden ÖNCE panelle
+  // kaydedilmiş eski içeriklerde front-matter'da "date" alanı hiç
+  // olmayabilir — bu durumda formu BOŞ bırakıp kullanıcıyı "bugün"e
+  // zorlamak yerine, dosya adındaki tarihten (blog: YYYY-MM-DD-, proje:
+  // isteğe bağlı YYYY- yıl öneki) geri türetiyoruz; o da yoksa (proje +
+  // yıl öneki kapalı) son çare olarak mevcut değeri boş bırakıyoruz.
+  let tarihDegeri = item.data.date || "";
+  if (!tarihDegeri) {
+    const tamTarihEslesme = dosyaAdi.match(/^(\d{4}-\d{2}-\d{2})-/);
+    const yilOnekiEslesme = !tamTarihEslesme && dosyaAdi.match(/^(\d{4})-/);
+    if (tamTarihEslesme) tarihDegeri = tamTarihEslesme[1];
+    else if (yilOnekiEslesme) tarihDegeri = `${yilOnekiEslesme[1]}-01-01`;
+  }
+  document.getElementById("ic-date").value = tarihDegeri;
+  const guncellemeTarihiEl = document.getElementById("ic-guncelleme-tarihi");
+  if (guncellemeTarihiEl) guncellemeTarihiEl.value = item.data.guncelleme_tarihi || "";
   document.getElementById("ic-slug").value =
     item.kaynak === "supabase"
       ? item.data.slug || ""
