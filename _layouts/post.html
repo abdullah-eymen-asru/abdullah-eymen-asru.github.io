@@ -28,10 +28,25 @@ layout: default
   {% assign _okuma_suresi = page.content | number_of_words | divided_by: 200 | plus: 1 %}
 
   <div class="meta">
-    {{ page.date | date: "%d %B %Y" }}
-    {% if page.guncelleme_tarihi %} · Güncellendi: {{ page.guncelleme_tarihi | date: "%d %B %Y" }}{% endif %}
-    {% if page.author %} · Yazan: {{ page.author }}{% endif %}
-    · {{ _okuma_suresi }} dk okuma
+    {% if page.author %}Yazan: {{ page.author }} · {% endif %}{{ _okuma_suresi }} dk okuma
+  </div>
+
+  {% comment %}
+    TARİH ROZETLERİ: bkz. _layouts/project.html içindeki aynı bloğun
+    açıklaması — yayın/güncelleme tarihi artık ayrı, kendi rozetlerinde ve
+    Türkçe ay adıyla (`ay_adi_tr`, bkz. _plugins/turkce_ay_filtresi.rb).
+  {% endcomment %}
+  <div class="meta-tarihler">
+    <span class="tarih-rozeti tarih-rozeti-yayin">
+      <span class="tarih-rozeti-etiket">Yayınlandı</span>
+      <span class="tarih-rozeti-deger">{{ page.date | date: "%-d" }} {{ page.date | ay_adi_tr }} {{ page.date | date: "%Y" }}</span>
+    </span>
+    {% if page.guncelleme_tarihi %}
+    <span class="tarih-rozeti tarih-rozeti-guncelleme">
+      <span class="tarih-rozeti-etiket">Güncellendi</span>
+      <span class="tarih-rozeti-deger">{{ page.guncelleme_tarihi | date: "%-d" }} {{ page.guncelleme_tarihi | ay_adi_tr }} {{ page.guncelleme_tarihi | date: "%Y" }}</span>
+    </span>
+    {% endif %}
   </div>
 
   {% if page.pdf_url %}
