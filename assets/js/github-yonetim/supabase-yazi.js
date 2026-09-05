@@ -59,6 +59,11 @@ async function init() {
       const parcalar = [];
       if (kayit.venue) parcalar.push(escapeHtml(kayit.venue));
       if (kayit.tarih) parcalar.push(new Date(kayit.tarih).getFullYear());
+      if (kayit.guncelleme_tarihi) {
+        parcalar.push(
+          `Güncellendi: ${new Date(kayit.guncelleme_tarihi).toLocaleDateString("tr-TR", { day: "2-digit", month: "long", year: "numeric" })}`
+        );
+      }
       if (kayit.durum) parcalar.push(`<span class="tag">${escapeHtml(kayit.durum)}</span>`);
       if (kayit.yazar_adi) parcalar.push(`Yazan: ${escapeHtml(kayit.yazar_adi)}`);
       parcalar.push(okumaSuresiMetni);
@@ -68,6 +73,11 @@ async function init() {
       if (kayit.tarih) {
         parcalar.push(
           new Date(kayit.tarih).toLocaleDateString("tr-TR", { day: "2-digit", month: "long", year: "numeric" })
+        );
+      }
+      if (kayit.guncelleme_tarihi) {
+        parcalar.push(
+          `Güncellendi: ${new Date(kayit.guncelleme_tarihi).toLocaleDateString("tr-TR", { day: "2-digit", month: "long", year: "numeric" })}`
         );
       }
       if (kayit.yazar_adi) parcalar.push(`Yazan: ${escapeHtml(kayit.yazar_adi)}`);
