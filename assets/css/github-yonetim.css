@@ -330,8 +330,19 @@
 [data-theme="dark"] .gy-rozet--yayinda { background: #123a22; color: #9ee3b6; }
 [data-theme="dark"] .gy-rozet--gizli   { background: #3a1f1c; color: #f3a89c; }
 
+/* BUG FİX (mobil taşma): "flex-wrap" hiç belirtilmediği için tarayıcı
+   varsayılanı olan "nowrap" geçerliydi — "Supabase'e Taşı" / "Linki
+   Kopyala" / "Düzenle" / "Sil" gibi 4 buton TEK SATIRDA sıkışmaya
+   zorlanıyordu. Bu satırın doğal (sıkışmamış) genişliği dar ekranlarda
+   kartın (ve dolayısıyla sayfanın) genişliğini aşıyor, "flex-shrink: 0"
+   da butonların küçülmesini engellediği için taşma tüm sayfayı yatay
+   kaydırılabilir hale getiriyordu (ekran görüntüsünde "Sil" butonunun
+   kırpılması ve sayfanın sağa kaymış görünmesi buradan kaynaklanıyordu).
+   flex-wrap:wrap ile butonlar gerektiğinde ikinci bir satıra geçer,
+   hiçbiri ekran dışına taşmaz. */
 .gy-icerik-kart-aksiyonlar {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   flex-shrink: 0;
 }
@@ -444,8 +455,11 @@
   font-size: 0.82rem;
   color: var(--muted);
 }
+/* BUG FİX (mobil taşma): gy-icerik-kart-aksiyonlar ile aynı sorun —
+   flex-wrap eksikti, dar ekranlarda buton sırası sayfayı yatay taşırıyordu. */
 .gy-klasor-kart-aksiyonlar {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   flex-shrink: 0;
 }
