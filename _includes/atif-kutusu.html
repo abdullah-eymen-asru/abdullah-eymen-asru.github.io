@@ -191,15 +191,30 @@
     ISO (YYYY-MM-DD) biçiminde bir "version" alanı ekleniyor. Hiçbiri
     tanımlı değilse alan tamamen ATLANIYOR (boş/placeholder alan
     bırakılmıyor).
+
+    HİBRİT year/month + date ALANLARI (Zotero UYUMLULUĞU): Zotero'nun
+    BibTeX içe aktarıcısı tarihi öncelikle biblatex'in tek parça ISO 8601
+    "date" alanından (page.date, "%Y-%m-%d" biçiminde) okur; bu alan
+    yoksa veya ayrıştıramazsa "year"/"month" ikilisine döner. Eski
+    (yalnızca klasik BibTeX anlayan, biblatex'siz) derleyiciler ise
+    "date" alanını tanımadığından onlar için yayın tarihinin YINE de
+    ayrı "year" (YYYY) ve "month" (sayısal, dilden bağımsız 1-12)
+    alanlarında durması ZORUNLUDUR. Bu yüzden üç alan da BİRLİKTE,
+    birbirini DIŞLAMADAN üretiliyor: "year" + "month" (klasik derleyici
+    ve Zotero'nun geri düşme yolu için) VE "date" (biblatex/Zotero'nun
+    öncelikli okuduğu tek parça ISO alan). "day" alanı klasik BibTeX'te
+    zaten tanınmadığı ve artık "date" alanı aynı bilgiyi taşıdığı için
+    kaldırıldı — bu, tekrarı önler ve Zotero'nun date/year/month'tan
+    çelişkili gün bilgisi okumasını engeller.
   {% endcomment %}
   <div class="atif-metin-alani" data-atif-panel="bibtex" data-atif-dil="tr" role="tabpanel" hidden>
     <pre class="atif-metin atif-metin-kod">@{{ atif_bibtex_tur }}{ {{ atif_bibtex_anahtar }},
   author       = { {{ atif_yazar }} },
   title        = { {{ atif_baslik }} },
   howpublished = { Kişisel Web Sitesi },
-  year         = { {{ atif_yil }} },
+  year         = { {{ page.date | date: "%Y" }} },
   month        = { {{ page.date | date: "%-m" }} },
-  day          = { {{ atif_gun }} },
+  date         = { {{ page.date | date: "%Y-%m-%d" }} },
   url          = { <span data-atif-url>{{ atif_url_yedek }}</span> },
   urldate      = { <span data-atif-urldate>hesaplanıyor…</span> }{% if atif_revizyon_tarihi %},
   version      = { {{ atif_revizyon_tarihi | date: "%Y-%m-%d" }} }{% endif %}
@@ -210,9 +225,9 @@
   author       = { {{ atif_yazar }} },
   title        = { {{ atif_baslik }} },
   howpublished = { Personal Website },
-  year         = { {{ atif_yil }} },
+  year         = { {{ page.date | date: "%Y" }} },
   month        = { {{ page.date | date: "%-m" }} },
-  day          = { {{ atif_gun }} },
+  date         = { {{ page.date | date: "%Y-%m-%d" }} },
   url          = { <span data-atif-url>{{ atif_url_yedek }}</span> },
   urldate      = { <span data-atif-urldate>calculating…</span> }{% if atif_revizyon_tarihi %},
   version      = { {{ atif_revizyon_tarihi | date: "%Y-%m-%d" }} }{% endif %}
