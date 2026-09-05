@@ -73,13 +73,7 @@ layout: default
   {% endif %}
 
   {% if page.toc %}
-  <details class="akademik-toc" markdown="1">
-<summary>İçindekiler</summary>
-
-* TOC
-{:toc}
-
-  </details>
+  <div id="icindekiler-yeri"></div>
   {% endif %}
 
   <div class="project-body">
@@ -108,3 +102,21 @@ layout: default
   {% include reklam-yazi-alt.html %}
   {% include comments.html %}
 </article>
+
+{% if page.toc %}
+{% comment %}
+  İÇİNDEKİLER — bkz. _layouts/post.html'deki AYNI blok ve orada yazılan
+  gerekçe (kramdown'ın "* TOC {:toc}" söz dizimi bu build ortamında
+  <details markdown="1"> içinde bile düz metin olarak kalıyordu; bunun
+  yerine ZATEN Supabase-only sayfalarda güvenilir çalışan tocOlustur()
+  kullanılıyor — kramdown'ın ürettiği gerçek <h2>/<h3>/<h4> etiketlerini
+  tarayarak DOM'da kendi listesini inşa ediyor).
+{% endcomment %}
+<script type="module">
+  import { tocOlustur } from "{{ '/assets/js/okuma-araclari/okuma-meta-yardimci.js' | relative_url }}";
+  const hedef = document.getElementById("icindekiler-yeri");
+  const govdeEl = document.querySelector(".project-body");
+  const toc = tocOlustur(govdeEl, true);
+  if (hedef && toc) hedef.appendChild(toc);
+</script>
+{% endif %}
