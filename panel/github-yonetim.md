@@ -99,8 +99,17 @@ permalink: "/panel/github-yonetim.html"
             </p>
           </div>
           <div class="form-field">
-            <label for="ic-date">Tarih</label>
+            <label for="ic-date">Tarih (yayınlandığı/yayınlanacağı tarih)</label>
             <input id="ic-date" type="date" required>
+          </div>
+          <div class="form-field">
+            <label for="ic-guncelleme-tarihi">Güncellenme tarihi (isteğe bağlı)</label>
+            <input id="ic-guncelleme-tarihi" type="date">
+            <p class="gy-yardim-metni">
+              Boş bırakılırsa yazıda/projede hiç gösterilmez. Doldurursan
+              yukarıdaki "Tarih" (orijinal yayın tarihi) OLDUĞU GİBİ kalır,
+              sayfada ayrıca "Güncellendi: ..." olarak eklenir.
+            </p>
           </div>
           <div class="form-field">
             <label for="ic-slug">Dosya adı / slug (boş bırakılırsa başlıktan otomatik üretilir)</label>
