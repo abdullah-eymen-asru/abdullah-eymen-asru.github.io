@@ -244,6 +244,7 @@ async function init() {
     ["ayarları yükle", () => ghAyarlariniYukle()],
     ["bölüm navigasyonu", () => wireSectionNav()],
     ["içerik türü", () => wireIcerikTuruToggle()],
+    ["akademik/atıf alanı", () => wireAkademikToggle()],
     ["yazar alanı", () => wireYazarAlani()],
     ["admin adına yayın isteği", () => wireAdminAdinaTalep()],
     ["editör araç çubuğu", () => wireEditorToolbar()],
@@ -555,6 +556,31 @@ function wireIcerikTuruToggle() {
 
 function duzenlemeModuMu() {
   return !!(DUZENLENEN_YOL || DUZENLENEN_TASLAK_ID);
+}
+
+/* ---------------------------------------------------------------------- */
+/* AKADEMİK YAZI / ATIF KUTUSU (page.akademik + last_modified_at)         */
+/* ---------------------------------------------------------------------- */
+// "Akademik Yazı / Atıf Kutusu Göster" kutusu KAPALIYKEN "Atıf Kutusu —
+// Güncelleme Tarihi" (last_modified_at) alanı tamamen GİZLENİR — bu alanın
+// tek anlamı zaten atıf kutusuyla ilişkili olduğu için, kutu kapalıyken
+// göstermek kafa karıştırır. Inline onclick/style KULLANILMAZ, sadece
+// addEventListener (bkz. sıkı CSP notu, _plugins/csp_hash_enjekte.rb).
+function wireAkademikToggle() {
+  const akademikKutu = document.getElementById("ic-akademik");
+  const lastModifiedWrap = document.getElementById("ic-last-modified-at-wrap");
+  if (!akademikKutu || !lastModifiedWrap) return;
+
+  function uygula() {
+    lastModifiedWrap.hidden = !akademikKutu.checked;
+    if (!akademikKutu.checked) {
+      const lastModifiedEl = document.getElementById("ic-last-modified-at");
+      if (lastModifiedEl) lastModifiedEl.value = "";
+    }
+  }
+
+  akademikKutu.addEventListener("change", uygula);
+  uygula();
 }
 
 async function guncelleIcerikTuru() {
@@ -1597,6 +1623,22 @@ function dosyaIcerigiOlustur(tur, alan, gizliKod, govde, yayinda = true) {
   // bu kutuyu boş bırakırsa front-matter'da hiç görünmez (bkz. reklam/toc/
   // pdf_url ile aynı "opsiyonel alan" konvansiyonu).
   satirlar.push(fmSatiri("guncelleme_tarihi", alan.guncellemeTarihi, true));
+
+  // akademik: SADECE açıkken (alan.akademik === true) yazılır — kapalıyken
+  // (varsayılan) front-matter'da hiç görünmez, "reklam/toc" ile AYNI
+  // minimalist konvansiyon. _includes/atif-kutusu.html bu alanı
+  // `page.akademik == true` ile okur; alan hiç yoksa (ya da false ise)
+  // atıf kutusu HİÇ render edilmez.
+  if (alan.akademik === true) {
+    satirlar.push(fmSatiri("akademik", true, true));
+  }
+  // last_modified_at: TAMAMEN İSTEĞE BAĞLI, "guncelleme_tarihi" ile AYNI
+  // mantıkla (çıplak/tarih olarak) yazılır ama SADECE doluysa. Atıf
+  // kutusundaki APA/Chicago/MLA/BibTeX "güncellendi/son güncelleme/
+  // versiyon" bilgisi ÖNCELİKLE bu alandan okunur (bkz. atif-kutusu.html
+  // atif_revizyon_tarihi = page.last_modified_at | default:
+  // page.guncelleme_tarihi), sadece boşsa guncelleme_tarihi'ne düşer.
+  satirlar.push(fmSatiri("last_modified_at", alan.lastModifiedAt, true));
   satirlar.push(fmSatiri("author", alan.author));
   // yazar_id: GitHub'a commit edilen dosyalarda da GÜVENİLİR bir sahiplik
   // kimliği tutmak için eklendi (bkz. icerikKendisineMiAit / Worker'daki
@@ -1974,6 +2016,11 @@ function duzenlemeyiIptalEt() {
   // kilitleri hâlâ eski durumda kalabilir — change olayını tetikleyip
   // uygula()'yı yeniden çalıştırıyoruz.
   document.getElementById("ic-admin-adina-kutu")?.dispatchEvent(new Event("change"));
+  // "Akademik Yazı" kutusu da form.reset() ile işaretsiz hâle döndü ama
+  // "ic-last-modified-at-wrap" görünürlüğü (wireAkademikToggle) bunu
+  // otomatik BİLMEZ (native reset "change" olayı tetiklemez) — elle
+  // tetikliyoruz.
+  document.getElementById("ic-akademik")?.dispatchEvent(new Event("change"));
 }
 
 const SECENEK_BUTON_ID = {
@@ -1994,6 +2041,11 @@ async function icerikKaydet(secenek = "a") {
   // yazılmaz (bkz. dosyaIcerigiOlustur), "date" (orijinal yayın tarihi)
   // alanından BAĞIMSIZDIR, onu asla değiştirmez/ezmez.
   const guncellemeTarihi = document.getElementById("ic-guncelleme-tarihi")?.value || "";
+  // akademik/last_modified_at: bkz. dosyaIcerigiOlustur başındaki not —
+  // last_modified_at de guncellemeTarihi gibi TAMAMEN İSTEĞE BAĞLI, sadece
+  // "akademik" açıksa (wireAkademikToggle) alan görünür durumda olur.
+  const akademik = !!document.getElementById("ic-akademik")?.checked;
+  const lastModifiedAt = document.getElementById("ic-last-modified-at")?.value || "";
 
   if (!title || !date) {
     showMessage(msgEl, "Başlık ve tarih zorunludur.", "error");
@@ -2072,6 +2124,8 @@ async function icerikKaydet(secenek = "a") {
     title,
     date,
     guncellemeTarihi,
+    akademik,
+    lastModifiedAt,
     author: yazar.ad,
     yazarId: yazar.id,
     // Formu GÖNDEREN kişi her zaman GİRİŞ_YAPAN_PROFIL'dir — "admin adına
@@ -2262,6 +2316,8 @@ async function icerikSupabaseeYaz(tur, alan, gizliKod, govde, slug, dosyaYolu, m
     baslik: alan.title,
     tarih: alan.date,
     guncelleme_tarihi: alan.guncellemeTarihi || null,
+    akademik: alan.akademik === true,
+    last_modified_at: alan.lastModifiedAt || null,
     slug,
     dosya_yolu: dosyaYolu,
     venue: alan.venue || null,
@@ -2370,6 +2426,8 @@ async function icerikSadeceSupabaseeYayinla(tur, alan, gizliKod, govde, slug, do
     baslik: alan.title,
     tarih: alan.date,
     guncelleme_tarihi: alan.guncellemeTarihi || null,
+    akademik: alan.akademik === true,
+    last_modified_at: alan.lastModifiedAt || null,
     slug,
     dosya_yolu: dosyaYolu,
     venue: alan.venue || null,
@@ -2480,6 +2538,8 @@ async function icerikSupabaseVeGithubaYaz(tur, alan, gizliKod, govde, slug, dosy
     baslik: alan.title,
     tarih: alan.date,
     guncelleme_tarihi: alan.guncellemeTarihi || null,
+    akademik: alan.akademik === true,
+    last_modified_at: alan.lastModifiedAt || null,
     slug,
     dosya_yolu: dosyaYolu,
     venue: alan.venue || null,
@@ -3510,6 +3570,8 @@ async function taslagiYayinla(item, tur, btn) {
       title: item.data.title,
       date: item.data.date,
       guncellemeTarihi: item.data.guncelleme_tarihi || null,
+      akademik: item.data.akademik === true,
+      lastModifiedAt: item.data.last_modified_at || null,
       author: item.data.yazar_adi || null,
       yazarId: item.data.yazar_id || null,
       olusturanId: item.data.olusturan_id || item.data.yazar_id || null,
@@ -3597,11 +3659,14 @@ async function gitDenTaslagaTasi(item, tur, btn) {
       link_etiket: item.data.link_label || null,
       govde: item.body || "",
       onizleme_kod: gizliKod,
-      // reklam/toc/pdf_url: GitHub'daki dosyanın front-matter'ındaki değeri
-      // (varsa) korunur — bkz. dosyaIcerigiOlustur/frontMatterOku.
+      // reklam/toc/pdf_url/akademik/last_modified_at: GitHub'daki dosyanın
+      // front-matter'ındaki değeri (varsa) korunur — bkz.
+      // dosyaIcerigiOlustur/frontMatterOku.
       reklam: item.data.reklam !== false,
       toc: item.data.toc === true,
       pdf_url: item.data.pdf_url || null,
+      akademik: item.data.akademik === true,
+      last_modified_at: item.data.last_modified_at || null,
       created_by: user?.id || null,
     };
     const { error: upsertHata } = await supabase
@@ -3750,6 +3815,16 @@ async function icerikDuzenlemeyeYukle(item, tur) {
   document.getElementById("ic-date").value = tarihDegeri;
   const guncellemeTarihiEl = document.getElementById("ic-guncelleme-tarihi");
   if (guncellemeTarihiEl) guncellemeTarihiEl.value = item.data.guncelleme_tarihi || "";
+  // akademik/last_modified_at: düzenlemeye açılan içeriğin mevcut değerleri
+  // forma geri yüklenir; wireAkademikToggle'ın "change" dinleyicisi burada
+  // TETİKLENMEDİĞİ için (değer koddan atanıyor, kullanıcı tıklamıyor)
+  // görünürlüğü de burada elle senkronize ediyoruz.
+  const akademikEl = document.getElementById("ic-akademik");
+  const lastModifiedAtEl = document.getElementById("ic-last-modified-at");
+  const lastModifiedWrapEl = document.getElementById("ic-last-modified-at-wrap");
+  if (akademikEl) akademikEl.checked = item.data.akademik === true;
+  if (lastModifiedAtEl) lastModifiedAtEl.value = item.data.last_modified_at || "";
+  if (lastModifiedWrapEl) lastModifiedWrapEl.hidden = item.data.akademik !== true;
   document.getElementById("ic-slug").value =
     item.kaynak === "supabase"
       ? item.data.slug || ""
