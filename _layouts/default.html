@@ -476,6 +476,16 @@
         console.error("Schema Hatası:", err);
       });
   </script>
+
+  <!-- RSS/ATOM OTOMATİK KEŞİF (AUTO-DISCOVERY):
+       Inoreader, Feedly, tarayıcı RSS eklentileri ve podcast/okuyucu
+       uygulamaları bir siteye girdiğinde önce <head> içindeki bu
+       rel="alternate" etiketlerini arar; bulduklarında kullanıcı feed
+       URL'sini elle yapıştırmak zorunda kalmadan "Abone Ol" butonunu
+       gösterebilir. İki format da (Atom + RSS 2.0) ayrı ayrı ilan
+       ediliyor çünkü bazı istemciler sadece birini destekliyor. -->
+  <link rel="alternate" type="application/atom+xml" title="{{ site.title | xml_escape }} (Atom)" href="{{ '/feed.xml' | absolute_url }}">
+  <link rel="alternate" type="application/rss+xml" title="{{ site.title | xml_escape }} (RSS)" href="{{ '/rss.xml' | absolute_url }}">
 </head>
 <body>
   <div id="lang-notice" class="lang-notice">
