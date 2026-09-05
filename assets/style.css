@@ -1427,6 +1427,16 @@ th { color: var(--muted); font-weight: 600; }
   font-size: 0.95em;
 }
 
+/* H4 (bkz. okuma-meta-yardimci.js tocOlustur BUG FİX notu) — kramdown'ın
+   GitHub tarafında ürettiği ÜÇÜNCÜ kademe iç içe listenin (ul ul ul) görsel
+   dengi: bir kademe daha girintili, biraz daha küçük punto. */
+.akademik-toc li.toc-alt-alt-baslik,
+.akademik-toc ul ul ul li {
+  list-style-type: square;
+  margin-left: 20px;
+  font-size: 0.9em;
+}
+
 .akademik-toc a {
   color: var(--text);
   text-decoration: none;
