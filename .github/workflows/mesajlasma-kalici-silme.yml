@@ -1,0 +1,37 @@
+# Bu workflow, supabase/functions/mesajlasma-kalici-silme Edge Function'ını
+# GÜNDE BİR KEZ tetikler — migration 0035'teki "kişiler tarafından
+# gizlenmiş/silinmiş konuşma ve mesajları 30 gün sonra Supabase'den KALICI
+# olarak sil" işlemini dışarıdan periyodik çalıştırır. Aynı desen
+# admin-denetim-zaman-asimi.yml'de de kullanılıyor (bkz. o dosyanın başındaki
+# not) — tek fark: eşik 30 gün olduğu için 15 dakikada bir kontrol etmenin
+# bir anlamı yok, günde bir kez yeterli.
+#
+# KURULUM (bir kereye mahsus):
+#   1) supabase functions deploy mesajlasma-kalici-silme
+#   2) CRON_SHARED_SECRET zaten admin-denetim-zaman-asimi için ayarlıysa
+#      YENİDEN ayarlamana gerek yok (aynı sır iki fonksiyon tarafından da
+#      okunuyor); hiç ayarlanmadıysa: supabase secrets set CRON_SHARED_SECRET=<rastgele-uzun-bir-deger>
+#   3) GitHub repo -> Settings -> Secrets and variables -> Actions:
+#        MESAJ_KALICI_SILME_FUNCTION_URL = https://<proje-ref>.supabase.co/functions/v1/mesajlasma-kalici-silme
+#        MESAJ_KALICI_SILME_CRON_SECRET  = (2. adımdaki AYNI değer)
+
+name: Mesajlaşma — Kalıcı Silme (30 gün)
+
+on:
+  schedule:
+    - cron: "0 3 * * *"   # her gün 03:00 UTC'de bir kez
+  workflow_dispatch: {}
+
+jobs:
+  kalici-silmeyi-isle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kalıcı silme Edge Function'ını çağır
+        run: |
+          if [ -z "${{ secrets.MESAJ_KALICI_SILME_FUNCTION_URL }}" ]; then
+            echo "::error::MESAJ_KALICI_SILME_FUNCTION_URL secret'ı tanımlı değil. Bu dosyanın başındaki kurulum adımlarına bak."
+            exit 1
+          fi
+          curl -X POST "${{ secrets.MESAJ_KALICI_SILME_FUNCTION_URL }}" \
+            -H "X-Cron-Secret: ${{ secrets.MESAJ_KALICI_SILME_CRON_SECRET }}" \
+            --fail --silent --show-error
