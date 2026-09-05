@@ -29,12 +29,36 @@ layout: default
 
   <div class="meta">
     {% if page.venue %}{{ page.venue }}{% endif %}
-    {% if page.date %} · {{ page.date | date: "%Y" }}{% endif %}
-    {% if page.guncelleme_tarihi %} · Güncellendi: {{ page.guncelleme_tarihi | date: "%d %B %Y" }}{% endif %}
     {% if page.status %} · <span class="tag">{{ page.status }}</span>{% endif %}
     {% if page.author %} · Yazan: {{ page.author }}{% endif %}
     · {{ _okuma_suresi }} dk okuma
   </div>
+
+  {% comment %}
+    TARİH ROZETLERİ: yayın ve (varsa) güncelleme tarihi, yukarıdaki meta
+    satırından ayrı, kendi rozetlerinde gösteriliyor — ikisi aynı satıra
+    "·" ile eklenince (özellikle güncelleme tarihi de varken) satır çok
+    kalabalıklaşıp hangi tarihin ne olduğu okunaklı çıkmıyordu. Ay adı
+    `ay_adi_tr` filtresiyle (bkz. _plugins/turkce_ay_filtresi.rb) Türkçe
+    üretiliyor — Jekyll'in kendi `date: "%B"` filtresi build ortamının
+    locale'i yüzünden hep İngilizce ay adı veriyordu.
+  {% endcomment %}
+  {% if page.date or page.guncelleme_tarihi %}
+  <div class="meta-tarihler">
+    {% if page.date %}
+    <span class="tarih-rozeti tarih-rozeti-yayin">
+      <span class="tarih-rozeti-etiket">Yayınlandı</span>
+      <span class="tarih-rozeti-deger">{{ page.date | date: "%-d" }} {{ page.date | ay_adi_tr }} {{ page.date | date: "%Y" }}</span>
+    </span>
+    {% endif %}
+    {% if page.guncelleme_tarihi %}
+    <span class="tarih-rozeti tarih-rozeti-guncelleme">
+      <span class="tarih-rozeti-etiket">Güncellendi</span>
+      <span class="tarih-rozeti-deger">{{ page.guncelleme_tarihi | date: "%-d" }} {{ page.guncelleme_tarihi | ay_adi_tr }} {{ page.guncelleme_tarihi | date: "%Y" }}</span>
+    </span>
+    {% endif %}
+  </div>
+  {% endif %}
 
   {% if page.pdf_url %}
     {% assign _pdf_on7 = page.pdf_url | slice: 0, 7 | downcase %}
