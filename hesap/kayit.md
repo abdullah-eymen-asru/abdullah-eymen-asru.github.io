@@ -28,19 +28,35 @@ permalink: "/hesap/kayit.html"
 
   <div id="kayit-aktif-alan">
 
-  <!-- KVKK onayı BİLEREK formun dışında, en üstte duruyor: hem e-posta/şifre
-       ile kayıtta hem de aşağıdaki "Google ile Kayıt Ol" butonunda ortak
-       kullanılıyor (Google'ın kendi ekranında KVKK onayı almadığımız için
-       OAuth'u başlatmadan ÖNCE bunun işaretli olması zorunlu tutuluyor —
-       bkz. assets/js/auth/auth-pages.js). form="kayit-form" ile aşağıdaki forma
-       bağlı kaldığı için normal kayıt gönderiminde de değeri okunur. -->
-  <div class="form-field">
-    <label class="csp-flex-gap8-start-row">
-      <input class="csp-mt-3" id="kvkk_onay" name="kvkk_onay" type="checkbox" form="kayit-form" required>
+  <!-- HUKUKİ AYRIM (bkz. auth-pages.js başındaki not): aşağıdaki iki öğe
+       KASITLI olarak birbirinden bağımsızdır ve "paket rıza" oluşturmaz:
+
+       1) Aydınlatma bilgilendirmesi (#kvkk-aydinlatma-bilgi): bir ONAY
+          KUTUSU DEĞİLDİR, sadece Aydınlatma Metni'ne bağlantı veren bir
+          bilgilendirme cümlesidir. Kayıt olmak KVKK m.10 kapsamındaki
+          aydınlatma yükümlülüğünün ifası içindir; ayrıca imzalanan bir
+          "okudum" kutusu ZORUNLU TUTULMAZ.
+
+       2) Yurt dışı aktarım açık rıza onay kutusu (#kvkk-yurtdisi-onay):
+          KVKK m.9 kapsamında AYRI, özgür iradeye dayalı bir açık rızadır.
+          Varsayılan olarak İŞARETSİZ (unchecked) gelir, önceden
+          işaretlenemez ve hem e-posta/şifre kaydında hem de aşağıdaki
+          "Google ile Kayıt Ol" butonunda (Google'ın kendi ekranında bu
+          rızayı almadığımız için) OAuth başlatılmadan önce ayrıca kontrol
+          edilir — bkz. assets/js/auth/auth-pages.js. form="kayit-form" ile
+          aşağıdaki forma bağlı kaldığı için normal kayıt gönderiminde de
+          değeri okunur. -->
+  <p id="kvkk-aydinlatma-bilgi">
+    Kayıt olarak <a href="{{ '/kurumsal/gizlilik-politikasi.html' | relative_url }}" target="_blank" rel="noopener noreferrer">Aydınlatma Metni</a>'ni okuduğunuzu beyan edersiniz.
+  </p>
+
+  <div class="form-checkbox">
+    <label for="kvkk-yurtdisi-onay">
+      <input id="kvkk-yurtdisi-onay" name="yurtdisi_onay" type="checkbox" form="kayit-form" required>
       <span>
-        <a href="{{ '/kurumsal/gizlilik-politikasi.html' | relative_url }}" target="_blank" rel="noopener noreferrer">KVKK Aydınlatma Metni ve Gizlilik Politikası</a>'nı
-        okudum, 6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında kişisel
-        verilerimin belirtilen şekilde işlenmesine açık rıza gösteriyorum.
+        Kişisel verilerimin üyelik işlemlerinin yürütülmesi amacıyla yurt
+        dışında (Almanya/Frankfurt) bulunan güvenli Supabase sunucularına
+        aktarılmasına açık rıza veriyorum.
       </span>
     </label>
   </div>
