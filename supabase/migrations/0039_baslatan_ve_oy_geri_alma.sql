@@ -1,4 +1,4 @@
--- 0037_baslatan_ve_oy_geri_alma.sql
+-- 0039_baslatan_ve_oy_geri_alma.sql
 -- (A) _denetim_bildirim_gonder(): artık vakayı BAŞLATAN adminin ad-soyadını
 --     da payload'a ekliyor (Telegram/SMS mesajında "Başlatan: X" satırı
 --     için — panel zaten bunu gösteriyordu, sadece bildirimde eksikti).
