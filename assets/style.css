@@ -1493,3 +1493,97 @@ th { color: var(--muted); font-weight: 600; }
   color: var(--text);
   font-style: italic;
 }
+
+/* ============================================================
+   ATIF KUTUSU (APA 7 / Chicago / MLA 9 / BibTeX)
+   ============================================================
+   bkz. _includes/atif-kutusu.html. TASARIM İSTEĞİ: "anasayfada yer alan
+   hakkımda kutusu gibi" — bu yüzden dil VE format sekmeleri, sitede zaten
+   var olan .lang-tabs/.lang-tab-btn (bkz. _includes/hakkimda-icerik.md,
+   yukarıdaki ".lang-tabs" kuralı) ile TAMAMEN AYNI görsel dili kullanıyor:
+   düz metin + alt çizgi vurgusu, tarayıcı varsayılanı KÜÇÜK/SIKIŞIK buton
+   değil. İki farklı context class'ı (.atif-dil-secici, .atif-format-
+   sekmeleri) sadece "hangi grup" olduğunu ayırt etmek için var, GÖRSEL
+   olarak ikisi de .lang-tab-btn kurallarından besleniyor; burada SADECE
+   format sekmesi grubunun (4 buton: APA/Chicago/MLA/BibTeX) dar ekranda
+   satır kaydırabilmesi (flex-wrap) için ek bir kural gerekiyor. */
+.atif-dil-secici,
+.atif-format-sekmeleri {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+.atif-metin-alani {
+  margin: 0 0 1.2em;
+}
+
+.atif-metin {
+  margin: 0;
+  line-height: 1.7;
+  color: var(--text);
+}
+
+/* BibTeX PANELİ: diğer üç formattan farklı olarak çok satırlı/girintili
+   bir kod bloğu — bu yüzden <pre> içinde, monospace yazı tipiyle ve yatay
+   kaydırılabilir (uzun URL'ler taşarsa) bir kutuda gösteriliyor. */
+.atif-metin-kod {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.atif-alt-satir {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.atif-kopyala-buton {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 0.88rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.atif-kopyala-buton:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.atif-kopyalandi-bildirim {
+  color: var(--accent);
+  font-size: 0.88rem;
+}
+
+.atif-not {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.atif-kutusu {
+  margin: 2.5em 0;
+  padding: 20px 22px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card-bg);
+}
+
+.atif-baslik {
+  margin: 0 0 14px;
+  font-size: 1.15rem;
+  color: var(--text);
+}
