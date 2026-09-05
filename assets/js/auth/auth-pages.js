@@ -504,14 +504,18 @@ export function initGirisPage() {
 
 /**
  * "Google ile Giriş Yap" sonrası bu sayfaya (giris.html) dönüldüğünde
- * çağrılır. Oturum kurulunca profildeki kvkk_onay_verildi bayrağına bakar:
- *  - true  -> bu üye gerçekten kayıtlı (bir zamanlar KVKK onayı vererek
- *             kayıt olmuş), istenen hedefe yönlendirilir.
- *  - false/yok -> bu Google hesabıyla hiç kayıt olunmamış (handle_new_user
- *             trigger'ı OAuth ile gelen HERKES için otomatik bir profil
- *             satırı açar, ama kvkk_onay_verildi varsayılan olarak false'tur)
- *             -> oturum kapatılır, "kullanıcı bulunamadı" mesajı gösterilir,
- *             panele erişim VERİLMEZ.
+ * çağrılır. Oturum kurulunca profildeki kvkk_onay_verildi VE
+ * yurtdisi_onay_verildi bayraklarına bakar (ikisi de true olmalı — bu iki
+ * onay ayrı ayrı toplanır ama "gerçekten kayıtlı üye" sayılmak için ikisi
+ * de gereklidir, çünkü üyelik altyapısı yurt dışında barındığından
+ * yurt dışı rızası olmadan veri işleme hukuki dayanaktan yoksun kalır):
+ *  - ikisi de true -> bu üye gerçekten kayıtlı, istenen hedefe yönlendirilir.
+ *  - biri/ikisi false/yok -> bu Google hesabıyla hiç GERÇEK kayıt
+ *             tamamlanmamış (handle_new_user trigger'ı OAuth ile gelen
+ *             HERKES için otomatik bir profil satırı açar, ama onay
+ *             bayrakları varsayılan olarak false'tur) -> oturum kapatılır,
+ *             "kullanıcı bulunamadı" mesajı gösterilir, panele erişim
+ *             VERİLMEZ.
  */
 function googleGirisDonusunuIsle(msg) {
   let tamamlandi = false;
@@ -531,11 +535,11 @@ function googleGirisDonusunuIsle(msg) {
 
     const { data: profile, error } = await supabase
       .from("profiles")
-      .select("kvkk_onay_verildi")
+      .select("kvkk_onay_verildi, yurtdisi_onay_verildi")
       .eq("id", session.user.id)
       .single();
 
-    if (!error && profile?.kvkk_onay_verildi) {
+    if (!error && profile?.kvkk_onay_verildi && profile?.yurtdisi_onay_verildi) {
       // GÜVENLİK DÜZELTMESİ: Google ile giriş de aynı şekilde AAL2
       // kontrolünden geçmeli — hesapta 2FA açıksa Google kimliği tek
       // başına yeterli değildir, authenticator kodu da istenir (bkz.
@@ -599,16 +603,22 @@ export async function initKayitPage() {
   // ?email=... ekliyoruz ki hesap-onayla.html açılınca e-posta alanı
   // otomatik dolu gelsin (kullanıcı tekrar yazmak zorunda kalmasın).
   const kodOnayLink = document.getElementById("kod-ile-onayla-link");
-  // KVKK checkbox'ı artık HEM e-posta/şifre formunu HEM "Google ile Kayıt
-  // Ol" butonunu birlikte gater — bu yüzden <form>'un dışında, sayfanın en
-  // üstünde duruyor (bkz. kayit.md) ve form="kayit-form" ile forma bağlı.
-  // Doğrudan id ile okuyoruz ki Google butonunun click dinleyicisi de
-  // (form submit olmadan) durumuna bakabilsin.
-  const kvkkCheckbox = document.getElementById("kvkk_onay");
+  // HUKUKİ AYRIM: aydınlatma bilgilendirmesi (#kvkk-aydinlatma-bilgi) artık
+  // bir onay kutusu DEĞİL, sadece bilgilendirici bir metin/bağlantıdır —
+  // kayıt olma eylemi kendisi aydınlatmanın ifası sayılır, ayrıca okunacak
+  // bir JS kontrolüne konu değildir. Tek gerçek onay kutusu, KVKK m.9
+  // kapsamında AYRI bir açık rıza olan "yurt dışına aktarım" kutusudur;
+  // bu da HEM e-posta/şifre formunu HEM "Google ile Kayıt Ol" butonunu
+  // birlikte gater — bu yüzden <form>'un dışında, sayfanın en üstünde
+  // duruyor (bkz. kayit.md) ve form="kayit-form" ile forma bağlı. Doğrudan
+  // id ile okuyoruz ki Google butonunun click dinleyicisi de (form submit
+  // olmadan) durumuna bakabilsin. Varsayılan olarak İŞARETSİZ gelir (bkz.
+  // kayit.md) — bu script hiçbir yerde onu önceden işaretli hale getirmez.
+  const yurtdisiCheckbox = document.getElementById("kvkk-yurtdisi-onay");
 
   // Google OAuth dönüşünde (bkz. aşağıdaki googleBtn dinleyicisi) Supabase
-  // bizi buraya (kayit.html) geri gönderdiyse KVKK onayını veritabanına
-  // yaz ve panele yönlendir.
+  // bizi buraya (kayit.html) geri gönderdiyse onayları veritabanına yaz ve
+  // panele yönlendir.
   if (sessionStorage.getItem(GOOGLE_KAYIT_INTENT_KEY) === "1") {
     googleKayitDonusunuIsle(msg);
   }
@@ -622,7 +632,14 @@ export async function initKayitPage() {
     const passwordAgain = form.password_again.value;
     const firstName = form.first_name.value.trim();
     const lastName = form.last_name.value.trim();
-    const kvkkOnay = kvkkCheckbox?.checked ?? false;
+    // Yurt dışına aktarım rızası: KVKK m.9 kapsamında aydınlatmadan AYRI,
+    // bağımsız bir açık rızadır — aşağıdaki kontrol paket rıza değildir,
+    // sadece bu sitenin üyelik altyapısının (Supabase, Frankfurt) yurt
+    // dışında barınması nedeniyle üyeliğin teknik olarak bu rıza olmadan
+    // kurulamamasının bir sonucudur; kullanıcı bu kutuyu işaretlemeyi
+    // reddederse kayıt tamamlanmaz, ama bu yalnızca "yurt dışı aktarım"
+    // rızasına bağlıdır — aydınlatma bilgilendirmesine değil.
+    const yurtdisiOnay = yurtdisiCheckbox?.checked ?? false;
 
     if (password !== passwordAgain) {
       showMessage(msg, "Şifreler birbiriyle eşleşmiyor.");
@@ -636,8 +653,11 @@ export async function initKayitPage() {
       showMessage(msg, "Ad ve soyadını gir.");
       return;
     }
-    if (!kvkkOnay) {
-      showMessage(msg, "Kayıt olmak için KVKK Aydınlatma Metni ve Açık Rıza onayını işaretlemelisin.");
+    if (!yurtdisiOnay) {
+      showMessage(
+        msg,
+        "Kayıt olmak için verilerin yurt dışına (Almanya/Frankfurt) aktarılmasına açık rıza onay kutusunu işaretlemelisin."
+      );
       return;
     }
 
@@ -654,8 +674,19 @@ export async function initKayitPage() {
           data: {
             first_name: firstName, // handle_new_user() trigger'ı bunu profiles.first_name'e kopyalar
             last_name: lastName,   // handle_new_user() trigger'ı bunu profiles.last_name'e kopyalar
+            // "kvkk_onay": Aydınlatma Metni bilgilendirmesinin kayıt anında
+            // ulaştırıldığının kaydı — bir açık rıza DEĞİLDİR, aydınlatma
+            // yükümlülüğünün ifasının log'udur, bu yüzden formda ayrı bir
+            // onay kutusu yoktur ve buraya her zaman true yazılır.
             kvkk_onay: true,
             kvkk_versiyon: KVKK_METIN_SURUMU,
+            // "yurtdisi_onay": KVKK m.9 kapsamında AYRI açık rıza — yukarıda
+            // zaten işaretli olmadan bu noktaya gelinemeyeceği doğrulandı,
+            // ama gerçek değeri (true) burada da kasıtlı olarak ayrı bir
+            // alanda taşınıyor ki veritabanı tarafında iki onay birbirine
+            // asla karışmasın.
+            yurtdisi_onay: yurtdisiOnay,
+            yurtdisi_versiyon: KVKK_METIN_SURUMU,
           },
           emailRedirectTo: `${SITE_ORIGIN}/hesap/giris.html`,
         },
@@ -710,13 +741,15 @@ export async function initKayitPage() {
   });
 
   googleBtn?.addEventListener("click", async () => {
-    // Google OAuth kendi ekranında bir KVKK onayı almıyor — bu yüzden
-    // OAuth'u BAŞLATMADAN ÖNCE checkbox'ın işaretli olmasını zorunlu
-    // tutuyoruz. İşaretli değilse hiç Google penceresi açılmaz.
-    if (!kvkkCheckbox?.checked) {
+    // Google OAuth kendi ekranında yurt dışı aktarım açık rızasını almıyor
+    // — bu yüzden OAuth'u BAŞLATMADAN ÖNCE checkbox'ın işaretli olmasını
+    // zorunlu tutuyoruz. İşaretli değilse hiç Google penceresi açılmaz.
+    // (Aydınlatma bilgilendirmesi bir onay kutusu olmadığı için burada
+    // kontrol edilmez; kayıt eylemi zaten aydınlatmanın ifası sayılır.)
+    if (!yurtdisiCheckbox?.checked) {
       showMessage(
         msg,
-        "Google ile kayıt olmak için önce yukarıdaki KVKK Aydınlatma Metni ve Açık Rıza onayını işaretlemelisin."
+        "Google ile kayıt olmak için önce yukarıdaki yurt dışına aktarım açık rıza onay kutusunu işaretlemelisin."
       );
       return;
     }
@@ -764,11 +797,11 @@ function googleKayitDonusunuIsle(msg) {
     // ÜZERİNE YAZMIYORUZ.
     const { data: mevcutProfil, error: profilHata } = await supabase
       .from("profiles")
-      .select("kvkk_onay_verildi")
+      .select("kvkk_onay_verildi, yurtdisi_onay_verildi")
       .eq("id", session.user.id)
       .single();
 
-    if (!profilHata && mevcutProfil?.kvkk_onay_verildi) {
+    if (!profilHata && mevcutProfil?.kvkk_onay_verildi && mevcutProfil?.yurtdisi_onay_verildi) {
       showMessage(
         msg,
         "Bu e-postayla zaten bir hesabın var, kayıt olmana gerek yok. Seni hesabına giriş yaptırdık, panele yönlendiriliyorsun...",
@@ -778,12 +811,21 @@ function googleKayitDonusunuIsle(msg) {
       return;
     }
 
-    const { error } = await supabase.rpc("kvkk_onayini_ver", { p_versiyon: KVKK_METIN_SURUMU });
+    // Bu noktaya kadar geldiysek googleBtn'in click dinleyicisi zaten
+    // yurtdisiCheckbox'ın işaretli olduğunu doğrulamıştı (OAuth aksi halde
+    // hiç başlatılmazdı) — o yüzden burada p_yurtdisi_onay değeri her
+    // zaman true olarak RPC'ye gönderilir; aydınlatma onayı (p_versiyon)
+    // ile AYRI parametreler olarak taşınır, birbirine karıştırılmaz.
+    const { error } = await supabase.rpc("kvkk_onayini_ver", {
+      p_versiyon: KVKK_METIN_SURUMU,
+      p_yurtdisi_onay: true,
+      p_yurtdisi_versiyon: KVKK_METIN_SURUMU,
+    });
     if (error) {
-      console.error("Google ile kayıtta KVKK onayı kaydedilemedi:", error);
+      console.error("Google ile kayıtta onaylar kaydedilemedi:", error);
       showMessage(
         msg,
-        "Google ile giriş yapıldı ama KVKK onayın kaydedilemedi. Panele yönlendiriliyorsun, lütfen oradan tekrar onayla.",
+        "Google ile giriş yapıldı ama onayların kaydedilemedi. Panele yönlendiriliyorsun, lütfen oradan tekrar onayla.",
         "success"
       );
       setTimeout(() => (window.location.href = REDIRECT_AFTER_LOGIN), 1800);
