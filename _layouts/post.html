@@ -62,13 +62,7 @@ layout: default
   {% endif %}
 
   {% if page.toc %}
-  <details class="akademik-toc" markdown="1">
-<summary>İçindekiler</summary>
-
-* TOC
-{:toc}
-
-  </details>
+  <div id="icindekiler-yeri"></div>
   {% endif %}
 
   <div class="project-body">
@@ -80,3 +74,31 @@ layout: default
   {% include reklam-yazi-alt.html %}
   {% include comments.html %}
 </article>
+
+{% if page.toc %}
+{% comment %}
+  İÇİNDEKİLER — NEDEN kramdown'ın kendi "* TOC {:toc}" söz dizimi YERİNE
+  bu JS yaklaşımı kullanılıyor: kramdown, <details> gibi bir HTML blok
+  etiketinin içeriğini markdown="1" ile işaretlense bile (ve doğru
+  girinti/boş satır düzeniyle bile) bu build/GitHub Pages ortamında
+  "* TOC {:toc}" satırlarını DÜZ METİN olarak bırakıyordu (gerçek bir
+  listeye/İçindekiler'e hiç dönüşmüyordu) — muhtemelen bu kramdown
+  sürümünün/yapılandırmasının markdown="1" + IAL kombinasyonunu güvenilir
+  şekilde desteklememesinden kaynaklanıyor.
+
+  Bunun yerine assets/js/okuma-araclari/okuma-meta-yardimci.js'teki
+  tocOlustur() — "Sadece Supabase'te Yayınla"/"Ön İzleme" sayfalarında
+  ZATEN güvenilir şekilde çalışan AYNI fonksiyon — burada da kullanılıyor:
+  kramdown'ın (buraya kadar sorunsuz) ürettiği GERÇEK <h2>/<h3>/<h4>
+  etiketlerini ".project-body" içinde TARAYIP kendi İçindekiler listesini
+  DOM'da inşa ediyor. Bu, kramdown'ın dahili "{:toc}" mekanizmasının
+  hiçbir iç detayına bağımlı olmadığı için çok daha güvenilir.
+{% endcomment %}
+<script type="module">
+  import { tocOlustur } from "{{ '/assets/js/okuma-araclari/okuma-meta-yardimci.js' | relative_url }}";
+  const hedef = document.getElementById("icindekiler-yeri");
+  const govdeEl = document.querySelector(".project-body");
+  const toc = tocOlustur(govdeEl, true);
+  if (hedef && toc) hedef.appendChild(toc);
+</script>
+{% endif %}
