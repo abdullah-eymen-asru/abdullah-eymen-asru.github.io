@@ -107,15 +107,32 @@ async function init() {
   }
 }
 
-/** ozel-icerik.js ile aynı, bağımlılıksız basit markdown->HTML dönüşümü (bkz. o dosyadaki açıklama). */
+/** ozel-icerik.js ile aynı, bağımlılıksız basit markdown->HTML dönüşümü (bkz. o dosyadaki açıklama).
+ *
+ * BUG FİX ("### şeklinde kalıyor" / H3-H4 içindekilere girmiyor): bu
+ * fonksiyon önceden SADECE "# ", "## ", "### " (H1-H3) kalıplarını
+ * tanıyordu — editördeki "H4" araç çubuğu düğmesiyle ("#### metin", bkz.
+ * panel/github-yonetim.md) eklenen bir alt-alt başlık hiç yakalanmıyor,
+ * "#### ..." METNİ olarak kalıyordu (GitHub'a commit edilip Jekyll/
+ * kramdown ile derlenen yazılarda bu sorun hiç yaşanmaz — kramdown H1-H6
+ * arası tüm seviyeleri zaten doğru işler; bu basit dönüştürücü SADECE
+ * Jekyll'i hiç görmeyen üç yol için kullanılır: önizleme, "sadece
+ * Supabase'te yayınla" ve "özel içerik"). Artık "#" sayısını (1-4 arası,
+ * editörün üretebildiği azami seviye) SAYIP ona göre h1..h4 üretiyor —
+ * assets/js/okuma-araclari/okuma-meta-yardimci.js'teki tocOlustur() da
+ * (bkz. o dosyadaki AYNI bugfix notu) artık h4'ü İçindekiler'e dahil
+ * ediyor, ikisi birlikte çalışır.
+ */
 function basitMarkdown(md) {
   const esc = escapeHtml(md);
   return esc
     .split(/\n{2,}/)
     .map((blok) => {
-      if (/^### /.test(blok)) return `<h3>${blok.slice(4)}</h3>`;
-      if (/^## /.test(blok)) return `<h2>${blok.slice(3)}</h2>`;
-      if (/^# /.test(blok)) return `<h1>${blok.slice(2)}</h1>`;
+      const baslikEslesme = blok.match(/^(#{1,4})[ \t]+(.+)$/);
+      if (baslikEslesme) {
+        const seviye = baslikEslesme[1].length;
+        return `<h${seviye}>${baslikEslesme[2]}</h${seviye}>`;
+      }
       let satir = blok
         .replaceAll(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
         .replaceAll(/\*(.+?)\*/g, "<em>$1</em>")
