@@ -1,12 +1,30 @@
 <div class="share-buttons" id="share-buttons">
   <span class="share-label">Paylaş:</span>
-  <a class="share-btn" data-share="whatsapp" target="_blank" rel="noopener noreferrer" href="#">WhatsApp</a>
-  <a class="share-btn" data-share="x" target="_blank" rel="noopener noreferrer" href="#">X</a>
-  <a class="share-btn" data-share="linkedin" target="_blank" rel="noopener noreferrer" href="#">LinkedIn</a>
-  <a class="share-btn" data-share="telegram" target="_blank" rel="noopener noreferrer" href="#">Telegram</a>
-  <a class="share-btn" data-share="facebook" target="_blank" rel="noopener noreferrer" href="#">Facebook</a>
-  <a class="share-btn" data-share="reddit" target="_blank" rel="noopener noreferrer" href="#">Reddit</a>
-  <a class="share-btn" data-share="pinterest" target="_blank" rel="noopener noreferrer" href="#">Pinterest</a>
+  {% comment %}
+    RESMİ MARKA İKONLARI (Simple Icons CDN): her platform linkinin
+    başına, o markanın resmi renk/logosunu barındıran Simple Icons
+    projesinin CDN'inden (cdn.simpleicons.org) bir <img> ekleniyor.
+    Bu servis marka SVG'lerini simpleicons.org'daki (markaların kendi
+    resmi stil kılavuzlarından derlenen) kaynaktan, marka renginin
+    VARSAYILAN olarak kullanıldığı biçimde sunar — renk parametresi
+    HİÇ verilmediği için her ikon kendi resmi rengiyle gelir.
+
+    GERİ DÜŞME (fallback) DAVRANIŞI: bu ikon isteği build-time'da DEĞİL,
+    ziyaretçinin tarayıcısında, sayfa yüklenirken ağ üzerinden yapılır.
+    CDN'e erişilemezse (ağ engeli, CDN kesintisi, vb.) tarayıcı <img>
+    üzerinde "onerror" olayını tetikler; bu olay ikonu DOM'dan tamamen
+    kaldırır (this.remove()) — placeholder/kırık-resim simgesi asla
+    görünmez, buton SADECE ESKİ (ikonsuz, salt metin) hâline geri döner.
+    Böylece ikon hiçbir zaman butonun önceki görünümünü BOZMAZ, sadece
+    başarıyla yüklendiğinde bir iyileştirme olarak eklenir.
+  {% endcomment %}
+  <a class="share-btn" data-share="whatsapp" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/whatsapp?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy" onerror="this.remove()">WhatsApp</a>
+  <a class="share-btn" data-share="x" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/x?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy" onerror="this.remove()">X</a>
+  <a class="share-btn" data-share="linkedin" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/linkedin?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy" onerror="this.remove()">LinkedIn</a>
+  <a class="share-btn" data-share="telegram" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/telegram?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy" onerror="this.remove()">Telegram</a>
+  <a class="share-btn" data-share="facebook" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/facebook?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy" onerror="this.remove()">Facebook</a>
+  <a class="share-btn" data-share="reddit" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/reddit?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy" onerror="this.remove()">Reddit</a>
+  <a class="share-btn" data-share="pinterest" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/pinterest?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy" onerror="this.remove()">Pinterest</a>
   <button class="share-btn" id="native-share-btn" type="button" hidden>📤 Paylaş</button>
   <button class="share-btn" id="copy-link-btn" type="button">Linki Kopyala</button>
 </div>
