@@ -749,7 +749,7 @@ export async function initKayitPage() {
     if (!yurtdisiCheckbox?.checked) {
       showMessage(
         msg,
-        "Google ile kayıt olmak için önce yukarıdaki yurt dışına aktarım açık rıza onay kutusunu işaretlemelisin."
+        "Google ile kayıt olmak için önce aşağıdaki yurt dışına aktarım açık rıza onay kutusunu işaretlemelisin."
       );
       return;
     }
