@@ -43,22 +43,67 @@ comment on column public.profiles.yurtdisi_onay_versiyonu is
 -- akışta hep true gelir, ama bu trigger'ı kasıtlı olarak "aydınlatma" ile
 -- "yurt dışı rızası"nı birbirine kilitlemeyecek şekilde tasarlıyoruz — ikisi
 -- ayrı sinyal, ayrı sütun, ayrı zaman damgası.
+--
+-- ÖNEMLİ: fonksiyonun geri kalanı migration 0031'deki (bu migration'dan
+-- önceki en güncel) haliyle BİREBİR aynı tutuluyor — kayıtlar-kapalı
+-- kontrolü (site_settings.kayitlar_acik), given_name/family_name önceliği,
+-- tek-parça isimden bölme mantığının HİÇBİRİ değiştirilmedi/kaldırılmadı,
+-- SADECE insert listesine yurtdisi_onay_* kolonları eklendi. (İlk yazımda
+-- bu fonksiyon yanlışlıkla eski/basitleştirilmiş bir sürümle "create or
+-- replace" edilmişti — bu, 0031'in kayıtlar-kapalı kontrolünü VE
+-- 0010/0031'in ad/soyad ayrıştırma mantığını sessizce SİLERdi. Bu
+-- migration'ın nihai hali bu hatayı içermez.)
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_first text;
+  v_last  text;
+  v_tek_parca text;
+  v_kayitlar_acik boolean;
 begin
+  -- bkz. migration 0031: üyelik kayıtları kapalıysa burada dur — exception,
+  -- bu trigger'ı tetikleyen auth.users INSERT'ini de (aynı transaction
+  -- içinde olduğu için) geri alır, yani hesap hiç oluşmaz.
+  select kayitlar_acik into v_kayitlar_acik from public.site_settings where id = 1;
+  if coalesce(v_kayitlar_acik, true) = false then
+    raise exception 'KAYITLAR_KAPALI: Üyelik kayıtları şu anda kapalı, yeni hesap oluşturulamaz.';
+  end if;
+
+  v_first := nullif(trim(new.raw_user_meta_data->>'first_name'), '');
+  v_last  := nullif(trim(new.raw_user_meta_data->>'last_name'), '');
+
+  -- Google OAuth: given_name/family_name varsa (Google'ın kendi ayırdığı
+  -- alanlar) ÖNCE bunlar kullanılır — çok kelimeli Türkçe isimlerde tek
+  -- parçayı ilk boşluktan bölmekten çok daha güvenilir sonuç verir.
+  if v_first is null and v_last is null then
+    v_first := nullif(trim(new.raw_user_meta_data->>'given_name'), '');
+    v_last  := nullif(trim(new.raw_user_meta_data->>'family_name'), '');
+  end if;
+
+  -- Hiçbiri yoksa (bazı hesaplarda/eski istemcilerde olabilir) tek parça
+  -- isimden (full_name/name) bölmeye geri dön.
+  if v_first is null and v_last is null then
+    v_tek_parca := coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name');
+    if v_tek_parca is not null and trim(v_tek_parca) <> '' then
+      v_first := nullif(split_part(trim(v_tek_parca), ' ', 1), '');
+      v_last  := nullif(trim(substring(trim(v_tek_parca) from length(split_part(trim(v_tek_parca), ' ', 1)) + 1)), '');
+    end if;
+  end if;
+
   insert into public.profiles (
-    id, email, full_name, role,
+    id, email, first_name, last_name, role,
     kvkk_onay_verildi, kvkk_onay_tarihi, kvkk_onay_versiyonu,
     yurtdisi_onay_verildi, yurtdisi_onay_tarihi, yurtdisi_onay_versiyonu
   )
   values (
     new.id,
     new.email,
-    coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name'),
+    v_first,
+    v_last,
     'user',
     coalesce((new.raw_user_meta_data->>'kvkk_onay')::boolean, false),
     case when coalesce((new.raw_user_meta_data->>'kvkk_onay')::boolean, false)
@@ -74,14 +119,25 @@ begin
 end;
 $$;
 
+-- migration 0031'de bu fonksiyonun EXECUTE izni public/anon/authenticated'tan
+-- alınmıştı (sadece auth.users trigger'ı SECURITY DEFINER ile çağırır) —
+-- burada fonksiyonu yeniden tanımladığımız için Postgres varsayılan EXECUTE
+-- iznini PUBLIC'e geri vermiş olabilir; aynı kısıtlamayı yeniden uyguluyoruz.
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
+
 -- Google OAuth ile kayıt olanlar için: OAuth kendi ekranında ne aydınlatma
 -- beyanını ne de yurt dışı aktarım rızasını ayrı ayrı alabildiğimiz bir
 -- arayüz sunmuyor. kvkk_onayini_ver() zaten aydınlatma beyanını kaydediyordu
--- (bkz. migration 0003); burada AYNI RPC'yi, kayıt sayfasındaki iki
+-- (bkz. migration 0003/0004); burada AYNI RPC'yi, kayıt sayfasındaki iki
 -- checkbox'ın (aydınlatma linki + yurt dışı rıza kutusu) o anki durumunu da
 -- iletecek şekilde genişletiyoruz. p_yurtdisi_onay parametresi
 -- varsayılan NULL bırakılıp geçilmezse yurt dışı rızası DOKUNULMADAN kalır
 -- (var olan çağıranlarla geriye dönük uyumluluk için).
+--
+-- ÖNEMLİ: migration 0004'te bu fonksiyona eklenen "sessiz başarısızlığı
+-- ortadan kaldırma" düzeltmesi (oturum yoksa veya güncellenen satır sayısı
+-- 0 ise AÇIKÇA hata fırlatma) burada KORUNUYOR — aksi halde bu migration
+-- 0004'ün düzelttiği hatayı yeniden geri getirmiş olurdu.
 create or replace function public.kvkk_onayini_ver(
   p_versiyon text,
   p_yurtdisi_onay boolean default null,
@@ -93,6 +149,10 @@ security definer
 set search_path = public
 as $$
 begin
+  if auth.uid() is null then
+    raise exception 'Oturum bulunamadı, lütfen tekrar giriş yap.';
+  end if;
+
   update public.profiles
   set kvkk_onay_verildi = true,
       kvkk_onay_tarihi = now(),
@@ -111,15 +171,22 @@ begin
         else p_yurtdisi_versiyon
       end
   where id = auth.uid();
+
+  if not found then
+    raise exception 'Profil bulunamadı, onay kaydedilemedi.';
+  end if;
 end;
 $$;
 
-revoke execute on function public.kvkk_onayini_ver(text, boolean, text) from public;
+revoke execute on function public.kvkk_onayini_ver(text, boolean, text) from public, anon;
 grant  execute on function public.kvkk_onayini_ver(text, boolean, text) to authenticated;
 
 -- Eski imza (tek parametreli) hâlâ referans veren istemci kodu olabilir diye
 -- overload olarak bırakılıyor; sadece aydınlatma beyanını günceller, yurt
--- dışı rızasına dokunmaz.
+-- dışı rızasına dokunmaz. Aynı şekilde oturum/satır kontrolünü (0004) korur
+-- — burada ayrıca tekrarlanıyor (3 parametreli sürüme devrederek değil,
+-- doğrudan) ki "not found" hatası BU çağrının kendi p_versiyon'una göre
+-- doğru şekilde raporlansın.
 create or replace function public.kvkk_onayini_ver(p_versiyon text)
 returns void
 language plpgsql
@@ -127,9 +194,21 @@ security definer
 set search_path = public
 as $$
 begin
-  perform public.kvkk_onayini_ver(p_versiyon, null, null);
+  if auth.uid() is null then
+    raise exception 'Oturum bulunamadı, lütfen tekrar giriş yap.';
+  end if;
+
+  update public.profiles
+  set kvkk_onay_verildi = true,
+      kvkk_onay_tarihi = now(),
+      kvkk_onay_versiyonu = p_versiyon
+  where id = auth.uid();
+
+  if not found then
+    raise exception 'Profil bulunamadı, onay kaydedilemedi.';
+  end if;
 end;
 $$;
 
-revoke execute on function public.kvkk_onayini_ver(text) from public;
+revoke execute on function public.kvkk_onayini_ver(text) from public, anon;
 grant  execute on function public.kvkk_onayini_ver(text) to authenticated;
