@@ -46,6 +46,22 @@
   transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 
+/* MOBİL YATAY TAŞMA (BUG FİX): overflow-x:hidden SADECE <body>'e
+   uygulandığında bazı mobil tarayıcılarda (özellikle iOS Safari) yeterli
+   olmuyor — gerçek kaydırma/viewport elemanı çoğu zaman <html>'in
+   kendisidir ve <body> onun İÇİNDE normal bir kutu olarak davranır.
+   İçerikte (ör. .gy-icerik-kart-aksiyonlar'daki buton sırası ya da
+   mobilde sağa yaslı ".auth-nav-menu" açılır menüsü gibi) satır kaydırma
+   OLMADAN taşan bir eleman varsa, <html>'in kendi genişliği içeriğe göre
+   büyüyor ve tüm sayfa sağa doğru kaydırılabilir hale geliyordu — <body>
+   üzerindeki overflow-x:hidden bunu KESMİYORDU, çünkü taşmanın gerçek
+   kaynağı <html> düzeyindeydi. <html>'e de aynı kuralı vererek taşmayı
+   kök seviyede kesin olarak engelliyoruz. */
+html {
+  overflow-x: hidden;
+  width: 100%;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -59,8 +75,11 @@ body {
      açabiliyordu — bu da sayfanın yüklenirken/kaydırılırken hafifçe sağa-
      sola "kaymış" gibi görünmesine (ve istenmeyen bir yatay scrollbar
      belirmesine) neden oluyordu. overflow-x:hidden bu taşmayı sayfa
-     seviyesinde güvenli bir şekilde keser. */
+     seviyesinde güvenli bir şekilde keser. (Yukarıdaki <html> kuralıyla
+     birlikte, taşmanın kaynağı ister <body>'in kendi çocukları ister
+     daha üstteki bir katman olsun, ikisi de kesilir.) */
   overflow-x: hidden;
+  width: 100%;
 }
 
 .wrap {
@@ -352,8 +371,19 @@ html[data-auth-hint="in"] .auth-nav-fallback-hesap { display: inline-block; }
   color: #d64545;
 }
 
+/* BUG FİX (mobil taşma): ".auth-nav" mobilde nav çubuğunun EN SAĞINDA
+   duruyor (bkz. aşağıdaki "flex: 0 0 auto" kuralı) — yani tetikleyici
+   buton zaten ekranın sağ kenarına yakın. Menüyü "left:0" ile butonun SOL
+   kenarına hizalamak, min-width:170px'lik menünün büyük kısmının
+   viewport'un sağından TAŞMASINA (ve bunun da sayfa genelinde istenmeyen
+   yatay kaydırmaya) yol açıyordu. Doğrusu — tıpkı masaüstünde olduğu
+   gibi — menüyü butonun SAĞ kenarına hizalayıp SOLA doğru açmak
+   (right:0), böylece menü her zaman ekranın içinde kalır. Bu yüzden bu
+   medya sorgusu artık tabanı EZMİYOR (override kaldırıldı); base
+   ".auth-nav-menu" kuralındaki right:0 mobilde de geçerli. Ekstra bir
+   güvenlik payı olarak menünün genişliğini de viewport'a göre sınırlıyoruz. */
 @media (max-width: 640px) {
-  .auth-nav-menu { right: auto; left: 0; }
+  .auth-nav-menu { max-width: calc(100vw - 32px); }
 }
 
 .content { padding: 40px 20px 60px; min-height: 60vh; }
