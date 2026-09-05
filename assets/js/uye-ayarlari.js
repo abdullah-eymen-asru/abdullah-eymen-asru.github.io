@@ -80,7 +80,9 @@ async function loadUsers() {
   const liste = document.getElementById("uya-liste");
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, email, first_name, last_name, full_name, role, created_at, kvkk_onay_verildi, kvkk_onay_tarihi")
+    .select(
+      "id, email, first_name, last_name, full_name, role, created_at, kvkk_onay_verildi, kvkk_onay_tarihi, yurtdisi_onay_verildi, yurtdisi_onay_tarihi"
+    )
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -281,8 +283,13 @@ function uyeKartHtml(u) {
         <span>Kayıt: ${new Date(u.created_at).toLocaleDateString("tr-TR")}</span>
         <span>${
           u.kvkk_onay_verildi
-            ? `KVKK: ✓ ${new Date(u.kvkk_onay_tarihi).toLocaleDateString("tr-TR")}`
-            : `KVKK: <span class="muted">Yok</span>`
+            ? `Aydınlatma: ✓ ${new Date(u.kvkk_onay_tarihi).toLocaleDateString("tr-TR")}`
+            : `Aydınlatma: <span class="muted">Yok</span>`
+        }</span>
+        <span>${
+          u.yurtdisi_onay_verildi
+            ? `Yurt Dışı Rızası: ✓ ${new Date(u.yurtdisi_onay_tarihi).toLocaleDateString("tr-TR")}`
+            : `Yurt Dışı Rızası: <span class="muted">Yok</span>`
         }</span>
       </div>
 
