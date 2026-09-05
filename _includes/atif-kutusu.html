@@ -43,10 +43,27 @@
 {% assign aylar_tr = "Ocak,Şubat,Mart,Nisan,Mayıs,Haziran,Temmuz,Ağustos,Eylül,Ekim,Kasım,Aralık" | split: "," %}
 {% assign atif_ay_index = page.date | date: "%-m" | minus: 1 %}
 {% assign atif_ay_adi = aylar_tr[atif_ay_index] %}
+{% assign atif_ay_adi_en = page.date | date: "%B" %}
 {% assign atif_gun = page.date | date: "%-d" %}
 {% assign atif_yil = page.date | date: "%Y" %}
 {% assign atif_yayin_tarihi_tr = atif_gun | append: " " | append: atif_ay_adi | append: " " | append: atif_yil %}
 {% assign atif_yayin_tarihi_en = page.date | date: "%B %-d, %Y" %}
+
+{% comment %}
+  GÜNCELLEME TARİHİ (opsiyonel): sadece page.guncelleme_tarihi doluysa
+  hesaplanır. Chicago paneli "Son güncelleme" etiketini ARTIK gerçekten
+  güncelleme tarihinden okuyor — önceki sürümde bu etiket her zaman yayın
+  tarihini (page.date) gösteriyordu, yani güncellenmemiş bir sayfada bile
+  yanlışlıkla "son güncelleme" ibaresi yayın tarihini taşıyordu.
+{% endcomment %}
+{% if page.guncelleme_tarihi %}
+  {% assign atif_guncelleme_ay_index = page.guncelleme_tarihi | date: "%-m" | minus: 1 %}
+  {% assign atif_guncelleme_ay_adi = aylar_tr[atif_guncelleme_ay_index] %}
+  {% assign atif_guncelleme_gun = page.guncelleme_tarihi | date: "%-d" %}
+  {% assign atif_guncelleme_yil = page.guncelleme_tarihi | date: "%Y" %}
+  {% assign atif_guncelleme_tarihi_tr = atif_guncelleme_gun | append: " " | append: atif_guncelleme_ay_adi | append: " " | append: atif_guncelleme_yil %}
+  {% assign atif_guncelleme_tarihi_en = page.guncelleme_tarihi | date: "%B %-d, %Y" %}
+{% endif %}
 
 {% comment %}
   BibTeX citekey: "SoyadYıl-ilkKelime" biçiminde, ör. "asru2026video".
@@ -76,17 +93,17 @@
   </div>
 
   <div class="atif-metin-alani" data-atif-panel="apa" data-atif-dil="tr" role="tabpanel">
-    <p class="atif-metin">{{ atif_yazar }}. ({{ atif_yil }}). <em>{{ atif_baslik }}</em>. {{ atif_site }}. <span data-atif-erisim>Erişim tarihi hesaplanıyor…</span> tarihinde <a href="{{ atif_url_yedek }}" data-atif-url>{{ atif_url_yedek }}</a> adresinden erişildi.</p>
+    <p class="atif-metin">{{ atif_yazar }}. ({{ atif_yil }}, {{ atif_gun }} {{ atif_ay_adi }}). <em>{{ atif_baslik }}</em>. {{ atif_site }}. <span data-atif-erisim>Erişim tarihi hesaplanıyor…</span> tarihinde <a href="{{ atif_url_yedek }}" data-atif-url>{{ atif_url_yedek }}</a> adresinden erişildi.</p>
   </div>
   <div class="atif-metin-alani" data-atif-panel="apa" data-atif-dil="en" role="tabpanel" hidden>
-    <p class="atif-metin">{{ atif_yazar }} ({{ atif_yil }}). <em>{{ atif_baslik }}</em>. {{ atif_site }}. Retrieved <span data-atif-erisim>calculating…</span>, from <a href="{{ atif_url_yedek }}" data-atif-url>{{ atif_url_yedek }}</a></p>
+    <p class="atif-metin">{{ atif_yazar }} ({{ atif_yil }}, {{ atif_ay_adi_en }} {{ atif_gun }}). <em>{{ atif_baslik }}</em>. {{ atif_site }}. Retrieved <span data-atif-erisim>calculating…</span>, from <a href="{{ atif_url_yedek }}" data-atif-url>{{ atif_url_yedek }}</a></p>
   </div>
 
   <div class="atif-metin-alani" data-atif-panel="chicago" data-atif-dil="tr" role="tabpanel" hidden>
-    <p class="atif-metin">{{ atif_yazar }}. "{{ atif_baslik }}." {{ atif_site }}. Son güncelleme {{ atif_yayin_tarihi_tr }}. Erişim tarihi <span data-atif-erisim>hesaplanıyor…</span>. <span data-atif-url>{{ atif_url_yedek }}</span>.</p>
+    <p class="atif-metin">{{ atif_yazar }}. "{{ atif_baslik }}." {{ atif_site }}. {% if page.guncelleme_tarihi %}Son güncelleme {{ atif_guncelleme_tarihi_tr }}{% else %}Yayın tarihi {{ atif_yayin_tarihi_tr }}{% endif %}. Erişim tarihi <span data-atif-erisim>hesaplanıyor…</span>. <span data-atif-url>{{ atif_url_yedek }}</span>.</p>
   </div>
   <div class="atif-metin-alani" data-atif-panel="chicago" data-atif-dil="en" role="tabpanel" hidden>
-    <p class="atif-metin">{{ atif_yazar }}. "{{ atif_baslik }}." {{ atif_site }}. Last modified {{ atif_yayin_tarihi_en }}. Accessed <span data-atif-erisim>calculating…</span>. <span data-atif-url>{{ atif_url_yedek }}</span>.</p>
+    <p class="atif-metin">{{ atif_yazar }}. "{{ atif_baslik }}." {{ atif_site }}. {% if page.guncelleme_tarihi %}Last modified {{ atif_guncelleme_tarihi_en }}{% else %}Published {{ atif_yayin_tarihi_en }}{% endif %}. Accessed <span data-atif-erisim>calculating…</span>. <span data-atif-url>{{ atif_url_yedek }}</span>.</p>
   </div>
 
   <div class="atif-metin-alani" data-atif-panel="mla" data-atif-dil="tr" role="tabpanel" hidden>
@@ -106,6 +123,19 @@
     olduğu için dile göre değişir — tr panelinde Türkçe "Kişisel Web
     Sitesi", en panelinde İngilizce "Personal Website" yazar (önceki
     sürümde en panelinde de yanlışlıkla Türkçe metin sabitti, düzeltildi).
+
+    GÜN/AY EKLENMESİ: "year" alanı bilerek KORUNUYOR — BibTeX/APA
+    stilleri @misc girdisinde year alanını ZORUNLU sayar, silinirse
+    gerçek bir .bib derleyicisinde (BibTeX/biblatex) hata verebilir.
+    Bunun yerine, tam tarih için "year"in YANINA standart "month" alanı
+    (biblatex/@online'da yaygın kullanılan, gün için ise yaygın kabul
+    gören eklenti alanı) "day" ekleniyor — böylece hem geçerli bir
+    BibTeX girdisi kalıyor hem de gün/ay bilgisi taşınıyor.
+
+    GÜNCELLEME TARİHİ: page.guncelleme_tarihi doluysa "note" alanına
+    erişim tarihinin ÖNÜNE "Son güncelleme: ..." eklenir (tr) / "Last
+    modified: ..." (en); yoksa note sadece erişim tarihini taşımaya
+    devam eder.
   {% endcomment %}
   <div class="atif-metin-alani" data-atif-panel="bibtex" data-atif-dil="tr" role="tabpanel" hidden>
     <pre class="atif-metin atif-metin-kod">@{{ atif_bibtex_tur }}{ {{ atif_bibtex_anahtar }},
@@ -113,8 +143,10 @@
   title        = { {{ atif_baslik }} },
   howpublished = { Kişisel Web Sitesi },
   year         = { {{ atif_yil }} },
+  month        = { {{ atif_ay_adi }} },
+  day          = { {{ atif_gun }} },
   url          = { <span data-atif-url>{{ atif_url_yedek }}</span> },
-  note         = { Erişim tarihi: <span data-atif-erisim>hesaplanıyor…</span> }
+  note         = { {% if page.guncelleme_tarihi %}Son güncelleme: {{ atif_guncelleme_tarihi_tr }}; {% endif %}Erişim tarihi: <span data-atif-erisim>hesaplanıyor…</span> }
 }</pre>
   </div>
   <div class="atif-metin-alani" data-atif-panel="bibtex" data-atif-dil="en" role="tabpanel" hidden>
@@ -123,8 +155,10 @@
   title        = { {{ atif_baslik }} },
   howpublished = { Personal Website },
   year         = { {{ atif_yil }} },
+  month        = { {{ atif_ay_adi_en }} },
+  day          = { {{ atif_gun }} },
   url          = { <span data-atif-url>{{ atif_url_yedek }}</span> },
-  note         = { Accessed: <span data-atif-erisim>calculating…</span> }
+  note         = { {% if page.guncelleme_tarihi %}Last modified: {{ atif_guncelleme_tarihi_en }}; {% endif %}Accessed: <span data-atif-erisim>calculating…</span> }
 }</pre>
   </div>
 
