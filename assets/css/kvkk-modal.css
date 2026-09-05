@@ -1,0 +1,151 @@
+/*
+ * assets/css/kvkk-modal.css
+ *
+ * "Sözleşme Versiyon Takibi" — eski kullanıcılar için ekranı kilitleyen
+ * Rıza Yenileme modalı (bkz. assets/js/auth/auth-guard.js ->
+ * kvkkRizaYenilemeModaliniGosterVeBekle()). Bu modal SADECE korumalı
+ * sayfalarda (panel/admin, requireAuth() üzerinden) DOM'a JS ile eklenir;
+ * bu yüzden sadece o sayfalarda yüklenmesi yeterlidir (site genelinde
+ * değil) — assets/css/cerez-onay.css'in aksine.
+ *
+ * assets/style.css'teki aynı CSS custom property'lerini (--text, --muted,
+ * --bg, --accent, --border, --card-bg) kullanır, böylece açık/koyu temayla
+ * otomatik uyumlu çalışır. Inline stil YOK (Sıkı CSP): tüm görünüm burada,
+ * tüm DOM/etkileşim auth-guard.js içinde addEventListener ile.
+ *
+ * KATMANLAMA: cerez-onay.css'teki şerit/panel z-index 950/960 kullanıyor.
+ * Bu modal, HESABA ERİŞİMİ TAMAMEN ENGELLEYEN bir "hard gate" olduğu için
+ * bilinçli olarak daha yüksek bir z-index'te (9999) tutuluyor — sayfada
+ * başka hangi katman açık olursa olsun (çerez şeridi dahil) en üstte kalır.
+ */
+
+.kvkk-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.kvkk-modal {
+  width: 100%;
+  max-width: 460px;
+  max-height: min(600px, 86vh);
+  overflow-y: auto;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card-bg);
+  color: var(--text);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.28);
+}
+
+.kvkk-modal h2 {
+  margin: 0 0 12px;
+  font-size: 1.15rem;
+  line-height: 1.3;
+}
+
+.kvkk-modal p {
+  margin: 0 0 12px;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.kvkk-modal p a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.kvkk-modal-altyazi {
+  color: var(--muted);
+  font-size: 0.84rem !important;
+}
+
+.kvkk-modal-hata {
+  color: #d33;
+  font-size: 0.84rem !important;
+  background: rgba(221, 51, 51, 0.08);
+  border: 1px solid rgba(221, 51, 51, 0.25);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.kvkk-modal-hata[hidden] {
+  display: none !important;
+}
+
+.kvkk-modal-aksiyonlar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.kvkk-modal-btn {
+  flex: 1 1 auto;
+  padding: 11px 16px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.kvkk-modal-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.kvkk-modal-btn--birincil {
+  border: none;
+  background: var(--accent);
+  color: #fff;
+}
+.kvkk-modal-btn--birincil:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.kvkk-modal-btn--ikincil {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 500;
+}
+.kvkk-modal-btn--ikincil:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+/* Modal açıkken arka planın kaydırılmaması auth-guard.js tarafında
+   document.body.style.overflow = "hidden" ile de sağlanıyor; bu sınıf
+   ekstra bir CSS-only güvence katmanı olarak burada tutulur (JS her
+   nedense çalışmazsa bile en azından body class'ı üzerinden kilitlenebilir
+   diye), ama şu an JS zaten inline style ile aynı işi yapıyor, bu yüzden
+   bu kural opsiyonel/ileri-uyum içindir. */
+body.kvkk-modal-acik {
+  overflow: hidden;
+}
+
+/* ---- Mobil / dar ekran ---- */
+@media (max-width: 480px) {
+  .kvkk-modal {
+    padding: 20px 16px;
+  }
+  .kvkk-modal-aksiyonlar {
+    flex-direction: column-reverse;
+  }
+  .kvkk-modal-btn {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kvkk-modal-backdrop,
+  .kvkk-modal {
+    transition: none !important;
+  }
+}
