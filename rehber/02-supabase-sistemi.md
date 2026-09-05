@@ -87,6 +87,8 @@ panel/panel.md / panel/admin.md / panel/ozel-icerik.md       <- Jekyll sayfalar�
 4b. Ardından **bir query daha** aç, `supabase/migrations/0003_yeni_ozellikler_ve_guvenlik.sql`
    dosyasının TAMAMINI yapıştır ve **Run**'a bas. Bu dosya şunları ekler:
    - KVKK onay alanları (`profiles.kvkk_onay_verildi` vb.) + `kvkk_onayini_ver()` RPC'si
+     (Not: yurt dışına aktarım açık rızası bu onaydan AYRI kolonlarda tutulur —
+     bkz. aşağıdaki 0042 migration'ı, `profiles.yurtdisi_onay_verildi` vb.)
    - Özel içerik "okundu" bilgisi ve üye başına isteğe bağlı son geçerlilik
      tarihi (`content_access` tablosuna yeni kolonlar) + otomatik/temizlik RPC'leri
    - Admin'in başka bir üyeyi (veya kendini) silebilmesi için `admin_delete_user_data()`
@@ -791,9 +793,13 @@ kurabiliriz.
       yeni şifre belirleyip giriş yapabiliyor musun?
 - [ ] `/panel/panel.html`: profil adı (Ad Soyad) kaydediliyor mu? (Avatar/bio
       alanları artık YOK — Supabase Storage kullanılmıyor, bkz. 0003 migration.)
-- [ ] Kayıt formunda KVKK onay kutusunu işaretlemeden kayıt olmaya çalış —
-      engellenmeli. İşaretleyip kayıt ol, `/panel/panel.html` → "KVKK Onayı"
-      bölümünde onay tarihinin göründüğünü doğrula.
+- [ ] Kayıt formunda yurt dışı aktarım onay kutusunu (yurtdisi_onay)
+      işaretlemeden kayıt olmaya çalış — engellenmeli. Aydınlatma
+      bilgilendirmesi (Aydınlatma Metni linki) artık bir onay kutusu
+      DEĞİL, sadece bilgi metni olduğu için ayrıca test edilmez.
+      Checkbox'ı işaretleyip kayıt ol, `/panel/panel.html` → "KVKK Onayı"
+      bölümünde HEM aydınlatma beyanının HEM yurt dışı rızasının ayrı ayrı
+      onay tarihleriyle göründüğünü doğrula (bkz. migration 0042).
 - [ ] `/panel/panel.html` → "İki Faktörlü Doğrulama" bölümünden 2FA'yı
       etkinleştir (Google Authenticator ile QR kodu okut, 6 haneli kodu
       doğrula) → tekrar sayfayı aç, "aktif" göründüğünü ve istersen
