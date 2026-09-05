@@ -6,6 +6,19 @@
   Yazar/başlık/site adı/yayın tarihi Jekyll Liquid ile build-time'da
   üretilir — harici bir API veya kütüphane YOK.
 
+  AKADEMİK MOD (page.akademik): Bu kutu ARTIK HER sayfada değil, SADECE
+  panelde "Akademik Yazı / Atıf Kutusu Göster" onay kutusu işaretlenip
+  front-matter'a `akademik: true` yazıldığında render edilir (bkz.
+  panel/github-yonetim.md, assets/js/github-yonetim/github-yonetim.js).
+  `akademik` alanı hiç yoksa veya `false` ise bu include HİÇBİR ŞEY
+  üretmez — include'un TAMAMI aşağıdaki tek `{% if %}` bloğunun içinde.
+
+  DİL VARSAYILANI (site.lang / page.lang -> TR / EN): kutu açıldığında
+  hangi dilin (TR/EN) sekmesinin başta seçili göründüğü artık sayfanın
+  kendi diline göre belirlenir — önce `page.lang`, o yoksa `site.lang`,
+  o da yoksa "tr" varsayılır. Kullanıcı yine de TR/EN sekmesini elle
+  değiştirebilir, bu sadece İLK açılışın varsayılanıdır.
+
   TASARIM: sekmeler (dil VE format), sitede zaten var olan
   _includes/hakkimda-icerik.md ".lang-tabs/.lang-tab-btn" ile AYNI
   görsel dili kullanır (bkz. assets/style.css .atif-dil-secici/
@@ -35,12 +48,33 @@
   SADECE addEventListener kullanılıyor, hiçbir inline onclick/style YOK.
 {% endcomment %}
 
+{% if page.akademik == true %}
+
 {% assign atif_yazar = page.author | default: site.title | escape %}
 {% assign atif_baslik = page.title | escape %}
 {% assign atif_site = site.title | escape %}
 {% assign atif_url_yedek = site.url | append: page.url | escape %}
 
+{% comment %}
+  DİL VARSAYILANI: page.lang > site.lang > "tr". "en" ile BAŞLAYAN her
+  değer ("en", "en-US", "en_GB" ...) İngilizce sayılır, gerisi TR kabul
+  edilir — bu, kutunun İLK açıldığında hangi sekmenin görüneceğini
+  belirler, ikisi arasında geçiş yine kullanıcı elindedir.
+{% endcomment %}
+{% assign atif_dil_kaynagi = page.lang | default: site.lang | default: "tr" | downcase %}
+{% assign atif_dil_varsayilan = "tr" %}
+{% if atif_dil_kaynagi contains "en" %}
+  {% assign atif_dil_varsayilan = "en" %}
+{% endif %}
+
 {% assign aylar_tr = "Ocak,Şubat,Mart,Nisan,Mayıs,Haziran,Temmuz,Ağustos,Eylül,Ekim,Kasım,Aralık" | split: "," %}
+{% comment %}
+  MLA 9, İngilizcede ayları KISALTARAK yazar (ör. "Aug."); ancak
+  Mayıs/Haziran/Temmuz (May/June/July) MLA kuralına göre HİÇ
+  kısaltılmaz — bu üç ay listede tam adıyla, noktasız duruyor.
+{% endcomment %}
+{% assign aylar_en_kisa_mla = "Jan.,Feb.,Mar.,Apr.,May,June,July,Aug.,Sept.,Oct.,Nov.,Dec." | split: "," %}
+
 {% assign atif_ay_index = page.date | date: "%-m" | minus: 1 %}
 {% assign atif_ay_adi = aylar_tr[atif_ay_index] %}
 {% assign atif_ay_adi_en = page.date | date: "%B" %}
@@ -50,19 +84,21 @@
 {% assign atif_yayin_tarihi_en = page.date | date: "%B %-d, %Y" %}
 
 {% comment %}
-  GÜNCELLEME TARİHİ (opsiyonel): sadece page.guncelleme_tarihi doluysa
-  hesaplanır. Chicago paneli "Son güncelleme" etiketini ARTIK gerçekten
-  güncelleme tarihinden okuyor — önceki sürümde bu etiket her zaman yayın
-  tarihini (page.date) gösteriyordu, yani güncellenmemiş bir sayfada bile
-  yanlışlıkla "son güncelleme" ibaresi yayın tarihini taşıyordu.
+  GÜNCELLEME / VERSİYON TARİHİ (opsiyonel): page.last_modified_at
+  (panelin yeni "Güncelleme Tarihi" alanı) VARSA öncelik ondadır;
+  yoksa geriye dönük uyumluluk için page.guncelleme_tarihi'ne bakılır.
+  İkisi de yoksa atif_revizyon_tarihi tanımsız kalır ve APA/Chicago/MLA/
+  BibTeX panellerindeki TÜM "güncellendi/son güncelleme/versiyon" ekleri
+  otomatik olarak hiç görünmez — sadece orijinal yayın tarihi kalır.
 {% endcomment %}
-{% if page.guncelleme_tarihi %}
-  {% assign atif_guncelleme_ay_index = page.guncelleme_tarihi | date: "%-m" | minus: 1 %}
-  {% assign atif_guncelleme_ay_adi = aylar_tr[atif_guncelleme_ay_index] %}
-  {% assign atif_guncelleme_gun = page.guncelleme_tarihi | date: "%-d" %}
-  {% assign atif_guncelleme_yil = page.guncelleme_tarihi | date: "%Y" %}
-  {% assign atif_guncelleme_tarihi_tr = atif_guncelleme_gun | append: " " | append: atif_guncelleme_ay_adi | append: " " | append: atif_guncelleme_yil %}
-  {% assign atif_guncelleme_tarihi_en = page.guncelleme_tarihi | date: "%B %-d, %Y" %}
+{% assign atif_revizyon_tarihi = page.last_modified_at | default: page.guncelleme_tarihi %}
+{% if atif_revizyon_tarihi %}
+  {% assign atif_rev_ay_index = atif_revizyon_tarihi | date: "%-m" | minus: 1 %}
+  {% assign atif_rev_ay_adi = aylar_tr[atif_rev_ay_index] %}
+  {% assign atif_rev_ay_adi_en = atif_revizyon_tarihi | date: "%B" %}
+  {% assign atif_rev_ay_adi_en_kisa = aylar_en_kisa_mla[atif_rev_ay_index] %}
+  {% assign atif_rev_gun = atif_revizyon_tarihi | date: "%-d" %}
+  {% assign atif_rev_yil = atif_revizyon_tarihi | date: "%Y" %}
 {% endif %}
 
 {% comment %}
@@ -77,12 +113,12 @@
 {% assign atif_bibtex_anahtar = atif_yazar_soyadi | append: atif_yil | append: atif_baslik_ilk_kelime %}
 {% assign atif_bibtex_tur = "misc" %}
 
-<section class="atif-kutusu" aria-label="Bu içeriğe atıf verme / Cite this content">
-  <h2 class="atif-baslik" data-atif-metin-tr="Bu İçeriğe Atıf Verin" data-atif-metin-en="Cite This Content">Bu İçeriğe Atıf Verin</h2>
+<section class="atif-kutusu" aria-label="Bu içeriğe atıf verme / Cite this content" data-atif-dil-varsayilan="{{ atif_dil_varsayilan }}">
+  <h2 class="atif-baslik" data-atif-metin-tr="Bu İçeriğe Atıf Verin" data-atif-metin-en="Cite This Content">{% if atif_dil_varsayilan == "en" %}Cite This Content{% else %}Bu İçeriğe Atıf Verin{% endif %}</h2>
 
   <div class="atif-dil-secici lang-tabs" role="tablist">
-    <button type="button" class="lang-tab-btn atif-dil-buton active" data-atif-dil="tr" aria-selected="true">🇹🇷 Türkçe</button>
-    <button type="button" class="lang-tab-btn atif-dil-buton" data-atif-dil="en" aria-selected="false">🇬🇧 English</button>
+    <button type="button" class="lang-tab-btn atif-dil-buton{% if atif_dil_varsayilan == "tr" %} active{% endif %}" data-atif-dil="tr" aria-selected="{% if atif_dil_varsayilan == "tr" %}true{% else %}false{% endif %}">🇹🇷 Türkçe</button>
+    <button type="button" class="lang-tab-btn atif-dil-buton{% if atif_dil_varsayilan == "en" %} active{% endif %}" data-atif-dil="en" aria-selected="{% if atif_dil_varsayilan == "en" %}true{% else %}false{% endif %}">🇬🇧 English</button>
   </div>
 
   <div class="atif-format-sekmeleri lang-tabs" role="tablist">
@@ -92,55 +128,63 @@
     <button type="button" class="lang-tab-btn atif-sekme-buton" data-atif-sekme="bibtex" role="tab" aria-selected="false">BibTeX</button>
   </div>
 
-  <div class="atif-metin-alani" data-atif-panel="apa" data-atif-dil="tr" role="tabpanel">
-    <p class="atif-metin">{{ atif_yazar }}. ({{ atif_yil }}, {{ atif_gun }} {{ atif_ay_adi }}). <em>{{ atif_baslik }}</em>. {{ atif_site }}. <span data-atif-erisim>Erişim tarihi hesaplanıyor…</span> tarihinde <a href="{{ atif_url_yedek }}" data-atif-url>{{ atif_url_yedek }}</a> adresinden erişildi.</p>
+  {% comment %}
+    APA 7 — güncelleme varsa parantez içine ", ... ; güncellendi/updated ..."
+    eklenir (bkz. görev tanımındaki örnek: "(2026, 22 Haziran; güncellendi
+    2026, 15 Ağustos)" / "(2026, June 22; updated 2026, August 15)").
+  {% endcomment %}
+  <div class="atif-metin-alani" data-atif-panel="apa" data-atif-dil="tr" role="tabpanel"{% unless atif_dil_varsayilan == "tr" %} hidden{% endunless %}>
+    <p class="atif-metin">{{ atif_yazar }}. ({{ atif_yil }}, {{ atif_gun }} {{ atif_ay_adi }}{% if atif_revizyon_tarihi %}; güncellendi {{ atif_rev_yil }}, {{ atif_rev_gun }} {{ atif_rev_ay_adi }}{% endif %}). <em>{{ atif_baslik }}</em>. {{ atif_site }}. <span data-atif-erisim>Erişim tarihi hesaplanıyor…</span> tarihinde <a href="{{ atif_url_yedek }}" data-atif-url>{{ atif_url_yedek }}</a> adresinden erişildi.</p>
   </div>
-  <div class="atif-metin-alani" data-atif-panel="apa" data-atif-dil="en" role="tabpanel" hidden>
-    <p class="atif-metin">{{ atif_yazar }} ({{ atif_yil }}, {{ atif_ay_adi_en }} {{ atif_gun }}). <em>{{ atif_baslik }}</em>. {{ atif_site }}. Retrieved <span data-atif-erisim>calculating…</span>, from <a href="{{ atif_url_yedek }}" data-atif-url>{{ atif_url_yedek }}</a></p>
-  </div>
-
-  <div class="atif-metin-alani" data-atif-panel="chicago" data-atif-dil="tr" role="tabpanel" hidden>
-    <p class="atif-metin">{{ atif_yazar }}. "{{ atif_baslik }}." {{ atif_site }}. {% if page.guncelleme_tarihi %}Son güncelleme {{ atif_guncelleme_tarihi_tr }}{% else %}Yayın tarihi {{ atif_yayin_tarihi_tr }}{% endif %}. Erişim tarihi <span data-atif-erisim>hesaplanıyor…</span>. <span data-atif-url>{{ atif_url_yedek }}</span>.</p>
-  </div>
-  <div class="atif-metin-alani" data-atif-panel="chicago" data-atif-dil="en" role="tabpanel" hidden>
-    <p class="atif-metin">{{ atif_yazar }}. "{{ atif_baslik }}." {{ atif_site }}. {% if page.guncelleme_tarihi %}Last modified {{ atif_guncelleme_tarihi_en }}{% else %}Published {{ atif_yayin_tarihi_en }}{% endif %}. Accessed <span data-atif-erisim>calculating…</span>. <span data-atif-url>{{ atif_url_yedek }}</span>.</p>
-  </div>
-
-  <div class="atif-metin-alani" data-atif-panel="mla" data-atif-dil="tr" role="tabpanel" hidden>
-    <p class="atif-metin">{{ atif_yazar }}. "{{ atif_baslik }}." <em>{{ atif_site }}</em>, {{ atif_yayin_tarihi_tr }}, <span data-atif-url>{{ atif_url_yedek }}</span>. Erişim tarihi <span data-atif-erisim>hesaplanıyor…</span>.</p>
-  </div>
-  <div class="atif-metin-alani" data-atif-panel="mla" data-atif-dil="en" role="tabpanel" hidden>
-    <p class="atif-metin">{{ atif_yazar }}. "{{ atif_baslik }}." <em>{{ atif_site }}</em>, {{ atif_yayin_tarihi_en }}, <span data-atif-url>{{ atif_url_yedek }}</span>. Accessed <span data-atif-erisim>calculating…</span>.</p>
+  <div class="atif-metin-alani" data-atif-panel="apa" data-atif-dil="en" role="tabpanel"{% unless atif_dil_varsayilan == "en" %} hidden{% endunless %}>
+    <p class="atif-metin">{{ atif_yazar }} ({{ atif_yil }}, {{ atif_ay_adi_en }} {{ atif_gun }}{% if atif_revizyon_tarihi %}; updated {{ atif_rev_yil }}, {{ atif_rev_ay_adi_en }} {{ atif_rev_gun }}{% endif %}). <em>{{ atif_baslik }}</em>. {{ atif_site }}. Retrieved <span data-atif-erisim>calculating…</span>, from <a href="{{ atif_url_yedek }}" data-atif-url>{{ atif_url_yedek }}</a></p>
   </div>
 
   {% comment %}
-    BibTeX: dilden BAĞIMSIZ tek bir gerçek format olduğu için hem tr hem
-    en dil sekmesinde AYNI YAPI gösteriliyor (alan adları @misc
-    standardına göre İngilizce kalıyor — bu, BibTeX'in evrensel
+    Chicago 17 — ARTIK yayın tarihi ile son güncelleme tarihi BİRLİKTE
+    gösteriliyor (önceki sürümde ikisinden sadece biri görünüyordu):
+    "Yayımlanma 22 Haziran 2026, son güncelleme 15 Ağustos 2026." /
+    "Published June 22, 2026, last modified August 15, 2026."
+  {% endcomment %}
+  <div class="atif-metin-alani" data-atif-panel="chicago" data-atif-dil="tr" role="tabpanel" hidden>
+    <p class="atif-metin">{{ atif_yazar }}. "{{ atif_baslik }}." {{ atif_site }}. Yayımlanma {{ atif_yayin_tarihi_tr }}{% if atif_revizyon_tarihi %}, son güncelleme {{ atif_rev_gun }} {{ atif_rev_ay_adi }} {{ atif_rev_yil }}{% endif %}. Erişim tarihi <span data-atif-erisim>hesaplanıyor…</span>. <span data-atif-url>{{ atif_url_yedek }}</span>.</p>
+  </div>
+  <div class="atif-metin-alani" data-atif-panel="chicago" data-atif-dil="en" role="tabpanel" hidden>
+    <p class="atif-metin">{{ atif_yazar }}. "{{ atif_baslik }}." {{ atif_site }}. Published {{ atif_yayin_tarihi_en }}{% if atif_revizyon_tarihi %}, last modified {{ atif_rev_ay_adi_en }} {{ atif_rev_gun }}, {{ atif_rev_yil }}{% endif %}. Accessed <span data-atif-erisim>calculating…</span>. <span data-atif-url>{{ atif_url_yedek }}</span>.</p>
+  </div>
+
+  {% comment %}
+    MLA 9 — güncelleme VARSA tarih alanı TAMAMEN "versiyon ..." /
+    "version ..." ibaresiyle DEĞİŞTİRİLİR (orijinal yayın tarihi o zaman
+    hiç yazılmaz — görev tanımındaki örnek budur: "versiyon 15 Ağustos
+    2026" / "version 15 Aug. 2026"); güncelleme YOKSA eskisi gibi
+    orijinal yayın tarihi kullanılır.
+  {% endcomment %}
+  <div class="atif-metin-alani" data-atif-panel="mla" data-atif-dil="tr" role="tabpanel" hidden>
+    <p class="atif-metin">{{ atif_yazar }}. "{{ atif_baslik }}." <em>{{ atif_site }}</em>, {% if atif_revizyon_tarihi %}versiyon {{ atif_rev_gun }} {{ atif_rev_ay_adi }} {{ atif_rev_yil }}{% else %}{{ atif_yayin_tarihi_tr }}{% endif %}, <span data-atif-url>{{ atif_url_yedek }}</span>. Erişim tarihi <span data-atif-erisim>hesaplanıyor…</span>.</p>
+  </div>
+  <div class="atif-metin-alani" data-atif-panel="mla" data-atif-dil="en" role="tabpanel" hidden>
+    <p class="atif-metin">{{ atif_yazar }}. "{{ atif_baslik }}." <em>{{ atif_site }}</em>, {% if atif_revizyon_tarihi %}version {{ atif_rev_gun }} {{ atif_rev_ay_adi_en_kisa }} {{ atif_rev_yil }}{% else %}{{ atif_yayin_tarihi_en }}{% endif %}, <span data-atif-url>{{ atif_url_yedek }}</span>. Accessed <span data-atif-erisim>calculating…</span>.</p>
+  </div>
+
+  {% comment %}
+    BibTeX/BibLaTeX: dilden BAĞIMSIZ tek bir gerçek format olduğu için
+    hem tr hem en dil sekmesinde AYNI YAPI gösteriliyor (alan adları
+    @misc standardına göre İngilizce kalıyor — bu, BibTeX'in evrensel
     biçimidir, Türkçeye çevrilmez). "howpublished" ise SADECE "Kişisel
     Web Sitesi" (site adı EKLENMEDEN) ibaresini taşıyor; bu alan tek
-    serbest-metin içerik olduğu için dile göre değişir — tr panelinde
-    Türkçe "Kişisel Web Sitesi", en panelinde İngilizce "Personal
-    Website" yazar.
+    serbest-metin içerik olduğu için dile göre değişir.
 
-    AY FORMATI: "month" alanı ARTIK metin adı (Haziran/June) DEĞİL,
-    TR/EN hiçbir derleyiciye bağlı olmayan evrensel SAYISAL biçimde
-    ({{ page.date | date: "%-m" }}) üretiliyor — bu, gerçek bir
-    BibTeX/biblatex derleyicisinin (biber vb.) ayrıştırabileceği tek
-    dilden-bağımsız biçimdir.
+    AY FORMATI: "month" alanı metin adı (Haziran/June) DEĞİL, TR/EN
+    hiçbir derleyiciye bağlı olmayan evrensel SAYISAL biçimde üretiliyor
+    — bu, gerçek bir BibTeX/biblatex derleyicisinin (biber vb.)
+    ayrıştırabileceği tek dilden-bağımsız biçimdir.
 
-    GÜN EKLENMESİ: "year" alanı bilerek KORUNUYOR — BibTeX/APA
-    stilleri @misc girdisinde year alanını ZORUNLU sayar, silinirse
-    gerçek bir .bib derleyicisinde (BibTeX/biblatex) hata verebilir.
-    Bunun yanına "day" eklentisi de korunuyor.
-
-    ERİŞİM TARİHİ (urldate): Önceki sürümde erişim tarihi "note"
-    alanına serbest metin ("Erişim tarihi: ...") olarak ekleniyordu.
-    ARTIK resmi BibLaTeX standardı olan "urldate" alanı, ISO 8601
-    (YYYY-MM-DD, saat bilgisi YOK) biçiminde kullanılıyor. Bu alan,
-    ziyaretçinin butona tıkladığı ANIN tarayıcı tarihiyle aşağıdaki
-    <script> bloğunda ([data-atif-urldate] seçicisiyle) dinamik olarak
-    dolduruluyor — build tarihi DEĞİL.
+    ERİŞİM TARİHİ (urldate): resmi BibLaTeX standardı olan "urldate"
+    alanı, ISO 8601 (YYYY-MM-DD, saat bilgisi YOK) biçiminde kullanılıyor.
+    Bu alan, ziyaretçinin butona tıkladığı ANIN tarayıcı tarihiyle
+    aşağıdaki <script> bloğunda ([data-atif-urldate] seçicisiyle) dinamik
+    olarak doldurulur — build tarihi DEĞİL.
 
     VERSİON (revizyon) BİLGİSİ: page.last_modified_at VEYA
     page.guncelleme_tarihi front-matter alanlarından biri tanımlıysa,
@@ -148,7 +192,6 @@
     tanımlı değilse alan tamamen ATLANIYOR (boş/placeholder alan
     bırakılmıyor).
   {% endcomment %}
-  {% assign atif_revizyon_tarihi = page.last_modified_at | default: page.guncelleme_tarihi %}
   <div class="atif-metin-alani" data-atif-panel="bibtex" data-atif-dil="tr" role="tabpanel" hidden>
     <pre class="atif-metin atif-metin-kod">@{{ atif_bibtex_tur }}{ {{ atif_bibtex_anahtar }},
   author       = { {{ atif_yazar }} },
@@ -181,7 +224,7 @@
     <span class="atif-kopyalandi-bildirim" data-atif-bildirim hidden>Kopyalandı ✓</span>
   </div>
 
-  <p class="atif-not" data-atif-metin-tr="Format otomatik oluşturulmuştur; gerektiğinde elle düzenleyebilirsiniz." data-atif-metin-en="This format was generated automatically; edit it if needed.">Format otomatik oluşturulmuştur; gerektiğinde elle düzenleyebilirsiniz.</p>
+  <p class="atif-not" data-atif-metin-tr="Format otomatik oluşturulmuştur; gerektiğinde elle düzenleyebilirsiniz." data-atif-metin-en="This format was generated automatically; edit it if needed.">{% if atif_dil_varsayilan == "en" %}This format was generated automatically; edit it if needed.{% else %}Format otomatik oluşturulmuştur; gerektiğinde elle düzenleyebilirsiniz.{% endif %}</p>
 </section>
 
 <script>
@@ -198,7 +241,12 @@
       "July", "August", "September", "October", "November", "December"];
 
     var secilenFormat = "apa";
-    var secilenDil = "tr";
+    // Dil varsayılanı ARTIK sabit "tr" değil — Liquid'in build-time'da
+    // page.lang/site.lang'e göre yazdığı data-atif-dil-varsayilan
+    // özniteliğinden okunuyor (bkz. yukarıdaki <section> etiketi), böylece
+    // JS'in dahili durumu (secilenDil) sayfada İLK GÖRÜNEN panelle her
+    // zaman tutarlı kalır.
+    var secilenDil = kutu.getAttribute("data-atif-dil-varsayilan") === "en" ? "en" : "tr";
 
     // GERÇEK URL: bu site hem github.io hem pages.dev üzerinden aynı anda
     // yayınlandığı için, hangisinin "doğru" adres olduğu build-time'da
@@ -328,3 +376,5 @@
     }
   })();
 </script>
+
+{% endif %}
