@@ -101,13 +101,15 @@
     en dil sekmesinde AYNI içerik gösteriliyor (alan adları @misc
     standardına göre İngilizce kalıyor — bu, BibTeX'in evrensel
     biçimidir, Türkçeye çevrilmez). "note" alanına erişim tarihi
-    ekleniyor, "howpublished" ise atıf URL'ini taşıyor.
+    ekleniyor, "howpublished" ise site adının ardından "| Kişisel Web
+    Sitesi" ibaresini taşıyor (dilden bağımsız, BibTeX geleneğinde
+    howpublished serbest metin olduğu için sabit tutuluyor).
   {% endcomment %}
   <div class="atif-metin-alani" data-atif-panel="bibtex" data-atif-dil="tr" role="tabpanel" hidden>
     <pre class="atif-metin atif-metin-kod">@{{ atif_bibtex_tur }}{ {{ atif_bibtex_anahtar }},
   author       = { {{ atif_yazar }} },
   title        = { {{ atif_baslik }} },
-  howpublished = { {{ atif_site }} },
+  howpublished = { {{ atif_site }} | Kişisel Web Sitesi },
   year         = { {{ atif_yil }} },
   url          = { <span data-atif-url>{{ atif_url_yedek }}</span> },
   note         = { Erişim tarihi: <span data-atif-erisim>hesaplanıyor…</span> }
@@ -117,7 +119,7 @@
     <pre class="atif-metin atif-metin-kod">@{{ atif_bibtex_tur }}{ {{ atif_bibtex_anahtar }},
   author       = { {{ atif_yazar }} },
   title        = { {{ atif_baslik }} },
-  howpublished = { {{ atif_site }} },
+  howpublished = { {{ atif_site }} | Kişisel Web Sitesi },
   year         = { {{ atif_yil }} },
   url          = { <span data-atif-url>{{ atif_url_yedek }}</span> },
   note         = { Accessed: <span data-atif-erisim>calculating…</span> }
