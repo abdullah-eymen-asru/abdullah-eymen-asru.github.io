@@ -90,6 +90,12 @@ export async function requireAuth({ role = null, redirectTo = "/hesap/giris.html
   // requireAuth() BAŞTAN çağrıldığı için o taze veri kayboluyor ve
   // "Henüz KVKK onayı vermemişsin" tekrar görünüyordu). Şimdi bu
   // kolonları da seçiyoruz.
+  // YURT DIŞI RIZASI (migration 0042): aydınlatma onayından (kvkk_onay_*)
+  // KASITLI olarak AYRI kolonlar — yurtdisi_onay_verildi/tarihi/versiyonu.
+  // panel.js -> wireKvkk(profile) artık ikisini de ayrı ayrı kontrol edip
+  // sürüm/rıza güncel değilse yeniden onay istiyor; burada seçilmezse yine
+  // aynı "her zaman eski görünüyor" hatası bu sefer yurt dışı rızası için
+  // tekrarlanır.
   // is_suspended: migration 0021 (Admin Güvenliği / "Site Sahibi" akışı) —
   // bir admin başka bir admin tarafından askıya alınmışsa bu true olur.
   // Veritabanı tarafı zaten is_admin() içinde bunu kapatıyor (RLS/RPC
@@ -98,7 +104,7 @@ export async function requireAuth({ role = null, redirectTo = "/hesap/giris.html
   const { data: profile, error } = await supabase
     .from("profiles")
     .select(
-      "id, email, first_name, last_name, full_name, role, is_suspended, kvkk_onay_verildi, kvkk_onay_versiyonu, kvkk_onay_tarihi"
+      "id, email, first_name, last_name, full_name, role, is_suspended, kvkk_onay_verildi, kvkk_onay_versiyonu, kvkk_onay_tarihi, yurtdisi_onay_verildi, yurtdisi_onay_versiyonu, yurtdisi_onay_tarihi"
     )
     .eq("id", session.user.id)
     .single();
