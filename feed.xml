@@ -6,6 +6,12 @@
 # eklemiyor — jekyll-feed'in kendi "published: false" alanı işimize
 # yaramıyor çünkü o, sayfayı build'den tamamen siliyor ve gizli önizleme
 # linkinin çalışmasını engelliyor.
+#
+# TAM METİN (FULL-TEXT) NOTU: <content> etiketi post.content'in TAMAMINI
+# CDATA içinde taşıyor (xml_escape yerine) — böylece Inoreader/Feedly gibi
+# okuyucular yazının özetini değil tüm gövdesini gösterir. İçerideki
+# kök-göreli görsel/link URL'leri absolutize_urls filtresiyle (bkz.
+# _plugins/feed_url_absolutize.rb) mutlak hale getiriliyor.
 layout: none
 ---
 <?xml version="1.0" encoding="UTF-8"?>
@@ -20,16 +26,21 @@ layout: none
 
   {% assign yayindaki_yazilar = site.posts | where_exp: "p", "p.yayinda != false" | where_exp: "p", "p.date <= site.time" %}
   {% for post in yayindaki_yazilar limit:20 %}
+    {% assign yazar_adi = post.author | default: site.author | default: site.title %}
     <entry>
       <title type="html">{{ post.title | smartify | xml_escape }}</title>
       <link href="{{ post.url | absolute_url }}" rel="alternate" type="text/html" title="{{ post.title | xml_escape }}" />
       <published>{{ post.date | date_to_xmlschema }}</published>
       <updated>{{ post.last_modified_at | default: post.date | date_to_xmlschema }}</updated>
       <id>{{ post.id | absolute_url | xml_escape }}</id>
-      <content type="html" xml:base="{{ post.url | absolute_url | xml_escape }}">{{ post.content | strip | xml_escape }}</content>
+      <content type="html" xml:base="{{ post.url | absolute_url | xml_escape }}"><![CDATA[ {{ post.content | absolutize_urls }} ]]></content>
       <author>
-        <name>{{ site.title | default: site.github_username }}</name>
+        <name>{{ yazar_adi | xml_escape }}</name>
       </author>
+      {% for kategori in post.categories %}<category term="{{ kategori | xml_escape }}" />
+      {% endfor %}
+      {% for etiket in post.tags %}<category term="{{ etiket | xml_escape }}" />
+      {% endfor %}
     </entry>
   {% endfor %}
 </feed>
