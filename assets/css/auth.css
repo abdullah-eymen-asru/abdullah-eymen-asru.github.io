@@ -48,6 +48,35 @@
   resize: vertical;
 }
 
+/* Onay kutuları (ör. yurt dışı aktarım açık rızası): metin + checkbox yan
+   yana, üstten hizalı — .form-field'daki dikey (label üstte, input altta)
+   düzenden farklı olarak buraya özel tutuluyor. */
+.form-checkbox {
+  margin-bottom: 16px;
+}
+
+.form-checkbox label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.form-checkbox input[type="checkbox"] {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+/* Aydınlatma bilgilendirme cümlesi (#kvkk-aydinlatma-bilgi): bir onay
+   kutusu DEĞİL, sadece bağlantılı bir bilgi metni — .form-field'ın
+   input/checkbox stillerinden ayrı, sade bir paragraf olarak görünür. */
+#kvkk-aydinlatma-bilgi {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
 .btn-primary,
 .btn-primary:visited {
   width: 100%;
