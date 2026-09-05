@@ -117,36 +117,49 @@
     BibTeX: dilden BAĞIMSIZ tek bir gerçek format olduğu için hem tr hem
     en dil sekmesinde AYNI YAPI gösteriliyor (alan adları @misc
     standardına göre İngilizce kalıyor — bu, BibTeX'in evrensel
-    biçimidir, Türkçeye çevrilmez). "note" alanına erişim tarihi
-    ekleniyor. "howpublished" ise SADECE "Kişisel Web Sitesi" (site adı
-    EKLENMEDEN) ibaresini taşıyor; bu alan tek serbest-metin içerik
-    olduğu için dile göre değişir — tr panelinde Türkçe "Kişisel Web
-    Sitesi", en panelinde İngilizce "Personal Website" yazar (önceki
-    sürümde en panelinde de yanlışlıkla Türkçe metin sabitti, düzeltildi).
+    biçimidir, Türkçeye çevrilmez). "howpublished" ise SADECE "Kişisel
+    Web Sitesi" (site adı EKLENMEDEN) ibaresini taşıyor; bu alan tek
+    serbest-metin içerik olduğu için dile göre değişir — tr panelinde
+    Türkçe "Kişisel Web Sitesi", en panelinde İngilizce "Personal
+    Website" yazar.
 
-    GÜN/AY EKLENMESİ: "year" alanı bilerek KORUNUYOR — BibTeX/APA
+    AY FORMATI: "month" alanı ARTIK metin adı (Haziran/June) DEĞİL,
+    TR/EN hiçbir derleyiciye bağlı olmayan evrensel SAYISAL biçimde
+    ({{ page.date | date: "%-m" }}) üretiliyor — bu, gerçek bir
+    BibTeX/biblatex derleyicisinin (biber vb.) ayrıştırabileceği tek
+    dilden-bağımsız biçimdir.
+
+    GÜN EKLENMESİ: "year" alanı bilerek KORUNUYOR — BibTeX/APA
     stilleri @misc girdisinde year alanını ZORUNLU sayar, silinirse
     gerçek bir .bib derleyicisinde (BibTeX/biblatex) hata verebilir.
-    Bunun yerine, tam tarih için "year"in YANINA standart "month" alanı
-    (biblatex/@online'da yaygın kullanılan, gün için ise yaygın kabul
-    gören eklenti alanı) "day" ekleniyor — böylece hem geçerli bir
-    BibTeX girdisi kalıyor hem de gün/ay bilgisi taşınıyor.
+    Bunun yanına "day" eklentisi de korunuyor.
 
-    GÜNCELLEME TARİHİ: page.guncelleme_tarihi doluysa "note" alanına
-    erişim tarihinin ÖNÜNE "Son güncelleme: ..." eklenir (tr) / "Last
-    modified: ..." (en); yoksa note sadece erişim tarihini taşımaya
-    devam eder.
+    ERİŞİM TARİHİ (urldate): Önceki sürümde erişim tarihi "note"
+    alanına serbest metin ("Erişim tarihi: ...") olarak ekleniyordu.
+    ARTIK resmi BibLaTeX standardı olan "urldate" alanı, ISO 8601
+    (YYYY-MM-DD, saat bilgisi YOK) biçiminde kullanılıyor. Bu alan,
+    ziyaretçinin butona tıkladığı ANIN tarayıcı tarihiyle aşağıdaki
+    <script> bloğunda ([data-atif-urldate] seçicisiyle) dinamik olarak
+    dolduruluyor — build tarihi DEĞİL.
+
+    VERSİON (revizyon) BİLGİSİ: page.last_modified_at VEYA
+    page.guncelleme_tarihi front-matter alanlarından biri tanımlıysa,
+    ISO (YYYY-MM-DD) biçiminde bir "version" alanı ekleniyor. Hiçbiri
+    tanımlı değilse alan tamamen ATLANIYOR (boş/placeholder alan
+    bırakılmıyor).
   {% endcomment %}
+  {% assign atif_revizyon_tarihi = page.last_modified_at | default: page.guncelleme_tarihi %}
   <div class="atif-metin-alani" data-atif-panel="bibtex" data-atif-dil="tr" role="tabpanel" hidden>
     <pre class="atif-metin atif-metin-kod">@{{ atif_bibtex_tur }}{ {{ atif_bibtex_anahtar }},
   author       = { {{ atif_yazar }} },
   title        = { {{ atif_baslik }} },
   howpublished = { Kişisel Web Sitesi },
   year         = { {{ atif_yil }} },
-  month        = { {{ atif_ay_adi }} },
+  month        = { {{ page.date | date: "%-m" }} },
   day          = { {{ atif_gun }} },
   url          = { <span data-atif-url>{{ atif_url_yedek }}</span> },
-  note         = { {% if page.guncelleme_tarihi %}Son güncelleme: {{ atif_guncelleme_tarihi_tr }}; {% endif %}Erişim tarihi: <span data-atif-erisim>hesaplanıyor…</span> }
+  urldate      = { <span data-atif-urldate>hesaplanıyor…</span> }{% if atif_revizyon_tarihi %},
+  version      = { {{ atif_revizyon_tarihi | date: "%Y-%m-%d" }} }{% endif %}
 }</pre>
   </div>
   <div class="atif-metin-alani" data-atif-panel="bibtex" data-atif-dil="en" role="tabpanel" hidden>
@@ -155,10 +168,11 @@
   title        = { {{ atif_baslik }} },
   howpublished = { Personal Website },
   year         = { {{ atif_yil }} },
-  month        = { {{ atif_ay_adi_en }} },
+  month        = { {{ page.date | date: "%-m" }} },
   day          = { {{ atif_gun }} },
   url          = { <span data-atif-url>{{ atif_url_yedek }}</span> },
-  note         = { {% if page.guncelleme_tarihi %}Last modified: {{ atif_guncelleme_tarihi_en }}; {% endif %}Accessed: <span data-atif-erisim>calculating…</span> }
+  urldate      = { <span data-atif-urldate>calculating…</span> }{% if atif_revizyon_tarihi %},
+  version      = { {{ atif_revizyon_tarihi | date: "%Y-%m-%d" }} }{% endif %}
 }</pre>
   </div>
 
@@ -208,6 +222,24 @@
       var panel = span.closest("[data-atif-panel]");
       var dil = panel ? panel.getAttribute("data-atif-dil") : "tr";
       span.textContent = dil === "en" ? erisimEn : erisimTr;
+    }
+
+    // BibTeX "urldate" alanı — resmi BibLaTeX standardına uygun ISO 8601
+    // (YYYY-MM-DD, saat bilgisi YOK) biçiminde, ziyaretçinin O ANKİ
+    // tarayıcı tarihinden üretilir (build tarihi DEĞİL). İki haneli
+    // ay/gün için sıfır dolgusu uygulanır. Kopyalama butonu, panelin
+    // güncel textContent'ini okuduğu için bu span'lar sayfa yüklenir
+    // yüklenmez doldurulduğunda kopyalanan metin de otomatik doğru olur
+    // — ayrı bir inline onclick/script GEREKMEZ.
+    function ikiHaneDoldur(sayi) {
+      return sayi < 10 ? "0" + sayi : "" + sayi;
+    }
+    var erisimIso = bugun.getFullYear() + "-" +
+      ikiHaneDoldur(bugun.getMonth() + 1) + "-" +
+      ikiHaneDoldur(bugun.getDate());
+    var urldateSpanlari = kutu.querySelectorAll("[data-atif-urldate]");
+    for (var u = 0; u < urldateSpanlari.length; u++) {
+      urldateSpanlari[u].textContent = erisimIso;
     }
 
     function panelleriGuncelle() {
