@@ -1492,6 +1492,13 @@ th { color: var(--muted); font-weight: 600; }
   align-items: baseline;
   gap: 4px 10px;
 }
+/* BUG FİX: ".share-alinti-notu" kuralı "display: flex" verdiği için,
+   tarayıcının [hidden] özniteliğine normalde uyguladığı "display: none"
+   bu kural tarafından EZİLİYORDU (bkz. ".auth-nav-menu[hidden]" için
+   yukarıdaki AYNI gerekçe) — sonuç: share.html içindeki JS notuEl.hidden
+   = true yapsa bile ("Vazgeç, normal paylaş" tıklansa dahi) not sayfada
+   görünmeye devam ediyordu. Bunu açıkça geri kazandırıyoruz. */
+.share-alinti-notu[hidden] { display: none; }
 
 .share-alinti-notu span {
   color: var(--text);
