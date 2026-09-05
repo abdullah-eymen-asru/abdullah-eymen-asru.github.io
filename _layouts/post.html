@@ -29,6 +29,7 @@ layout: default
 
   <div class="meta">
     {{ page.date | date: "%d %B %Y" }}
+    {% if page.guncelleme_tarihi %} · Güncellendi: {{ page.guncelleme_tarihi | date: "%d %B %Y" }}{% endif %}
     {% if page.author %} · Yazan: {{ page.author }}{% endif %}
     · {{ _okuma_suresi }} dk okuma
   </div>
