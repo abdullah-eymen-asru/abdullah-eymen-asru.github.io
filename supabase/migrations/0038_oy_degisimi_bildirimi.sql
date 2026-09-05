@@ -1,4 +1,4 @@
--- 0036_oy_degisimi_bildirimi.sql
+-- 0038_oy_degisimi_bildirimi.sql
 -- Değişiklik: admin_denetim_oy_kullan() artık HER oy kullanımında değil,
 -- sadece (a) kişinin İLK oyu ya da (b) önceki oyundan FARKLI bir oy
 -- verdiğinde bildirim gönderiyor. Aynı oyu tekrar verirse (değişiklik
