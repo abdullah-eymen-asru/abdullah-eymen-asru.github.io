@@ -702,7 +702,54 @@ th { color: var(--muted); font-weight: 600; }
 .project-detail .meta {
   color: var(--muted);
   font-size: 0.9rem;
+  margin-bottom: 0.7em;
+}
+
+/* Yayın/güncelleme tarihi rozetleri — .meta'nın hemen altında, kendi
+   satırında. Amaç: "Yayınlandı" ve "Güncellendi" tarihleri tek bir kalabalık
+   "·" ile ayrılmış satıra sıkıştırmak yerine, her biri kendi net etiketiyle
+   ayrı bir rozette göstermek. */
+.meta-tarihler {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 1.5em;
+}
+
+.tarih-rozeti {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.tarih-rozeti-etiket {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.7rem;
+}
+
+.tarih-rozeti-deger {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Güncelleme rozeti, yayın rozetinden görsel olarak ayrışsın diye vurgu
+   rengini kullanır — böylece "hangisi ilk yayın, hangisi güncelleme"
+   sorusu bir bakışta cevaplanır. */
+.tarih-rozeti-guncelleme {
+  border-color: var(--accent);
+  background: var(--tag-bg);
+}
+
+.tarih-rozeti-guncelleme .tarih-rozeti-deger {
+  color: var(--accent);
 }
 
 .project-body { line-height: 1.75; }
