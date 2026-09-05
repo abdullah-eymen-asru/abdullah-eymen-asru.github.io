@@ -330,21 +330,32 @@
 [data-theme="dark"] .gy-rozet--yayinda { background: #123a22; color: #9ee3b6; }
 [data-theme="dark"] .gy-rozet--gizli   { background: #3a1f1c; color: #f3a89c; }
 
-/* BUG FİX (mobil taşma): "flex-wrap" hiç belirtilmediği için tarayıcı
-   varsayılanı olan "nowrap" geçerliydi — "Supabase'e Taşı" / "Linki
-   Kopyala" / "Düzenle" / "Sil" gibi 4 buton TEK SATIRDA sıkışmaya
-   zorlanıyordu. Bu satırın doğal (sıkışmamış) genişliği dar ekranlarda
-   kartın (ve dolayısıyla sayfanın) genişliğini aşıyor, "flex-shrink: 0"
-   da butonların küçülmesini engellediği için taşma tüm sayfayı yatay
-   kaydırılabilir hale getiriyordu (ekran görüntüsünde "Sil" butonunun
-   kırpılması ve sayfanın sağa kaymış görünmesi buradan kaynaklanıyordu).
-   flex-wrap:wrap ile butonlar gerektiğinde ikinci bir satıra geçer,
-   hiçbiri ekran dışına taşmaz. */
+/* BUG FİX (mobil taşma — DÜZELTMENİN DÜZELTMESİ):
+   İlk turda sadece "flex-wrap: wrap" eklenmişti ama "flex-shrink: 0"
+   olduğu gibi bırakılmıştı — bu ikisi birbiriyle ÇELİŞİYOR. flex-shrink:0
+   tarayıcıya "bu kutuyu asla doğal (sıkışmamış) genişliğinden küçültme"
+   der; kutu hiç küçülmediği için mevcut alana sığdırılmaya hiç
+   zorlanmıyor, dolayısıyla flex-wrap da (sarma ancak kutu mevcut alana
+   sığmayacak kadar sıkıştırıldığında devreye girer) TETİKLENMİYORDU —
+   4 buton ("Supabase'e Taşı" / "Linki Kopyala" / "Düzenle" / "Sil") yine
+   tek satırda kalıp kart/sayfa genişliğini aşmaya, butonlar ekran dışında
+   kalıp tıklanamaz hale gelmeye devam ediyordu.
+
+   DOĞRU ÇÖZÜM: flex-shrink:0'ı kaldırıp (varsayılan 1'e dönüyor) ayrıca
+   min-width:0 veriyoruz — bir flex öğesinin otomatik minimum genişliği
+   normalde İÇERİĞİNİN taşmadan sığabileceği genişliktir (bu da sarmayı
+   engelleyebilir); min-width:0 bu otomatik alt sınırı kaldırıp kutunun
+   gerçekten mevcut alana göre küçülmesine, böylece içindeki butonların
+   flex-wrap ile ihtiyaç oldukça alt satıra geçmesine izin verir. Böylece
+   yeterli genişlik olan (masaüstü/geniş ekran) durumda butonlar hâlâ tek
+   satırda kalır, dar ekranda ise kutu küçülüp butonlar 2-3 satıra
+   bölünür — hiçbiri ekran dışına taşıp tıklanamaz hale gelmez. */
 .gy-icerik-kart-aksiyonlar {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  flex-shrink: 0;
+  min-width: 0;
+  max-width: 100%;
 }
 .gy-icerik-kart-aksiyonlar button {
   padding: 6px 12px;
@@ -455,13 +466,16 @@
   font-size: 0.82rem;
   color: var(--muted);
 }
-/* BUG FİX (mobil taşma): gy-icerik-kart-aksiyonlar ile aynı sorun —
-   flex-wrap eksikti, dar ekranlarda buton sırası sayfayı yatay taşırıyordu. */
+/* BUG FİX (mobil taşma): gy-icerik-kart-aksiyonlar ile AYNI çelişki —
+   flex-shrink:0 kutunun küçülmesini (dolayısıyla flex-wrap'ın devreye
+   girmesini) engelliyordu. min-width:0 ile kaldırıldı, ayrıntılı gerekçe
+   için bkz. .gy-icerik-kart-aksiyonlar üzerindeki not. */
 .gy-klasor-kart-aksiyonlar {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  flex-shrink: 0;
+  min-width: 0;
+  max-width: 100%;
 }
 .gy-klasor-kart-aksiyonlar button {
   padding: 6px 12px;
