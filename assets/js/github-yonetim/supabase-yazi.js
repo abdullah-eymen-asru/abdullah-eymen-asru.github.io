@@ -16,6 +16,255 @@ function relUrl(path) {
   return base + path;
 }
 
+/*
+ * AKADEMİK ATIF KUTUSU — "Sadece Supabase'te Yayınla" içeriği için
+ * _includes/atif-kutusu.html'in ÇALIŞMA ZAMANI (client-side) eşdeğeri.
+ * Bu sayfa (icerik/supabase-yazi.html) Jekyll build-time'da içerik
+ * bilmediği için (hangi yazının gösterileceği ancak bir RPC ile ANLAŞILIYOR)
+ * Liquid tabanlı atif-kutusu.html burada KULLANILAMAZ — aynı görsel/işlevsel
+ * kutuyu (dil + format sekmeleri, kopyalama, erişim tarihi) burada saf
+ * vanilla JS ile yeniden üretiyoruz. SIKI CSP: hiçbir inline <script>/
+ * onclick YOK — bu dosyanın kendisi zaten harici bir <script type="module">
+ * olarak yükleniyor (bkz. icerik/supabase-yazi.md), tüm etkileşim
+ * addEventListener ile bağlanıyor.
+ *
+ * SADECE kayit.akademik === true iken çağrılır (bkz. init() içindeki
+ * kontrol) — "Akademik Yazı / Atıf Kutusu Göster" kapalıyken hiç render
+ * edilmez, panel/github-yonetim.js'deki front-matter mantığıyla BİREBİR
+ * aynı davranış.
+ */
+const AYLAR_TR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+  "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+const AYLAR_EN = ["January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"];
+// MLA 9: Mayıs/Haziran/Temmuz HİÇ kısaltılmaz, diğerleri noktayla kısaltılır.
+const AYLAR_EN_KISA_MLA = ["Jan.", "Feb.", "Mar.", "Apr.", "May", "June",
+  "July", "Aug.", "Sept.", "Oct.", "Nov.", "Dec."];
+
+function tarihParcalariniAl(isoTarih) {
+  // "YYYY-MM-DD" (saat bilgisi olmadan) bekleniyor — Supabase'ten gelen
+  // tarih/güncelleme sütunları bu biçimde. new Date("YYYY-MM-DD") UTC
+  // gece yarısı olarak parse edilir; yerel saat dilimi kaymasını önlemek
+  // için parçaları elle ayırıyoruz (tarayıcı saat dilimine bakmadan).
+  if (!isoTarih) return null;
+  const parcalar = String(isoTarih).slice(0, 10).split("-");
+  if (parcalar.length !== 3) return null;
+  const yil = parseInt(parcalar[0], 10);
+  const ayIndex = parseInt(parcalar[1], 10) - 1;
+  const gun = parseInt(parcalar[2], 10);
+  if (Number.isNaN(yil) || Number.isNaN(ayIndex) || Number.isNaN(gun)) return null;
+  return { yil, ayIndex, gun };
+}
+
+/**
+ * kayit: sadece_supabase_yazi_getir() RPC'sinden dönen satır.
+ * siteTitle/siteUrl: #supabase-yazi-app'in data-site-title/data-site-url
+ * özniteliklerinden (Liquid build-time'da yazar).
+ * dilVarsayilan: "tr" | "en" — document.documentElement.lang'ten türetilir.
+ * Döndürdüğü <section> elementi çağıran kodun DOM'a eklemesi ve
+ * wireAtifKutusu() ile olay dinleyicilerinin bağlanması GEREKİR.
+ */
+function atifKutusuOlustur(kayit, siteTitle, siteUrl, dilVarsayilan, escapeHtml) {
+  const yazar = kayit.yazar_adi || siteTitle || "";
+  const baslik = kayit.baslik || "";
+  const site = siteTitle || "";
+  const url = window.location.origin + window.location.pathname + window.location.search;
+
+  const yayinTarihi = tarihParcalariniAl(kayit.tarih);
+  const revizyonTarihiHam = kayit.last_modified_at || kayit.guncelleme_tarihi || null;
+  const revizyonTarihi = tarihParcalariniAl(revizyonTarihiHam);
+
+  if (!yayinTarihi) return null;
+
+  const yayinTr = `${yayinTarihi.gun} ${AYLAR_TR[yayinTarihi.ayIndex]} ${yayinTarihi.yil}`;
+  const yayinEn = `${AYLAR_EN[yayinTarihi.ayIndex]} ${yayinTarihi.gun}, ${yayinTarihi.yil}`;
+
+  const revTr = revizyonTarihi
+    ? `${revizyonTarihi.gun} ${AYLAR_TR[revizyonTarihi.ayIndex]} ${revizyonTarihi.yil}`
+    : "";
+  const revEn = revizyonTarihi
+    ? `${AYLAR_EN[revizyonTarihi.ayIndex]} ${revizyonTarihi.gun}, ${revizyonTarihi.yil}`
+    : "";
+  const revEnMla = revizyonTarihi
+    ? `${revizyonTarihi.gun} ${AYLAR_EN_KISA_MLA[revizyonTarihi.ayIndex]} ${revizyonTarihi.yil}`
+    : "";
+
+  const e = (s) => escapeHtml(String(s == null ? "" : s));
+  const dilTr = dilVarsayilan === "en" ? "" : " active";
+  const dilEn = dilVarsayilan === "en" ? " active" : "";
+  const hiddenTr = dilVarsayilan === "en" ? " hidden" : "";
+  const hiddenEn = dilVarsayilan === "en" ? "" : " hidden";
+
+  const yazarSoyadi = (yazar.split(" ").pop() || "yazi").toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const ilkKelime = (baslik.split(" ")[0] || "yazi").toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const bibtexAnahtar = `${yazarSoyadi}${yayinTarihi.yil}${ilkKelime}`;
+  const ayNumerik = yayinTarihi.ayIndex + 1;
+
+  const kutu = document.createElement("section");
+  kutu.className = "atif-kutusu";
+  kutu.setAttribute("aria-label", "Bu içeriğe atıf verme / Cite this content");
+  kutu.setAttribute("data-atif-dil-varsayilan", dilVarsayilan);
+
+  kutu.innerHTML = `
+    <h2 class="atif-baslik" data-atif-metin-tr="Bu İçeriğe Atıf Verin" data-atif-metin-en="Cite This Content">${
+      dilVarsayilan === "en" ? "Cite This Content" : "Bu İçeriğe Atıf Verin"
+    }</h2>
+    <div class="atif-dil-secici lang-tabs" role="tablist">
+      <button type="button" class="lang-tab-btn atif-dil-buton${dilTr}" data-atif-dil="tr" aria-selected="${dilVarsayilan !== "en"}">🇹🇷 Türkçe</button>
+      <button type="button" class="lang-tab-btn atif-dil-buton${dilEn}" data-atif-dil="en" aria-selected="${dilVarsayilan === "en"}">🇬🇧 English</button>
+    </div>
+    <div class="atif-format-sekmeleri lang-tabs" role="tablist">
+      <button type="button" class="lang-tab-btn atif-sekme-buton active" data-atif-sekme="apa" role="tab" aria-selected="true">APA 7</button>
+      <button type="button" class="lang-tab-btn atif-sekme-buton" data-atif-sekme="chicago" role="tab" aria-selected="false">Chicago</button>
+      <button type="button" class="lang-tab-btn atif-sekme-buton" data-atif-sekme="mla" role="tab" aria-selected="false">MLA 9</button>
+      <button type="button" class="lang-tab-btn atif-sekme-buton" data-atif-sekme="bibtex" role="tab" aria-selected="false">BibTeX</button>
+    </div>
+
+    <div class="atif-metin-alani" data-atif-panel="apa" data-atif-dil="tr" role="tabpanel"${hiddenTr}>
+      <p class="atif-metin">${e(yazar)}. (${yayinTarihi.yil}, ${yayinTarihi.gun} ${AYLAR_TR[yayinTarihi.ayIndex]}${revizyonTarihi ? `; güncellendi ${revizyonTarihi.yil}, ${revTr.split(" ").slice(0, 2).join(" ")}` : ""}). <em>${e(baslik)}</em>. ${e(site)}. <span data-atif-erisim>hesaplanıyor…</span> tarihinde <a href="${e(url)}" data-atif-url>${e(url)}</a> adresinden erişildi.</p>
+    </div>
+    <div class="atif-metin-alani" data-atif-panel="apa" data-atif-dil="en" role="tabpanel"${hiddenEn}>
+      <p class="atif-metin">${e(yazar)} (${yayinTarihi.yil}, ${AYLAR_EN[yayinTarihi.ayIndex]} ${yayinTarihi.gun}${revizyonTarihi ? `; updated ${revizyonTarihi.yil}, ${AYLAR_EN[revizyonTarihi.ayIndex]} ${revizyonTarihi.gun}` : ""}). <em>${e(baslik)}</em>. ${e(site)}. Retrieved <span data-atif-erisim>calculating…</span>, from <a href="${e(url)}" data-atif-url>${e(url)}</a></p>
+    </div>
+
+    <div class="atif-metin-alani" data-atif-panel="chicago" data-atif-dil="tr" role="tabpanel" hidden>
+      <p class="atif-metin">${e(yazar)}. "${e(baslik)}." ${e(site)}. Yayımlanma ${yayinTr}${revizyonTarihi ? `, son güncelleme ${revTr}` : ""}. Erişim tarihi <span data-atif-erisim>hesaplanıyor…</span>. <span data-atif-url>${e(url)}</span>.</p>
+    </div>
+    <div class="atif-metin-alani" data-atif-panel="chicago" data-atif-dil="en" role="tabpanel" hidden>
+      <p class="atif-metin">${e(yazar)}. "${e(baslik)}." ${e(site)}. Published ${yayinEn}${revizyonTarihi ? `, last modified ${revEn}` : ""}. Accessed <span data-atif-erisim>calculating…</span>. <span data-atif-url>${e(url)}</span>.</p>
+    </div>
+
+    <div class="atif-metin-alani" data-atif-panel="mla" data-atif-dil="tr" role="tabpanel" hidden>
+      <p class="atif-metin">${e(yazar)}. "${e(baslik)}." <em>${e(site)}</em>, ${revizyonTarihi ? `versiyon ${revTr}` : yayinTr}, <span data-atif-url>${e(url)}</span>. Erişim tarihi <span data-atif-erisim>hesaplanıyor…</span>.</p>
+    </div>
+    <div class="atif-metin-alani" data-atif-panel="mla" data-atif-dil="en" role="tabpanel" hidden>
+      <p class="atif-metin">${e(yazar)}. "${e(baslik)}." <em>${e(site)}</em>, ${revizyonTarihi ? `version ${revEnMla}` : yayinEn}, <span data-atif-url>${e(url)}</span>. Accessed <span data-atif-erisim>calculating…</span>.</p>
+    </div>
+
+    <div class="atif-metin-alani" data-atif-panel="bibtex" data-atif-dil="tr" role="tabpanel" hidden><pre class="atif-metin atif-metin-kod">@misc{ ${e(bibtexAnahtar)},
+  author       = { ${e(yazar)} },
+  title        = { ${e(baslik)} },
+  howpublished = { Kişisel Web Sitesi },
+  year         = { ${yayinTarihi.yil} },
+  month        = { ${ayNumerik} },
+  day          = { ${yayinTarihi.gun} },
+  url          = { <span data-atif-url>${e(url)}</span> },
+  urldate      = { <span data-atif-urldate>hesaplanıyor…</span> }${revizyonTarihi ? `,
+  version      = { ${revizyonTarihi.yil}-${String(revizyonTarihi.ayIndex + 1).padStart(2, "0")}-${String(revizyonTarihi.gun).padStart(2, "0")} }` : ""}
+}</pre></div>
+    <div class="atif-metin-alani" data-atif-panel="bibtex" data-atif-dil="en" role="tabpanel" hidden><pre class="atif-metin atif-metin-kod">@misc{ ${e(bibtexAnahtar)},
+  author       = { ${e(yazar)} },
+  title        = { ${e(baslik)} },
+  howpublished = { Personal Website },
+  year         = { ${yayinTarihi.yil} },
+  month        = { ${ayNumerik} },
+  day          = { ${yayinTarihi.gun} },
+  url          = { <span data-atif-url>${e(url)}</span> },
+  urldate      = { <span data-atif-urldate>calculating…</span> }${revizyonTarihi ? `,
+  version      = { ${revizyonTarihi.yil}-${String(revizyonTarihi.ayIndex + 1).padStart(2, "0")}-${String(revizyonTarihi.gun).padStart(2, "0")} }` : ""}
+}</pre></div>
+
+    <div class="atif-alt-satir">
+      <button type="button" class="atif-kopyala-buton" data-atif-kopyala>Atıfı Kopyala</button>
+      <span class="atif-kopyalandi-bildirim" data-atif-bildirim hidden>Kopyalandı ✓</span>
+    </div>
+    <p class="atif-not" data-atif-metin-tr="Format otomatik oluşturulmuştur; gerektiğinde elle düzenleyebilirsiniz." data-atif-metin-en="This format was generated automatically; edit it if needed.">${
+      dilVarsayilan === "en"
+        ? "This format was generated automatically; edit it if needed."
+        : "Format otomatik oluşturulmuştur; gerektiğinde elle düzenleyebilirsiniz."
+    }</p>
+  `;
+
+  return kutu;
+}
+
+/**
+ * _includes/atif-kutusu.html'deki inline <script>'in BİREBİR aynı mantığı
+ * — SADECE addEventListener kullanılır, hiç onclick/inline stil YOK. Bu
+ * fonksiyon her çağrıldığında YENİ bir kutu üzerinde çalışır (sayfa
+ * başına bir kez çağrılır), bu yüzden modül-seviyesi paylaşılan durum
+ * (secilenFormat/secilenDil) burada KAPALI (closure) olarak tutulur.
+ */
+function wireAtifKutusu(kutu) {
+  const secim = { format: "apa", dil: kutu.getAttribute("data-atif-dil-varsayilan") === "en" ? "en" : "tr" };
+
+  function panelleriGuncelle() {
+    kutu.querySelectorAll("[data-atif-panel]").forEach((p) => {
+      p.hidden = !(p.getAttribute("data-atif-panel") === secim.format && p.getAttribute("data-atif-dil") === secim.dil);
+    });
+  }
+
+  kutu.querySelectorAll("[data-atif-sekme]").forEach((buton) => {
+    buton.addEventListener("click", () => {
+      secim.format = buton.getAttribute("data-atif-sekme");
+      kutu.querySelectorAll("[data-atif-sekme]").forEach((b) => {
+        const aktifMi = b === buton;
+        b.classList.toggle("active", aktifMi);
+        b.setAttribute("aria-selected", aktifMi ? "true" : "false");
+      });
+      panelleriGuncelle();
+    });
+  });
+
+  const dilMetinElemanlari = kutu.querySelectorAll("[data-atif-metin-tr]");
+  kutu.querySelectorAll(".atif-dil-buton").forEach((buton) => {
+    buton.addEventListener("click", () => {
+      secim.dil = buton.getAttribute("data-atif-dil");
+      kutu.querySelectorAll(".atif-dil-buton").forEach((b) => {
+        const aktifMi = b === buton;
+        b.classList.toggle("active", aktifMi);
+        b.setAttribute("aria-selected", aktifMi ? "true" : "false");
+      });
+      dilMetinElemanlari.forEach((el) => {
+        el.textContent = secim.dil === "en" ? el.getAttribute("data-atif-metin-en") : el.getAttribute("data-atif-metin-tr");
+      });
+      panelleriGuncelle();
+    });
+  });
+
+  const kopyalaButon = kutu.querySelector("[data-atif-kopyala]");
+  const bildirim = kutu.querySelector("[data-atif-bildirim]");
+  if (kopyalaButon) {
+    kopyalaButon.addEventListener("click", () => {
+      const aktifPanel = kutu.querySelector("[data-atif-panel]:not([hidden])");
+      if (!aktifPanel) return;
+      const metinEl = aktifPanel.querySelector(".atif-metin");
+      const metin =
+        aktifPanel.getAttribute("data-atif-panel") === "bibtex"
+          ? metinEl.textContent.trim()
+          : metinEl.textContent.replace(/\s+/g, " ").trim();
+
+      const bildirGoster = (msg) => {
+        if (!bildirim) return;
+        bildirim.textContent = msg;
+        bildirim.hidden = false;
+        setTimeout(() => { bildirim.hidden = true; }, 1800);
+      };
+
+      if (!navigator.clipboard || !navigator.clipboard.writeText) {
+        bildirGoster("Kopyalanamadı");
+        return;
+      }
+      navigator.clipboard.writeText(metin).then(() => bildirGoster("Kopyalandı ✓")).catch(() => bildirGoster("Kopyalanamadı"));
+    });
+  }
+}
+
+/** Erişim tarihi / BibTeX urldate: ziyaretçinin O ANKİ tarayıcı tarihinden — build/veritabanı tarihi DEĞİL. */
+function atifKutusuDinamikTarihleriDoldur(kutu) {
+  const bugun = new Date();
+  const erisimTr = `${bugun.getDate()} ${AYLAR_TR[bugun.getMonth()]} ${bugun.getFullYear()}`;
+  const erisimEn = `${AYLAR_EN[bugun.getMonth()]} ${bugun.getDate()}, ${bugun.getFullYear()}`;
+  kutu.querySelectorAll("[data-atif-erisim]").forEach((span) => {
+    const panel = span.closest("[data-atif-panel]");
+    const dil = panel ? panel.getAttribute("data-atif-dil") : "tr";
+    span.textContent = dil === "en" ? erisimEn : erisimTr;
+  });
+  const pad = (n) => (n < 10 ? `0${n}` : `${n}`);
+  const iso = `${bugun.getFullYear()}-${pad(bugun.getMonth() + 1)}-${pad(bugun.getDate())}`;
+  kutu.querySelectorAll("[data-atif-urldate]").forEach((span) => { span.textContent = iso; });
+}
+
 async function init() {
   const govdeEl = document.getElementById("supabase-yazi-govde");
   const geriLink = document.getElementById("supabase-yazi-geri-link");
@@ -105,6 +354,25 @@ async function init() {
     const tocElementi = tocOlustur(govdeEl.querySelector(".project-body"), kayit.toc === true);
     if (tocElementi) {
       govdeEl.querySelector(".project-body").before(tocElementi);
+    }
+
+    // AKADEMİK ATIF KUTUSU — SADECE kayit.akademik === true iken eklenir
+    // (bkz. panel/github-yonetim.md "Akademik Yazı / Atıf Kutusu Göster"
+    // ve _includes/atif-kutusu.html'deki `page.akademik == true` kontrolüyle
+    // BİREBİR aynı davranış). Dil varsayılanı sayfanın <html lang> özniteliğine
+    // göre belirlenir; site geneli için ayrı bir page.lang kavramı olmadığından
+    // bu, atif-kutusu.html'deki site.lang/page.lang mantığının bu sayfadaki
+    // karşılığıdır.
+    if (kayit.akademik === true) {
+      const appEl = document.getElementById("supabase-yazi-app");
+      const siteTitle = appEl?.dataset.siteTitle || document.title;
+      const dilVarsayilan = (document.documentElement.lang || "tr").toLowerCase().indexOf("en") === 0 ? "en" : "tr";
+      const atifKutusu = atifKutusuOlustur(kayit, siteTitle, appEl?.dataset.siteUrl, dilVarsayilan, escapeHtml);
+      if (atifKutusu) {
+        govdeEl.appendChild(atifKutusu);
+        wireAtifKutusu(atifKutusu);
+        atifKutusuDinamikTarihleriDoldur(atifKutusu);
+      }
     }
 
     // REKLAM (bkz. icerik/supabase-yazi.md ve assets/js/core/
