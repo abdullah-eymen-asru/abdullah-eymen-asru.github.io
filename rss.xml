@@ -1,14 +1,15 @@
 ---
-# feed.xml (Atom) ile AYNI yazı listesini ve AYNI tam-metin/mutlak-URL
-# mantığını RSS 2.0 formatında sunan ikinci feed. Bazı okuyucular/
-# entegrasyonlar (ör. bazı e-posta-ile-abonelik servisleri, eski RSS
-# istemcileri) sadece RSS 2.0'ı destekliyor; Atom'u destekleyenlerin
-# BÜYÜK ÇOĞUNLUĞU RSS 2.0'ı da destekliyor, dolayısıyla iki dosyayı
-# birlikte sunmak en geniş uyumluluğu sağlıyor.
+# feed.xml (Atom) ile AYNI birleşik listeyi (blog + akademik projeler) ve
+# AYNI tam-metin/mutlak-URL mantığını RSS 2.0 formatında sunan ikinci
+# feed. Bazı okuyucular/entegrasyonlar sadece RSS 2.0'ı destekliyor;
+# Atom'u destekleyenlerin BÜYÜK ÇOĞUNLUĞU RSS 2.0'ı da destekliyor,
+# dolayısıyla iki dosyayı birlikte sunmak en geniş uyumluluğu sağlıyor.
 #
 # content:encoded (RSS 2.0'ın tam-metin standardı) + dc:creator (yazar,
-# birden fazla yazar olabileceği için post.author front-matter alanından
-# okunuyor) + <category> (varsa etiket/kategori) içeriyor.
+# post/project.author front-matter alanından okunuyor) + <category>
+# (Blog Yazısı / Akademik Proje ayrımı, ayrıca varsa etiket/kategori)
+# içeriyor. "Sadece Supabase'te yayınla" projeleri statik build'e hiç
+# girmediği için burada da YOK — bkz. feed.xml başındaki not.
 layout: none
 ---
 <?xml version="1.0" encoding="UTF-8"?>
@@ -25,15 +26,20 @@ layout: none
     <lastBuildDate>{{ site.time | date_to_rfc822 }}</lastBuildDate>
     <generator>Jekyll v{{ jekyll.version }}</generator>
 
-    {% assign yayindaki_yazilar = site.posts | where_exp: "p", "p.yayinda != false" | where_exp: "p", "p.date <= site.time" %}
-    {% for post in yayindaki_yazilar limit:20 %}
+    {% assign blog_yazilari = site.posts | where_exp: "p", "p.yayinda != false" | where_exp: "p", "p.date <= site.time" %}
+    {% assign akademik_projeler = site.projects | where_exp: "p", "p.yayinda != false" | where_exp: "p", "p.date <= site.time" %}
+    {% assign tum_icerik = blog_yazilari | concat: akademik_projeler | sort: "date" | reverse %}
+    {% for post in tum_icerik limit:20 %}
       {% assign yazar_adi = post.author | default: site.author | default: site.title %}
+      {% assign icerik_turu = "Blog Yazısı" %}
+      {% if post.collection == "projects" %}{% assign icerik_turu = "Akademik Proje" %}{% endif %}
       <item>
         <title>{{ post.title | smartify | xml_escape }}</title>
         <link>{{ post.url | absolute_url }}</link>
         <guid isPermaLink="true">{{ post.url | absolute_url }}</guid>
         <pubDate>{{ post.date | date_to_rfc822 }}</pubDate>
         <dc:creator>{{ yazar_adi | xml_escape }}</dc:creator>
+        <category>{{ icerik_turu }}</category>
         {% for kategori in post.categories %}<category>{{ kategori | xml_escape }}</category>
         {% endfor %}
         {% for etiket in post.tags %}<category>{{ etiket | xml_escape }}</category>
