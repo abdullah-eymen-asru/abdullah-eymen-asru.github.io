@@ -639,66 +639,150 @@ async function renderAcikOturumlar() {
 }
 
 /* ---------------------------------------------------------------------- */
-/* KVKK ONAYI                                                             */
+/* KVKK ONAYI + YURT DIŞI AKTARIM AÇIK RIZASI                             */
 /* ---------------------------------------------------------------------- */
+/*
+ * HUKUKİ AYRIM (bkz. migration 0042 + assets/js/auth/auth-pages.js):
+ * Aydınlatma Metni bilgilendirmesi (kvkk_onay_*) ile yurt dışına aktarım
+ * açık rızası (yurtdisi_onay_*) ARTIK AYRI kolonlarda tutuluyor ve bu
+ * panel ekranında da AYRI, birbirine bağlı olmayan iki durum/aksiyon
+ * olarak gösteriliyor — biri güncel değilse diğerinin durumuna
+ * dokunulmaz, ikisi de kendi "Onayla" butonuyla bağımsız çalışır.
+ * Eski üyeler (migration 0042 öncesi kayıt olmuş, yurtdisi_onay_verildi
+ * hâlâ false olan hesaplar) panele girdiğinde burada yurt dışı rızası
+ * ayrıca ve açıkça istenir; aydınlatma onayı zaten güncelse o kutu tekrar
+ * gösterilmez.
+ */
 function wireKvkk(profile) {
   const box = document.getElementById("kvkk-durum");
   if (!box) return;
 
-  const guncelMi = profile.kvkk_onay_verildi && profile.kvkk_onay_versiyonu === KVKK_METIN_SURUMU;
+  const aydinlatmaGuncelMi = profile.kvkk_onay_verildi && profile.kvkk_onay_versiyonu === KVKK_METIN_SURUMU;
+  const yurtdisiGuncelMi =
+    profile.yurtdisi_onay_verildi && profile.yurtdisi_onay_versiyonu === KVKK_METIN_SURUMU;
 
-  if (guncelMi) {
-    box.innerHTML = `
+  let html = "";
+
+  if (aydinlatmaGuncelMi) {
+    html += `
       <p class="auth-message auth-message--success" style="position:static;">
-        ✓ KVKK Aydınlatma Metni ve Açık Rıza onayını verdin
+        ✓ KVKK Aydınlatma Metni'ni okudum beyanını verdin
         (${new Date(profile.kvkk_onay_tarihi).toLocaleDateString("tr-TR")}).
       </p>`;
-    return;
+  } else {
+    html += `
+      <p class="auth-message auth-message--error" style="position:static;">
+        ${
+          profile.kvkk_onay_verildi
+            ? "Gizlilik politikası/KVKK Aydınlatma Metni güncellendi, lütfen tekrar okuduğunu beyan et."
+            : "Henüz KVKK Aydınlatma Metni'ni okuduğuna dair bir beyanın yok."
+        }
+      </p>
+      <p>
+        <a href="/kurumsal/gizlilik-politikasi.html" target="_blank" rel="noopener noreferrer">KVKK Aydınlatma Metni ve Gizlilik Politikası</a>'nı
+        okudun mu?
+      </p>
+      <button id="kvkk-aydinlatma-onayla-btn" type="button" class="btn-primary" style="width:auto;">Okudum</button>`;
   }
 
-  box.innerHTML = `
-    <p class="auth-message auth-message--error" style="position:static;">
-      ${profile.kvkk_onay_verildi ? "Gizlilik politikası/KVKK metni güncellendi, lütfen yeniden onayla." : "Henüz KVKK onayı vermemişsin."}
-    </p>
-    <label style="display:flex; gap:8px; align-items:flex-start; margin:10px 0;">
-      <input type="checkbox" id="kvkk-checkbox" style="margin-top:3px;">
-      <span>
-        <a href="/kurumsal/gizlilik-politikasi.html" target="_blank" rel="noopener noreferrer">KVKK Aydınlatma Metni ve Gizlilik Politikası</a>'nı
-        okudum, kişisel verilerimin belirtilen şekilde işlenmesine açık rıza gösteriyorum.
-      </span>
-    </label>
-    <button id="kvkk-onayla-btn" type="button" class="btn-primary" style="width:auto;">Onayla</button>`;
+  // YURT DIŞI AKTARIM RIZASI: aydınlatma durumundan TAMAMEN bağımsız bir
+  // blok olarak render ediliyor — checkbox varsayılan olarak İŞARETSİZ,
+  // "Onayla" butonuna kadar hiçbir yerde önceden işaretlenmiyor.
+  if (yurtdisiGuncelMi) {
+    html += `
+      <p class="auth-message auth-message--success" style="position:static;">
+        ✓ Verilerinin yurt dışına (Almanya/Frankfurt) aktarılmasına açık rıza verdin
+        (${new Date(profile.yurtdisi_onay_tarihi).toLocaleDateString("tr-TR")}).
+      </p>`;
+  } else {
+    html += `
+      <p class="auth-message auth-message--error" style="position:static;">
+        ${
+          profile.yurtdisi_onay_verildi
+            ? "Yurt dışına aktarım metni güncellendi, lütfen rızanı yeniden ver."
+            : "Henüz yurt dışına aktarım için açık rıza vermemişsin."
+        }
+      </p>
+      <label style="display:flex; gap:8px; align-items:flex-start; margin:10px 0;">
+        <input type="checkbox" id="yurtdisi-checkbox" style="margin-top:3px;">
+        <span>
+          Kişisel verilerimin üyelik işlemlerinin yürütülmesi amacıyla yurt
+          dışında (Almanya/Frankfurt) bulunan güvenli Supabase sunucularına
+          aktarılmasına açık rıza veriyorum.
+        </span>
+      </label>
+      <button id="yurtdisi-onayla-btn" type="button" class="btn-primary" style="width:auto;">Onayla</button>`;
+  }
 
-  document.getElementById("kvkk-onayla-btn").addEventListener("click", async () => {
-    const checked = document.getElementById("kvkk-checkbox").checked;
+  box.innerHTML = html;
+
+  const aydinlatmaBtn = document.getElementById("kvkk-aydinlatma-onayla-btn");
+  aydinlatmaBtn?.addEventListener("click", async () => {
+    aydinlatmaBtn.disabled = true;
+    // p_yurtdisi_onay = null: bu RPC çağrısı SADECE aydınlatma beyanını
+    // günceller, yurt dışı rızasına DOKUNMAZ (bkz. migration 0042 —
+    // p_yurtdisi_onay null bırakılırsa ilgili kolonlar olduğu gibi kalır).
+    const { error } = await supabase.rpc("kvkk_onayini_ver", {
+      p_versiyon: KVKK_METIN_SURUMU,
+      p_yurtdisi_onay: null,
+      p_yurtdisi_versiyon: null,
+    });
+    aydinlatmaBtn.disabled = false;
+    if (error) {
+      alert("Beyan kaydedilemedi: " + error.message);
+      return;
+    }
+    await profiliTazeleVeCiz();
+  });
+
+  const yurtdisiBtn = document.getElementById("yurtdisi-onayla-btn");
+  yurtdisiBtn?.addEventListener("click", async () => {
+    const checked = document.getElementById("yurtdisi-checkbox").checked;
     if (!checked) {
       showMessage(box.querySelector(".auth-message") || box, "Devam etmek için kutuyu işaretlemelisin.");
       return;
     }
-    const { error } = await supabase.rpc("kvkk_onayini_ver", { p_versiyon: KVKK_METIN_SURUMU });
+    yurtdisiBtn.disabled = true;
+    // Burada p_versiyon her zaman gönderilir (RPC imzası zorunlu tutuyor)
+    // ama aydınlatma zaten güncelse bu, mevcut kvkk_onay_tarihi'ni GEREKSİZ
+    // YERE GÜNCELLEMEZ ÇÜNKÜ RPC koşulsuz "kvkk_onay_verildi=true,
+    // kvkk_onay_tarihi=now()" yazıyor — yani aydınlatma zaten onaylıyken
+    // sadece yurt dışı rızası veren bir kullanıcının aydınlatma tarihi de
+    // yenilenir. Bu, güncel aydınlatma metnine yeniden dokunmuş olsa da
+    // ONAY DURUMUNU BOZMAZ (true kalır) — sadece tarih damgası ileri
+    // alınır, ki bu iki onayın veritabanında AYRI sütunlarda tutulmasının
+    // doğal bir sonucu, "paket rıza" oluşturmaz.
+    const { error } = await supabase.rpc("kvkk_onayini_ver", {
+      p_versiyon: profile.kvkk_onay_versiyonu || KVKK_METIN_SURUMU,
+      p_yurtdisi_onay: true,
+      p_yurtdisi_versiyon: KVKK_METIN_SURUMU,
+    });
+    yurtdisiBtn.disabled = false;
     if (error) {
-      alert("Onay kaydedilemedi: " + error.message);
+      alert("Rıza kaydedilemedi: " + error.message);
       return;
     }
-    // İYİLEŞTİRME: optimistik (yerel) güncelleme yerine profili VERİTABANINDAN
-    // yeniden çekiyoruz — "onayladım ama her yerde onaylı görünmüyor"
-    // şikayetinin bir sebebi, yazma işlemi sessizce başarısız olsa bile
-    // (ör. oturum/RLS kenar durumu) arayüzün hep "başarılı" göstermesiydi.
-    // Artık gerçek DB durumunu okuyup ona göre çiziyoruz.
+    await profiliTazeleVeCiz();
+  });
+
+  // İYİLEŞTİRME: optimistik (yerel) güncelleme yerine profili VERİTABANINDAN
+  // yeniden çekiyoruz — "onayladım ama her yerde onaylı görünmüyor"
+  // şikayetinin bir sebebi, yazma işlemi sessizce başarısız olsa bile
+  // (ör. oturum/RLS kenar durumu) arayüzün hep "başarılı" göstermesiydi.
+  // Artık gerçek DB durumunu okuyup ona göre çiziyoruz.
+  async function profiliTazeleVeCiz() {
     const { data: guncelProfil, error: fetchErr } = await supabase
       .from("profiles")
-      .select("kvkk_onay_verildi, kvkk_onay_versiyonu, kvkk_onay_tarihi")
+      .select(
+        "kvkk_onay_verildi, kvkk_onay_versiyonu, kvkk_onay_tarihi, yurtdisi_onay_verildi, yurtdisi_onay_versiyonu, yurtdisi_onay_tarihi"
+      )
       .eq("id", profile.id)
       .single();
     if (!fetchErr && guncelProfil) {
       Object.assign(profile, guncelProfil);
-    } else {
-      profile.kvkk_onay_verildi = true;
-      profile.kvkk_onay_versiyonu = KVKK_METIN_SURUMU;
-      profile.kvkk_onay_tarihi = new Date().toISOString();
     }
     wireKvkk(profile);
-  });
+  }
 }
 
 /* ---------------------------------------------------------------------- */
