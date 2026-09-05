@@ -247,10 +247,23 @@ export function kullaniciAramayaUyuyorMu(kullanici, aramaKucuk) {
  * Bugünün Gizlilik Politikası / KVKK metni sürüm etiketi. Metni
  * (kurumsal/gizlilik-politikasi.md) gerçekten değiştirdiğinde bu değeri de
  * güncelle — o andan itibaren yeni kayıt olanlar bu sürüme onay verir ve
- * eski üyeler panelde "güncellenmiş metni onaylaman gerekiyor" uyarısı
- * görür (bkz. panel.js).
+ * eski üyeler ekranı kilitleyen "Rıza Yenileme" modalıyla karşılaşır (bkz.
+ * auth-guard.js -> kvkkVersiyonKontroluVeModal()) ve panelde de ayrıca
+ * "güncellenmiş metni onaylaman gerekiyor" uyarısı görür (bkz. panel.js).
+ *
+ * SÜRÜM FORMATI: "v1.0", "v1.1", ... — semantik bir anlamı yok, sadece
+ * SIRALI ve HER DEĞİŞİKLİKTE FARKLI olması yeterli. (Not: bu değer daha
+ * önce "2026-08" gibi tarih temelli bir biçimdeydi; okunabilirlik ve
+ * "Sözleşme Versiyon Takibi" özelliğiyle birebir örtüşmesi için "vX.Y"
+ * biçimine geçirildi. Format değişikliği tek başına eski/yeni sürüm
+ * karşılaştırmasını bozmaz — kontrol her zaman düz metin EŞİTLİK
+ * karşılaştırmasıdır, "v1.0" ile "2026-08" zaten farklı string olduğu
+ * için bu geçişin kendisi mevcut tüm kullanıcılara otomatik olarak BİR
+ * SEFERLİK rıza yenileme modalı gösterecektir — bu istenen/beklenen bir
+ * yan etkidir, çünkü versiyon şeması değiştiği için gerçek onay tarihinin
+ * yeni şemaya göre yeniden teyit edilmesi doğrudur.)
  */
-export const KVKK_METIN_SURUMU = "2026-08";
+export const KVKK_METIN_SURUMU = "v1.1";
 
 /*
  * ÜYELİK KAYITLARI AÇIK/KAPALI (bkz. migration
