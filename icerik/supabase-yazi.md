@@ -21,6 +21,8 @@ sitemap: false
 -->
 
 <article class="project-detail" id="supabase-yazi-app"
+  data-site-title="{{ site.title | escape }}"
+  data-site-url="{{ site.url | escape }}"
   {% if site.adsense_client_id and site.adsense_client_id != "" %}
   data-adsense-client="{{ site.adsense_client_id }}"
   data-adsense-slot="{{ site.adsense_slot_icerik_alt }}"
