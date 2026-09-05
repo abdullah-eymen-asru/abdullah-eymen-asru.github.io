@@ -140,15 +140,22 @@ async function init() {
   }
 }
 
-/** onizleme.js / ozel-icerik.js ile aynı, bağımlılıksız basit markdown->HTML dönüşümü. */
+/** onizleme.js / ozel-icerik.js ile aynı, bağımlılıksız basit markdown->HTML dönüşümü.
+ *
+ * BUG FİX ("### şeklinde kalıyor" / H3-H4 içindekilere girmiyor): bkz.
+ * onizleme.js'deki AYNI fonksiyonun başındaki bugfix notu — burada da
+ * birebir aynı düzeltme uygulandı (H1-H4 hepsi tanınıyor).
+ */
 function basitMarkdown(md) {
   const esc = escapeHtml(md);
   return esc
     .split(/\n{2,}/)
     .map((blok) => {
-      if (/^### /.test(blok)) return `<h3>${blok.slice(4)}</h3>`;
-      if (/^## /.test(blok)) return `<h2>${blok.slice(3)}</h2>`;
-      if (/^# /.test(blok)) return `<h1>${blok.slice(2)}</h1>`;
+      const baslikEslesme = blok.match(/^(#{1,4})[ \t]+(.+)$/);
+      if (baslikEslesme) {
+        const seviye = baslikEslesme[1].length;
+        return `<h${seviye}>${baslikEslesme[2]}</h${seviye}>`;
+      }
       let satir = blok
         .replaceAll(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
         .replaceAll(/\*(.+?)\*/g, "<em>$1</em>")
