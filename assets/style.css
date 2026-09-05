@@ -816,6 +816,9 @@ th { color: var(--muted); font-weight: 600; }
 .share-label { color: var(--muted); font-size: 0.88rem; margin-right: 4px; }
 
 .share-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 6px 14px;
   border: 1px solid var(--border);
   border-radius: 20px;
@@ -828,6 +831,20 @@ th { color: var(--muted); font-weight: 600; }
 }
 
 .share-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Resmi marka ikonu (Simple Icons CDN) — bkz. _includes/share.html
+   içindeki açıklama. İkon yüklenemezse <img> zaten "onerror" ile
+   DOM'dan tamamen kaldırılıyor; buradaki kurallar SADECE başarıyla
+   yüklenen ikonun boyutunu/hizasını düzenler, kırık ikon için ayrıca
+   bir gizleme kuralı GEREKMEZ. gap: 6px zaten .share-btn'de tanımlı
+   olduğundan ikon kaldırıldığında metin otomatik olarak eski (ikonsuz)
+   boşluk düzenine geri döner. */
+.share-btn-icon {
+  display: block;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
 
 /* Blog sayfası: 2 sütunlu düzen */
 .blog-columns {
