@@ -2,10 +2,19 @@
 # Bu dosya, jekyll-feed plugin'inin OTOMATİK ürettiği feed.xml'in yerine
 # geçer (plugin, kökte kendi adıyla bir dosya varsa onu kullanmayı
 # bırakıp bunu kullanır). Tek farkı: "yayinda: false" olan (gizli) ya da
-# "date" alanı henüz gelmemiş (zamanlanmış) yazıları feed'e HİÇ
+# "date" alanı henüz gelmemiş (zamanlanmış) içerikleri feed'e HİÇ
 # eklemiyor — jekyll-feed'in kendi "published: false" alanı işimize
 # yaramıyor çünkü o, sayfayı build'den tamamen siliyor ve gizli önizleme
 # linkinin çalışmasını engelliyor.
+#
+# BLOG + AKADEMİK BİRLEŞİK FEED: site.posts (blog) ve site.projects
+# (akademik projeler/yayınlar) TEK feed'de, tarihe göre karışık şekilde
+# yer alıyor. Hangisinin ne olduğu <category term="Blog Yazısı"/> ya da
+# <category term="Akademik Proje"/> ile ayırt ediliyor. NOT: "sadece
+# Supabase'te yayınla" seçeneğiyle eklenen projeler (bkz.
+# icerik/akademik-projeler.md) sayfaya build ANINDAN SONRA JS ile
+# eklendiği için bu statik feed'e giremiyor — sadece _projects/ altında
+# GERÇEK DOSYA olarak duran projeler feed'e girer.
 #
 # TAM METİN (FULL-TEXT) NOTU: <content> etiketi post.content'in TAMAMINI
 # CDATA içinde taşıyor (xml_escape yerine) — böylece Inoreader/Feedly gibi
@@ -24,9 +33,13 @@ layout: none
   <title type="html">{{ site.title | smartify }}</title>
   {% if site.description %}<subtitle>{{ site.description }}</subtitle>{% endif %}
 
-  {% assign yayindaki_yazilar = site.posts | where_exp: "p", "p.yayinda != false" | where_exp: "p", "p.date <= site.time" %}
-  {% for post in yayindaki_yazilar limit:20 %}
+  {% assign blog_yazilari = site.posts | where_exp: "p", "p.yayinda != false" | where_exp: "p", "p.date <= site.time" %}
+  {% assign akademik_projeler = site.projects | where_exp: "p", "p.yayinda != false" | where_exp: "p", "p.date <= site.time" %}
+  {% assign tum_icerik = blog_yazilari | concat: akademik_projeler | sort: "date" | reverse %}
+  {% for post in tum_icerik limit:20 %}
     {% assign yazar_adi = post.author | default: site.author | default: site.title %}
+    {% assign icerik_turu = "Blog Yazısı" %}
+    {% if post.collection == "projects" %}{% assign icerik_turu = "Akademik Proje" %}{% endif %}
     <entry>
       <title type="html">{{ post.title | smartify | xml_escape }}</title>
       <link href="{{ post.url | absolute_url }}" rel="alternate" type="text/html" title="{{ post.title | xml_escape }}" />
@@ -37,6 +50,7 @@ layout: none
       <author>
         <name>{{ yazar_adi | xml_escape }}</name>
       </author>
+      <category term="{{ icerik_turu }}" />
       {% for kategori in post.categories %}<category term="{{ kategori | xml_escape }}" />
       {% endfor %}
       {% for etiket in post.tags %}<category term="{{ etiket | xml_escape }}" />
