@@ -12,6 +12,7 @@
 </div>
 <p class="share-alinti-notu" id="share-alinti-notu" hidden>
   Seçtiğin alıntıyla paylaşılacak: <span id="share-alinti-onizleme"></span>
+  <button type="button" class="share-alinti-iptal-btn" id="share-alinti-iptal-btn">Vazgeç, normal paylaş</button>
 </p>
 
 <script>
@@ -35,8 +36,19 @@
      * okunuyor, build-time site.url'e GÜVENİLMİYOR.
      */
     const ALINTI_ANAHTARI = "paylas-alinti:" + window.location.pathname;
+    // İPTAL DURUMU: kullanıcı "Vazgeç, normal paylaş" butonuna basarsa, bu
+    // BAYRAK true olur — aktifAlintiyiOku() bundan sonra alıntı hâlâ
+    // sessionStorage'da dursa BİLE boş döner, ta ki YENİ bir alıntı
+    // kopyalanana (secim-alinti-guncellendi event'i) kadar. Sayfa
+    // yenilenince bu bayrak da sıfırlanır (sadece bellekte tutuluyor,
+    // sessionStorage'a YAZILMIYOR) — bu bilinçli bir tercih: "vazgeçme"
+    // sadece o an açık olan sayfa görüntüleme oturumu için geçerli olsun,
+    // kullanıcı sayfayı yenileyip yeniden gelirse alıntı notu (hâlâ 10
+    // dakika içindeyse) tekrar görünsün.
+    let alintiIptalEdildi = false;
 
     function aktifAlintiyiOku() {
+      if (alintiIptalEdildi) return "";
       try {
         const ham = sessionStorage.getItem(ALINTI_ANAHTARI);
         if (!ham) return "";
@@ -78,7 +90,20 @@
     // kaydırdığında (ya da sekmeye geri döndüğünde) not güncel kalsın.
     notuGuncelle();
     window.addEventListener("focus", notuGuncelle);
-    document.addEventListener("secim-alinti-guncellendi", notuGuncelle);
+    document.addEventListener("secim-alinti-guncellendi", () => {
+      // YENİ bir alıntı kopyalandı — önceki "vazgeç" tercihi artık
+      // geçersiz, yeni alıntı normal şekilde gösterilsin.
+      alintiIptalEdildi = false;
+      notuGuncelle();
+    });
+
+    const iptalBtn = document.getElementById("share-alinti-iptal-btn");
+    if (iptalBtn) {
+      iptalBtn.addEventListener("click", () => {
+        alintiIptalEdildi = true;
+        notuGuncelle();
+      });
+    }
 
     const LINK_URETICI = {
       whatsapp: (metin, url) => `https://wa.me/?text=${encodeURIComponent(metin + " " + url)}`,
@@ -128,6 +153,13 @@
     if (copyBtn) {
       copyBtn.addEventListener("click", () => {
         const hedefUrl = gercekUrl || sayfaUrlYedek;
+        // DİĞER PLATFORM LİNKLERİYLE TUTARLI: aktif bir alıntı varsa, o da
+        // (tırnak içinde) linkle birlikte kopyalanır — "Linki Kopyala"
+        // artık sadece çıplak URL değil, WhatsApp/X/Telegram vb. ile AYNI
+        // "alıntı + link" metnini panoya yazıyor.
+        const alinti = aktifAlintiyiOku();
+        const kopyalanacakMetin = alinti ? `${paylasimMetniUret()}\n${hedefUrl}` : hedefUrl;
+
         // WEBVIEW UYUMLULUĞU: navigator.clipboard bazı WebView'lerde hiç
         // tanımlı olmayabilir (izin verilmemiş) ya da writeText() reddedilebilir
         // — bu durumda kullanıcıya bir mesaj gösteriyoruz, sessizce
@@ -138,7 +170,7 @@
           setTimeout(() => { copyBtn.textContent = original; }, 1800);
           return;
         }
-        navigator.clipboard.writeText(hedefUrl).then(() => {
+        navigator.clipboard.writeText(kopyalanacakMetin).then(() => {
           const original = copyBtn.textContent;
           copyBtn.textContent = "Kopyalandı ✓";
           setTimeout(() => { copyBtn.textContent = original; }, 1800);
