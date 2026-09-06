@@ -1544,6 +1544,41 @@ function markdownUygula(tur) {
       return;
     }
 
+    /* --- dipnot (footnote) ---
+     * Kramdown'ın YERLEŞİK "[^etiket]" / "[^etiket]: açıklama" söz
+     * dizimine TAM UYUMLU — burada BAŞKA bir işaretleme icat edilmiyor,
+     * GitHub'a commit edilen gerçek Markdown, kramdown tarafından zaten
+     * kendi haliyle doğru şekilde işlenir. Bu buton sadece elle yazma
+     * zahmetini azaltıp SIRALI bir numara öneriyor:
+     *   1) İmlecin/seçimin YERİNE "[^N]" işareti yazılır (seçili metni
+     *      SARMAZ — dipnot işareti kramdown'da bağımsız bir satır-içi
+     *      öğedir, metni değiştirmez).
+     *   2) Metnin SONUNA (kendi paragrafında) "[^N]: " taslağı eklenir
+     *      ve imleç hemen oraya, açıklamayı yazmaya hazır şekilde
+     *      bırakılır. Kramdown, dipnot TANIMININ belgede NEREDE
+     *      durduğuna bakmaz (numaraya göre eşleştirir), bu yüzden
+     *      hepsini sona toplamak hem güvenli hem düzenli.
+     *   3) "N" numarası, mevcut metindeki "[^sayı]" işaretlerinin
+     *      EN BÜYÜĞÜNE bakılarak otomatik hesaplanır — kullanıcı aynı
+     *      butona tekrar tekrar bassa bile numaralar asla çakışmaz.
+     */
+    case "footnote": {
+      const kullanilanNumaralar = [...ta.value.matchAll(/\[\^(\d+)\]/g)].map((m) => parseInt(m[1], 10));
+      const sonrakiNo = kullanilanNumaralar.length ? Math.max(...kullanilanNumaralar) + 1 : 1;
+      const isaret = `[^${sonrakiNo}]`;
+
+      // İmlecin/seçimin yerine işareti yaz.
+      ta.setRangeText(isaret, start, end, "end");
+
+      // Tanım taslağını metnin (artık işaret eklenmiş hâlinin) SONUNA ekle.
+      const sonNokta = ta.value.length;
+      const sonKarakter = ta.value[sonNokta - 1];
+      const bosluk = sonKarakter === undefined || sonKarakter === "\n" ? "\n" : "\n\n";
+      ta.setRangeText(`${bosluk}${isaret}: `, sonNokta, sonNokta, "end");
+      ta.focus();
+      return;
+    }
+
     default:
       return;
   }
@@ -1675,6 +1710,15 @@ function dosyaIcerigiOlustur(tur, alan, gizliKod, govde, yayinda = true) {
   }
   if (alan.pdf_url) {
     satirlar.push(fmSatiri("pdf_url", alan.pdf_url));
+  }
+  // veri_url: pdf_url ile BİREBİR AYNI konvansiyon (opsiyonel, doluysa
+  // yazılır) — GitHub reposu/Zenodo/OSF/Kaggle gibi bir veri seti
+  // adresine işaret eder. _layouts/post.html / project.html PDF
+  // butonunun YANINDA bunun için ayrı bir "Veri Seti" butonu gösterir;
+  // _includes/head.html ise Google Scholar için `citation_data_url`
+  // meta etiketine çevirir.
+  if (alan.veri_url) {
+    satirlar.push(fmSatiri("veri_url", alan.veri_url));
   }
 
   if (tur === "proje") {
@@ -2112,11 +2156,16 @@ async function icerikKaydet(secenek = "a") {
   // (submit sırasında) haberdar olsun (bkz. birazdan eklenen kontrol).
   const toc = !!document.getElementById("ic-toc")?.checked;
   const pdfUrlHam = document.getElementById("ic-pdf-url")?.value.trim() || "";
+  const veriUrlHam = document.getElementById("ic-veri-url")?.value.trim() || "";
   const yilOneki = tur === "proje" && document.getElementById("ic-yil-oneki").checked;
   const klasor = klasorSecimDegeriniAl();
 
   if (pdfUrlHam && !/^https?:\/\//i.test(pdfUrlHam)) {
     showMessage(msgEl, "PDF Bağlantısı sadece http:// veya https:// ile başlayabilir.", "error");
+    return;
+  }
+  if (veriUrlHam && !/^https?:\/\//i.test(veriUrlHam)) {
+    showMessage(msgEl, "Veri Seti URL sadece http:// veya https:// ile başlayabilir.", "error");
     return;
   }
 
@@ -2143,6 +2192,7 @@ async function icerikKaydet(secenek = "a") {
     reklam,
     toc,
     pdf_url: pdfUrlHam,
+    veri_url: veriUrlHam,
   };
   if (tur === "proje") {
     alan.venue = document.getElementById("ic-venue").value.trim();
@@ -2337,6 +2387,8 @@ async function icerikSupabaseeYaz(tur, alan, gizliKod, govde, slug, dosyaYolu, m
     // matter'a taşınır (bkz. taslagiYayinla) — bkz. migration 0040.
     toc: alan.toc === true,
     pdf_url: alan.pdf_url || null,
+    // veri_url: pdf_url ile AYNI mantık (bkz. migration 0044).
+    veri_url: alan.veri_url || null,
     // "Admin/Site Sahibi adına yayınla" onay süreci (bkz. migration 0016 ve
     // 0023 / wireAdminAdinaTalep) — sunucu tarafındaki tetikleyici
     // admin_onay_durumu / sahip_onay_durumu'nu buna göre otomatik ayarlar.
@@ -2452,6 +2504,9 @@ async function icerikSadeceSupabaseeYayinla(tur, alan, gizliKod, govde, slug, do
     // assets/js/okuma-araclari/okuma-meta-yardimci.js ve migration 0040).
     toc: alan.toc === true,
     pdf_url: alan.pdf_url || null,
+    // veri_url: pdf_url ile AYNI mantık — Veri Seti butonu için (bkz.
+    // migration 0044).
+    veri_url: alan.veri_url || null,
     // "Admin/Site Sahibi adına yayınla" onay süreci (bkz. migration 0016 ve
     // 0023 / wireAdminAdinaTalep) — sunucu tarafındaki tetikleyici
     // admin_onay_durumu / sahip_onay_durumu'nu buna göre otomatik ayarlar.
@@ -2555,7 +2610,7 @@ async function icerikSupabaseVeGithubaYaz(tur, alan, gizliKod, govde, slug, dosy
     reklam: alan.reklam !== false,
     toc: alan.toc === true,
     pdf_url: alan.pdf_url || null,
-    // "Admin/Site Sahibi adına yayınla" onay süreci (bkz. migration 0016 ve
+    veri_url: alan.veri_url || null,
     // 0023 / wireAdminAdinaTalep) — sunucu tarafındaki tetikleyici
     // admin_onay_durumu / sahip_onay_durumu'nu buna göre otomatik ayarlar.
     // hedefRol 'owner' ise sahip_adina_talep, aksi halde (varsayılan
@@ -3578,6 +3633,7 @@ async function taslagiYayinla(item, tur, btn) {
       reklam: item.data.reklam !== false,
       toc: item.data.toc === true,
       pdf_url: item.data.pdf_url || null,
+      veri_url: item.data.veri_url || null,
     };
     if (tur === "proje") {
       alan.venue = item.data.venue;
@@ -3659,12 +3715,13 @@ async function gitDenTaslagaTasi(item, tur, btn) {
       link_etiket: item.data.link_label || null,
       govde: item.body || "",
       onizleme_kod: gizliKod,
-      // reklam/toc/pdf_url/akademik/last_modified_at: GitHub'daki dosyanın
-      // front-matter'ındaki değeri (varsa) korunur — bkz.
+      // reklam/toc/pdf_url/veri_url/akademik/last_modified_at: GitHub'daki
+      // dosyanın front-matter'ındaki değeri (varsa) korunur — bkz.
       // dosyaIcerigiOlustur/frontMatterOku.
       reklam: item.data.reklam !== false,
       toc: item.data.toc === true,
       pdf_url: item.data.pdf_url || null,
+      veri_url: item.data.veri_url || null,
       akademik: item.data.akademik === true,
       last_modified_at: item.data.last_modified_at || null,
       created_by: user?.id || null,
@@ -3858,6 +3915,7 @@ async function icerikDuzenlemeyeYukle(item, tur) {
   document.getElementById("ic-reklam").checked = item.data.reklam !== false;
   document.getElementById("ic-toc").checked = item.data.toc === true;
   document.getElementById("ic-pdf-url").value = item.data.pdf_url || "";
+  document.getElementById("ic-veri-url").value = item.data.veri_url || "";
 
   // İçeriğin daha önce üretilmiş bir gizli ön izleme kodu varsa hatırla ve
   // göster. Permalink/onizleme_kod herhangi bir sebeple eksikse (elle
