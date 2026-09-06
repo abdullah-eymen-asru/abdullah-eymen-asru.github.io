@@ -850,6 +850,15 @@
   border-top: 1px solid var(--border);
   background: var(--card-bg);
 }
+/* BUG FİX (bu dosyadaki .share-btn[hidden]/.auth-nav-menu[hidden]/
+   .cerez-banner[hidden] ile AYNI hata sınıfı): ".chat-form" kuralı
+   "display: flex" verdiği için, tarayıcının [hidden] özniteliğine
+   normalde uyguladığı "display: none" bu kural tarafından EZİLİYORDU.
+   Sonuç: chat.js hiçbir sohbet seçili değilken "form.hidden = true"
+   yapsa bile (bkz. konusmaSec/konusmaSil), mesaj yazma kutusu HER ZAMAN
+   görünür kalıyordu. Diğer üç yerde zaten uygulanan aynı düzeltmeyi
+   burada da açıkça geri kazandırıyoruz. */
+.chat-form[hidden] { display: none; }
 .chat-form textarea {
   flex: 1;
   resize: none;
