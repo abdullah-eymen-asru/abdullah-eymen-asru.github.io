@@ -179,7 +179,11 @@ grant  execute on function public.mesajlasma_kalici_silmeyi_isle() to service_ro
 -- BİTTİ. Bu RPC'yi periyodik tetiklemek için (pg_cron yerine, admin-denetim-
 -- zaman-asimi ile AYNI "Edge Function + GitHub Actions" deseni):
 --   1) supabase functions deploy mesajlasma-kalici-silme
---      (bkz. supabase/functions/mesajlasma-kalici-silme/index.ts)
+--      (bkz. supabase/functions/mesajlasma-kalici-silme/index.ts VE
+--      supabase/config.toml — bu deploy'un "verify_jwt = false" ile
+--      yapılması ŞART, aksi halde fonksiyon X-Cron-Secret doğru olsa bile
+--      Supabase'in kendi JWT zorunluluğu yüzünden HER ZAMAN
+--      "401 Unauthorized" döner; kod hiç çalıştırılmadan reddedilir)
 --   2) supabase secrets set CRON_SHARED_SECRET=<mevcut değerle AYNI>
 --   3) GitHub repo -> Settings -> Secrets and variables -> Actions:
 --        MESAJ_KALICI_SILME_FUNCTION_URL = https://<proje-ref>.supabase.co/functions/v1/mesajlasma-kalici-silme
