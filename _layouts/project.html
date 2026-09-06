@@ -42,12 +42,20 @@ layout: default
     `ay_adi_tr` filtresiyle (bkz. _plugins/turkce_ay_filtresi.rb) Türkçe
     üretiliyor — Jekyll'in kendi `date: "%B"` filtresi build ortamının
     locale'i yüzünden hep İngilizce ay adı veriyordu.
+
+    ETİKET "Yayın tarihi" (ESKİDEN "Yayınlandı"): yukarıdaki meta satırında
+    page.status alanı da tam olarak "Yayınlandı" değerini taşıyabildiği için
+    (bkz. icerik/akademik-projeler.md'deki proje kartları), bu rozetin
+    etiketi de "Yayınlandı" olunca aynı sayfada iki farklı "Yayınlandı"
+    ibaresi (biri durum etiketi, biri tarih rozeti) yan yana görünüp
+    karışıyordu. "Yayın tarihi" hem bunu ayırt eder hem de bir tarih
+    değeriyle eşleşen bir alan adı olarak daha doğru okunur.
   {% endcomment %}
   {% if page.date or page.guncelleme_tarihi %}
   <div class="meta-tarihler">
     {% if page.date %}
     <span class="tarih-rozeti tarih-rozeti-yayin">
-      <span class="tarih-rozeti-etiket">Yayınlandı</span>
+      <span class="tarih-rozeti-etiket">Yayın tarihi</span>
       <span class="tarih-rozeti-deger">{{ page.date | date: "%-d" }} {{ page.date | ay_adi_tr }} {{ page.date | date: "%Y" }}</span>
     </span>
     {% endif %}
