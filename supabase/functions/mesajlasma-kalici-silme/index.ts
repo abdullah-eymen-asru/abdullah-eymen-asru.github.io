@@ -38,6 +38,16 @@
 // Deploy:  supabase functions deploy mesajlasma-kalici-silme
 // Secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (otomatik enjekte edilir)
 //          + elle (zaten ayarlıysa atlanabilir): supabase secrets set CRON_SHARED_SECRET=<rastgele-uzun-bir-deger>
+//
+// ÖNEMLİ — JWT DOĞRULAMASI KAPALI OLMALI: bu fonksiyon bir Supabase JWT'si
+// (Authorization header'ı) İLE ÇAĞRILMAZ, sadece yukarıdaki X-Cron-Secret
+// ile. Supabase Edge Functions VARSAYILAN olarak her isteğin geçerli bir
+// JWT taşımasını zorunlu kılar ("Enforce JWT Verification") — bu kontrol
+// bu KODA HİÇ GİRMEDEN, Supabase'in kendi ağ geçidinde yapılır. Bu yüzden
+// bkz. supabase/config.toml'daki "verify_jwt = false" ayarı — o dosya
+// olmadan (ya da deploy'dan sonra JWT zorunluluğu hâlâ açıksa) bu fonksiyon
+// HER ZAMAN "401 Unauthorized" döner, X-Cron-Secret DOĞRU olsa bile (çünkü
+// kod hiç çalıştırılmaz).
 // ============================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
