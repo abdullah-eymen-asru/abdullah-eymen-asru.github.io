@@ -1,0 +1,75 @@
+{% comment %}
+  _includes/head.html
+  ---------------------------------------------------------------
+  Google Scholar / Highwire Press meta etiketleri — bu, akademik arama
+  motorlarının bir HTML sayfasını "working paper" / akademik doküman
+  olarak tanıyıp dizine eklemesi için beklediği fiili standarttır
+  (bkz. Google Scholar "Inclusion Guidelines" — "citation_" önekli
+  <meta> etiketleri). MathJax/KaTeX ya da başka bir harici kütüphane
+  GEREKTİRMEZ, sadece build-time'da Liquid ile üretilen düz <meta>
+  etiketleridir — sıkı CSP'yi (script-src) hiç ilgilendirmez.
+
+  SADECE YAZI/PROJE SAYFALARINDA: bu etiketler page.layout "post" ya da
+  "project" olduğunda eklenir (panel/hesap/onizleme gibi diğer tüm
+  sayfa türlerinde — ki onlarda zaten page.title/page.date akademik bir
+  anlam taşımıyor — hiç render edilmez).
+
+  GİZLİ/ZAMANLANMIŞ/PANEL SAYFALARINDA GÖSTERİLMEZ: _layouts/default.html
+  bu include'tan HEMEN ÖNCE `henuz_yayinlanmadi` değişkenini zaten
+  hesaplıyor ve `page.gizli_sayfa` ile birlikte <meta name="robots"
+  content="noindex, nofollow"> kararını veriyor — bir sayfa arama
+  motorlarından ZATEN gizleniyorsa, Scholar'a "bunu indeksle" sinyali
+  veren citation_ etiketlerini eklemek tutarsız olurdu; bu yüzden AYNI
+  iki koşul burada da tekrar kullanılıyor. Liquid'in {% include %}
+  etiketi ayrı bir scope AÇMAZ, üst şablonda tanımlı `henuz_yayinlanmadi`
+  burada da doğrudan okunabilir.
+
+  ALANLAR:
+    - citation_title            : page.title
+    - citation_author           : page.author, yoksa site.author, o da
+                                   yoksa site.title (atif-kutusu.html'
+                                   deki `atif_yazar` ile AYNI fallback
+                                   zinciri — sitede ayrı bir "author"
+                                   anahtarı olmadığından site sahibinin
+                                   adı olan site.title'a düşer).
+    - citation_publication_date : YYYY/MM/DD — Highwire Press'in
+                                   BEKLEDİĞİ biçim bu; atif-kutusu.html'
+                                   deki APA/MLA/BibTeX'in kendi
+                                   biçimlerinden (gün-ay adı, sayısal ay
+                                   vb.) KASITLI OLARAK farklı, botlar bu
+                                   sabit YYYY/MM/DD kalıbını bekliyor.
+    - citation_pdf_url          : SADECE page.pdf_url doluysa. Jekyll'in
+                                   absolute_url filtresi zaten mutlak
+                                   (http/https ile başlayan) bir URL'yi
+                                   OLDUĞU GİBİ bırakır (bkz. Jekyll
+                                   kaynak kodu — Addressable::URI.parse
+                                   ...absolute? kontrolü), pdf_url zaten
+                                   dış bir http(s) adresi olduğu için bu
+                                   filtre burada zararsız/idempotent bir
+                                   güvenlik ağıdır.
+    - citation_data_url         : SADECE page.veri_url doluysa, AYNI
+                                   absolute_url mantığıyla — GitHub repo/
+                                   Zenodo/Kaggle/OSF gibi bir veri seti
+                                   adresine işaret eder. pdf_url ile
+                                   BİREBİR PARALEL mimari (bkz.
+                                   _layouts/post.html ve project.html'
+                                   deki "Veri Seti" butonu, panel/
+                                   github-yonetim.md'deki "Veri Seti URL"
+                                   alanı).
+{% endcomment %}
+{% if page.layout == "post" or page.layout == "project" %}
+{% unless henuz_yayinlanmadi or page.gizli_sayfa %}
+{% assign _citation_yazar = page.author | default: site.author | default: site.title %}
+<meta name="citation_title" content="{{ page.title | escape }}">
+<meta name="citation_author" content="{{ _citation_yazar | escape }}">
+{% if page.date %}
+<meta name="citation_publication_date" content="{{ page.date | date: '%Y/%m/%d' }}">
+{% endif %}
+{% if page.pdf_url %}
+<meta name="citation_pdf_url" content="{{ page.pdf_url | absolute_url | escape }}">
+{% endif %}
+{% if page.veri_url %}
+<meta name="citation_data_url" content="{{ page.veri_url | absolute_url | escape }}">
+{% endif %}
+{% endunless %}
+{% endif %}
