@@ -14,7 +14,7 @@
  * geliyor.
  */
 import { supabase, escapeHtml, guvenliDisUrlMi } from "../core/supabase-client.js";
-import { okumaSuresiHesapla, pdfButonuHtml, tocOlustur } from "../okuma-araclari/okuma-meta-yardimci.js";
+import { okumaSuresiHesapla, kaynakButonlariHtml, tocOlustur } from "../okuma-araclari/okuma-meta-yardimci.js";
 
 async function init() {
   const govdeEl = document.getElementById("onizleme-govde");
@@ -82,7 +82,7 @@ async function init() {
     }
 
     let html = `<h1>${escapeHtml(kayit.baslik)}</h1>${metaHtml}`;
-    html += pdfButonuHtml(kayit.pdf_url, escapeHtml);
+    html += kaynakButonlariHtml(kayit.pdf_url, kayit.veri_url, escapeHtml);
     html += `<div class="project-body">${basitMarkdown(kayit.govde || "")}</div>`;
     // GÜVENLİK: href'e basmadan önce şema kontrolü (bkz. guvenliDisUrlMi
     // yorumu) — "javascript:" gibi bir URI hiç render edilmez.
@@ -123,11 +123,81 @@ async function init() {
  * (bkz. o dosyadaki AYNI bugfix notu) artık h4'ü İçindekiler'e dahil
  * ediyor, ikisi birlikte çalışır.
  */
+/**
+ * KRAMDOWN DİPNOT (FOOTNOTE) DESTEĞİ:
+ * Bu önizleme motoru Jekyll/kramdown'ı hiç görmediği için (bkz. yukarıdaki
+ * H1-H4 bugfix notu) kramdown'ın YERLEŞİK "[^etiket]" / "[^etiket]:
+ * açıklama" söz dizimini KENDİSİ tanımak zorunda — aksi halde GitHub'a
+ * commit edilince düzgün görünecek bir dipnot, burada sadece ham "[^1]"
+ * metni olarak kalırdı.
+ *
+ * Üretilen HTML, kramdown'ın KENDİ ürettiği sınıf/kimlik adlarıyla
+ * (`sup[id^="fnref:"] > a.footnote`, `div.footnotes`, `li[id^="fn:"]`,
+ * `a.reversefootnote`) BİREBİR AYNI — böylece assets/style.css'teki TEK
+ * bir kural seti hem gerçek (GitHub'a commit edilmiş, kramdown'ın
+ * ürettiği) yazılarda hem burada, tarayıcıda üretilen önizlemede AYNI
+ * görünümü verir; iki ayrı stil seti bakımı gerekmez.
+ *
+ * `md` PARAMETRESİ ZATEN escapeHtml() İLE KAÇIRILMIŞ metindir (bkz.
+ * basitMarkdown) — bu güvenli, çünkü escapeHtml sadece & < > " '
+ * karakterlerini değiştirir, "[", "]", "^", ":" karakterlerine hiç
+ * dokunmaz; bu yüzden aşağıdaki regex'ler kaçırılmış metin üzerinde de
+ * sorunsuz çalışır ve kullanıcının dipnot AÇIKLAMASINDA yazdığı
+ * < > & gibi karakterler zaten güvenle kaçırılmış olarak HTML'e girer
+ * (ekstra bir escape adımına gerek YOK, çift-kaçırma riski de yok).
+ */
+function dipnotTanimlariniAyikla(escKacirilmisMd) {
+  const tanimlar = new Map(); // etiket -> açıklama HTML'i (zaten esc edilmiş)
+  const govde = escKacirilmisMd.replace(/^\[\^([^\]\s]+)\]:[ \t]*(.+)$/gm, (_tam, etiket, aciklama) => {
+    tanimlar.set(etiket, aciklama.trim());
+    return ""; // tanım satırını gövdeden çıkar — ayrıca render edilmeyecek
+  });
+  return { govde, tanimlar };
+}
+
+/**
+ * `html` (bloklara ayrılıp render edildikten SONRAKİ tam sayfa HTML'i)
+ * içindeki "[^etiket]" işaretlerini kramdown'ınkiyle AYNI görünür
+ * numaralandırmayla (belgede İLK GEÇTİĞİ sıraya göre 1, 2, 3…) satır
+ * içi bağlantılara çevirir ve sayfanın SONUNA ↩ geri dönüş
+ * bağlantılı bir "Dipnotlar" listesi ekler. Tanımı OLMAYAN bir "[^x]"
+ * işaretine DOKUNULMAZ (kullanıcı henüz tanımını yazmamış olabilir —
+ * ham metin olarak kalması, sessizce kaybolmasından daha faydalıdır).
+ */
+function dipnotlariRenderla(html, tanimlar) {
+  if (tanimlar.size === 0) return html;
+
+  const siraNo = new Map(); // etiket -> görünür numara (ilk geçiş sırası)
+  const isaretliHtml = html.replace(/\[\^([^\]\s]+)\]/g, (tamEslesme, etiket) => {
+    if (!tanimlar.has(etiket)) return tamEslesme;
+    if (!siraNo.has(etiket)) siraNo.set(etiket, siraNo.size + 1);
+    const no = siraNo.get(etiket);
+    return `<sup id="fnref:${etiket}"><a href="#fn:${etiket}" class="footnote">${no}</a></sup>`;
+  });
+
+  if (siraNo.size === 0) return isaretliHtml; // hiç kullanılan (referans verilen) tanım yok
+
+  const maddeler = [...siraNo.keys()]
+    .map(
+      (etiket) =>
+        `<li id="fn:${etiket}">${tanimlar.get(etiket)} <a href="#fnref:${etiket}" class="reversefootnote">↩</a></li>`
+    )
+    .join("");
+
+  return `${isaretliHtml}<div class="footnotes"><ol>${maddeler}</ol></div>`;
+}
+
 function basitMarkdown(md) {
   const esc = escapeHtml(md);
-  return esc
+  // Dipnot TANIMLARI ("[^N]: açıklama" satırları), paragraf bloklarına
+  // ayrılmadan ÖNCE metinden çıkarılır — aksi halde "## " gibi bir
+  // başlık kalıbıyla YANLIŞLIKLA eşleşmez ve kendi (istenmeyen) <p>
+  // bloğu olarak render edilmez.
+  const { govde, tanimlar } = dipnotTanimlariniAyikla(esc);
+  const anaHtml = govde
     .split(/\n{2,}/)
     .map((blok) => {
+      if (blok.trim() === "") return "";
       const baslikEslesme = blok.match(/^(#{1,4})[ \t]+(.+)$/);
       if (baslikEslesme) {
         const seviye = baslikEslesme[1].length;
@@ -140,7 +210,12 @@ function basitMarkdown(md) {
         .replaceAll(/\n/g, "<br>");
       return `<p>${satir}</p>`;
     })
+    // Dipnot tanım satırı silinince geride kalabilecek BOŞ blokları at
+    // (ör. tanım tek başına kendi paragrafındaysa) — yoksa boş bir
+    // "<p></p>" olarak sayfada gereksiz bir boşluk bırakırdı.
+    .filter((parca) => parca !== "")
     .join("\n");
+  return dipnotlariRenderla(anaHtml, tanimlar);
 }
 
 init();
