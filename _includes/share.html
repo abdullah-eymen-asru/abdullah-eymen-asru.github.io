@@ -11,20 +11,26 @@
 
     GERİ DÜŞME (fallback) DAVRANIŞI: bu ikon isteği build-time'da DEĞİL,
     ziyaretçinin tarayıcısında, sayfa yüklenirken ağ üzerinden yapılır.
-    CDN'e erişilemezse (ağ engeli, CDN kesintisi, vb.) tarayıcı <img>
-    üzerinde "onerror" olayını tetikler; bu olay ikonu DOM'dan tamamen
-    kaldırır (this.remove()) — placeholder/kırık-resim simgesi asla
-    görünmez, buton SADECE ESKİ (ikonsuz, salt metin) hâline geri döner.
-    Böylece ikon hiçbir zaman butonun önceki görünümünü BOZMAZ, sadece
-    başarıyla yüklendiğinde bir iyileştirme olarak eklenir.
+    Gerçek bir ağ hatasında ("error" event) İKON DOM'DAN KALDIRILIR. AMA
+    bazı reklam/izleme engelleyicileri (özellikle "linkedin" gibi bilinen
+    marka isimlerini içeren istekleri) ağ hatası DÖNDÜRMadEN, gövdesi boş
+    ya da bozuk sahte bir "200 OK" yanıtıyla engeller — bu durumda "error"
+    olayı HİÇ tetiklenmez (tarayıcı isteği teknik olarak "başarılı" sayar),
+    görüntü sadece boş/bozuk kalır. Bunu YAKALAMAK için artık sadece
+    "onerror" değil, HTMLImageElement.decode() de kullanılıyor (bkz.
+    aşağıdaki <script> — decode() gerçekten geçerli bir görsel verisi
+    olmadığında da reddeder, gövdesi boş/bozuk sahte yanıtları da yakalar).
+    Her iki yol da aynı sonuca çıkar: ikon <img> DOM'dan tamamen kaldırılır,
+    placeholder/kırık-resim simgesi asla görünmez, buton SADECE ESKİ
+    (ikonsuz, salt metin) hâline geri döner.
   {% endcomment %}
-  <a class="share-btn" data-share="whatsapp" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/whatsapp?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy" onerror="this.remove()">WhatsApp</a>
-  <a class="share-btn" data-share="x" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/x?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy" onerror="this.remove()">X</a>
-  <a class="share-btn" data-share="linkedin" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/linkedin?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy" onerror="this.remove()">LinkedIn</a>
-  <a class="share-btn" data-share="telegram" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/telegram?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy" onerror="this.remove()">Telegram</a>
-  <a class="share-btn" data-share="facebook" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/facebook?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy" onerror="this.remove()">Facebook</a>
-  <a class="share-btn" data-share="reddit" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/reddit?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy" onerror="this.remove()">Reddit</a>
-  <a class="share-btn" data-share="pinterest" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/pinterest?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy" onerror="this.remove()">Pinterest</a>
+  <a class="share-btn" data-share="whatsapp" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/whatsapp?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy">WhatsApp</a>
+  <a class="share-btn" data-share="x" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/x?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy">X</a>
+  <a class="share-btn" data-share="linkedin" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/linkedin?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy">LinkedIn</a>
+  <a class="share-btn" data-share="telegram" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/telegram?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy">Telegram</a>
+  <a class="share-btn" data-share="facebook" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/facebook?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy">Facebook</a>
+  <a class="share-btn" data-share="reddit" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/reddit?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy">Reddit</a>
+  <a class="share-btn" data-share="pinterest" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/pinterest?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy">Pinterest</a>
   <button class="share-btn" id="native-share-btn" type="button" hidden>📤 Paylaş</button>
   <button class="share-btn" id="copy-link-btn" type="button">Linki Kopyala</button>
 </div>
@@ -37,6 +43,24 @@
   (function () {
     const wrap = document.getElementById("share-buttons");
     if (!wrap) return;
+
+    // İKON GERİ DÜŞMESİ (fallback) — bkz. yukarıdaki <img> etiketlerinin
+    // üzerindeki {% comment %} açıklaması. "error" event'i GERÇEK ağ
+    // hatalarını (404, CDN kesintisi, DNS engeli vb.) yakalar. decode()
+    // ise bazı reklam/izleme engelleyicilerinin (özellikle "linkedin" gibi
+    // marka adı geçen istekleri) "200 OK" ama boş/bozuk bir gövdeyle
+    // engellediği durumları da yakalar — bu durumda "error" event'i HİÇ
+    // tetiklenmeyebilir, ama decode() geçerli bir görsel olmadığında
+    // reddeder. İkisi birlikte, ikonun her türlü başarısızlık senaryosunda
+    // (gerçek hata VEYA sahte-başarılı-ama-boş yanıt) DOM'dan kaldırılıp
+    // butonun eski (ikonsuz) görünümüne dönmesini garantiler.
+    wrap.querySelectorAll(".share-btn-icon").forEach((img) => {
+      const kaldir = () => img.remove();
+      img.addEventListener("error", kaldir);
+      if (img.decode) {
+        img.decode().catch(kaldir);
+      }
+    });
 
     const sayfaBasligi = {{ page.title | jsonify }};
     const sayfaUrlYedek = {{ page.url | absolute_url | jsonify }};
@@ -146,12 +170,31 @@
       });
     });
 
-    // NATIVE PAYLAŞIM (Web Share API) — sadece destekleyen tarayıcılarda
-    // (çoğunlukla mobil) gösterilir; masaüstü Safari/Chrome gibi
-    // desteklemeyenlerde buton hiç görünmez, boşuna tıklanabilir bir
-    // buton bırakmamak için.
+    // NATIVE PAYLAŞIM (Web Share API) — SADECE gerçekten dokunmatik/mobil
+    // bir cihazda gösterilir.
+    //
+    // ÖNCEDEN: sadece `navigator.share` var mı diye bakılıyordu ve yorum
+    // "çoğunlukla mobil" destekler diyordu — ama artık Windows'ta
+    // Chrome/Edge gibi MASAÜSTÜ tarayıcılar da navigator.share'i
+    // destekliyor (işletim sisteminin kendi paylaşım panelini açarak).
+    // Bu, İKİ soruna yol açıyordu: (1) masaüstünde marka ikonlu diğer
+    // butonların arasında uyumsuz duran fazladan bir "📤 Paylaş" emoji
+    // butonu görünüyordu (görsel olarak "kötü"); (2) bazı masaüstü
+    // ortamlarında (özellikle üzerinde bir paylaşım sağlayıcısı kayıtlı
+    // olmayan Windows kurulumları / uzak masaüstü gibi) OS'nin paylaşım
+    // paneli hiç açılmıyor ve navigator.share()'in döndürdüğü Promise
+    // SÜRESİZ askıda kalıyor — sayfa aslında donmuyor ama kullanıcı
+    // tıkladığında hiçbir şey olmuyor ve ekran "kilitlenmiş" gibi
+    // görünüyordu. Bu yüzden artık navigator.share desteğine EK olarak
+    // dokunmatik/mobil bir cihaz olup olmadığı da kontrol ediliyor;
+    // masaüstünde bu buton HER ZAMAN gizli kalıyor — masaüstü için zaten
+    // yukarıdaki marka linkleri + "Linki Kopyala" butonu yeterli.
+    const muhtemelenMobil =
+      (navigator.maxTouchPoints && navigator.maxTouchPoints > 0) ||
+      /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
     const nativeBtn = document.getElementById("native-share-btn");
-    if (nativeBtn && navigator.share) {
+    if (nativeBtn && navigator.share && muhtemelenMobil) {
       nativeBtn.hidden = false;
       nativeBtn.addEventListener("click", () => {
         navigator
