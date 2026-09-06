@@ -1,0 +1,46 @@
+# supabase/config.toml
+#
+# NEDEN BU DOSYA GEREKLİ (401 HATASININ ASIL SEBEBİ):
+# Supabase Edge Functions, VARSAYILAN olarak her isteğin geçerli bir
+# Supabase JWT (`Authorization: Bearer <...>` header'ı — anon key ya da bir
+# kullanıcı oturum token'ı) taşımasını ZORUNLU kılar ("Enforce JWT
+# Verification"). Bu kontrol, FONKSİYON KODUNUZ ÇALIŞMADAN ÖNCE, Supabase'in
+# kendi ağ geçidi (gateway) tarafından yapılır.
+#
+# .github/workflows/mesajlasma-kalici-silme.yml (ve AYNI desendeki
+# admin-denetim-zaman-asimi.yml) içindeki `curl` çağrısı SADECE
+# `X-Cron-Secret` header'ı gönderir, `Authorization` header'ı GÖNDERMEZ —
+# bu fonksiyonlar zaten kendi paylaşılan-sır (shared secret) kontrolünü
+# KENDİ KODLARINDA yapıyor (bkz. ilgili index.ts'teki sabitZamanliEsitMi()),
+# ayrıca bir Supabase JWT'sine ihtiyaçları yok. Bu yüzden bu iki fonksiyon
+# için gateway'in JWT zorunluluğu AÇIKÇA kapatılmalı — aksi halde istek
+# fonksiyon koduna hiç ulaşmadan "401 Unauthorized" ile geri döner (kod
+# içindeki CRON_SHARED_SECRET karşılaştırması hiç ÇALIŞTIRILMAZ bile,
+# "değerler doğru" olsa dahi 401 alınmaya devam eder).
+#
+# BU DOSYA COMMIT EDİLDİKTEN SONRA (ya da elle):
+#   supabase functions deploy mesajlasma-kalici-silme
+#   supabase functions deploy admin-denetim-zaman-asimi
+# ile YENİDEN deploy edilmesi gerekir — config.toml'daki bu ayar sadece
+# BİR SONRAKİ deploy'da uygulanır, geçmişte deploy edilmiş bir fonksiyonu
+# otomatik güncellemez.
+#
+# ALTERNATİF (bu dosya olmadan da çözer, ama kod dışı/hatırlanması gereken
+# bir adım olur): `supabase functions deploy <isim> --no-verify-jwt` bayrağı
+# ile deploy etmek, YA DA Supabase Dashboard -> Edge Functions -> ilgili
+# fonksiyon -> "Enforce JWT Verification" anahtarını KAPATMAK. Bu config.toml
+# dosyası bu ayarı KOD İÇİNDE, tekrar deploy edilse bile KALICI şekilde
+# belgeliyor — CLI bayrağını hatırlamaya ya da Dashboard'da elle
+# değiştirmeye gerek bırakmıyor.
+#
+# migration 0035 / index.ts / .yml dosyalarındaki mevcut şifreleme (SHA-256
+# ile sabit-zamanlı X-Cron-Secret karşılaştırması) DEĞİŞMEDİ — bu sadece
+# Supabase'in KENDİ, ondan ÖNCE gelen JWT katmanını devre dışı bırakıyor;
+# asıl yetkilendirme hâlâ fonksiyonun kendi X-Cron-Secret kontrolünde VE
+# veritabanı tarafında (RPC'nin service_role dışına kapalı olması) kalıyor.
+
+[functions.mesajlasma-kalici-silme]
+verify_jwt = false
+
+[functions.admin-denetim-zaman-asimi]
+verify_jwt = false
