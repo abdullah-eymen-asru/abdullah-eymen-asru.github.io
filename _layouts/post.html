@@ -35,10 +35,12 @@ layout: default
     TARİH ROZETLERİ: bkz. _layouts/project.html içindeki aynı bloğun
     açıklaması — yayın/güncelleme tarihi artık ayrı, kendi rozetlerinde ve
     Türkçe ay adıyla (`ay_adi_tr`, bkz. _plugins/turkce_ay_filtresi.rb).
+    Etiket "Yayın tarihi" (eskiden "Yayınlandı") — bkz. project.html'deki
+    AYNI değişikliğin gerekçesi (durum etiketiyle karışmaması için).
   {% endcomment %}
   <div class="meta-tarihler">
     <span class="tarih-rozeti tarih-rozeti-yayin">
-      <span class="tarih-rozeti-etiket">Yayınlandı</span>
+      <span class="tarih-rozeti-etiket">Yayın tarihi</span>
       <span class="tarih-rozeti-deger">{{ page.date | date: "%-d" }} {{ page.date | ay_adi_tr }} {{ page.date | date: "%Y" }}</span>
     </span>
     {% if page.guncelleme_tarihi %}
