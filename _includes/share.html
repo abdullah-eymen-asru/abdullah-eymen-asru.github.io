@@ -170,28 +170,38 @@
       });
     });
 
-    // NATIVE PAYLAŞIM (Web Share API) — SADECE gerçekten dokunmatik/mobil
-    // bir cihazda gösterilir.
+    // NATIVE PAYLAŞIM (Web Share API) — SADECE gerçekten mobil bir
+    // tarayıcı/işletim sisteminde gösterilir.
     //
-    // ÖNCEDEN: sadece `navigator.share` var mı diye bakılıyordu ve yorum
-    // "çoğunlukla mobil" destekler diyordu — ama artık Windows'ta
-    // Chrome/Edge gibi MASAÜSTÜ tarayıcılar da navigator.share'i
-    // destekliyor (işletim sisteminin kendi paylaşım panelini açarak).
-    // Bu, İKİ soruna yol açıyordu: (1) masaüstünde marka ikonlu diğer
-    // butonların arasında uyumsuz duran fazladan bir "📤 Paylaş" emoji
-    // butonu görünüyordu (görsel olarak "kötü"); (2) bazı masaüstü
-    // ortamlarında (özellikle üzerinde bir paylaşım sağlayıcısı kayıtlı
-    // olmayan Windows kurulumları / uzak masaüstü gibi) OS'nin paylaşım
-    // paneli hiç açılmıyor ve navigator.share()'in döndürdüğü Promise
-    // SÜRESİZ askıda kalıyor — sayfa aslında donmuyor ama kullanıcı
-    // tıkladığında hiçbir şey olmuyor ve ekran "kilitlenmiş" gibi
-    // görünüyordu. Bu yüzden artık navigator.share desteğine EK olarak
-    // dokunmatik/mobil bir cihaz olup olmadığı da kontrol ediliyor;
-    // masaüstünde bu buton HER ZAMAN gizli kalıyor — masaüstü için zaten
-    // yukarıdaki marka linkleri + "Linki Kopyala" butonu yeterli.
+    // ÖNCEDEN (1. deneme): sadece `navigator.share` var mı diye
+    // bakılıyordu — Windows'ta Chrome/Edge gibi MASAÜSTÜ tarayıcılar da
+    // bunu desteklediği için masaüstünde de görünüyordu.
+    //
+    // ÖNCEDEN (2. deneme): buna ek olarak "dokunmatik ekran var mı"
+    // (navigator.maxTouchPoints > 0) kontrolü eklenmişti — AMA bu da
+    // YANLIŞ POZİTİF veriyordu: dokunmatik ekranlı Windows dizüstü/2-in-1
+    // bilgisayarlar (Surface vb.) GERÇEKTEN masaüstü/laptop olduğu hâlde
+    // bu kontrolden "mobil" gibi geçiyordu — sorun bu yüzden hâlâ devam
+    // ediyordu (kullanıcı gerçekte masaüstünde olsa da buton görünmeye ve
+    // navigator.share()'in tıklanınca askıda kalan Promise'i yüzünden
+    // "ekran donuyor" hissi vermeye devam ediyordu).
+    //
+    // ARTIK: dokunmatik kontrolü TAMAMEN kaldırıldı, yerine tarayıcının
+    // KENDİ bildirdiği mobil/masaüstü bilgisi kullanılıyor —
+    // navigator.userAgentData.mobile (Chrome/Edge'in User-Agent Client
+    // Hints API'si, gerçek işletim sistemine göre doğru rapor eder,
+    // donanımdaki bir özelliğe değil) mevcutsa ONA güveniliyor; bu API'yi
+    // desteklemeyen tarayıcılarda (Safari, Firefox) User-Agent metnine
+    // bakılıyor. Sonuç: dokunmatik ekranlı bir Windows masaüstünde bu
+    // buton artık KESİN olarak gizli kalıyor.
+    const uaMobilBilgisi =
+      navigator.userAgentData && typeof navigator.userAgentData.mobile === "boolean"
+        ? navigator.userAgentData.mobile
+        : null;
     const muhtemelenMobil =
-      (navigator.maxTouchPoints && navigator.maxTouchPoints > 0) ||
-      /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      uaMobilBilgisi !== null
+        ? uaMobilBilgisi
+        : /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
     const nativeBtn = document.getElementById("native-share-btn");
     if (nativeBtn && navigator.share && muhtemelenMobil) {
