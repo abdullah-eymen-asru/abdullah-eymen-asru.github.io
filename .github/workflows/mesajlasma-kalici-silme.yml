@@ -1,5 +1,5 @@
 # Bu workflow, supabase/functions/mesajlasma-kalici-silme Edge Function'ını
-# GÜNDE BİR KEZ tetikler — migration 0035'teki "kişiler tarafından
+# GÜNDE BİR KEZ tetikler — migration 0045'teki "kişiler tarafından
 # gizlenmiş/silinmiş konuşma ve mesajları 30 gün sonra Supabase'den KALICI
 # olarak sil" işlemini dışarıdan periyodik çalıştırır. Aynı desen
 # admin-denetim-zaman-asimi.yml'de de kullanılıyor (bkz. o dosyanın başındaki
@@ -8,6 +8,10 @@
 #
 # KURULUM (bir kereye mahsus):
 #   1) supabase functions deploy mesajlasma-kalici-silme
+#      (bkz. supabase/config.toml — bu deploy'un JWT doğrulaması OLMADAN
+#      çalışması için "verify_jwt = false" o dosyada tanımlı; o dosya
+#      olmadan/güncel olmadan bu adım "401 Unauthorized" ile sonuçlanır,
+#      X-Cron-Secret doğru olsa bile)
 #   2) CRON_SHARED_SECRET zaten admin-denetim-zaman-asimi için ayarlıysa
 #      YENİDEN ayarlamana gerek yok (aynı sır iki fonksiyon tarafından da
 #      okunuyor); hiç ayarlanmadıysa: supabase secrets set CRON_SHARED_SECRET=<rastgele-uzun-bir-deger>
