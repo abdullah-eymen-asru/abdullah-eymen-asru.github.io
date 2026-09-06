@@ -92,8 +92,22 @@ body {
    tarayıcı varsayılanı yerine temaya uygun renk kullanıyoruz.
    Bu olmadan koyu temada linkler tarayıcının kendi mavisiyle
    düşük kontrastla kalıyordu. */
+/* NOT: burada bilinçli olarak "a:visited" kuralı YOK. Sebep: bir
+   pseudo-class (":visited") CSS özgüllüğünde bir SINIF SAYILIR, yani
+   "a:visited" (0,1,1) özgüllüğü "nav a" (0,0,2), ".brand" (0,1,0),
+   ".sekme-btn" (0,1,0) gibi TÜM site içi bağlantı kurallarını EZERdi —
+   ziyaret edilmiş (tarayıcı geçmişinde olan) her link, o linkin asıl
+   niyet edilen rengi ne olursa olsun (gri/nötr dahil) hep --accent
+   mavisine döner, ziyaret edilmemiş linkler ise doğru rengini korurdu.
+   Kullanıcı bunu üst menüde "bazı linkler mavi, bazıları gri, bozuk
+   gibi" olarak fark etti — aslında bozuk olan, hangi sayfaları daha
+   önce ziyaret ettiğine bağlı bir CSS özgüllük hatasıydı, açık/koyu
+   temanın ikisinde de aynen oluşuyordu. Aşağıdaki tek kural (":visited"
+   OLMADAN) hem ziyaret edilmiş hem edilmemiş sınıfsız linkler için AYNI
+   temayla uyumlu rengi verir, ve daha spesifik kurallar (nav a, .brand,
+   .sekme-btn, .auth-nav-fallback-hesap, vb.) artık ziyaret durumundan
+   BAĞIMSIZ olarak her zaman kazanır. */
 a { color: var(--accent); }
-a:visited { color: var(--accent); }
 
 .site-header {
   border-bottom: 1px solid var(--border);
