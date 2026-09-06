@@ -1245,6 +1245,19 @@ th { color: var(--muted); font-weight: 600; }
  * (Chrome, Firefox, Safari, Edge) hiçbir şey değişmez.
  */
 @media (prefers-reduced-motion: no-preference) {
+  /* Dipnot (footnote) ↩ geri-dönüş bağlantıları ve "[^N]" referansları
+     sayfa içi (#fn:.../#fnref:...) çapa atlamaları yapıyor — tarayıcının
+     VARSAYILAN sert/anlık zıplaması yerine yumuşak bir kaydırma
+     (bkz. .footnotes/.reversefootnote altındaki scroll-margin-top notu)
+     "sayfa zıplamasını" hissedilir şekilde azaltır. Hareket
+     hassasiyeti olan ziyaretçiler için (aşağıdaki media query sayesinde)
+     bu davranış devre dışı kalır, tarayıcı varsayılan anlık atlamaya döner
+     — kullanıcı deneyimi bozulmaz, sadece "smooth" efekti kaybolur.
+  */
+  html {
+    scroll-behavior: smooth;
+  }
+
   @view-transition {
     navigation: auto;
   }
@@ -1362,6 +1375,10 @@ th { color: var(--muted); font-weight: 600; }
    assets/js/okuma-araclari/okuma-meta-yardimci.js pdfButonuHtml()
    (Supabase-only sayfalar için). */
 .pdf-indir-alani {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
   margin: 0 0 1.5em;
 }
 
@@ -1384,6 +1401,103 @@ th { color: var(--muted); font-weight: 600; }
 .pdf-indir-btn:hover {
   background: var(--accent);
   color: var(--bg);
+}
+
+/* VERİ SETİ BUTONU: pdf-indir-btn ile AYNI kutu/hizada, ama BİLİNÇLİ
+   olarak PDF butonundan görsel olarak ayırt edilebilir "ikincil" bir
+   stil kullanıyor (dolu accent renk yerine nötr kenarlık/metin) —
+   ikisi aynı anda görünürken hangisinin "birincil eylem" (PDF) olduğu
+   hâlâ net kalsın diye. Aynı boyut/dolgu/geçiş süresiyle .pdf-indir-btn
+   ile hizalı durur (bkz. .pdf-indir-alani'nin flex+gap düzeni). */
+.veri-indir-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.veri-indir-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ============================================================
+   DİPNOTLAR (FOOTNOTES)
+   ============================================================
+   Kramdown'ın "[^etiket]" / "[^etiket]: açıklama" söz diziminden
+   ÜRETTİĞİ GERÇEK sınıf/kimlik adları — GitHub'a commit edilmiş bir
+   yazı build edildiğinde kramdown otomatik olarak BUNLARI üretir:
+     <sup id="fnref:1"><a href="#fn:1" class="footnote">1</a></sup>
+     <div class="footnotes"><ol><li id="fn:1">... <a class="reversefootnote">↩</a></li></ol></div>
+   AYNI sınıf adları, Jekyll'i hiç görmeyen üç yol (bkz.
+   assets/js/github-yonetim/onizleme.js, supabase-yazi.js — "Ön İzleme"
+   ve "Sadece Supabase'te Yayınla") tarafından da JS ile ÜRETİLİYOR; bu
+   yüzden TEK bir kural seti her üç durumda da aynı görünümü veriyor,
+   ayrı bir "önizleme" stil dosyası GEREKMEZ.
+*/
+sup > a.footnote {
+  text-decoration: none;
+  font-size: 0.75em;
+  font-weight: 700;
+  color: var(--accent);
+  padding: 0 2px;
+}
+
+sup > a.footnote:hover {
+  text-decoration: underline;
+}
+
+/* scroll-margin-top: sabit (position: sticky) site başlığının ALTINDA
+   kalması için — çapa atlaması olmadan doğrudan URL'de #fn:.../#fnref:...
+   ile gelindiğinde bile içerik başlığın arkasına gizlenmesin. Yumuşak
+   kaydırma davranışı (bkz. yukarıdaki @media (prefers-reduced-motion:
+   no-preference) bloğundaki html { scroll-behavior: smooth }) BURADAKİ
+   ofsetle birlikte çalışır. */
+sup[id^="fnref:"],
+.footnotes li {
+  scroll-margin-top: 90px;
+}
+
+.footnotes {
+  margin-top: 2.5em;
+  padding-top: 1.2em;
+  border-top: 1px solid var(--border);
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.footnotes ol {
+  padding-left: 1.4em;
+  margin: 0;
+}
+
+.footnotes li {
+  margin-bottom: 0.6em;
+  line-height: 1.55;
+}
+
+.footnotes li:target {
+  color: var(--text);
+}
+
+a.reversefootnote {
+  text-decoration: none;
+  color: var(--accent);
+  margin-left: 4px;
+  font-size: 0.85em;
+}
+
+a.reversefootnote:hover {
+  text-decoration: underline;
 }
 
 /* ============================================================
