@@ -194,29 +194,94 @@
     // desteklemeyen tarayıcılarda (Safari, Firefox) User-Agent metnine
     // bakılıyor. Sonuç: dokunmatik ekranlı bir Windows masaüstünde bu
     // buton artık KESİN olarak gizli kalıyor.
+    //
+    // BUG FİX ("iOS Safari'de buton çalışmıyor"): iPadOS 13'ten beri
+    // Safari, "Masaüstü Web Sitesi İste" AÇIK OLMASA BİLE varsayılan
+    // olarak User-Agent'ında "iPad"/"Mobi" GEÇİRMİYOR — kendini doğrudan
+    // masaüstü Mac Safari'siymiş gibi tanıtıyor ("Macintosh; Intel Mac OS
+    // X ..."). Bu yüzden yukarıdaki User-Agent regex'i GERÇEK bir iPad'i
+    // "masaüstü" sanıp butonu (aşağıdaki CSS düzeltmesinden ÖNCE görünür
+    // kalsa bile) tıklama dinleyicisiz, yani "çalışmayan" bir buton olarak
+    // bırakıyordu. navigator.userAgentData da Safari'de HİÇ yok, o yüzden
+    // ilk dal da devreye girmiyordu. Çözüm: gerçek Mac'lerde ASLA
+    // dokunmatik ekran OLMADIĞI (maxTouchPoints hep 0'dır) için, "platform
+    // Mac'i bildiriyor AMA dokunmatik ekranı var" kombinasyonu SADECE
+    // iPad'de mümkündür — bu, önceki denemedeki genel "dokunmatik var mı"
+    // kontrolünün AKSİNE, Windows dokunmatik dizüstülerinde YANLIŞ POZİTİF
+    // ÜRETMEZ (onlar "MacIntel" platformunu hiç bildirmez).
+    const ipadMacGibiGorunuyor =
+      typeof navigator.platform === "string" &&
+      navigator.platform === "MacIntel" &&
+      navigator.maxTouchPoints > 1;
+
     const uaMobilBilgisi =
       navigator.userAgentData && typeof navigator.userAgentData.mobile === "boolean"
         ? navigator.userAgentData.mobile
         : null;
     const muhtemelenMobil =
-      uaMobilBilgisi !== null
+      ipadMacGibiGorunuyor ||
+      (uaMobilBilgisi !== null
         ? uaMobilBilgisi
-        : /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        : /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
 
     const nativeBtn = document.getElementById("native-share-btn");
     if (nativeBtn && navigator.share && muhtemelenMobil) {
       nativeBtn.hidden = false;
+
+      // BUG FİX ("tuşa basınca/paylaşımdan dönünce ekran donuyor/kasıyor"):
+      // ÖNCEDEN her tıklamada KOŞULSUZ yeni bir navigator.share() çağrısı
+      // yapılıyordu. iOS/iPadOS Safari'de (WebKit), BİR paylaşım sayfası
+      // (share sheet) hâlâ açıkken/kapanış animasyonu SÜRERKEN ikinci bir
+      // navigator.share() çağrısı yapılırsa (ör. kullanıcı iki kez art
+      // arda dokunursa — dokunmatik ekranlarda "çift dokunma" alışılmadık
+      // değildir, özellikle animasyon süresince buton hâlâ tıklanabilir
+      // GÖRÜNÜYORSA) WebKit bu ikinci isteği düzgün reddetmek yerine
+      // sayfayı/animasyonu askıda bırakabiliyor — kullanıcı bunu "ekran
+      // donuyor" olarak görüyor. Kullanıcı paylaşım panelinden bir uygulama
+      // seçip GERİ DÖNDÜĞÜNDE de aynı risk var: sekme odağı geri gelirken
+      // (focus/pageshow) buton hâlâ "aktif" durumdaysa ve bu sırada tekrar
+      // dokunulursa aynı askıda kalma oluşabiliyor.
+      //
+      // ÇÖZÜM: basit bir "meşgul" bayrağıyla YENİDEN GİRİŞ (re-entrancy)
+      // engelleniyor — bir paylaşım isteği SÜRERKEN (kullanıcı panelde bir
+      // uygulama seçene, iptal edene ya da geri dönene KADAR) buton
+      // devre dışı bırakılıyor, ikinci bir navigator.share() çağrısı asla
+      // yapılmıyor. `.finally()` ile de İSTEĞİN SONUCU NE OLURSA OLSUN
+      // (başarılı, iptal edilmiş ya da hata) buton HER ZAMAN yeniden
+      // etkinleştiriliyor — kullanıcı panelden döndüğünde buton "takılı"
+      // kalmıyor. Senkron bir hata ihtimaline karşı (bazı eski WebKit
+      // sürümleri navigator.share()'i reddetmek yerine SENKRON olarak
+      // fırlatabiliyor) çağrı try/catch içine de alınıyor, aksi hâlde
+      // "meşgul" bayrağı hiç sıfırlanmadan sonsuza kadar takılı kalırdı.
+      let paylasimSuruyor = false;
       nativeBtn.addEventListener("click", () => {
-        navigator
-          .share({
-            title: sayfaBasligi,
-            text: paylasimMetniUret(),
-            url: gercekUrl || sayfaUrlYedek,
-          })
-          .catch(() => {
-            // Kullanıcı paylaşım panelini iptal etti ya da tarayıcı
-            // reddetti — sessizce yok say, bir hata değil.
-          });
+        if (paylasimSuruyor) return;
+        paylasimSuruyor = true;
+        nativeBtn.disabled = true;
+
+        const bitir = () => {
+          paylasimSuruyor = false;
+          nativeBtn.disabled = false;
+        };
+
+        try {
+          navigator
+            .share({
+              title: sayfaBasligi,
+              text: paylasimMetniUret(),
+              url: gercekUrl || sayfaUrlYedek,
+            })
+            .catch(() => {
+              // Kullanıcı paylaşım panelini iptal etti ya da tarayıcı
+              // reddetti — sessizce yok say, bir hata değil.
+            })
+            .finally(bitir);
+        } catch (e) {
+          // Bazı eski WebKit sürümlerinde navigator.share() Promise
+          // reddetmek yerine SENKRON fırlatabiliyor — bu durumda da
+          // "meşgul" bayrağının takılı kalmaması için burada temizleniyor.
+          bitir();
+        }
       });
     }
 
