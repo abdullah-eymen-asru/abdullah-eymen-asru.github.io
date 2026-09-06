@@ -833,12 +833,13 @@ th { color: var(--muted); font-weight: 600; }
 .share-btn:hover { border-color: var(--accent); color: var(--accent); }
 
 /* Resmi marka ikonu (Simple Icons CDN) — bkz. _includes/share.html
-   içindeki açıklama. İkon yüklenemezse <img> zaten "onerror" ile
-   DOM'dan tamamen kaldırılıyor; buradaki kurallar SADECE başarıyla
-   yüklenen ikonun boyutunu/hizasını düzenler, kırık ikon için ayrıca
-   bir gizleme kuralı GEREKMEZ. gap: 6px zaten .share-btn'de tanımlı
-   olduğundan ikon kaldırıldığında metin otomatik olarak eski (ikonsuz)
-   boşluk düzenine geri döner. */
+   içindeki açıklama ve <script> bloğu. İkon yüklenemezse ("error" event)
+   YA DA sahte-başarılı-ama-boş/bozuk bir yanıt gelirse (decode() reddi)
+   <img> zaten JS ile DOM'dan tamamen kaldırılıyor; buradaki kurallar
+   SADECE başarıyla yüklenen ikonun boyutunu/hizasını düzenler, kırık
+   ikon için ayrıca bir gizleme kuralı GEREKMEZ. gap: 6px zaten
+   .share-btn'de tanımlı olduğundan ikon kaldırıldığında metin otomatik
+   olarak eski (ikonsuz) boşluk düzenine geri döner. */
 .share-btn-icon {
   display: block;
   flex-shrink: 0;
