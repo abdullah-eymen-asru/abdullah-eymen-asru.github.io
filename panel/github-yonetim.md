@@ -229,6 +229,10 @@ permalink: "/panel/github-yonetim.html"
                 <button type="button" data-md="link" title="Bağlantı ([metin](url))">🔗</button>
                 <button type="button" data-md="image" title="Görsel — dış URL ile (![açıklama](url))">🖼️</button>
               </span>
+              <span class="gy-editor-ayrac" aria-hidden="true"></span>
+              <span class="gy-editor-grup">
+                <button type="button" data-md="footnote" title="Dipnot ekle (kramdown [^N] / [^N]: açıklama)">¹</button>
+              </span>
             </div>
             <textarea id="ic-body" rows="14" placeholder="Markdown formatında içeriğini buraya yaz..."></textarea>
           </div>
@@ -295,6 +299,18 @@ permalink: "/panel/github-yonetim.html"
               "📄 PDF İndir" butonu çıkar — ör. tam metin makale, rapor ya da
               sunum PDF'i için. Sadece <code>https://</code> ile başlayan
               adresler kabul edilir.
+            </p>
+          </div>
+          <div class="form-field">
+            <label for="ic-veri-url">Veri Seti URL (veri_url, opsiyonel)</label>
+            <input id="ic-veri-url" type="url" placeholder="https://github.com/... veya https://zenodo.org/... veya https://osf.io/...">
+            <p class="gy-yardim-metni">
+              Doluysa yazının/projenin başında, PDF butonunun YANINDA "🗃️ Veri
+              Seti" butonu çıkar — analiz kodunun/veri setinin bulunduğu bir
+              GitHub reposu, Zenodo/OSF kaydı ya da Kaggle veri kümesi için.
+              PDF Bağlantısı ile TAMAMEN BAĞIMSIZDIR, ikisi birden ya da
+              sadece biri doldurulabilir. Sadece <code>https://</code> ile
+              başlayan adresler kabul edilir.
             </p>
           </div>
           <div class="form-field" id="ic-gizli-hedef-wrap" hidden>
