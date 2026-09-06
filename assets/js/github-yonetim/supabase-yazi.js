@@ -9,7 +9,7 @@
  * görebilmeli.
  */
 import { supabase, escapeHtml, guvenliDisUrlMi } from "../core/supabase-client.js";
-import { okumaSuresiHesapla, pdfButonuHtml, tocOlustur } from "../okuma-araclari/okuma-meta-yardimci.js";
+import { okumaSuresiHesapla, kaynakButonlariHtml, tocOlustur } from "../okuma-araclari/okuma-meta-yardimci.js";
 
 function relUrl(path) {
   const base = document.documentElement.dataset.baseurl || "";
@@ -335,7 +335,7 @@ async function init() {
     }
 
     let html = `<h1>${escapeHtml(kayit.baslik)}</h1>${metaHtml}`;
-    html += pdfButonuHtml(kayit.pdf_url, escapeHtml);
+    html += kaynakButonlariHtml(kayit.pdf_url, kayit.veri_url, escapeHtml);
     html += `<div class="project-body">${basitMarkdown(kayit.govde || "")}</div>`;
     // GÜVENLİK: href'e basmadan önce şema kontrolü (bkz. supabase-client.js
     // guvenliDisUrlMi yorumu) — "javascript:" gibi bir URI hiç render edilmez.
@@ -413,12 +413,50 @@ async function init() {
  * BUG FİX ("### şeklinde kalıyor" / H3-H4 içindekilere girmiyor): bkz.
  * onizleme.js'deki AYNI fonksiyonun başındaki bugfix notu — burada da
  * birebir aynı düzeltme uygulandı (H1-H4 hepsi tanınıyor).
+ *
+ * KRAMDOWN DİPNOT DESTEĞİ — bkz. assets/js/github-yonetim/onizleme.js'
+ * deki AYNI çift fonksiyonun (dipnotTanimlariniAyikla /
+ * dipnotlariRenderla) başındaki ayrıntılı açıklama; bu sayfa da
+ * (GitHub'a hiç commit edilmemiş, "Sadece Supabase'te Yayınla" içeriği)
+ * kramdown'ı hiç görmediği için AYNI mantık burada birebir tekrarlanıyor
+ * — üretilen sınıf/kimlik adları (`.footnote`, `.footnotes`,
+ * `.reversefootnote`) kramdown'ınkiyle BİREBİR aynı.
  */
+function dipnotTanimlariniAyikla(escKacirilmisMd) {
+  const tanimlar = new Map();
+  const govde = escKacirilmisMd.replace(/^\[\^([^\]\s]+)\]:[ \t]*(.+)$/gm, (_tam, etiket, aciklama) => {
+    tanimlar.set(etiket, aciklama.trim());
+    return "";
+  });
+  return { govde, tanimlar };
+}
+
+function dipnotlariRenderla(html, tanimlar) {
+  if (tanimlar.size === 0) return html;
+  const siraNo = new Map();
+  const isaretliHtml = html.replace(/\[\^([^\]\s]+)\]/g, (tamEslesme, etiket) => {
+    if (!tanimlar.has(etiket)) return tamEslesme;
+    if (!siraNo.has(etiket)) siraNo.set(etiket, siraNo.size + 1);
+    const no = siraNo.get(etiket);
+    return `<sup id="fnref:${etiket}"><a href="#fn:${etiket}" class="footnote">${no}</a></sup>`;
+  });
+  if (siraNo.size === 0) return isaretliHtml;
+  const maddeler = [...siraNo.keys()]
+    .map(
+      (etiket) =>
+        `<li id="fn:${etiket}">${tanimlar.get(etiket)} <a href="#fnref:${etiket}" class="reversefootnote">↩</a></li>`
+    )
+    .join("");
+  return `${isaretliHtml}<div class="footnotes"><ol>${maddeler}</ol></div>`;
+}
+
 function basitMarkdown(md) {
   const esc = escapeHtml(md);
-  return esc
+  const { govde, tanimlar } = dipnotTanimlariniAyikla(esc);
+  const anaHtml = govde
     .split(/\n{2,}/)
     .map((blok) => {
+      if (blok.trim() === "") return "";
       const baslikEslesme = blok.match(/^(#{1,4})[ \t]+(.+)$/);
       if (baslikEslesme) {
         const seviye = baslikEslesme[1].length;
@@ -431,7 +469,9 @@ function basitMarkdown(md) {
         .replaceAll(/\n/g, "<br>");
       return `<p>${satir}</p>`;
     })
+    .filter((parca) => parca !== "")
     .join("\n");
+  return dipnotlariRenderla(anaHtml, tanimlar);
 }
 
 init();
