@@ -832,6 +832,34 @@ th { color: var(--muted); font-weight: 600; }
 
 .share-btn:hover { border-color: var(--accent); color: var(--accent); }
 
+/* Paylaşım isteği SÜRERKEN (bkz. share.html'deki "paylasimSuruyor"
+   bayrağı) buton devre dışı bırakılır — kullanıcı dokunmasının
+   "boşa gittiğini" değil, isteğin işlendiğini görsün diye soluklaştırılır.
+   Bu, tekrar tıklamayı (ve WebKit'te buna bağlı askıda kalma riskini)
+   caydırmaya da yardımcı olur. */
+.share-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* BUG FİX ("Paylaş" butonu masaüstünde/desteklenmeyen tarayıcılarda GÖRÜNÜP
+   tıklanınca hiçbir şey yapmıyordu): ".share-btn" kuralı "display:
+   inline-flex" verdiği için, tarayıcının [hidden] özniteliğine normalde
+   uyguladığı "display: none" bu kural tarafından EZİLİYORDU — AYNEN
+   ".auth-nav-menu[hidden]" ve ".share-alinti-notu[hidden]" için bu
+   dosyada zaten iki kez düzeltilmiş olan BİREBİR AYNI hata sınıfı (yazar
+   stil sayfası kuralları, özgüllük eşit olsa bile tarayıcının varsayılan
+   stilini her zaman ezer). Sonuç: _includes/share.html'deki
+   "#native-share-btn" öğesi HTML'de "hidden" ile başladığı ve JS SADECE
+   gerçekten mobil bir tarayıcıda "nativeBtn.hidden = false" yaptığı hâlde
+   — masaüstünde, navigator.share() olmayan tarayıcılarda ya da mobil
+   algısı yanlış çıkan cihazlarda (bkz. share.html'deki iPad/masaüstü
+   algı notu) buton HER ZAMAN görünür kalıyor, JS ise o durumlarda tıklama
+   dinleyicisini hiç bağlamadığı için buton "çalışmıyormuş" gibi
+   duruyordu. Bunu açıkça geri kazandırıyoruz. */
+.share-btn[hidden] { display: none; }
+
 /* Resmi marka ikonu (Simple Icons CDN) — bkz. _includes/share.html
    içindeki açıklama ve <script> bloğu. İkon yüklenemezse ("error" event)
    YA DA sahte-başarılı-ama-boş/bozuk bir yanıt gelirse (decode() reddi)
