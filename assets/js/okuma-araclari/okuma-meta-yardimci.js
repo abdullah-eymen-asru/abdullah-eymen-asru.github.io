@@ -41,6 +41,33 @@ export function pdfButonuHtml(pdfUrl, escapeHtml) {
 }
 
 /**
+ * `veri_url` (GitHub reposu/Zenodo/OSF/Kaggle gibi bir veri seti adresi)
+ * doluysa, _layouts/post.html / project.html'deki ile GÖRSEL OLARAK AYNI
+ * "Veri Seti" butonunu üretir — pdfButonuHtml ile AYNI güvenlik kuralı
+ * (sadece http/https).
+ */
+export function veriButonuHtml(veriUrl, escapeHtml) {
+  if (!veriUrl || typeof veriUrl !== "string") return "";
+  if (!/^https?:\/\//i.test(veriUrl)) return "";
+  return `<a href="${escapeHtml(veriUrl)}" class="veri-indir-btn" target="_blank" rel="noopener noreferrer">🗃️ Veri Seti</a>`;
+}
+
+/**
+ * PDF ve Veri Seti butonlarını TEK bir "pdf-indir-alani" kutusunda,
+ * YAN YANA birleştirir — _layouts/post.html / project.html'deki
+ * "{% if _pdf_gecerli or _veri_gecerli %}" ile GÖRSEL OLARAK AYNI mimari.
+ * İkisi de boşsa hiçbir şey döndürmez (boş bir <p> bırakmaz).
+ */
+export function kaynakButonlariHtml(pdfUrl, veriUrl, escapeHtml) {
+  const pdfBtn = pdfUrl && /^https?:\/\//i.test(pdfUrl)
+    ? `<a href="${escapeHtml(pdfUrl)}" class="pdf-indir-btn" target="_blank" rel="noopener noreferrer">📄 PDF İndir</a>`
+    : "";
+  const veriBtn = veriButonuHtml(veriUrl, escapeHtml);
+  if (!pdfBtn && !veriBtn) return "";
+  return `<p class="pdf-indir-alani">${pdfBtn}${veriBtn}</p>`;
+}
+
+/**
  * `govdeEl` içine render edilmiş HTML'i TARAR (h2/h3/h4 başlıklarını
  * bulur), her birine bir `id` atar (yoksa) ve _layouts/post.html'deki
  * `<details class="akademik-toc">` ile GÖRSEL OLARAK AYNI, katlanabilir
