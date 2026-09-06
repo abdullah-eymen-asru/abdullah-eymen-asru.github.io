@@ -14,12 +14,17 @@ permalink: "/icerik/blog.html"
 
   <div class="blog-column">
     <h2>Substack Yazıları</h2>
-    <input
-      type="text"
-      id="substack-search"
-      class="search-box"
-      placeholder="Yazı ara…"
-      disabled>
+    <div class="filter-row">
+      <input
+        type="text"
+        id="substack-search"
+        class="search-box"
+        placeholder="Yazı ara…"
+        disabled>
+      <select id="substack-year-filter" class="tur-select" disabled>
+        <option value="">Tüm yıllar</option>
+      </select>
+    </div>
 
     <div id="substack-posts" class="scroll-list">
       <p class="loading">Yazılar yükleniyor…</p>
@@ -28,19 +33,32 @@ permalink: "/icerik/blog.html"
 
   <div class="blog-column">
     <h2>Notlarım</h2>
-    <input
-      type="text"
-      id="notes-search"
-      class="search-box"
-      placeholder="Notlarımda ara…">
+    <div class="filter-row">
+      <input
+        type="text"
+        id="notes-search"
+        class="search-box"
+        placeholder="Notlarımda ara…">
+      <select id="notes-year-filter" class="tur-select">
+        <option value="">Tüm yıllar</option>
+      </select>
+    </div>
 
     <div id="notes-posts" class="scroll-list">
       {% assign yayindaki_yazilar = site.posts | where_exp: "p", "p.yayinda != false" | where_exp: "p", "p.date <= site.time" %}
       {% for post in yayindaki_yazilar %}
+      {% comment %}
+        TARİH: eskiden post.date, "%d %B %Y" biçiminde doğrudan yazdırılıyordu
+        — Jekyll'in `date: "%B"` filtresi build ortamının locale'i yüzünden
+        AY ADINI HER ZAMAN İNGİLİZCE üretiyordu (ör. "05 September 2026").
+        `ay_adi_tr` (bkz. _plugins/turkce_ay_filtresi.rb) bunu düzeltiyor.
+        Ayrıca "Yayın tarihi: " etiketi eklendi — akademik-projeler.md'deki
+        AYNI gerekçeyle (tarih, yanındaki başka bir etiketle karışmasın).
+      {% endcomment %}
       <div class="post-card searchable" data-search="{{ post.title | downcase }} {{ post.author | downcase }} {{ post.excerpt | strip_html | downcase }}" data-date="{{ post.date | date: '%Y-%m-%d' }}">
         <h3><a href="{{ post.url | relative_url }}">{{ post.title }}</a></h3>
         <div class="meta">
-          {{ post.date | date: "%d %B %Y" }}
+          Yayın tarihi: {{ post.date | date: "%-d" }} {{ post.date | ay_adi_tr }} {{ post.date | date: "%Y" }}
           {% if post.author %} · Yazan: {{ post.author }}{% endif %}
         </div>
         <p>{{ post.excerpt }}</p>
@@ -140,6 +158,15 @@ permalink: "/icerik/blog.html"
       const descRaw = item.querySelector("description")?.textContent || "";
 
       const title = decodeEntities(titleRaw);
+      // TAM TARİH ("Yayın tarihi: ..."): eskiden burada sadece tarih
+      // yazıyordu, etiketsiz — Notlarım/Akademik Projeler sütunlarındaki
+      // AYNI gerekçeyle (bkz. dosya başındaki not) artık "Yayın tarihi: "
+      // ile başlıyor. data-date (YYYY-MM-DD) ayrıca yıl filtresi için
+      // saklanıyor — RSS'in pubDate'i zaten ISO değil (ör. "Sat, 05 Sep
+      // 2026 ..."), bu yüzden Date nesnesinden yeniden ISO'ya çeviriyoruz.
+      const tarihIso = pubDateRaw && !isNaN(new Date(pubDateRaw).getTime())
+        ? new Date(pubDateRaw).toISOString().slice(0, 10)
+        : "";
       const date = pubDateRaw
         ? new Date(pubDateRaw).toLocaleDateString("tr-TR", { year: "numeric", month: "long", day: "numeric" })
         : "";
@@ -151,17 +178,25 @@ permalink: "/icerik/blog.html"
       card.className = "post-card searchable";
       // arama için başlık+özet küçük harfe çevrilip veri olarak saklanıyor
       card.dataset.search = (title + " " + plain).toLowerCase();
+      card.dataset.date = tarihIso;
       card.innerHTML = `
         <h3><a href="${escapeHtml(guvenliLink(link))}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)}</a></h3>
-        <div class="meta">${escapeHtml(date)}</div>
+        <div class="meta">${date ? "Yayın tarihi: " + escapeHtml(date) : ""}</div>
         <p>${escapeHtml(plain)}…</p>
       `;
       container.appendChild(card);
     });
 
-    // Veri geldikten sonra arama kutusunu aktif hale getiriyoruz
+    // Veri geldikten sonra arama kutusunu VE yıl filtresini aktif hale
+    // getiriyoruz, yıl seçeneklerini de şimdi (öğeler DOM'a girdikten
+    // sonra) dolduruyoruz.
     searchBox.disabled = false;
     searchBox.placeholder = "Yazı ara…";
+    const yearSelect = document.getElementById("substack-year-filter");
+    if (yearSelect) {
+      window.yilSecenekleriniDoldur("substack-posts", "substack-year-filter");
+      yearSelect.disabled = false;
+    }
 
   } catch (err) {
     // Timeout (AbortError) dahil HER hata türünde container'daki "yükleniyor"
@@ -178,26 +213,64 @@ permalink: "/icerik/blog.html"
   }
 })();
 
-// Genel arama mantığı: bir arama kutusu + bir liste kutusunu birbirine bağlar.
+// YIL FİLTRESİ SEÇENEKLERİNİ DOLDUR: verilen liste kutusundaki tüm
+// ".searchable" kartların data-date'inden (YYYY-MM-DD) yıl çıkarılıp
+// tekilleştirilerek, büyükten küçüğe verilen <select>'e yazılır. window'a
+// asılı (window.yilSecenekleriniDoldur) çünkü hem bu script hem de aşağıdaki
+// ayrı <script type="module"> bloğu (Supabase'ten eklenen notlar için)
+// bunu çağırabilsin diye — modül script'leri kendi kapsamında çalışır,
+// global olarak tanımlı bir fonksiyonu ÇAĞIRABİLİR ama modülün KENDİ
+// tanımladığı fonksiyonlar dışarıdan görünmez, bu yüzden paylaşılan yön
+// HER ZAMAN "normal script -> window'a asar, modül script okur" şeklinde.
+window.yilSecenekleriniDoldur = function (listId, selectId) {
+  const list = document.getElementById(listId);
+  const select = document.getElementById(selectId);
+  if (!list || !select) return;
+
+  const yillar = new Set();
+  list.querySelectorAll(".searchable").forEach((card) => {
+    const yil = (card.dataset.date || "").slice(0, 4);
+    if (yil) yillar.add(yil);
+  });
+
+  const seciliDeger = select.value;
+  select.innerHTML = '<option value="">Tüm yıllar</option>';
+  Array.from(yillar).sort((a, b) => b.localeCompare(a)).forEach((yil) => {
+    const opt = document.createElement("option");
+    opt.value = yil;
+    opt.textContent = yil;
+    select.appendChild(opt);
+  });
+  if (Array.from(select.options).some((o) => o.value === seciliDeger)) {
+    select.value = seciliDeger;
+  }
+};
+
+// Genel arama + yıl filtresi mantığı: bir arama kutusu + bir yıl <select>'i
+// + bir liste kutusunu birbirine bağlar (VE mantığıyla birlikte uygular).
 // Hem Substack hem Notlarım sütunu bu aynı fonksiyonu kullanır.
-function baglaArama(inputId, listId) {
+function baglaAramaVeYil(inputId, yearSelectId, listId) {
   const input = document.getElementById(inputId);
+  const yearSelect = document.getElementById(yearSelectId);
   const list = document.getElementById(listId);
 
-  input.addEventListener("input", () => {
+  function uygula() {
     const q = input.value.trim().toLowerCase();
+    const yil = yearSelect.value;
     const cards = list.querySelectorAll(".searchable");
     let visibleCount = 0;
 
     cards.forEach(card => {
-      const match = card.dataset.search.includes(q);
+      const metinEslesiyor = q === "" || card.dataset.search.includes(q);
+      const yilEslesiyor = yil === "" || (card.dataset.date || "").slice(0, 4) === yil;
+      const match = metinEslesiyor && yilEslesiyor;
       card.style.display = match ? "" : "none";
       if (match) visibleCount++;
     });
 
     // "sonuç yok" mesajını yönet
     let emptyMsg = list.querySelector(".no-results");
-    if (visibleCount === 0 && q !== "") {
+    if (visibleCount === 0 && (q !== "" || yil !== "")) {
       if (!emptyMsg) {
         emptyMsg = document.createElement("p");
         emptyMsg.className = "loading no-results";
@@ -207,11 +280,21 @@ function baglaArama(inputId, listId) {
     } else if (emptyMsg) {
       emptyMsg.remove();
     }
-  });
+  }
+
+  input.addEventListener("input", uygula);
+  yearSelect.addEventListener("change", uygula);
 }
 
-baglaArama("substack-search", "substack-posts");
-baglaArama("notes-search", "notes-posts");
+baglaAramaVeYil("substack-search", "substack-year-filter", "substack-posts");
+baglaAramaVeYil("notes-search", "notes-year-filter", "notes-posts");
+
+// Notlarım sütunu Jekyll build-time'da hazır olduğu için yıl seçeneklerini
+// hemen dolduruyoruz (Substack için bu, feed geldikten SONRA yukarıda
+// ayrıca çağrılıyor). Supabase'ten eklenen notlar için de aşağıdaki ayrı
+// <script type="module"> bloğu bu fonksiyonu TEKRAR çağırıp olası yeni
+// yılları ekliyor.
+window.yilSecenekleriniDoldur("notes-posts", "notes-year-filter");
 </script>
 
 <script type="module">
@@ -222,7 +305,7 @@ baglaArama("notes-search", "notes-posts");
   // içerikler var olmadığından site.posts içinde hiç görünmezler, bu
   // yüzden istemci tarafında ayrıca çekilip listeye ekleniyorlar. Arama
   // kutusu zaten ".searchable" + "data-search" üzerinden çalıştığı için
-  // (bkz. yukarıdaki baglaArama), buraya eklenen kartlar otomatik olarak
+  // (bkz. yukarıdaki baglaAramaVeYil), buraya eklenen kartlar otomatik olarak
   // aranabilir hâle gelir — ekstra bir kablolamaya gerek yok.
   import { supabase, escapeHtml } from "{{ '/assets/js/core/supabase-client.js' | relative_url }}";
 
@@ -253,7 +336,7 @@ baglaArama("notes-search", "notes-posts");
         card.innerHTML = `
           <h3><a href="${href}">${escapeHtml(yazi.baslik || "")}</a></h3>
           <div class="meta">
-            ${escapeHtml(tarihMetni)}
+            ${tarihMetni ? "Yayın tarihi: " + escapeHtml(tarihMetni) : ""}
             ${yazi.yazar_adi ? ` · Yazan: ${escapeHtml(yazi.yazar_adi)}` : ""}
           </div>
           <p>${escapeHtml(ozet)}${ozet.length >= 180 ? "…" : ""}</p>
@@ -269,6 +352,12 @@ baglaArama("notes-search", "notes-posts");
           list.appendChild(card);
         }
       });
+
+      // Supabase'ten eklenen notların yılları da yıl filtresine yansısın diye
+      // (bkz. yukarıdaki plain <script> bloğundaki window.yilSecenekleriniDoldur)
+      // seçenekleri şimdi TEKRAR dolduruyoruz — daha önce seçili bir yıl
+      // varsa o seçim korunur (bkz. fonksiyonun içindeki seciliDeger mantığı).
+      window.yilSecenekleriniDoldur?.("notes-posts", "notes-year-filter");
     } catch (err) {
       // Sessizce vazgeç — Substack ve GitHub tabanlı yazılar zaten
       // gösteriliyor, bu ek kaynak başarısız olsa bile sayfanın geri
