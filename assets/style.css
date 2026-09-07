@@ -1021,16 +1021,19 @@ th { color: var(--muted); font-weight: 600; }
         tbody/tr'leri ayrı blok kutular gibi davrandırıyor — sütunlar artık
         satırlar arasında hizalanmıyor (thead ve tbody bağımsız kayıyor).
      2) white-space:nowrap, "Game of Thrones (Karakterlerin Analizi)" gibi
-        uzun film/dizi başlıklarının TEK SATIRDA kalmaya zorlanmasına
-        neden oluyordu; başlık sütunu ekranın tamamını kaplayıp diğer
-        sütunları (Tür, İzle vs.) ekran dışına itiyordu — okuduklarım'da
-        kitap adları kısa olduğu için sorun gizli kalıyordu.
+        uzun film/dizi başlıklarının, ya da "Selahaddin Eyyübi - Minberin
+        Sırrı" / uzun bir yazar adı gibi Okuduklarım'daki metinlerin TEK
+        SATIRDA kalmaya zorlanmasına neden oluyordu; o sütun ekranın
+        tamamını kaplayıp diğer sütunları (Tür, Yazar, İzle vs.) ekran
+        dışına itiyordu.
    Çözüm: tabloyu GERÇEK bir tablo (display:table) olarak bırakıp yatay
-   taşmayı dışarıdaki sarmalayıcıya devrediyoruz; sabit (fixed) sütun
-   genişlikleriyle her sütuna adil bir pay veriyoruz; sadece "Başlık"
-   sütununda metnin satır kırılmasına (wrap) izin veriyoruz. Böylece uzun
-   başlıklar taşmak yerine ikinci satıra geçiyor, tablo hem masaüstünde
-   hem mobilde ekrana sığıyor. */
+   taşmayı dışarıdaki sarmalayıcıya devrediyoruz. Sütun genişliklerini
+   sabit piksel yerine ORANSAL (%) veriyoruz ve HER sütunda satır kırmaya
+   (white-space: normal + break-word) izin veriyoruz — böylece hangi
+   sütunda (Başlık, Yazar, Tür, fark etmez) uzun bir metin gelirse gelsin,
+   taşmak yerine ikinci satıra sarılır. Sadece kısa/işlem sütunları
+   (#, İzle linki gibi tek kelimelik olanlar) görece dar kalsın diye genel
+   orana göre bir tık daha az pay veriyoruz; onlar da gerekirse sarılır. */
 .scroll-list--tablo,
 .scroll-list:has(table) {
   overflow-x: auto;
@@ -1047,34 +1050,36 @@ th { color: var(--muted); font-weight: 600; }
 .scroll-list td, .scroll-list th {
   overflow-wrap: break-word;
   word-break: break-word;
+  white-space: normal;
 }
 
-/* Başlık sütunu: geri kalan tüm genişliği o alır, uzun isimler sarılır. */
+/* Başlık sütunu (her zaman 2. sütun): en geniş payı o alır, çünkü hem
+   film/dizi hem kitap adları genelde en uzun metin buraya düşer. */
 .scroll-list th:nth-child(2),
 .scroll-list td:nth-child(2) {
-  width: auto;
-  white-space: normal;
+  width: 40%;
 }
 
-/* Diğer meta sütunları (Tür, Yazar, Durum, Puan vb.): sabit, makul bir
-   genişlik — çok uzun tek kelimeler bile taşmasın diye break-word ile. */
+/* Diğer TÜM meta sütunları (Tür, Yazar, Durum, Puan, İzle vb.) kalan
+   alanı aralarında eşit paylaşır — sayı kaç olursa olsun (worker'dan
+   gelen sütun sayısı değişebiliyor), oranlar otomatik dengelenir. */
 .scroll-list th:nth-child(n+3),
 .scroll-list td:nth-child(n+3) {
-  width: 120px;
-  white-space: normal;
+  width: 20%;
 }
 
 .col-index {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
-  width: 36px;
+  width: 32px;
   text-align: right;
+  white-space: nowrap;
 }
 
-/* Dar ekranlarda meta sütunlarına ayrılan sabit genişliği biraz daraltıp
-   Başlık sütununa daha fazla alan bırakıyoruz; ayrıca yazı boyutunu hafif
-   küçültüp satır içi boşlukları sıklaştırıyoruz ki tablo mobilde de
-   rahatça okunabilsin. */
+/* Dar ekranlarda Başlık sütununa daha da fazla alan bırakıyoruz (mobilde
+   genelde 2-3 meta sütunu sığar, geri kalanı yatay kaydırmayla görülür);
+   ayrıca yazı boyutunu hafif küçültüp satır içi boşlukları sıklaştırarak
+   tablo mobilde de rahat okunsun istiyoruz. */
 @media (max-width: 640px) {
   .scroll-list table {
     min-width: 420px;
@@ -1083,9 +1088,13 @@ th { color: var(--muted); font-weight: 600; }
   .scroll-list th, .scroll-list td {
     padding: 8px 8px;
   }
+  .scroll-list th:nth-child(2),
+  .scroll-list td:nth-child(2) {
+    width: 46%;
+  }
   .scroll-list th:nth-child(n+3),
   .scroll-list td:nth-child(n+3) {
-    width: 84px;
+    width: 18%;
   }
 }
 
