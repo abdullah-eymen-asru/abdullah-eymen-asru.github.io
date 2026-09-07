@@ -1014,26 +1014,23 @@ th { color: var(--muted); font-weight: 600; }
 }
 
 /* --------------------------------------------------------------------- */
-/* İzlediklerim/Okuduklarım tabloları — DÜZELTME (önceki sürümün hatası):
-   Eski kural tabloyu "display:block; white-space:nowrap" yapıyordu. Bu
-   ikisi bir arada iki soruna yol açıyordu:
-     1) display:block bir <table>'ı gerçek bir tablo gibi değil, thead/
-        tbody/tr'leri ayrı blok kutular gibi davrandırıyor — sütunlar artık
-        satırlar arasında hizalanmıyor (thead ve tbody bağımsız kayıyor).
-     2) white-space:nowrap, "Game of Thrones (Karakterlerin Analizi)" gibi
-        uzun film/dizi başlıklarının, ya da "Selahaddin Eyyübi - Minberin
-        Sırrı" / uzun bir yazar adı gibi Okuduklarım'daki metinlerin TEK
-        SATIRDA kalmaya zorlanmasına neden oluyordu; o sütun ekranın
-        tamamını kaplayıp diğer sütunları (Tür, Yazar, İzle vs.) ekran
-        dışına itiyordu.
-   Çözüm: tabloyu GERÇEK bir tablo (display:table) olarak bırakıp yatay
-   taşmayı dışarıdaki sarmalayıcıya devrediyoruz. Sütun genişliklerini
-   sabit piksel yerine ORANSAL (%) veriyoruz ve HER sütunda satır kırmaya
-   (white-space: normal + break-word) izin veriyoruz — böylece hangi
-   sütunda (Başlık, Yazar, Tür, fark etmez) uzun bir metin gelirse gelsin,
-   taşmak yerine ikinci satıra sarılır. Sadece kısa/işlem sütunları
-   (#, İzle linki gibi tek kelimelik olanlar) görece dar kalsın diye genel
-   orana göre bir tık daha az pay veriyoruz; onlar da gerekirse sarılır. */
+/* İzlediklerim/Okuduklarım tabloları — DÜZELTME 2 (ilk düzeltme de
+   yetersiz kaldı): Worker'dan gelen sütun sayısı 6-7'ye çıkabiliyor
+   (Başlık, Durum, Tür, Puan, Sezon/Bölüm, Başlama/Bitiş Tarihi gibi).
+   Bu kadar çok sütunu dar bir telefon ekranına SIĞDIRMAYA çalışmak
+   (ister sabit px, ister % oranla) matematiksel olarak imkansız — her
+   sütuna düşen pay birkaç piksele inince metin harf harf alt alta
+   diziliyor, tablo okunmaz hale geliyor.
+   Çözüm: masaüstünde (>640px) tabloyu olduğu gibi bırakıyoruz (yeterli
+   yatay alan var). Mobilde (≤640px) ise tabloyu TAMAMEN kart görünümüne
+   çeviriyoruz — <table> elemanı görsel olarak bir tablo gibi değil, her
+   <tr> kendi başına bir kart, içindeki her <td> de "Etiket: Değer" satırı
+   gibi davranıyor. Bu, satır içeriğini kaybetmeden (yatay kaydırma/
+   kesme olmadan) her veriyi tam ve okunaklı gösteren, çok-sütunlu
+   responsive tablolar için standart bir tekniktir. Etiketler tablonun
+   <thead>'inden CSS content: attr(data-label) ile alınıyor — bunun için
+   koleksiyon-tablo.js her <td>'ye kendi sütun başlığını data-label olarak
+   yazıyor (bkz. o dosyadaki ilgili değişiklik). */
 .scroll-list--tablo,
 .scroll-list:has(table) {
   overflow-x: auto;
@@ -1057,15 +1054,17 @@ th { color: var(--muted); font-weight: 600; }
    film/dizi hem kitap adları genelde en uzun metin buraya düşer. */
 .scroll-list th:nth-child(2),
 .scroll-list td:nth-child(2) {
-  width: 40%;
+  width: 26%;
 }
 
-/* Diğer TÜM meta sütunları (Tür, Yazar, Durum, Puan, İzle vb.) kalan
-   alanı aralarında eşit paylaşır — sayı kaç olursa olsun (worker'dan
-   gelen sütun sayısı değişebiliyor), oranlar otomatik dengelenir. */
+/* Diğer TÜM meta sütunları (Tür, Yazar, Durum, Puan vb.) kalan alanı
+   aralarında eşit paylaşır — sayı kaç olursa olsun (worker'dan gelen
+   sütun sayısı değişebiliyor), oranlar otomatik dengelenir. Bu genişlik
+   sadece MASAÜSTÜNDE (>640px) geçerlidir; mobilde aşağıdaki kart
+   görünümü kuralları bunu tamamen geçersiz kılar. */
 .scroll-list th:nth-child(n+3),
 .scroll-list td:nth-child(n+3) {
-  width: 20%;
+  width: auto;
 }
 
 .col-index {
@@ -1076,25 +1075,122 @@ th { color: var(--muted); font-weight: 600; }
   white-space: nowrap;
 }
 
-/* Dar ekranlarda Başlık sütununa daha da fazla alan bırakıyoruz (mobilde
-   genelde 2-3 meta sütunu sığar, geri kalanı yatay kaydırmayla görülür);
-   ayrıca yazı boyutunu hafif küçültüp satır içi boşlukları sıklaştırarak
-   tablo mobilde de rahat okunsun istiyoruz. */
+/* ===================================================================
+   MOBİL KART GÖRÜNÜMÜ (≤640px): <table> artık görsel bir tablo değil,
+   her satır (<tr>) kendi kartına dönüşüyor. Sütun sayısı ne olursa
+   olsun (5, 7, 10 fark etmez) her veri kendi etiketiyle birlikte tam
+   olarak görünür, hiçbir şey kesilmez veya sıkışmaz.
+   =================================================================== */
 @media (max-width: 640px) {
+  .scroll-list table,
+  .scroll-list thead,
+  .scroll-list tbody,
+  .scroll-list th,
+  .scroll-list td,
+  .scroll-list tr {
+    display: block;
+  }
+
   .scroll-list table {
-    min-width: 420px;
-    font-size: 0.88rem;
+    min-width: 0;
+    width: 100%;
   }
-  .scroll-list th, .scroll-list td {
-    padding: 8px 8px;
+
+  /* Tablo başlığı (thead) artık görünmüyor — etiketler her hücrenin
+     içinde data-label ile tekrar gösteriliyor, thead'e gerek kalmıyor.
+     Ekran okuyucular için erişilebilirlik kaybı olmasın diye tamamen
+     kaldırmak yerine, sadece görsel olarak gizliyoruz. */
+  .scroll-list thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
-  .scroll-list th:nth-child(2),
+
+  .scroll-list tbody tr {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 12px;
+    padding: 4px 12px;
+    background: var(--card-bg);
+  }
+
+  .scroll-list tbody tr.no-results-row {
+    border: none;
+    background: none;
+    padding: 0;
+  }
+
+  /* Kartın üst satırı: "#" numarası ve Başlık aynı satırda, yan yana.
+     flex ile hizalanıyor; numara küçük/soluk, başlık büyük/kalın. */
+  .scroll-list tr {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .scroll-list td.col-index {
+    display: block;
+    width: auto;
+    order: 1;
+    flex: 0 0 auto;
+    color: var(--muted);
+    font-size: 0.85rem;
+    text-align: left;
+    padding: 10px 8px 8px 0;
+    border-bottom: 1px solid var(--border);
+    align-self: flex-start;
+  }
+
+  /* Başlık hücresi (2. sütun): kartın üst kısmında büyük ve belirgin,
+     numarayla aynı satırda, kalan tüm genişliği kaplar. Kendi etiketini
+     göstermiyor çünkü zaten kartın "kimliği" bu. */
   .scroll-list td:nth-child(2) {
-    width: 46%;
+    display: block;
+    order: 2;
+    flex: 1 1 auto;
+    width: auto;
+    padding: 10px 0 8px;
+    border-bottom: 1px solid var(--border);
+    font-size: 1.02rem;
+    font-weight: 600;
   }
-  .scroll-list th:nth-child(n+3),
+
+  /* Diğer tüm meta hücreleri (Tür, Durum, Puan, tarihler vb.) her zaman
+     tam genişlikte, alt alta sırayla gelsin diye 3'ten itibaren artan
+     bir "order" veriyoruz — CSS içinde sabit bir sayı yazmak yerine
+     kalan hücrelerin doğal DOM sırasını (order tanımlanmazsa 0 olur ama
+     yukarıdaki 1 ve 2'den sonra geldiği için) koruyoruz. */
   .scroll-list td:nth-child(n+3) {
-    width: 18%;
+    order: 3;
+    flex: 1 1 100%;
+  }
+
+  /* Diğer tüm hücreler (Tür, Durum, Puan, Sezon/Bölüm, tarihler vb.):
+     her biri kendi etiketiyle birlikte ayrı bir satır olarak, dikey
+     olarak alt alta diziliyor — yatay sıkışma tamamen ortadan kalkıyor. */
+  .scroll-list td:nth-child(n+3) {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    width: auto;
+    padding: 7px 0;
+    border-bottom: 1px dashed var(--border);
+    font-size: 0.9rem;
+  }
+  .scroll-list td:nth-child(n+3):last-child {
+    border-bottom: none;
+  }
+  .scroll-list td:nth-child(n+3)::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 0.82rem;
+    flex-shrink: 0;
+  }
+  .scroll-list td:nth-child(n+3) {
+    text-align: right;
   }
 }
 
