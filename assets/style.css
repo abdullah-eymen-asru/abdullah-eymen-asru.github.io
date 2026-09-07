@@ -1013,21 +1013,80 @@ th { color: var(--muted); font-weight: 600; }
   overflow-y: visible;
 }
 
-.scroll-list table {
-  display: block;
+/* --------------------------------------------------------------------- */
+/* İzlediklerim/Okuduklarım tabloları — DÜZELTME (önceki sürümün hatası):
+   Eski kural tabloyu "display:block; white-space:nowrap" yapıyordu. Bu
+   ikisi bir arada iki soruna yol açıyordu:
+     1) display:block bir <table>'ı gerçek bir tablo gibi değil, thead/
+        tbody/tr'leri ayrı blok kutular gibi davrandırıyor — sütunlar artık
+        satırlar arasında hizalanmıyor (thead ve tbody bağımsız kayıyor).
+     2) white-space:nowrap, "Game of Thrones (Karakterlerin Analizi)" gibi
+        uzun film/dizi başlıklarının TEK SATIRDA kalmaya zorlanmasına
+        neden oluyordu; başlık sütunu ekranın tamamını kaplayıp diğer
+        sütunları (Tür, İzle vs.) ekran dışına itiyordu — okuduklarım'da
+        kitap adları kısa olduğu için sorun gizli kalıyordu.
+   Çözüm: tabloyu GERÇEK bir tablo (display:table) olarak bırakıp yatay
+   taşmayı dışarıdaki sarmalayıcıya devrediyoruz; sabit (fixed) sütun
+   genişlikleriyle her sütuna adil bir pay veriyoruz; sadece "Başlık"
+   sütununda metnin satır kırılmasına (wrap) izin veriyoruz. Böylece uzun
+   başlıklar taşmak yerine ikinci satıra geçiyor, tablo hem masaüstünde
+   hem mobilde ekrana sığıyor. */
+.scroll-list--tablo,
+.scroll-list:has(table) {
   overflow-x: auto;
-  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+}
+
+.scroll-list table {
+  width: 100%;
+  min-width: 480px;
+  table-layout: fixed;
+  border-collapse: collapse;
 }
 
 .scroll-list td, .scroll-list th {
-  white-space: nowrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* Başlık sütunu: geri kalan tüm genişliği o alır, uzun isimler sarılır. */
+.scroll-list th:nth-child(2),
+.scroll-list td:nth-child(2) {
+  width: auto;
+  white-space: normal;
+}
+
+/* Diğer meta sütunları (Tür, Yazar, Durum, Puan vb.): sabit, makul bir
+   genişlik — çok uzun tek kelimeler bile taşmasın diye break-word ile. */
+.scroll-list th:nth-child(n+3),
+.scroll-list td:nth-child(n+3) {
+  width: 120px;
+  white-space: normal;
 }
 
 .col-index {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
-  width: 44px;
+  width: 36px;
   text-align: right;
+}
+
+/* Dar ekranlarda meta sütunlarına ayrılan sabit genişliği biraz daraltıp
+   Başlık sütununa daha fazla alan bırakıyoruz; ayrıca yazı boyutunu hafif
+   küçültüp satır içi boşlukları sıklaştırıyoruz ki tablo mobilde de
+   rahatça okunabilsin. */
+@media (max-width: 640px) {
+  .scroll-list table {
+    min-width: 420px;
+    font-size: 0.88rem;
+  }
+  .scroll-list th, .scroll-list td {
+    padding: 8px 8px;
+  }
+  .scroll-list th:nth-child(n+3),
+  .scroll-list td:nth-child(n+3) {
+    width: 84px;
+  }
 }
 
 .no-results-row td {
