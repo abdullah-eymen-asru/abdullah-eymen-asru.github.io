@@ -136,9 +136,14 @@ async function koleksiyonTablosuOlustur(config) {
       const searchText = aramaMetniParcalari.join(" ").toString();
       const searchTextKucuk = kucukHarfeCevirTr(searchText);
 
+      // data-label: mobilde (≤640px, bkz. style.css "MOBİL KART GÖRÜNÜMÜ")
+      // tablo satır satır kartlara dönüşüyor ve her hücre CSS ile kendi
+      // sütun adını "::before { content: attr(data-label) }" olarak
+      // gösteriyor. Bu yüzden her <td>'ye kendi sütununun adını buraya
+      // yazıyoruz — thead'deki metinle birebir aynı olmalı.
       const hucreler = sutunlar.map(sutun => {
         const deger = item[sutun];
-        return `<td>${escapeHtml(deger == null ? "" : deger)}</td>`;
+        return `<td data-label="${escapeHtml(sutun)}">${escapeHtml(deger == null ? "" : deger)}</td>`;
       }).join("");
 
       rows += `
