@@ -53,6 +53,7 @@ permalink: "/panel/izleme-okuma-yonetim.html"
           <label for="iy-title">Başlık (film/dizi adı ya da kitap adı)</label>
           <input id="iy-title" type="text" required autocomplete="off">
         </div>
+        <div id="iy-benzer-uyari" class="auth-message auth-message--warning" hidden></div>
         <div class="form-field">
           <label for="iy-aciklama">Açıklama (opsiyonel)</label>
           <textarea id="iy-aciklama" rows="4" placeholder="Notlar, alıntı, kısa yorum…"></textarea>
