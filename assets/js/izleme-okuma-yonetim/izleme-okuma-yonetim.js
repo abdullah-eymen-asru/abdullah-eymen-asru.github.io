@@ -29,7 +29,8 @@
  * #iy-mod-nav. İkisi de aynı aktif koleksiyona (izleme/okuma) göre çalışır.
  */
 import { requireAuthOrShowError } from "../auth/auth-guard.js";
-import { showMessage, kucukHarfeCevirTr, supabase } from "../core/supabase-client.js";
+import { showMessage, supabase } from "../core/supabase-client.js";
+import { normallestir, enBenzerKayitlariBul } from "./benzerlik.js";
 
 // ---- BURAYI DOLDUR: Worker deploy edildikten sonra aldığın URL ----
 const IZLEME_OKUMA_WORKER_URL = "https://izleme-okuma-yonetim-worker.aeymena.workers.dev";
@@ -45,6 +46,12 @@ let aktifMod = "ekle"; // "ekle" | "mevcut"
 let aktifAlanlar = []; // Worker'ın /alanlar uç noktasından gelen [{name, dataType, options?}]
 let sonListe = []; // /liste'den gelen son sonuç kümesi (arama filtresi client-side)
 let duzenlenenKayit = null; // { number, title, body, alanlar } — şu an düzenleme formunda açık olan kayıt
+
+// ---- Yakın-kayıt (bulanık kopya) uyarısı için durum — bkz. benzerlik.js ----
+let ekleIcinKayitlar = []; // "ekle" formu açıkken arka planda çekilen mevcut kayıtlar (sadece bu kontrol için)
+let ekleBenzerKayitlar = []; // Şu an ekranda gösterilen, girilen başlığa benzeyen kayıtlar
+let ekleOnayBekleniyor = false; // true ise: kullanıcı benzer kayıt uyarısını görüp "Yine de ekle"ye BİR KEZ daha basmalı
+let benzerlikZamanlayici = null; // input debounce için setTimeout kimliği
 
 async function workerRequest(path, options = {}) {
   const {
@@ -170,6 +177,89 @@ function formdanAlanlariTopla(containerId) {
 
 // ---------------- MOD: YENİ KAYIT EKLE ----------------
 
+// Panoda ZATEN var olan kayıtları arka planda çeker (benzerlik kontrolü
+// İÇİN — panel arayüzünde başka hiçbir yerde gösterilmez). Çekilemezse
+// (ağ hatası, vb.) sessizce boş bırakılır: bu sadece bir KOLAYLIK, yeni
+// kayıt eklemeyi ASLA engellememeli.
+async function ekleIcinKayitlariYukle() {
+  try {
+    const { items } = await workerRequest(`/liste?project=${aktifKoleksiyon}`);
+    ekleIcinKayitlar = items || [];
+  } catch (_err) {
+    ekleIcinKayitlar = [];
+  }
+}
+
+function ekleOnayGeriAl() {
+  ekleOnayBekleniyor = false;
+  const submitBtn = document.getElementById("iy-submit-btn");
+  if (submitBtn) submitBtn.textContent = "➕ Kaydı Ekle";
+}
+
+function ekleBenzerUyarisiniGizle() {
+  ekleBenzerKayitlar = [];
+  ekleOnayGeriAl();
+  const kutu = document.getElementById("iy-benzer-uyari");
+  if (!kutu) return;
+  kutu.hidden = true;
+  kutu.innerHTML = "";
+}
+
+// Girilen başlığa bulanık olarak benzeyen mevcut kayıtları bulup
+// #iy-benzer-uyari kutusunda listeler. Kayıt EKLEMEZ, sadece UYARIR —
+// asıl engelleme submit anında (ekleFormGonderimiBagla) yapılıyor, çünkü
+// kullanıcı uyarıyı görüp bilerek devam edebilmeli (bazen gerçekten aynı
+// isimli AMA farklı bir kayıt olabilir — ör. aynı adı taşıyan iki kitap).
+function benzerlikKontrolEtVeGoster() {
+  const kutu = document.getElementById("iy-benzer-uyari");
+  if (!kutu) return;
+  const baslik = document.getElementById("iy-title").value.trim();
+
+  if (!baslik || normallestir(baslik).length < 2 || ekleIcinKayitlar.length === 0) {
+    ekleBenzerKayitlar = [];
+    kutu.hidden = true;
+    kutu.innerHTML = "";
+    return;
+  }
+
+  ekleBenzerKayitlar = enBenzerKayitlariBul(baslik, ekleIcinKayitlar, 0.55, 3).map((x) => x.kayit);
+  if (ekleBenzerKayitlar.length === 0) {
+    kutu.hidden = true;
+    kutu.innerHTML = "";
+    return;
+  }
+
+  kutu.innerHTML = "";
+  kutu.className = "auth-message auth-message--warning";
+  const p = document.createElement("p");
+  p.textContent = "⚠️ Panoda buna benzeyen kayıt(lar) var — aynısını mı ekliyorsun?";
+  kutu.appendChild(p);
+  const ul = document.createElement("ul");
+  ekleBenzerKayitlar.forEach((kayit) => {
+    const li = document.createElement("li");
+    const a = document.createElement("a");
+    a.href = kayit.url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.textContent = `#${kayit.number} — ${kayit.title}`;
+    li.appendChild(a);
+    ul.appendChild(li);
+  });
+  kutu.appendChild(ul);
+  kutu.hidden = false;
+}
+
+function benzerlikKontroluBagla() {
+  const baslikInput = document.getElementById("iy-title");
+  baslikInput.addEventListener("input", () => {
+    // Başlık değişti: önceki "Yine de ekle" onayı artık geçersiz —
+    // kullanıcı yeni metni görmeden eski onayla kayıt gitmemeli.
+    ekleOnayGeriAl();
+    clearTimeout(benzerlikZamanlayici);
+    benzerlikZamanlayici = setTimeout(benzerlikKontrolEtVeGoster, 300);
+  });
+}
+
 async function ekleFormunuKoleksiyonaGoreKur() {
   const container = document.getElementById("iy-alanlar-container");
   const baslikInput = document.getElementById("iy-title");
@@ -178,6 +268,11 @@ async function ekleFormunuKoleksiyonaGoreKur() {
 
   formBaslik.textContent = `Yeni Kayıt Ekle — ${baslikEtiketi}`;
   baslikInput.placeholder = placeholderBaslik;
+
+  ekleBenzerUyarisiniGizle();
+  // Beklemeden başlat: alan (/alanlar) yüklenmesini YAVAŞLATMASIN, hazır
+  // olduğunda benzerlik kontrolü kendiliğinden çalışır hale gelir.
+  ekleIcinKayitlariYukle();
 
   container.innerHTML = "";
   const yukleniyor = document.createElement("p");
@@ -222,6 +317,22 @@ function ekleFormGonderimiBagla() {
       showMessage(messageEl, "Başlık zorunludur.", "error");
       return;
     }
+
+    // Benzer kayıt uyarısı ekranda AMA henüz onaylanmadıysa: kaydı GÖNDERME,
+    // sadece butonu "Yine de ekle"ye çevirip kullanıcının bilerek ikinci
+    // kez basmasını bekle. Böylece tek tıkla yanlışlıkla kopya eklenmesi
+    // engellenmiş olur (bkz. benzerlikKontrolEtVeGoster).
+    if (ekleBenzerKayitlar.length > 0 && !ekleOnayBekleniyor) {
+      ekleOnayBekleniyor = true;
+      submitBtn.textContent = "⚠️ Yine de ekle";
+      showMessage(
+        messageEl,
+        "Yukarıdaki benzer kayıtları kontrol et — bu gerçekten farklı bir kayıtsa 'Yine de ekle'ye tekrar bas.",
+        "warning"
+      );
+      return;
+    }
+
     const aciklama = document.getElementById("iy-aciklama").value;
     const alanlar = formdanAlanlariTopla("iy-alanlar-container");
 
@@ -232,6 +343,11 @@ function ekleFormGonderimiBagla() {
         method: "POST",
         body: JSON.stringify({ project: aktifKoleksiyon, title, aciklama, alanlar }),
       });
+
+      // Yeni eklenen kaydı, aynı oturumda hemen başka bir benzer başlık
+      // girilirse de yakalanabilsin diye yerel önbelleğe ekle (tekrar
+      // /liste çağırmaya gerek kalmadan).
+      ekleIcinKayitlar.push({ number: sonuc.issue.number, title, body: aciklama, url: sonuc.issue.url, alanlar });
 
       const basarisizAlanlar = (sonuc.alanSonuclari || []).filter((a) => !a.basarili);
       if (basarisizAlanlar.length > 0) {
@@ -252,18 +368,23 @@ function ekleFormGonderimiBagla() {
       basariKutu.hidden = false;
 
       form.reset();
+      ekleBenzerUyarisiniGizle();
     } catch (err) {
       showMessage(messageEl, "Kayıt eklenemedi: " + err.message, "error");
     } finally {
       submitBtn.disabled = false;
-      submitBtn.textContent = "➕ Kaydı Ekle";
+      // Hata durumunda "Yine de ekle" onayı hâlâ geçerli olmalı (kullanıcı
+      // tekrar denediğinde ikinci kez uyarıyla karşılaşmasın) — bu yüzden
+      // burada metni SIFIRLAMIYORUZ; sadece başarı/uyarı-gizleme yollarında
+      // (yukarıda ve ekleBenzerUyarisiniGizle içinde) sıfırlanıyor.
+      if (!ekleOnayBekleniyor) submitBtn.textContent = "➕ Kaydı Ekle";
     }
   });
 }
 
 // ---------------- MOD: MEVCUT KAYITLAR (ARA + DÜZENLE) ----------------
 
-function listeyiCiz(items) {
+function listeyiCiz(items, { yakinMod = false } = {}) {
   const container = document.getElementById("iy-liste");
   const sonucYokEl = document.getElementById("iy-liste-sonuc-yok");
   container.innerHTML = "";
@@ -273,6 +394,15 @@ function listeyiCiz(items) {
     return;
   }
   sonucYokEl.hidden = true;
+
+  if (yakinMod) {
+    // Tam/alt-dize eşleşmesi bulunamadı ama başlık bazında bulanık
+    // benzerlik yakaladı — muhtemelen aranan kayıt eski/hatalı yazılmış.
+    const not = document.createElement("p");
+    not.className = "muted";
+    not.textContent = "Tam eşleşme yok — yazım farkı olabilir, bunlar benziyor:";
+    container.appendChild(not);
+  }
 
   items.forEach((item) => {
     const kart = document.createElement("div");
@@ -317,18 +447,33 @@ function listeyiCiz(items) {
 }
 
 function listeyiFiltreleVeCiz() {
-  const q = kucukHarfeCevirTr(document.getElementById("iy-liste-arama").value.trim());
-  if (!q) {
+  const ham = document.getElementById("iy-liste-arama").value.trim();
+  if (!ham) {
     listeyiCiz(sonListe);
     return;
   }
+
+  // normallestir() burada da (benzerlik.js — "ekle" formundaki kopya
+  // uyarısıyla AYNI fonksiyon) kullanılıyor ki noktalama/parantez farkı
+  // yüzünden ("Dune (2021)" vs "Dune 2021") arama sonuçsuz dönmesin.
+  const q = normallestir(ham);
   const filtreli = sonListe.filter((item) => {
-    const metin = kucukHarfeCevirTr(
+    const metin = normallestir(
       [item.title, item.body, ...Object.values(item.alanlar || {})].filter(Boolean).join(" ")
     );
     return metin.includes(q);
   });
-  listeyiCiz(filtreli);
+
+  if (filtreli.length > 0) {
+    listeyiCiz(filtreli);
+    return;
+  }
+
+  // Tam alt-dize eşleşmesi de yok — son çare olarak SADECE başlık üzerinde
+  // bulanık benzerlik dene (açıklama/alanlar üzerinde değil, gürültü çok
+  // artar). Yazım hatalı eski kayıtları bulmayı kolaylaştırır.
+  const yakinlar = enBenzerKayitlariBul(ham, sonListe, 0.45, 5).map((x) => x.kayit);
+  listeyiCiz(yakinlar, { yakinMod: yakinlar.length > 0 });
 }
 
 async function listeyiYukle() {
@@ -533,6 +678,7 @@ async function init() {
   koleksiyonSekmeleriniBagla();
   await modSekmeleriniBagla();
   ekleFormGonderimiBagla();
+  benzerlikKontroluBagla();
   duzenlemeFormGonderimiBagla();
   aramaKutusunuBagla();
 
