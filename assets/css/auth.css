@@ -145,8 +145,13 @@
 }
 .auth-message--error   { background: #fdecea; color: #a13327; border: 1px solid #f3b7ae; }
 .auth-message--success { background: #eaf7ee; color: #1e6b3a; border: 1px solid #b7e3c4; }
+/* "warning" — auth-spam-notice'teki AYNI amber palet (site genelinde tek
+   bir "dikkat, ama hata değil" rengi olsun diye). İzleme/Okuma Yönetimi
+   panelindeki bulanık kopya-kayıt uyarısı bunu kullanıyor. */
+.auth-message--warning { background: #fff8e6; color: #7a5b06; border: 1px solid #f0dfa3; }
 [data-theme="dark"] .auth-message--error   { background: #3a1f1c; color: #f3a89c; border-color: #5a2f29; }
 [data-theme="dark"] .auth-message--success { background: #123a22; color: #9ee3b6; border-color: #1f5a37; }
+[data-theme="dark"] .auth-message--warning { background: #3a2f10; color: #f0d98c; border-color: #5a4a1c; }
 
 /* "SPAM klasörünü kontrol et" uyarısı — mail gönderilen her ekranda
    (kayıt, şifremi unuttum, hesap onayla, e-posta değiştirme) aynı görünüm.
