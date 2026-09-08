@@ -27,3 +27,15 @@
 #iy-mod-nav {
   margin-bottom: 18px;
 }
+
+#iy-benzer-uyari p {
+  margin: 0 0 6px;
+}
+#iy-benzer-uyari ul {
+  margin: 0;
+  padding-left: 20px;
+}
+#iy-benzer-uyari a {
+  color: inherit;
+  text-decoration: underline;
+}
