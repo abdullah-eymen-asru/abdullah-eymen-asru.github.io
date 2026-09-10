@@ -29,16 +29,26 @@ permalink: "/icerik/izlediklerim.html"
      birebir aynı görünür. -->
 <div id="izleme-okuma-yonetim-kisayol"></div>
 
+<!-- "Kaç tane izledim" istatistik şeridi — koleksiyon-tablo.js tarafından
+     JSON yüklendikten sonra doldurulur. Veri gelene kadar boş/gizli kalır,
+     bu yüzden hiçbir yükleniyor metni içermiyor. -->
+<div id="izleme-istatistik" class="liste-istatistik" role="group" aria-label="İzleme istatistikleri" hidden></div>
+
 <div class="filter-row">
   <input
     type="text"
     id="izleme-search"
     class="search-box"
     placeholder="Film/dizi ara…"
+    aria-label="Film veya dizi ara"
     disabled>
 
-  <select id="tur-filtresi" class="tur-select" disabled>
+  <select id="tur-filtresi" class="tur-select" aria-label="Türe göre filtrele" disabled>
     <option value="">Tüm türler</option>
+  </select>
+
+  <select id="durum-filtresi" class="tur-select" aria-label="Durumuma göre filtrele" disabled>
+    <option value="">Tüm durumlar</option>
   </select>
 </div>
 
@@ -54,9 +64,15 @@ permalink: "/icerik/izlediklerim.html"
     searchInputId: "izleme-search",
     turSelectId: "tur-filtresi",
     turFieldName: "Tür",
+    durumSelectId: "durum-filtresi",
+    durumFieldName: "Durum",
     aramaAlanlari: ["Tür", "Sezon/Bölüm", "Durum"],
     gizliAlanlar: [],
-    sayfaBasinaKayit: 50
+    sayfaBasinaKayit: 50,
+    istatistikContainerId: "izleme-istatistik",
+    istatistikEylem: "izlediğim",
+    baslamaTarihiAlani: "Başlama Tarihi",
+    bitisTarihiAlani: "Bitiş Tarihi"
   });
 </script>
 <script type="module" src="{{ '/assets/js/izleme-okuma-yonetim/izleme-okuma-yonetim-kisayol.js' | relative_url }}"></script>
