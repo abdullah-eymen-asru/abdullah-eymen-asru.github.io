@@ -38,6 +38,19 @@
 
 * { box-sizing: border-box; }
 
+/* Ekran okuyucu için görünmez ama erişilebilir metin/duyuru alanları.
+   (.scroll-list thead içinde aynı teknik daha önce elle tekrarlanmıştı;
+   bu genel sınıf başka yerlerde de kullanılabilsin diye buraya alındı,
+   var olan .scroll-list thead kuralına DOKUNULMADI.) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 /* Tema değişiminde renk/arka plan geçişleri tüm elemanlarda tutarlı ve
    hızlı olsun diye genel bir kural tanımlıyoruz — tek tek her bileşene
    ayrı ayrı transition eklemek yerine, kısa ve tekdüze bir geçiş süresi
@@ -919,7 +932,48 @@ th { color: var(--muted); font-weight: 600; }
 
 .search-box:disabled { background: var(--card-bg); color: var(--muted); }
 
-/* İzlediklerim/Okuduklarım'da arama kutusu + tür dropdown'u yan yana.
+/* İzlediklerim/Okuduklarım'da "kaç tane okudum/izledim" istatistik şeridi.
+   Tasarım dili panel/uye-ayarlari.css'teki .uya-stat-kart ile aynı (kart
+   grubu + öne çıkan "Toplam" kartı), ama admin paneline özel bir sınıfı
+   ziyaretçiye açık bu sayfalarda tekrar kullanmak yerine, halka açık
+   stiller içinde kendi ismiyle tutuluyor. JS tarafında veri gelene kadar
+   [hidden] kalır, o yüzden burada ayrı bir "yükleniyor" görünümüne gerek yok. */
+.liste-istatistik {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.liste-istatistik-kart {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 108px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card-bg);
+}
+
+.liste-istatistik-kart--toplam { border-color: var(--accent); }
+
+.liste-istatistik-sayi {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1.15;
+}
+
+.liste-istatistik-etiket {
+  font-size: 0.76rem;
+  color: var(--muted);
+  margin-top: 2px;
+  text-align: center;
+}
+
+/* İzlediklerim/Okuduklarım'da arama kutusu + tür/durum dropdown'ları yan yana.
    Chip butonları yerine dropdown kullanıyoruz çünkü tür sayısı arttıkça
    (20-30+) chip'ler ekranı doldurup dağınıklaşırdı; dropdown sabit yer kaplar. */
 .filter-row {
