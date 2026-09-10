@@ -29,16 +29,26 @@ permalink: "/icerik/okuduklarim.html"
      birebir aynı görünür. -->
 <div id="izleme-okuma-yonetim-kisayol"></div>
 
+<!-- "Kaç kitap okudum" istatistik şeridi — koleksiyon-tablo.js tarafından
+     JSON yüklendikten sonra doldurulur. Veri gelene kadar boş/gizli kalır,
+     bu yüzden hiçbir yükleniyor metni içermiyor. -->
+<div id="okuma-istatistik" class="liste-istatistik" role="group" aria-label="Okuma istatistikleri" hidden></div>
+
 <div class="filter-row">
   <input
     type="text"
     id="okuma-search"
     class="search-box"
     placeholder="Kitap/yazar ara…"
+    aria-label="Kitap veya yazar ara"
     disabled>
 
-  <select id="tur-filtresi" class="tur-select" disabled>
+  <select id="tur-filtresi" class="tur-select" aria-label="Türe göre filtrele" disabled>
     <option value="">Tüm türler</option>
+  </select>
+
+  <select id="durum-filtresi" class="tur-select" aria-label="Okuma durumuna göre filtrele" disabled>
+    <option value="">Tüm durumlar</option>
   </select>
 </div>
 
@@ -54,9 +64,15 @@ permalink: "/icerik/okuduklarim.html"
     searchInputId: "okuma-search",
     turSelectId: "tur-filtresi",
     turFieldName: "Tür",
-    aramaAlanlari: ["Yazar", "Tür", "Durum"],
+    durumSelectId: "durum-filtresi",
+    durumFieldName: "Okuma Durumu",
+    aramaAlanlari: ["Yazar", "Tür", "Okuma Durumu"],
     gizliAlanlar: [],
-    sayfaBasinaKayit: 50
+    sayfaBasinaKayit: 50,
+    istatistikContainerId: "okuma-istatistik",
+    istatistikEylem: "okuduğum",
+    baslamaTarihiAlani: "Başlama Tarihi",
+    bitisTarihiAlani: "Bitiş Tarihi"
   });
 </script>
 <script type="module" src="{{ '/assets/js/izleme-okuma-yonetim/izleme-okuma-yonetim-kisayol.js' | relative_url }}"></script>
