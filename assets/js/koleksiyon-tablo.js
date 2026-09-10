@@ -2,7 +2,8 @@
  * Bu dosya İzlediklerim ve Okuduklarım sayfalarının ortak mantığını taşır.
  * Build-time'da GitHub Actions tarafından üretilen statik JSON dosyalarını
  * (assets/data/izlenenler.json, okunanlar.json) fetch edip dinamik bir tablo,
- * arama kutusu ve tür filtresi oluşturur.
+ * arama kutusu, tür/durum filtreleri ve bir "kaç tane okudum/izledim"
+ * istatistik şeridi oluşturur.
  *
  * "Dinamik" olmasının anlamı: kod hangi sütunların (Tür, Puan, Yazar vs.)
  * var olacağını build zamanında BİLMİYOR — JSON'da hangi alanlar geldiyse
@@ -48,6 +49,77 @@ function kucukHarfeCevirTr(metin) {
   return (metin == null ? "" : String(metin)).toLocaleLowerCase("tr");
 }
 
+// GitHub Projects'in "Date" alanları GraphQL'den her zaman "YYYY-MM-DD"
+// formatında düz bir metin olarak gelir (saat/saat dilimi bilgisi YOKTUR).
+// Bunu doğrudan `new Date(...)` ile parse edip .getFullYear() çağırmak,
+// tarayıcının yerel saat dilimine göre (örn. UTC-x bölgelerde) günü bir
+// önceki güne kaydırıp YANLIŞ yılı üretebilir. Bunun yerine baştaki 4
+// haneyi düz metin olarak alıyoruz — saat dilimi belirsizliğine tamamen
+// kapalı, garanti doğru bir yöntem.
+function yilCikar(tarihMetni) {
+  if (typeof tarihMetni !== "string") return null;
+  const eslesme = tarihMetni.match(/^(\d{4})-\d{2}-\d{2}/);
+  return eslesme ? eslesme[1] : null;
+}
+
+/**
+ * "Kaç tane okudum/izledim" istatistik şeridini oluşturur.
+ *
+ * Mantık: her kaydın "tamamlanma yılı", önce Bitiş Tarihi'nden, o da yoksa
+ * Başlama Tarihi'nden çıkarılır. İkisi de boşsa (örn. henüz başlanmamış,
+ * "İzleyeceğim"/"Okuyacağım" durumundaki kayıtlar tipik olarak tarihsizdir)
+ * o kayıt sayıma hiç girmez. Böylece ayrıca bir "Durum" alanı kontrolüne
+ * ihtiyaç duymadan sayaç doğal olarak sadece başlanmış/bitmiş kayıtları
+ * sayar — "başlama veya bitiş tarihi esas alınabilir" fikri tam olarak
+ * bunu sağlıyor.
+ *
+ * Her yıl için ayrı bir kart + tüm yılların toplamı için bir "Toplam"
+ * kartı üretilir. Yıllar en yeniden en eskiye sıralanır.
+ */
+function istatistikGosterimiOlustur(items, config) {
+  if (!config.istatistikContainerId) return;
+  const el = document.getElementById(config.istatistikContainerId);
+  if (!el) return;
+
+  const baslamaAlani = config.baslamaTarihiAlani || "Başlama Tarihi";
+  const bitisAlani = config.bitisTarihiAlani || "Bitiş Tarihi";
+  const eylem = config.istatistikEylem || "eklediğim";
+
+  const yilSayaci = new Map();
+  items.forEach(item => {
+    const tarih = item[bitisAlani] || item[baslamaAlani];
+    const yil = yilCikar(tarih);
+    if (!yil) return;
+    yilSayaci.set(yil, (yilSayaci.get(yil) || 0) + 1);
+  });
+
+  if (yilSayaci.size === 0) {
+    el.innerHTML = "";
+    el.hidden = true;
+    return;
+  }
+
+  const toplam = [...yilSayaci.values()].reduce((a, b) => a + b, 0);
+  // localeCompare ile string sıralama, 4 haneli yıllar için ("2026" > "2025")
+  // sayısal sıralamayla birebir aynı sonucu verir, ekstra Number() dönüşümüne
+  // gerek yok.
+  const yillar = [...yilSayaci.keys()].sort((a, b) => b.localeCompare(a));
+
+  const yilKartlariHtml = yillar.map(yil => `
+    <div class="liste-istatistik-kart">
+      <span class="liste-istatistik-sayi">${yilSayaci.get(yil).toLocaleString("tr-TR")}</span>
+      <span class="liste-istatistik-etiket">${escapeHtml(yil)} yılında ${escapeHtml(eylem)}</span>
+    </div>`).join("");
+
+  el.hidden = false;
+  el.innerHTML = `
+    <div class="liste-istatistik-kart liste-istatistik-kart--toplam">
+      <span class="liste-istatistik-sayi">${toplam.toLocaleString("tr-TR")}</span>
+      <span class="liste-istatistik-etiket">Toplam ${escapeHtml(eylem)}</span>
+    </div>
+    ${yilKartlariHtml}`;
+}
+
 /**
  * @param {Object} config
  * @param {string} config.jsonUrl - JSON dosyasının yolu (örn. "/assets/data/izlenenler.json")
@@ -55,14 +127,21 @@ function kucukHarfeCevirTr(metin) {
  * @param {string} config.searchInputId - Arama kutusu id'si
  * @param {string} config.turSelectId - Tür dropdown id'si
  * @param {string} config.turFieldName - JSON'daki hangi alan "Tür" olarak kullanılsın (örn. "Tür")
+ * @param {string} [config.durumSelectId] - Durum/okuma durumu dropdown id'si (verilmezse durum filtresi kurulmaz)
+ * @param {string} [config.durumFieldName] - JSON'daki hangi alan "Durum" filtresi olarak kullanılsın (örn. "Durum" ya da "Okuma Durumu")
  * @param {string[]} config.aramaAlanlari - Arama sırasında hangi alanlarda metin aransın (başlık her zaman dahildir)
  * @param {string[]} [config.gizliAlanlar] - Tabloda GÖSTERİLMEYECEK EK alan adları (id/url/state/title zaten her zaman gizli)
  * @param {number} [config.sayfaBasinaKayit=50] - Bir sayfada gösterilecek satır sayısı
+ * @param {string} [config.istatistikContainerId] - "Kaç tane okudum/izledim" şeridinin basılacağı <div> id'si (verilmezse şerit oluşturulmaz)
+ * @param {string} [config.istatistikEylem] - İstatistik etiketlerinde kullanılacak fiil (örn. "izlediğim", "okuduğum")
+ * @param {string} [config.baslamaTarihiAlani="Başlama Tarihi"] - İstatistik hesaplamasında kullanılacak başlama tarihi alan adı
+ * @param {string} [config.bitisTarihiAlani="Bitiş Tarihi"] - İstatistik hesaplamasında kullanılacak bitiş tarihi alan adı
  */
 async function koleksiyonTablosuOlustur(config) {
   const container = document.getElementById(config.containerId);
   const searchBox = document.getElementById(config.searchInputId);
   const turSelect = document.getElementById(config.turSelectId);
+  const durumSelect = config.durumSelectId ? document.getElementById(config.durumSelectId) : null;
 
   // "id", "url", "state" fetch-projects.js'in HER ZAMAN eklediği teknik
   // alanlar — bunlar hiçbir zaman ayrı sütun olarak gösterilmemeli, "url"
@@ -70,6 +149,32 @@ async function koleksiyonTablosuOlustur(config) {
   // gizliAlanlar listesi bunun ÜSTÜNE ekleniyor (örn. "Durum", "Title").
   const gizliAlanlar = new Set(["id", "url", "state", ...(config.gizliAlanlar || [])]);
   const sayfaBasinaKayit = config.sayfaBasinaKayit || 50;
+
+  // Sekme filtreleri: hem Tür hem (varsa) Durum/Okuma Durumu için AYNI
+  // dropdown-doldurma + filtreleme mantığını tekrar tekrar yazmamak için
+  // genel bir liste kuruyoruz. Her satıra buradaki alanların küçük harfli
+  // değeri data-* attribute olarak yazılacak (örn. data-tur, data-durum),
+  // dropdown'lar da JSON'daki gerçek (büyük/küçük harfi korunmuş) değerlerle
+  // doldurulacak. Sadece HTML'de karşılığı olan (config'te id'si verilen)
+  // filtreler listeye eklenir; okuduklarim.html'de olmayan bir alan
+  // izlediklerim.html'i etkilemez ve tam tersi.
+  const filtreTanimlari = [];
+  if (config.turFieldName && turSelect) {
+    filtreTanimlari.push({ alanAdi: config.turFieldName, select: turSelect, veriAlani: "tur" });
+  }
+  if (config.durumFieldName && durumSelect) {
+    filtreTanimlari.push({ alanAdi: config.durumFieldName, select: durumSelect, veriAlani: "durum" });
+  }
+
+  // Ekran okuyucular için: koca tabloyu doğrudan aria-live yapmak (yüzlerce
+  // satırı tek seferde okutup gürültü yaratır) yerine, "Yükleniyor…" ->
+  // "143 kayıt yüklendi" gibi kısa durum değişikliklerini duyuran, görsel
+  // olarak gizli (bkz. .sr-only) ayrı ve küçük bir canlı bölge kullanıyoruz.
+  const durumDuyuru = document.createElement("div");
+  durumDuyuru.className = "sr-only";
+  durumDuyuru.setAttribute("role", "status");
+  durumDuyuru.setAttribute("aria-live", "polite");
+  container.parentNode.insertBefore(durumDuyuru, container);
 
   // WEBVIEW UYUMLULUĞU: aynı-origin bir istek olsa bile bazı WebView'lerde
   // ağ bağlantısı (ör. captive portal, flaky Wi-Fi) fetch()'i reddetmeden
@@ -89,8 +194,14 @@ async function koleksiyonTablosuOlustur(config) {
     const data = await res.json();
     const items = Array.isArray(data.items) ? data.items : [];
 
+    // İstatistik şeridi arama/filtrelemeden bağımsızdır — TÜM kayıtlar
+    // üzerinden hesaplanır (görünürdeki sayfa/filtre durumuna göre değişmez),
+    // bu yüzden burada, filtreleme başlamadan önce bir kere kuruluyor.
+    istatistikGosterimiOlustur(items, config);
+
     if (items.length === 0) {
       container.innerHTML = '<p class="loading">Henüz eklenmiş bir kayıt yok.</p>';
+      durumDuyuru.textContent = "Henüz eklenmiş bir kayıt yok.";
       return;
     }
 
@@ -127,14 +238,19 @@ async function koleksiyonTablosuOlustur(config) {
     // Tablo satırları
     let rows = "";
     items.forEach((item, index) => {
-      const turDegeri = config.turFieldName ? (item[config.turFieldName] || "") : "";
-
       const aramaMetniParcalari = [item.title];
       (config.aramaAlanlari || []).forEach(alan => {
         if (item[alan] != null) aramaMetniParcalari.push(item[alan]);
       });
       const searchText = aramaMetniParcalari.join(" ").toString();
       const searchTextKucuk = kucukHarfeCevirTr(searchText);
+
+      // Her filtre tanımı (Tür, Durum...) için o satırın küçük harfli
+      // değerini ayrı bir data-* attribute olarak yazıyoruz.
+      const filtreDataAttrs = filtreTanimlari.map(f => {
+        const deger = kucukHarfeCevirTr(item[f.alanAdi] || "");
+        return ` data-${f.veriAlani}="${escapeHtml(deger)}"`;
+      }).join("");
 
       // data-label: mobilde (≤640px, bkz. style.css "MOBİL KART GÖRÜNÜMÜ")
       // tablo satır satır kartlara dönüşüyor ve her hücre CSS ile kendi
@@ -147,7 +263,7 @@ async function koleksiyonTablosuOlustur(config) {
       }).join("");
 
       rows += `
-        <tr class="searchable" data-search="${escapeHtml(searchTextKucuk)}" data-tur="${escapeHtml(kucukHarfeCevirTr(turDegeri))}">
+        <tr class="searchable" data-search="${escapeHtml(searchTextKucuk)}"${filtreDataAttrs}>
           <td class="col-index">${index + 1}</td>
           <td><a href="${escapeHtml(guvenliLink(item.url))}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.title)}</a></td>
           ${hucreler}
@@ -161,43 +277,50 @@ async function koleksiyonTablosuOlustur(config) {
       </table>
       <div id="${config.containerId}-pagination" class="pagination"></div>`;
 
-    // Tür dropdown'ını doldur (varsa)
+    durumDuyuru.textContent = `${items.length.toLocaleString("tr-TR")} kayıt yüklendi.`;
+
+    // Tür/Durum dropdown'larını doldur (varsa)
     const tbody = document.getElementById(`${config.containerId}-tbody`);
     const tumSatirlar = Array.from(tbody.querySelectorAll(".searchable"));
     const paginationEl = document.getElementById(`${config.containerId}-pagination`);
     let mevcutSayfa = 1;
 
-    if (config.turFieldName && turSelect) {
-      const benzersizTurler = [...new Set(
-        tumSatirlar.map(tr => tr.dataset.tur).filter(t => t !== "")
+    filtreTanimlari.forEach(f => {
+      const benzersizDegerler = [...new Set(
+        tumSatirlar.map(tr => tr.dataset[f.veriAlani]).filter(v => v)
       )].sort();
 
-      if (benzersizTurler.length > 0) {
-        benzersizTurler.forEach(tur => {
-          const ornekItem = items.find(
-            it => kucukHarfeCevirTr(it[config.turFieldName] || "") === tur
-          );
-          const option = document.createElement("option");
-          option.value = tur;
-          option.textContent = ornekItem[config.turFieldName];
-          turSelect.appendChild(option);
-        });
-        turSelect.disabled = false;
-        turSelect.addEventListener("change", () => { mevcutSayfa = 1; uygulaFiltre(); });
-      }
-    }
+      if (benzersizDegerler.length === 0) return;
 
-    // Arama/tür filtresine göre "aktif" (eşleşen) satırları hesaplar.
+      benzersizDegerler.forEach(deger => {
+        // Dropdown'da GÖRÜNEN metin, JSON'daki orijinal (büyük/küçük harfi
+        // korunmuş) değer olsun diye küçük-harfli değere sahip ilk kaydı
+        // örnek alıyoruz.
+        const ornekItem = items.find(
+          it => kucukHarfeCevirTr(it[f.alanAdi] || "") === deger
+        );
+        const option = document.createElement("option");
+        option.value = deger;
+        option.textContent = ornekItem[f.alanAdi];
+        f.select.appendChild(option);
+      });
+      f.select.disabled = false;
+      f.select.addEventListener("change", () => { mevcutSayfa = 1; uygulaFiltre(); });
+    });
+
+    // Arama/filtrelere göre "aktif" (eşleşen) satırları hesaplar.
     // Sayfalama SADECE bu eşleşen satırlar üzerinde çalışır — yani kullanıcı
     // arama yaptığında, o aramaya uyan tüm sonuçlar kendi sayfalarına göre
     // bölünür, filtrelenmemiş satırlar sayıma hiç girmez.
     function eslesenSatirlariBul() {
       const q = kucukHarfeCevirTr((searchBox.value || "").trim());
-      const secilenTur = turSelect ? turSelect.value : "";
       return tumSatirlar.filter(tr => {
         const metinEslesiyor = tr.dataset.search.includes(q);
-        const turEslesiyor = !secilenTur || tr.dataset.tur === secilenTur;
-        return metinEslesiyor && turEslesiyor;
+        const filtrelerUyuyor = filtreTanimlari.every(f => {
+          const secilen = f.select.value;
+          return !secilen || tr.dataset[f.veriAlani] === secilen;
+        });
+        return metinEslesiyor && filtrelerUyuyor;
       });
     }
 
@@ -235,7 +358,7 @@ async function koleksiyonTablosuOlustur(config) {
 
       let sayfaBtnHtml = "";
       for (let s = 1; s <= toplamSayfa; s++) {
-        sayfaBtnHtml += `<button type="button" class="page-btn ${s === mevcutSayfa ? "active" : ""}" data-page="${s}">${s}</button>`;
+        sayfaBtnHtml += `<button type="button" class="page-btn ${s === mevcutSayfa ? "active" : ""}" data-page="${s}" aria-label="Sayfa ${s}" aria-current="${s === mevcutSayfa ? "page" : "false"}">${s}</button>`;
       }
 
       paginationEl.innerHTML = `
@@ -278,6 +401,7 @@ async function koleksiyonTablosuOlustur(config) {
         ? "Liste zaman aşımına uğradı."
         : "Liste yüklenemedi.";
     container.innerHTML = `<p class="error">${mesaj} Lütfen daha sonra tekrar dene.</p>`;
+    durumDuyuru.textContent = `${mesaj} Lütfen daha sonra tekrar dene.`;
     console.error(err);
   } finally {
     clearTimeout(timeoutId);
