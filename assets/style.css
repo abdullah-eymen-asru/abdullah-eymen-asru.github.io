@@ -941,9 +941,14 @@ th { color: var(--muted); font-weight: 600; }
 .liste-istatistik {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
   margin-bottom: 16px;
 }
+
+/* Yıl seçici — filter-row'daki tür/durum dropdown'larıyla aynı görünüm için
+   .tur-select sınıfını paylaşıyor, buraya özgü tek fark üstteki boşluk. */
+.liste-istatistik-yil-secici { margin-left: 2px; }
 
 .liste-istatistik-kart {
   display: flex;
@@ -1091,7 +1096,6 @@ th { color: var(--muted); font-weight: 600; }
 
 .scroll-list table,
 .scroll-list thead,
-.scroll-list tbody,
 .scroll-list th,
 .scroll-list td,
 .scroll-list tr {
@@ -1102,6 +1106,18 @@ th { color: var(--muted); font-weight: 600; }
   width: 100%;
   min-width: 0;
   border-collapse: collapse;
+}
+
+/* Kartları tek sütun halinde alt alta dizmek yerine 2 sütunlu bir grid'e
+   yerleştiriyoruz — aynı 50 kayıt artık 25 satırda gösteriliyor, sayfa
+   yarı yarıya kısalıyor. Kartların KENDİ iç düzeni (başlık, alanlar,
+   data-label vb.) değişmedi; sadece tbody'nin onları nasıl dizdiği
+   değişti. Çok dar ekranlarda (≤480px, aşağıdaki media query'e bak)
+   tek sütuna geri dönülüyor ki kart içeriği sıkışıp okunmaz hâle gelmesin. */
+.scroll-list tbody {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .scroll-list td, .scroll-list th {
@@ -1131,16 +1147,15 @@ th { color: var(--muted); font-weight: 600; }
   margin-bottom: 12px;
   padding: 4px 16px;
   background: var(--card-bg);
-  /* Kartlar dar mobilde tam genişlik, geniş masaüstünde ise okunabilirlik
-     için makul bir üst sınırla ortalanıyor — tüm pencereyi germiyor. */
-  max-width: 640px;
 }
 
 .scroll-list tbody tr.no-results-row {
   border: none;
   background: none;
   padding: 0;
-  max-width: none;
+  /* Grid'in tek satırı yerine HER İKİ sütunu da kaplasın — "eşleşen sonuç
+     bulunamadı" mesajı tek bir dar sütuna sıkışıp tuhaf durmasın diye. */
+  grid-column: 1 / -1;
 }
 
 /* # sütunu: kartın üst-sol köşesinde küçük ve soluk bir numara. */
@@ -1153,7 +1168,6 @@ th { color: var(--muted); font-weight: 600; }
   font-size: 0.85rem;
   text-align: left;
   padding: 10px 8px 8px 0;
-  border-bottom: 1px solid var(--border);
   align-self: flex-start;
 }
 
@@ -1166,15 +1180,28 @@ th { color: var(--muted); font-weight: 600; }
   flex: 1 1 auto;
   width: auto;
   padding: 10px 0 8px;
-  border-bottom: 1px solid var(--border);
   font-size: 1.02rem;
   font-weight: 600;
+}
+
+/* DÜZELTME (çizgi hatası): # ve Başlık hücreleri yan yana duran İKİ AYRI
+   flex öğesi olduğu için, ikisine de kendi border-bottom'unu vermek tek bir
+   düz çizgi değil, aralarında (col-index'in sağ padding'i kadar) boşluk
+   bırakan İKİ AYRI çizgi parçası üretiyordu. Çözüm: o iki hücrenin kendi
+   border'ını kaldırıp, satırın TAMAMINI kaplayan tek bir sahte ayraç
+   (::after, order:3 ile üst satırla meta alanları arasına yerleştirilmiş)
+   kullanmak — tam genişlikte, kesintisiz TEK bir çizgi. */
+.scroll-list tbody tr:not(.no-results-row)::after {
+  content: "";
+  order: 3;
+  flex: 1 1 100%;
+  border-bottom: 1px solid var(--border);
 }
 
 /* Diğer tüm meta hücreleri (Tür, Durum, Puan, tarihler vb.) her zaman
    tam genişlikte, alt alta sırayla geliyor. */
 .scroll-list td:nth-child(n+3) {
-  order: 3;
+  order: 4;
   flex: 1 1 100%;
   display: flex;
   justify-content: space-between;
@@ -1203,6 +1230,10 @@ th { color: var(--muted); font-weight: 600; }
   .scroll-list tbody tr { padding: 4px 12px; }
   .scroll-list td:nth-child(2) { font-size: 0.98rem; }
   .scroll-list td:nth-child(n+3) { font-size: 0.86rem; }
+  /* Çok dar telefonlarda 2 sütun her kartı aşırı daraltır (ör. "Bitiş
+     Tarihi: 2018-06-02" gibi satırlar sıkışıp okunmaz olur) — burada tek
+     sütuna geri dönülüyor. */
+  .scroll-list tbody { grid-template-columns: 1fr; }
 }
 
 .no-results-row td {
