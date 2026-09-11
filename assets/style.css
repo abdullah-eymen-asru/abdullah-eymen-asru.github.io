@@ -1169,7 +1169,14 @@ th { color: var(--muted); font-weight: 600; }
   grid-column: 1 / -1;
 }
 
-/* # sütunu: kartın üst-sol köşesinde küçük ve soluk bir numara. */
+/* # sütunu: kartın üst-sol köşesinde küçük ve soluk bir numara.
+   border-bottom:none ÖNEMLİ — genel "th, td { border-bottom: ... }"
+   kuralı (yukarıda, satır ~541) bu hücreye de otomatik bulaşıyor. Bu
+   hücrenin kendi kısa border-bottom'u, başlık iki satıra (ana+alt)
+   çıktığında col-index'in hizası daha yukarıda kaldığı için ayrı, kısa
+   ve "kopuk" bir çizgi parçası olarak görünüyordu. Kartın TEK ayracı
+   zaten aşağıdaki ::after kuralıyla tam genişlikte çiziliyor; bu yüzden
+   hücrenin kendi border-bottom'unu burada iptal ediyoruz. */
 .scroll-list td.col-index {
   display: block;
   width: auto;
@@ -1180,11 +1187,15 @@ th { color: var(--muted); font-weight: 600; }
   text-align: left;
   padding: 10px 8px 8px 0;
   align-self: flex-start;
+  border-bottom: none;
 }
 
 /* Başlık hücresi (2. sütun): kartın üst kısmında büyük ve belirgin,
    numarayla aynı satırda, kalan tüm genişliği kaplar. Kendi etiketini
-   göstermiyor çünkü zaten kartın "kimliği" bu. */
+   göstermiyor çünkü zaten kartın "kimliği" bu.
+   border-bottom:none — col-index'teki AYNI sebep: genel "th, td" kuralı
+   bu hücreye de kendi (title yüksekliğine göre biten, dolayısıyla
+   ::after'la aynı hizada OLMAYAN) bir border-bottom bindiriyordu. */
 .scroll-list td:nth-child(2) {
   display: block;
   order: 2;
@@ -1192,6 +1203,7 @@ th { color: var(--muted); font-weight: 600; }
   width: auto;
   padding: 10px 0 8px;
   min-width: 0;
+  border-bottom: none;
 }
 
 /* TASARIM: uzun başlıklar (ör. "Karayip Korsanları: Siyah İnci'nin Laneti
