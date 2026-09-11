@@ -73,7 +73,7 @@ permalink: "/icerik/izlediklerim.html"
     yilSelectId: "yil-filtresi",
     aramaAlanlari: ["Tür", "Sezon/Bölüm", "Durum"],
     gizliAlanlar: [],
-    sayfaBasinaKayit: 50,
+    sayfaBasinaKayit: 25,
     istatistikContainerId: "izleme-istatistik",
     istatistikEylem: "izlediğim",
     istatistikTamamlandiDegeri: "İzlendi",
