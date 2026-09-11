@@ -50,6 +50,10 @@ permalink: "/icerik/okuduklarim.html"
   <select id="durum-filtresi" class="tur-select" aria-label="Okuma durumuna göre filtrele" disabled>
     <option value="">Tüm durumlar</option>
   </select>
+
+  <select id="yil-filtresi" class="tur-select" aria-label="Yıla göre filtrele" disabled>
+    <option value="">Tüm yıllar</option>
+  </select>
 </div>
 
 <div id="okunanlar-tablo" class="scroll-list scroll-list--tablo">
@@ -66,6 +70,7 @@ permalink: "/icerik/okuduklarim.html"
     turFieldName: "Tür",
     durumSelectId: "durum-filtresi",
     durumFieldName: "Okuma Durumu",
+    yilSelectId: "yil-filtresi",
     aramaAlanlari: ["Yazar", "Tür", "Okuma Durumu"],
     gizliAlanlar: [],
     sayfaBasinaKayit: 50,
