@@ -73,7 +73,7 @@ permalink: "/icerik/okuduklarim.html"
     yilSelectId: "yil-filtresi",
     aramaAlanlari: ["Yazar", "Tür", "Okuma Durumu"],
     gizliAlanlar: [],
-    sayfaBasinaKayit: 50,
+    sayfaBasinaKayit: 25,
     istatistikContainerId: "okuma-istatistik",
     istatistikEylem: "okuduğum",
     istatistikTamamlandiDegeri: "Okudum",
