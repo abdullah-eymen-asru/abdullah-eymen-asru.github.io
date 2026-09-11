@@ -71,7 +71,7 @@ permalink: "/icerik/izlediklerim.html"
     sayfaBasinaKayit: 50,
     istatistikContainerId: "izleme-istatistik",
     istatistikEylem: "izlediğim",
-    istatistikTamamlandiDegeri: "İzledim",
+    istatistikTamamlandiDegeri: "İzlendi",
     baslamaTarihiAlani: "Başlama Tarihi",
     bitisTarihiAlani: "Bitiş Tarihi"
   });
