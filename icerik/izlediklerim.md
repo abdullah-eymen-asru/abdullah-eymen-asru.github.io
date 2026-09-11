@@ -50,6 +50,10 @@ permalink: "/icerik/izlediklerim.html"
   <select id="durum-filtresi" class="tur-select" aria-label="Durumuma göre filtrele" disabled>
     <option value="">Tüm durumlar</option>
   </select>
+
+  <select id="yil-filtresi" class="tur-select" aria-label="Yıla göre filtrele" disabled>
+    <option value="">Tüm yıllar</option>
+  </select>
 </div>
 
 <div id="izlenenler-tablo" class="scroll-list scroll-list--tablo">
@@ -66,6 +70,7 @@ permalink: "/icerik/izlediklerim.html"
     turFieldName: "Tür",
     durumSelectId: "durum-filtresi",
     durumFieldName: "Durum",
+    yilSelectId: "yil-filtresi",
     aramaAlanlari: ["Tür", "Sezon/Bölüm", "Durum"],
     gizliAlanlar: [],
     sayfaBasinaKayit: 50,
