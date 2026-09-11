@@ -310,6 +310,8 @@
   <script defer src="{{ '/assets/js/auth/sifre-goster.js' | relative_url }}"></script>
   <!-- Çerez onay şeridi/paneli mantığı — bkz. assets/js/core/site-islemleri.js başındaki tasarım notları. -->
   <script defer src="{{ '/assets/js/core/site-islemleri.js' | relative_url }}"></script>
+  <!-- Mobil hamburger menü aç/kapa mantığı — bkz. assets/js/core/mobil-nav.js başındaki tasarım notları. -->
+  <script defer src="{{ '/assets/js/core/mobil-nav.js' | relative_url }}"></script>
   <!-- SEKMELER ARASI HIZLI/MODERN GEÇİŞ (üzerine gelince/dokununca ön-yükleme)
        — bkz. assets/js/core/on-yukle-prefetch.js başındaki tasarım notları.
        Görsel geçiş (crossfade) tarafı assets/style.css sonundaki
@@ -500,17 +502,36 @@
   <header class="site-header">
     <div class="wrap">
       <a class="brand" href="{{ '/' | relative_url }}">{{ site.title }}</a>
-      <nav>
-        <!--
-          .nav-links-scroll: masaüstünde "display:contents" ile görünmez
-          (linkler doğrudan nav'ın flex öğesiymiş gibi davranır, eski
-          düzen aynen korunur); mobilde ise (bkz. style.css @media
-          max-width:640px) TEK SATIRDA yatay kaydırmalı bir bara
-          dönüşür. Bunu ayrı bir kapsayıcıya alma sebebi: hesap menüsü
-          (#auth-nav) açılır menüsünü bu kaydırma kutusunun DIŞINDA
-          tutmak — aksi halde dropdown, kaydırma kutusunun taşma
-          kırpmasına takılıp mobilde görünmez/kesik çıkardı.
-        -->
+
+      <!--
+        MOBİL MENÜ DÜĞMESİ (hamburger): SADECE dar ekranlarda görünür
+        (bkz. style.css @media max-width:640px .nav-toggle). Masaüstünde
+        "display:none" ile tamamen devre dışı — nav zaten yatayda tüm
+        linkleri gösterdiği için düğmeye gerek yok.
+
+        Neden artık "tek satır yatay kaydırma" değil de tam bir menü:
+        yatay kaydırmalı bar teknik olarak çalışıyordu ama menünün bir
+        kısmının ekran dışında/kaydırılarak keşfedilmesi gerekmesi
+        erişilebilirlik açısından ideal değildi (görme veya motor
+        güçlüğü olan kullanıcılar için kaydırma ipucuna bağımlıydı, ekran
+        okuyucularda da sırayla "gizli" hissi veriyordu). Aşağıdaki
+        #mobile-nav-panel tüm linkleri TEK SEFERDE, dikey bir listede,
+        kaydırmaya gerek kalmadan gösteriyor.
+      -->
+      <button
+        id="nav-toggle"
+        class="nav-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="mobile-nav-panel"
+        aria-label="Menüyü aç"
+      >
+        <span class="nav-toggle-bar" aria-hidden="true"></span>
+        <span class="nav-toggle-bar" aria-hidden="true"></span>
+        <span class="nav-toggle-bar" aria-hidden="true"></span>
+      </button>
+
+      <nav class="site-nav-desktop" aria-label="Ana menü">
         <div class="nav-links-scroll">
           <a href="{{ '/' | relative_url }}" {% if page.url == '/' or page.url == '/index.html' %}class="active"{% endif %}>Anasayfa</a>
           <a href="{{ '/icerik/blog.html' | relative_url }}" {% if page.url contains 'blog' %}class="active"{% endif %}>Blog</a>
@@ -539,6 +560,14 @@
                "Giriş Yap"tan sonradan DÖNÜŞMEZ (bu dönüşüm hem "titreme"
                hem de yan taraftaki tema düğmesini iten bir Layout Shift'in
                kök nedeniydi).
+
+          NOT: Bu #auth-nav, masaüstü nav'ının İÇİNDEKİ (orijinal) kopyadır
+          — masaüstünde hâlâ burada, sağda görünür. Mobil panel
+          (#mobile-nav-panel) İÇİNDE de nav-auth.js'in doldurduğu AYRI bir
+          #auth-nav-mobile kopyası var (bkz. aşağıda); ikisi de aynı JS
+          tarafından senkron güncellenir (bkz. assets/js/auth/nav-auth.js
+          başındaki not — querySelectorAll ile TÜM #auth-nav elemanlarını
+          doldurur).
         -->
         <div id="auth-nav" class="auth-nav">
           <a
@@ -548,6 +577,7 @@
           <span class="auth-nav-fallback-hesap" aria-hidden="true">Hesabım ▾</span>
         </div>
       </nav>
+
       <button id="theme-toggle" class="theme-toggle" type="button" role="switch" aria-checked="false" aria-label="Koyu temaya geç" title="Koyu / açık tema">
         <span class="theme-toggle-track">
           <span class="theme-toggle-icon theme-toggle-icon--sun" aria-hidden="true">☀️</span>
@@ -556,6 +586,59 @@
         </span>
         <span class="theme-toggle-label">Açık mod</span>
       </button>
+    </div>
+
+    <!--
+      MOBİL AÇILIR MENÜ PANELİ — position:fixed (position:absolute DEĞİL).
+
+      NEDEN fixed: Bu sitede <html>'e overflow-x:hidden uygulanıyor (bkz.
+      assets/style.css başındaki "MOBİL YATAY TAŞMA" notu). CSS
+      spesifikasyonuna göre bir eksende overflow "hidden/scroll/auto"
+      olarak ayarlandığında, DİĞER eksen "visible" bırakılsa bile tarayıcı
+      onu ÖRTÜK OLARAK "auto"ya çevirir (bkz. CSS Overflow Module Level 3,
+      §overflow-computed-value). Yani buradaki overflow-x:hidden, aslında
+      <html>'e overflow-y:auto da uygulamış oluyor. Sonucu: <html>'in
+      kendi kaydırma alanı, İÇİNDEKİ normal akış içeriğinin yüksekliğiyle
+      sınırlanıyor. Sayfa içeriği viewport'tan KISA olduğunda (ör. az
+      metinli bir sayfa), position:absolute ile konumlanmış bir öğe bu
+      kısa içerik kutusunun ALTINA taşarsa görünmez/kırpılmış kalıyordu —
+      çünkü absolute bir öğenin "containing block"u (ve dolayısıyla
+      kaydırma/taşma sınırı) en yakın konumlandırılmış atasıdır, ki o da
+      nihayetinde <html>'in bu daralmış kaydırma kutusuna bağlıdır.
+
+      position:fixed bu sorunu YAPISAL olarak atlar: fixed bir öğenin
+      containing block'u <html>'in kaydırma kutusu değil, doğrudan
+      VIEWPORT'un kendisidir (yine CSS spesifikasyonu gereği, bir
+      transform/filter/will-change ile "fixed'i yakalayan" bir ata
+      olmadığı sürece — bu sayfada header'da öyle bir özellik yok).
+      Panelin yüksekliği veya sayfanın kısalığı ne olursa olsun, fixed
+      panel her zaman ekranın gerçek üstünde/o an göründüğü yerde kalır.
+      Bu ayrıca mobil menüler için zaten yaygın/standart olan yaklaşım:
+      panel scroll pozisyonundan ve sayfa akışından tamamen bağımsız
+      davranır, sayfa kaydırılırken de ekranda sabit görünür (istenen
+      davranış — kullanıcı menüyü açıkken kazara sayfayı kaydırıp
+      panelin "geride kalmasını" istemeyiz zaten, ayrıca panel açıkken
+      body scroll'u da JS ile kilitleniyor, bkz. mobil-nav.js).
+    -->
+    <div id="mobile-nav-panel" class="mobile-nav-panel" hidden>
+      <nav aria-label="Mobil menü">
+        <a href="{{ '/' | relative_url }}" {% if page.url == '/' or page.url == '/index.html' %}class="active"{% endif %}>Anasayfa</a>
+        <a href="{{ '/icerik/blog.html' | relative_url }}" {% if page.url contains 'blog' %}class="active"{% endif %}>Blog</a>
+        <a href="{{ '/kurumsal/iletisim.html' | relative_url }}" {% if page.url contains 'iletisim' %}class="active"{% endif %}>İletişim</a>
+        <a href="{{ '/icerik/akademik-projeler.html' | relative_url }}" {% if page.url contains 'akademik-projeler' or page.url contains '/projects/' %}class="active"{% endif %}>Akademik Projeler</a>
+        <a href="{{ '/icerik/izlediklerim.html' | relative_url }}" {% if page.url contains 'izlediklerim' or page.url contains 'okuduklarim' %}class="active"{% endif %}>Listelerim</a>
+        <div class="mobile-nav-panel-ayirici" role="separator"></div>
+        <!-- nav-auth.js bu ikinci #auth-nav'ı da masaüstündekiyle birebir
+             aynı şekilde dolduruyor (Giriş Yap / Hesabım ▾ + Panelim/
+             Admin/Çıkış Yap). -->
+        <div id="auth-nav-mobile" class="auth-nav auth-nav--mobile">
+          <a
+            class="auth-nav-fallback-giris{% if page.url contains 'giris' or page.url contains 'kayit' %} active{% endif %}"
+            href="{{ '/hesap/giris.html' | relative_url }}"
+          >Giriş Yap</a>
+          <span class="auth-nav-fallback-hesap" aria-hidden="true">Hesabım ▾</span>
+        </div>
+      </nav>
     </div>
   </header>
 
