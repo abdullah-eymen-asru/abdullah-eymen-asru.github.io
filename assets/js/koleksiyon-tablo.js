@@ -2,7 +2,7 @@
  * Bu dosya İzlediklerim ve Okuduklarım sayfalarının ortak mantığını taşır.
  * Build-time'da GitHub Actions tarafından üretilen statik JSON dosyalarını
  * (assets/data/izlenenler.json, okunanlar.json) fetch edip dinamik bir tablo,
- * arama kutusu, tür/durum filtreleri ve bir "kaç tane okudum/izledim"
+ * arama kutusu, tür/durum/yıl filtreleri ve bir "kaç tane okudum/izledim"
  * istatistik şeridi oluşturur.
  *
  * "Dinamik" olmasının anlamı: kod hangi sütunların (Tür, Puan, Yazar vs.)
@@ -21,7 +21,14 @@
 function escapeHtml(text) {
   const div = document.createElement("div");
   div.textContent = text == null ? "" : String(text);
-  return div.innerHTML;
+  // div.innerHTML sadece TEXT-NODE bağlamında güvenlidir (&, <, > kaçışlanır).
+  // Bu fonksiyon aynı zamanda ÖZNİTELİK (attribute) değerleri içinde de
+  // kullanılıyor (data-search="...", data-tur="..." gibi) — orada çift
+  // tırnak (") kaçışlanmazsa, değer içinde bir " geçtiğinde attribute'tan
+  // kaçılıp yeni bir HTML özniteliği/etiketi açılabilir. Bu yüzden " ve '
+  // karakterlerini elle de kaçışlıyoruz; text-node bağlamında bunun hiçbir
+  // zararı yok, sadece attribute bağlamını da güvenli hale getiriyor.
+  return div.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 // Ekstra savunma katmanı: link http(s):// ile başlamalı VE içinde boşluk/
@@ -197,6 +204,7 @@ function istatistikGosterimiOlustur(items, config) {
  * @param {string} config.turFieldName - JSON'daki hangi alan "Tür" olarak kullanılsın (örn. "Tür")
  * @param {string} [config.durumSelectId] - Durum/okuma durumu dropdown id'si (verilmezse durum filtresi kurulmaz)
  * @param {string} [config.durumFieldName] - JSON'daki hangi alan "Durum" filtresi olarak kullanılsın (örn. "Durum" ya da "Okuma Durumu")
+ * @param {string} [config.yilSelectId] - Yıl dropdown id'si (verilmezse yıl filtresi kurulmaz). Yıl, Bitiş Tarihi (yoksa Başlama Tarihi) alanından çıkarılır — istatistik şeridiyle aynı mantık.
  * @param {string[]} config.aramaAlanlari - Arama sırasında hangi alanlarda metin aransın (başlık her zaman dahildir)
  * @param {string[]} [config.gizliAlanlar] - Tabloda GÖSTERİLMEYECEK EK alan adları (id/url/state/title zaten her zaman gizli)
  * @param {number} [config.sayfaBasinaKayit=50] - Bir sayfada gösterilecek satır sayısı
@@ -212,6 +220,9 @@ async function koleksiyonTablosuOlustur(config) {
   const searchBox = document.getElementById(config.searchInputId);
   const turSelect = document.getElementById(config.turSelectId);
   const durumSelect = config.durumSelectId ? document.getElementById(config.durumSelectId) : null;
+  const yilSelect = config.yilSelectId ? document.getElementById(config.yilSelectId) : null;
+  const baslamaAlani = config.baslamaTarihiAlani || "Başlama Tarihi";
+  const bitisAlani = config.bitisTarihiAlani || "Bitiş Tarihi";
 
   // "id", "url", "state" fetch-projects.js'in HER ZAMAN eklediği teknik
   // alanlar — bunlar hiçbir zaman ayrı sütun olarak gösterilmemeli, "url"
@@ -220,20 +231,42 @@ async function koleksiyonTablosuOlustur(config) {
   const gizliAlanlar = new Set(["id", "url", "state", ...(config.gizliAlanlar || [])]);
   const sayfaBasinaKayit = config.sayfaBasinaKayit || 50;
 
-  // Sekme filtreleri: hem Tür hem (varsa) Durum/Okuma Durumu için AYNI
-  // dropdown-doldurma + filtreleme mantığını tekrar tekrar yazmamak için
-  // genel bir liste kuruyoruz. Her satıra buradaki alanların küçük harfli
-  // değeri data-* attribute olarak yazılacak (örn. data-tur, data-durum),
-  // dropdown'lar da JSON'daki gerçek (büyük/küçük harfi korunmuş) değerlerle
-  // doldurulacak. Sadece HTML'de karşılığı olan (config'te id'si verilen)
+  // Sekme filtreleri: Tür, (varsa) Durum/Okuma Durumu ve (varsa) Yıl için
+  // AYNI dropdown-doldurma + filtreleme mantığını tekrar tekrar yazmamak
+  // için genel bir liste kuruyoruz. Her tanım bir "cek(item)" fonksiyonuyla
+  // o satırın ham (orijinal harf durumlu) değerini üretir — Tür/Durum için
+  // bu doğrudan bir JSON alanı, Yıl için ise Bitiş/Başlama Tarihi'nden
+  // türetilmiş bir değerdir (istatistik şeridindeki yilCikar ile birebir
+  // aynı mantık). Her satıra bu değerin küçük harfli hâli data-* attribute
+  // olarak yazılır (örn. data-tur, data-durum, data-yil), dropdown'lar da
+  // "cek()"in döndürdüğü orijinal (büyük/küçük harfi korunmuş) değerlerle
+  // doldurulur. Sadece HTML'de karşılığı olan (config'te id'si verilen)
   // filtreler listeye eklenir; okuduklarim.html'de olmayan bir alan
   // izlediklerim.html'i etkilemez ve tam tersi.
   const filtreTanimlari = [];
   if (config.turFieldName && turSelect) {
-    filtreTanimlari.push({ alanAdi: config.turFieldName, select: turSelect, veriAlani: "tur" });
+    filtreTanimlari.push({
+      select: turSelect,
+      veriAlani: "tur",
+      cek: item => item[config.turFieldName]
+    });
   }
   if (config.durumFieldName && durumSelect) {
-    filtreTanimlari.push({ alanAdi: config.durumFieldName, select: durumSelect, veriAlani: "durum" });
+    filtreTanimlari.push({
+      select: durumSelect,
+      veriAlani: "durum",
+      cek: item => item[config.durumFieldName]
+    });
+  }
+  if (yilSelect) {
+    filtreTanimlari.push({
+      select: yilSelect,
+      veriAlani: "yil",
+      cek: item => yilCikar(item[bitisAlani] || item[baslamaAlani]),
+      // Yıllar alfabetik değil, en yeniden en eskiye sıralansın (istatistik
+      // şeridindeki sıralamayla tutarlı olsun diye).
+      sirala: (a, b) => b.localeCompare(a)
+    });
   }
 
   // Ekran okuyucular için: koca tabloyu doğrudan aria-live yapmak (yüzlerce
@@ -315,10 +348,10 @@ async function koleksiyonTablosuOlustur(config) {
       const searchText = aramaMetniParcalari.join(" ").toString();
       const searchTextKucuk = kucukHarfeCevirTr(searchText);
 
-      // Her filtre tanımı (Tür, Durum...) için o satırın küçük harfli
+      // Her filtre tanımı (Tür, Durum, Yıl...) için o satırın küçük harfli
       // değerini ayrı bir data-* attribute olarak yazıyoruz.
       const filtreDataAttrs = filtreTanimlari.map(f => {
-        const deger = kucukHarfeCevirTr(item[f.alanAdi] || "");
+        const deger = kucukHarfeCevirTr(f.cek(item) || "");
         return ` data-${f.veriAlani}="${escapeHtml(deger)}"`;
       }).join("");
 
@@ -358,7 +391,7 @@ async function koleksiyonTablosuOlustur(config) {
     filtreTanimlari.forEach(f => {
       const benzersizDegerler = [...new Set(
         tumSatirlar.map(tr => tr.dataset[f.veriAlani]).filter(v => v)
-      )].sort();
+      )].sort(f.sirala || ((a, b) => a.localeCompare(b, "tr")));
 
       if (benzersizDegerler.length === 0) return;
 
@@ -367,11 +400,11 @@ async function koleksiyonTablosuOlustur(config) {
         // korunmuş) değer olsun diye küçük-harfli değere sahip ilk kaydı
         // örnek alıyoruz.
         const ornekItem = items.find(
-          it => kucukHarfeCevirTr(it[f.alanAdi] || "") === deger
+          it => kucukHarfeCevirTr(f.cek(it) || "") === deger
         );
         const option = document.createElement("option");
         option.value = deger;
-        option.textContent = ornekItem[f.alanAdi];
+        option.textContent = f.cek(ornekItem);
         f.select.appendChild(option);
       });
       f.select.disabled = false;
