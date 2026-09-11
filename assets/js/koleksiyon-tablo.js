@@ -71,17 +71,19 @@ function yilCikar(tarihMetni) {
  * "İzleyeceğim/Okuyacağım" durumundaki kayıtlar sayaca hiç girmez.
  *
  * Bu tamamlanmış kayıtlar arasında, her birinin "yılı" önce Bitiş
- * Tarihi'nden, o da yoksa Başlama Tarihi'nden çıkarılır — hangi yıla ait
- * olduğu böyle belirlenir. (Tamamlanmış ama olağandışı biçimde hiç tarihi
- * girilmemiş bir kayıt olursa, o kayıt yine de TOPLAM'a dahildir, sadece
- * hiçbir yıl kartına yazılmaz.)
+ * Tarihi'nden, o da yoksa Başlama Tarihi'nden çıkarılır. (Tamamlanmış ama
+ * olağandışı biçimde hiç tarihi girilmemiş bir kayıt olursa, o kayıt yine de
+ * TOPLAM'a dahildir, sadece hiçbir yıla yazılmaz.)
+ *
+ * GÖRÜNÜM: tüm yılları aynı anda kart kart dizmek (özellikle çok yıllık bir
+ * geçmişte) kalabalıklaşıyordu. Bunun yerine sadece "Toplam" ve "seçili yıl"
+ * kartı gösteriliyor; diğer yıllar arasında geçiş yapmak için yanlarına küçük
+ * bir <select> ekleniyor. Varsayılan seçili yıl: içinde bulunulan yıl (o yıla
+ * ait hiç kayıt yoksa, verideki en yeni yıl).
  *
  * istatistikTamamlandiDegeri (ya da durum alanı) config'te verilmemişse,
  * yanlışlıkla her kaydı "tamamlandı" sayıp hatalı bir rakam göstermektense
  * şerit hiç gösterilmez.
- *
- * Her yıl için ayrı bir kart + tüm yılların toplamı için bir "Toplam"
- * kartı üretilir. Yıllar en yeniden en eskiye sıralanır.
  */
 function istatistikGosterimiOlustur(items, config) {
   if (!config.istatistikContainerId) return;
@@ -105,6 +107,18 @@ function istatistikGosterimiOlustur(items, config) {
   );
 
   if (tamamlananlar.length === 0) {
+    // Geliştirme/hata ayıklama kolaylığı: "tamamlandı" sayılan hiçbir kayıt
+    // bulunamadıysa (ör. istatistikTamamlandiDegeri, GitHub Projects'teki
+    // gerçek seçenek metniyle birebir eşleşmiyorsa) tarayıcı konsoluna o
+    // alanda GERÇEKTE görülen değerleri yazıyoruz. Bu sadece geliştirici
+    // araçlarını açan biri için görünür, ziyaretçiyi hiç etkilemez.
+    if (items.length > 0) {
+      const gorulenDurumlar = [...new Set(items.map(it => it[durumAlani]).filter(Boolean))];
+      console.warn(
+        `[istatistik] "${durumAlani}" alanında "${config.istatistikTamamlandiDegeri}" değerine sahip kayıt bulunamadı.`,
+        "Bu alanda görülen gerçek değerler:", gorulenDurumlar
+      );
+    }
     el.innerHTML = "";
     el.hidden = true;
     return;
@@ -124,11 +138,24 @@ function istatistikGosterimiOlustur(items, config) {
   // gerek yok.
   const yillar = [...yilSayaci.keys()].sort((a, b) => b.localeCompare(a));
 
-  const yilKartlariHtml = yillar.map(yil => `
-    <div class="liste-istatistik-kart">
-      <span class="liste-istatistik-sayi">${yilSayaci.get(yil).toLocaleString("tr-TR")}</span>
-      <span class="liste-istatistik-etiket">${escapeHtml(yil)} yılında ${escapeHtml(eylem)}</span>
-    </div>`).join("");
+  // Yıl kartı gösterilecek veri yoksa (hiçbir tamamlanmış kaydın tarihi
+  // yoksa) sadece Toplam kartını göster, yıl seçiciyi hiç oluşturma.
+  if (yillar.length === 0) {
+    el.hidden = false;
+    el.innerHTML = `
+      <div class="liste-istatistik-kart liste-istatistik-kart--toplam">
+        <span class="liste-istatistik-sayi">${toplam.toLocaleString("tr-TR")}</span>
+        <span class="liste-istatistik-etiket">Toplam ${escapeHtml(eylem)}</span>
+      </div>`;
+    return;
+  }
+
+  const buYil = new Date().getFullYear().toString();
+  let seciliYil = yilSayaci.has(buYil) ? buYil : yillar[0];
+
+  const yilSecenekleriHtml = yillar
+    .map(yil => `<option value="${escapeHtml(yil)}" ${yil === seciliYil ? "selected" : ""}>${escapeHtml(yil)}</option>`)
+    .join("");
 
   el.hidden = false;
   el.innerHTML = `
@@ -136,7 +163,29 @@ function istatistikGosterimiOlustur(items, config) {
       <span class="liste-istatistik-sayi">${toplam.toLocaleString("tr-TR")}</span>
       <span class="liste-istatistik-etiket">Toplam ${escapeHtml(eylem)}</span>
     </div>
-    ${yilKartlariHtml}`;
+    <div class="liste-istatistik-kart" aria-live="polite">
+      <span class="liste-istatistik-sayi" data-rol="yil-sayisi"></span>
+      <span class="liste-istatistik-etiket" data-rol="yil-etiket"></span>
+    </div>
+    <select class="tur-select liste-istatistik-yil-secici" aria-label="Yıl seç">
+      ${yilSecenekleriHtml}
+    </select>`;
+
+  // Seçili yıl kartının içeriğini (sayı + etiket) günceller. Tüm şeridi
+  // yeniden çizmek yerine sadece bu iki <span>'i değiştiriyoruz ki
+  // <select>'in kendisi odağını kaybetmesin.
+  const sayiEl = el.querySelector('[data-rol="yil-sayisi"]');
+  const etiketEl = el.querySelector('[data-rol="yil-etiket"]');
+  const yilSecici = el.querySelector(".liste-istatistik-yil-secici");
+
+  function yilKartiniGuncelle() {
+    const yil = yilSecici.value;
+    sayiEl.textContent = (yilSayaci.get(yil) || 0).toLocaleString("tr-TR");
+    etiketEl.textContent = `${yil} yılında ${eylem}`;
+  }
+
+  yilSecici.addEventListener("change", yilKartiniGuncelle);
+  yilKartiniGuncelle();
 }
 
 /**
