@@ -203,8 +203,152 @@ nav {
 
 /* Masaüstünde bu kapsayıcı "görünmez" — içindeki linkler doğrudan
    nav'ın flex öğesi gibi davranır, mevcut düzen birebir korunur.
-   Mobil override'ı için bkz. @media (max-width: 640px) aşağıda. */
+   Mobil override'ı için bkz. @media (max-width: 640px) aşağıda:
+   masaüstü nav'ı (.site-nav-desktop) orada tamamen gizlenir, bu yüzden
+   .nav-links-scroll'un kendi mobil kaydırma davranışı artık pratikte hiç
+   devreye girmez, ama başka bir yerde (varsa) yanlışlıkla kullanılırsa
+   diye kural kaldırılmadı. */
 .nav-links-scroll { display: contents; }
+
+/*
+  HAMBURGER MENÜ DÜĞMESİ (mobil): masaüstünde tamamen gizli, sadece
+  @media (max-width:640px) altında görünür hale getirilir (aşağıda).
+  32x32'lik dokunma alanı + kendi içinde 3 çizgi; erişilebilirlik için
+  gerçek metin yerine aria-label kullanılıyor (bkz. HTML'deki
+  aria-label="Menüyü aç"/"Menüyü kapat").
+*/
+.nav-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.nav-toggle:hover,
+.nav-toggle[aria-expanded="true"] {
+  background: var(--tag-bg);
+}
+.nav-toggle-bar {
+  display: block;
+  width: 20px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--text);
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+/* Açıkken 3 çizgi klasik "X" şekline dönüşür — menünün açık olduğunu
+   ikonun kendisinden de anlamak, sadece aria-expanded'a güvenmemek için. */
+.nav-toggle[aria-expanded="true"] .nav-toggle-bar:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+.nav-toggle[aria-expanded="true"] .nav-toggle-bar:nth-child(2) {
+  opacity: 0;
+}
+.nav-toggle[aria-expanded="true"] .nav-toggle-bar:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+/*
+  MOBİL AÇILIR MENÜ PANELİ — bkz. _layouts/default.html #mobile-nav-panel
+  başındaki uzun not: position:fixed BİLEREK seçildi (position:absolute
+  DEĞİL), çünkü <html>'e uygulanan overflow-x:hidden CSS spesifikasyonu
+  gereği overflow-y'yi de örtük olarak "auto"ya çeviriyor ve <html>'in
+  kaydırma/taşma sınırını normal akıştaki içeriğin yüksekliğiyle
+  sınırlıyor. Kısa sayfalarda absolute bir panel bu sınırın altında
+  görünmez kalabiliyordu; fixed, containing block'u doğrudan viewport
+  yaptığı için bu sınırı tamamen atlıyor.
+
+  Varsayılan (kapalı) durumda [hidden] ile DOM'dan render dışı bırakılır
+  (tarayıcının yerleşik "display:none" davranışı yeterli, .auth-nav-menu
+  için yapıldığı gibi ayrıca ezilme riski yok çünkü burada "display"i
+  aşağıda ayrı bir sınıfla (.mobile-nav-panel açıkken) veriyoruz, temel
+  kuralda display tanımlı değil).
+*/
+.mobile-nav-panel {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--bg);
+  /* Panel açıkken arkadaki header'ın üstünü de kaplasın diye tam ekran;
+     üstte gerçek header yüksekliği kadar boşluk bırakıp linkleri onun
+     ALTINDA başlatıyoruz (bkz. JS'in ayarladığı --mobile-nav-top özel
+     özelliği), böylece marka/tema düğmesi/hamburger her zaman görünür
+     kalıyor ve panel onların üzerine binmiyor. */
+  padding-top: var(--mobile-nav-top, 64px);
+}
+.mobile-nav-panel:not([hidden]) {
+  display: block;
+}
+.mobile-nav-panel nav {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 20px 32px;
+}
+.mobile-nav-panel nav a {
+  margin-left: 0;
+  padding: 14px 12px;
+  font-size: 1.05rem;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+}
+.mobile-nav-panel nav a:last-of-type { border-bottom: none; }
+.mobile-nav-panel nav a.active {
+  border-radius: 8px;
+  border-bottom-color: transparent;
+}
+.mobile-nav-panel-ayirici {
+  height: 1px;
+  margin: 8px 0;
+  background: var(--border);
+}
+/* Mobil paneldeki hesap menüsü (#auth-nav-mobile): masaüstündeki dar
+   dropdown yerine, panelin geri kalanıyla aynı geniş/dikey listeye
+   uysun diye kendi düzeni var. */
+.auth-nav--mobile {
+  display: block;
+  width: 100%;
+}
+.auth-nav--mobile .auth-nav-fallback-giris,
+.auth-nav--mobile .auth-nav-fallback-hesap,
+.auth-nav--mobile .auth-nav-btn {
+  display: block;
+  width: 100%;
+  margin-left: 0;
+  padding: 14px 12px;
+  font-size: 1.05rem;
+  text-align: left;
+  border-radius: 8px;
+}
+.auth-nav--mobile .auth-nav-dropdown { width: 100%; }
+/* Masaüstündeki gibi "sağ üstte köşede açılan küçük kutu" değil, buton
+   hemen altına TAM GENİŞLİK bir liste olarak açılsın — panelin geneliyle
+   tutarlı, ayrıca fixed panelin İÇİNDE ekstra bir absolute/fixed katman
+   açmaktan kaçınıp basit tutuyoruz. */
+.auth-nav--mobile .auth-nav-menu {
+  position: static;
+  margin-top: 4px;
+  box-shadow: none;
+  border-radius: 8px;
+}
+.auth-nav--mobile .auth-nav-menu a,
+.auth-nav--mobile .auth-nav-menu-cikis {
+  padding: 12px 14px;
+  font-size: 1rem;
+}
 
 nav a {
   margin-left: 4px;
@@ -1407,98 +1551,40 @@ th { color: var(--muted); font-weight: 600; }
 }
 
 /* MOBİL HEADER DÜZENİ
-   Öncesinde küçük ekranlarda .theme-toggle-label { display:none } ile
-   etiket tamamen gizleniyordu — kullanıcı hangi modda olduğunu göremiyordu.
-   Artık etiketi mobilde de gösteriyoruz; bunun yerine header'ı mobilde
-   satır satır (marka üstte, nav ortada, tema anahtarı altta/yanında)
-   düzgün sarılacak şekilde yeniden düzenliyoruz ki hiçbir öğe kesilmesin
-   ya da taşmasın. */
+   ESKİ YÖNTEM (kaldırıldı): linkler (.nav-links-scroll) tek satırda yatay
+   kaydırmalı (swipe) bir bara dönüştürülüyordu. Teknik olarak çalışıyordu
+   ama tüm menünün her zaman aynı anda görünür olmaması (bir kısmı hep
+   ekran dışında/kaydırılarak keşfedilmesi gerekiyordu) erişilebilirlik
+   açısından ideal değildi. YENİ YÖNTEM: masaüstü nav'ı (.site-nav-desktop)
+   burada tamamen gizlenir, onun yerine bir hamburger düğmesi (.nav-toggle)
+   görünür hale gelir; tıklanınca TÜM linkleri (+ hesap menüsünü) dikey,
+   kaydırmaya gerek kalmadan tek seferde gösteren tam ekran bir panel
+   açılır (bkz. yukarıdaki .mobile-nav-panel kuralları ve
+   assets/js/core/mobil-nav.js). Header satırı marka + hamburger + tema
+   düğmesi gibi sade/tek satırlık kalır, ekstra dikey alan kaplamaz. */
 @media (max-width: 640px) {
   .site-header .wrap {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .nav-toggle {
+    display: flex;
+    order: 1;
   }
 
   .brand {
-    text-align: center;
-  }
-
-  /* BUG FİX: nav (Anasayfa/Blog/İletişim/Akademik Projeler/İzlediklerim/
-     Okuduklarım/Giriş Yap) önceden flex-wrap ile mobilde 3-4 satıra
-     bölünüyor, bu da tüm sekme barının ekranın yarısına yakın bir
-     dikey alan kaplamasına yol açıyordu. Hiçbir sekmeyi kaldırmadan,
-     linkleri (.nav-links-scroll) TEK SATIRDA yatay kaydırmalı (swipe)
-     bir bara çeviriyoruz — mobilde çok sık görülen ve tüm sekmelerin
-     erişilebilir kalmasını sağlayan bir düzen. Hesap menüsü (#auth-nav)
-     kasıtlı olarak bu kaydırma kutusunun DIŞINDA/yanında sabit kalıyor
-     ki açılır menüsü kırpılmasın (bkz. default.html'deki not). */
-  nav {
-    flex-wrap: nowrap;
-    align-items: center;
-    gap: 4px;
-    /* KRİTİK: nav da (üst öğesi olan .wrap sütun yönlü flex container
-       olduğu için) varsayılan "min-width: auto" ile İÇERİĞİNİN doğal
-       (sıkışmamış) genişliğinden KÜÇÜLEMİYORDU — bu da nav'ın kendisinin
-       stretch ile 100% genişliğe değil, çocuklarının toplam doğal
-       genişliğine (ör. 590px, 390px'lik ekranda taşarak) sabitlenmesine
-       yol açıyordu: nav-links-scroll'un "overflow-x:auto"su devreye bile
-       girmiyordu çünkü onu saran nav zaten taşmıştı. min-width:0 bu
-       otomatik-minimum davranışını kapatıp nav'ın gerçekten ekran
-       genişliğine sıkışmasını, böylece nav-links-scroll'un kendi içinde
-       yatay kaydırmalı hale gelmesini sağlıyor. */
-    min-width: 0;
-    width: 100%;
-  }
-
-  .nav-links-scroll {
-    display: flex;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none; /* Firefox: kaydırma çubuğunu görsel olarak gizle */
-    gap: 2px;
+    order: 2;
     flex: 1 1 auto;
-    min-width: 0;
-    /* KAYDIRILABİLİRLİK İPUCU: ilk defa gören biri, metnin sağ kenarda
-       "bitmiş" mi yoksa "kesilmiş" mi olduğunu ayırt edemeyebilir. Sağ
-       kenarı yumuşakça saydamlaştıran bir maske ekleyerek "burada daha
-       fazlası var, kaydır" hissi veriyoruz — klasik bir mobil liste/tab
-       bar deseni. Kaydırma gerçekten sona erdiğinde (bkz. site-islemleri.js
-       navKaydirmaIpucunuGuncelle) ".nav-scroll-sonda" sınıfıyla maske
-       kaldırılıyor ki son sekme solgun görünüp "tıklanamaz" hissi vermesin.
-       Ayrıca sayfa ilk açıldığında (bkz. aynı fonksiyon) bar birkaç
-       saniyeliğine hafifçe sağa/sola oynatılarak "bu kaydırılabilir"
-       mesajı bir kez daha, hareketle de veriliyor (prefers-reduced-motion
-       kapalıysa atlanır). */
-    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
-    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
-  }
-  .nav-links-scroll.nav-scroll-sonda {
-    -webkit-mask-image: none;
-    mask-image: none;
-  }
-  .nav-links-scroll::-webkit-scrollbar { display: none; } /* Chrome/Safari */
-
-  nav a {
-    margin-left: 0;
-    padding: 6px 9px;
-    font-size: 0.87rem;
-    white-space: nowrap;
-    flex: 0 0 auto;
+    text-align: left;
   }
 
-  .auth-nav { margin-left: 0; flex: 0 0 auto; }
-  .auth-nav-btn,
-  .auth-nav-fallback-hesap {
-    margin-left: 0;
-    padding: 6px 9px;
-    font-size: 0.87rem;
-    white-space: nowrap;
+  .site-nav-desktop {
+    display: none;
   }
 
   .theme-toggle {
-    align-self: center;
+    order: 3;
   }
 }
 
