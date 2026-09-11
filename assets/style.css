@@ -1208,36 +1208,27 @@ th { color: var(--muted); font-weight: 600; }
 
 /* TASARIM: uzun başlıklar (ör. "Karayip Korsanları: Siyah İnci'nin Laneti
    (Pirates of the Caribbean: The Curse of the Black Pearl)") tek kalın
-   satır olarak basıldığında hem okuması zorlaşıyor hem de kart sıkışık/
-   düzensiz görünüyordu. Link artık ana başlık + (varsa) parantez içindeki
-   alt başlığı DİKEY olarak, iki ayrı görsel katmanda gösteren bir flex
-   sütunu. Alt çizgi sadece hover/focus'ta beliriyor (sürekli altı çizili
-   uzun bir cümle yerine daha sakin, modern bir görünüm), ama link olduğu
-   rengiyle zaten belli oluyor. */
+   satır olarak basıldığında hem okuması zorlaşıyor hem de kart sıkışık
+   görünüyordu. Önceki denemede başlığı "Ana Başlık (Alt Başlık)" kalıbına
+   göre ikiye bölüp ayrı satırlarda gösteriyorduk — ama kayıtlar bu kalıba
+   her zaman uymuyor (ör. "Snowpiercer (English) - Bong Joon-ho": parantez
+   sonda değil, ortada), bu da tutarsız/hatalı görünüme yol açtı. Bunun
+   yerine başlığı HİÇ PARÇALAMADAN tam metin olarak basıyoruz; okunabilirlik
+   satır yüksekliği + kelime kaydırma + tire ile (taşma varsa) sağlanıyor.
+   Böylece veri hangi kalıpta olursa olsun (parantez sonda/ortada/hiç yok)
+   aynı, tutarlı şekilde görünür. */
 .koleksiyon-baslik-link {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+  display: block;
   text-decoration: none;
-}
-.koleksiyon-baslik-link:hover .koleksiyon-baslik-ana,
-.koleksiyon-baslik-link:focus-visible .koleksiyon-baslik-ana {
-  text-decoration: underline;
-}
-.koleksiyon-baslik-ana {
   font-size: 1.05rem;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.4;
   overflow-wrap: break-word;
   hyphens: auto;
 }
-.koleksiyon-baslik-alt {
-  font-size: 0.86rem;
-  font-weight: 400;
-  color: var(--muted);
-  line-height: 1.3;
-  overflow-wrap: break-word;
-  hyphens: auto;
+.koleksiyon-baslik-link:hover,
+.koleksiyon-baslik-link:focus-visible {
+  text-decoration: underline;
 }
 
 /* DÜZELTME (çizgi hatası): # ve Başlık hücreleri yan yana duran İKİ AYRI
@@ -1291,8 +1282,7 @@ th { color: var(--muted); font-weight: 600; }
    biraz daha sıkılaştırıyoruz ki kenarlardan taşma olmasın. */
 @media (max-width: 480px) {
   .scroll-list tbody tr { padding: 4px 12px; }
-  .koleksiyon-baslik-ana { font-size: 0.98rem; }
-  .koleksiyon-baslik-alt { font-size: 0.82rem; }
+  .koleksiyon-baslik-link { font-size: 0.98rem; }
   .scroll-list td:nth-child(n+3) { font-size: 0.86rem; }
   /* Çok dar telefonlarda 2 sütun her kartı aşırı daraltır (ör. "Bitiş
      Tarihi: 2018-06-02" gibi satırlar sıkışıp okunmaz olur) — burada tek
