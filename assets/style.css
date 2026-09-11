@@ -354,6 +354,12 @@ nav {
   border-radius: 10px;
   overflow: hidden;
 }
+/* BUG FİX (yukarıdaki nottaki AYNI sebep): burada da nav-auth.js'in
+   render ettiği gerçek "Giriş Yap" linkini kapsamak için ekstra bir
+   ".auth-nav--mobile > a" seçicisi ekliyoruz — sadece class adına
+   güvenmek (fallback-giris/fallback-hesap) JS devreye girince bu temel
+   boyut/dolgu stillerinin de kaybolmasına yol açardı. */
+.auth-nav--mobile > a,
 .auth-nav--mobile .auth-nav-fallback-giris,
 .auth-nav--mobile .auth-nav-fallback-hesap,
 .auth-nav--mobile .auth-nav-btn {
@@ -367,9 +373,23 @@ nav {
 }
 /* Sadece "Giriş Yap" (çıkış yapmışken tek başına görünen link, kart
    İÇİNDE değil) — o zaten tek bir öğe olduğu için ayrı bir çerçeveye
-   ihtiyacı yok, diğer nav linkleriyle aynı stili paylaşsın. */
-.auth-nav--mobile > .auth-nav-fallback-giris,
-.auth-nav--mobile > .auth-nav-fallback-hesap {
+   ihtiyacı yok, diğer nav linkleriyle aynı stili paylaşsın.
+
+   BUG FİX: nav-auth.js'in ÇALIŞMA ZAMANINDA render ettiği gerçek "Giriş
+   Yap" linki (bkz. renderGirisLinki()) className'i sadece "" ya da
+   "active" olarak ayarlıyor — statik HTML'deki yedek gibi
+   ".auth-nav-fallback-giris" sınıfını TAŞIMIYOR. Bu yüzden aşağıdaki
+   ".auth-nav-fallback-giris" seçicili kural SADECE nav-auth.js çalışana
+   kadarki kısa süreli statik yedeğe uygulanıyordu; JS devreye girer
+   girmez gerçek link bu çerçeve/dolgu stilini KAYBEDİP düz bir metin
+   linki gibi görünüyordu. Class adına bağlı olmayan, ".auth-nav--mobile"
+   kapsayıcısının DOĞRUDAN <a> çocuğunu hedefleyen bir seçici ekleyerek
+   hem statik yedeği HEM DE JS'in yazdığı gerçek linki aynı anda
+   kapsıyoruz — ikisi de aynı DOM konumunda (kapsayıcının doğrudan
+   çocuğu olarak) bulunuyor. */
+.auth-nav--mobile > a,
+.auth-nav--mobile .auth-nav-fallback-giris,
+.auth-nav--mobile .auth-nav-fallback-hesap {
   border: 1px solid var(--border);
   border-radius: 10px;
 }
