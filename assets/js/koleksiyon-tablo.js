@@ -43,21 +43,6 @@ function guvenliLink(url) {
   return "#";
 }
 
-// TASARIM: uzun başlıkların okunabilirliği için "Ana Başlık (Alt Başlık)"
-// kalıbındaki (çoğunlukla orijinal/İngilizce ad parantez içinde eklenmiş)
-// kayıtlarda ana başlığı ve parantez içindeki kısmı ayrı satırlara, ayrı
-// stillerle (bkz. .koleksiyon-baslik-ana / .koleksiyon-baslik-alt, style.css)
-// basıyoruz. Tek bir uzun ve kalın satır yerine, göz için iki net katman
-// oluşuyor. Kalıba uymayan (parantezsiz ya da parantez cümle ortasında
-// geçen) başlıklar hiç dokunulmadan tek satır olarak kalır — burada sadece
-// SONDA tek bir parantez grubu varsa ayırma yapılır.
-function baslikParcalariniAyir(title) {
-  const metin = title == null ? "" : String(title);
-  const eslesme = metin.match(/^(.+?)\s*(\([^()]+\))\s*$/);
-  if (!eslesme) return { ana: metin, alt: null };
-  return { ana: eslesme[1], alt: eslesme[2] };
-}
-
 // Büyük/küçük harf duyarsız arama için Türkçe'ye uygun harf küçültme.
 // Düz toLowerCase() "İ" (noktalı büyük İ) gibi harfleri Türkçe kuralına
 // göre değil Unicode varsayılanına göre çevirir — bu da örneğin "İstanbul"
@@ -222,7 +207,7 @@ function istatistikGosterimiOlustur(items, config) {
  * @param {string} [config.yilSelectId] - Yıl dropdown id'si (verilmezse yıl filtresi kurulmaz). Yıl, Bitiş Tarihi (yoksa Başlama Tarihi) alanından çıkarılır — istatistik şeridiyle aynı mantık.
  * @param {string[]} config.aramaAlanlari - Arama sırasında hangi alanlarda metin aransın (başlık her zaman dahildir)
  * @param {string[]} [config.gizliAlanlar] - Tabloda GÖSTERİLMEYECEK EK alan adları (id/url/state/title zaten her zaman gizli)
- * @param {number} [config.sayfaBasinaKayit=50] - Bir sayfada gösterilecek satır sayısı
+ * @param {number} [config.sayfaBasinaKayit=25] - Bir sayfada gösterilecek satır sayısı
  * @param {string} [config.istatistikContainerId] - "Kaç tane okudum/izledim" şeridinin basılacağı <div> id'si (verilmezse şerit oluşturulmaz)
  * @param {string} [config.istatistikEylem] - İstatistik etiketlerinde kullanılacak fiil (örn. "izlediğim", "okuduğum")
  * @param {string} [config.istatistikTamamlandiDegeri] - Durum alanında "tamamlandı" sayılacak değer (örn. "İzledim", "Okudum") — verilmezse istatistik şeridi hiç gösterilmez
@@ -244,7 +229,7 @@ async function koleksiyonTablosuOlustur(config) {
   // zaten Başlık sütununun linki için kullanılıyor. Kullanıcının verdiği
   // gizliAlanlar listesi bunun ÜSTÜNE ekleniyor (örn. "Durum", "Title").
   const gizliAlanlar = new Set(["id", "url", "state", ...(config.gizliAlanlar || [])]);
-  const sayfaBasinaKayit = config.sayfaBasinaKayit || 50;
+  const sayfaBasinaKayit = config.sayfaBasinaKayit || 25;
 
   // Sekme filtreleri: Tür, (varsa) Durum/Okuma Durumu ve (varsa) Yıl için
   // AYNI dropdown-doldurma + filtreleme mantığını tekrar tekrar yazmamak
@@ -380,15 +365,10 @@ async function koleksiyonTablosuOlustur(config) {
         return `<td data-label="${escapeHtml(sutun)}">${escapeHtml(deger == null ? "" : deger)}</td>`;
       }).join("");
 
-      const { ana, alt } = baslikParcalariniAyir(item.title);
-      const baslikHtml = alt
-        ? `<span class="koleksiyon-baslik-ana">${escapeHtml(ana)}</span><span class="koleksiyon-baslik-alt">${escapeHtml(alt)}</span>`
-        : `<span class="koleksiyon-baslik-ana">${escapeHtml(ana)}</span>`;
-
       rows += `
         <tr class="searchable" data-search="${escapeHtml(searchTextKucuk)}"${filtreDataAttrs}>
           <td class="col-index">${index + 1}</td>
-          <td><a class="koleksiyon-baslik-link" href="${escapeHtml(guvenliLink(item.url))}" target="_blank" rel="noopener noreferrer">${baslikHtml}</a></td>
+          <td><a class="koleksiyon-baslik-link" href="${escapeHtml(guvenliLink(item.url))}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.title)}</a></td>
           ${hucreler}
         </tr>`;
     });
