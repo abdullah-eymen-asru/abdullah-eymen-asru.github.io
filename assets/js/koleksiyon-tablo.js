@@ -43,6 +43,21 @@ function guvenliLink(url) {
   return "#";
 }
 
+// TASARIM: uzun başlıkların okunabilirliği için "Ana Başlık (Alt Başlık)"
+// kalıbındaki (çoğunlukla orijinal/İngilizce ad parantez içinde eklenmiş)
+// kayıtlarda ana başlığı ve parantez içindeki kısmı ayrı satırlara, ayrı
+// stillerle (bkz. .koleksiyon-baslik-ana / .koleksiyon-baslik-alt, style.css)
+// basıyoruz. Tek bir uzun ve kalın satır yerine, göz için iki net katman
+// oluşuyor. Kalıba uymayan (parantezsiz ya da parantez cümle ortasında
+// geçen) başlıklar hiç dokunulmadan tek satır olarak kalır — burada sadece
+// SONDA tek bir parantez grubu varsa ayırma yapılır.
+function baslikParcalariniAyir(title) {
+  const metin = title == null ? "" : String(title);
+  const eslesme = metin.match(/^(.+?)\s*(\([^()]+\))\s*$/);
+  if (!eslesme) return { ana: metin, alt: null };
+  return { ana: eslesme[1], alt: eslesme[2] };
+}
+
 // Büyük/küçük harf duyarsız arama için Türkçe'ye uygun harf küçültme.
 // Düz toLowerCase() "İ" (noktalı büyük İ) gibi harfleri Türkçe kuralına
 // göre değil Unicode varsayılanına göre çevirir — bu da örneğin "İstanbul"
@@ -365,10 +380,15 @@ async function koleksiyonTablosuOlustur(config) {
         return `<td data-label="${escapeHtml(sutun)}">${escapeHtml(deger == null ? "" : deger)}</td>`;
       }).join("");
 
+      const { ana, alt } = baslikParcalariniAyir(item.title);
+      const baslikHtml = alt
+        ? `<span class="koleksiyon-baslik-ana">${escapeHtml(ana)}</span><span class="koleksiyon-baslik-alt">${escapeHtml(alt)}</span>`
+        : `<span class="koleksiyon-baslik-ana">${escapeHtml(ana)}</span>`;
+
       rows += `
         <tr class="searchable" data-search="${escapeHtml(searchTextKucuk)}"${filtreDataAttrs}>
           <td class="col-index">${index + 1}</td>
-          <td><a href="${escapeHtml(guvenliLink(item.url))}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.title)}</a></td>
+          <td><a class="koleksiyon-baslik-link" href="${escapeHtml(guvenliLink(item.url))}" target="_blank" rel="noopener noreferrer">${baslikHtml}</a></td>
           ${hucreler}
         </tr>`;
     });
