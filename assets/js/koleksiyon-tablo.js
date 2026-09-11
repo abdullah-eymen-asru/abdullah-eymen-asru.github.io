@@ -65,13 +65,20 @@ function yilCikar(tarihMetni) {
 /**
  * "Kaç tane okudum/izledim" istatistik şeridini oluşturur.
  *
- * Mantık: her kaydın "tamamlanma yılı", önce Bitiş Tarihi'nden, o da yoksa
- * Başlama Tarihi'nden çıkarılır. İkisi de boşsa (örn. henüz başlanmamış,
- * "İzleyeceğim"/"Okuyacağım" durumundaki kayıtlar tipik olarak tarihsizdir)
- * o kayıt sayıma hiç girmez. Böylece ayrıca bir "Durum" alanı kontrolüne
- * ihtiyaç duymadan sayaç doğal olarak sadece başlanmış/bitmiş kayıtları
- * sayar — "başlama veya bitiş tarihi esas alınabilir" fikri tam olarak
- * bunu sağlıyor.
+ * Mantık: sadece GERÇEKTEN tamamlanmış kayıtlar sayılır — yani Durum alanı
+ * (izlemede "Durum", okumada "Okuma Durumu") config.istatistikTamamlandiDegeri
+ * ile eşleşen kayıtlar (örn. "İzledim" / "Okudum"). "İzliyorum/Okuyorum" ve
+ * "İzleyeceğim/Okuyacağım" durumundaki kayıtlar sayaca hiç girmez.
+ *
+ * Bu tamamlanmış kayıtlar arasında, her birinin "yılı" önce Bitiş
+ * Tarihi'nden, o da yoksa Başlama Tarihi'nden çıkarılır — hangi yıla ait
+ * olduğu böyle belirlenir. (Tamamlanmış ama olağandışı biçimde hiç tarihi
+ * girilmemiş bir kayıt olursa, o kayıt yine de TOPLAM'a dahildir, sadece
+ * hiçbir yıl kartına yazılmaz.)
+ *
+ * istatistikTamamlandiDegeri (ya da durum alanı) config'te verilmemişse,
+ * yanlışlıkla her kaydı "tamamlandı" sayıp hatalı bir rakam göstermektense
+ * şerit hiç gösterilmez.
  *
  * Her yıl için ayrı bir kart + tüm yılların toplamı için bir "Toplam"
  * kartı üretilir. Yıllar en yeniden en eskiye sıralanır.
@@ -84,22 +91,34 @@ function istatistikGosterimiOlustur(items, config) {
   const baslamaAlani = config.baslamaTarihiAlani || "Başlama Tarihi";
   const bitisAlani = config.bitisTarihiAlani || "Bitiş Tarihi";
   const eylem = config.istatistikEylem || "eklediğim";
+  const durumAlani = config.istatistikDurumAlani || config.durumFieldName;
+
+  if (!config.istatistikTamamlandiDegeri || !durumAlani) {
+    el.innerHTML = "";
+    el.hidden = true;
+    return;
+  }
+  const tamamlandiDegeri = kucukHarfeCevirTr(config.istatistikTamamlandiDegeri);
+
+  const tamamlananlar = items.filter(
+    item => kucukHarfeCevirTr(item[durumAlani] || "") === tamamlandiDegeri
+  );
+
+  if (tamamlananlar.length === 0) {
+    el.innerHTML = "";
+    el.hidden = true;
+    return;
+  }
 
   const yilSayaci = new Map();
-  items.forEach(item => {
+  tamamlananlar.forEach(item => {
     const tarih = item[bitisAlani] || item[baslamaAlani];
     const yil = yilCikar(tarih);
     if (!yil) return;
     yilSayaci.set(yil, (yilSayaci.get(yil) || 0) + 1);
   });
 
-  if (yilSayaci.size === 0) {
-    el.innerHTML = "";
-    el.hidden = true;
-    return;
-  }
-
-  const toplam = [...yilSayaci.values()].reduce((a, b) => a + b, 0);
+  const toplam = tamamlananlar.length;
   // localeCompare ile string sıralama, 4 haneli yıllar için ("2026" > "2025")
   // sayısal sıralamayla birebir aynı sonucu verir, ekstra Number() dönüşümüne
   // gerek yok.
@@ -134,6 +153,8 @@ function istatistikGosterimiOlustur(items, config) {
  * @param {number} [config.sayfaBasinaKayit=50] - Bir sayfada gösterilecek satır sayısı
  * @param {string} [config.istatistikContainerId] - "Kaç tane okudum/izledim" şeridinin basılacağı <div> id'si (verilmezse şerit oluşturulmaz)
  * @param {string} [config.istatistikEylem] - İstatistik etiketlerinde kullanılacak fiil (örn. "izlediğim", "okuduğum")
+ * @param {string} [config.istatistikTamamlandiDegeri] - Durum alanında "tamamlandı" sayılacak değer (örn. "İzledim", "Okudum") — verilmezse istatistik şeridi hiç gösterilmez
+ * @param {string} [config.istatistikDurumAlani] - İstatistik için hangi alana bakılsın (verilmezse config.durumFieldName kullanılır)
  * @param {string} [config.baslamaTarihiAlani="Başlama Tarihi"] - İstatistik hesaplamasında kullanılacak başlama tarihi alan adı
  * @param {string} [config.bitisTarihiAlani="Bitiş Tarihi"] - İstatistik hesaplamasında kullanılacak bitiş tarihi alan adı
  */
