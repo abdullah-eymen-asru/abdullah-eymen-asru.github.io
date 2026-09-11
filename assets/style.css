@@ -304,11 +304,27 @@ nav {
   font-size: 1.05rem;
   border-bottom: 1px solid var(--border);
   border-radius: 0;
+  /* "nav a" temel kuralından miras kalan display:inline-block/genişlik
+     davranışı yerine, panelin geri kalanıyla (tam satır genişliğinde,
+     sola hizalı) tutarlı olsun diye açıkça blok yapıyoruz. */
+  display: block;
+  width: 100%;
+  text-align: left;
 }
 .mobile-nav-panel nav a:last-of-type { border-bottom: none; }
+/* BUG FİX: "nav a.active" temel kuralı (bkz. aşağıda genel ".active"
+   kuralı) masaüstünde küçük bir "hap/tag" gibi görünsün diye tasarlanmış
+   — dar bir background + border-radius. Mobil panelde bu, tam genişlik
+   listenin ortasında dar, kutucuk gibi bir öğe olarak göze batıyordu.
+   Burada aktif sayfayı YİNE vurguluyoruz (kullanıcı hangi sayfada
+   olduğunu görebilsin) ama panelin geri kalanıyla aynı TAM GENİŞLİK
+   satır düzenine uyacak şekilde: dolgu arka plan yerine ince bir sol
+   şerit (accent renkli border-left) + kalın yazı. */
 .mobile-nav-panel nav a.active {
-  border-radius: 8px;
-  border-bottom-color: transparent;
+  background: none;
+  border-bottom-color: var(--border);
+  border-left: 3px solid var(--accent);
+  padding-left: 9px;
 }
 .mobile-nav-panel-ayirici {
   height: 1px;
@@ -317,10 +333,26 @@ nav {
 }
 /* Mobil paneldeki hesap menüsü (#auth-nav-mobile): masaüstündeki dar
    dropdown yerine, panelin geri kalanıyla aynı geniş/dikey listeye
-   uysun diye kendi düzeni var. */
+   uysun diye kendi düzeni var.
+
+   BUG FİX: "Hesabım ▾" butonu ile altında açılan Panelim/Sohbet/Admin/
+   Çıkış listesi ÖNCEDEN görsel olarak İKİ AYRI kutu gibi görünüyordu —
+   butonun kendi border-radius:8px'i + menünün margin-top:4px + KENDİ
+   border-radius:8px'i, ikisi arasında boşluklu iki ayrı "hap" oluşturuyordu.
+   Şimdi ikisini TEK bir dikdörtgen kart olarak birleştiriyoruz: dıştaki
+   .auth-nav-dropdown kartın kendisi (arka plan + tek border-radius), buton
+   ve menü onun İÇİNDE şeffaf/kenarlıksız duruyor, aralarında sadece ince
+   bir ayırıcı çizgi var. */
 .auth-nav--mobile {
   display: block;
   width: 100%;
+}
+.auth-nav--mobile .auth-nav-dropdown {
+  width: 100%;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
 }
 .auth-nav--mobile .auth-nav-fallback-giris,
 .auth-nav--mobile .auth-nav-fallback-hesap,
@@ -333,16 +365,34 @@ nav {
   text-align: left;
   border-radius: 8px;
 }
-.auth-nav--mobile .auth-nav-dropdown { width: 100%; }
+/* Sadece "Giriş Yap" (çıkış yapmışken tek başına görünen link, kart
+   İÇİNDE değil) — o zaten tek bir öğe olduğu için ayrı bir çerçeveye
+   ihtiyacı yok, diğer nav linkleriyle aynı stili paylaşsın. */
+.auth-nav--mobile > .auth-nav-fallback-giris,
+.auth-nav--mobile > .auth-nav-fallback-hesap {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
 /* Masaüstündeki gibi "sağ üstte köşede açılan küçük kutu" değil, buton
    hemen altına TAM GENİŞLİK bir liste olarak açılsın — panelin geneliyle
    tutarlı, ayrıca fixed panelin İÇİNDE ekstra bir absolute/fixed katman
-   açmaktan kaçınıp basit tutuyoruz. */
+   açmaktan kaçınıp basit tutuyoruz. Artık .auth-nav-dropdown'ın KENDİSİ
+   kartın çerçevesini/arka planını sağladığı için, buton ile menü
+   arasında EKSTRA bir boşluk/köşe yuvarlama YOK — tek bir ince üst
+   kenarlıkla ayrılan, aynı kartın iki bölümü gibi duruyorlar. */
+.auth-nav--mobile .auth-nav-btn {
+  border-radius: 0;
+  background: none;
+}
 .auth-nav--mobile .auth-nav-menu {
   position: static;
-  margin-top: 4px;
+  margin-top: 0;
   box-shadow: none;
-  border-radius: 8px;
+  border: none;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  padding: 6px;
+  background: none;
 }
 .auth-nav--mobile .auth-nav-menu a,
 .auth-nav--mobile .auth-nav-menu-cikis {
