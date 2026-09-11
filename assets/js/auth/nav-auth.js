@@ -37,6 +37,16 @@
  * atomik adımda, ASYNC iş (profil sorgusu) bittikten SONRA yapılıyor; o
  * bekleme sırasında DAHA YENİ bir istek başlamışsa (nesil ilerlemişse) eski
  * sonuç sessizce atılıyor, DOM'a hiç yazılmıyor.
+ *
+ * ÇOKLU CONTAINER (mobil menü desteği): Artık sayfada #auth-nav'ın YANI
+ * SIRA, mobil açılır panelin içinde bir #auth-nav-mobile de var (bkz.
+ * _layouts/default.html #mobile-nav-panel). İkisi de AYNI hesap durumunu
+ * göstermesi gerektiği için (masaüstünde biri görünür, mobilde diğeri),
+ * document.getElementById yerine querySelectorAll(".auth-nav") ile TÜM
+ * container'lar bulunup HER BİRİNE ayrı ayrı (ama aynı veriyle) menü
+ * render ediliyor. Böylece nav-auth.js'e yeni bir yer/kopya eklemek
+ * istenirse tek yapılması gereken aynı ".auth-nav" sınıfına sahip yeni
+ * bir <div id="..."> eklemek.
  */
 import { supabase } from "../core/supabase-client.js";
 
@@ -62,15 +72,21 @@ function hintYaz(girisYapilmisMi) {
 }
 
 export async function initAuthNav() {
-  const container = document.getElementById("auth-nav");
-  if (!container) return;
+  // ÇOKLU CONTAINER: masaüstü nav'ındaki #auth-nav VE mobil panel
+  // içindeki #auth-nav-mobile — ikisi de ".auth-nav" sınıfını paylaşır.
+  // Sayfada hangisi/hangileri varsa (bazı sayfalarda ikisi de olabilir,
+  // bazı özel şablonlarda sadece biri olabilir) hepsi bulunur.
+  const containers = Array.from(document.querySelectorAll(".auth-nav"));
+  if (containers.length === 0) return;
 
   let renderNesli = 0;
 
   // Verilen session'a göre menüyü GERÇEKTEN DOM'a yazan tek yer burasıdır
   // — hem ilk yüklemede hem her onAuthStateChange olayında AYNI fonksiyon
   // çağrılır, böylece "iki farklı kod yolu" riski (yukarıdaki BUG FİX
-  // notuna bakın) bir daha oluşamaz.
+  // notuna bakın) bir daha oluşamaz. Artık TÜM container'lara aynı anda
+  // (aynı nesil/aynı veriyle) yazıyor, böylece masaüstü ve mobil menü
+  // birbirinden asla farklı bir duruma düşmüyor.
   async function menuyuGuncelle(session) {
     const buNesil = ++renderNesli;
 
@@ -96,13 +112,15 @@ export async function initAuthNav() {
     // (ya da o da bayatlarsa ONDAN sonraki) uygulayacaktır.
     if (buNesil !== renderNesli) return;
 
-    container.innerHTML = "";
     hintYaz(yeniIcerik.tur === "hesap");
-    if (yeniIcerik.tur === "giris") {
-      renderGirisLinki(container);
-    } else {
-      renderHesapMenusu(container, yeniIcerik.role);
-    }
+    containers.forEach((container) => {
+      container.innerHTML = "";
+      if (yeniIcerik.tur === "giris") {
+        renderGirisLinki(container);
+      } else {
+        renderHesapMenusu(container, yeniIcerik.role);
+      }
+    });
   }
 
   try {
