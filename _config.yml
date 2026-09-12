@@ -72,6 +72,28 @@ include:
   - .well-known
   - llms.txt
 
+# GÜVENLİK: "supabase/" (veritabanı migration'ları + Edge Function kaynak
+# kodu, ör. admin-change-email/index.ts) ve "cloudflare worker/" (Cloudflare
+# Workers'a elle deploy edilen worker.js dosyaları) SADECE geliştirme
+# zamanında kullanılan kaynak kod depolarıdır — ikisi de tarayıcıdan HİÇ
+# çağrılmaz (Supabase migration'ları SQL Editor'e elle yapıştırılır, worker
+# kodu Cloudflare paneline elle deploy edilir), dolayısıyla canlı sitenin
+# ÇALIŞMASI için build çıktısında bulunmaları gerekmiyor. Daha önce bu
+# klasörler exclude edilmediği için Jekyll'in varsayılan davranışıyla
+# (alt çizgiyle başlamayan her klasör statik olarak kopyalanır) build
+# çıktısına AYNEN kopyalanıyor ve URL'i bilen biri için canlı sitede
+# erişilebilir kalıyor olabiliyordu — robots.txt bunu botlardan gizler
+# ama URL'i doğrudan bilen/tahmin eden birini engellemez. "exclude" ile
+# bu iki klasör build'e HİÇ dahil edilmiyor; SQL/worker kaynak kodu artık
+# sadece bu GitHub deposunda (Git geçmişinde) kalıyor, canlı sitede değil.
+# NOT: rehber/ klasöründeki dokümantasyon bu dosya yollarından METİN
+# OLARAK bahsetmeye devam ediyor (kurulum talimatı olarak) — bu sadece
+# düz metin referansı, Jekyll include/link mekanizması DEĞİL, dolayısıyla
+# bu exclude o metinleri bozmaz.
+exclude:
+  - supabase
+  - "cloudflare worker"
+
 # NOT: jekyll-feed plugin'i BİLEREK kullanılmıyor. Bunun yerine kökte
 # elle yazılmış bir feed.xml var (bkz. o dosyanın başındaki açıklama) —
 # çünkü jekyll-feed'in "published: false" alanı sayfayı build'den TAMAMEN
