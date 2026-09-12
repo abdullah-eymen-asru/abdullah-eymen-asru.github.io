@@ -15,18 +15,60 @@ permalink: "/icerik/blog.html"
   <div class="blog-column">
     <h2>Substack Yazıları</h2>
     <div class="filter-row">
+      <!--
+        ERİŞİLEBİLİRLİK: Bu input/select'lerin ÖNCEDEN görünür/programatik
+        HİÇBİR etiketi yoktu — sadece placeholder metni vardı. Placeholder,
+        WCAG'e göre bir <label> yerine GEÇMEZ: (1) kullanıcı bir şey
+        yazmaya başlar başlamaz kaybolur, o an ekran okuyucu kullanıcısı
+        da dahil kimse alanın ne işe yaradığını göremez; (2) çoğu ekran
+        okuyucu placeholder'ı hiç okumaz ya da "isim/açıklama" olarak değil
+        yalnızca ipucu metni olarak okur, alan sesli olarak "adsız düzenleme
+        kutusu" gibi duyurulabilir. Görsel olarak bir <label> EKLEMEK
+        istemiyoruz (tasarım zaten placeholder ile kompakt tutulmuş) — bu
+        yüzden ".sr-only" (bkz. style.css başı — ekranda görünmez ama
+        ekran okuyucuya görünür) bir <label> ekliyoruz; placeholder GÖRSEL
+        ipucu olarak kalmaya devam ediyor, ama artık her iki kullanıcı
+        grubu için de alanın amacı net.
+      -->
+      <label for="substack-search" class="sr-only">Substack yazılarında ara</label>
       <input
         type="text"
         id="substack-search"
         class="search-box"
         placeholder="Yazı ara…"
-        disabled>
-      <select id="substack-year-filter" class="tur-select" disabled>
+        disabled
+        aria-describedby="substack-search-durum">
+      <label for="substack-year-filter" class="sr-only">Substack yazılarını yıla göre filtrele</label>
+      <select id="substack-year-filter" class="tur-select" disabled aria-describedby="substack-search-durum">
         <option value="">Tüm yıllar</option>
       </select>
+      <!--
+        Neden disabled olduğunu (henüz feed yüklenmedi) hem görsel hem
+        ekran-okuyucu kullanıcısına açıklayan, ekranda görünmez metin.
+        JS bu alanları enabled yaptığında (bkz. aşağıdaki script,
+        searchBox.disabled = false satırı) bu açıklama artık geçerli
+        olmadığından aynı yerde kaldırılıyor.
+      -->
+      <span id="substack-search-durum" class="sr-only">Yazılar yüklenene kadar arama ve filtre kutuları kullanılamaz.</span>
     </div>
 
-    <div id="substack-posts" class="scroll-list">
+    <!--
+      ERİŞİLEBİLİRLİK — CANLI BÖLGE: Bu kutunun içeriği JS ile üç ayrı
+      anda değişiyor: (1) ilk yüklemede "Yazılar yükleniyor…" -> gerçek
+      kart listesi, (2) arama/yıl filtresi her değiştiğinde görünür kart
+      sayısı, (3) ağ hatası olursa hata mesajı. role="region" + aria-live
+      olmadan ekran okuyucu kullanıcısı bu değişikliklerin HİÇBİRİNDEN
+      haberdar olmaz — imleci o an başka bir yerdeyse (ör. arama kutusuna
+      yazarken) listenin güncellendiğini fark etmesinin tek yolu manuel
+      olarak listeye gidip yeniden okumaktır. "polite" (assertive DEĞİL)
+      seçildi çünkü bu bir hata/acil durum uyarısı değil — kullanıcının o
+      an yaptığı işi (ör. yazmayı) kesmeden, o iş bittiğinde duyurulması
+      yeterli. aria-busy, yükleme sırasında "true", tamamlanınca JS
+      tarafından "false" yapılıyor (bkz. script) — bazı ekran okuyucular
+      bunu "içerik hâlâ değişiyor, bitene kadar bekle" sinyali olarak
+      kullanır.
+    -->
+    <div id="substack-posts" class="scroll-list" role="region" aria-label="Substack yazı listesi" aria-live="polite" aria-busy="true" tabindex="0">
       <p class="loading">Yazılar yükleniyor…</p>
     </div>
   </div>
@@ -34,17 +76,19 @@ permalink: "/icerik/blog.html"
   <div class="blog-column">
     <h2>Notlarım</h2>
     <div class="filter-row">
+      <label for="notes-search" class="sr-only">Notlarımda ara</label>
       <input
         type="text"
         id="notes-search"
         class="search-box"
         placeholder="Notlarımda ara…">
+      <label for="notes-year-filter" class="sr-only">Notlarımı yıla göre filtrele</label>
       <select id="notes-year-filter" class="tur-select">
         <option value="">Tüm yıllar</option>
       </select>
     </div>
 
-    <div id="notes-posts" class="scroll-list">
+    <div id="notes-posts" class="scroll-list" role="region" aria-label="Notlarım yazı listesi" aria-live="polite" tabindex="0">
       {% assign yayindaki_yazilar = site.posts | where_exp: "p", "p.yayinda != false" | where_exp: "p", "p.date <= site.time" %}
       {% for post in yayindaki_yazilar %}
       {% comment %}
@@ -192,11 +236,23 @@ permalink: "/icerik/blog.html"
     // sonra) dolduruyoruz.
     searchBox.disabled = false;
     searchBox.placeholder = "Yazı ara…";
+    searchBox.removeAttribute("aria-describedby");
     const yearSelect = document.getElementById("substack-year-filter");
     if (yearSelect) {
       window.yilSecenekleriniDoldur("substack-posts", "substack-year-filter");
       yearSelect.disabled = false;
+      yearSelect.removeAttribute("aria-describedby");
     }
+    // Artık geçerli olmayan "yüklenene kadar kullanılamaz" açıklamasını
+    // DOM'dan da kaldırıyoruz (aria-describedby referansı yukarıda zaten
+    // sökülmüştü, bu span'ın kendisi kalırsa sonraki bir odaklanmada
+    // yanlışlıkla tekrar okunabilirdi diye tamamen temizliyoruz).
+    document.getElementById("substack-search-durum")?.remove();
+    // ERİŞİLEBİLİRLİK: yükleme bitti, canlı bölge artık "meşgul" değil —
+    // aria-busy="false" bazı ekran okuyuculara içeriğin durulduğunu,
+    // artık okunabilir/güvenilir olduğunu bildirir (bkz. yukarıdaki
+    // blog.md'deki role="region" notunun devamı).
+    container.setAttribute("aria-busy", "false");
 
   } catch (err) {
     // Timeout (AbortError) dahil HER hata türünde container'daki "yükleniyor"
@@ -207,6 +263,10 @@ permalink: "/icerik/blog.html"
     container.innerHTML =
       `<p class="error">${mesaj} ` +
       '<a href="{{ site.substack_url }}" target="_blank" rel="noopener noreferrer">Substack sayfamı buradan ziyaret edebilirsin</a>.</p>';
+    // Hata durumunda da "meşgul" bayrağını kaldırıyoruz — aksi halde
+    // aria-busy="true" sonsuza dek takılı kalır ve ekran okuyucu bu
+    // bölgeyi (hatalı biçimde) hâlâ "yükleniyor" olarak değerlendirebilir.
+    container.setAttribute("aria-busy", "false");
     console.error(err);
   } finally {
     clearTimeout(timeoutId);
@@ -249,10 +309,35 @@ window.yilSecenekleriniDoldur = function (listId, selectId) {
 // Genel arama + yıl filtresi mantığı: bir arama kutusu + bir yıl <select>'i
 // + bir liste kutusunu birbirine bağlar (VE mantığıyla birlikte uygular).
 // Hem Substack hem Notlarım sütunu bu aynı fonksiyonu kullanır.
+//
+// ERİŞİLEBİLİRLİK NOTU: Kartları gizlemek için "display:none" kullanmak
+// (aşağıda olduğu gibi) görsel olarak doğru ama tek başına ekran okuyucu
+// kullanıcısına YETERLİ bilgi vermez — kullanıcı arama kutusuna yazarken
+// imleç zaten oradadır, listeye "gidip" kaç sonuç kaldığını görmesi
+// beklenemez. Bu yüzden her filtre uygulamasından sonra, listenin
+// HEMEN ÖNÜNDEKİ .filter-row içine kısa bir "N sonuç" özetini ekliyoruz
+// (bkz. durumOzeti oluşturma kısmı) — bu özet ".sr-only" olduğu için
+// GÖRSEL olarak hiçbir şeyi değiştirmiyor (tasarım aynı kalıyor), ama
+// aria-live="polite" olduğu için ekran okuyucu kullanıcısı yazmayı
+// bitirir bitirmez "3 sonuç bulundu" gibi bir duyuru duyuyor.
 function baglaAramaVeYil(inputId, yearSelectId, listId) {
   const input = document.getElementById(inputId);
   const yearSelect = document.getElementById(yearSelectId);
   const list = document.getElementById(listId);
+
+  // Durum özetini tutacak canlı bölge — filter-row'un İÇİNDE değil hemen
+  // ARDINDAN, listeden önce; input/select'lerin DOM sırasını bozmamak ve
+  // "sr-only" olduğu için zaten görünmeyeceği için konum görsel olarak
+  // önemsiz, ama mantıksal akışta (arama kutuları -> sonuç özeti -> liste)
+  // doğru sırada olsun diye buraya ekleniyor.
+  let durumOzeti = document.getElementById(listId + "-durum-ozeti");
+  if (!durumOzeti) {
+    durumOzeti = document.createElement("p");
+    durumOzeti.id = listId + "-durum-ozeti";
+    durumOzeti.className = "sr-only";
+    durumOzeti.setAttribute("aria-live", "polite");
+    list.parentElement.insertBefore(durumOzeti, list);
+  }
 
   function uygula() {
     const q = input.value.trim().toLowerCase();
@@ -279,6 +364,18 @@ function baglaAramaVeYil(inputId, yearSelectId, listId) {
       }
     } else if (emptyMsg) {
       emptyMsg.remove();
+    }
+
+    // Filtre hiç uygulanmamışken (arama boş VE yıl seçilmemiş) sonuç
+    // sayısını duyurmuyoruz — bu durum zaten "tüm yazılar" demek, listeyi
+    // her sayfa yüklemesinde gereksiz yere duyurmuş oluruz. Sadece
+    // kullanıcı GERÇEKTEN bir filtre uyguladığında duyuruyoruz.
+    if (q !== "" || yil !== "") {
+      durumOzeti.textContent = visibleCount === 0
+        ? "Eşleşen sonuç bulunamadı."
+        : visibleCount + (visibleCount === 1 ? " sonuç bulundu." : " sonuç bulundu.");
+    } else {
+      durumOzeti.textContent = "";
     }
   }
 
