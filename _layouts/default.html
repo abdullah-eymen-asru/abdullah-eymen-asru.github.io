@@ -615,9 +615,51 @@
     kaynaklı örtük overflow-y:auto sınırlamasından da (bkz. eski not,
     aynı mantık burada da geçerli) hem de header'ın kendi stacking
     context'inden de tamamen bağımsız kalıyor.
+
+    BUG FİX — HAMBURGER DÜĞMESİ BAZI MOBİL WEBVIEW'LERDE TIKLANAMIYORDU:
+    Panel <header>'ın DIŞINA taşındıktan sonra, panelin z-index'i (100)
+    artık header'ın z-index'inden (50) BAĞIMSIZ, kendi (body seviyesinde)
+    stacking context'inde değerlendiriliyor — ve panel DOM'da header'dan
+    SONRA geldiği için, panel açıkken görsel olarak header'ın (dolayısıyla
+    içindeki hamburger düğmesinin) TAMAMEN ÜSTÜNDE duruyordu. Masaüstü
+    tarayıcılarda bu genelde sorun çıkarmıyordu (kullanıcı panel dışına
+    tıklayıp kapatabiliyordu ya da Escape basıyordu) ama bazı mobil
+    WebView'lerde (uygulama içi tarayıcılar) "dışarı tıklama" davranışı
+    tutarsız çalışabiliyor, tek güvenilir yol GÖRÜNÜR bir kapatma
+    kontrolüydü — ki o da (hamburger) artık panelin ALTINDA kalmış,
+    dokunulamaz durumdaydı.
+
+    ÇÖZÜM: panelin kendi İÇİNE, sağ üstte her zaman görünür/erişilebilir
+    bir "Kapat" düğmesi eklendi (#mobile-nav-kapat). Artık kullanıcı
+    paneli kapatmak için DIŞARIDAKİ (bazen erişilemez) hamburger'a değil,
+    panelin kendi içindeki bu düğmeye güvenebiliyor — ayrıca geri tuşuna
+    basmadan da (browser history'yi değiştirmeden) mevcut sayfada kalarak
+    paneli kapatabiliyor, ki bu tam olarak istenen davranıştı.
   -->
-  <div id="mobile-nav-panel" class="mobile-nav-panel" hidden>
-    <nav aria-label="Mobil menü">
+  <div id="mobile-nav-panel" class="mobile-nav-panel" role="dialog" aria-modal="true" aria-label="Mobil menü" tabindex="-1" hidden>
+    <div class="mobile-nav-panel-ust">
+      <span class="mobile-nav-panel-baslik">{{ site.title }}</span>
+      <!--
+        role="dialog" + aria-modal="true": panel açıkken bu artık ekran
+        okuyucu için bağımsız bir "pencere" gibi davranmalı — arkadaki
+        sayfa içeriği geçici olarak "arka planda" sayılmalı. Gerçek odak
+        tuzağı (focus trap) mobil-nav.js'te JS ile sağlanıyor (bkz. o
+        dosyadaki not); buradaki aria-modal bunu ekran okuyuculara da
+        bildiriyor.
+      -->
+      <button
+        id="mobile-nav-kapat"
+        type="button"
+        class="mobile-nav-panel-kapat"
+        aria-label="Menüyü kapat"
+      >
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+          <path d="M6 6 L18 18 M18 6 L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+        </svg>
+        <span>Kapat</span>
+      </button>
+    </div>
+    <nav>
       <a href="{{ '/' | relative_url }}" {% if page.url == '/' or page.url == '/index.html' %}class="active"{% endif %}>Anasayfa</a>
       <a href="{{ '/icerik/blog.html' | relative_url }}" {% if page.url contains 'blog' %}class="active"{% endif %}>Blog</a>
       <a href="{{ '/kurumsal/iletisim.html' | relative_url }}" {% if page.url contains 'iletisim' %}class="active"{% endif %}>İletişim</a>
