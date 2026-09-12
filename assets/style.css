@@ -1229,6 +1229,18 @@ th { color: var(--muted); font-weight: 600; }
 }
 .scroll-list .post-card:last-child { margin-bottom: 0; }
 
+/* ERİŞİLEBİLİRLİK: .scroll-list artık tabindex="0" taşıyor (bkz.
+   icerik/blog.md) — böylece fare/dokunmatik olmadan, sadece klavye (Tab
+   ile odaklanıp ok tuşlarıyla) da kaydırılabiliyor. Tarayıcının
+   varsayılan odak halkası zaten görünür durumda (sitede outline'ı
+   kapatan bir kural yok), ama tam bu kutunun kendisi için biraz daha
+   belirgin/tutarlı bir görünüm veriyoruz ki "buraya Tab ile gelindi,
+   ok tuşlarıyla kaydırabilirsin" ipucu net olsun. */
+.scroll-list:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .no-results { padding: 8px 0; }
 
 .load-more-btn {
