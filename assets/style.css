@@ -567,6 +567,18 @@ nav a.active {
      geçildiğinde dikey konum kaymasın diye. */
   margin-bottom: -1px;
   transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  /* BUG FİX / GENİŞLETME: ".sekme-btn" ilk olarak SADECE <a> etiketleri
+     (İzlediklerim/Okuduklarım gibi ayrı SAYFALARA giden linkler) için
+     tasarlanmıştı. Blog sayfasındaki yeni sekmeler ise gerçek <button
+     role="tab"> öğeleri (aynı sayfada içerik değiştiriyorlar, ayrı bir
+     URL'e gitmiyorlar — bkz. blog.md'deki tasarım notu). <button>'ın
+     tarayıcı varsayılanları (arka plan, font, imleç) <a>'dan farklı
+     olduğundan, bu üç özelliği burada AÇIKÇA sıfırlıyoruz ki ".sekme-btn"
+     hangi etiketle (<a> ya da <button>) kullanılırsa kullanılsın BİREBİR
+     aynı görünsün. */
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
 }
 
 .sekme-btn:hover {
@@ -579,6 +591,11 @@ nav a.active {
   background: var(--card-bg);
   border-color: var(--border);
   font-weight: 600;
+}
+
+.sekme-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 @media (max-width: 640px) {
@@ -1213,21 +1230,14 @@ th { color: var(--muted); font-weight: 600; }
   height: 16px;
 }
 
-/* Blog sayfası: 2 sütunlu düzen */
-.blog-columns {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 32px;
-  margin-top: 1.5em;
-}
-
-@media (max-width: 720px) {
-  .blog-columns {
-    grid-template-columns: 1fr;   /* mobilde alt alta düşer */
-  }
-}
-
-.blog-column h2 { margin-top: 0; }
+/* Blog sayfası: eskiden 2 sütunlu grid'di (.blog-columns / .blog-column),
+   artık ".listeler-sekmeler" (bkz. yukarısı) ile sekmeli bir yapıya
+   geçildi — bkz. blog.md'deki büyük tasarım-değişikliği notu. Panel artık
+   basit, tam genişlik bir blok: aynı anda sadece BİR panel (role="tabpanel")
+   görünür olduğu için yan yana sütun düzenine hiç gerek kalmadı, bu da
+   mobilde iki ayrı arama/filtre/liste kutusunun üst üste yığılma sorununu
+   kökten ortadan kaldırıyor. */
+.blog-panel { margin-top: 4px; }
 
 .search-box {
   width: 100%;
