@@ -426,7 +426,16 @@ nav {
   box-sizing: border-box;
   border: 1px solid var(--border);
   border-radius: 10px;
-  overflow: hidden;
+  /* BUG FİX: "overflow: hidden" burada SADECE köşe yuvarlamayı garanti
+     altına almak için vardı, ama ".auth-nav-menu" (menü) genişlemesi
+     gerektiğinde bu kırpma alanı içeriği YANLIŞLIKLA gizleyebiliyordu
+     (bkz. aşağıdaki ".auth-nav--mobile .auth-nav-menu" bloğundaki BUG
+     FİX notu — asıl sebep menünün eski min-width/position kalıntılarıydı,
+     ama "overflow: hidden" bu hatayı GÖRÜNMEZ/tanısı zor hale getiren
+     ek bir katmandı). Artık menünün genişliği/konumu doğru ayarlandığı
+     için kırpmaya hiç gerek yok; "border-radius" tek başına köşeleri
+     yuvarlatmaya yetiyor çünkü menü de kendi border-radius'unu (0, düz
+     kenar) doğru şekilde taşıyor. */
 }
 .auth-nav--mobile > a {
   padding: 14px 12px;
@@ -442,17 +451,56 @@ nav {
   padding: 14px 12px;
   font-size: 1.05rem;
   text-align: left;
-  border-radius: 0;
+  /* wrap'in üst köşeleriyle uyumlu (bkz. menünün alt köşe notu) —
+     buton menü kapalıyken wrap'in tek/tüm içeriği olduğundan üst VE alt
+     köşeleri yuvarlıyoruz; menü açılınca alt köşe görsel olarak menünün
+     üst kenarına bitişecek (menu'nün border-top'u sınırı çiziyor), bu da
+     görsel olarak sorun teşkil etmiyor çünkü ikisi aynı arka plan rengini
+     paylaşıyor. */
+  border-radius: 9px;
   background: none;
   border: none;
 }
+/* BUG FİX — "HESABIM ▾" / "GİRİŞ YAP" AÇILINCA İÇERİK SAYFA KENARINA
+   TAŞIP KAYBOLUYORDU: Temel ".auth-nav-menu" kuralı (bkz. aşağısı)
+   masaüstü için tasarlanmış "position: absolute; right: 0; top:
+   calc(100% + 6px); min-width: 170px" değerleri taşıyor — bu menüyü,
+   içinde bulunduğu ".auth-nav-dropdown" (wrap, "position: relative"
+   taşıyor) kutusunun SAĞ ÜST köşesine göre, kutunun DIŞINA taşacak
+   şekilde konumluyor (bu masaüstünde İSTENEN davranış: küçük bir
+   dropdown gibi açılması). Mobilde ben bu davranışı "position: static"
+   ile iptal etmeye çalışmıştım, AMA "right: 0" ve "top: calc(100% + 6px)"
+   ile "min-width: 170px" değerlerini AÇIKÇA SIFIRLAMAMIŞTIM. "position:
+   static" olduğunda "top/right" tarayıcı tarafından yok sayılsa da,
+   ".auth-nav--mobile .auth-nav-dropdown"a eklediğim "overflow: hidden"
+   (sadece köşeleri yuvarlatmak için konmuştu) ile "min-width: 170px"
+   BİR ARAYA GELİNCE: menü, dar bir mobil ekranda "wrap"in kendi
+   genişliğinden (100%) FARKLI bir min-width dayattığı için mizanpaj
+   hesaplaması bozuluyor, içerik kutunun kırpma alanının (overflow:hidden)
+   dışına/kenara taşıp görünmez kalıyordu. ÇÖZÜM: mobilde tüm masaüstü-
+   özel konumlandırma/boyut değerlerini (position, top, right, min-width,
+   box-shadow, z-index) AÇIKÇA sıfırlıyoruz; menü artık "wrap"in TAM
+   GENİŞLİĞİNİ (width:100%, box-sizing:border-box) kullanan, normal akışta
+   duran sıradan bir blok. */
 .auth-nav--mobile .auth-nav-menu {
   position: static;
+  top: auto;
+  right: auto;
+  left: auto;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  z-index: auto;
   margin-top: 0;
   box-shadow: none;
   border: none;
   border-top: 1px solid var(--border);
-  border-radius: 0;
+  /* wrap'in dış "border-radius: 10px"ı ile tutarlı olsun diye menünün
+     ALT köşelerini de aynı yarıçapla yuvarlıyoruz (üst köşeler zaten
+     butonun altında/köşeye uzak olduğu için düz kalabilir) — artık
+     "overflow: hidden" olmadığından bu köşe uyumu wrap'in kendi
+     border-radius'una bağlı değil, açıkça burada belirtilmesi gerekiyor. */
+  border-radius: 0 0 9px 9px;
   padding: 6px;
   background: none;
 }
