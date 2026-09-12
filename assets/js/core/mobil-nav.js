@@ -39,14 +39,70 @@
     // rastgele bir yere sıçramıyor.
     let acilmadanOncekiOdak = null;
 
+    // Panel açıkken arkadaki sayfanın kayması engellenmeli (bkz. az
+    // aşağıdaki BUG FİX notu) — bunun için sayfanın o anki kaydırma
+    // konumunu burada saklıyoruz, panelAc() ve panelKapat() arasında
+    // paylaşılıyor.
+    let kilitlenmedenOncekiKaydirma = 0;
+
+    // BUG FİX — PANEL AÇIKKEN ARKA PLAN (SEKME İÇİNDE) YİNE DE KAYDIRILABİLİYORDU:
+    // Eski yöntem sadece "document.body.style.overflow = 'hidden'" idi.
+    // Bu, masaüstü tarayıcılarda fare tekerleğiyle kaydırmayı engelliyordu
+    // AMA mobil Safari/Chrome'da (özellikle iOS'ta) dokunuşla kaydırmayı
+    // GÜVENİLİR ŞEKİLDE ENGELLEMİYOR — iOS'un "elastic/rubber-band" kaydırma
+    // davranışı, <body>'ye "overflow: hidden" verilmiş olsa bile parmakla
+    // kaydırmaya izin veriyor (özellikle panelin kendi İÇİNDEKİ kaydırılabilir
+    // nav'ın — bkz. ".mobile-nav-panel nav { overflow-y: auto }" — sınırına
+    // ulaşıldığında dokunuş olayı "taşıp" arkadaki body'yi kaydırabiliyor).
+    // Sonuç: kullanıcı panel açıkken (farkında olmadan) arkadaki sayfayı
+    // kaydırıyor, paneli "Kapat" ile kapattığında okuduğu yerden BAMBAŞKA
+    // bir konumda buluyor — bu da Kapat düğmesini (ve genel olarak modal
+    // panel hissini) anlamsızlaştırıyor.
+    //
+    // ÇÖZÜM: klasik/güvenilir "body'yi position:fixed ile kilitleme" tekniği.
+    // Panel açılırken mevcut kaydırma konumunu (window.scrollY) kaydedip
+    // body'ye "position: fixed; top: -kaydirma; width: 100%" veriyoruz —
+    // bu, body'yi görsel olarak TAM OLDUĞU YERDE dondurur (negatif "top",
+    // içeriği kaydırma miktarı kadar yukarı kaydırıp position:fixed'in onu
+    // sabitlemesiyle sayfa hiç "zıplamıyor") ve artık <body> bir kaydırma
+    // konteyneri OLMADIĞI için ne fare tekerleği ne de dokunuşla kaydırma
+    // (iOS dahil) arka planı hareket ettiremiyor. Panel kapanınca bu stilleri
+    // kaldırıp "window.scrollTo" ile TAM OLARAK aynı konuma (hiç animasyonsuz,
+    // aynı kare içinde) geri dönüyoruz — kullanıcı panel hiç açılmamış gibi,
+    // sayfada kaldığı yerde devam ediyor.
+    function arkaPlaniKilitle() {
+      kilitlenmedenOncekiKaydirma = window.scrollY || window.pageYOffset || 0;
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${kilitlenmedenOncekiKaydirma}px`;
+      document.body.style.left = "0";
+      document.body.style.right = "0";
+      document.body.style.width = "100%";
+    }
+
+    function arkaPlaniKilidiAc() {
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.left = "";
+      document.body.style.right = "";
+      document.body.style.width = "";
+      // BUG FİX: sitede dipnot (footnote) atlamaları yumuşak kaysın diye
+      // "html { scroll-behavior: smooth }" GENEL kuralı var (bkz. style.css,
+      // prefers-reduced-motion:no-preference altında). Bu kural, "behavior"
+      // BELİRTİLMEDEN çağrılan HER "scrollTo"yu (bu satır dahil) etkiliyor —
+      // yani aşağıdaki konum geri yükleme çağrısı da CSS'ten dolayı yumuşak/
+      // yavaş animasyonlu çalışıp kullanıcının gözü önünde sayfayı BİR KEZ
+      // DAHA (görünür şekilde) kaydırırdı; hâlbuki asıl amaç panel hiç
+      // açılmamış GİBİ, anlık ve fark edilmeden eski konuma dönmek. Açıkça
+      // "behavior: 'instant'" vererek bu sayfa geneli kuralı BURADA
+      // geçersiz kılıyoruz.
+      window.scrollTo({ top: kilitlenmedenOncekiKaydirma, left: 0, behavior: "instant" });
+    }
+
     function panelAc() {
       acilmadanOncekiOdak = document.activeElement;
       panel.hidden = false;
       toggleBtn.setAttribute("aria-expanded", "true");
-      // Panel açıkken arka plan (body) kaydırılamasın — kullanıcı panel
-      // içinde kaydırırken kazara arkadaki sayfanın da kaymasını/panelin
-      // "geride kalmış" hissi vermesini önler.
-      document.body.style.overflow = "hidden";
+      arkaPlaniKilitle();
       // ERİŞİLEBİLİRLİK: panel bir "dialog" (bkz. default.html'deki
       // role="dialog" aria-modal="true") olduğu için, açılır açılmaz
       // odağı panelin İÇİNE (Kapat düğmesine) taşımak standart pratiktir
@@ -64,7 +120,7 @@
     function panelKapat() {
       panel.hidden = true;
       toggleBtn.setAttribute("aria-expanded", "false");
-      document.body.style.overflow = "";
+      arkaPlaniKilidiAc();
       // Odağı, paneli açan yere (ya da artık DOM'da yoksa hamburger'a)
       // geri veriyoruz.
       const geriDonulecekOdak =
