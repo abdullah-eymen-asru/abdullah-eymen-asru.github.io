@@ -280,20 +280,67 @@ nav {
   right: 0;
   bottom: 0;
   z-index: 100;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
   background: var(--bg);
-  /* Panel açıkken arkadaki header'ın üstünü de kaplasın diye tam ekran;
-     üstte gerçek header yüksekliği kadar boşluk bırakıp linkleri onun
-     ALTINDA başlatıyoruz (bkz. JS'in ayarladığı --mobile-nav-top özel
-     özelliği), böylece marka/tema düğmesi/hamburger her zaman görünür
-     kalıyor ve panel onların üzerine binmiyor. */
-  padding-top: var(--mobile-nav-top, 64px);
+  /* Panel artık kendi İÇİNDE sabit bir üst şerit (.mobile-nav-panel-ust,
+     marka + Kapat düğmesi) taşıyor — bkz. aşağısı ve default.html'deki
+     büyük BUG FİX notu. Bu yüzden ESKİDEN burada gerekli olan
+     "padding-top: var(--mobile-nav-top)" (dıştaki gerçek header'ın
+     görünür kalması için boşluk bırakma) artık GEREKSİZ: kullanıcının
+     kapatmak için dıştaki (bazı WebView'lerde erişilemeyen) hamburger'a
+     ulaşmasına hiç gerek yok, panelin kendi kapatma düğmesi her zaman
+     üstte ve erişilebilir. Panel artık dikey olarak flex ile ikiye
+     bölünüyor: sabit üst şerit + altında kaydırılabilir nav içeriği. */
+  flex-direction: column;
 }
 .mobile-nav-panel:not([hidden]) {
-  display: block;
+  display: flex;
 }
+/* Üstte HER ZAMAN sabit kalan şerit: marka adı (kullanıcı hangi sitede
+   olduğunu unutmasın) + sağda büyük, açıkça etiketlenmiş "Kapat"
+   düğmesi. Bu şerit panelin "dialog" başlığı gibi davranıyor. */
+.mobile-nav-panel-ust {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.mobile-nav-panel-baslik {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+/* KAPAT DÜĞMESİ: bilerek büyük bir dokunma alanı (en az 44x44px, Apple/
+   Google'ın önerdiği asgari dokunmatik hedef boyutu) + hem ikon hem de
+   yazı ("Kapat") birlikte — sadece bir "X" ikonu bazı kullanıcılar için
+   (özellikle motor/görme güçlüğü olanlar ya da siteyi ilk kez kullananlar
+   için) ne işe yaradığı net olmayabilir, yazı bunu belirsizlik bırakmadan
+   açıklıyor. */
+.mobile-nav-panel-kapat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.mobile-nav-panel-kapat:hover,
+.mobile-nav-panel-kapat:focus-visible {
+  background: var(--tag-bg);
+}
+
 .mobile-nav-panel nav {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
   padding: 8px 20px 32px;
@@ -311,7 +358,15 @@ nav {
   width: 100%;
   text-align: left;
 }
-.mobile-nav-panel nav a:last-of-type { border-bottom: none; }
+/* :last-of-type yerine BİLEREK ":not(.auth-nav--mobile > a):last-of-type"
+   kullanmıyoruz (bkz. az aşağıdaki BUG FİX notu) — bunun yerine hesap
+   kartını (.auth-nav--mobile) panelin nav linklerinden TAMAMEN ayrı bir
+   kapsayıcıya (kendi border'ı olan bir kutu) alarak, bu ":last-of-type"
+   kuralının hesap kartının İÇİNDEKİ "Giriş Yap" linkine hiç uygulanmamasını
+   sağlıyoruz — ayrıntı için ".auth-nav--mobile" kurallarına bakın.
+   Burada kalan tek iş: panelin GERÇEK son linki (Listelerim) altındaki
+   çizgiyi kaldırmak. */
+.mobile-nav-panel nav > a:last-of-type { border-bottom: none; }
 /* BUG FİX: "nav a.active" temel kuralı (bkz. aşağıda genel ".active"
    kuralı) masaüstünde küçük bir "hap/tag" gibi görünsün diye tasarlanmış
    — dar bir background + border-radius. Mobil panelde bu, tam genişlik
@@ -335,33 +390,51 @@ nav {
    dropdown yerine, panelin geri kalanıyla aynı geniş/dikey listeye
    uysun diye kendi düzeni var.
 
-   BUG FİX: "Hesabım ▾" butonu ile altında açılan Panelim/Sohbet/Admin/
-   Çıkış listesi ÖNCEDEN görsel olarak İKİ AYRI kutu gibi görünüyordu —
-   butonun kendi border-radius:8px'i + menünün margin-top:4px + KENDİ
-   border-radius:8px'i, ikisi arasında boşluklu iki ayrı "hap" oluşturuyordu.
-   Şimdi ikisini TEK bir dikdörtgen kart olarak birleştiriyoruz: dıştaki
-   .auth-nav-dropdown kartın kendisi (arka plan + tek border-radius), buton
-   ve menü onun İÇİNDE şeffaf/kenarlıksız duruyor, aralarında sadece ince
-   bir ayırıcı çizgi var. */
+   BUG FİX — "GİRİŞ YAP" KUTUSUNUN ALT KENARI KESİK/YARIM GÖRÜNÜYORDU:
+   Sebep, iki farklı kuralın AYNI <a> etiketi üzerinde çakışmasıydı:
+     1) ".mobile-nav-panel nav a" (yukarıda) her linke "border-bottom: 1px"
+        ve "border-radius: 0" veriyordu.
+     2) ".mobile-nav-panel nav a:last-of-type" (hemen üstte) son linkin
+        (ki "Giriş Yap" panelin son <a>'sıydı) ALT kenarlığını "none"
+        yapıyordu.
+     3) Buna ek olarak eski bir kural "Giriş Yap"a "border-radius: 10px"
+        (dört köşe yuvarlak, tam çerçeveli bir "kutu" görünümü) vermeye
+        çalışıyordu.
+   Sonuç: kutu üç kenarında (üst + iki yan) çerçeveliydi ama ALT kenarı
+   "last-of-type" kuralı tarafından siliniyordu — köşeler yuvarlatılmış
+   göründüğü için bu eksik kenar özellikle "yarım/kesik köşe" gibi göze
+   batıyordu.
+   ÇÖZÜM: "Giriş Yap"/"Hesabım" öğesini ARTIK ".auth-nav--mobile" adında
+   TAMAMEN AYRI bir sarmalayıcı <div>'in İÇİNE alıyoruz (bkz. yukarısı,
+   HTML default.html'de zaten böyleydi) ve panelin genel "nav a" kuralları
+   bu sarmalayıcının İÇİNDEKİ <a>'ya hiç uygulanmasın diye ayrı, kendi
+   kapalı kutusunu (tam 4 kenarlı border + tek border-radius) TANIMLIYORUZ.
+   Yukarıdaki ":last-of-type" seçicisini de ONLY panelin ÜST SEVİYE
+   linklerini (nav'ın DOĞRUDAN çocukları, ">") hedefleyecek şekilde
+   daralttık — ".auth-nav--mobile" bir div olduğu için ve içindeki <a>
+   nav'ın torunu (çocuğu değil) olduğu için, bu ayrım "Giriş Yap"ın
+   yukarıdaki genel kurallardan hiç etkilenmemesini sağlıyor. */
 .auth-nav--mobile {
   display: block;
   width: 100%;
+  margin-top: 4px;
 }
+.auth-nav--mobile > a,
 .auth-nav--mobile .auth-nav-dropdown {
+  display: block;
   width: 100%;
-  background: var(--card-bg);
+  box-sizing: border-box;
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
 }
-/* BUG FİX (yukarıdaki nottaki AYNI sebep): burada da nav-auth.js'in
-   render ettiği gerçek "Giriş Yap" linkini kapsamak için ekstra bir
-   ".auth-nav--mobile > a" seçicisi ekliyoruz — sadece class adına
-   güvenmek (fallback-giris/fallback-hesap) JS devreye girince bu temel
-   boyut/dolgu stillerinin de kaybolmasına yol açardı. */
-.auth-nav--mobile > a,
-.auth-nav--mobile .auth-nav-fallback-giris,
-.auth-nav--mobile .auth-nav-fallback-hesap,
+.auth-nav--mobile > a {
+  padding: 14px 12px;
+  font-size: 1.05rem;
+  text-align: left;
+  color: inherit;
+  text-decoration: none;
+}
 .auth-nav--mobile .auth-nav-btn {
   display: block;
   width: 100%;
@@ -369,40 +442,9 @@ nav {
   padding: 14px 12px;
   font-size: 1.05rem;
   text-align: left;
-  border-radius: 8px;
-}
-/* Sadece "Giriş Yap" (çıkış yapmışken tek başına görünen link, kart
-   İÇİNDE değil) — o zaten tek bir öğe olduğu için ayrı bir çerçeveye
-   ihtiyacı yok, diğer nav linkleriyle aynı stili paylaşsın.
-
-   BUG FİX: nav-auth.js'in ÇALIŞMA ZAMANINDA render ettiği gerçek "Giriş
-   Yap" linki (bkz. renderGirisLinki()) className'i sadece "" ya da
-   "active" olarak ayarlıyor — statik HTML'deki yedek gibi
-   ".auth-nav-fallback-giris" sınıfını TAŞIMIYOR. Bu yüzden aşağıdaki
-   ".auth-nav-fallback-giris" seçicili kural SADECE nav-auth.js çalışana
-   kadarki kısa süreli statik yedeğe uygulanıyordu; JS devreye girer
-   girmez gerçek link bu çerçeve/dolgu stilini KAYBEDİP düz bir metin
-   linki gibi görünüyordu. Class adına bağlı olmayan, ".auth-nav--mobile"
-   kapsayıcısının DOĞRUDAN <a> çocuğunu hedefleyen bir seçici ekleyerek
-   hem statik yedeği HEM DE JS'in yazdığı gerçek linki aynı anda
-   kapsıyoruz — ikisi de aynı DOM konumunda (kapsayıcının doğrudan
-   çocuğu olarak) bulunuyor. */
-.auth-nav--mobile > a,
-.auth-nav--mobile .auth-nav-fallback-giris,
-.auth-nav--mobile .auth-nav-fallback-hesap {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-}
-/* Masaüstündeki gibi "sağ üstte köşede açılan küçük kutu" değil, buton
-   hemen altına TAM GENİŞLİK bir liste olarak açılsın — panelin geneliyle
-   tutarlı, ayrıca fixed panelin İÇİNDE ekstra bir absolute/fixed katman
-   açmaktan kaçınıp basit tutuyoruz. Artık .auth-nav-dropdown'ın KENDİSİ
-   kartın çerçevesini/arka planını sağladığı için, buton ile menü
-   arasında EKSTRA bir boşluk/köşe yuvarlama YOK — tek bir ince üst
-   kenarlıkla ayrılan, aynı kartın iki bölümü gibi duruyorlar. */
-.auth-nav--mobile .auth-nav-btn {
   border-radius: 0;
   background: none;
+  border: none;
 }
 .auth-nav--mobile .auth-nav-menu {
   position: static;
@@ -419,6 +461,13 @@ nav {
   padding: 12px 14px;
   font-size: 1rem;
 }
+/* Mobil paneldeki hesap menüsü (#auth-nav-mobile) stilleri artık
+   yukarıdaki ".auth-nav--mobile" bloğunda TEK YERDE tanımlı (bkz. yukarısı,
+   büyük BUG FİX notu — "Giriş Yap"ın kesik köşesi sorunu). Burada eskiden
+   AYNI seçicilerle İKİNCİ bir tanım seti daha vardı (dosyaya art arda
+   iki kez eklenmiş), bu ikisi birbiriyle çakışıp "Giriş Yap" kutusunun
+   alt kenarının hem "1px solid" hem "none" olarak ayarlanmasına yol
+   açıyordu. Yinelenen blok tamamen kaldırıldı. */
 
 nav a {
   margin-left: 4px;
