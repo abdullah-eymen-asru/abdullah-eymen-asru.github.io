@@ -343,6 +343,25 @@ nav {
   -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
+  /* BUG FİX (asıl sebep — "Hesabım" hesap menüsü ekran dışına taşıyordu):
+     sayfadaki genel "nav { flex-wrap: wrap; ... }" kuralı (yukarıda,
+     dosyanın başında) etiket seçici olduğu için BU nav'a da (mobil panelin
+     içindeki <nav>) miras kalıyordu. ".mobile-nav-panel nav" burada
+     flex-wrap'i hiç override etmiyordu, bu yüzden panel "flex-direction:
+     column" + "flex-wrap: wrap" ile birlikte ÇOK SATIRLI bir grid gibi
+     davranmaya çalışıyordu: "Hesabım ▾" açılıp (Panelim/Sohbet/Admin vb.
+     linklerle) uzayınca, o tek öğenin yüksekliği panelin o ana kadar
+     kalan boş dikey alanına sığmıyor, flexbox bunu YENİ BİR SÜTUNA
+     sarıyordu — bu yeni sütun da panelin GENİŞLİĞİNİN (350px) hemen
+     SAĞINDAN başladığı için container'ın (390px) çok dışına taşıp
+     görünmez/erişilemez kalıyordu (kullanıcı ekran görüntüsünde bildirdiği
+     "hesabım kısmı sayfa dışına taşıyor" tam olarak buydu). Panel zaten
+     dikey kaydırma için "overflow-y: auto" taşıdığından sütunlara
+     bölünmeye hiç gerek yok — burada "flex-wrap: nowrap" ile bunu açıkça
+     iptal ediyoruz: artık ne kadar uzarsa uzasın "Hesabım" menüsü TEK
+     sütunda kalır, taşan kısım (varsa) panelin kendi dikey kaydırmasıyla
+     görülür. */
+  flex-wrap: nowrap;
   padding: 8px 20px 32px;
 }
 .mobile-nav-panel nav a {
