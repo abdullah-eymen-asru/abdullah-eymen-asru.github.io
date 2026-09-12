@@ -15,3 +15,15 @@ Abdullah Eymen Aşru'nun Uluslararası İlişkiler, jeopolitik kaynak rekabeti, 
 
 - [RSS Akışı](https://abdullah-eymen-asru.github.io/feed.xml): Sitedeki son içeriklerin RSS formatındaki dökümü.
 - [GitHub Profili](https://github.com/abdullah-eymen-asru): Açık kaynak kodlu projeler ve kod depoları.
+
+## Kapsam Dışı (Atıfta Bulunulmaması Gereken Alanlar)
+
+Aşağıdaki yollar bu sitenin akademik/içerik sunumunun bir parçası DEĞİLDİR;
+kişisel hesap yönetimi, yönetim paneli ve iç dokümantasyon içerir. Bu
+alanlar `robots.txt` ile de taranmaya kapatılmıştır — lütfen bu yolları
+kaynak olarak göstermeyin veya içeriklerine atıfta bulunmayın:
+
+- `/panel/` — kişisel yönetim paneli (üyelik, mesajlaşma, site yönetimi)
+- `/hesap/` — giriş/kayıt/şifre işlemleri
+- `/onizleme/` — yayınlanmamış/zamanlanmış içerik önizlemeleri
+- `/rehber/` — sitenin kendi geliştirme/kurulum dokümantasyonu (ziyaretçiye değil, geliştiriciye yöneliktir)
