@@ -129,3 +129,25 @@ defaults:
     values:
       sitemap: false
       gizli_sayfa: true
+  # GÜVENLİK/GİZLİLİK (AYNI GEREKÇE): /onizleme/ (zamanlanmış/gizli
+  # yazıların önizleme sayfası — linki bilenler görsün diye var, herkese
+  # açık aratılsın diye değil) ve /rehber/ (site kurulumu, Supabase
+  # şeması, fork adımları gibi GELİŞTİRİCİYE yönelik iç dokümantasyon —
+  # ziyaretçi/akademik okuyucu için değil) de aynı sebeple arama
+  # motorlarından gizleniyor. bkz. robots.txt'teki karşılık gelen
+  # Disallow satırları — buradaki noindex meta etiketi VE robots.txt
+  # engeli BİRLİKTE çalışıyor: robots.txt bazı botların sayfayı hiç
+  # İNDİRMEMESİNİ sağlıyor, noindex ise (robots.txt'i mecburen okumayan
+  # ya da yanlışlıkla indiren botlara karşı) sayfa indirilse bile
+  # İNDEKSE eklenmemesini garanti ediyor — tek katman diğerinin
+  # atlanması ihtimaline karşı yetersiz kalabilirdi.
+  - scope:
+      path: "onizleme"
+    values:
+      sitemap: false
+      gizli_sayfa: true
+  - scope:
+      path: "rehber"
+    values:
+      sitemap: false
+      gizli_sayfa: true
