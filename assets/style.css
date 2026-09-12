@@ -414,10 +414,28 @@ nav {
    daralttık — ".auth-nav--mobile" bir div olduğu için ve içindeki <a>
    nav'ın torunu (çocuğu değil) olduğu için, bu ayrım "Giriş Yap"ın
    yukarıdaki genel kurallardan hiç etkilenmemesini sağlıyor. */
-.auth-nav--mobile {
+.auth-nav.auth-nav--mobile {
+  /* BUG FİX — HESAP MENÜSÜ SAĞ KENARA TAŞIP KIRPILIYORDU: ".auth-nav"
+     (temel/masaüstü kuralı, bkz. aşağısı) "display: inline-flex;
+     justify-content: flex-end" veriyor. Bu kural ile ".auth-nav--mobile"
+     (burada, o zamanki hâliyle SADECE tek class seçici) AYNI özgüllüğe
+     (0,1,0) sahipti — CSS'te eşit özgüllükte seçiciler arasında dosyada
+     SONRA gelen kazanır, ve ".auth-nav" tanımı dosyada BU kuraldan SONRA
+     geliyordu. Sonuç: mobilde "display: block; width: 100%" ile
+     yapmaya çalıştığım override hiç uygulanmıyordu — kapsayıcı hâlâ
+     "inline-flex" (içeriğine sarılı, dar) + "justify-content: flex-end"
+     (sağa yaslı) kalıyordu. İçindeki menü ("width: 100%") bu dar/sağa
+     yaslı kutunun genişliğine göre hesaplandığından, panelin sağ kenarını
+     aşıp görünüm dışına/kırpılmaya taşıyordu (ekran görüntüsünde görülen
+     sorun tam olarak buydu).
+     ÇÖZÜM: seçiciyi ".auth-nav.auth-nav--mobile" (İKİ class birleşik,
+     özgüllük 0,2,0) yaparak, dosyadaki SIRADAN BAĞIMSIZ olarak her zaman
+     tek-class'lı ".auth-nav" kuralını geçersiz kılmasını garanti ediyoruz. */
   display: block;
   width: 100%;
   margin-top: 4px;
+  margin-left: 0;
+  justify-content: normal;
 }
 .auth-nav--mobile > a,
 .auth-nav--mobile .auth-nav-dropdown {
