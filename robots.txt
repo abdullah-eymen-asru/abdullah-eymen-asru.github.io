@@ -1,4 +1,127 @@
+# ============================================================================
+# robots.txt — akademik görünürlük ile veri/gizlilik dengesi
+#
+# STRATEJİ (özet): "hepsi serbest" ya da "tamamen yasak" yerine hibrit bir
+# yaklaşım izleniyor:
+#   1) Akademik/içerik alanları (/icerik/, /kurumsal/, kök sayfalar, yazı
+#      koleksiyonları) HERKESE (arama motorları + akademik/atıf yapan AI
+#      ajanları + genel botlar) AÇIK — amaç bu içeriğin Google Scholar,
+#      Perplexity, ChatGPT/Claude gibi araçlarda KAYNAK GÖSTERİLEREK
+#      bulunabilmesi.
+#   2) Kişisel/dahili alanlar (panel, hesap, önizleme, iç dokümantasyon,
+#      worker/veritabanı kaynakları) TÜM botlara (istisnasız) KAPALI — bu
+#      dizinler zaten _config.yml'de "noindex, nofollow" meta etiketiyle de
+#      korunuyor (bkz. o dosyadaki not); robots.txt burada İKİNCİ bir katman:
+#      meta etiketi sayfa İNDİRİLDİKTEN sonra devreye girer, robots.txt ise
+#      uyumlu botların sayfayı hiç İNDİRMESİNİ, dolayısıyla dahili yapı
+#      hakkında hiçbir bilgi toplamasını engeller.
+#   3) Sadece devasa veri kümesi biriktirip atıf/trafik vermeyen toplu
+#      EĞİTİM-kazıma botları (ör. CCBot/Common Crawl, GPTBot, ClaudeBot)
+#      site genelinde engelleniyor — bunlar "kaynak göster" davranışı
+#      taşımadığından akademik görünürlük hedefine katkısı yok, sadece
+#      riski artırıyor. Aynı şirketlerin ARAMA/ATIF amaçlı ayrı botları
+#      (ör. OAI-SearchBot, ChatGPT-User, Claude-User) ise bir kullanıcının
+#      anlık sorgusuna cevap ararken siteyi ziyaret eder ve genelde KAYNAK
+#      GÖSTERİR — bunlara ayrı ve İZİNLİ davranılıyor.
+#
+# NOT: robots.txt TAMAMEN GÖNÜLLÜLÜK ESASINA dayanır — kurallara uymayan
+# botları durduramaz (onlara karşı gerçek koruma zaten RLS + auth-guard.js'te
+# ve Supabase Row Level Security'de). Burası sadece kurallara uyan/saygılı
+# botlara niyeti bildirir.
+# ============================================================================
+
+# ---- Genel kural: listelenmemiş TÜM botlar için hassas/dahili dizinler
+#      kapalı, geri kalan her şey (akademik içerik dahil) açık. ----
 User-agent: *
+Disallow: /panel/
+Disallow: /hesap/
+Disallow: /onizleme/
+Disallow: /rehber/
+Disallow: /supabase/
+Disallow: /cloudflare%20worker/
+Allow: /
+
+# ----------------------------------------------------------------------
+# EĞİTİM AMAÇLI TOPLU KAZIYICILAR — site genelinde tamamen engelli.
+# Bu botlar içeriği bir arama sonucunda kaynak göstermek için değil,
+# büyük dil modeli eğitim verisi olarak toplu biriktirmek için tarar;
+# akademik görünürlük/atıf hedefine katkısı yok.
+# ----------------------------------------------------------------------
+User-agent: CCBot
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: FacebookBot
+Disallow: /
+
+User-agent: Amazonbot
+Disallow: /
+
+User-agent: Applebot-Extended
+Disallow: /
+
+# ----------------------------------------------------------------------
+# ARAMA/ATIF ODAKLI AI AJANLARI — kullanıcı bir şey sorduğunda siteyi
+# KAYNAK GÖSTEREREK yanıt üretir (arama motoru gibi çalışır, toplu eğitim
+# verisi biriktirmez). Akademik görünürlük hedefiyle doğrudan uyumlu
+# olduğu için içerik alanlarına erişimlerine izin veriliyor — ama diğer
+# botlar gibi onlar için de hassas dizinler (yukarıdaki genel kuralla
+# aynı liste) kapalı kalıyor.
+# ----------------------------------------------------------------------
+User-agent: PerplexityBot
+Disallow: /panel/
+Disallow: /hesap/
+Disallow: /onizleme/
+Disallow: /rehber/
+Disallow: /supabase/
+Disallow: /cloudflare%20worker/
+Allow: /
+
+User-agent: ChatGPT-User
+Disallow: /panel/
+Disallow: /hesap/
+Disallow: /onizleme/
+Disallow: /rehber/
+Disallow: /supabase/
+Disallow: /cloudflare%20worker/
+Allow: /
+
+User-agent: OAI-SearchBot
+Disallow: /panel/
+Disallow: /hesap/
+Disallow: /onizleme/
+Disallow: /rehber/
+Disallow: /supabase/
+Disallow: /cloudflare%20worker/
+Allow: /
+
+User-agent: Claude-User
+Disallow: /panel/
+Disallow: /hesap/
+Disallow: /onizleme/
+Disallow: /rehber/
+Disallow: /supabase/
+Disallow: /cloudflare%20worker/
+Allow: /
+
+User-agent: Claude-SearchBot
+Disallow: /panel/
+Disallow: /hesap/
+Disallow: /onizleme/
+Disallow: /rehber/
+Disallow: /supabase/
+Disallow: /cloudflare%20worker/
 Allow: /
 
 Sitemap: https://abdullah-eymen-asru.github.io/sitemap.xml
