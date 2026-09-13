@@ -182,6 +182,23 @@ göstermeli.
 Anasayfada görünen "hakkımda" metni ve kutusu — biyografini, unvanını,
 tanıtım yazını buraya serbest metin olarak yaz.
 
+**ÖNEMLİ — bu iki dosya HTML formatındadır, Markdown DEĞİLDİR:**
+`hakkimda-kutusu.md` sadece isim/unvan satırını (`<h1>`/`<p>`) barındırır;
+`hakkimda-icerik.md` ise anasayfadaki İngilizce/Türkçe sekmeli kutunun
+tamamını — sekme butonlarını, CSP uyumlu sekme geçiş `<script>`'ini ve iki
+dilin `<div class="lang-panel" id="lang-en"|"lang-tr">` içeriğini — barındırır.
+Elle düzenleyeceksen bu HTML yapısını (özellikle `<div>`/`id` iskeletini ve
+`<script>` bloğunu) bozmadan sadece panel içindeki `<h2>`/`<p>`/`<ul>` gibi
+etiketleri değiştir.
+
+Bu iki dosyayı elle Git üzerinden düzenlemek yerine, artık
+`panel/github-yonetim.md` mini CMS panelinin **"🙋 Hakkımda"** sekmesinden de
+düzenleyebilirsin (bkz. § 10 aşağıda) — panel mevcut HTML sarmalayıcısını
+(sekme butonları + script) hiç göstermeden sadece İngilizce ve Türkçe içerik
+kutularını (ve üstteki isim/unvan satırını) ayrı ayrı düzenletir, kaydederken
+sarmalayıcıyı olduğu gibi geri koyar. Bu sekme SADECE admin/Site Sahibi
+rolüne açıktır (bkz. worker.js'teki `_includes/hakkimda-*.md` yol kısıtı).
+
 ## 8. İçerik ekleme — blog yazıları ve akademik projeler
 
 - **Blog yazısı:** `_posts/YIL/` klasörüne `YIL-AY-GUN-baslik.md` formatında
@@ -529,6 +546,14 @@ durmaz.**
   var olup olmadığını GitHub API üzerinden kontrol edip önizlemesini
   gösterir; yeni bir görsel seçip "Yükle/Değiştir" ile değiştirebilir,
   "Profil Fotoğrafını Sil" ile tamamen kaldırabilirsin.
+- **"🙋 Hakkımda" sekmesi** — anasayfadaki üst başlık
+  (`_includes/hakkimda-kutusu.md`) ile İngilizce/Türkçe "Hakkımda" kutusunu
+  (`_includes/hakkimda-icerik.md`) düzenler (bkz. § 7 yukarıda). "Mevcut
+  İçeriği Yükle" ile dosyalar çekilir, sekme geçişli iki ayrı kutuya (EN/TR)
+  konur; "Kaydet ve Yayınla" ile ikisi de ayrı ayrı GitHub'a commit edilir.
+  İçerik HTML olduğundan kutulara Markdown değil geçerli HTML yazılmalıdır;
+  panel, mevcut sekme geçiş script'ini/iskeletini hiç göstermeden otomatik
+  olarak korur. SADECE admin/Site Sahibi görebilir.
 
 ### GitHub bağlantısı ve token güvenliği
 
