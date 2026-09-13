@@ -65,6 +65,13 @@
  * düz HTTP istekleri atıyor (npm bağımlılığı yok, r2_storage_worker'daki
  * gibi Dashboard'un "Quick Edit" düzenleyicisine yapıştırıp
  * çalıştırabilirsin).
+ *
+ * YETKİ AYARLARI (migration 0048) — owner panelden ("🔐 Yetki Ayarları"
+ * sekmesi) bazı admin-only özellikleri (CV, Hakkımda, Profil Fotoğrafı)
+ * admin için AYRICA kapatabilir; bu Worker bunu SUPABASE_URL/
+ * SUPABASE_SERVICE_ROLE_KEY'i (yukarıdaki ikisi, YENİ bir değişken GEREKMEZ)
+ * kullanarak public.ozellik_erisimi_var_mi RPC'sine sorup uygular (bkz.
+ * aşağıdaki ozellikErisimVarMi() ve "yalnizAdminYolu" bloğu).
  */
 
 const GITHUB_API = "https://api.github.com";
@@ -186,6 +193,44 @@ async function yazarHedefiOwnerVeyaAdminMi(env, yazarId) {
   } catch (_err) {
     return null;
   }
+}
+
+/**
+ * migration 0048 (owner'ın panelden — "🔐 Yetki Ayarları" — kod yazmadan
+ * rol bazlı özellik erişimi kısıtlayabildiği sistem) için Worker tarafı
+ * kapı. public.ozellik_erisimi_var_mi(p_ozellik, p_rol) RPC'sini
+ * service_role ile çağırır. Ağ hatası ya da RPC bulunamazsa (ör. migration
+ * henüz uygulanmadıysa) GÜVENLİ TARAFTA DEĞİL, ESKİ DAVRANIŞTA kalınır —
+ * yani true (izinli) döner: bu fonksiyon SADECE owner'ın AÇIKÇA bir
+ * kısıtlama TANIMLADIĞI durumları sıkılaştırmak içindir, veritabanı
+ * ulaşılamaz olduğunda mevcut admin/owner işlevselliğini KIRMAMALIDIR
+ * (bkz. dosya başındaki "yalnizAdminYolu" kontrolü zaten asıl güvenlik
+ * sınırını — rolün admin/owner olup olmadığını — sağlıyor; bu fonksiyon
+ * onun ÜZERİNE, isteğe bağlı bir ek kısıt).
+ */
+async function ozellikErisimVarMi(env, rol, ozellikAnahtari) {
+  try {
+    const res = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/ozellik_erisimi_var_mi`, {
+      method: "POST",
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ p_ozellik: ozellikAnahtari, p_rol: rol }),
+    });
+    if (!res.ok) return true; // RPC yoksa/hata verirse eski davranışta kal
+    const sonuc = await res.json();
+    return sonuc !== false; // sadece açıkça false ise kısıtla
+  } catch (_err) {
+    return true;
+  }
+}
+
+/** hedefYol "assets/cv/..." altında bir dosya mı? (bkz. github-yonetim.js
+ * cvPdfYukle — CV her zaman bu klasöre yüklenir.) */
+function cvYoluMu(hedefYol) {
+  return hedefYol === "assets/cv" || hedefYol.startsWith("assets/cv/");
 }
 
 /**
@@ -796,6 +841,31 @@ export default {
       } else if (yalnizAdminYolu) {
         if (rol !== "admin" && rol !== "owner") {
           return jsonHata("Bu dosya sadece admin tarafından değiştirilebilir.", 403);
+        }
+        // EK KISIT KATMANI (migration 0048) — owner panelden ("🔐 Yetki
+        // Ayarları" sekmesi) admin'in BU özelliğe erişimini KISMIŞ olabilir
+        // (ör. "CV yükleme sadece owner'da olsun"). owner bu kontrole hiç
+        // girmez (yukarıdaki if zaten geçirdi) — ozellikErisimVarMi'ye
+        // owner için hiç SORMUYORUZ bile, gereksiz bir ağ isteğinden
+        // kaçınmak için erkenden atlıyoruz (veritabanı tarafında da owner
+        // için sonuç zaten her zaman true, bkz. migration 0048).
+        if (rol === "admin") {
+          const ozellikAnahtari = hakkimdaYolu
+            ? "hakkimda_duzenleme"
+            : cvYoluMu(hedefYol)
+            ? "cv_yonetimi"
+            : hedefYol === "assets/profil.jpg" || hedefYol === "assets/profile.webp" || hedefYol.startsWith("assets/profil")
+            ? "profil_fotografi"
+            : null;
+          if (ozellikAnahtari) {
+            const izinli = await ozellikErisimVarMi(env, "admin", ozellikAnahtari);
+            if (!izinli) {
+              return jsonHata(
+                "Site Sahibi, bu özelliğe erişimini kısıtlamış — bu işlemi sadece Site Sahibi (owner) yapabilir.",
+                403
+              );
+            }
+          }
         }
       } else {
         return jsonHata("Bu yola bu Worker üzerinden erişilemez.", 403);
