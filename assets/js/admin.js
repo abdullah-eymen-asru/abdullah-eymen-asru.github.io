@@ -21,7 +21,8 @@
  *
  * Bölüm (section) bazlı gezinme (sol menü), içerik DÜZENLEME, içerik
  * atarken üye başına son geçerlilik TARİH+SAAT'i (Türkiye saatine göre)
- * veya "Süresiz" seçeneği, atama listesinde isim/e-posta arama, her içerik
+ * veya "Süresiz" seçeneği, atama listesinde SADECE isimle arama (bkz.
+ * migration 0050 — e-posta artık hiç çekilmiyor), her içerik
  * için üye bazlı OKUNDU/erişim detayları ve süresi geçmiş erişimlerin
  * otomatik temizliği.
  *
@@ -30,7 +31,7 @@
  * _includes/hakkimda-icerik.md dosyasından, doğrudan koda dokunarak
  * güncellenir.
  */
-import { supabase, escapeHtml, kucukHarfeCevirTr, kullaniciAramayaUyuyorMu, showMessage } from "./core/supabase-client.js";
+import { supabase, escapeHtml, kucukHarfeCevirTr, kullaniciAramayaUyuyorMu, rolEtiketi, showMessage } from "./core/supabase-client.js";
 import { requireAuthOrShowError } from "./auth/auth-guard.js";
 import { imzaliLinkUret } from "./dosya-paylasim.js";
 
@@ -178,10 +179,14 @@ async function temizleSuresiGecmisErisimler() {
 /* assets/js/uye-ayarlari.js içinde — bkz. dosya başındaki not.            */
 /* ---------------------------------------------------------------------- */
 async function loadUsers() {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, email, first_name, last_name, full_name, role, created_at, kvkk_onay_verildi, kvkk_onay_tarihi")
-    .order("created_at", { ascending: false });
+  // GÜVENLİK (bkz. migration 0050): bu liste artık doğrudan
+  // .from("profiles").select(...) ile DEĞİL, e-posta hiç döndürmeyen
+  // icerik_atama_listesi_getir() RPC'si ile çekiliyor — tıpkı mesajlar
+  // tarafındaki mesaj_hedef_listesi_getir() (migration 0030) gibi. Dönen
+  // her satır sadece { id, full_name, role } — email/first_name/last_name/
+  // created_at/kvkk_* burada zaten kullanılmıyordu (üye/rol yönetimi
+  // panel/uye-ayarlari.md'ye taşındı, bkz. dosya başı notu).
+  const { data, error } = await supabase.rpc("icerik_atama_listesi_getir");
 
   if (error) {
     console.error("Kullanıcı listesi yüklenemedi (atama listesi boş kalacak):", error);
@@ -272,7 +277,12 @@ function renderContentAssigneeOptions(kullanicilar) {
   const atamaWrap = document.getElementById("icerik-atama-liste");
   if (!atamaWrap) return;
 
-  const hedefKullanicilar = kullanicilar.filter((u) => u.role === "special_user" || u.role === "admin");
+  // BUG DÜZELTMESİ (bkz. migration 0050): 'owner' (Site Sahibi) burada hiç
+  // yer almıyordu — bir site sahibi hesabı bu listede ASLA görünmüyordu.
+  // Sade 'user' (sıradan üye) rolü hâlâ bilinçli olarak dışarıda: "özel
+  // içerik" kavramının amacı zaten işaretli (özel üye/yönetici/site
+  // sahibi) hesaplara erişim vermek, sıradan her üyeye değil.
+  const hedefKullanicilar = kullanicilar.filter((u) => u.role === "special_user" || u.role === "admin" || u.role === "owner");
 
   // ATAMA_DURUMU'nda artık listede olmayan (rolü değişmiş/silinmiş) üyeleri temizle
   const gecerliIdler = new Set(hedefKullanicilar.map((u) => u.id));
@@ -312,7 +322,7 @@ function atamaListesiCiz(hedefKullanicilar) {
       <div class="atama-satiri">
         <label class="atama-satiri-secim">
           <input type="checkbox" class="atama-checkbox" value="${u.id}" ${durum.checked ? "checked" : ""}>
-          <span>${escapeHtml(u.full_name || u.email)} <span class="muted">(${escapeHtml(u.email)})</span></span>
+          <span>${escapeHtml(u.full_name || "—")} <span class="muted">(${escapeHtml(rolEtiketi(u.role))})</span></span>
         </label>
         <span class="atama-tarih-alani">
           <input
@@ -371,7 +381,8 @@ function atamaListesiCiz(hedefKullanicilar) {
   });
 }
 
-/** İçerik atama listesinde isim/e-posta ile arama — seçim durumu (checkbox +
+/** İçerik atama listesinde SADECE isimle arama (bkz. migration 0050 — RPC
+ * e-posta hiç döndürmüyor) — seçim durumu (checkbox +
  * tarih), ATAMA_DURUMU Map'inde tutulduğu için filtrelense/listeden
  * kaybolsa bile KAYBOLMAZ. */
 function wireIcerikAtamaArama() {
@@ -379,7 +390,7 @@ function wireIcerikAtamaArama() {
   if (!input) return;
   input.addEventListener("input", () => {
     const q = kucukHarfeCevirTr(input.value.trim());
-    const hedefKullanicilar = TUM_KULLANICILAR.filter((u) => u.role === "special_user" || u.role === "admin");
+    const hedefKullanicilar = TUM_KULLANICILAR.filter((u) => u.role === "special_user" || u.role === "admin" || u.role === "owner");
     const filtrelenmis = q
       ? hedefKullanicilar.filter((u) => kullaniciAramayaUyuyorMu(u, q))
       : hedefKullanicilar;
