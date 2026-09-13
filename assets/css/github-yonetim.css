@@ -577,3 +577,71 @@
  * veriyor (auth.css bunu zaten "position: absolute" bekliyor).
  */
 .gy-arama-wrap { position: relative; }
+
+/*
+ * "Yetki Ayarları" matrisi (owner-only, bkz. migration 0048 ve
+ * wireYetkiAyarlari) — bir özellik (satır) x rol (sütun) tablosu, her
+ * hücrede küçük bir .gy-toggle (yukarıdaki "Yayında" toggle'ıyla AYNI
+ * görsel bileşen, sadece boyutu küçültülmüş).
+ */
+.ya-tablo {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.ya-tablo th, .ya-tablo td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+.ya-tablo th:first-child, .ya-tablo td:first-child {
+  text-align: left;
+}
+.ya-tablo thead th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+.ya-ozellik-adi { font-weight: 600; color: var(--text); }
+.ya-ozellik-aciklama { display: block; font-weight: 400; color: var(--muted); font-size: 0.82rem; margin-top: 2px; }
+
+.ya-mini-toggle {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 21px;
+  vertical-align: middle;
+}
+.ya-mini-toggle input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+.ya-mini-toggle input:disabled { cursor: default; }
+.ya-mini-toggle .ya-mini-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: #c0392b;
+  transition: background-color 0.2s ease;
+}
+.ya-mini-toggle .ya-mini-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: transform 0.2s ease;
+}
+.ya-mini-toggle input:checked ~ .ya-mini-track { background: #1e6b3a; }
+.ya-mini-toggle input:checked ~ .ya-mini-track .ya-mini-thumb { transform: translateX(15px); }
+.ya-mini-toggle input:disabled ~ .ya-mini-track { opacity: 0.35; }
+
+.ya-owner-hucre { color: var(--muted); font-size: 0.82rem; font-style: italic; }
+
