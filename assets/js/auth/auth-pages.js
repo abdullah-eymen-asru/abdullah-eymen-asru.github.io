@@ -504,18 +504,34 @@ export function initGirisPage() {
 
 /**
  * "Google ile Giriş Yap" sonrası bu sayfaya (giris.html) dönüldüğünde
- * çağrılır. Oturum kurulunca profildeki kvkk_onay_verildi VE
- * yurtdisi_onay_verildi bayraklarına bakar (ikisi de true olmalı — bu iki
- * onay ayrı ayrı toplanır ama "gerçekten kayıtlı üye" sayılmak için ikisi
- * de gereklidir, çünkü üyelik altyapısı yurt dışında barındığından
- * yurt dışı rızası olmadan veri işleme hukuki dayanaktan yoksun kalır):
- *  - ikisi de true -> bu üye gerçekten kayıtlı, istenen hedefe yönlendirilir.
- *  - biri/ikisi false/yok -> bu Google hesabıyla hiç GERÇEK kayıt
- *             tamamlanmamış (handle_new_user trigger'ı OAuth ile gelen
- *             HERKES için otomatik bir profil satırı açar, ama onay
- *             bayrakları varsayılan olarak false'tur) -> oturum kapatılır,
- *             "kullanıcı bulunamadı" mesajı gösterilir, panele erişim
- *             VERİLMEZ.
+ * çağrılır. Oturum kurulunca profildeki kvkk_onay_verildi bayrağına bakar:
+ *  - true  -> bu üye gerçekten (aydınlatmayı görüp) kayıt olmuş, istenen
+ *             hedefe yönlendirilir. yurtdisi_onay_verildi bu kararı
+ *             ETKİLEMEZ (bkz. aşağıdaki BUG FİX notu).
+ *  - false -> bu Google hesabıyla hiç GERÇEK kayıt tamamlanmamış
+ *             (handle_new_user trigger'ı OAuth ile gelen HERKES için
+ *             otomatik bir profil satırı açar, ama kvkk_onay_verildi
+ *             varsayılan olarak false'tur) -> oturum kapatılır, "kullanıcı
+ *             bulunamadı" mesajı gösterilir, hesap silinir.
+ *
+ * BUG FİX (eski üyelerin Google ile girişte hesabının SİLİNMESİ):
+ * Bu fonksiyon önceden "gerçekten kayıtlı üye" kararını kvkk_onay_verildi
+ * VE yurtdisi_onay_verildi'nin İKİSİNE BİRDEN bakarak veriyordu. Ama
+ * yurtdisi_onay_verildi migration 0042 ile eklendi ve o migration'dan
+ * önce kayıt olmuş hiçbir hesap için geriye dönük doldurulmadı — yani
+ * migration 0042 öncesi Google ile kayıt olmuş HER eski üyenin
+ * yurtdisi_onay_verildi'si kalıcı olarak false. Böyle bir üye "Google ile
+ * Giriş Yap"a bastığında eski kod bunu "hiç kayıt olmamış hayalet hesap"
+ * sanıp kvkkOnaysizHesabiSilVeCikis() ile HESABINI KALICI OLARAK
+ * SİLİYORDU — tam olarak panelde (wireKvkk) nazikçe hatırlatılması,
+ * ASLA erişimi kesip hesabı silme sebebi yapılmaması gereken durum
+ * (bkz. panel.js -> wireKvkk ve auth-guard.js -> requireAuth
+ * başındaki HUKUKİ AYRIM notları: yurt dışı rızası özgür iradeyle ve
+ * erişimden bağımsız verilir, e-posta/şifreyle giriş yolu da bu bayrağı
+ * hiç kontrol etmiyor). Artık SADECE kvkk_onay_verildi (gerçek bir
+ * aydınlatma/kayıt eyleminin varlığının tek güvenilir göstergesi) bu
+ * kararı veriyor; yurtdisi_onay_verildi false kalsa bile üye normal
+ * şekilde içeri alınır ve rızasını panelden dilediği an verebilir.
  */
 function googleGirisDonusunuIsle(msg) {
   let tamamlandi = false;
@@ -535,15 +551,18 @@ function googleGirisDonusunuIsle(msg) {
 
     const { data: profile, error } = await supabase
       .from("profiles")
-      .select("kvkk_onay_verildi, yurtdisi_onay_verildi")
+      .select("kvkk_onay_verildi")
       .eq("id", session.user.id)
       .single();
 
-    if (!error && profile?.kvkk_onay_verildi && profile?.yurtdisi_onay_verildi) {
+    if (!error && profile?.kvkk_onay_verildi) {
       // GÜVENLİK DÜZELTMESİ: Google ile giriş de aynı şekilde AAL2
       // kontrolünden geçmeli — hesapta 2FA açıksa Google kimliği tek
       // başına yeterli değildir, authenticator kodu da istenir (bkz.
-      // mfaGerekirseDogrulaVeYonlendir başındaki açıklama).
+      // mfaGerekirseDogrulaVeYonlendir başındaki açıklama). Yurt dışı
+      // rızası burada KASITLI OLARAK kontrol edilmiyor — bkz. yukarıdaki
+      // BUG FİX notu; o rıza panelden bağımsız ve erişimi kesmeden
+      // istenir.
       await mfaGerekirseDogrulaVeYonlendir(msg, donus);
       return;
     }
