@@ -254,6 +254,7 @@ async function init() {
     ["içerik listesi", () => wireIcerikListe()],
     ["klasör yönetimi", () => wireKlasorYonetimi()],
     ["profil fotoğrafı", () => wireProfilFoto()],
+    ["hakkımda", () => wireHakkimda()],
   ];
   for (const [ad, fn] of adimlar) {
     try {
@@ -4186,6 +4187,213 @@ async function profilFotoSil() {
     showMessage(msgEl, `Silinemedi: ${err.message}`, "error");
   } finally {
     btn.disabled = false;
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* HAKKIMDA (ANASAYFA) — _includes/hakkimda-kutusu.md +                    */
+/* _includes/hakkimda-icerik.md düzenleme.                                 */
+/*                                                                          */
+/* ÖNEMLİ — BU İÇERİK HTML'DİR, MARKDOWN DEĞİL: her iki dosya da Jekyll     */
+/* include'u olarak DOĞRUDAN HTML barındırır (index.md içine                */
+/* {% include ... %} ile gömülür). Bu yüzden aşağıdaki textarea'lar         */
+/* ic-body'deki (Markdown) editör araç çubuğunu KULLANMAZ — kullanıcı ham   */
+/* HTML yazar/düzenler, biz sadece dosyayı olduğu gibi okuyup yazarız.      */
+/*                                                                          */
+/* hakkimda-icerik.md sabit bir SARMALAYICI (dil sekmesi butonları + CSP    */
+/* uyumlu <script>) İÇİNDE iki <div class="lang-panel" id="lang-en"|        */
+/* "lang-tr"> barındırır (bkz. dosyanın kendisi). Bu sarmalayıcıyı ASLA     */
+/* kullanıcıya düzenletmiyoruz — sadece iki panelin İÇİNİ ayıklayıp iki ayrı */
+/* textarea'ya koyuyoruz, kaydederken aynı sabit şablonun içine geri        */
+/* yerleştiriyoruz. Böylece kullanıcı yanlışlıkla sekme script'ini/CSS      */
+/* sınıflarını bozamaz, ama HTML içeriğin kendisini serbestçe değiştirebilir. */
+/* ---------------------------------------------------------------------- */
+const HAKKIMDA_KUTUSU_YOLU = "_includes/hakkimda-kutusu.md";
+const HAKKIMDA_ICERIK_YOLU = "_includes/hakkimda-icerik.md";
+
+// lang-panel div'lerini yakalamak için: id="lang-en"/"lang-tr" olan, en
+// dıştaki <div ...>...</div> bloğunu (basit, iç içe <div> barındırmadığı
+// varsayımıyla) çeker. Mevcut dosya yapısı bu varsayıma uyuyor (bkz.
+// hakkimda-icerik.md — panel içeriği sadece <h2>/<p>/<ul>/<li>/<strong>/
+// <code> gibi iç içe DIV içermeyen etiketler barındırıyor).
+function hakkimdaPanelIcerigiCikar(ham, lang) {
+  const re = new RegExp(
+    `<div id="lang-${lang}" class="lang-panel( active)?">([\\s\\S]*?)</div>\\s*(?=<div id="lang-|$)`,
+    "m"
+  );
+  const m = ham.match(re);
+  return m ? m[2].trim() : "";
+}
+
+// Sekme sarmalayıcısını (buton çubuğu + script) HER ZAMAN sabit tutarak,
+// verilen EN/TR HTML gövdelerini yeniden birleştirir. Bu, kaydedilen
+// dosyanın satır satır orijinaliyle AYNI olacağı anlamına gelmez (girinti
+// vb. farklı olabilir) ama İŞLEVSEL olarak (sekme geçişi, CSP hash'i script
+// bloğu değişmediği için hâlâ geçerli) TAMAMEN AYNI kalır.
+function hakkimdaIcerikDosyasiOlustur(enHtml, trHtml) {
+  return `<div class="lang-tabs">
+  <button type="button" class="lang-tab-btn active" data-lang="en">🇬🇧 English</button>
+  <button type="button" class="lang-tab-btn" data-lang="tr">🇹🇷 Türkçe</button>
+</div>
+
+<script>
+  (function () {
+    // NOT: Bu buton için eskiden onclick="..." inline attribute'u
+    // kullanılıyordu. CSP'nin script-src'si sadece <script> ELEMENT
+    // içeriklerini SHA-256 hash'leyip izin veriyor (bkz.
+    // _plugins/csp_hash_enjekte.rb) — inline event handler ATTRIBUTE'ları
+    // ('unsafe-hashes' gerektirir) kapsam dışı, bu yüzden onclick sessizce
+    // bloklanıyor ve butonlar tıklanınca hiçbir şey olmuyordu. Çözüm:
+    // mantığı gerçek bir <script> elementine taşımak — bu blok build
+    // sırasında otomatik hash'lenip CSP'ye eklenir.
+    document.querySelectorAll(".lang-tab-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var lang = btn.getAttribute("data-lang");
+        document.querySelectorAll(".lang-panel").forEach(function (p) {
+          p.classList.remove("active");
+        });
+        document.querySelectorAll(".lang-tab-btn").forEach(function (b) {
+          b.classList.remove("active");
+        });
+        document.getElementById("lang-" + lang).classList.add("active");
+        btn.classList.add("active");
+      });
+    });
+  })();
+</script>
+
+<div id="lang-en" class="lang-panel active">
+${enHtml.trim()}
+</div>
+
+<div id="lang-tr" class="lang-panel">
+${trHtml.trim()}
+</div>
+`;
+}
+
+function wireHakkimda() {
+  const navLink = document.querySelector('#gy-nav a[data-section="hakkimda"]');
+  const bolum = document.getElementById("hakkimda");
+
+  // SADECE admin/owner — bkz. worker.js YOL KISITLARI (hakkimdaYolu bloğu,
+  // yalnizAdminYolu ile aynı grupta) ve profil fotoğrafındaki AYNI desen
+  // (wireProfilFoto). Bu istemci tarafı kontrol sadece bir kolaylık;
+  // gerçek yetki sınırı Worker'dadır.
+  if (GIRIS_YAPAN_PROFIL?.role !== "admin" && GIRIS_YAPAN_PROFIL?.role !== "owner") {
+    navLink?.remove();
+    bolum?.remove();
+    return;
+  }
+
+  document.getElementById("hk-yukle-btn").addEventListener("click", hakkimdaIcerigiYukle);
+  document.getElementById("hk-kaydet-btn").addEventListener("click", hakkimdaIcerigiKaydet);
+
+  // Form içindeki EN/TR sekme geçişi — ana sayfadaki gerçek sekmelerden
+  // BAĞIMSIZ, sadece bu düzenleme formunun içinde hangi textarea'nın
+  // görüneceğini kontrol eder (kaydedilen HTML'i ETKİLEMEZ).
+  const formAlani = document.getElementById("hk-form-alani");
+  formAlani.querySelectorAll(".lang-tab-btn[data-hk-lang]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const lang = btn.dataset.hkLang;
+      formAlani.querySelectorAll(".lang-tab-btn[data-hk-lang]").forEach((b) => b.classList.remove("active"));
+      formAlani.querySelectorAll(".lang-panel").forEach((p) => p.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById(`hk-panel-${lang}`).classList.add("active");
+    });
+  });
+}
+
+let HAKKIMDA_KUTUSU_SHA = null;
+let HAKKIMDA_ICERIK_SHA = null;
+
+async function hakkimdaIcerigiYukle() {
+  const durumEl = document.getElementById("hk-durum");
+  const msgEl = document.getElementById("hk-message");
+  if (!GH_BAGLI) {
+    showMessage(msgEl, 'Önce "GitHub Bağlantısı" sekmesinden bağlantını doğrula.', "error");
+    return;
+  }
+  const btn = document.getElementById("hk-yukle-btn");
+  btn.disabled = true;
+  btn.textContent = "Yükleniyor...";
+  try {
+    const [kutuDosya, icerikDosya] = await Promise.all([
+      ghGetContents(HAKKIMDA_KUTUSU_YOLU),
+      ghGetContents(HAKKIMDA_ICERIK_YOLU),
+    ]);
+    if (!kutuDosya || !icerikDosya) {
+      throw new Error("Dosyalardan biri veya ikisi de repoda bulunamadı.");
+    }
+    HAKKIMDA_KUTUSU_SHA = kutuDosya.sha;
+    HAKKIMDA_ICERIK_SHA = icerikDosya.sha;
+
+    const kutuHtml = b64Decode(kutuDosya.content.replace(/\n/g, ""));
+    const icerikHtml = b64Decode(icerikDosya.content.replace(/\n/g, ""));
+
+    document.getElementById("hk-baslik-html").value = kutuHtml.trim();
+    document.getElementById("hk-icerik-en").value = hakkimdaPanelIcerigiCikar(icerikHtml, "en");
+    document.getElementById("hk-icerik-tr").value = hakkimdaPanelIcerigiCikar(icerikHtml, "tr");
+
+    document.getElementById("hk-form-alani").hidden = false;
+    durumEl.textContent = "Mevcut içerik yüklendi — aşağıdan düzenleyip kaydedebilirsin.";
+    showMessage(msgEl, "", "success");
+    msgEl.hidden = true;
+  } catch (err) {
+    showMessage(msgEl, `Yüklenemedi: ${err.message}`, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Mevcut İçeriği Yükle";
+  }
+}
+
+async function hakkimdaIcerigiKaydet() {
+  const msgEl = document.getElementById("hk-message");
+  if (!GH_BAGLI) {
+    showMessage(msgEl, 'Önce "GitHub Bağlantısı" sekmesinden bağlantını doğrula.', "error");
+    return;
+  }
+  if (!HAKKIMDA_KUTUSU_SHA || !HAKKIMDA_ICERIK_SHA) {
+    showMessage(msgEl, 'Önce "Mevcut İçeriği Yükle" ile dosyaları çek.', "error");
+    return;
+  }
+
+  const baslikHtml = document.getElementById("hk-baslik-html").value.trim();
+  const enHtml = document.getElementById("hk-icerik-en").value.trim();
+  const trHtml = document.getElementById("hk-icerik-tr").value.trim();
+
+  if (!baslikHtml || !enHtml || !trHtml) {
+    showMessage(msgEl, "Hiçbir alan boş bırakılamaz (üst başlık, İngilizce ve Türkçe içerik).", "error");
+    return;
+  }
+
+  const btn = document.getElementById("hk-kaydet-btn");
+  btn.disabled = true;
+  btn.textContent = "Kaydediliyor...";
+  try {
+    // İki dosya birbirinden bağımsız commit edilir (GitHub Contents API tek
+    // seferde çoklu dosya commit'i desteklemiyor) — biri başarısız olursa
+    // diğeri yine de denenmiş olabilir, bu yüzden hata mesajı HANGİ dosyanın
+    // başarısız olduğunu açıkça belirtir.
+    await ghPutFile(HAKKIMDA_KUTUSU_YOLU, b64Encode(baslikHtml + "\n"), "Hakkımda: üst başlık güncellendi", HAKKIMDA_KUTUSU_SHA);
+
+    const yeniIcerik = hakkimdaIcerikDosyasiOlustur(enHtml, trHtml);
+    await ghPutFile(HAKKIMDA_ICERIK_YOLU, b64Encode(yeniIcerik), "Hakkımda: EN/TR içerik güncellendi", HAKKIMDA_ICERIK_SHA);
+
+    showMessage(msgEl, "Kaydedildi ve GitHub'a commit edildi — 1-2 dakika içinde sitede güncellenecektir.", "success");
+    // SHA'lar artık eski (dosyalar değişti) — tekrar kaydetmeden önce
+    // yeniden yüklenmesi gerekir, yanlışlıkla eski sha ile 409 almamak için
+    // sıfırlıyoruz ve kullanıcıya tekrar "Yükle" demesini hatırlatıyoruz.
+    HAKKIMDA_KUTUSU_SHA = null;
+    HAKKIMDA_ICERIK_SHA = null;
+    document.getElementById("hk-form-alani").hidden = true;
+    document.getElementById("hk-durum").textContent =
+      "Kaydedildi. Tekrar düzenlemek için önce içeriği yeniden yükle.";
+  } catch (err) {
+    showMessage(msgEl, `Kaydedilemedi: ${err.message}`, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Kaydet ve Yayınla";
   }
 }
 
