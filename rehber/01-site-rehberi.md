@@ -554,6 +554,22 @@ durmaz.**
   İçerik HTML olduğundan kutulara Markdown değil geçerli HTML yazılmalıdır;
   panel, mevcut sekme geçiş script'ini/iskeletini hiç göstermeden otomatik
   olarak korur. SADECE admin/Site Sahibi görebilir.
+- **"📄 CV" sekmesi** — anasayfadaki "CV Görüntüle" butonunu ve `/cv/`
+  adresinin gittiği hedefi yönetir (`_config.yml`'deki `cv_url` alanı).
+  Blog yazılarındaki "GitHub'a Yayınla" / "Sadece Supabase'te Yayınla"
+  ayrımıyla AYNI mantıkla üç yöntem sunar: (1) **GitHub'a Yükle** — PDF
+  `assets/cv/ozgecmis.pdf` olarak commit edilir; (2) **Sadece Supabase'e
+  Yükle** (migration 0049) — PDF GitHub'a hiç dokunmadan, herkese açık
+  `cv-dosyalari` Storage bucket'ına yüklenir, `cv_url` o adrese ayarlanır;
+  (3) **Dış Bağlantı** — Drive/Dropbox/LinkedIn gibi zaten yayında olan bir
+  `https://` adresi doğrudan bağlanır. Üçü de AYNI `cv_url` alanını
+  günceller (o an hangisi kullanılıyorsa CV odur), birinden diğerine
+  geçildiğinde eski kaynak (GitHub dosyası ya da Supabase dosyası)
+  otomatik temizlenir. "CV'yi Kaldır" butonu hangi kaynakta olursa olsun
+  temizler ve `cv_url`'ü boşaltır. SADECE admin/Site Sahibi görebilir —
+  migration 0048'in "Yetki Ayarları" sistemiyle admin'in erişimi
+  kısıtlanabilir (bkz. bir alt madde), bu kısıt hem GitHub yolunu (worker.js)
+  hem Supabase yolunu (migration 0049'daki RLS) kapsar.
 - **"🔐 Yetki Ayarları" sekmesi (migration 0048, SADECE owner görür)** —
   yukarıdaki "Profil Fotoğrafı", "Hakkımda" ve "CV" gibi admin-only
   özelliklerin her biri için, owner'ın admin'e özel olarak erişimi
