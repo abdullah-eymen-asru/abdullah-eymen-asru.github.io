@@ -26,6 +26,7 @@ permalink: "/panel/github-yonetim.html"
     <a href="#icerikler" data-section="icerikler">📚 Mevcut İçerikler</a>
     <a href="#klasorler" data-section="klasorler">📁 Klasörler</a>
     <a href="#profil-foto" data-section="profil-foto">🖼️ Profil Fotoğrafı</a>
+    <a href="#hakkimda" data-section="hakkimda">🙋 Hakkımda</a>
   </nav>
 
   <div class="panel-grid">
@@ -468,6 +469,78 @@ permalink: "/panel/github-yonetim.html"
           <button id="pf-sil-btn" type="button" class="btn-danger csp-w-auto">Profil Fotoğrafını Sil</button>
         </div>
         <div id="pf-message" class="auth-message" hidden></div>
+      </section>
+
+      <section id="hakkimda" class="panel-section">
+        <h2>Hakkımda (Anasayfa)</h2>
+        <p class="muted">
+          Anasayfada görünen üstteki isim/unvan satırı ile aşağıdaki
+          İngilizce/Türkçe "Hakkımda" kutusunu buradan düzenleyebilirsin.
+          Bu alan doğrudan <code>_includes/hakkimda-kutusu.md</code> ve
+          <code>_includes/hakkimda-icerik.md</code> dosyalarına GitHub'a
+          commit atar — <strong>içerik HTML formatındadır, Markdown
+          DEĞİLDİR</strong>; aşağıdaki kutulara yazarken de düz metin değil
+          geçerli HTML (<code>&lt;p&gt;</code>, <code>&lt;strong&gt;</code>,
+          <code>&lt;ul&gt;</code>/<code>&lt;li&gt;</code> vb.) kullanmalısın,
+          aksi hâlde sayfanın mevcut görünümü/biçimlendirmesi bozulur. Sadece
+          admin/Site Sahibi bu bölümü görebilir ve düzenleyebilir.
+        </p>
+
+        <button id="hk-yukle-btn" type="button" class="btn-primary csp-w-auto csp-mb-12">Mevcut İçeriği Yükle</button>
+        <div id="hk-durum" class="muted">Yüklemek için yukarıdaki butona bas.</div>
+
+        <div id="hk-form-alani" hidden>
+
+          <h3>Üst Başlık</h3>
+          <p class="gy-yardim-metni">
+            Anasayfada profil fotoğrafının hemen altında görünen isim ve
+            unvan satırı (<code>_includes/hakkimda-kutusu.md</code>). Bu
+            alan tek dilde tutulur, EN/TR ayrımı yoktur.
+          </p>
+          <div class="form-field">
+            <label for="hk-baslik-html">Üst başlık (HTML)</label>
+            <textarea id="hk-baslik-html" rows="4" spellcheck="false"></textarea>
+          </div>
+
+          <h3 class="csp-mt-18">Hakkımda Kutusu</h3>
+          <p class="gy-yardim-metni">
+            Anasayfadaki İngilizce/Türkçe sekmeli "Hakkımda" kutusunun
+            (<code>_includes/hakkimda-icerik.md</code>) içeriği. Sekme
+            geçiş mekanizması (üstteki butonlar + script) otomatik olarak
+            korunur — aşağıdaki iki kutuya SADECE her dilin kendi
+            <code>&lt;div class="lang-panel"&gt;</code> içindeki HTML'ini
+            yazman yeterli, geri kalan sarmalayıcı yapı (script, sekme
+            butonları, <code>id="lang-en"</code>/<code>id="lang-tr"</code>)
+            kaydederken otomatik olarak yeniden oluşturulur ve bozulmaz.
+          </p>
+
+          <div class="lang-tabs">
+            <button type="button" class="lang-tab-btn active" data-hk-lang="en">🇬🇧 English</button>
+            <button type="button" class="lang-tab-btn" data-hk-lang="tr">🇹🇷 Türkçe</button>
+          </div>
+
+          <div id="hk-panel-en" class="lang-panel active">
+            <div class="form-field">
+              <label for="hk-icerik-en">İngilizce içerik (HTML)</label>
+              <textarea id="hk-icerik-en" rows="16" spellcheck="false"></textarea>
+            </div>
+          </div>
+          <div id="hk-panel-tr" class="lang-panel">
+            <div class="form-field">
+              <label for="hk-icerik-tr">Türkçe içerik (HTML)</label>
+              <textarea id="hk-icerik-tr" rows="16" spellcheck="false"></textarea>
+            </div>
+          </div>
+
+          <p class="gy-yardim-metni">
+            Değişiklikleri kaydetmeden önce dilediğin kadar düzenleyebilirsin;
+            hiçbir şey kaydedip GitHub'a commit atılana kadar sitede
+            görünmez. Kaydettikten sonra değişikliklerin sitede görünmesi
+            (GitHub Pages derlemesi nedeniyle) 1-2 dakika sürebilir.
+          </p>
+          <button id="hk-kaydet-btn" type="button" class="btn-primary csp-w-auto">Kaydet ve Yayınla</button>
+        </div>
+        <div id="hk-message" class="auth-message" hidden></div>
       </section>
 
   </div>
