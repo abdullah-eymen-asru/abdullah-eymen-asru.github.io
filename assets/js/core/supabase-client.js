@@ -244,6 +244,25 @@ export function kullaniciAramayaUyuyorMu(kullanici, aramaKucuk) {
 }
 
 /**
+ * Bir profilin "role" alanını ekranda gösterilecek Türkçe etikete çevirir.
+ * chat.js'teki dar kapsamlı hedefRolEtiketi()'nin (sadece owner/else ayırt
+ * eden) GENEL hâli — admin.js'teki "Erişim Verilecek Özel Üyeler" atama
+ * listesi (bkz. migration 0050) gibi TÜM rollerin görünebildiği yerlerde
+ * kullanılır. Bilinmeyen/boş bir rol gelirse sessizce "Üye" gösterilir.
+ */
+export function rolEtiketi(rol) {
+  const etiketler = {
+    owner: "Site Sahibi",
+    admin: "Yönetici",
+    manager: "İçerik Sorumlusu",
+    editor: "Editör",
+    special_user: "Özel Üye",
+    user: "Üye",
+  };
+  return etiketler[rol] || "Üye";
+}
+
+/**
  * Bugünün Gizlilik Politikası / KVKK metni sürüm etiketi. Metni
  * (kurumsal/gizlilik-politikasi.md) gerçekten değiştirdiğinde bu değeri de
  * güncelle — o andan itibaren yeni kayıt olanlar bu sürüme onay verir ve
