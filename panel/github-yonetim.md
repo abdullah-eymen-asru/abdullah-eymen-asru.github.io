@@ -27,6 +27,7 @@ permalink: "/panel/github-yonetim.html"
     <a href="#klasorler" data-section="klasorler">📁 Klasörler</a>
     <a href="#profil-foto" data-section="profil-foto">🖼️ Profil Fotoğrafı</a>
     <a href="#hakkimda" data-section="hakkimda">🙋 Hakkımda</a>
+    <a href="#cv" data-section="cv">📄 CV</a>
   </nav>
 
   <div class="panel-grid">
@@ -541,6 +542,60 @@ permalink: "/panel/github-yonetim.html"
           <button id="hk-kaydet-btn" type="button" class="btn-primary csp-w-auto">Kaydet ve Yayınla</button>
         </div>
         <div id="hk-message" class="auth-message" hidden></div>
+      </section>
+
+      <section id="cv" class="panel-section">
+        <h2>CV (Özgeçmiş)</h2>
+        <p class="muted">
+          Anasayfada, CV varsa otomatik olarak beliren <strong>"📄 CV
+          Görüntüle"</strong> butonu ve <code>{{ site.url }}/cv/</code>
+          adresinden buraya erişimi buradan yönetirsin. CV yoksa (aşağıdaki
+          durum "CV eklenmemiş" ise) buton anasayfada HİÇ görünmez, <code>/cv/</code>
+          adresi de "CV henüz eklenmedi" mesajı gösterir — bu sayfayı elle
+          silmene gerek yok, davranışı otomatik değişir.
+        </p>
+        <p class="gy-yardim-metni">
+          <code>/cv/</code> adresi <strong>kalıcıdır</strong> — CV'nin
+          gerçek konumunu (aşağıdaki PDF'i güncellersen ya da dış linki
+          değiştirirsen) değiştirsen bile bu adres hep aynı kalır, daha önce
+          paylaştığın <code>/cv/</code> linki asla kırılmaz.
+        </p>
+
+        <div id="cv-mevcut" class="gy-profil-onizleme">
+          <p class="muted">Görüntülemek için önce bağlantıyı doğrula.</p>
+        </div>
+
+        <h3 class="csp-mt-18">Yöntem 1 — PDF Yükle (önerilen)</h3>
+        <p class="gy-yardim-metni">
+          Bir PDF dosyası seçip yüklersin; panel dosyayı
+          <code>assets/cv/</code> altına commit eder ve <code>cv_url</code>'ü
+          otomatik olarak bu dosyanın adresine ayarlar.
+        </p>
+        <div class="form-field">
+          <label for="cv-dosya">PDF Dosyası Seç</label>
+          <input id="cv-dosya" type="file" accept="application/pdf">
+        </div>
+        <button id="cv-yukle-btn" type="button" class="btn-primary csp-w-auto">Yükle / Değiştir</button>
+
+        <h3 class="csp-mt-18">Yöntem 2 — Dış Bağlantı Kullan</h3>
+        <p class="gy-yardim-metni">
+          PDF'i buraya yüklemek yerine, CV'nin zaten yayında olduğu başka
+          bir adresi (ör. Google Drive/Dropbox paylaşım linki, LinkedIn CV
+          adresi vb.) doğrudan bağlayabilirsin. Sadece <code>https://</code>
+          ile başlayan adresler kabul edilir.
+        </p>
+        <div class="form-field">
+          <label for="cv-dis-url">Dış CV Bağlantısı</label>
+          <input id="cv-dis-url" type="url" placeholder="https://...">
+        </div>
+        <button id="cv-dis-url-kaydet-btn" type="button" class="btn-primary csp-w-auto">Bu Bağlantıyı Kaydet</button>
+
+        <div class="csp-mt-18">
+          <button id="cv-sil-btn" type="button" class="btn-danger csp-w-auto">
+            CV'yi Kaldır (Butonu ve /cv/ Yönlendirmesini Kapat)
+          </button>
+        </div>
+        <div id="cv-message" class="auth-message" hidden></div>
       </section>
 
   </div>
