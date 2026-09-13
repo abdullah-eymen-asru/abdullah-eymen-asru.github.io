@@ -289,20 +289,43 @@ function ozellikErisimVarMiClient(ozellikAnahtari) {
 // (bkz. wireAdminAdinaTalep / yazarBilgisiniAl). null ise talep aktif değil.
 let ADMIN_ADINA_HEDEF = null;
 
+/** Her (nav linki, section) çiftinin hangi koşulda GÖRÜNMEMESİ gerektiğini
+ * TEK bir yerde topluyoruz — bkz. init()'teki çağrı noktası ve neden #app
+ * görünür olmadan ÖNCE çalıştığını açıklayan not. "gizle" fonksiyonu true
+ * dönerse ilgili nav linki ve section DOM'dan tamamen kaldırılır (sadece
+ * CSS ile gizlenmez — tutarlı olsun diye wireX() fonksiyonlarındaki AYNI
+ * .remove() deseni kullanılıyor).
+ */
+function rolBazliArayuzuUygula() {
+  const rol = GIRIS_YAPAN_PROFIL?.role;
+  const kurallar = [
+    { section: "profil-foto", gizle: () => rol !== "admin" && rol !== "owner" || (rol === "admin" && !ozellikErisimVarMiClient("profil_fotografi")) },
+    { section: "hakkimda", gizle: () => rol !== "admin" && rol !== "owner" || (rol === "admin" && !ozellikErisimVarMiClient("hakkimda_duzenleme")) },
+    { section: "cv", gizle: () => rol !== "admin" && rol !== "owner" || (rol === "admin" && !ozellikErisimVarMiClient("cv_yonetimi")) },
+    // "Yetki Ayarları" — SADECE owner, İSTİSNASIZ (bkz. migration 0048 —
+    // owner asla kısıtlanamaz, ama bu sekme de asla admin dahil kimseye
+    // açılmaz; ekranda "görünüp kaybolma" sorununun en görünür örneği
+    // buydu, çünkü admin için bu her zaman true'ydu ama BİR ANLIĞINA
+    // görünüyordu).
+    { section: "yetki-ayarlari", gizle: () => rol !== "owner" },
+  ];
+
+  for (const { section, gizle } of kurallar) {
+    if (!gizle()) continue;
+    document.querySelector(`#gy-nav a[data-section="${section}"]`)?.remove();
+    document.getElementById(section)?.remove();
+  }
+}
+
 async function init() {
   const { profile } = await requireAuthOrShowError({ role: ["editor", "manager"] });
   GIRIS_YAPAN_PROFIL = profile;
-  document.getElementById("loading")?.setAttribute("hidden", "");
-  document.getElementById("app").hidden = false;
 
   // "Yetki Ayarları" (migration 0048) — sayfa açılışında BİR KEZ, kendi
   // rolüm için hangi özelliklere erişimim olduğunu (owner'ın panelden
-  // kısıtlamış olabileceği) çekiyoruz. Bu, aşağıdaki wireProfilFoto/
-  // wireHakkimda/wireCv fonksiyonlarının ilgili sekmeyi baştan gizleyip
-  // gizlememeye karar vermesi için gerekli — GERÇEK sınır yine worker.js'te
-  // (sunucu tarafında), bu sadece "zaten yapamayacağın bir işlem için
-  // butonu gösterme" kolaylığıdır. owner için bu adım gereksiz (owner asla
-  // kısıtlanamaz) ama zararsız — RPC owner için hep true döner.
+  // kısıtlamış olabileceği) çekiyoruz. BİLEREK #app GÖRÜNÜR OLMADAN ÖNCE
+  // (aşağıdaki satırdan ÖNCE) çalıştırılıyor — bkz. hemen altındaki
+  // rolBazliArayuzuUygula() çağrısının neden burada olduğunu açıklayan not.
   if (GIRIS_YAPAN_PROFIL?.role === "admin") {
     await Promise.all(
       OZELLIK_KATALOGU.map(async ({ anahtar }) => {
@@ -315,6 +338,27 @@ async function init() {
       })
     );
   }
+
+  // BUG FİX ("Yetki Ayarları" ve "CV" sekmeleri bir anlığına görünüp
+  // kayboluyordu): #app'i görünür yapmadan HEMEN ÖNCE, SADECE role/izin
+  // kontrolüne bağlı nav linklerini/section'ları senkron olarak
+  // ekle/kaldır. Önceden bu iş wireProfilFoto/wireHakkimda/wireCv/
+  // wireYetkiAyarlari fonksiyonlarının İÇİNDE, adımlar dizisi ilerlerken
+  // (birçoğu await içeriyor — ağ isteği atıyor) yapılıyordu; ama #app o
+  // adımlar BAŞLAMADAN ÖNCE zaten görünür kılınmıştı (aşağıdaki satır),
+  // yani kullanıcı sayfa her açıldığında/yenilendiğinde bir-iki saniyeliğine
+  // erişimi olmayan sekmeleri (ör. bir admin "Yetki Ayarları"nı, ya da
+  // owner'ın kısıtladığı bir admin "CV"yi) GÖRÜP sonra kaybolduğunu
+  // izliyordu — kafa karıştırıcı ve "sızıntı" gibi hissettiren bir
+  // görünüm. Artık bu karar #app görünür olmadan TAMAMLANMIŞ oluyor; ilgili
+  // wireX() fonksiyonları hâlâ AYNI kaldırma işlemini de yapıyor (idempotent
+  // — element zaten yoksa .remove() çağrısı sorunsuz no-op) ama görsel
+  // olarak artık hiçbir an için yanlış sekmeler DOM'da görünür durumda
+  // OLMUYOR.
+  rolBazliArayuzuUygula();
+
+  document.getElementById("loading")?.setAttribute("hidden", "");
+  document.getElementById("app").hidden = false;
 
   // Diğer panellerdeki (panel.js, admin.js) aynı düzeltme: her adım
   // birbirinden bağımsız kuruluyor, biri hata verirse geri kalanı
