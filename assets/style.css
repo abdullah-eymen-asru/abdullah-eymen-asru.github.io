@@ -830,6 +830,25 @@ h2 { font-size: 1.3rem; margin-top: 2em; }
 
 .social-links a:hover { border-color: var(--accent); color: var(--accent); }
 
+.cv-link-wrap { margin: 4px 0 20px; }
+
+.cv-goruntule-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border-radius: 20px;
+  background: var(--accent);
+  color: #fff;
+  text-decoration: none;
+  font-size: 0.92rem;
+  font-weight: 600;
+  border: 1px solid var(--accent);
+}
+
+.cv-goruntule-btn:hover { filter: brightness(1.08); }
+.cv-goruntule-btn:visited { color: #fff; }
+
 .about-box {
   background: var(--card-bg);
   border: 1px solid var(--border);
