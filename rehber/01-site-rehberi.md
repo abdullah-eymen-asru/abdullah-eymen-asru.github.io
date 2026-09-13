@@ -554,6 +554,19 @@ durmaz.**
   İçerik HTML olduğundan kutulara Markdown değil geçerli HTML yazılmalıdır;
   panel, mevcut sekme geçiş script'ini/iskeletini hiç göstermeden otomatik
   olarak korur. SADECE admin/Site Sahibi görebilir.
+- **"🔐 Yetki Ayarları" sekmesi (migration 0048, SADECE owner görür)** —
+  yukarıdaki "Profil Fotoğrafı", "Hakkımda" ve "CV" gibi admin-only
+  özelliklerin her biri için, owner'ın admin'e özel olarak erişimi
+  KAPATABİLDİĞİ bir anahtar matrisi. Örnek: "CV Yönetimi" satırındaki
+  toggle'ı kapatırsan, artık SADECE owner CV'yi yükleyip/kaldırabilir —
+  admin o sekmeyi panelde hiç görmez VE Cloudflare Worker'a doğrudan istek
+  atmaya çalışsa bile sunucu tarafında reddedilir (bkz.
+  `supabase/migrations/0048_ozellik_bazinda_rol_erisimi_owner_paneli.sql`
+  ve worker.js'teki `ozellikErisimVarMi`). Hiçbir anahtara dokunmazsan site
+  bu migration'dan ÖNCEKİYLE BİREBİR AYNI davranır — bu sistem SADECE
+  owner'ın bilerek kısıtlama TANIMLADIĞI durumlarda devreye girer, yeni bir
+  yetki asla VEREMEZ, sadece VAR OLAN bir admin yetkisini kısabilir. owner
+  kendi erişimini asla kısıtlayamaz (kilitlenmeyi önlemek için).
 
 ### GitHub bağlantısı ve token güvenliği
 
