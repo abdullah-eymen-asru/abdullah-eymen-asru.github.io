@@ -241,6 +241,7 @@ function wireCurrentAdminSelfDelete(session) {
     }
 
     btn.disabled = true;
+    btn.textContent = "Siliniyor...";
     try {
       const res = await fetch(DELETE_ACCOUNT_FUNCTION_URL, {
         method: "POST",
@@ -266,6 +267,7 @@ function wireCurrentAdminSelfDelete(session) {
     } catch (err) {
       showMessage(msg, "Hesap silinemedi: " + err.message);
       btn.disabled = false;
+      btn.textContent = "Hesabımı Kalıcı Olarak Sil";
     }
   });
 }
