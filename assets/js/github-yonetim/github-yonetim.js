@@ -4541,6 +4541,7 @@ function wireCv() {
   }
 
   document.getElementById("cv-yukle-btn").addEventListener("click", cvPdfYukle);
+  document.getElementById("cv-supabase-yukle-btn").addEventListener("click", cvSupabaseYukle);
   document.getElementById("cv-dis-url-kaydet-btn").addEventListener("click", cvDisUrlKaydet);
   document.getElementById("cv-sil-btn").addEventListener("click", cvKaldir);
 }
@@ -4592,6 +4593,20 @@ function cvUrlRepoYoluMu(deger) {
   return deger.replace(/^\/+/, "");
 }
 
+// migration 0049 — Supabase Storage'a yüklenen CV'nin sabit dosya adı ve
+// bucket'ı. cvSupabaseYukle bu adı kullanır; cvUrlSupabaseYoluMu de bir
+// cv_url değerinin bu bucket'tan mı geldiğini (silme/durum gösterimi için)
+// anlamak amacıyla AYNI deseni arar.
+const CV_SUPABASE_BUCKET = "cv-dosyalari";
+const CV_SUPABASE_DOSYA_ADI = "ozgecmis.pdf";
+
+/** Bir cv_url değeri, migration 0049'daki 'cv-dosyalari' Supabase Storage
+ * bucket'ından mı geliyor? (getPublicUrl çıktısı her zaman ".../storage/v1/
+ * object/public/cv-dosyalari/..." biçimindedir.) */
+function cvUrlSupabaseYoluMu(deger) {
+  return !!deger && deger.includes(`/storage/v1/object/public/${CV_SUPABASE_BUCKET}/`);
+}
+
 async function cvDurumYukle() {
   const el = document.getElementById("cv-mevcut");
   if (!el || (GIRIS_YAPAN_PROFIL?.role !== "admin" && GIRIS_YAPAN_PROFIL?.role !== "owner")) return;
@@ -4607,6 +4622,7 @@ async function cvDurumYukle() {
       return;
     }
     const repoYolu = cvUrlRepoYoluMu(deger);
+    const supabaseYolu = cvUrlSupabaseYoluMu(deger);
     el.innerHTML = `
       <p><strong>Mevcut CV:</strong> <a href="${escapeHtml(deger)}" target="_blank" rel="noopener noreferrer">${escapeHtml(
       deger
@@ -4614,7 +4630,9 @@ async function cvDurumYukle() {
       <p class="muted">${
         repoYolu
           ? "Bu, GitHub'a yüklenmiş bir PDF dosyasıdır."
-          : "Bu, dış bir bağlantıdır (GitHub'a bir dosya yüklenmedi)."
+          : supabaseYolu
+          ? "Bu, Supabase Storage'a (GitHub'a commit edilmeden) yüklenmiş bir PDF dosyasıdır."
+          : "Bu, dış bir bağlantıdır (GitHub'a/Supabase'e bir dosya yüklenmedi)."
       }</p>`;
   } catch (err) {
     el.innerHTML = `<p class="muted">Durum okunamadı: ${escapeHtml(err.message)}</p>`;
@@ -4648,6 +4666,7 @@ async function cvPdfYukle() {
   try {
     const { deger: eskiDeger } = await cvYapilandirmasiniOku();
     const eskiRepoYolu = cvUrlRepoYoluMu(eskiDeger);
+    const eskiSupabaseYoluMu = cvUrlSupabaseYoluMu(eskiDeger);
 
     // Dosya adını sabit tutuyoruz (profil fotoğrafındaki gibi orijinal adı
     // korumak yerine) — CV genelde tek bir dosya olarak kalır ve /cv/
@@ -4674,10 +4693,21 @@ async function cvPdfYukle() {
         }
       }
     }
+    // Eski CV Supabase Storage'a yüklenmişse (bkz. cvSupabaseYukle), artık
+    // GitHub'a geçildiği için orayı da temizliyoruz — CV HER ZAMAN tek bir
+    // kaynakta dursun, eski kopyalar Storage kotasını gereksiz tüketmesin.
+    if (eskiSupabaseYoluMu) {
+      try {
+        await supabase.storage.from(CV_SUPABASE_BUCKET).remove([CV_SUPABASE_DOSYA_ADI]);
+      } catch (e) {
+        // kritik değil, devam et.
+      }
+    }
 
     await cvUrlGuncelle("/" + yeniYol);
     showMessage(msgEl, "CV yüklendi ve GitHub'a commit edildi — 1-2 dakika içinde /cv/ ve anasayfadaki buton güncellenecektir.", "success");
     dosyaInput.value = "";
+    document.getElementById("cv-dosya-supabase").value = "";
     document.getElementById("cv-dis-url").value = "";
     await panelListeleriniTazele();
     cvDurumYukle();
@@ -4685,7 +4715,93 @@ async function cvPdfYukle() {
     showMessage(msgEl, `Yüklenemedi: ${err.message}`, "error");
   } finally {
     btn.disabled = false;
-    btn.textContent = "Yükle / Değiştir";
+    btn.textContent = "GitHub'a Yükle / Değiştir";
+  }
+}
+
+/*
+ * migration 0049 — CV'yi GitHub'a HİÇ commit etmeden, doğrudan Supabase
+ * Storage'ın public "cv-dosyalari" bucket'ına yükler (blog yazılarındaki
+ * "Sadece Supabase'te Yayınla" ile AYNI felsefe). supabase.storage
+ * client'ı doğrudan çağrılır — bu Worker'a (GitHub PAT'ına) hiç gitmez,
+ * yetki tamamen Storage RLS politikalarınca (bkz. migration 0049
+ * cv_storage_yazabilir_mi — migration 0048'in "Yetki Ayarları" kısıtını da
+ * kapsıyor) uygulanır.
+ */
+async function cvSupabaseYukle() {
+  const msgEl = document.getElementById("cv-message");
+  if (GIRIS_YAPAN_PROFIL?.role !== "admin" && GIRIS_YAPAN_PROFIL?.role !== "owner") {
+    showMessage(msgEl, "Bu işlem için yetkin yok — CV'yi sadece admin değiştirebilir.", "error");
+    return;
+  }
+  const dosyaInput = document.getElementById("cv-dosya-supabase");
+  const dosya = dosyaInput.files[0];
+  if (!dosya) {
+    showMessage(msgEl, "Önce bir PDF dosyası seç.", "error");
+    return;
+  }
+  if (dosya.type && dosya.type !== "application/pdf" && !dosya.name.toLowerCase().endsWith(".pdf")) {
+    showMessage(msgEl, "Sadece PDF dosyası yükleyebilirsin.", "error");
+    return;
+  }
+
+  const btn = document.getElementById("cv-supabase-yukle-btn");
+  btn.disabled = true;
+  btn.textContent = "Yükleniyor...";
+  try {
+    const { data: uploadData, error: uploadErr } = await supabase.storage
+      .from(CV_SUPABASE_BUCKET)
+      .upload(CV_SUPABASE_DOSYA_ADI, dosya, { upsert: true, contentType: "application/pdf" });
+    if (uploadErr) throw uploadErr;
+
+    const { data: urlData } = supabase.storage.from(CV_SUPABASE_BUCKET).getPublicUrl(uploadData.path);
+    const publicUrl = urlData.publicUrl;
+
+    // Eski CV GitHub'a yüklenmişse (bkz. cvPdfYukle), artık Supabase'e
+    // geçildiği için oradaki dosyayı da temizliyoruz — CV HER ZAMAN tek bir
+    // kaynakta dursun. GitHub yazma yetkisi GH_BAGLI'ya (Worker bağlantısı)
+    // bağlı olduğundan, bağlı değilse bu adım sessizce atlanır (kritik
+    // değil — _config.yml zaten aşağıda güncellenip yeni kaynağı gösterecek,
+    // eski GitHub dosyası kullanılmayan bir artık olarak kalır).
+    if (GH_BAGLI) {
+      try {
+        const { deger: eskiDeger } = await cvYapilandirmasiniOku();
+        const eskiRepoYolu = cvUrlRepoYoluMu(eskiDeger);
+        if (eskiRepoYolu) {
+          const eskiDosya = await ghGetContents(eskiRepoYolu);
+          if (eskiDosya) await ghDeleteFile(eskiRepoYolu, eskiDosya.sha, `CV Supabase'e taşındı, eski GitHub dosyası kaldırıldı (${eskiRepoYolu})`);
+        }
+        await cvUrlGuncelle(publicUrl);
+      } catch (e) {
+        // _config.yml GitHub Worker bağlantısı üzerinden güncellenir — bu
+        // adım başarısız olursa kullanıcıyı BİLGİLENDİR (sessizce yutma,
+        // aksi halde dosya yüklenir ama cv_url hiç güncellenmez, /cv/ eski
+        // adresi göstermeye devam eder).
+        throw new Error(
+          `Dosya Supabase'e yüklendi ama _config.yml güncellenemedi (GitHub bağlantısı gerekiyor): ${e.message}`
+        );
+      }
+    } else {
+      throw new Error(
+        'Dosya Supabase\'e yüklendi ama cv_url\'ü güncellemek için "GitHub Bağlantısı" sekmesinden bağlantını doğrulaman gerekiyor (cv_url, GitHub\'daki _config.yml içinde tutuluyor).'
+      );
+    }
+
+    showMessage(
+      msgEl,
+      "CV Supabase'e yüklendi ve cv_url güncellendi — 1-2 dakika içinde /cv/ ve anasayfadaki buton güncellenecektir.",
+      "success"
+    );
+    dosyaInput.value = "";
+    document.getElementById("cv-dosya").value = "";
+    document.getElementById("cv-dis-url").value = "";
+    await panelListeleriniTazele();
+    cvDurumYukle();
+  } catch (err) {
+    showMessage(msgEl, `Yüklenemedi: ${err.message}`, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Supabase'e Yükle / Değiştir";
   }
 }
 
@@ -4716,6 +4832,7 @@ async function cvDisUrlKaydet() {
   try {
     const { deger: eskiDeger } = await cvYapilandirmasiniOku();
     const eskiRepoYolu = cvUrlRepoYoluMu(eskiDeger);
+    const eskiSupabaseYoluMu = cvUrlSupabaseYoluMu(eskiDeger);
     // Eskiden GitHub'a yüklenmiş bir PDF varsa, dış bir bağlantıya
     // geçildiğinde artık kullanılmayacağı için temizlenir (isteğe bağlı bir
     // iyileştirme — başarısız olursa sessizce devam edilir).
@@ -4727,10 +4844,19 @@ async function cvDisUrlKaydet() {
         // kritik değil, devam et.
       }
     }
+    // Eskiden Supabase Storage'a yüklenmiş bir PDF varsa AYNI şekilde temizle.
+    if (eskiSupabaseYoluMu) {
+      try {
+        await supabase.storage.from(CV_SUPABASE_BUCKET).remove([CV_SUPABASE_DOSYA_ADI]);
+      } catch (e) {
+        // kritik değil, devam et.
+      }
+    }
     await cvUrlGuncelle(url);
     showMessage(msgEl, "Dış bağlantı kaydedildi — 1-2 dakika içinde /cv/ ve anasayfadaki buton güncellenecektir.", "success");
     urlInput.value = "";
     document.getElementById("cv-dosya").value = "";
+    document.getElementById("cv-dosya-supabase").value = "";
     await panelListeleriniTazele();
     cvDurumYukle();
   } catch (err) {
@@ -4769,6 +4895,14 @@ async function cvKaldir() {
           if (dosya) await ghDeleteFile(repoYolu, dosya.sha, `CV kaldırıldı (${repoYolu})`);
         } catch (e) {
           // Dosya zaten yoksa/okunamıyorsa yine de _config.yml temizlenir.
+        }
+      }
+      // Supabase Storage'a yüklenmişse (migration 0049) AYNI şekilde temizle.
+      if (cvUrlSupabaseYoluMu(deger)) {
+        try {
+          await supabase.storage.from(CV_SUPABASE_BUCKET).remove([CV_SUPABASE_DOSYA_ADI]);
+        } catch (e) {
+          // kritik değil, _config.yml yine de temizlenecek.
         }
       }
       await cvUrlTemizle();
