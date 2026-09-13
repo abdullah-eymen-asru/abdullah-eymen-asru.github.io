@@ -255,6 +255,7 @@ async function init() {
     ["klasör yönetimi", () => wireKlasorYonetimi()],
     ["profil fotoğrafı", () => wireProfilFoto()],
     ["hakkımda", () => wireHakkimda()],
+    ["cv", () => wireCv()],
   ];
   for (const [ad, fn] of adimlar) {
     try {
@@ -346,6 +347,7 @@ async function ghBaglantisiniTestEt(hataGoster) {
       yazmaYetkisi ? "success" : "error"
     );
     profilFotoDurumYukle();
+    cvDurumYukle();
     await icerikFormuKlasorSecimGuncelle();
     klasorListesiYukle();
     icerikListesiYukle();
@@ -4398,3 +4400,285 @@ async function hakkimdaIcerigiKaydet() {
 }
 
 init();
+
+/* ---------------------------------------------------------------------- */
+/* CV (ÖZGEÇMİŞ) — anasayfadaki "📄 CV Görüntüle" butonu + /cv/ adresi.     */
+/*                                                                          */
+/* _config.yml'deki `cv_url` alanına yazar/okur (profilYapilandirmasiniOku/ */
+/* configIcindeProfilYoluYaz ile AYNI regex tabanlı yaklaşım, farklı bir    */
+/* alan adı için). Anasayfa ({% if site.cv_url and site.cv_url != "" %}) ve */
+/* /cv/ sayfası (cv/index.md) bu alanı build zamanında okuyup butonu/       */
+/* yönlendirmeyi otomatik gösterir ya da gizler — bu JS dosyası SADECE      */
+/* _config.yml'i günceller, anasayfadaki görünürlüğü DOĞRUDAN etkilemez     */
+/* (bir sonraki Jekyll build'inde, yani commit'ten 1-2 dakika sonra yansır).*/
+/*                                                                          */
+/* İki yöntem: (1) PDF'i GitHub'a assets/cv/ altına yükle → cv_url o        */
+/* dosyanın RAW/Pages adresi olur; (2) dış bir https:// URL'i doğrudan      */
+/* cv_url'e yaz. İkisi ayrı YÖNTEM ama AYNI ALANI (cv_url) günceller — yani */
+/* biri kullanılıyorken diğerine geçmek eskisinin üzerine yazar (ikisi      */
+/* birden aktif olamaz, tıpkı profil fotoğrafında olduğu gibi TEK bir       */
+/* "mevcut" durum vardır).                                                  */
+/* ---------------------------------------------------------------------- */
+const CV_URL_SATIR_REGEX = /^cv_url:[ \t]*("[^"]*"|'[^']*'|[^#\r\n]*?)?[ \t]*(#.*)?$/m;
+// GitHub Pages'in kendi domain'inden servis edilen bir dosya için _config.yml
+// içine site göreli ("/assets/cv/...") bir yol yazıyoruz — anasayfa/CV
+// sayfası bunu zaten `site.cv_url` olarak DOĞRUDAN <a href>/<meta refresh>
+// içinde kullanıyor, bu yüzden ya TAM bir https:// URL ya da "/" ile
+// başlayan site-göreli bir yol olmalı.
+
+function wireCv() {
+  const navLink = document.querySelector('#gy-nav a[data-section="cv"]');
+  const bolum = document.getElementById("cv");
+
+  // SADECE admin/owner — bkz. worker.js YOL KISITLARI notu (assets/ ve
+  // _config.yml zaten sadece admin/owner'a açık, CV bu ikisini kullanıyor).
+  if (GIRIS_YAPAN_PROFIL?.role !== "admin" && GIRIS_YAPAN_PROFIL?.role !== "owner") {
+    navLink?.remove();
+    bolum?.remove();
+    return;
+  }
+
+  document.getElementById("cv-yukle-btn").addEventListener("click", cvPdfYukle);
+  document.getElementById("cv-dis-url-kaydet-btn").addEventListener("click", cvDisUrlKaydet);
+  document.getElementById("cv-sil-btn").addEventListener("click", cvKaldir);
+}
+
+function cvIcindeUrlYaz(icerik, yeniDegerYaml) {
+  const eslesme = icerik.match(CV_URL_SATIR_REGEX);
+  const yorum = eslesme && eslesme[2] ? `   ${eslesme[2]}` : "";
+  const yeniSatir = `cv_url: ${yeniDegerYaml}${yorum}`;
+  if (eslesme) return icerik.replace(CV_URL_SATIR_REGEX, yeniSatir);
+  // Satır _config.yml'de hiç yoksa (ör. çok eski bir kopya) başa eklenir —
+  // profilYapilandirmasiniOku/configIcindeProfilYoluYaz'daki AYNI davranış.
+  return `${yeniSatir}\n${icerik}`;
+}
+
+/* _config.yml içeriğini okuyup cv_url değerini (varsa) döner. Satır yoksa
+ * ya da değeri boşsa deger=null döner. */
+async function cvYapilandirmasiniOku() {
+  const dosya = await ghGetContents(CONFIG_YOLU);
+  if (!dosya) throw new Error("_config.yml bulunamadı.");
+  const icerik = b64Decode(dosya.content.replace(/\n/g, ""));
+  const eslesme = icerik.match(CV_URL_SATIR_REGEX);
+  let deger = null;
+  if (eslesme) {
+    const ham = (eslesme[1] || "").trim().replace(/^["']|["']$/g, "").trim();
+    if (ham) deger = ham;
+  }
+  return { deger, icerik, sha: dosya.sha };
+}
+
+async function cvUrlGuncelle(yeniDeger) {
+  const { icerik, sha } = await cvYapilandirmasiniOku();
+  const guncel = cvIcindeUrlYaz(icerik, `"${yeniDeger}"`);
+  await ghPutFile(CONFIG_YOLU, b64Encode(guncel), `_config.yml: cv_url güncellendi`, sha);
+}
+
+async function cvUrlTemizle() {
+  const { icerik, sha, deger } = await cvYapilandirmasiniOku();
+  if (!deger) return; // zaten boş
+  const guncel = cvIcindeUrlYaz(icerik, `""`);
+  await ghPutFile(CONFIG_YOLU, b64Encode(guncel), "_config.yml: cv_url temizlendi", sha);
+}
+
+/** Site-göreli ("/assets/...") bir cv_url'i GitHub repo yoluna çevirir
+ * (baştaki "/" kaldırılır). Dış (https://) bir URL ise null döner —
+ * repoda karşılığı olmadığı için "sil" işleminde GitHub'dan dosya
+ * silinmeye çalışılmaz, sadece _config.yml temizlenir. */
+function cvUrlRepoYoluMu(deger) {
+  if (!deger || /^https?:\/\//i.test(deger)) return null;
+  return deger.replace(/^\/+/, "");
+}
+
+async function cvDurumYukle() {
+  const el = document.getElementById("cv-mevcut");
+  if (!el || (GIRIS_YAPAN_PROFIL?.role !== "admin" && GIRIS_YAPAN_PROFIL?.role !== "owner")) return;
+  if (!GH_BAGLI) {
+    el.innerHTML = '<p class="muted">Önce "GitHub Bağlantısı" sekmesinden bağlantını doğrula.</p>';
+    return;
+  }
+  try {
+    const { deger } = await cvYapilandirmasiniOku();
+    if (!deger) {
+      el.innerHTML =
+        '<p class="muted">CV eklenmemiş — anasayfada "CV Görüntüle" butonu görünmüyor, <code>/cv/</code> adresi de "henüz eklenmedi" mesajı gösteriyor.</p>';
+      return;
+    }
+    const repoYolu = cvUrlRepoYoluMu(deger);
+    el.innerHTML = `
+      <p><strong>Mevcut CV:</strong> <a href="${escapeHtml(deger)}" target="_blank" rel="noopener noreferrer">${escapeHtml(
+      deger
+    )}</a></p>
+      <p class="muted">${
+        repoYolu
+          ? "Bu, GitHub'a yüklenmiş bir PDF dosyasıdır."
+          : "Bu, dış bir bağlantıdır (GitHub'a bir dosya yüklenmedi)."
+      }</p>`;
+  } catch (err) {
+    el.innerHTML = `<p class="muted">Durum okunamadı: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+async function cvPdfYukle() {
+  const msgEl = document.getElementById("cv-message");
+  if (GIRIS_YAPAN_PROFIL?.role !== "admin" && GIRIS_YAPAN_PROFIL?.role !== "owner") {
+    showMessage(msgEl, "Bu işlem için yetkin yok — CV'yi sadece admin değiştirebilir.", "error");
+    return;
+  }
+  if (!GH_BAGLI) {
+    showMessage(msgEl, 'Önce "GitHub Bağlantısı" sekmesinden bağlantını doğrula.', "error");
+    return;
+  }
+  const dosyaInput = document.getElementById("cv-dosya");
+  const dosya = dosyaInput.files[0];
+  if (!dosya) {
+    showMessage(msgEl, "Önce bir PDF dosyası seç.", "error");
+    return;
+  }
+  if (dosya.type && dosya.type !== "application/pdf" && !dosya.name.toLowerCase().endsWith(".pdf")) {
+    showMessage(msgEl, "Sadece PDF dosyası yükleyebilirsin.", "error");
+    return;
+  }
+
+  const btn = document.getElementById("cv-yukle-btn");
+  btn.disabled = true;
+  btn.textContent = "Yükleniyor...";
+  try {
+    const { deger: eskiDeger } = await cvYapilandirmasiniOku();
+    const eskiRepoYolu = cvUrlRepoYoluMu(eskiDeger);
+
+    // Dosya adını sabit tutuyoruz (profil fotoğrafındaki gibi orijinal adı
+    // korumak yerine) — CV genelde tek bir dosya olarak kalır ve /cv/
+    // linkinin İÇERİĞİ değişse de KENDİSİ (path) sabit kalırsa, tarayıcı
+    // önbelleği/paylaşılan linkler için biraz daha öngörülebilir olur.
+    // Yine de dosya uzantısı her zaman ".pdf" olacak şekilde zorlanır.
+    const yeniYol = "assets/cv/ozgecmis.pdf";
+    const base64 = await dosyayiBase64eCevir(dosya);
+
+    if (eskiRepoYolu === yeniYol) {
+      const mevcut = await ghGetContents(yeniYol);
+      await ghPutFile(yeniYol, base64, "CV güncellendi", mevcut ? mevcut.sha : null);
+    } else {
+      await ghPutFile(yeniYol, base64, `CV eklendi (${yeniYol})`, null);
+      // Eski CV dış bir URL'ydi ya da farklı bir dosyaydıysa, eğer GitHub'a
+      // yüklenmiş bir dosyaysa temizle — dış bir URL'yse zaten silinecek bir
+      // repo dosyası yok.
+      if (eskiRepoYolu && eskiRepoYolu !== yeniYol) {
+        try {
+          const eskiDosya = await ghGetContents(eskiRepoYolu);
+          if (eskiDosya) await ghDeleteFile(eskiRepoYolu, eskiDosya.sha, `Eski CV kaldırıldı (${eskiRepoYolu})`);
+        } catch (e) {
+          // Eski dosya silinemedi (ör. zaten yoktu); kritik değil, devam et.
+        }
+      }
+    }
+
+    await cvUrlGuncelle("/" + yeniYol);
+    showMessage(msgEl, "CV yüklendi ve GitHub'a commit edildi — 1-2 dakika içinde /cv/ ve anasayfadaki buton güncellenecektir.", "success");
+    dosyaInput.value = "";
+    document.getElementById("cv-dis-url").value = "";
+    await panelListeleriniTazele();
+    cvDurumYukle();
+  } catch (err) {
+    showMessage(msgEl, `Yüklenemedi: ${err.message}`, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Yükle / Değiştir";
+  }
+}
+
+async function cvDisUrlKaydet() {
+  const msgEl = document.getElementById("cv-message");
+  if (GIRIS_YAPAN_PROFIL?.role !== "admin" && GIRIS_YAPAN_PROFIL?.role !== "owner") {
+    showMessage(msgEl, "Bu işlem için yetkin yok — CV'yi sadece admin değiştirebilir.", "error");
+    return;
+  }
+  if (!GH_BAGLI) {
+    showMessage(msgEl, 'Önce "GitHub Bağlantısı" sekmesinden bağlantını doğrula.', "error");
+    return;
+  }
+  const urlInput = document.getElementById("cv-dis-url");
+  const url = urlInput.value.trim();
+  if (!url) {
+    showMessage(msgEl, "Önce bir bağlantı gir.", "error");
+    return;
+  }
+  if (!/^https:\/\//i.test(url)) {
+    showMessage(msgEl, "Sadece https:// ile başlayan adresler kabul edilir.", "error");
+    return;
+  }
+
+  const btn = document.getElementById("cv-dis-url-kaydet-btn");
+  btn.disabled = true;
+  btn.textContent = "Kaydediliyor...";
+  try {
+    const { deger: eskiDeger } = await cvYapilandirmasiniOku();
+    const eskiRepoYolu = cvUrlRepoYoluMu(eskiDeger);
+    // Eskiden GitHub'a yüklenmiş bir PDF varsa, dış bir bağlantıya
+    // geçildiğinde artık kullanılmayacağı için temizlenir (isteğe bağlı bir
+    // iyileştirme — başarısız olursa sessizce devam edilir).
+    if (eskiRepoYolu) {
+      try {
+        const eskiDosya = await ghGetContents(eskiRepoYolu);
+        if (eskiDosya) await ghDeleteFile(eskiRepoYolu, eskiDosya.sha, `CV dış bağlantıya taşındı, eski dosya kaldırıldı (${eskiRepoYolu})`);
+      } catch (e) {
+        // kritik değil, devam et.
+      }
+    }
+    await cvUrlGuncelle(url);
+    showMessage(msgEl, "Dış bağlantı kaydedildi — 1-2 dakika içinde /cv/ ve anasayfadaki buton güncellenecektir.", "success");
+    urlInput.value = "";
+    document.getElementById("cv-dosya").value = "";
+    await panelListeleriniTazele();
+    cvDurumYukle();
+  } catch (err) {
+    showMessage(msgEl, `Kaydedilemedi: ${err.message}`, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Bu Bağlantıyı Kaydet";
+  }
+}
+
+async function cvKaldir() {
+  const msgEl = document.getElementById("cv-message");
+  if (GIRIS_YAPAN_PROFIL?.role !== "admin" && GIRIS_YAPAN_PROFIL?.role !== "owner") {
+    showMessage(msgEl, "Bu işlem için yetkin yok — CV'yi sadece admin kaldırabilir.", "error");
+    return;
+  }
+  if (!GH_BAGLI) {
+    showMessage(msgEl, 'Önce "GitHub Bağlantısı" sekmesinden bağlantını doğrula.', "error");
+    return;
+  }
+  try {
+    const { deger } = await cvYapilandirmasiniOku();
+    if (!deger) {
+      showMessage(msgEl, "Zaten kayıtlı bir CV yok.", "error");
+      return;
+    }
+    if (!confirm("CV'yi kaldırmak istediğine emin misin? Anasayfadaki buton kaybolacak ve /cv/ adresi \"henüz eklenmedi\" mesajı gösterecek.")) return;
+
+    const btn = document.getElementById("cv-sil-btn");
+    btn.disabled = true;
+    try {
+      const repoYolu = cvUrlRepoYoluMu(deger);
+      if (repoYolu) {
+        try {
+          const dosya = await ghGetContents(repoYolu);
+          if (dosya) await ghDeleteFile(repoYolu, dosya.sha, `CV kaldırıldı (${repoYolu})`);
+        } catch (e) {
+          // Dosya zaten yoksa/okunamıyorsa yine de _config.yml temizlenir.
+        }
+      }
+      await cvUrlTemizle();
+      showMessage(msgEl, "CV kaldırıldı — 1-2 dakika içinde anasayfadaki buton kaybolacak.", "success");
+      document.getElementById("cv-dosya").value = "";
+      document.getElementById("cv-dis-url").value = "";
+      await panelListeleriniTazele();
+      cvDurumYukle();
+    } finally {
+      btn.disabled = false;
+    }
+  } catch (err) {
+    showMessage(msgEl, `Kaldırılamadı: ${err.message}`, "error");
+  }
+}
