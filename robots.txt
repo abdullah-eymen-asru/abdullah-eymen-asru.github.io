@@ -16,13 +16,19 @@
 #      uyumlu botların sayfayı hiç İNDİRMESİNİ, dolayısıyla dahili yapı
 #      hakkında hiçbir bilgi toplamasını engeller.
 #   3) Sadece devasa veri kümesi biriktirip atıf/trafik vermeyen toplu
-#      EĞİTİM-kazıma botları (ör. CCBot/Common Crawl, GPTBot, ClaudeBot)
-#      site genelinde engelleniyor — bunlar "kaynak göster" davranışı
-#      taşımadığından akademik görünürlük hedefine katkısı yok, sadece
-#      riski artırıyor. Aynı şirketlerin ARAMA/ATIF amaçlı ayrı botları
-#      (ör. OAI-SearchBot, ChatGPT-User, Claude-User) ise bir kullanıcının
-#      anlık sorgusuna cevap ararken siteyi ziyaret eder ve genelde KAYNAK
-#      GÖSTERİR — bunlara ayrı ve İZİNLİ davranılıyor.
+#      EĞİTİM-kazıma botları (ör. CCBot/Common Crawl, GPTBot, ClaudeBot,
+#      Google-Extended) site genelinde engelleniyor — bunlar "kaynak
+#      göster" davranışı taşımadığından akademik görünürlük hedefine
+#      katkısı yok, sadece riski artırıyor. Aynı şirketlerin ARAMA/ATIF
+#      amaçlı ayrı botları (ör. OAI-SearchBot, ChatGPT-User, Claude-User)
+#      ise bir kullanıcının anlık sorgusuna cevap ararken siteyi ziyaret
+#      eder ve genelde KAYNAK GÖSTERİR — bunlara ayrı ve İZİNLİ davranılıyor.
+#
+# NOT (teknik): robots.txt yolları düz metin/glob (* ve $ joker karakterleri)
+# olarak eşleşir; tarayıcı URL encode'u (%20 gibi) burada geçerli DEĞİLDİR.
+# Bu yüzden "cloudflare worker" gibi boşluk içeren dizin adları için
+# Disallow: /cloudflare*worker/ kullanılıyor — hem düz boşluklu hem de
+# herhangi bir ayraçla oluşmuş varyasyonu güvenle yakalar.
 #
 # NOT: robots.txt TAMAMEN GÖNÜLLÜLÜK ESASINA dayanır — kurallara uymayan
 # botları durduramaz (onlara karşı gerçek koruma zaten RLS + auth-guard.js'te
@@ -38,11 +44,11 @@ Disallow: /hesap/
 Disallow: /onizleme/
 Disallow: /rehber/
 Disallow: /supabase/
-Disallow: /cloudflare%20worker/
+Disallow: /cloudflare*worker/
 Allow: /
 
 # ----------------------------------------------------------------------
-# EĞİTİM AMAÇLI TOPLU KAZIYICILAR — site genelinde tamamen engelli.
+# EĞİTİM VE TİCARİ VERİ KAZIYICILARI — site genelinde tamamen engelli.
 # Bu botlar içeriği bir arama sonucunda kaynak göstermek için değil,
 # büyük dil modeli eğitim verisi olarak toplu biriktirmek için tarar;
 # akademik görünürlük/atıf hedefine katkısı yok.
@@ -65,10 +71,22 @@ Disallow: /
 User-agent: FacebookBot
 Disallow: /
 
+User-agent: Meta-ExternalAgent
+Disallow: /
+
 User-agent: Amazonbot
 Disallow: /
 
 User-agent: Applebot-Extended
+Disallow: /
+
+User-agent: cohere-ai
+Disallow: /
+
+User-agent: Diffbot
+Disallow: /
+
+User-agent: Omgili
 Disallow: /
 
 # ----------------------------------------------------------------------
@@ -85,7 +103,7 @@ Disallow: /hesap/
 Disallow: /onizleme/
 Disallow: /rehber/
 Disallow: /supabase/
-Disallow: /cloudflare%20worker/
+Disallow: /cloudflare*worker/
 Allow: /
 
 User-agent: ChatGPT-User
@@ -94,7 +112,7 @@ Disallow: /hesap/
 Disallow: /onizleme/
 Disallow: /rehber/
 Disallow: /supabase/
-Disallow: /cloudflare%20worker/
+Disallow: /cloudflare*worker/
 Allow: /
 
 User-agent: OAI-SearchBot
@@ -103,7 +121,7 @@ Disallow: /hesap/
 Disallow: /onizleme/
 Disallow: /rehber/
 Disallow: /supabase/
-Disallow: /cloudflare%20worker/
+Disallow: /cloudflare*worker/
 Allow: /
 
 User-agent: Claude-User
@@ -112,7 +130,7 @@ Disallow: /hesap/
 Disallow: /onizleme/
 Disallow: /rehber/
 Disallow: /supabase/
-Disallow: /cloudflare%20worker/
+Disallow: /cloudflare*worker/
 Allow: /
 
 User-agent: Claude-SearchBot
@@ -121,7 +139,7 @@ Disallow: /hesap/
 Disallow: /onizleme/
 Disallow: /rehber/
 Disallow: /supabase/
-Disallow: /cloudflare%20worker/
+Disallow: /cloudflare*worker/
 Allow: /
 
 Sitemap: https://abdullah-eymen-asru.github.io/sitemap.xml
