@@ -664,6 +664,11 @@ export default {
       // (bkz. github-yonetim.js wireHakkimda — aynı kural client tarafında
       // da ön kontrol olarak var, asıl sınır burası).
       const hakkimdaYolu = hedefYol === "_includes/hakkimda-icerik.md" || hedefYol === "_includes/hakkimda-kutusu.md";
+      // NOT — CV özelliği (bkz. github-yonetim.js wireCv): CV dosyası
+      // GitHub'a yüklenirse "assets/cv/..." altına gider (zaten aşağıdaki
+      // "assets/" kuralıyla kapsanır), CV'nin linki ise "_config.yml" içindeki
+      // "cv_url" alanında tutulur (zaten aşağıdaki "_config.yml" kuralıyla
+      // kapsanır) — bu ikisi için AYRICA bir yol izni eklemeye gerek YOK.
       const yalnizAdminYolu =
         hedefYol === "assets" ||
         hedefYol.startsWith("assets/") ||
