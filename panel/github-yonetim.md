@@ -566,19 +566,36 @@ permalink: "/panel/github-yonetim.html"
           <p class="muted">Görüntülemek için önce bağlantıyı doğrula.</p>
         </div>
 
-        <h3 class="csp-mt-18">Yöntem 1 — PDF Yükle (önerilen)</h3>
+        <h3 class="csp-mt-18">Yöntem 1 — GitHub'a Yükle</h3>
         <p class="gy-yardim-metni">
           Bir PDF dosyası seçip yüklersin; panel dosyayı
-          <code>assets/cv/</code> altına commit eder ve <code>cv_url</code>'ü
-          otomatik olarak bu dosyanın adresine ayarlar.
+          <code>assets/cv/</code> altına GitHub'a COMMIT eder ve
+          <code>cv_url</code>'ü otomatik olarak bu dosyanın adresine
+          ayarlar. Blog yazılarındaki "GitHub'a Yayınla" ile aynı mantık —
+          dosya reponun içinde, git geçmişinde durur.
         </p>
         <div class="form-field">
           <label for="cv-dosya">PDF Dosyası Seç</label>
           <input id="cv-dosya" type="file" accept="application/pdf">
         </div>
-        <button id="cv-yukle-btn" type="button" class="btn-primary csp-w-auto">Yükle / Değiştir</button>
+        <button id="cv-yukle-btn" type="button" class="btn-primary csp-w-auto">GitHub'a Yükle / Değiştir</button>
 
-        <h3 class="csp-mt-18">Yöntem 2 — Dış Bağlantı Kullan</h3>
+        <h3 class="csp-mt-18">Yöntem 2 — Sadece Supabase'e Yükle</h3>
+        <p class="gy-yardim-metni">
+          Blog yazılarındaki <strong>"Sadece Supabase'te Yayınla"</strong>
+          ile aynı mantık: dosya GitHub'a hiç commit edilmez, doğrudan
+          Supabase Storage'a (herkese açık, ayrı bir <code>cv-dosyalari</code>
+          bucket'ı) yüklenir ve <code>cv_url</code> o adrese ayarlanır. Git
+          geçmişine bir kayıt bırakmadan CV'yi hızlıca değiştirmek/kaldırmak
+          istediğinde bu yöntem daha pratiktir.
+        </p>
+        <div class="form-field">
+          <label for="cv-dosya-supabase">PDF Dosyası Seç</label>
+          <input id="cv-dosya-supabase" type="file" accept="application/pdf">
+        </div>
+        <button id="cv-supabase-yukle-btn" type="button" class="btn-primary csp-w-auto">Supabase'e Yükle / Değiştir</button>
+
+        <h3 class="csp-mt-18">Yöntem 3 — Dış Bağlantı Kullan</h3>
         <p class="gy-yardim-metni">
           PDF'i buraya yüklemek yerine, CV'nin zaten yayında olduğu başka
           bir adresi (ör. Google Drive/Dropbox paylaşım linki, LinkedIn CV
