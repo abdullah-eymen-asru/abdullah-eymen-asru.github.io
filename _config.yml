@@ -42,7 +42,7 @@ profile_image: "/assets/profile.webp"   # örn: "/assets/profil.jpg" - fotoğraf
 # buraya yönlendirilir — panele GitHub'a yüklenmiş bir PDF'in yolu (örn.
 # "/assets/cv/abdullah-eymen-asru-cv.pdf") ya da dış bir URL (örn. Google
 # Drive/Dropbox paylaşım linki, https://... ile başlamalı) olabilir.
-cv_url: "https://google.com"
+cv_url: ""
 cloudflare_worker_url: "https://izleme-okuma-api.aeymena.workers.dev"   # Cloudflare Worker'ı deploy edince buraya yapıştır
 mirror_site_url: "https://abdullah-eymen-asru.pages.dev"   # İkincil/yedek kopya   # Aynı sitenin Cloudflare Pages'teki yedek kopyası
 
