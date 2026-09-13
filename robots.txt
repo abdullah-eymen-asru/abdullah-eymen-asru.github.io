@@ -89,6 +89,27 @@ Disallow: /
 User-agent: Omgili
 Disallow: /
 
+User-agent: ImagesiftBot
+Disallow: /
+
+User-agent: Timpibot
+Disallow: /
+
+User-agent: Meta-ExternalFetcher
+Disallow: /
+
+User-agent: AI2Bot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
 # ----------------------------------------------------------------------
 # ARAMA/ATIF ODAKLI AI AJANLARI — kullanıcı bir şey sorduğunda siteyi
 # KAYNAK GÖSTEREREK yanıt üretir (arama motoru gibi çalışır, toplu eğitim
