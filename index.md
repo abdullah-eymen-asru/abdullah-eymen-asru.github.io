@@ -24,6 +24,14 @@ title: Anasayfa
     <a href="{{ site.substack_url }}" target="_blank" rel="noopener noreferrer">Substack</a>
   </div>
 
+  {% if site.cv_url and site.cv_url != "" %}
+  <div class="cv-link-wrap">
+    <a href="{{ '/cv/' | relative_url }}" class="cv-goruntule-btn">
+      📄 CV Görüntüle
+    </a>
+  </div>
+  {% endif %}
+
   {% if site.mirror_site_url and site.mirror_site_url != "" %}
   <p class="format-hint csp-mt-1-2em">
     Bu site iki adreste eşzamanlı olarak yayınlanıyor:
