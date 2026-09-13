@@ -28,6 +28,7 @@ permalink: "/panel/github-yonetim.html"
     <a href="#profil-foto" data-section="profil-foto">🖼️ Profil Fotoğrafı</a>
     <a href="#hakkimda" data-section="hakkimda">🙋 Hakkımda</a>
     <a href="#cv" data-section="cv">📄 CV</a>
+    <a href="#yetki-ayarlari" data-section="yetki-ayarlari">🔐 Yetki Ayarları</a>
   </nav>
 
   <div class="panel-grid">
@@ -596,6 +597,33 @@ permalink: "/panel/github-yonetim.html"
           </button>
         </div>
         <div id="cv-message" class="auth-message" hidden></div>
+      </section>
+
+      <section id="yetki-ayarlari" class="panel-section">
+        <h2>Yetki Ayarları</h2>
+        <p class="muted">
+          Bu sayfadaki (GitHub İçerik Yönetimi paneli) bazı özellikleri
+          hangi rollerin kullanabildiğini buradan <strong>kod yazmadan</strong>
+          değiştirebilirsin. Bir satırdaki anahtarı kapatırsan, o rol o
+          özelliği panelde artık hiç görmez VE sunucu tarafında da
+          (Cloudflare Worker) o işlemi yapmaya çalışsa reddedilir — sadece
+          görünürlük değil, gerçek bir yetki kısıtlamasıdır.
+        </p>
+        <p class="gy-yardim-metni">
+          <strong>Bu sadece owner'a (Site Sahibi'ne) özeldir.</strong>
+          owner'ın kendisi hiçbir zaman kısıtlanamaz (kendi panelinden
+          kilitlenmeni engellemek için bilerek böyle tasarlandı). Bir
+          anahtarı kapatman, ilgili rolün SADECE o tekil özelliğe erişimini
+          keser — o rolün panele genel girişini ya da diğer özelliklerini
+          etkilemez. Örnek: "CV Yönetimi" satırında "Admin" anahtarını
+          kapatırsan, adminler CV'yi artık göremez/değiştiremez, sadece sen
+          (owner) yönetebilirsin.
+        </p>
+
+        <div id="ya-tablo-alani">
+          <p class="muted">Yükleniyor...</p>
+        </div>
+        <div id="ya-message" class="auth-message" hidden></div>
       </section>
 
   </div>
