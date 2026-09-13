@@ -73,7 +73,7 @@ permalink: "/panel/admin.html"
           <div class="form-field">
             <label>Erişim Verilecek Özel Üyeler / Yöneticiler (isteğe bağlı son geçerlilik tarih &amp; saatiyle, Türkiye saati)</label>
             <div class="form-field atama-arama">
-              <input id="icerik-atama-arama" type="search" placeholder="Üye ara (isim veya e-posta)...">
+              <input id="icerik-atama-arama" type="search" placeholder="Üye ara (isim)...">
             </div>
             <div id="icerik-atama-liste" class="atama-liste"><p class="muted">Yükleniyor...</p></div>
           </div>
