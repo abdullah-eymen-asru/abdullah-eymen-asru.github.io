@@ -227,6 +227,64 @@ let PROFIL_SHA = null;
 // (bkz. wireYazarAlani).
 let GIRIS_YAPAN_PROFIL = null;
 
+/*
+ * "Yetki Ayarları" (migration 0048) — owner'ın panelden kısıtladığı
+ * (özellik, rol) çiftlerinin ÖNBELLEĞİ. Sayfa açılışında (init() içinde)
+ * TEK seferde supabase.rpc("ozellik_erisimlerini_getir") ile doldurulur —
+ * bu RPC sadece owner için satır döner (bkz. migration), admin/editor/
+ * manager için HER ZAMAN boş dizi döner, yani onlar için bu önbellek boş
+ * kalır ve aşağıdaki ozellikErisimVarMiClient() DAİMA true döner (çünkü
+ * onlar zaten kısıtlamayı SORAMAZ, sadece worker.js'in reddiyle karşılaşır
+ * — bu satır sadece "owner arayüzü matrisi doğru çizsin" içindir). Sıradan
+ * bir admin için "ben kısıtlı mıyım" sorusu, tabloya YAZAMAYACAĞI için ayrı
+ * bir yardımcı ile (bkz. ADMIN_OZELLIK_KISITLARI ve init() içindeki
+ * dolduruluşu) HERKESE AÇIK bir RPC'den (ozellik_erisimi_var_mi) okunur.
+ */
+let OZELLIK_KISITLARI_ONBELLEK = null; // owner görünümü için: [{ozellik_anahtari, rol, izinli}, ...]
+// Sıradan kullanıcının (ör. admin) KENDİ rolü için hangi özelliklere erişebildiği
+// — herkese açık ozellik_erisimi_var_mi RPC'siyle, GIRIS_YAPAN_PROFIL.role için
+// dolduruluyor (bkz. init()). Anahtar: ozellik_anahtari, değer: boolean.
+const KENDI_OZELLIK_ERISIMI = {};
+
+/*
+ * Panelde kısıtlanabilir her özelliğin TEK kaynak listesi — worker.js'teki
+ * "OZELLIK_KATALOGU" yorumuyla (ve migration 0048'in sonundaki listeyle)
+ * SENKRON tutulmalı. "rolAdi" sadece bu üç rol için (admin/owner) anlamlı —
+ * editor/manager/user/special_user zaten bu özelliklere sabit kodda hiç
+ * erişemiyor, bu yüzden owner onlar için bir kısıtlama TANIMLAYAMAZ (matris
+ * bu üç rolü göstermez, sadece admin'i — owner zaten hep izinli).
+ */
+const OZELLIK_KATALOGU = [
+  {
+    anahtar: "profil_fotografi",
+    baslik: "Profil Fotoğrafı Yönetimi",
+    aciklama: "Anasayfadaki profil fotoğrafını yükleme/silme.",
+  },
+  {
+    anahtar: "hakkimda_duzenleme",
+    baslik: "Hakkımda Düzenleme",
+    aciklama: "Anasayfadaki EN/TR \"Hakkımda\" metni ve üst başlık.",
+  },
+  {
+    anahtar: "cv_yonetimi",
+    baslik: "CV Yönetimi",
+    aciklama: "CV PDF yükleme, dış bağlantı kaydetme, kaldırma.",
+  },
+];
+
+/** Sıradan bir kullanıcının (owner OLMAYAN) kendi rolü için bir özelliğe
+ * erişimi var mı? KENDI_OZELLIK_ERISIMI önbelleğinden okur (init() içinde
+ * dolduruldu) — bulunamazsa (ör. RPC henüz dönmediyse/migration
+ * uygulanmadıysa) GÜVENLİ VARSAYILAN true'dur (eski davranış korunur,
+ * worker.js zaten asıl sunucu taraflı sınırı uyguluyor — bu sadece UI'ın
+ * gereksiz bir butonu göstermemesi için bir kolaylıktır).
+ */
+function ozellikErisimVarMiClient(ozellikAnahtari) {
+  if (KENDI_OZELLIK_ERISIMI[ozellikAnahtari] === undefined) return true;
+  return KENDI_OZELLIK_ERISIMI[ozellikAnahtari] !== false;
+}
+
+
 // "Admin adına yayınla" kutusu işaretliyken hedef admin'in {id, ad} bilgisi
 // (bkz. wireAdminAdinaTalep / yazarBilgisiniAl). null ise talep aktif değil.
 let ADMIN_ADINA_HEDEF = null;
@@ -236,6 +294,27 @@ async function init() {
   GIRIS_YAPAN_PROFIL = profile;
   document.getElementById("loading")?.setAttribute("hidden", "");
   document.getElementById("app").hidden = false;
+
+  // "Yetki Ayarları" (migration 0048) — sayfa açılışında BİR KEZ, kendi
+  // rolüm için hangi özelliklere erişimim olduğunu (owner'ın panelden
+  // kısıtlamış olabileceği) çekiyoruz. Bu, aşağıdaki wireProfilFoto/
+  // wireHakkimda/wireCv fonksiyonlarının ilgili sekmeyi baştan gizleyip
+  // gizlememeye karar vermesi için gerekli — GERÇEK sınır yine worker.js'te
+  // (sunucu tarafında), bu sadece "zaten yapamayacağın bir işlem için
+  // butonu gösterme" kolaylığıdır. owner için bu adım gereksiz (owner asla
+  // kısıtlanamaz) ama zararsız — RPC owner için hep true döner.
+  if (GIRIS_YAPAN_PROFIL?.role === "admin") {
+    await Promise.all(
+      OZELLIK_KATALOGU.map(async ({ anahtar }) => {
+        try {
+          const { data, error } = await supabase.rpc("ozellik_erisimi_var_mi", { p_ozellik: anahtar });
+          KENDI_OZELLIK_ERISIMI[anahtar] = error ? true : data !== false;
+        } catch (_err) {
+          KENDI_OZELLIK_ERISIMI[anahtar] = true; // RPC/migration yoksa eski davranış
+        }
+      })
+    );
+  }
 
   // Diğer panellerdeki (panel.js, admin.js) aynı düzeltme: her adım
   // birbirinden bağımsız kuruluyor, biri hata verirse geri kalanı
@@ -256,6 +335,7 @@ async function init() {
     ["profil fotoğrafı", () => wireProfilFoto()],
     ["hakkımda", () => wireHakkimda()],
     ["cv", () => wireCv()],
+    ["yetki ayarları", () => wireYetkiAyarlari()],
   ];
   for (const [ad, fn] of adimlar) {
     try {
@@ -3966,6 +4046,15 @@ function wireProfilFoto() {
     bolum?.remove();
     return;
   }
+  // "Yetki Ayarları" (migration 0048) — owner bu özelliği admin için
+  // kapatmış olabilir (bkz. OZELLIK_KATALOGU "profil_fotografi"). owner
+  // bu kontrole hiç girmez (yukarıdaki if zaten geçirdi, owner asla
+  // kısıtlanamaz).
+  if (GIRIS_YAPAN_PROFIL?.role === "admin" && !ozellikErisimVarMiClient("profil_fotografi")) {
+    navLink?.remove();
+    bolum?.remove();
+    return;
+  }
 
   document.getElementById("pf-yukle-btn").addEventListener("click", profilFotoYukle);
   document.getElementById("pf-sil-btn").addEventListener("click", profilFotoSil);
@@ -4287,6 +4376,11 @@ function wireHakkimda() {
     bolum?.remove();
     return;
   }
+  if (GIRIS_YAPAN_PROFIL?.role === "admin" && !ozellikErisimVarMiClient("hakkimda_duzenleme")) {
+    navLink?.remove();
+    bolum?.remove();
+    return;
+  }
 
   document.getElementById("hk-yukle-btn").addEventListener("click", hakkimdaIcerigiYukle);
   document.getElementById("hk-kaydet-btn").addEventListener("click", hakkimdaIcerigiKaydet);
@@ -4433,6 +4527,14 @@ function wireCv() {
   // SADECE admin/owner — bkz. worker.js YOL KISITLARI notu (assets/ ve
   // _config.yml zaten sadece admin/owner'a açık, CV bu ikisini kullanıyor).
   if (GIRIS_YAPAN_PROFIL?.role !== "admin" && GIRIS_YAPAN_PROFIL?.role !== "owner") {
+    navLink?.remove();
+    bolum?.remove();
+    return;
+  }
+  // "Yetki Ayarları" (migration 0048) — owner'ın verdiği örnek TAM OLARAK
+  // bu: "CV yükleme sadece owner'da olsun, admin'de olmasın". owner bu
+  // kontrole hiç girmez (yukarıdaki if zaten geçirdi).
+  if (GIRIS_YAPAN_PROFIL?.role === "admin" && !ozellikErisimVarMiClient("cv_yonetimi")) {
     navLink?.remove();
     bolum?.remove();
     return;
@@ -4682,3 +4784,130 @@ async function cvKaldir() {
     showMessage(msgEl, `Kaldırılamadı: ${err.message}`, "error");
   }
 }
+
+/* ---------------------------------------------------------------------- */
+/* YETKİ AYARLARI (migration 0048) — SADECE owner. "Adminin hangi alana    */
+/* erişimi olsun/olmasın" sorusunu owner'ın panelden, kod yazmadan          */
+/* yönetebildiği matris. Aşağıdaki OZELLIK_KATALOGU listesindeki her       */
+/* özellik için, sadece "admin" sütunu gösterilir (editor/manager/user/    */
+/* special_user zaten bu özelliklere sabit kodda hiç erişemiyor — owner    */
+/* onlar için bir kısıtlama TANIMLAYAMAZ çünkü verecek bir şey yok; owner  */
+/* sütunu da yok çünkü owner asla kısıtlanamaz, bkz. migration'daki        */
+/* trigger). Yani matris şu an fiilen "her özellik için admin: açık/kapalı"*/
+/* tek sütunlu bir liste — ileride bu katalog genişleyip başka rollerin de */
+/* kısıtlanabildiği bir özellik eklenirse (bkz. OZELLIK_KATALOGU'na yeni   */
+/* bir "rolSutunlari" alanı eklenmesi) tablo otomatik olarak o rolün       */
+/* sütununu da çizecek şekilde tasarlandı (bkz. YA_KISITLANABILIR_ROLLER). */
+/* ---------------------------------------------------------------------- */
+const YA_ROL_ETIKETLERI = {
+  admin: "Yönetici (Admin)",
+};
+// Şu an her özellik için kısıtlanabilir TEK rol "admin" — bkz. dosya başı
+// notu. Yeni bir özellik eklenip başka bir rol için de kısıtlama
+// gerekiyorsa buraya ve migration'daki check kısıtına (zaten tüm rolleri
+// kapsıyor) ekleme yapman yeterli, başka bir yeri değiştirmen gerekmez.
+const YA_KISITLANABILIR_ROLLER = ["admin"];
+
+function wireYetkiAyarlari() {
+  const navLink = document.querySelector('#gy-nav a[data-section="yetki-ayarlari"]');
+  const bolum = document.getElementById("yetki-ayarlari");
+
+  // SADECE owner — bkz. migration 0048 owner_ozellik_erisimi_ayarla/
+  // ozellik_erisimlerini_getir (ikisi de is_owner() zorunlu kılıyor,
+  // burası SADECE görünürlük kolaylığı, asıl sınır veritabanında).
+  if (GIRIS_YAPAN_PROFIL?.role !== "owner") {
+    navLink?.remove();
+    bolum?.remove();
+    return;
+  }
+
+  yetkiAyarlariTablosunuYukle();
+}
+
+async function yetkiAyarlariTablosunuYukle() {
+  const alan = document.getElementById("ya-tablo-alani");
+  const msgEl = document.getElementById("ya-message");
+  try {
+    const { data, error } = await supabase.rpc("ozellik_erisimlerini_getir");
+    if (error) throw error;
+
+    // data: [{ozellik_anahtari, rol, izinli, updated_at}, ...] — SADECE
+    // GERÇEKTEN kısıtlanmış (izinli=false) satırlar döner (bkz. migration
+    // § 4 yorumu). Hızlı bakış için (özellik, rol) -> izinli haritası kur;
+    // haritada olmayan her kombinasyon "izinli" (varsayılan) demektir.
+    const kisitHaritasi = {};
+    for (const satir of data || []) {
+      kisitHaritasi[`${satir.ozellik_anahtari}::${satir.rol}`] = satir.izinli;
+    }
+
+    const basliklar = YA_KISITLANABILIR_ROLLER.map((r) => `<th>${escapeHtml(YA_ROL_ETIKETLERI[r] || r)}</th>`).join("");
+
+    const satirlarHtml = OZELLIK_KATALOGU.map((ozellik) => {
+      const hucreler = YA_KISITLANABILIR_ROLLER.map((rol) => {
+        const anahtar = `${ozellik.anahtar}::${rol}`;
+        const izinli = kisitHaritasi[anahtar] !== false; // yoksa varsayılan: izinli
+        return `
+          <td>
+            <label class="ya-mini-toggle">
+              <input type="checkbox" data-ya-ozellik="${escapeHtml(ozellik.anahtar)}" data-ya-rol="${escapeHtml(rol)}" ${izinli ? "checked" : ""}>
+              <span class="ya-mini-track"><span class="ya-mini-thumb"></span></span>
+            </label>
+          </td>`;
+      }).join("");
+      return `
+        <tr>
+          <td>
+            <span class="ya-ozellik-adi">${escapeHtml(ozellik.baslik)}</span>
+            <span class="ya-ozellik-aciklama">${escapeHtml(ozellik.aciklama)}</span>
+          </td>
+          ${hucreler}
+        </tr>`;
+    }).join("");
+
+    alan.innerHTML = `
+      <table class="ya-tablo">
+        <thead><tr><th>Özellik</th>${basliklar}</tr></thead>
+        <tbody>${satirlarHtml}</tbody>
+      </table>`;
+
+    alan.querySelectorAll('input[data-ya-ozellik]').forEach((input) => {
+      input.addEventListener("change", () => yetkiAyariniKaydet(input));
+    });
+  } catch (err) {
+    alan.innerHTML = '<p class="muted">Yüklenemedi.</p>';
+    showMessage(msgEl, `Yetki ayarları yüklenemedi: ${err.message}`, "error");
+  }
+}
+
+async function yetkiAyariniKaydet(input) {
+  const msgEl = document.getElementById("ya-message");
+  const ozellik = input.dataset.yaOzellik;
+  const rol = input.dataset.yaRol;
+  const yeniDeger = input.checked; // true = izinli (varsayılana dön), false = kısıtla
+
+  input.disabled = true;
+  try {
+    const { error } = await supabase.rpc("owner_ozellik_erisimi_ayarla", {
+      p_ozellik: ozellik,
+      p_rol: rol,
+      p_izinli: yeniDeger,
+    });
+    if (error) throw error;
+
+    const ozellikBaslik = OZELLIK_KATALOGU.find((o) => o.anahtar === ozellik)?.baslik || ozellik;
+    const rolEtiket = YA_ROL_ETIKETLERI[rol] || rol;
+    showMessage(
+      msgEl,
+      yeniDeger
+        ? `"${ozellikBaslik}" özelliği ${rolEtiket} için tekrar açıldı.`
+        : `"${ozellikBaslik}" özelliği ${rolEtiket} için kapatıldı — bu rolden bu özellik artık hem panelde gizlenecek hem sunucu tarafında reddedilecek.`,
+      "success"
+    );
+  } catch (err) {
+    input.checked = !yeniDeger; // başarısızsa toggle'ı eski haline geri al
+    showMessage(msgEl, `Kaydedilemedi: ${err.message}`, "error");
+  } finally {
+    input.disabled = false;
+  }
+}
+
