@@ -27,12 +27,14 @@
  *        - `_posts/` ve `_projects/` altındaki her şey → editor, manager,
  *          admin (requireAuth({role:['editor','manager']}) ile AYNI kural,
  *          admin her zaman geçer).
- *        - `assets/` altı VE `_config.yml` (profil fotoğrafı + site
- *          yapılandırması) → SADECE admin (github-yonetim.js'teki
+ *        - `assets/` altı, `_config.yml` (profil fotoğrafı + site
+ *          yapılandırması) VE `_includes/hakkimda-icerik.md` +
+ *          `_includes/hakkimda-kutusu.md` (anasayfadaki EN/TR "Hakkımda"
+ *          metni + isim/unvan) → SADECE admin (github-yonetim.js'teki
  *          `GIRIS_YAPAN_PROFIL?.role !== "admin"` ön kontrolüyle AYNI kural,
  *          burada ayrıca SUNUCU tarafında da zorunlu kılınıyor).
  *        - Başka HERHANGİ bir yol → HERKESE reddedilir (repoda bu Worker
- *          üzerinden SADECE bu dört alan değiştirilebilir).
+ *          üzerinden SADECE bu alanlar değiştirilebilir).
  *   Bu iki kontrol sayesinde panel artık GERÇEK bir güvenlik sınırı — bir
  *   editor/manager, panelin dışından bu Worker'a istek atsa bile aynı yol/
  *   rol kısıtlarına tabidir; PAT'a hiçbir zaman erişemez.
@@ -655,7 +657,18 @@ export default {
         hedefYol.startsWith("_posts/") ||
         hedefYol === "_projects" ||
         hedefYol.startsWith("_projects/");
-      const yalnizAdminYolu = hedefYol === "assets" || hedefYol.startsWith("assets/") || hedefYol === "_config.yml";
+      // "Hakkımda" içeriği (anasayfadaki İngilizce/Türkçe hakkımda kutusu +
+      // isim/unvan başlığı) — sadece bu iki dosyaya izin verilir, TÜM
+      // _includes/ klasörüne değil (diğer include'lar şablon/mantık
+      // dosyalarıdır, panelden düzenlenmesi amaçlanmaz). SADECE admin/owner
+      // (bkz. github-yonetim.js wireHakkimda — aynı kural client tarafında
+      // da ön kontrol olarak var, asıl sınır burası).
+      const hakkimdaYolu = hedefYol === "_includes/hakkimda-icerik.md" || hedefYol === "_includes/hakkimda-kutusu.md";
+      const yalnizAdminYolu =
+        hedefYol === "assets" ||
+        hedefYol.startsWith("assets/") ||
+        hedefYol === "_config.yml" ||
+        hakkimdaYolu;
 
       if (icerikYolu) {
         // editor/manager/admin — zaten icerikYoneticisiMi ile yukarıda kontrol edildi.
