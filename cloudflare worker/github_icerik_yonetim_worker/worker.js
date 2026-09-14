@@ -873,11 +873,25 @@ export default {
             ozellikAnahtarlari = ["hakkimda_duzenleme"];
           } else if (cvYoluMu(hedefYol)) {
             ozellikAnahtarlari = ["cv_yonetimi"];
-          } else if (
-            hedefYol === "assets/profil.jpg" ||
-            hedefYol === "assets/profile.webp" ||
-            hedefYol.startsWith("assets/profil")
-          ) {
+          } else if (hedefYol.startsWith("assets/")) {
+            // GÜVENLİK AÇIĞI DÜZELTMESİ — eski desen sadece "assets/profil"
+            // ile BAŞLAYAN dosya adlarını yakalıyordu. Ama panel JS'i
+            // (github-yonetim.js profilFotoYukle()) yüklenen dosyanın
+            // ORİJİNAL adını (sadece sanitize edilmiş) kullanıyor —
+            // "profil.jpg" gibi SABİT bir isme hiç ZORLAMIYOR
+            // (profilDosyaAdiTemizle bkz.). Yani admin "tatil-fotografi.png"
+            // gibi farklı adlı bir görsel yüklerse hedefYol
+            // "assets/tatil-fotografi.png" olur ve ESKİ desenle HİÇ
+            // eşleşmezdi — owner "profil_fotografi"yi kapatmış olsa bile
+            // kontrol sessizce hiç UYGULANMAZDI (kötü niyet gerekmiyordu,
+            // sadece dosya adı seçimine bağlıydı — normal kullanımda bile
+            // açık kalıyordu). Bu panelde "assets/" altına CV
+            // (assets/cv/*, yukarıdaki cvYoluMu dalıyla zaten elendi)
+            // DIŞINDA BAŞKA HİÇBİR ŞEY yazılmıyor (github-yonetim.js'te
+            // "assets/" yazımı SADECE profilFotoYukle() ve cvPdfYukle()'de
+            // var, bkz. o dosyadaki grep) — bu yüzden buraya ulaşan (cv
+            // dalına girmemiş) HER "assets/" yolu güvenle
+            // "profil_fotografi" kapsamında sayılabilir.
             ozellikAnahtarlari = ["profil_fotografi"];
           } else if (hedefYol === CONFIG_YOLU_SABIT) {
             // GÜVENLİK AÇIĞI DÜZELTMESİ — _config.yml hem "profile_image"
