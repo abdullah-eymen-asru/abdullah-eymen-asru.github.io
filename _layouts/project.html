@@ -91,7 +91,11 @@ layout: default
       {% assign _veri_gecerli = true %}
     {% endif %}
   {% endif %}
-  {% if _pdf_gecerli or _veri_gecerli %}
+  {% comment %}
+    "RAPOR OLARAK YAZDIR" BUTONU — bkz. _layouts/post.html'deki AYNI blok
+    ve assets/js/okuma-araclari/rapor-yazdir.js için orada yazılan
+    gerekçe. page.pdf_url/veri_url'den BAĞIMSIZ her zaman gösterilir.
+  {% endcomment %}
   <p class="pdf-indir-alani">
     {% if _pdf_gecerli %}
     <a href="{{ page.pdf_url | escape }}" class="pdf-indir-btn" target="_blank" rel="noopener noreferrer">
@@ -103,12 +107,16 @@ layout: default
       🗃️ Veri Seti
     </a>
     {% endif %}
+    <button type="button" class="rapor-yazdir-btn" id="rapor-yazdir-btn">
+      🖨️ Rapor Olarak Yazdır / PDF Kaydet
+    </button>
   </p>
-  {% endif %}
 
   {% if page.toc %}
   <div id="icindekiler-yeri"></div>
   {% endif %}
+
+  {% include rapor-yazdirma-basligi.html %}
 
   <div class="project-body">
     {{ content }}
