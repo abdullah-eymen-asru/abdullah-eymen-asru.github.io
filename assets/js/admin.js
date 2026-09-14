@@ -68,6 +68,16 @@ async function init() {
     kisitliManagerGorunumunuUygula();
   }
 
+  // EK KISIT KATMANI (migration 0048 + 0051) — owner "🔐 Yetki Ayarları"
+  // panelinden admin/manager'ın "Özel İçerik Yönetimi" ve/veya "R2 Dosya
+  // Paylaşımı" erişimini kısmış olabilir. Bu SADECE bir UI kolaylığıdır
+  // (ilgili sekmeyi göstermemek için) — GERÇEK sınır migration 0051'deki
+  // RLS politikalarında ve r2-imza-worker'da uygulanıyor; owner bu
+  // kontrolden hiçbir zaman etkilenmez (ozellik_erisimi_var_mi owner için
+  // her zaman true döner). wireSectionNav()'dan ÖNCE çalışması gerekiyor
+  // ki gizlenen sekmeler bir an için görünüp kaybolmasın.
+  await ozelIcerikVeDosyaPaylasimiKisitlariniUygula(profile.role);
+
   wireSectionNav();
 
   // Her bölüm birbirinden BAĞIMSIZ kuruluyor — biri hata verirse (ör. bir
@@ -114,6 +124,38 @@ async function init() {
  * başındaki not) ve /panel/uye-ayarlari.html'in kendi
  * requireAuth({role:'admin'}) kontrolünde.
  */
+/** ozellik_erisimi_var_mi() RPC'sini sarmalar — hata/ağ sorununda GÜVENLİ
+ * VARSAYILAN true'dur (eski davranış korunur; asıl sınır zaten RLS/worker
+ * tarafında, bu sadece UI'ın gereksiz bir sekmeyi göstermemesi içindir). */
+async function ozellikErisimiKontrolEt(ozellikAnahtari, rol) {
+  try {
+    const { data, error } = await supabase.rpc("ozellik_erisimi_var_mi", { p_ozellik: ozellikAnahtari, p_rol: rol });
+    if (error) return true;
+    return data !== false;
+  } catch (_err) {
+    return true;
+  }
+}
+
+/** bkz. init() içindeki çağrı noktasındaki yorum. */
+async function ozelIcerikVeDosyaPaylasimiKisitlariniUygula(rol) {
+  const [icerikIzinli, dosyaIzinli] = await Promise.all([
+    ozellikErisimiKontrolEt("ozel_icerik_yonetimi", rol),
+    ozellikErisimiKontrolEt("dosya_paylasimi_yonetimi", rol),
+  ]);
+
+  if (!icerikIzinli) {
+    ["icerik-ekle", "icerikler"].forEach((id) => {
+      document.querySelector(`#admin-nav a[data-section="${id}"]`)?.setAttribute("hidden", "");
+      document.getElementById(id)?.setAttribute("hidden", "");
+    });
+  }
+  if (!dosyaIzinli) {
+    document.querySelector('#admin-nav a[data-section="dosya-paylasim"]')?.setAttribute("hidden", "");
+    document.getElementById("dosya-paylasim")?.setAttribute("hidden", "");
+  }
+}
+
 function kisitliManagerGorunumunuUygula() {
   document.getElementById("admin-nav-uye-ayarlari")?.setAttribute("hidden", "");
   document.getElementById("admin-nav-guvenlik")?.setAttribute("hidden", "");
