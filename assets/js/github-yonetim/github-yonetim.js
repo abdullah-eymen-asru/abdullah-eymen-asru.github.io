@@ -259,16 +259,40 @@ const OZELLIK_KATALOGU = [
     anahtar: "profil_fotografi",
     baslik: "Profil Fotoğrafı Yönetimi",
     aciklama: "Anasayfadaki profil fotoğrafını yükleme/silme.",
+    rolSutunlari: ["admin"],
   },
   {
     anahtar: "hakkimda_duzenleme",
     baslik: "Hakkımda Düzenleme",
     aciklama: "Anasayfadaki EN/TR \"Hakkımda\" metni ve üst başlık.",
+    rolSutunlari: ["admin"],
   },
   {
     anahtar: "cv_yonetimi",
     baslik: "CV Yönetimi",
     aciklama: "CV PDF yükleme, dış bağlantı kaydetme, kaldırma.",
+    rolSutunlari: ["admin"],
+  },
+  {
+    // BUG DÜZELTMESİ (bkz. migration 0050): CV/profil_fotografi kısıtlaması
+    // eskiden SADECE gerçek dosya yoluna (assets/cv/*, assets/profil*)
+    // uygulanıyordu — _config.yml'deki cv_url/profile_image alanı doğrudan
+    // değiştirilerek atlatılabiliyordu. worker.js artık bunu da kontrol
+    // ediyor (bkz. o dosyadaki "GÜVENLİK AÇIĞI DÜZELTMESİ" notu).
+    anahtar: "ozel_icerik_yonetimi",
+    baslik: "Özel İçerik Ekle/Düzenle/Sil",
+    aciklama: "Admin panelindeki \"Özel İçerik Ekle/Düzenle\", \"Mevcut Özel İçerikler\" (silme dahil) ve üyelere erişim atama/kaldırma.",
+    // manager (İçerik Sorumlusu) bu bölüme admin ile AYNI şekilde erişiyor
+    // (admin.js'te TAM_YETKILI kontrolü bu bölümü hiç kapsamıyor) — bu
+    // yüzden owner'ın ikisini de AYRI AYRI kısabilmesi gerekiyor (bkz.
+    // migration 0051).
+    rolSutunlari: ["admin", "manager"],
+  },
+  {
+    anahtar: "dosya_paylasimi_yonetimi",
+    baslik: "R2 Dosya Paylaşımı",
+    aciklama: "Admin panelindeki R2 dosya paylaşım linki oluşturma — content_access ataması aranmadan HERHANGİ bir dosyaya erişim.",
+    rolSutunlari: ["admin", "manager"],
   },
 ];
 
@@ -4967,24 +4991,22 @@ async function cvKaldir() {
 /* YETKİ AYARLARI (migration 0048) — SADECE owner. "Adminin hangi alana    */
 /* erişimi olsun/olmasın" sorusunu owner'ın panelden, kod yazmadan          */
 /* yönetebildiği matris. Aşağıdaki OZELLIK_KATALOGU listesindeki her       */
-/* özellik için, sadece "admin" sütunu gösterilir (editor/manager/user/    */
-/* special_user zaten bu özelliklere sabit kodda hiç erişemiyor — owner    */
-/* onlar için bir kısıtlama TANIMLAYAMAZ çünkü verecek bir şey yok; owner  */
-/* sütunu da yok çünkü owner asla kısıtlanamaz, bkz. migration'daki        */
-/* trigger). Yani matris şu an fiilen "her özellik için admin: açık/kapalı"*/
-/* tek sütunlu bir liste — ileride bu katalog genişleyip başka rollerin de */
-/* kısıtlanabildiği bir özellik eklenirse (bkz. OZELLIK_KATALOGU'na yeni   */
-/* bir "rolSutunlari" alanı eklenmesi) tablo otomatik olarak o rolün       */
-/* sütununu da çizecek şekilde tasarlandı (bkz. YA_KISITLANABILIR_ROLLER). */
+/* özelliğin KENDİ "rolSutunlari" alanı vardır (bkz. o listedeki yorumlar) */
+/* — böylece bazı özellikler (profil fotoğrafı/hakkımda/CV) sadece admin  */
+/* sütununu, bazıları (özel içerik/dosya paylaşımı) admin+manager         */
+/* sütununu gösterebilir. owner sütunu hiç yok çünkü owner asla           */
+/* kısıtlanamaz (bkz. migration'daki trigger); editor/user/special_user   */
+/* için hiçbir özellikte sütun yok çünkü onlar zaten bu özelliklere sabit */
+/* kodda hiç erişemiyor, owner için kısacak bir şey yok. YENİ bir özellik */
+/* eklenip BAŞKA bir rol için de kısıtlama gerekiyorsa, sadece o          */
+/* özelliğin rolSutunlari'na ekleme yapman ve YA_ROL_ETIKETLERI'ne o      */
+/* rolün Türkçe etiketini eklemen yeterli — tablo geri kalanını otomatik  */
+/* hesaplar.                                                              */
 /* ---------------------------------------------------------------------- */
 const YA_ROL_ETIKETLERI = {
   admin: "Yönetici (Admin)",
+  manager: "İçerik Sorumlusu (Manager)",
 };
-// Şu an her özellik için kısıtlanabilir TEK rol "admin" — bkz. dosya başı
-// notu. Yeni bir özellik eklenip başka bir rol için de kısıtlama
-// gerekiyorsa buraya ve migration'daki check kısıtına (zaten tüm rolleri
-// kapsıyor) ekleme yapman yeterli, başka bir yeri değiştirmen gerekmez.
-const YA_KISITLANABILIR_ROLLER = ["admin"];
 
 function wireYetkiAyarlari() {
   const navLink = document.querySelector('#gy-nav a[data-section="yetki-ayarlari"]');
@@ -5018,10 +5040,26 @@ async function yetkiAyarlariTablosunuYukle() {
       kisitHaritasi[`${satir.ozellik_anahtari}::${satir.rol}`] = satir.izinli;
     }
 
-    const basliklar = YA_KISITLANABILIR_ROLLER.map((r) => `<th>${escapeHtml(YA_ROL_ETIKETLERI[r] || r)}</th>`).join("");
+    // Tüm özelliklerin rolSutunlari'nın BİRLEŞİMİ — sütun başlıklarını
+    // oluşturur (ilk görülme sırasına göre, katalog sırasını takip eder).
+    const tumRoller = [];
+    OZELLIK_KATALOGU.forEach((o) => {
+      (o.rolSutunlari || ["admin"]).forEach((r) => {
+        if (!tumRoller.includes(r)) tumRoller.push(r);
+      });
+    });
+
+    const basliklar = tumRoller.map((r) => `<th>${escapeHtml(YA_ROL_ETIKETLERI[r] || r)}</th>`).join("");
 
     const satirlarHtml = OZELLIK_KATALOGU.map((ozellik) => {
-      const hucreler = YA_KISITLANABILIR_ROLLER.map((rol) => {
+      const ozellikRolleri = ozellik.rolSutunlari || ["admin"];
+      const hucreler = tumRoller.map((rol) => {
+        // Bu özellik bu rol için hiç tanımlı değilse (ör. "CV Yönetimi"
+        // satırında "manager" sütunu) — manager zaten bu özelliğe sabit
+        // kodda hiç erişemiyor, kısacak bir şey yok, boş hücre göster.
+        if (!ozellikRolleri.includes(rol)) {
+          return `<td class="ya-hucre-yok" aria-hidden="true">—</td>`;
+        }
         const anahtar = `${ozellik.anahtar}::${rol}`;
         const izinli = kisitHaritasi[anahtar] !== false; // yoksa varsayılan: izinli
         return `
