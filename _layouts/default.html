@@ -714,6 +714,16 @@
   <script defer src="{{ '/assets/js/okuma-araclari/okuma-ilerleme-cubugu.js' | relative_url }}"></script>
   <script defer src="{{ '/assets/js/okuma-araclari/secim-baloncugu.js' | relative_url }}"></script>
   {% endif %}
+  {% comment %}
+    "Rapor Olarak Yazdır" butonu SADECE layout: post/project sayfalarında
+    var (bkz. o layout dosyaları) — supabase-yazi.md/onizleme gibi diğer
+    "okuma araçları sayfaları"nda bu buton HİÇ render edilmediği için
+    (#rapor-yazdir-btn bulunamaz) script sessizce hiçbir şey yapmadan
+    döner, ekstra bir koşula gerek yok.
+  {% endcomment %}
+  {% if page.layout == "post" or page.layout == "project" %}
+  <script defer src="{{ '/assets/js/okuma-araclari/rapor-yazdir.js' | relative_url }}"></script>
+  {% endif %}
 
   <footer class="site-footer">
     <div class="wrap">
