@@ -2058,6 +2058,198 @@ th { color: var(--muted); font-weight: 600; }
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
+/* ============================================================
+   RAPOR OLARAK YAZDIR / PDF OLARAK KAYDET BUTONU
+   ============================================================
+   bkz. _layouts/post.html / project.html — .pdf-indir-btn ile AYNI görsel
+   dili paylaşan, ama harici bir dosyaya değil window.print()'e bağlanan
+   bir buton. Tıklanınca tarayıcının kendi "Yazdır" iletişim kutusu açılır;
+   kullanıcı orada hedef olarak "PDF olarak kaydet"i seçer. Aşağıdaki
+   @media print bloğu sadece o iletişim kutusundaki ÖN İZLEMEDE ve
+   gerçek çıktıda devreye girer, normal ekran görünümünü HİÇ etkilemez. */
+.rapor-yazdir-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.rapor-yazdir-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Print'e özel başlık bloğu (rapor anteti): ekranda hiç görünmez, SADECE
+   yazdırma/PDF çıktısında belirir — bkz. _includes/rapor-yazdirma-basligi.html. */
+.rapor-yazdirma-basligi {
+  display: none;
+}
+
+/* ============================================================
+   YAZDIRMA (PRINT) MODU — "Rapor Olarak Yazdır" için sitenin geri
+   kalanını (nav, footer, reklam, paylaş/yorum blokları, kenar
+   çubukları, ilerleme çubuğu, çerez şeridi vb.) gizleyip SADECE yazı
+   gövdesini + rapor anteti (başlık/imza/tarih/özet/kaynakça) kalan
+   tertemiz, kağıda uygun bir düzene çeviriyor. Harici bir kütüphane
+   veya sunucu YOK — tamamen tarayıcının yerel "Yazdır > PDF olarak
+   kaydet" motoruna dayanıyor.
+
+   NEDEN body içindeki HER ŞEYİ gizleyip SADECE .project-body/.rapor-*
+   öğelerini geri açıyoruz (ve tersini değil, yani "her şeyi göster,
+   istenmeyeni gizle" değil): sitenin üzerine zamanla eklenen her yeni
+   widget/banner/buton (ör. yeni bir reklam alanı, yeni bir okuma aracı)
+   otomatik olarak print çıktısının DIŞINDA kalsın istiyoruz — "unutulan
+   yeni bir öğe sızar" riski, "her şeyi gizle, gerekeni aç" yaklaşımında
+   çok daha düşük.
+   ============================================================ */
+@media print {
+  /* 1) SİTE İSKELETİNİ TAMAMEN GİZLE */
+  .site-header,
+  .mobile-nav-panel,
+  .mobile-nav-panel-arkaplan,
+  .site-footer,
+  .cerez-serit,
+  #cerez-serit,
+  .cerez-ayarlar-modal,
+  #kvkk-modal,
+  .okuma-ilerleme-cubugu,
+  .secim-baloncugu,
+  .back-link,
+  .share-buttons,
+  .comments-section,
+  .reklam-alani,
+  .pdf-indir-alani,
+  .rapor-yazdir-btn,
+  .atif-kutusu,
+  #icindekiler-yeri,
+  .auth-nav,
+  .format-hint {
+    display: none !important;
+  }
+
+  /* 2) SAYFA/GÖVDE — kağıda uygun beyaz zemin + siyah metin, karanlık
+     tema renkleri (varsa) print'te ZORLA geçersiz kılınır; tarayıcı
+     arka plan grafiklerini/renklerini yazdırmayı varsayılan olarak
+     atladığı için burada elle beyaz/siyah'a sabitliyoruz. */
+  html,
+  body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  main.wrap.content {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  article.project-detail {
+    max-width: 100% !important;
+  }
+
+  /* 3) RAPOR ANTETİ — sadece print'te görünür (bkz. yukarıdaki ekran
+     kuralı .rapor-yazdirma-basligi { display:none }). Başlık, yazar
+     "imzası", tarih ve özet burada yer alır. */
+  .rapor-yazdirma-basligi {
+    display: block !important;
+    margin: 0 0 24pt;
+    padding: 0 0 14pt;
+    border-bottom: 1.5pt solid #111;
+  }
+
+  .rapor-yazdirma-basligi .rapor-site-adi {
+    font-size: 9pt;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #555;
+    margin: 0 0 10pt;
+  }
+
+  .rapor-yazdirma-basligi .rapor-baslik {
+    font-size: 20pt;
+    font-weight: 700;
+    line-height: 1.25;
+    margin: 0 0 10pt;
+  }
+
+  .rapor-yazdirma-basligi .rapor-meta-satiri {
+    font-size: 10pt;
+    color: #333;
+    margin: 0 0 4pt;
+  }
+
+  .rapor-yazdirma-basligi .rapor-ozet {
+    font-size: 10.5pt;
+    color: #222;
+    margin: 10pt 0 0;
+    font-style: italic;
+  }
+
+  /* 4) GÖVDE METNİ — okunabilir, yazdırmaya uygun tipografi */
+  .project-body {
+    font-size: 11pt;
+    line-height: 1.55;
+    color: #111 !important;
+  }
+
+  .project-body a {
+    color: #111 !important;
+    text-decoration: underline;
+  }
+
+  /* Bağlantının gerçek adresi de görünsün diye (kağıt çıktıda link
+     tıklanamaz) — köprü metninden sonra parantez içinde URL basılır. */
+  .project-body a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 8.5pt;
+    color: #555;
+    word-break: break-all;
+  }
+
+  .project-body img,
+  .project-body svg {
+    max-width: 100% !important;
+    page-break-inside: avoid;
+  }
+
+  .project-body pre,
+  .project-body table {
+    page-break-inside: avoid;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    page-break-after: avoid;
+    color: #111 !important;
+  }
+
+  /* 5) KAYNAKÇA — GitHub-yönetim panelinden "Kaynakça" alanı doldurulmuş
+     yazılarda front-matter'daki referanslar body içinde bir liste olarak
+     zaten render ediliyor (bkz. panel şablonu); burada sadece sayfa
+     kesmesinden korunuyor, ayrıca bir seçici GEREKMİYOR. */
+  .kaynakca-listesi {
+    page-break-inside: avoid;
+  }
+
+  /* 6) SAYFA KENAR BOŞLUKLARI VE ALT BİLGİ (Chrome/Edge destekliyor,
+     Firefox'ta yoksayılır — zararsız bir "progressive enhancement"). */
+  @page {
+    margin: 2cm 1.8cm;
+  }
+}
+
 .veri-indir-btn:hover {
   border-color: var(--accent);
   color: var(--accent);
