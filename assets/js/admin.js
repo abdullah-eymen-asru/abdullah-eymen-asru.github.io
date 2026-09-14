@@ -39,6 +39,15 @@ const DELETE_ACCOUNT_FUNCTION_URL =
   "https://eahvcirspmvntffzphye.supabase.co/functions/v1/delete-account";
 
 let TUM_KULLANICILAR = [];
+
+/** "Özel içerik" atama listesinde SEÇİLEBİLİR roller. BUG DÜZELTMESİ: eskiden
+ * sadece special_user/admin vardı — 'owner' (Site Sahibi), 'manager'
+ * (İçerik Sorumlusu) ve 'editor' (İçerik Editörü) hiç görünmüyordu.
+ * renderContentAssigneeOptions() ve wireIcerikAtamaArama() bu TEK listeyi
+ * paylaşır ki ikisi asla birbirinden sapmasın. Sade 'user' (sıradan üye)
+ * hâlâ bilinçli olarak dışarıda: "özel içerik" amacı işaretli hesaplara
+ * erişim vermek, sıradan her üyeye değil. */
+const HEDEF_ROLLER = ["special_user", "editor", "manager", "admin", "owner"];
 let DUZENLENEN_ICERIK_ID = null; // null: yeni içerik ekleniyor, doluysa düzenleniyor
 
 // Atama listesindeki her üye için { checked, tarih } durumunu, arama
@@ -279,12 +288,9 @@ function renderContentAssigneeOptions(kullanicilar) {
   const atamaWrap = document.getElementById("icerik-atama-liste");
   if (!atamaWrap) return;
 
-  // BUG DÜZELTMESİ (bkz. migration 0050): 'owner' (Site Sahibi) burada hiç
-  // yer almıyordu — bir site sahibi hesabı bu listede ASLA görünmüyordu.
-  // Sade 'user' (sıradan üye) rolü hâlâ bilinçli olarak dışarıda: "özel
-  // içerik" kavramının amacı zaten işaretli (özel üye/yönetici/site
-  // sahibi) hesaplara erişim vermek, sıradan her üyeye değil.
-  const hedefKullanicilar = kullanicilar.filter((u) => u.role === "special_user" || u.role === "admin" || u.role === "owner");
+  // BUG DÜZELTMESİ (bkz. migration 0050 + yukarıdaki HEDEF_ROLLER notu):
+  // 'owner', 'manager' ve 'editor' rolleri bu listede hiç görünmüyordu.
+  const hedefKullanicilar = kullanicilar.filter((u) => HEDEF_ROLLER.includes(u.role));
 
   // ATAMA_DURUMU'nda artık listede olmayan (rolü değişmiş/silinmiş) üyeleri temizle
   const gecerliIdler = new Set(hedefKullanicilar.map((u) => u.id));
@@ -392,7 +398,7 @@ function wireIcerikAtamaArama() {
   if (!input) return;
   input.addEventListener("input", () => {
     const q = kucukHarfeCevirTr(input.value.trim());
-    const hedefKullanicilar = TUM_KULLANICILAR.filter((u) => u.role === "special_user" || u.role === "admin" || u.role === "owner");
+    const hedefKullanicilar = TUM_KULLANICILAR.filter((u) => HEDEF_ROLLER.includes(u.role));
     const filtrelenmis = q
       ? hedefKullanicilar.filter((u) => kullaniciAramayaUyuyorMu(u, q))
       : hedefKullanicilar;
