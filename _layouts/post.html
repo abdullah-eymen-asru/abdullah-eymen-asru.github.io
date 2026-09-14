@@ -74,7 +74,15 @@ layout: default
       {% assign _veri_gecerli = true %}
     {% endif %}
   {% endif %}
-  {% if _pdf_gecerli or _veri_gecerli %}
+  {% comment %}
+    "RAPOR OLARAK YAZDIR" BUTONU — window.print() tetikler, tarayıcının
+    yerel Yazdır iletişim kutusunda kullanıcı "PDF olarak kaydet"i
+    seçebilir. Sunucu/kütüphane gerektirmez, bkz. style.css @media print
+    bloğu ve _includes/rapor-yazdirma-basligi.html. Her zaman gösterilir
+    (page.pdf_url'den BAĞIMSIZ) — pdf_url zaten hazır bir dosyaya link
+    verir, bu buton ise SAYFANIN KENDİSİNİ raporlaştırır, ikisi farklı
+    amaçlara hizmet eder ve birlikte var olabilirler.
+  {% endcomment %}
   <p class="pdf-indir-alani">
     {% if _pdf_gecerli %}
     <a href="{{ page.pdf_url | escape }}" class="pdf-indir-btn" target="_blank" rel="noopener noreferrer">
@@ -86,12 +94,16 @@ layout: default
       🗃️ Veri Seti
     </a>
     {% endif %}
+    <button type="button" class="rapor-yazdir-btn" id="rapor-yazdir-btn">
+      🖨️ Rapor Olarak Yazdır / PDF Kaydet
+    </button>
   </p>
-  {% endif %}
 
   {% if page.toc %}
   <div id="icindekiler-yeri"></div>
   {% endif %}
+
+  {% include rapor-yazdirma-basligi.html %}
 
   <div class="project-body">
     {{ content }}
