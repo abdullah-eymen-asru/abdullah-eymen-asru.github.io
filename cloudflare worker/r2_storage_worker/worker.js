@@ -29,6 +29,33 @@
  * için binding'i kullanıyor, presigned URL üretimi düz HTTP imzalama.
  */
 
+/**
+ * Owner'ın panelden ("🔐 Yetki Ayarları" sekmesi, bkz. migration 0048)
+ * kısıtlamış olabileceği bir (özellik, rol) çiftini Supabase'teki
+ * ozellik_erisimi_var_mi() RPC'sinden sorar. github_icerik_yonetim_worker
+ * içindeki AYNI isimli fonksiyonla BİREBİR aynı desen — bu iki worker
+ * birbirinden bağımsız deploy edildiği için kod PAYLAŞILMIYOR, kasıtlı
+ * olarak burada da ayrıca tanımlı.
+ */
+async function ozellikErisimVarMi(env, rol, ozellikAnahtari) {
+  try {
+    const res = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/ozellik_erisimi_var_mi`, {
+      method: "POST",
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ p_ozellik: ozellikAnahtari, p_rol: rol }),
+    });
+    if (!res.ok) return true; // RPC yoksa/hata verirse eski davranışta kal
+    const sonuc = await res.json();
+    return sonuc !== false; // sadece açıkça false ise kısıtla
+  } catch (_err) {
+    return true;
+  }
+}
+
 export default {
   async fetch(request, env) {
     const origin = request.headers.get("Origin") || request.headers.get("Referer") || "";
@@ -213,7 +240,22 @@ export default {
       // R2 dosyasını indirmeye devam edebiliyordu. Sadece 'admin' rolü
       // askıya alınabildiği için (owner asla, diğerleri bu sisteme dahil
       // değil) kontrolü tüm rollere uygulamak zararsız.
-      const herkeseAcikRolMu = !!rol && rol !== "user" && !askidaMi;
+      const herkeseAcikRolMuVarsayilan = !!rol && rol !== "user" && !askidaMi;
+
+      // EK KISIT KATMANI (migration 0048) — owner panelden ("🔐 Yetki
+      // Ayarları" sekmesi) admin/manager'ın "R2 Dosya Paylaşımı" blanket
+      // erişimini (content_access ataması ARANMADAN her dosyaya erişim)
+      // KISMIŞ olabilir. Kısıtlanmışsa bu kullanıcı artık role='user' ile
+      // AYNI yolu izler: sadece content_access'te açıkça kendisine
+      // atanmış dosyalara erişebilir. special_user/editor/owner bu ek
+      // kontrole hiç girmez (katalogda sadece admin+manager sütunu var,
+      // owner zaten hiç kısıtlanamaz) — gereksiz ağ isteğinden kaçınmak
+      // için erkenden atlanıyor.
+      let herkeseAcikRolMu = herkeseAcikRolMuVarsayilan;
+      if (herkeseAcikRolMu && (rol === "admin" || rol === "manager")) {
+        const izinli = await ozellikErisimVarMi(env, rol, "dosya_paylasimi_yonetimi");
+        if (!izinli) herkeseAcikRolMu = false;
+      }
 
       if (!herkeseAcikRolMu) {
         if (!uuidRegex.test(contentId)) {
