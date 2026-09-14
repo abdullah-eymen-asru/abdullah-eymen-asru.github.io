@@ -62,6 +62,27 @@ uye_ayarlari_css: true
       <div id="ag-kayitlar-message" class="auth-message" hidden></div>
     </section>
 
+    <section class="panel-section sadece-owner">
+      <h2>🚨 Kilit Modu (Acil Durdurma)</h2>
+      <p class="muted">
+        Açtığında Site Sahibi (sen) dışında hiçbir rol (admin/manager/editor)
+        içerik ekleyemez, düzenleyemez ya da silemez — panel açılıp mevcut
+        içerik görüntülenebilir, sadece yazma işlemleri Worker tarafında
+        reddedilir. Bir hesabın ele geçirildiğinden şüphelendiğinde, tek tek
+        rolleri değiştirmek yerine tüm yazma yetkisini anında durdurmak
+        içindir. Bu yetki sadece Site Sahibi'ne aittir.
+      </p>
+      <p>
+        Şu an durum:
+        <strong id="ag-kilit-durum">Yükleniyor...</strong>
+      </p>
+      <div class="csp-flex-gap10">
+        <button id="ag-kilit-ac-btn" type="button" class="btn-danger csp-w-auto">🔒 Kilit Modunu Aç — Yazmayı Durdur</button>
+        <button id="ag-kilit-kapat-btn" type="button" class="btn-primary csp-w-auto">🔓 Kilit Modunu Kapat — Yazmaya İzin Ver</button>
+      </div>
+      <div id="ag-kilit-message" class="auth-message" hidden></div>
+    </section>
+
     <section class="panel-section">
       <h2>🔴 Bir Admin'i Askıya Al ("Acil Fren")</h2>
       <p class="muted">
@@ -92,6 +113,34 @@ uye_ayarlari_css: true
       </p>
       <div id="ag-vaka-listesi"><p class="muted">Yükleniyor...</p></div>
       <div class="uya-sayfalama" id="ag-vaka-sayfalama"></div>
+    </section>
+
+    <section class="panel-section sadece-owner">
+      <h2>📜 Denetim Kaydı (Audit Log)</h2>
+      <p class="muted">
+        github-yonetim panelinin arkasındaki Worker'ın verdiği her yazma
+        (ekleme/düzenleme/silme) denemesinin izi — kim, ne zaman, hangi
+        dosyayı, ne sonuçla (izin verildi/reddedildi). Depolamayı
+        doldurmasın diye tek tek kayıt ya da belirli bir tarihten eskisinin
+        tamamı silinebilir; bu SADECE Site Sahibi'ne açıktır, admin bile
+        göremez/silemez.
+      </p>
+      <div class="csp-flex-gap10">
+        <label for="ag-denetim-filtre" class="muted">Göster:</label>
+        <select id="ag-denetim-filtre">
+          <option value="hepsi">Hepsi</option>
+          <option value="reddedildi">Sadece reddedilenler</option>
+          <option value="izin_verildi">Sadece izin verilenler</option>
+        </select>
+        <button id="ag-denetim-yenile-btn" type="button" class="btn-secondary csp-w-auto">🔄 Yenile</button>
+      </div>
+      <div id="ag-denetim-listesi"><p class="muted">Yükleniyor...</p></div>
+      <div class="uya-sayfalama" id="ag-denetim-sayfalama"></div>
+      <div class="csp-flex-gap10 csp-mt-14">
+        <button id="ag-denetim-30gun-temizle-btn" type="button" class="btn-secondary csp-w-auto">🧹 30 Günden Eskisini Sil</button>
+        <button id="ag-denetim-hepsi-temizle-btn" type="button" class="btn-danger csp-w-auto">🗑️ Tüm Kayıtları Sil</button>
+      </div>
+      <div id="ag-denetim-message" class="auth-message" hidden></div>
     </section>
 
     <section class="panel-section">
