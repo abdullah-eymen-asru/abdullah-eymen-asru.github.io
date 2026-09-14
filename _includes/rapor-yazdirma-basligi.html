@@ -1,0 +1,39 @@
+{% comment %}
+  _includes/rapor-yazdirma-basligi.html
+  ---------------------------------------------------------------
+  SADECE yazdırma/"PDF olarak kaydet" çıktısında görünen rapor anteti —
+  ekranda .rapor-yazdirma-basligi { display:none } (bkz. style.css) ile
+  tamamen gizli durur, @media print bloğu onu görünür kılar. Amaç: normal
+  ekran görünümünü hiç değiştirmeden, sadece kağıda/PDF'e çıktığında
+  başlık + yazar "imzası" + tarih + (varsa) özet içeren, akademik/kurumsal
+  bir rapor gibi görünen bir üst bilgi eklemek.
+
+  Bu include _layouts/post.html ve _layouts/project.html'in İKİSİNDE de
+  {{ content }}'ten (yazı gövdesinden) HEMEN ÖNCE çağrılır, böylece print
+  çıktısında antet en üstte, gövde metninin hemen üzerinde yer alır.
+
+  Kullandığı alanlar:
+    page.title    - başlık (zorunlu, zaten her yazıda var)
+    page.author   - "imza" (yoksa site.title'a, yani site sahibinin adına düşer)
+    page.date     - yayın tarihi
+    page.summary / page.ozet / page.excerpt - özet (ilk bulunan kullanılır;
+                    hiçbiri yoksa özet satırı hiç basılmaz)
+{% endcomment %}
+
+{% assign _rapor_yazar = page.author | default: site.title %}
+{% assign _rapor_ozet = page.summary | default: page.ozet | default: page.excerpt %}
+
+<div class="rapor-yazdirma-basligi">
+  <p class="rapor-site-adi">{{ site.title }}{% if site.description %} · {{ site.description }}{% endif %}</p>
+  <h1 class="rapor-baslik">{{ page.title }}</h1>
+  <p class="rapor-meta-satiri">Yazar: {{ _rapor_yazar }}</p>
+  {% if page.date %}
+  <p class="rapor-meta-satiri">
+    Yayın tarihi: {{ page.date | date: "%-d" }} {{ page.date | ay_adi_tr }} {{ page.date | date: "%Y" }}
+    {% if page.last_modified_at %} · Güncellendi: {{ page.last_modified_at | date: "%-d" }} {{ page.last_modified_at | ay_adi_tr }} {{ page.last_modified_at | date: "%Y" }}{% elsif page.guncelleme_tarihi %} · Güncellendi: {{ page.guncelleme_tarihi | date: "%-d" }} {{ page.guncelleme_tarihi | ay_adi_tr }} {{ page.guncelleme_tarihi | date: "%Y" }}{% endif %}
+  </p>
+  {% endif %}
+  {% if _rapor_ozet %}
+  <p class="rapor-ozet">{{ _rapor_ozet }}</p>
+  {% endif %}
+</div>
