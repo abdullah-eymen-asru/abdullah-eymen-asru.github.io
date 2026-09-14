@@ -25,6 +25,17 @@
  *     (site_settings.kayitlar_acik) açar/kapatır (bkz. migration
  *     0031_uyelik_kayitlarini_ac_kapat.sql). Bu sayfadaki ".sadece-owner"
  *     bölümü ("Üyelik Kayıtları") admin'den de tamamen gizlenir.
+ *   - owner_kilit_modu_ayarla(aktif) -> SADECE owner, kilit modunu
+ *     (site_settings.kilit_modu) açar/kapatır — açıkken owner DIŞINDA
+ *     kimse github-yonetim panelinden içerik yazamaz/silemez (bkz.
+ *     migration 0052_denetim_kaydi_ve_kilit_modu.sql ve
+ *     github_icerik_yonetim_worker/worker.js'teki kontrol).
+ *   - denetim_kayitlari tablosu (doğrudan select, RPC değil) -> SADECE
+ *     owner okuyabilir (RLS) — github-yonetim Worker'ının verdiği her
+ *     yazma denemesinin izi (kim/ne zaman/hangi dosya/sonuç).
+ *   - owner_denetim_kaydi_sil(id) / owner_denetim_kayitlarini_temizle(tarih)
+ *     -> SADECE owner, tek bir denetim kaydını ya da (parametre boşsa
+ *     tümünü, doluysa o tarihten eskisini) topluca siler.
  */
 import { supabase, showMessage, escapeHtml } from "./core/supabase-client.js";
 import { requireAuthOrShowError } from "./auth/auth-guard.js";
@@ -66,6 +77,8 @@ async function init() {
 
   wireAskiyaAlForm();
   wireKayitlarToggle();
+  wireKilitModuToggle();
+  wireDenetimKaydiKontrolleri();
   // KARARLILIK: Promise.all([...]) önceden kullanılıyordu — bunlardan
   // BİRİ bile hata fırlatırsa (ör. beklenmeyen bir istisna) Promise.all
   // hemen reddolur, wireRealtime() HİÇ çalışmaz VE henüz başarıyla
@@ -74,7 +87,13 @@ async function init() {
   // bölüm birbirinden BAĞIMSIZ ele alınıyor — biri başarısız olsa bile
   // diğerleri ve wireRealtime() normal çalışmaya devam ediyor (panel.js/
   // admin.js'teki "her bölüm bağımsız" prensibiyle tutarlı).
-  const sonuclar = await Promise.allSettled([loadAdminListesi(), loadVakalar(), loadKayitDurumu()]);
+  const sonuclar = await Promise.allSettled([
+    loadAdminListesi(),
+    loadVakalar(),
+    loadKayitDurumu(),
+    loadKilitDurumu(),
+    loadDenetimKayitlari(),
+  ]);
   sonuclar.forEach((sonuc, i) => {
     if (sonuc.status === "rejected") {
       console.error(`admin-guvenlik.js: init adım ${i} başarısız:`, sonuc.reason);
@@ -141,6 +160,268 @@ function wireKayitlarToggle() {
       return;
     }
     ayarla(false, kapatBtn);
+  });
+}
+
+/* ---------------------------------------------------------------------- */
+/* KİLİT MODU (Panic Button) — SADECE owner (bkz. panel/admin-guvenlik.md   */
+/* ".sadece-owner" bölümü ve migration 0052_denetim_kaydi_ve_kilit_modu.sql) */
+/* ---------------------------------------------------------------------- */
+async function loadKilitDurumu() {
+  const etiket = document.getElementById("ag-kilit-durum");
+  if (!etiket) return;
+
+  // site_settings herkese açık okunabilir (bkz. migration 0001
+  // "settings_select_anyone") — loadKayitDurumu ile AYNI mantık.
+  const { data, error } = await supabase
+    .from("site_settings")
+    .select("kilit_modu")
+    .eq("id", 1)
+    .single();
+
+  if (error || !data) {
+    etiket.textContent = "Okunamadı";
+    return;
+  }
+
+  etiket.textContent = data.kilit_modu === true ? "🔴 AKTİF — sadece Site Sahibi yazabilir" : "🟢 Kapalı — herkes kendi yetkisince yazabilir";
+}
+
+function wireKilitModuToggle() {
+  const acBtn = document.getElementById("ag-kilit-ac-btn");
+  const kapatBtn = document.getElementById("ag-kilit-kapat-btn");
+  const msg = document.getElementById("ag-kilit-message");
+  if (!acBtn || !kapatBtn) return;
+
+  async function ayarla(p_aktif, btn) {
+    btn.disabled = true;
+    // owner_kilit_modu_ayarla: SADECE owner çağırabilir (bkz. migration
+    // 0052) — admin bu RPC'yi çağırsa bile veritabanı reddeder, burada
+    // sadece bu düğmeleri ".sadece-owner" ile admin'den zaten gizliyoruz.
+    const { error } = await supabase.rpc("owner_kilit_modu_ayarla", { p_aktif });
+    btn.disabled = false;
+
+    if (error) {
+      showMessage(msg, "Değiştirilemedi: " + error.message, "error");
+      return;
+    }
+
+    showMessage(
+      msg,
+      p_aktif
+        ? "Kilit modu AÇILDI — Site Sahibi dışında kimse içerik ekleyemez/düzenleyemez/silemez."
+        : "Kilit modu kapatıldı — herkes kendi rol yetkisince yazabilir.",
+      "success"
+    );
+    await loadKilitDurumu();
+  }
+
+  acBtn.addEventListener("click", () => {
+    if (
+      !confirm(
+        "Kilit modunu açmak üzeresin: sen dışındaki TÜM admin/manager/editor'lerin içerik ekleme/düzenleme/silme yetkisi anında durur. Emin misin?"
+      )
+    ) {
+      return;
+    }
+    ayarla(true, acBtn);
+  });
+  kapatBtn.addEventListener("click", () => ayarla(false, kapatBtn));
+}
+
+/* ---------------------------------------------------------------------- */
+/* DENETİM KAYDI (Audit Log) — SADECE owner (bkz. panel/admin-guvenlik.md   */
+/* ".sadece-owner" bölümü ve migration 0052). github_icerik_yonetim_worker  */
+/* tarafından service_role ile yazılan satırları listeler; owner tek tek   */
+/* ya da toplu (owner_denetim_kaydi_sil / owner_denetim_kayitlarini_temizle) */
+/* silebilir. Sayfalama ag-vaka-* ile AYNI istemci-taraflı desen.          */
+/* ---------------------------------------------------------------------- */
+let TUM_DENETIM_KAYITLARI = [];
+let DENETIM_SAYFA = 1;
+const DENETIM_SAYFA_BOYUTU = 20;
+
+async function loadDenetimKayitlari() {
+  const kutu = document.getElementById("ag-denetim-listesi");
+  if (!kutu) return;
+
+  // RLS (migration 0052 "denetim_kayitlari_select_owner") zaten sadece
+  // owner'ın SELECT yapmasına izin veriyor — admin bu sorguyu atsa bile
+  // boş sonuç alır, bu bölüm admin'den ".sadece-owner" ile zaten gizli.
+  const { data, error } = await supabase
+    .from("denetim_kayitlari")
+    .select("id, olusturuldu, aktor_email, aktor_rol, yontem, hedef_yol, sonuc, ret_nedeni")
+    .order("olusturuldu", { ascending: false })
+    .limit(500);
+
+  if (error) {
+    kutu.innerHTML = `<p class="muted">Denetim kaydı yüklenemedi: ${escapeHtml(error.message)}</p>`;
+    renderDenetimSayfalama(0, 0);
+    return;
+  }
+
+  TUM_DENETIM_KAYITLARI = data || [];
+  renderDenetimListesi();
+}
+
+function denetimFiltreDegeri() {
+  return document.getElementById("ag-denetim-filtre")?.value || "hepsi";
+}
+
+function renderDenetimListesi() {
+  const kutu = document.getElementById("ag-denetim-listesi");
+  if (!kutu) return;
+
+  const filtre = denetimFiltreDegeri();
+  const filtreliListe =
+    filtre === "hepsi" ? TUM_DENETIM_KAYITLARI : TUM_DENETIM_KAYITLARI.filter((k) => k.sonuc === filtre);
+
+  if (filtreliListe.length === 0) {
+    kutu.innerHTML = `<p class="muted">Bu filtreyle eşleşen kayıt yok.</p>`;
+    renderDenetimSayfalama(0, 0);
+    return;
+  }
+
+  const toplamSayfa = Math.max(1, Math.ceil(filtreliListe.length / DENETIM_SAYFA_BOYUTU));
+  if (DENETIM_SAYFA > toplamSayfa) DENETIM_SAYFA = toplamSayfa;
+  const baslangic = (DENETIM_SAYFA - 1) * DENETIM_SAYFA_BOYUTU;
+  const sayfaVerisi = filtreliListe.slice(baslangic, baslangic + DENETIM_SAYFA_BOYUTU);
+
+  kutu.innerHTML = sayfaVerisi.map((k) => denetimKayitKartHtml(k)).join("");
+  wireDenetimKayitOlaylari(kutu);
+  renderDenetimSayfalama(toplamSayfa, filtreliListe.length);
+}
+
+function denetimKayitKartHtml(k) {
+  const basariliMi = k.sonuc === "izin_verildi";
+  return `
+    <div class="uya-kart" data-id="${k.id}">
+      <div class="uya-kart-ust">
+        <div class="uya-kart-kimlik">
+          <strong>${escapeHtml(k.aktor_email || "—")}</strong>
+          <span class="uya-email muted">${escapeHtml(k.aktor_rol || "—")} · ${escapeHtml(k.yontem)}</span>
+        </div>
+        <span class="uya-rol-etiket">${basariliMi ? "🟢 İzin verildi" : "🔴 Reddedildi"}</span>
+      </div>
+      <p><strong>Yol:</strong> ${escapeHtml(k.hedef_yol)}</p>
+      ${k.ret_nedeni ? `<p class="muted"><strong>Neden:</strong> ${escapeHtml(k.ret_nedeni)}</p>` : ""}
+      <div class="uya-kart-meta">
+        <span>${new Date(k.olusturuldu).toLocaleString("tr-TR")}</span>
+      </div>
+      <div class="uya-kart-aksiyonlar">
+        <button class="btn-danger tablo-aksiyon-btn ag-denetim-sil-btn" data-id="${k.id}">🗑️ Bu Kaydı Sil</button>
+      </div>
+    </div>`;
+}
+
+function renderDenetimSayfalama(toplamSayfa, toplamSonuc) {
+  const alan = document.getElementById("ag-denetim-sayfalama");
+  if (!alan) return;
+
+  if (toplamSonuc === 0 || toplamSayfa <= 1) {
+    alan.innerHTML = "";
+    return;
+  }
+
+  alan.innerHTML = `
+    <button type="button" class="uya-sayfa-btn" id="ag-denetim-sayfa-onceki" ${DENETIM_SAYFA <= 1 ? "disabled" : ""}>‹ Önceki</button>
+    <span class="uya-sayfa-gosterge">Sayfa ${DENETIM_SAYFA} / ${toplamSayfa} (${toplamSonuc} kayıt)</span>
+    <button type="button" class="uya-sayfa-btn" id="ag-denetim-sayfa-sonraki" ${DENETIM_SAYFA >= toplamSayfa ? "disabled" : ""}>Sonraki ›</button>
+  `;
+
+  document.getElementById("ag-denetim-sayfa-onceki")?.addEventListener("click", () => {
+    if (DENETIM_SAYFA <= 1) return;
+    DENETIM_SAYFA--;
+    renderDenetimListesi();
+    document.getElementById("ag-denetim-listesi")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  document.getElementById("ag-denetim-sayfa-sonraki")?.addEventListener("click", () => {
+    DENETIM_SAYFA++;
+    renderDenetimListesi();
+    document.getElementById("ag-denetim-listesi")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
+function wireDenetimKayitOlaylari(kutu) {
+  kutu.querySelectorAll(".ag-denetim-sil-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Bu denetim kaydını kalıcı olarak silmek istediğine emin misin? Bu işlem GERİ ALINAMAZ.")) return;
+
+      btn.disabled = true;
+      const { error } = await supabase.rpc("owner_denetim_kaydi_sil", { p_id: btn.dataset.id });
+      btn.disabled = false;
+
+      if (error) {
+        alert("Kayıt silinemedi: " + error.message);
+        return;
+      }
+      await loadDenetimKayitlari();
+    });
+  });
+}
+
+function wireDenetimKaydiKontrolleri() {
+  const filtre = document.getElementById("ag-denetim-filtre");
+  const yenileBtn = document.getElementById("ag-denetim-yenile-btn");
+  const otuzGunBtn = document.getElementById("ag-denetim-30gun-temizle-btn");
+  const hepsiBtn = document.getElementById("ag-denetim-hepsi-temizle-btn");
+  const msg = document.getElementById("ag-denetim-message");
+  if (!filtre) return;
+
+  filtre.addEventListener("change", () => {
+    DENETIM_SAYFA = 1;
+    renderDenetimListesi();
+  });
+
+  yenileBtn?.addEventListener("click", () => loadDenetimKayitlari());
+
+  otuzGunBtn?.addEventListener("click", async () => {
+    if (
+      !confirm(
+        "30 günden eski TÜM denetim kayıtları kalıcı olarak silinecek. Bu işlem GERİ ALINAMAZ. Emin misin?"
+      )
+    ) {
+      return;
+    }
+
+    otuzGunBtn.disabled = true;
+    const otuzGunOnce = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase.rpc("owner_denetim_kayitlarini_temizle", {
+      p_su_tarihten_once: otuzGunOnce,
+    });
+    otuzGunBtn.disabled = false;
+
+    if (error) {
+      showMessage(msg, "Temizlenemedi: " + error.message, "error");
+      return;
+    }
+    showMessage(msg, `${data ?? 0} kayıt silindi.`, "success");
+    await loadDenetimKayitlari();
+  });
+
+  hepsiBtn?.addEventListener("click", async () => {
+    if (
+      !confirm(
+        "TÜM denetim kayıtları (istisnasız hepsi) kalıcı olarak silinecek. Bu işlem GERİ ALINAMAZ. Emin misin?"
+      )
+    ) {
+      return;
+    }
+    if (!confirm("Son bir kez soruyoruz: gerçekten TÜM denetim kaydını silmek istiyor musun?")) {
+      return;
+    }
+
+    hepsiBtn.disabled = true;
+    const { data, error } = await supabase.rpc("owner_denetim_kayitlarini_temizle", {
+      p_su_tarihten_once: null,
+    });
+    hepsiBtn.disabled = false;
+
+    if (error) {
+      showMessage(msg, "Temizlenemedi: " + error.message, "error");
+      return;
+    }
+    showMessage(msg, `${data ?? 0} kayıt silindi.`, "success");
+    await loadDenetimKayitlari();
   });
 }
 
