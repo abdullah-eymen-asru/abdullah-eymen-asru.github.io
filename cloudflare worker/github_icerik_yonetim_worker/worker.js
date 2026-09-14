@@ -77,6 +77,66 @@
 const GITHUB_API = "https://api.github.com";
 
 /**
+ * DENETİM KAYDI (Audit Log) — migration 0052'deki public.denetim_kayitlari
+ * tablosuna service_role ile TEK bir satır ekler. Bilerek "fire and forget"
+ * DEĞİL — ama başarısız olsa bile (ör. migration henüz çalıştırılmadıysa,
+ * tablo yoksa) asıl isteği ASLA engellemez: audit log bir GÜVENLİK KONTROLÜ
+ * değil, sadece bir İZ'dir; loglama başarısız oldu diye meşru bir isteği
+ * reddetmek ya da yetkisiz birine yanlışlıkla izin vermek yanlış olur. Bu
+ * yüzden her çağrı kendi try/catch'i içinde, sonucu ne olursa olsun akışın
+ * geri kalanını etkilemez (bkz. çağrı noktalarındaki "await ... catch(() => {})").
+ */
+async function denetimKaydiYaz(env, { userId, kullaniciEmail, rol, yontem, hedefYol, sonuc, retNedeni }) {
+  try {
+    await fetch(`${env.SUPABASE_URL}/rest/v1/denetim_kayitlari`, {
+      method: "POST",
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({
+        aktor_id: userId || null,
+        aktor_email: kullaniciEmail || null,
+        aktor_rol: rol || null,
+        yontem,
+        hedef_yol: hedefYol,
+        sonuc,
+        ret_nedeni: sonuc === "reddedildi" ? retNedeni || null : null,
+      }),
+    });
+  } catch (_err) {
+    // Bilerek yutuluyor — bkz. fonksiyon başı notu.
+  }
+}
+
+/**
+ * KİLİT MODU (Panic Button) — migration 0052'deki site_settings.kilit_modu
+ * bayrağını okur. true dönerse, çağıran taraf owner DIŞINDAKİ hiçbir role
+ * PUT/DELETE için izin vermemelidir (GET/okuma bundan ETKİLENMEZ). Ağ hatası
+ * ya da migration henüz çalıştırılmamışsa (kolon yok) GÜVENLİ TARAFTA KAL:
+ * false döner, yani kilit AKTİF DEĞİLMİŞ gibi davranılır — bu bilinçli bir
+ * tercih: bir ağ hatası yüzünden owner'ın kendisi de dahil TÜM siteyi
+ * kilitlemek istemeyiz; kilit modu sadece AÇIKÇA true okunduğunda devreye girer.
+ */
+async function kilitModuAktifMi(env) {
+  try {
+    const res = await fetch(`${env.SUPABASE_URL}/rest/v1/site_settings?id=eq.1&select=kilit_modu`, {
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return !!data?.[0]?.kilit_modu;
+  } catch (_err) {
+    return false;
+  }
+}
+
+/**
  * Verilen yoldaki dosyanın GERÇEK (UTF-8) içeriğini GitHub'dan okuyup düz
  * metin olarak döner — dosya yoksa (404) veya herhangi bir sebeple
  * okunamazsa null döner (bu durumda çağıran, "dosya henüz yok, yeni
@@ -668,6 +728,31 @@ export default {
       return jsonHata("Bu işlem için yetkin yok.", 403);
     }
 
+    // 3.4 KİLİT MODU (Panic Button, migration 0052) — owner DIŞINDA hiçbir
+    //     rolün YAZMA (PUT/DELETE) yapmasına izin verilmez. Sadece bu ikisini
+    //     durduruyoruz; GET (panelin açılıp içeriğin görüntülenmesi) her
+    //     zaman çalışmaya devam eder, böylece kilit modundayken bile owner
+    //     dışındaki kullanıcılar en azından mevcut durumu görebilir, sadece
+    //     değiştiremez. owner bu kontrole hiç girmez (aşağıdaki koşulun
+    //     dışında kalır) — bir hesap ele geçirme şüphesinde owner kilidi
+    //     kendisi açtığı için, kendi erişimini kesmemesi gerekir.
+    if (rol !== "owner" && (request.method === "PUT" || request.method === "DELETE")) {
+      if (await kilitModuAktifMi(env)) {
+        const kilitMesaji =
+          "Site şu anda kilit modunda — Site Sahibi (owner) dışında kimse içerik ekleyemez/düzenleyemez/silemez. Bu geçicidir, Site Sahibi kilidi kaldırana kadar sürer.";
+        await denetimKaydiYaz(env, {
+          userId,
+          kullaniciEmail,
+          rol,
+          yontem: request.method,
+          hedefYol: new URL(request.url).pathname,
+          sonuc: "reddedildi",
+          retNedeni: kilitMesaji,
+        });
+        return jsonHata(kilitMesaji, 503);
+      }
+    }
+
     // 3.5 TEK İSTEKLİ TOPLU UÇ NOKTA — bkz. panelBaslangicVerisiGetir başındaki
     //     mimari notu. Diğer /contents/... akışından TAMAMEN ayrı: GitHub'a
     //     kendi içinde birden çok paralel istek atıp SONUCU TEK bir JSON'da
@@ -799,14 +884,21 @@ export default {
                 : adminBuIcerigeErisebilirMi(frontMatterAlanlariniOku(mevcutDosya), userId);
             }
             if (!sahipUyusuyorMu) {
-              return jsonHata(
-                gitkeepDosyasiMi
-                  ? "Bu klasörü sadece oluşturan kişi silebilir."
-                  : rol === "admin"
-                  ? "Bu içerik başka bir admin ya da Site Sahibi adına yayınlandı — sadece o kişi ya da Site Sahibi bu içeriği düzenleyebilir/silebilir."
-                  : "Bu içeriği düzenleme/silme yetkin yok — başka bir yazara ait.",
-                403
-              );
+              const sahiplikRetMesaji = gitkeepDosyasiMi
+                ? "Bu klasörü sadece oluşturan kişi silebilir."
+                : rol === "admin"
+                ? "Bu içerik başka bir admin ya da Site Sahibi adına yayınlandı — sadece o kişi ya da Site Sahibi bu içeriği düzenleyebilir/silebilir."
+                : "Bu içeriği düzenleme/silme yetkin yok — başka bir yazara ait.";
+              await denetimKaydiYaz(env, {
+                userId,
+                kullaniciEmail,
+                rol,
+                yontem: request.method,
+                hedefYol,
+                sonuc: "reddedildi",
+                retNedeni: sahiplikRetMesaji,
+              });
+              return jsonHata(sahiplikRetMesaji, 403);
             }
           }
         }
@@ -858,7 +950,17 @@ export default {
         }
       } else if (yalnizAdminYolu) {
         if (rol !== "admin" && rol !== "owner") {
-          return jsonHata("Bu dosya sadece admin tarafından değiştirilebilir.", 403);
+          const yalnizAdminRetMesaji = "Bu dosya sadece admin tarafından değiştirilebilir.";
+          await denetimKaydiYaz(env, {
+            userId,
+            kullaniciEmail,
+            rol,
+            yontem: request.method,
+            hedefYol,
+            sonuc: "reddedildi",
+            retNedeni: yalnizAdminRetMesaji,
+          });
+          return jsonHata(yalnizAdminRetMesaji, 403);
         }
         // EK KISIT KATMANI (migration 0048) — owner panelden ("🔐 Yetki
         // Ayarları" sekmesi) admin'in BU özelliğe erişimini KISMIŞ olabilir
@@ -940,10 +1042,18 @@ export default {
           for (const ozellikAnahtari of ozellikAnahtarlari) {
             const izinli = await ozellikErisimVarMi(env, "admin", ozellikAnahtari);
             if (!izinli) {
-              return jsonHata(
-                "Site Sahibi, bu özelliğe erişimini kısıtlamış — bu işlemi sadece Site Sahibi (owner) yapabilir.",
-                403
-              );
+              const ozellikRetMesaji =
+                "Site Sahibi, bu özelliğe erişimini kısıtlamış — bu işlemi sadece Site Sahibi (owner) yapabilir.";
+              await denetimKaydiYaz(env, {
+                userId,
+                kullaniciEmail,
+                rol,
+                yontem: request.method,
+                hedefYol,
+                sonuc: "reddedildi",
+                retNedeni: ozellikRetMesaji,
+              });
+              return jsonHata(ozellikRetMesaji, 403);
             }
           }
         }
@@ -978,6 +1088,27 @@ export default {
       }
 
       const ghRes = await fetch(hedefUrl, ghOptions);
+
+      // DENETİM KAYDI (migration 0052) — buraya kadar gelmiş bir PUT/DELETE,
+      // yukarıdaki TÜM rol/yol/sahiplik/kilit-modu kontrollerini geçmiş
+      // demektir; yani GitHub'a fiilen gönderilmiştir. ghRes.ok ise
+      // "izin_verildi", değilse (GitHub'ın kendi reddi — ör. dosya
+      // bulunamadı, sha uyuşmazlığı) "reddedildi" olarak, GitHub'ın döndüğü
+      // durumu ret_nedeni'ne yazarak logluyoruz. GET (salt okuma) bilerek
+      // LOGLANMIYOR — audit log'un amacı yazma/silme denemelerini izlemek,
+      // her sayfa görüntülemeyi kaydedip tabloyu şişirmek değil.
+      if (request.method === "PUT" || request.method === "DELETE") {
+        await denetimKaydiYaz(env, {
+          userId,
+          kullaniciEmail,
+          rol,
+          yontem: request.method,
+          hedefYol: url.pathname,
+          sonuc: ghRes.ok ? "izin_verildi" : "reddedildi",
+          retNedeni: ghRes.ok ? null : `GitHub HTTP ${ghRes.status}`,
+        });
+      }
+
       return new Response(ghRes.body, {
         status: ghRes.status,
         headers: { ...corsHeaders, "Content-Type": ghRes.headers.get("Content-Type") || "application/json" },
