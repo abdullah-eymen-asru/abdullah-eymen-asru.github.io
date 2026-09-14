@@ -234,6 +234,24 @@ function cvYoluMu(hedefYol) {
 }
 
 /**
+ * _config.yml içeriğinden tek satırlık (`anahtar: değer`) bir alanı okur —
+ * yalnizAdminYolu bloğunda profile_image/cv_url alanlarından HANGİSİNİN
+ * gerçekten değiştiğini tespit etmek için kullanılır (bkz. o bloktaki
+ * güvenlik açığı notu). frontMatterAlanlariniOku'dan farklı olarak
+ * `---` sınırlayıcı ARAMAZ — _config.yml düz bir YAML dosyası, front-matter
+ * bloğu değil.
+ */
+function configAlaniniOku(icerik, anahtar) {
+  const m = icerik.match(new RegExp(`^${anahtar}:\\s*(.*)$`, "m"));
+  if (!m) return null;
+  let deger = m[1].trim();
+  if (deger.startsWith('"') && deger.endsWith('"') && deger.length >= 2) {
+    deger = deger.slice(1, -1).replace(/\\"/g, '"');
+  }
+  return deger;
+}
+
+/**
  * Mevcut bir dosyanın front-matter'ı, kendisini düzenlemeye/silmeye
  * çalışan editor'e mi ait? Önce (varsa) GÜVENİLİR yazar_id alanı karşılaştırılır.
  * yazar_id hiç yoksa (bu alan eklenmeden ÖNCE yazılmış, çok eski bir dosya)
@@ -850,14 +868,62 @@ export default {
         // kaçınmak için erkenden atlıyoruz (veritabanı tarafında da owner
         // için sonuç zaten her zaman true, bkz. migration 0048).
         if (rol === "admin") {
-          const ozellikAnahtari = hakkimdaYolu
-            ? "hakkimda_duzenleme"
-            : cvYoluMu(hedefYol)
-            ? "cv_yonetimi"
-            : hedefYol === "assets/profil.jpg" || hedefYol === "assets/profile.webp" || hedefYol.startsWith("assets/profil")
-            ? "profil_fotografi"
-            : null;
-          if (ozellikAnahtari) {
+          let ozellikAnahtarlari = [];
+          if (hakkimdaYolu) {
+            ozellikAnahtarlari = ["hakkimda_duzenleme"];
+          } else if (cvYoluMu(hedefYol)) {
+            ozellikAnahtarlari = ["cv_yonetimi"];
+          } else if (
+            hedefYol === "assets/profil.jpg" ||
+            hedefYol === "assets/profile.webp" ||
+            hedefYol.startsWith("assets/profil")
+          ) {
+            ozellikAnahtarlari = ["profil_fotografi"];
+          } else if (hedefYol === CONFIG_YOLU_SABIT) {
+            // GÜVENLİK AÇIĞI DÜZELTMESİ — _config.yml hem "profile_image"
+            // (profil_fotografi özelliği) hem "cv_url" (cv_yonetimi
+            // özelliği) alanlarını tutuyor. Yukarıdaki iki dal sadece
+            // GERÇEK DOSYA yollarını (assets/profil*, assets/cv/*)
+            // kontrol ediyordu — bu ORTAK ayar dosyasının KENDİSİ hiç
+            // kontrol edilmiyordu. Sonuç: owner "cv_yonetimi"ni admin
+            // için kapatsa bile, admin hiç PDF yüklemeden (assets/cv/*
+            // yoluna dokunmadan), SADECE _config.yml'deki cv_url satırını
+            // (dış bağlantı) doğrudan değiştirerek kısıtlamayı tamamen
+            // atlatabiliyordu — aynı açık profile_image için de geçerliydi.
+            // Çözüm: PUT gövdesini oku, mevcut dosyayla karşılaştır,
+            // SADECE GERÇEKTEN DEĞİŞEN alan(lar) için ilgili özelliği
+            // kontrol listesine ekle (değişmeyen alanı gereksiz kısıtlama).
+            if (request.method === "PUT") {
+              try {
+                const govdeKopyasi = request.clone();
+                const istekGovdesi = await govdeKopyasi.json();
+                const b64Icerik = istekGovdesi?.content;
+                if (typeof b64Icerik === "string") {
+                  const binary = atob(b64Icerik.replace(/\n/g, ""));
+                  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+                  const yeniIcerik = new TextDecoder("utf-8").decode(bytes);
+                  const eskiIcerik = (await githubDosyaOku(env, CONFIG_YOLU_SABIT)) || "";
+                  if (configAlaniniOku(yeniIcerik, "profile_image") !== configAlaniniOku(eskiIcerik, "profile_image")) {
+                    ozellikAnahtarlari.push("profil_fotografi");
+                  }
+                  if (configAlaniniOku(yeniIcerik, "cv_url") !== configAlaniniOku(eskiIcerik, "cv_url")) {
+                    ozellikAnahtarlari.push("cv_yonetimi");
+                  }
+                }
+              } catch (_err) {
+                // Gövde ayrıştırılamadıysa güvenli tarafta kal: HANGİ alanın
+                // değiştiğini bilemediğimiz için İKİSİNİ DE kontrol listesine
+                // ekliyoruz (aksi hâlde açığı kapatmamış oluruz).
+                ozellikAnahtarlari = ["profil_fotografi", "cv_yonetimi"];
+              }
+            } else {
+              // _config.yml için DELETE (normalde hiç kullanılmaz — site
+              // yapılandırma dosyası silinmez) — hangi alanın etkilendiği
+              // belirsiz, güvenli tarafta kalıp ikisini de kontrol et.
+              ozellikAnahtarlari = ["profil_fotografi", "cv_yonetimi"];
+            }
+          }
+          for (const ozellikAnahtari of ozellikAnahtarlari) {
             const izinli = await ozellikErisimVarMi(env, "admin", ozellikAnahtari);
             if (!izinli) {
               return jsonHata(
