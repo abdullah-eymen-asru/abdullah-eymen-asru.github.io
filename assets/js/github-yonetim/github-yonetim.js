@@ -294,6 +294,39 @@ const OZELLIK_KATALOGU = [
     aciklama: "Admin panelindeki R2 dosya paylaşım linki oluşturma — content_access ataması aranmadan HERHANGİ bir dosyaya erişim.",
     rolSutunlari: ["admin", "manager"],
   },
+  {
+    // bkz. migration 0053 — bu üçü (yazi_ekleme/duzenleme/silme) editor/
+    // manager/admin'in ÜÇÜNE de açık, çünkü _posts/_projects zaten bu üç
+    // role de rol bazında açık (bkz. worker.js icerikYoneticisiMi). owner
+    // bunları BİRBİRİNDEN BAĞIMSIZ kapatabilir — ör. editor'ın
+    // yazi_duzenleme'si açık kalırken yazi_silme'si kapatılabilir.
+    anahtar: "yazi_ekleme",
+    baslik: "Yeni Yazı/Proje Ekleme",
+    aciklama: "\"Yeni İçerik Ekle\" formuyla _posts veya _projects altına HENÜZ VAR OLMAYAN bir dosya oluşturma.",
+    rolSutunlari: ["editor", "manager", "admin"],
+  },
+  {
+    anahtar: "yazi_duzenleme",
+    baslik: "Mevcut Yazı/Proje Düzenleme",
+    aciklama: "_posts/_projects altında VAR OLAN bir yazı/projeyi düzenleme. Sahiplik kuralları (editor sadece kendi yazısı, manager tümü, admin kendi/olağan yazılar) bu anahtardan BAĞIMSIZ olarak hâlâ geçerlidir.",
+    rolSutunlari: ["editor", "manager", "admin"],
+  },
+  {
+    anahtar: "yazi_silme",
+    baslik: "Yazı/Proje Silme",
+    aciklama: "_posts/_projects altında bir yazı/projeyi silme — düzenleme yetkisinden BAĞIMSIZDIR (ör. bir rol düzenleyebilir ama silemez şeklinde ayarlanabilir). Sahiplik kuralları burada da geçerlidir.",
+    rolSutunlari: ["editor", "manager", "admin"],
+  },
+  {
+    // bkz. migration 0053 (EK bölümü) — yazi_* anahtarlarından TAMAMEN
+    // BAĞIMSIZ: bir rolün yeni yazı EKLEYEBİLMESİ, yeni bir KLASÖR
+    // açabileceği anlamına gelmez. "Yeniden Adlandır" da içeride .gitkeep
+    // taşıdığı için bu anahtara tabidir (gerçek dosyalar hâlâ yazi_*'a tabi).
+    anahtar: "klasor_yonetimi",
+    baslik: "Klasör Oluşturma / Silme",
+    aciklama: "_posts/_projects altında BOŞ bir alt klasör oluşturma, silme ya da yeniden adlandırma (site yapısını değiştirme). Editor kendi oluşturduğu boş klasörü hariç, bu kapalıyken hiçbir klasör işlemi yapamaz.",
+    rolSutunlari: ["editor", "manager", "admin"],
+  },
 ];
 
 /** Sıradan bir kullanıcının (owner OLMAYAN) kendi rolü için bir özelliğe
@@ -345,12 +378,17 @@ async function init() {
   const { profile } = await requireAuthOrShowError({ role: ["editor", "manager"] });
   GIRIS_YAPAN_PROFIL = profile;
 
-  // "Yetki Ayarları" (migration 0048) — sayfa açılışında BİR KEZ, kendi
+  // "Yetki Ayarları" (migration 0048/0053) — sayfa açılışında BİR KEZ, kendi
   // rolüm için hangi özelliklere erişimim olduğunu (owner'ın panelden
   // kısıtlamış olabileceği) çekiyoruz. BİLEREK #app GÖRÜNÜR OLMADAN ÖNCE
   // (aşağıdaki satırdan ÖNCE) çalıştırılıyor — bkz. hemen altındaki
   // rolBazliArayuzuUygula() çağrısının neden burada olduğunu açıklayan not.
-  if (GIRIS_YAPAN_PROFIL?.role === "admin") {
+  // ESKİDEN sadece role === "admin" için çalışıyordu (0048'in 3 özelliği
+  // SADECE admin'i ilgilendiriyordu) — migration 0053 ile editor/manager de
+  // (yazi_ekleme/duzenleme/silme) kısıtlanabilir olduğu için artık owner
+  // DIŞINDA HERKES için çalışıyor (owner zaten her zaman izinli, RPC'ye hiç
+  // sormaya gerek yok — bkz. migration 0048 ozellik_erisimi_var_mi kısayolu).
+  if (GIRIS_YAPAN_PROFIL?.role && GIRIS_YAPAN_PROFIL.role !== "owner") {
     await Promise.all(
       OZELLIK_KATALOGU.map(async ({ anahtar }) => {
         try {
@@ -746,6 +784,22 @@ async function guncelleIcerikTuru() {
     : proje
     ? "Yeni Akademik Proje Ekle"
     : "Yeni Blog Yazısı Ekle";
+
+  // YETKİ AYARLARI (migration 0053) — "yazi_ekleme" kapalıysa VE düzenleme
+  // modunda DEĞİLSEK (yani gerçekten yeni bir şey ekleniyorsa), kaydet
+  // butonlarını (a/b/c seçenekleri) önceden devre dışı bırakıp sebebini
+  // gösteriyoruz — böylece kullanıcı formu doldurup en sonda (icerikKaydet
+  // içindeki asıl kontrole çarpıp) hayal kırıklığına uğramak yerine daha
+  // en baştan durumu görüyor. Düzenleme modundaysa (mevcut bir kaydı
+  // açtıysa) bu kısıt HİÇ uygulanmaz — "Düzenle" butonu zaten
+  // "yazi_duzenleme" ile ayrıca kontrol ediliyor (bkz. icerikKartiCiz).
+  const yeniEklemeEngelli = !duzenlemeModuMu() && !ozellikErisimVarMiClient("yazi_ekleme");
+  const yeniEklemeUyariEl = document.getElementById("ic-yazi-ekleme-engelli-uyari");
+  if (yeniEklemeUyariEl) yeniEklemeUyariEl.hidden = !yeniEklemeEngelli;
+  ["ic-submit-btn", "ic-submit-b-btn", "ic-submit-c-btn"].forEach((id) => {
+    const btn = document.getElementById(id);
+    if (btn) btn.disabled = yeniEklemeEngelli;
+  });
 }
 
 /**
@@ -1274,6 +1328,17 @@ function wireKlasorYonetimi() {
   const yeniAdInput = document.getElementById("kl-yeni-ad");
   if (!yenileBtn || !olusturBtn || !yeniAdInput) return;
 
+  // YETKİ AYARLARI (migration 0053 eki) — "klasor_yonetimi" kapalıysa
+  // oluşturma alanını en baştan devre dışı bırak (klasorOlustur() içindeki
+  // asıl kontrole hiç gerek kalmadan kullanıcıyı önceden bilgilendirir).
+  if (!ozellikErisimVarMiClient("klasor_yonetimi")) {
+    olusturBtn.disabled = true;
+    yeniAdInput.disabled = true;
+    yeniAdInput.placeholder = "Site Sahibi bu yetkiyi kapatmış";
+    const uyari = document.getElementById("kl-yonetimi-engelli-uyari");
+    if (uyari) uyari.hidden = false;
+  }
+
   document.querySelectorAll(".gy-klasor-tur-sekme").forEach((btn) => {
     btn.addEventListener("click", () => {
       KLASOR_SEKME_TUR = btn.dataset.klasorTur;
@@ -1346,6 +1411,17 @@ async function klasorOlustur() {
   const input = document.getElementById("kl-yeni-ad");
   const btn = document.getElementById("kl-olustur-btn");
   msgEl.hidden = true;
+
+  // YETKİ AYARLARI (migration 0053 eki) — owner "klasor_yonetimi"yi
+  // kapatmışsa, GitHub'a hiç istek atmadan burada durduruyoruz. Gerçek
+  // sınır worker.js'te (4.0 kontrolü, "klasor_yonetimi" anahtarı) — bu
+  // sadece kullanıcıyı reddedilecek bir isteği denemekten caydıran bir
+  // kolaylık katmanı.
+  if (!ozellikErisimVarMiClient("klasor_yonetimi")) {
+    showMessage(msgEl, "Site Sahibi, rolünün klasör oluşturma yetkisini kapatmış.", "error");
+    return;
+  }
+
   const kokKlasor = kokKlasorAdi(KLASOR_SEKME_TUR);
 
   const ad = klasorAdiTemizle(input.value.trim());
@@ -1423,9 +1499,16 @@ function klasorKartiCiz(k) {
   // github_icerik_yonetim_worker/worker.js), burası sadece butonu önceden
   // gizleyen bir kolaylık katmanı. manager/admin bu kısıttan etkilenmez.
   const editorBaskasininKlasoruMu = GIRIS_YAPAN_PROFIL?.role === "editor" && k.sahipId !== GIRIS_YAPAN_PROFIL?.id;
-  const silDevreDisi = dolu || editorBaskasininKlasoruMu;
+  // YETKİ AYARLARI (migration 0053 eki) — "klasor_yonetimi" kapalıysa,
+  // sahiplik ne olursa olsun (editor kendi klasörü olsa BİLE) hem Sil hem
+  // Yeniden Adlandır tamamen gizlenir — bu ikisi ile sahiplik kontrolü
+  // BİRBİRİNE EKLENEREK uygulanır (en kısıtlayıcı olan kazanır).
+  const klasorYonetimiKapaliMi = !ozellikErisimVarMiClient("klasor_yonetimi");
+  const silDevreDisi = dolu || editorBaskasininKlasoruMu || klasorYonetimiKapaliMi;
   const silBaslik = dolu
     ? "Önce içindeki dosyaları başka bir klasöre taşı ya da sil"
+    : klasorYonetimiKapaliMi
+    ? "Site Sahibi, rolünün klasör silme yetkisini kapatmış"
     : editorBaskasininKlasoruMu
     ? "Bu klasörü sadece oluşturan kişi (içerik sorumlusu/admin) silebilir"
     : "";
@@ -1435,11 +1518,11 @@ function klasorKartiCiz(k) {
       <div class="gy-klasor-kart-meta">${k.dosyaSayisi} ${k.kokKlasor === "_projects" ? "proje" : "yazı"}</div>
     </div>
     <div class="gy-klasor-kart-aksiyonlar">
-      <button type="button" class="gy-klasor-yenidenadlandir-btn">Yeniden Adlandır</button>
+      ${klasorYonetimiKapaliMi ? "" : '<button type="button" class="gy-klasor-yenidenadlandir-btn">Yeniden Adlandır</button>'}
       <button type="button" class="gy-klasor-sil-btn" ${silDevreDisi ? "disabled" : ""} title="${silBaslik}">Sil</button>
     </div>
   `;
-  kart.querySelector(".gy-klasor-yenidenadlandir-btn").addEventListener("click", () => klasorYenidenAdlandir(k));
+  kart.querySelector(".gy-klasor-yenidenadlandir-btn")?.addEventListener("click", () => klasorYenidenAdlandir(k));
   const silBtn = kart.querySelector(".gy-klasor-sil-btn");
   if (!silDevreDisi) {
     silBtn.addEventListener("click", () => klasorSil(k));
@@ -1459,6 +1542,15 @@ function klasorKartiCiz(k) {
 async function klasorYenidenAdlandir(k) {
   const msgEl = document.getElementById("kl-message");
   msgEl.hidden = true;
+
+  // YETKİ AYARLARI (migration 0053 eki) — buton zaten klasorKartiCiz'de
+  // klasor_yonetimi kapalıyken hiç render edilmiyor; bu ek kontrol sadece
+  // savunma amaçlı ikinci bir katman (asıl sınır worker.js'te).
+  if (!ozellikErisimVarMiClient("klasor_yonetimi")) {
+    showMessage(msgEl, "Site Sahibi, rolünün klasör yeniden adlandırma yetkisini kapatmış.", "error");
+    return;
+  }
+
   const yeniAdHam = window.prompt(`"${k.kokKlasor}/${k.ad}/" klasörünü nasıl adlandırmak istersin?`, k.ad);
   if (yeniAdHam === null) return;
   const yeniAd = klasorAdiTemizle(yeniAdHam.trim());
@@ -2228,6 +2320,19 @@ async function icerikKaydet(secenek = "a") {
   const msgEl = document.getElementById("ic-message");
   const submitBtn = document.getElementById(SECENEK_BUTON_ID[secenek] || SECENEK_BUTON_ID.a);
   msgEl.hidden = true;
+
+  // YETKİ AYARLARI (migration 0053) — owner "yazi_ekleme"yi kapatmışsa, bu
+  // form DÜZENLEME modunda DEĞİLKEN (yani gerçekten YENİ bir dosya
+  // oluşturuluyorken) kaydetmeyi burada, GitHub'a hiç istek atmadan
+  // durduruyoruz. Düzenleme modundaysa (duzenlemeModuMu() true) bu kontrol
+  // HİÇ uygulanmaz — o zaten "yazi_duzenleme" ile ayrı kısıtlanıyor (bkz.
+  // icerikKartiCiz'deki "Düzenle" butonu gizleme kontrolü) ve worker.js
+  // zaten gerçek sınırı sunucu tarafında uyguluyor; bu sadece kullanıcıyı
+  // reddedilecek bir isteği denemekten önceden caydıran bir kolaylık.
+  if (!duzenlemeModuMu() && !ozellikErisimVarMiClient("yazi_ekleme")) {
+    showMessage(msgEl, "Site Sahibi, rolünün yeni yazı/proje ekleme yetkisini kapatmış.", "error");
+    return;
+  }
 
   const tur = icerikTuru();
   const title = document.getElementById("ic-title").value.trim();
@@ -3403,13 +3508,16 @@ function icerikKartiCiz(item, tur) {
     // için (front-matter parse edilemedi) editor için varsayılan "kendisine
     // ait değil" sayılır — bkz. icerikKendisineMiAit.
     const editorKisitliMi = GIRIS_YAPAN_PROFIL?.role === "editor" && !icerikKendisineMiAit(item);
+    // bkz. migration 0053 — Düzenle burada zaten yok (içerik okunamadığı
+    // için form doldurulamaz), ama Sil için AYNI "yazi_silme" kontrolü.
+    const silGosterilsinMi = !editorKisitliMi && ozellikErisimVarMiClient("yazi_silme");
     kart.innerHTML = `
       <div class="gy-icerik-kart-bilgi">
         <div class="gy-icerik-kart-baslik">${metniVurgula(item.data.title)}<span class="gy-rozet gy-rozet--gizli">Hata</span></div>
         <div class="gy-icerik-kart-meta">${metniVurgula(item.path)}</div>
       </div>
       <div class="gy-icerik-kart-aksiyonlar">
-        ${editorKisitliMi ? "" : '<button type="button" class="gy-sil-btn">Sil</button>'}
+        ${silGosterilsinMi ? '<button type="button" class="gy-sil-btn">Sil</button>' : ""}
       </div>
     `;
     kart.querySelector(".gy-sil-btn")?.addEventListener("click", () => icerikSil(item));
@@ -3578,10 +3686,20 @@ function icerikKartiCiz(item, tur) {
   // Sahibi adına" işaretli bir taslakta hedef/owner/oluşturan DIŞINDAKİ bir
   // admin de artık Düzenle/Sil butonlarını GÖRMEZ (bkz. digerAdminErisimEngelliMi
   // yukarıda) — gerçek sınır yine Supabase RLS'idir (migration 0028).
-  const duzenleSilBtnleri = editorKisitliMi || digerAdminErisimEngelliMi
-    ? ""
-    : `<button type="button" class="gy-duzenle-btn">Düzenle</button>
-       <button type="button" class="gy-sil-btn">Sil</button>`;
+  //
+  // YETKİ AYARLARI (migration 0053) — owner panelden Düzenle ve Sil'i
+  // BİRBİRİNDEN BAĞIMSIZ kapatmış olabilir (bkz. OZELLIK_KATALOGU
+  // "yazi_duzenleme"/"yazi_silme"). Bu kontrol yukarıdaki sahiplik
+  // kontrollerinin ÜZERİNE eklenir — ikisi de geçerli olmalı ki buton
+  // görünsün. ozellikErisimVarMiClient owner için hep true döner (bkz. o
+  // fonksiyonun init()'te owner'ı hiç sorgulamaması), bu yüzden owner
+  // burada hiç etkilenmez.
+  const digerErisimEngeli = editorKisitliMi || digerAdminErisimEngelliMi;
+  const duzenleGosterilsinMi = !digerErisimEngeli && ozellikErisimVarMiClient("yazi_duzenleme");
+  const silGosterilsinMi = !digerErisimEngeli && ozellikErisimVarMiClient("yazi_silme");
+  const duzenleSilBtnleri =
+    (duzenleGosterilsinMi ? '<button type="button" class="gy-duzenle-btn">Düzenle</button>' : "") +
+    (silGosterilsinMi ? '<button type="button" class="gy-sil-btn">Sil</button>' : "");
 
   kart.innerHTML = `
     <div class="gy-icerik-kart-bilgi">
@@ -5004,6 +5122,7 @@ async function cvKaldir() {
 /* hesaplar.                                                              */
 /* ---------------------------------------------------------------------- */
 const YA_ROL_ETIKETLERI = {
+  editor: "Yazar (Editor)",
   admin: "Yönetici (Admin)",
   manager: "İçerik Sorumlusu (Manager)",
 };
