@@ -189,6 +189,66 @@ async function githubDosyaOku(env, yol) {
 }
 
 /**
+ * BUG FİX (migration 0053 4.0/4.1 kontrolleri) — githubDosyaOku() yukarıda
+ * "dosya yok" (404) İLE "GitHub'a hiç ulaşılamadı / geçici bir hata oldu"
+ * durumlarının İKİSİNDE DE aynı şekilde null döndürüyor; bu iki durum
+ * BİRBİRİNDEN TAMAMEN FARKLI anlamlara gelir ve "yazi_ekleme"/
+ * "yazi_duzenleme" ayrımını yapan koda göre KRİTİK bir fark yaratır:
+ *
+ *   - Dosya GERÇEKTEN yoksa (404) -> bu bir "yazi_ekleme" (yeni içerik).
+ *   - Dosya VARDIR ama GitHub'a geçici bir ağ/rate-limit hatası yüzünden
+ *     ULAŞILAMADIYSA -> bu aslında bir "yazi_duzenleme" (mevcut dosyanın
+ *     üzerine yazılıyor) ama githubDosyaOku'nun null dönmesi yüzünden
+ *     YANLIŞLIKLA "yazi_ekleme" sayılabilir. Bunun İKİ SONUCU olur:
+ *     (a) owner "yazi_ekleme=true, yazi_duzenleme=false" ayarlamışsa,
+ *         normalde reddedilmesi gereken bir DÜZENLEME isteği YANLIŞLIKLA
+ *         KABUL EDİLİR (yetki atlatma);
+ *     (b) 4.1'deki SAHİPLİK kontrolü de aynı mevcutDosyaOn'a bakıyor —
+ *         "dosya yok" sanıldığı için sahiplik kontrolü de HİÇ ÇALIŞMAZ,
+ *         yani bir editor başkasının yazısının üzerine sahiplik
+ *         kontrolünden geçmeden yazabilir.
+ *
+ * Bu yüzden 4.0/4.1'de artık githubDosyaOku YERİNE bu fonksiyon
+ * kullanılıyor: GitHub'a gerçekten ULAŞILAMADIYSA (ağ hatası, 5xx, vb.)
+ * HATA FIRLATIR (belirsizlik varken "dosya yok" varsaymak yerine isteği
+ * güvenli tarafta - yani reddederek - durdurmak için) — SADECE GitHub
+ * kesin ve net bir şekilde 404 dönerse "dosya yok" (null) sonucunu verir.
+ * Diğer çağrı noktası (CONFIG_YOLU_SABIT okuması, satır ~1104) bu
+ * belirsizlikten ETKİLENMİYOR (orada "yoksa boş string" davranışı zaten
+ * doğru ve kasıtlı), o yüzden ORADA hâlâ eski githubDosyaOku kullanılıyor.
+ */
+async function githubDosyaVarMiKesin(env, yol) {
+  const res = await fetch(
+    `${GITHUB_API}/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${yol
+      .split("/")
+      .map(encodeURIComponent)
+      .join("/")}`,
+    {
+      headers: {
+        Authorization: `token ${env.GITHUB_PAT}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "abdullah-eymen-asru-github-icerik-worker",
+      },
+      cf: { cacheTtl: 0, cacheEverything: false },
+    }
+  );
+  if (res.status === 404) return null; // GERÇEKTEN yok — güvenle "yazi_ekleme" denebilir.
+  if (!res.ok) {
+    // 404 DIŞINDA bir hata (403 rate limit, 5xx, vb.) — dosyanın var olup
+    // olmadığı BELİRSİZ. "Yok" varsaymak (yazi_ekleme'ye düşürmek) yetki
+    // atlatmaya açık olduğu için, burada isteği tamamen durduruyoruz.
+    throw new Error(`GitHub'a ulaşılamadı (HTTP ${res.status}) — dosyanın var olup olmadığı doğrulanamadı.`);
+  }
+  const veri = await res.json();
+  if (typeof veri.content !== "string") return null;
+  const temizB64 = veri.content.replace(/\n/g, "");
+  const binary = atob(temizB64);
+  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+  return new TextDecoder("utf-8").decode(bytes);
+}
+
+/**
  * Basit front-matter alan okuyucu — assets/js/github-yonetim.js'teki
  * frontMatterOku'nun SADE bir alt kümesi, burada sadece sahiplik kontrolü
  * için gereken birkaç alana (olusturan_id, yazar_id, author) ihtiyaç var.
@@ -868,9 +928,17 @@ export default {
         //      değerlendirilir (aşağıdaki yaziOzelligi seçimi buna göre
         //      dallanıyor).
         const gitkeepDosyasiMiOn = hedefYol === ".gitkeep" || hedefYol.endsWith("/.gitkeep");
-        let mevcutDosyaOn; // undefined = henüz sorulmadı, null = sorgulandı ve dosya yok, obje = sorgulandı ve dosya var
+        let mevcutDosyaOn; // undefined = henüz sorulmadı, null = KESİN olarak dosya yok, obje = sorgulandı ve dosya var
         if (rol !== "owner" && (request.method === "PUT" || request.method === "DELETE")) {
-          mevcutDosyaOn = await githubDosyaOku(env, hedefYol);
+          try {
+            mevcutDosyaOn = await githubDosyaVarMiKesin(env, hedefYol);
+          } catch (err) {
+            // bkz. githubDosyaVarMiKesin başındaki BUG FİX notu — dosyanın
+            // var olup olmadığı belirsizken (GitHub'a ulaşılamadı) sessizce
+            // "yok" varsayıp yazi_ekleme'ye düşürmek yerine isteği burada
+            // güvenli tarafta durduruyoruz.
+            return jsonHata("GitHub'a ulaşılamadı, tekrar dener misin? (" + err.message + ")", 502);
+          }
           const yaziOzelligi = gitkeepDosyasiMiOn
             ? "klasor_yonetimi"
             : request.method === "DELETE"
@@ -944,14 +1012,23 @@ export default {
         // istek sadece "diğer adminler" ile ilgili).
         if ((rol === "editor" || rol === "admin") && (request.method === "PUT" || request.method === "DELETE")) {
           // KÜÇÜK OPTİMİZASYON: 4.0 bloğu (yukarıda) artık gitkeep DAHİL
-          // owner-olmayan her PUT/DELETE için githubDosyaOku çağırıp
+          // owner-olmayan her PUT/DELETE için githubDosyaVarMiKesin çağırıp
           // mevcutDosyaOn'a koyuyor — burada AYNI dosyayı ikinci kez
           // GitHub'a sormaya gerek yok. mevcutDosyaOn === undefined SADECE
           // rol === "owner" iken kalır (4.0 hiç çalışmadı), ama owner zaten
           // bu bloğa (rol === "editor" || "admin" koşulu) hiç girmiyor —
           // yani pratikte bu dal artık hiç tetiklenmez, sadece gelecekte
           // 4.0'ın koşulu değişirse diye güvenlik amaçlı bırakıldı.
-          const mevcutDosya = mevcutDosyaOn === undefined ? await githubDosyaOku(env, hedefYol) : mevcutDosyaOn;
+          let mevcutDosya;
+          if (mevcutDosyaOn === undefined) {
+            try {
+              mevcutDosya = await githubDosyaVarMiKesin(env, hedefYol);
+            } catch (err) {
+              return jsonHata("GitHub'a ulaşılamadı, tekrar dener misin? (" + err.message + ")", 502);
+            }
+          } else {
+            mevcutDosya = mevcutDosyaOn;
+          }
           if (mevcutDosya) {
             let sahipUyusuyorMu;
             if (rol === "editor") {
