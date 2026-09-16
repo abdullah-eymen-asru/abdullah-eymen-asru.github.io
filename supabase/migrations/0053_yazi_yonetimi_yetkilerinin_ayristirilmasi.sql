@@ -1,0 +1,152 @@
+-- ============================================================================
+-- 0053_yazi_yonetimi_yetkilerinin_ayristirilmasi.sql
+--
+-- (Dosya adı "yazı yönetimi" diyor ama İKİNCİ bir ek olarak dosyanın SONUNA
+-- "klasor_yonetimi" özelliği de eklendi — bkz. dosyanın alt kısmındaki "EK"
+-- başlıklı bölüm. Ayrı bir migration numarası açmak yerine buraya eklendi
+-- çünkü kavramsal olarak aynı işin (CMS yazma yetkilerinin ince taneli hale
+-- getirilmesi) bir parçası.)
+--
+-- İSTEK: "Yetki Ayarları" matrisi (migration 0048 + 0051) şimdiye kadar
+-- profil fotoğrafı/hakkımda/CV (SADECE admin) ve özel içerik/dosya paylaşımı
+-- (admin+manager) özelliklerini kapsıyordu — ama panelin EN SIK kullanılan
+-- kısmı olan "_posts/_projects'e yazı/proje ekleme-düzenleme-silme" (yani
+-- github-yonetim.js'in editor/manager/admin'e açık ANA CMS akışı) hiç bu
+-- sisteme dahil değildi. Owner bugüne kadar "editor artık YENİ yazı
+-- ekleyemesin" ya da "editor kendi yazısını bile SİLEMESİN, sadece
+-- düzenleyebilsin" gibi ince ayarlar yapamıyordu — ya rol tamamen
+-- editor/manager/admin'di (o zaman TÜM CMS'e erişiyordu) ya da hiç değildi.
+--
+-- BU MİGRATION NE EKLİYOR (mevcut mekanizmanın ÜZERİNE, migration 0048/0051
+-- ile AYNI desen — YENİ tablo/fonksiyon GEREKMEZ, ozellik_erisimleri tablosu
+-- zaten herhangi bir metin anahtarını kabul ediyor):
+--
+--   "yazi_ekleme"     — _posts/_projects altına YENİ dosya oluşturma
+--                        (PUT ile GitHub'da HENÜZ VAR OLMAYAN bir yola
+--                        yazma). Varsayılan: editor, manager, admin (owner
+--                        her zaman kısıtsız).
+--   "yazi_duzenleme"  — _posts/_projects altında MEVCUT bir dosyayı PUT ile
+--                        değiştirme (içerik güncelleme, front-matter
+--                        düzenleme). Sahiplik kuralları (editor sadece
+--                        kendi yazısı, admin sadece kendi/"admin adına
+--                        olmayan" yazı — bkz. migration 0028) DEĞİŞMEDİ; bu
+--                        özellik o kuralların ÜZERİNE, "bu rol düzenleme
+--                        YAPABİLSİN Mİ" sorusunu ekliyor.
+--   "yazi_silme"      — _posts/_projects altında DELETE. Kullanıcının
+--                        istediği "silme, düzenlemeden bağımsız bir switch
+--                        olsun" tam olarak bu — owner artık "editor kendi
+--                        yazısını düzenleyebilsin ama SİLEMESİN" diyebilir
+--                        (yazi_duzenleme=true, yazi_silme=false).
+--
+-- Bu üçü de rolSutunlari: ["editor", "manager", "admin"] olacak (owner hariç
+-- HERKES, çünkü bu ana CMS akışı 0048'deki 3 özelliğin aksine editor/manager/
+-- admin'in ÜÇÜNE de açık — bkz. worker.js "icerikYoneticisiMi" kontrolü).
+--
+-- ÖNEMLİ SINIRLAMA (bu migration İLK yazıldığında böyleydi — artık GEÇERSİZ,
+-- bkz. aşağıdaki "EK" bölümü): bu üç anahtar SADECE _posts/_projects (yani
+-- "icerikYolu" — bkz. worker.js) için geçerlidir; .gitkeep (klasör
+-- oluşturma/silme) buna dahil DEĞİLDİR — bir editor'ın "yazi_ekleme" yetkisi
+-- kapatılsa bile boş bir klasör açıp kapatabilmesi (organizasyon amaçlı)
+-- ayrı bir haktır. [GÜNCELLEME: bu artık "klasor_yonetimi" anahtarıyla
+-- kapsama dahil edildi — aşağıdaki "EK" bölümüne bakın.]
+--
+-- Gerçek/bağlayıcı kontrol cloudflare worker/github_icerik_yonetim_worker/
+-- worker.js içinde YAPILMALI (bu migration'ın parçası DEĞİL, elle deploy
+-- edilmesi gerekiyor — ayrı dosya) ve panel JS'inde (github-yonetim.js
+-- OZELLIK_KATALOGU'na 3 yeni satır + ilgili wireX() fonksiyonlarında buton
+-- gizleme). migration'ın kendisi sadece bu 3 anahtarı DOKÜMANTE ediyor —
+-- ozellik_erisimi_var_mi/owner_ozellik_erisimi_ayarla fonksiyonları zaten
+-- herhangi bir (özellik, rol) çiftiyle çalıştığından burada YENİ bir SQL
+-- objesi oluşturmaya gerek yok.
+--
+-- Owner hiçbir şey değiştirmezse (tablo bu üç özellik için boşsa) site
+-- AYNEN eskisi gibi davranmaya devam eder — editor/manager/admin bugünkü
+-- gibi yazı ekleyip düzenleyip silebilir.
+--
+-- ============================================================================
+-- EK: "klasor_yonetimi" (bkz. yukarıdaki "ÖNEMLİ SINIRLAMA" notu — bu migration
+-- İLK yazıldığında .gitkeep bilerek kapsam dışı bırakılmıştı, şimdi ekleniyor)
+-- ============================================================================
+--
+--   "klasor_yonetimi" — _posts/_projects altında BOŞ bir alt klasör
+--                        oluşturma (.gitkeep PUT, dosya GitHub'da henüz
+--                        yokken) veya BOŞ bir alt klasörü silme (.gitkeep
+--                        DELETE). "Klasörü Yeniden Adlandır" da içeride
+--                        dosya kopyalama (PUT) + eski dosyaları silme
+--                        (DELETE) yaptığı için bu anahtardan DOLAYLI olarak
+--                        etkilenir — ama SADECE .gitkeep dosyaları için;
+--                        klasördeki GERÇEK yazı/proje dosyalarının kopyalanıp
+--                        silinmesi yine yazi_ekleme/yazi_duzenleme/yazi_silme
+--                        anahtarlarına tabidir (bkz. worker.js'teki ilgili
+--                        blok). Yani "klasor_yonetimi" kapalı ama
+--                        "yazi_duzenleme" açık bir rol, dolu bir klasörü
+--                        yeniden adlandırmaya çalışırsa dosyaları taşıyabilir
+--                        ama klasörün KENDİSİNİ (boşken) oluşturamaz/silemez —
+--                        bu son derece nadir bir kombinasyon, günlük
+--                        kullanımda owner genelde ikisini birlikte açar/kapatır.
+--
+--                        rolSutunlari: editor, manager, admin. Varsayılan
+--                        (özellik hiç ayarlanmamışsa) mevcut davranışla AYNI:
+--                        editor SADECE KENDİ oluşturduğu boş klasörü
+--                        silebilir/yeniden adlandırabilir (bkz.
+--                        gitkeepSahibiId — bu kural klasor_yonetimi'nden
+--                        BAĞIMSIZ, ÜZERİNE eklenir, kaldırmaz), manager/admin
+--                        her boş klasörü yönetebilir.
+--
+-- Karşılık gelen kod değişiklikleri (AYRI, bu migration'ın parçası değil):
+--   - worker.js: "icerikYolu" bloğunun 4.0 kontrolünde artık .gitkeep
+--     dosyaları da (önceden "KAPSAM DIŞI" tutuluyordu) "klasor_yonetimi"
+--     anahtarıyla kontrol ediliyor — sahiplik kontrolü (editor sadece kendi
+--     oluşturduğu boş klasör) HÂLÂ AYRICA, bu kontrolün ÜZERİNE uygulanıyor.
+--   - github-yonetim.js: OZELLIK_KATALOGU'na "klasor_yonetimi" satırı,
+--     "Klasör Oluştur" formunu ve klasör kartlarındaki "Sil"/"Yeniden
+--     Adlandır" butonlarını buna göre gizleyen kontroller.
+-- ============================================================================
+
+-- Bu migration'ın SQL olarak yapması gereken TEK şey: hiçbir şey. Yukarıda
+-- açıklanan 3 yeni özellik anahtarı (yazi_ekleme, yazi_duzenleme, yazi_silme)
+-- migration 0048'in ozellik_erisimleri tablosunda ekstra bir satır/kolon
+-- GEREKTİRMEDEN, sadece worker.js ve github-yonetim.js tarafında
+-- "ozellik_erisimi_var_mi('yazi_ekleme', ...)" gibi yeni bir anahtar STRING'İ
+-- olarak kullanılmaya başlanır. Aşağıdaki select, migration'ın çalıştığını
+-- (ve altyapının hazır olduğunu) doğrulamak için sadece bir "no-op" kontrolü.
+do $$
+begin
+  if not exists (
+    select 1 from pg_proc where proname = 'ozellik_erisimi_var_mi'
+  ) then
+    raise exception 'migration 0048 önce çalıştırılmalı — public.ozellik_erisimi_var_mi bulunamadı.';
+  end if;
+end $$;
+
+-- ============================================================================
+-- OZELLIK_KATALOGU EKLENTİSİ (bilgi amaçlı — bkz. migration 0048 sonu):
+--
+--   "yazi_ekleme"     — _posts/_projects altına yeni yazı/proje ekleme.
+--                        rolSutunlari: editor, manager, admin.
+--   "yazi_duzenleme"  — _posts/_projects altında mevcut yazı/proje
+--                        düzenleme (sahiplik kuralları hâlâ geçerli).
+--                        rolSutunlari: editor, manager, admin.
+--   "yazi_silme"      — _posts/_projects altında yazı/proje silme
+--                        (sahiplik kuralları hâlâ geçerli). Düzenlemeden
+--                        BAĞIMSIZ: bir rolün yazi_duzenleme=true,
+--                        yazi_silme=false olması mümkündür.
+--                        rolSutunlari: editor, manager, admin.
+--   "klasor_yonetimi" — _posts/_projects altında BOŞ klasör oluşturma/
+--                        silme/yeniden adlandırma (.gitkeep dosyaları).
+--                        yazi_* anahtarlarından TAMAMEN BAĞIMSIZDIR.
+--                        rolSutunlari: editor, manager, admin.
+--
+-- Karşılık gelen kod değişiklikleri (AYRI, bu migration'ın parçası değil):
+--   - cloudflare worker/github_icerik_yonetim_worker/worker.js: "icerikYolu"
+--     bloğunun başında, sahiplik kontrolünden ÖNCE, .gitkeep ise
+--     "klasor_yonetimi", değilse yeni dosya mı (PUT + GitHub'da yok =
+--     "yazi_ekleme") yoksa mevcut dosya mı (PUT + var = "yazi_duzenleme",
+--     DELETE = "yazi_silme") ayrımına göre ozellikErisimVarMi(env, rol,
+--     anahtar) çağrısı.
+--   - assets/js/github-yonetim/github-yonetim.js: OZELLIK_KATALOGU'na 4
+--     yeni satır + "Yeni Yazı/Proje Ekle" formunu, mevcut kartlardaki
+--     "Düzenle"/"Sil" butonlarını ve "Klasör Oluştur"/klasör kartlarındaki
+--     "Sil"/"Yeniden Adlandır" butonlarını KENDİ rolü için
+--     ozellikErisimVarMiClient ile gizleyen kontroller.
+-- ============================================================================
