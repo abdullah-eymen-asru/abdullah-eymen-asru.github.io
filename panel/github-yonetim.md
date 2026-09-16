@@ -55,6 +55,9 @@ permalink: "/panel/github-yonetim.html"
 
       <section id="icerik-ekle" class="panel-section">
         <h2 id="ic-form-baslik">Yeni İçerik Ekle</h2>
+        <p id="ic-yazi-ekleme-engelli-uyari" class="auth-message auth-message--error" hidden>
+          Site Sahibi, rolünün yeni yazı/proje ekleme yetkisini kapatmış — mevcut bir içeriği düzenlemek için "Mevcut İçerikler" sekmesindeki "Düzenle" butonunu kullanabilirsin.
+        </p>
 
         <div class="form-field">
           <label>İçerik Türü</label>
@@ -444,6 +447,9 @@ permalink: "/panel/github-yonetim.html"
           <input id="kl-yeni-ad" type="text" placeholder="Yeni klasör adı (örn. 2027 ya da seyahat)" autocomplete="off">
           <button id="kl-olustur-btn" type="button" class="btn-primary csp-w-auto">➕ Klasör Oluştur</button>
         </div>
+        <p id="kl-yonetimi-engelli-uyari" class="auth-message auth-message--error" hidden>
+          Site Sahibi, rolünün klasör oluşturma/silme/yeniden adlandırma yetkisini kapatmış — bu, kendi oluşturduğun klasörler için de geçerlidir.
+        </p>
         <div id="kl-message" class="auth-message" hidden></div>
 
         <div id="kl-liste"><p class="muted">Henüz yüklenmedi.</p></div>
