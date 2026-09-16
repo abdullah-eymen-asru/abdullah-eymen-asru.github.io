@@ -72,6 +72,17 @@
  * SUPABASE_SERVICE_ROLE_KEY'i (yukarıdaki ikisi, YENİ bir değişken GEREKMEZ)
  * kullanarak public.ozellik_erisimi_var_mi RPC'sine sorup uygular (bkz.
  * aşağıdaki ozellikErisimVarMi() ve "yalnizAdminYolu" bloğu).
+ *
+ * YETKİ AYARLARI — YAZI EKLEME/DÜZENLEME/SİLME (migration 0053) — AYNI
+ * mekanizmanın "yazi_ekleme"/"yazi_duzenleme"/"yazi_silme" anahtarlarıyla
+ * _posts/_projects'e (icerikYolu) uygulanan hâli; owner artık "editor
+ * düzenleyebilsin ama SİLEMESİN" gibi düzenleme/silmeyi birbirinden BAĞIMSIZ
+ * kısıtlayabiliyor (bkz. "icerikYolu" bloğunun başındaki 4.0 kontrolü).
+ *
+ * YETKİ AYARLARI — KLASÖR YÖNETİMİ (migration 0053'ün EKİ) — AYNI 4.0
+ * kontrolü, .gitkeep dosyaları (yani "boş klasör oluştur/sil") için de
+ * "klasor_yonetimi" anahtarıyla çalışır; yazi_* anahtarlarından TAMAMEN
+ * BAĞIMSIZDIR (bir rol yazı ekleyebilir ama yeni klasör açamaz olabilir).
  */
 
 const GITHUB_API = "https://api.github.com";
@@ -826,6 +837,70 @@ export default {
       if (icerikYolu) {
         // editor/manager/admin — zaten icerikYoneticisiMi ile yukarıda kontrol edildi.
         //
+        // 4.0) YAZI EKLEME/DÜZENLEME/SİLME + KLASÖR YÖNETİMİ YETKİ AYARLARI
+        //      (migration 0053) — owner panelden ("🔐 Yetki Ayarları"
+        //      sekmesi) bir rolün _posts/_projects üzerindeki YENİ YAZI
+        //      EKLEME, MEVCUT YAZI DÜZENLEME, SİLME ve (AYRICA) BOŞ KLASÖR
+        //      OLUŞTURMA/SİLME yetkilerini birbirinden BAĞIMSIZ olarak
+        //      kapatabilir (ör. "editor düzenleyebilsin ama SİLEMESİN", ya
+        //      da "editor yazı ekleyebilsin ama yeni klasör AÇAMASIN").
+        //      Bu kontrol aşağıdaki 4.1 SAHİPLİK kontrolünden ÖNCE çalışır —
+        //      yani bir rolün bu özelliği tamamen kapalıysa, sahiplik hiç
+        //      önemli değildir (kendi yazısı/klasörü olsa bile giremez).
+        //      owner bu bloğa hiç girmez (aşağıdaki "rol !== 'owner'"
+        //      koşulu), her zaman kısıtsızdır.
+        //
+        //      GET isteklerine (panelin içerik listelemesi/okuması)
+        //      UYGULANMAZ — sadece PUT (ekleme/düzenleme) ve DELETE (silme)
+        //      için.
+        //
+        //      .GITKEEP DOSYALARI (klasör oluşturma/silme) — bu migration
+        //      İLK yazıldığında bilerek KAPSAM DIŞI bırakılmıştı ("editor'ın
+        //      organizasyon amaçlı boş klasör açıp kapatması ayrı bir
+        //      haktır" notuyla). Artık AYRI bir "klasor_yonetimi" anahtarıyla
+        //      kapsama dahil edildi — çünkü owner'ın "editor'lar yeni yazı
+        //      ekleyebilsin ama site yapısını (klasör ağacını) DEĞİŞTİREMESİN"
+        //      diyebilmesi de makul bir ihtiyaç. Not: "Klasörü Yeniden
+        //      Adlandır" özelliği içeride hem .gitkeep hem GERÇEK yazı/proje
+        //      dosyalarını taşıdığı için, o işlem sırasında GERÇEK dosyalar
+        //      hâlâ yazi_ekleme/yazi_duzenleme/yazi_silme'ye, .gitkeep'in
+        //      kendisi ise klasor_yonetimi'ne tabidir — ikisi ayrı ayrı
+        //      değerlendirilir (aşağıdaki yaziOzelligi seçimi buna göre
+        //      dallanıyor).
+        const gitkeepDosyasiMiOn = hedefYol === ".gitkeep" || hedefYol.endsWith("/.gitkeep");
+        let mevcutDosyaOn; // undefined = henüz sorulmadı, null = sorgulandı ve dosya yok, obje = sorgulandı ve dosya var
+        if (rol !== "owner" && (request.method === "PUT" || request.method === "DELETE")) {
+          mevcutDosyaOn = await githubDosyaOku(env, hedefYol);
+          const yaziOzelligi = gitkeepDosyasiMiOn
+            ? "klasor_yonetimi"
+            : request.method === "DELETE"
+            ? "yazi_silme"
+            : mevcutDosyaOn
+            ? "yazi_duzenleme"
+            : "yazi_ekleme";
+          const yaziIzinli = await ozellikErisimVarMi(env, rol, yaziOzelligi);
+          if (!yaziIzinli) {
+            const yaziRetMesaji =
+              yaziOzelligi === "yazi_ekleme"
+                ? "Site Sahibi, rolünün yeni yazı/proje ekleme yetkisini kapatmış."
+                : yaziOzelligi === "yazi_duzenleme"
+                ? "Site Sahibi, rolünün mevcut yazı/proje düzenleme yetkisini kapatmış."
+                : yaziOzelligi === "klasor_yonetimi"
+                ? "Site Sahibi, rolünün klasör oluşturma/silme (yeniden adlandırma dahil) yetkisini kapatmış."
+                : "Site Sahibi, rolünün yazı/proje silme yetkisini kapatmış — düzenleme yetkin olsa bile silemezsin.";
+            await denetimKaydiYaz(env, {
+              userId,
+              kullaniciEmail,
+              rol,
+              yontem: request.method,
+              hedefYol,
+              sonuc: "reddedildi",
+              retNedeni: yaziRetMesaji,
+            });
+            return jsonHata(yaziRetMesaji, 403);
+          }
+        }
+        //
         // 4.1) SAHİPLİK KONTROLÜ — role='editor' İÇİN TAM (manager'a bu
         //      kısıt HİÇ uygulanmaz, migration 0016'daki gibi "editor ile
         //      aynı yazma yetkisi" onda hâlâ TÜM içeriği kapsıyor);
@@ -857,7 +932,7 @@ export default {
         // (kim oluşturdu) gösterir ve düz metinde "olusturan_id: <uuid>" satırı
         // olarak tutulur (bkz. gitkeepIcerigiOlustur). Bu yüzden ayrı bir okuyucuyla
         // (gitkeepSahipIdOku) kontrol ediliyor.
-        const gitkeepDosyasiMi = hedefYol === ".gitkeep" || hedefYol.endsWith("/.gitkeep");
+        const gitkeepDosyasiMi = gitkeepDosyasiMiOn;
         // MİGRATION 0028 § C: eskiden bu blok SADECE rol === "editor" için
         // çalışıyordu ("manager ve admin'e bu kısıt HİÇ uygulanmaz" —
         // yorum aşağıda buna göre güncellendi). Artık rol === "admin" da
@@ -868,7 +943,15 @@ export default {
         // ama TÜM içeriği kapsar" tasarımı manager için değişmedi, bu
         // istek sadece "diğer adminler" ile ilgili).
         if ((rol === "editor" || rol === "admin") && (request.method === "PUT" || request.method === "DELETE")) {
-          const mevcutDosya = await githubDosyaOku(env, hedefYol);
+          // KÜÇÜK OPTİMİZASYON: 4.0 bloğu (yukarıda) artık gitkeep DAHİL
+          // owner-olmayan her PUT/DELETE için githubDosyaOku çağırıp
+          // mevcutDosyaOn'a koyuyor — burada AYNI dosyayı ikinci kez
+          // GitHub'a sormaya gerek yok. mevcutDosyaOn === undefined SADECE
+          // rol === "owner" iken kalır (4.0 hiç çalışmadı), ama owner zaten
+          // bu bloğa (rol === "editor" || "admin" koşulu) hiç girmiyor —
+          // yani pratikte bu dal artık hiç tetiklenmez, sadece gelecekte
+          // 4.0'ın koşulu değişirse diye güvenlik amaçlı bırakıldı.
+          const mevcutDosya = mevcutDosyaOn === undefined ? await githubDosyaOku(env, hedefYol) : mevcutDosyaOn;
           if (mevcutDosya) {
             let sahipUyusuyorMu;
             if (rol === "editor") {
