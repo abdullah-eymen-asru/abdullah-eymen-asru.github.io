@@ -58,39 +58,56 @@ const MODULES = {
 // #view-* elemanının sonu), module (MODULES anahtarı) }
 const NAV = [
   {
-    group: "📝 İçerik Yönetimi",
+    group: "İçerik Yönetimi",
+    icon: "📝",
     items: [
-      { id: "content-all", label: "Tüm Yazılar & Projeler", module: "gy" },
-      { id: "content-new", label: "Yeni İçerik Ekle", module: "gy" },
-      { id: "content-private", label: "Özel / Gizli Makaleler", module: "admin" },
-      { id: "content-folders", label: "Klasör Yönetimi", module: "gy" },
+      { id: "content-all", icon: "📚", label: "Tüm Yazılar & Projeler", module: "gy" },
+      { id: "content-new", icon: "➕", label: "Yeni İçerik Ekle", module: "gy" },
+      { id: "content-private", icon: "🔒", label: "Özel / Gizli Makaleler", module: "admin" },
+      { id: "content-folders", icon: "📁", label: "Klasör Yönetimi", module: "gy" },
     ],
   },
   {
-    group: "📁 Medya & Takip",
+    group: "Medya & Takip",
+    icon: "📁",
     items: [
-      { id: "media-r2", label: "R2 Dosya Paylaşımı", module: "admin" },
-      { id: "media-izleme", label: "İzleme ve Okuma Yönetimi", module: "izleme" },
-      { id: "media-cv", label: "Özgeçmiş (CV) & Profil Görseli", module: "gy" },
+      { id: "media-r2", icon: "🗂️", label: "R2 Dosya Paylaşımı", module: "admin" },
+      { id: "media-izleme", icon: "🎬", label: "İzleme ve Okuma Yönetimi", module: "izleme" },
+      { id: "media-cv", icon: "📄", label: "Özgeçmiş (CV) & Profil Görseli", module: "gy" },
     ],
   },
   {
-    group: "👥 Kullanıcı & İletişim",
+    group: "Kullanıcı & İletişim",
+    icon: "👥",
     items: [
-      { id: "users-uye", label: "Üye Ayarları", module: "uye" },
-      { id: "users-mesajlar", label: "Sohbet / Mesajlar", module: "mesajlar" },
+      { id: "users-uye", icon: "👤", label: "Üye Ayarları", module: "uye" },
+      { id: "users-mesajlar", icon: "💬", label: "Sohbet / Mesajlar", module: "mesajlar" },
     ],
   },
   {
-    group: "⚙️ Sistem & Güvenlik",
+    group: "Sistem & Güvenlik",
+    icon: "⚙️",
     items: [
-      { id: "sys-guvenlik", label: "Admin Güvenliği", module: "guvenlik" },
-      { id: "sys-github", label: "GitHub / Worker Bağlantı Durumu", module: "gy" },
-      { id: "sys-hakkimda", label: "Hakkımda & Sosyal Linkler", module: "gy" },
-      { id: "sys-hesabim", label: "Hesabım (Tehlikeli Bölge)", module: "admin" },
+      { id: "sys-guvenlik", icon: "🛡️", label: "Admin Güvenliği", module: "guvenlik" },
+      // MADDE 4: "Yetki Ayarları" eskiden "GitHub / Worker Bağlantı Durumu"
+      // görünümünün ALTINDA, ikinci bir blok olarak duruyordu — aslında
+      // bambaşka bir konu olduğu için artık KENDİ sekmesi. Script'i (gy)
+      // aynı, ama görünürlüğü owner'a sabitlenmiş durumda: github-yonetim.js
+      // -> wireYetkiAyarlari() zaten owner değilse bölümü DOM'dan siliyor,
+      // burada da sidebar linkini hiç çizmiyoruz (item.role override'ı).
+      { id: "sys-yetki", icon: "🔐", label: "Yetki Ayarları", module: "gy", role: "owner" },
+      { id: "sys-github", icon: "🔑", label: "GitHub / Worker Bağlantısı", module: "gy" },
+      { id: "sys-hakkimda", icon: "🙋", label: "Hakkımda & Sosyal Linkler", module: "gy" },
+      { id: "sys-hesabim", icon: "⚠️", label: "Hesabım (Tehlikeli Bölge)", module: "admin" },
     ],
   },
 ];
+
+// Bir sekmenin gerektirdiği rol: varsa sekmenin KENDİ "role" alanı
+// (ör. Yetki Ayarları -> owner), yoksa modülün rolü.
+function itemRole(item) {
+  return item.role !== undefined ? item.role : MODULES[item.module].role;
+}
 
 /* ------------------------------------------------------------------ */
 /* 2) Rol kontrolü — auth-guard.js -> requireAuth() ile AYNI mantık    */
@@ -182,29 +199,100 @@ function buildSidebar(profile) {
 
   for (const group of NAV) {
     const visibleItems = group.items.filter((it) =>
-      roleAllowed(MODULES[it.module].role, profile)
+      roleAllowed(itemRole(it), profile)
     );
     if (visibleItems.length === 0) continue;
 
-    const h = document.createElement("div");
-    h.className = "dash-nav-group-title";
-    h.textContent = group.group;
-    nav.appendChild(h);
+    // ANA SEKME (accordion başlığı). Eskiden burası tıklanamayan düz bir
+    // yazıydı ve altındaki TÜM linkler her zaman açıktı — sol menüde aynı
+    // anda 13 satır yazı durduğu için kalabalık görünüyor, odağı
+    // dağıtıyordu. Artık 4 ana sekme var; sadece içinde bulunduğun grup
+    // açık kalıyor (aşağıdaki gruplariAc/accordion mantığı).
+    const baslik = document.createElement("button");
+    baslik.type = "button";
+    baslik.className = "dash-nav-group";
+    baslik.setAttribute("aria-expanded", "false");
+
+    const etiket = document.createElement("span");
+    etiket.className = "dash-nav-group-label";
+    etiket.textContent = `${group.icon} ${group.group}`;
+
+    const ok = document.createElement("span");
+    ok.className = "dash-nav-group-ok";
+    ok.textContent = "›";
+    ok.setAttribute("aria-hidden", "true");
+
+    baslik.append(etiket, ok);
+
+    const kutu = document.createElement("div");
+    kutu.className = "dash-nav-group-items";
+    kutu.hidden = true;
+    const kutuId = `dash-nav-grup-${NAV.indexOf(group)}`;
+    kutu.id = kutuId;
+    baslik.setAttribute("aria-controls", kutuId);
+
+    baslik.addEventListener("click", () => {
+      const acik = baslik.getAttribute("aria-expanded") === "true";
+      // Akordeon: bir grup açılınca diğerleri kapanır (menü hiçbir zaman
+      // uzun bir liste haline gelmez). Aynı gruba tekrar basmak kapatır.
+      kapatTumGruplar();
+      if (!acik) acGrup(baslik);
+    });
+
+    nav.append(baslik, kutu);
 
     for (const item of visibleItems) {
       const a = document.createElement("a");
       a.href = `#${item.id}`;
-      a.textContent = item.label;
       a.dataset.viewId = item.id;
       a.dataset.module = item.module;
+
+      const ikon = document.createElement("span");
+      ikon.className = "dash-nav-ikon";
+      ikon.textContent = item.icon || "•";
+      ikon.setAttribute("aria-hidden", "true");
+
+      const yazi = document.createElement("span");
+      yazi.textContent = item.label;
+
+      a.append(ikon, yazi);
       a.addEventListener("click", (e) => {
         e.preventDefault();
         showView(item.id, item.module);
         closeMobileSidebar();
       });
-      nav.appendChild(a);
+      kutu.appendChild(a);
     }
   }
+}
+
+function acGrup(baslik) {
+  baslik.setAttribute("aria-expanded", "true");
+  const kutu = document.getElementById(baslik.getAttribute("aria-controls"));
+  if (kutu) kutu.hidden = false;
+}
+
+function kapatTumGruplar() {
+  document.querySelectorAll(".dash-nav-group").forEach((b) => {
+    b.setAttribute("aria-expanded", "false");
+    const kutu = document.getElementById(b.getAttribute("aria-controls"));
+    if (kutu) kutu.hidden = true;
+  });
+}
+
+// Aktif sekmeyi içeren grubu aç, diğerlerini kapat; ayrıca kapalı grubun
+// başlığında da aktiflik belli olsun diye işaretle.
+function aktifGrubuAc(viewId) {
+  const link = document.querySelector(`#dash-nav a[data-view-id="${viewId}"]`);
+  const kutu = link?.closest(".dash-nav-group-items");
+  document.querySelectorAll(".dash-nav-group").forEach((b) => {
+    const icerir = b.getAttribute("aria-controls") === kutu?.id;
+    b.dataset.aktifIcerir = icerir ? "true" : "false";
+  });
+  if (!kutu) return;
+  kapatTumGruplar();
+  const baslik = kutu.previousElementSibling;
+  if (baslik) acGrup(baslik);
 }
 
 async function showView(viewId, moduleKey) {
@@ -221,6 +309,15 @@ async function showView(viewId, moduleKey) {
     .querySelector(`#dash-nav a[data-view-id="${viewId}"]`)
     ?.classList.add("active");
 
+  aktifGrubuAc(viewId);
+
+  // Mobil üst şeritte "şu an hangi sekmedeyim" yazsın — dar ekranda
+  // sidebar kapalı olduğu için tek ipucu bu.
+  const basligiAl =
+    NAV.flatMap((g) => g.items).find((it) => it.id === viewId)?.label || "";
+  const topbarBaslik = document.getElementById("dash-topbar-baslik");
+  if (topbarBaslik) topbarBaslik.textContent = basligiAl;
+
   activeViewId = viewId;
   history.replaceState(null, "", `#${viewId}`);
 
@@ -230,7 +327,7 @@ async function showView(viewId, moduleKey) {
 function firstAvailableView(profile) {
   for (const group of NAV) {
     for (const item of group.items) {
-      if (roleAllowed(MODULES[item.module].role, profile)) return item;
+      if (roleAllowed(itemRole(item), profile)) return item;
     }
   }
   return null;
@@ -246,6 +343,24 @@ function closeMobileSidebar() {
   document.getElementById("dash-nav-toggle")?.setAttribute("aria-expanded", "false");
 }
 
+/*
+ * MADDE 1 — İKİ HAMBURGER ÜST ÜSTE GELİYORDU:
+ * Panelin düğmesi eskiden "position: fixed; top:12px; left:12px" idi ve
+ * tam olarak sitenin kendi header hamburger'ının (#nav-toggle) üstüne
+ * oturuyordu; iki menü tek düğme gibi görünüyor, site menüsüne (sekmeler
+ * arası geçiş) dokunmak mümkün olmuyordu. Düğme artık akışın içinde,
+ * header'ın ALTINDAKİ kendi şeridinde (.dash-topbar). Bu şeridin sticky
+ * konumunun header'ın gerçek yüksekliğini bilmesi gerekiyor (header mobilde
+ * satır kaydırabiliyor), o yüzden yüksekliği burada ölçüp CSS değişkeni
+ * olarak yazıyoruz.
+ */
+function olcuHeaderYuksekligi() {
+  const header = document.querySelector(".site-header");
+  const shell = document.querySelector(".dash-shell");
+  if (!header || !shell) return;
+  shell.style.setProperty("--dash-header-h", `${Math.round(header.getBoundingClientRect().height)}px`);
+}
+
 function wireMobileNav() {
   const toggle = document.getElementById("dash-nav-toggle");
   const sidebar = document.getElementById("dash-sidebar");
@@ -258,6 +373,14 @@ function wireMobileNav() {
     toggle.setAttribute("aria-expanded", open ? "true" : "false");
   });
   overlay.addEventListener("click", closeMobileSidebar);
+
+  // Escape ile de kapansın (site menüsündeki desenle aynı).
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeMobileSidebar();
+  });
+
+  olcuHeaderYuksekligi();
+  window.addEventListener("resize", olcuHeaderYuksekligi);
 }
 
 /* ------------------------------------------------------------------ */
@@ -287,7 +410,7 @@ async function init() {
     ? NAV.flatMap((g) => g.items).find((it) => it.id === requestedId)
     : null;
   const target =
-    requested && roleAllowed(MODULES[requested.module].role, profile)
+    requested && roleAllowed(itemRole(requested), profile)
       ? requested
       : firstAvailableView(profile);
 
