@@ -1,4 +1,3 @@
-
 /*
  * assets/js/auth/nav-auth.js
  *
