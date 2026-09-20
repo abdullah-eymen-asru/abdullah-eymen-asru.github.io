@@ -262,6 +262,26 @@ permalink: "/panel/github-yonetim.html"
               </span>
             </label>
           </div>
+          <div class="form-field" id="ic-sadece-supabase-wrap">
+            <label class="gy-toggle-satir" for="ic-sadece-supabase">
+              <span class="gy-toggle">
+                <input id="ic-sadece-supabase" type="checkbox" role="switch">
+                <span class="gy-toggle-track"><span class="gy-toggle-thumb"></span></span>
+              </span>
+              <span class="gy-toggle-metin">
+                <strong>GitHub yerine Supabase'te depola</strong>
+                <span class="muted">
+                  Açarsan içerik GitHub'a HİÇ commit edilmez, sadece
+                  Supabase'te durur — ama yine de GERÇEKTEN yayındadır: blog/proje
+                  listesinde görünür, kendi adresi vardır ve arama motorlarınca
+                  indekslenebilir. Kapalıyken içerik (mevcut yöntemle) GitHub'a
+                  commit edilir. Bu anahtar sadece "Yayında" açıkken geçerlidir;
+                  "Yayında" kapalıyken içerik zaten gizli olarak Supabase'e
+                  taslak gider.
+                </span>
+              </span>
+            </label>
+          </div>
           <div class="form-field">
             <label class="gy-toggle-satir" for="ic-reklam">
               <span class="gy-toggle">
@@ -374,18 +394,15 @@ permalink: "/panel/github-yonetim.html"
             <strong>🅱️ Supabase'e Kaydet ve GitHub ile Yayınla:</strong>
             içerik hem Supabase'e (kalıcı bir yedek/arama kaydı olarak) hem
             de GitHub'a yazılır — ikisi de aynı içeriği gösterir, panelde
-            tek bir kart olarak listelenir.
-            <strong>🅲️ Sadece Supabase'te Yayınla:</strong> içerik GitHub'a
-            HİÇ commit edilmez — reponun git geçmişinde hiçbir zaman yer
-            almaz — ama yine de GERÇEKTEN yayındadır: blog/proje listesinde
-            görünür, kendi sayfası vardır ve normal bir yazı gibi
-            paylaşılabilir. Sonradan istersen "Mevcut İçerikler" listesinden
-            aynı yazıyı GitHub'a da aktarabilirsin.
+            tek bir kart olarak listelenir. İçeriği GitHub'a hiç commit
+            etmeden sadece Supabase'te yayınlamak için yukarıdaki
+            "GitHub yerine Supabase'te depola" anahtarını aç. Sonradan
+            istersen "Mevcut İçerikler" listesinden aynı yazıyı GitHub'a da
+            aktarabilirsin.
           </p>
           <div class="csp-flex-gap10-wrap">
             <button type="submit" id="ic-submit-btn" class="btn-primary csp-w-auto">🅰️ Doğrudan GitHub'a Aktar ve Yayınla</button>
             <button type="button" id="ic-submit-b-btn" class="btn-primary csp-w-auto" hidden>🅱️ Supabase'e Kaydet ve GitHub ile Yayınla</button>
-            <button type="button" id="ic-submit-c-btn" class="btn-secondary csp-w-auto" hidden>🅲️ Sadece Supabase'te Yayınla (GitHub'a Commit Atma)</button>
             <button type="button" id="ic-iptal-btn" class="btn-danger csp-w-auto" hidden>Düzenlemeyi İptal Et</button>
           </div>
         </form>
