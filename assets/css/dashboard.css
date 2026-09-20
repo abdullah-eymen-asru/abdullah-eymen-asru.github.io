@@ -39,6 +39,26 @@
  *    kolon: tüm alt bloklar arasında 24px nefes payı var.
  * ========================================================================== */
 
+/*
+ * STICKY GÜVENCESİ (tarayıcı uyumu): assets/style.css içinde <html> ve
+ * <body> için "overflow-x: hidden" var (mobil yatay taşmayı kesmek için,
+ * bilinçli). Ama CSS spesifikasyonu gereği bir eksende "hidden",
+ * diğer ekseni örtük olarak "auto"ya çevirir — yani <html> bir kaydırma
+ * kabı haline gelir. Bu, bazı tarayıcılarda (özellikle eski Safari)
+ * içerideki "position: sticky" elemanların (bizim sol menümüz ve mobil
+ * üst şeridimiz) yapışmayı bırakıp sayfayla birlikte kaybolmasına yol
+ * açıyor. "overflow-x: clip" AYNI kırpmayı yapar ama kaydırma kabı
+ * YARATMAZ, dolayısıyla sticky her yerde çalışır. Desteklemeyen
+ * tarayıcılar (Safari 15 ve öncesi) ikinci satırı yok sayıp bir
+ * üstteki hidden davranışında kalır — yani hiçbir şey bozulmaz.
+ * Bu kural SADECE dashboard.css yüklenen sayfada geçerli.
+ */
+html,
+body {
+  overflow-x: hidden;
+  overflow-x: clip;
+}
+
 .dash-shell {
   /* Header yüksekliği JS'te ölçülüp buraya yazılır (dashboard.js ->
      olcuHeaderYuksekligi). JS çalışmazsa 72px makul bir varsayılan. */
@@ -51,6 +71,14 @@
      ortalar; hedef ebeveynden darsa margin pozitif olur ve düzen yine
      bozulmaz. 100vw yerine "100vw - 40px" kullanmak dikey kaydırma
      çubuğunun yol açabileceği yatay taşmayı da önler. */
+  /* TARAYICI UYUMU: "margin-inline" Safari 14.1 / Firefox 66 öncesinde
+     yoktur, "min()" ise Safari 13.4 öncesinde. Bu yüzden önce klasik
+     margin-left/right, sonra modern kısayol yazılıyor: destekleyen
+     tarayıcı ikincisini kullanır, desteklemeyen ilkini — ikisi de
+     anlaşılmazsa panel sadece .wrap genişliğinde (860px) kalır, yani
+     BOZULMAZ, sadece darlaşır (graceful degradation). */
+  margin-left: calc(50% - min(var(--dash-max-w), 100vw - 40px) / 2);
+  margin-right: calc(50% - min(var(--dash-max-w), 100vw - 40px) / 2);
   margin-inline: calc(50% - min(var(--dash-max-w), 100vw - 40px) / 2);
 
   display: grid;
@@ -65,7 +93,11 @@
 .dash-sidebar {
   position: sticky;
   top: calc(var(--dash-header-h) + 8px);
+  /* dvh: mobil tarayıcılarda adres çubuğu açılıp kapanırken 100vh
+     "zıplar" ve panelin altı ekran dışında kalırdı. dvh bunu çözüyor;
+     desteklemeyen tarayıcı bir üstteki vh satırında kalır. */
   max-height: calc(100vh - var(--dash-header-h) - 16px);
+  max-height: calc(100dvh - var(--dash-header-h) - 16px);
   overflow-y: auto;
   overscroll-behavior: contain;
   border: 1px solid var(--border);
@@ -126,6 +158,7 @@
 }
 
 .dash-nav-group:hover {
+  background: var(--tag-bg); /* color-mix desteklemeyen tarayıcılar için */
   background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
@@ -181,10 +214,12 @@
 }
 
 #dash-nav a:hover {
+  background: var(--tag-bg);
   background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 #dash-nav a.active {
+  background: var(--tag-bg);
   background: color-mix(in srgb, var(--accent) 16%, transparent);
   color: var(--accent);
   font-weight: 600;
@@ -316,7 +351,27 @@
 }
 
 @media (max-width: 980px) {
-  .dash-shell {
+  /*
+ * STICKY GÜVENCESİ (tarayıcı uyumu): assets/style.css içinde <html> ve
+ * <body> için "overflow-x: hidden" var (mobil yatay taşmayı kesmek için,
+ * bilinçli). Ama CSS spesifikasyonu gereği bir eksende "hidden",
+ * diğer ekseni örtük olarak "auto"ya çevirir — yani <html> bir kaydırma
+ * kabı haline gelir. Bu, bazı tarayıcılarda (özellikle eski Safari)
+ * içerideki "position: sticky" elemanların (bizim sol menümüz ve mobil
+ * üst şeridimiz) yapışmayı bırakıp sayfayla birlikte kaybolmasına yol
+ * açıyor. "overflow-x: clip" AYNI kırpmayı yapar ama kaydırma kabı
+ * YARATMAZ, dolayısıyla sticky her yerde çalışır. Desteklemeyen
+ * tarayıcılar (Safari 15 ve öncesi) ikinci satırı yok sayıp bir
+ * üstteki hidden davranışında kalır — yani hiçbir şey bozulmaz.
+ * Bu kural SADECE dashboard.css yüklenen sayfada geçerli.
+ */
+html,
+body {
+  overflow-x: hidden;
+  overflow-x: clip;
+}
+
+.dash-shell {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -331,7 +386,11 @@
     width: 280px;
     max-width: 84vw;
     height: 100vh;
+    height: 100dvh;
     max-height: none;
+    /* iOS'ta çentik/ev çubuğu altında kalmasın */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    -webkit-overflow-scrolling: touch;
     z-index: 40; /* header'ın (50) altında; panel açıkken overlay 39 */
     border-radius: 0;
     border-right: 1px solid var(--border);
@@ -352,6 +411,16 @@
   .dash-view {
     max-width: none;
   }
+}
+
+/* Mobilde sidebar açıkken arkadaki sayfanın kaymasını engelle.
+   Sadece "overflow: hidden" iOS Safari'de YETMİYOR (elastic scroll),
+   bu yüzden position:fixed + kaydırma konumunu JS saklıyor — bkz.
+   assets/js/core/mobil-nav.js'teki aynı desen. */
+body.dash-nav-acik {
+  position: fixed;
+  width: 100%;
+  overflow: hidden;
 }
 
 @media (prefers-reduced-motion: reduce) {
