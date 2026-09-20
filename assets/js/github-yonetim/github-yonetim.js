@@ -4750,6 +4750,12 @@ function socialBlokunuAyristir(icerik) {
       key,
       label: temizle(labelM ? labelM[1] : "") || key,
       url: temizle(urlM ? urlM[1] : ""),
+      // Dosyadan okunan HER girdi "mevcut" sayılır — key'i SABİT kalır,
+      // kullanıcı etiketi sonradan değiştirse bile (bkz. baglantiYeniEkle
+      // ve baglantilariKaydet'teki "yeniMi" mantığı). Aksi hâlde her
+      // etiket düzeltmesinde YAML'daki anahtar (ve dolayısıyla index.md'de
+      // <a> sırası) gereksiz yere değişirdi.
+      yeniMi: false,
     });
   }
   return sonuc;
@@ -4789,14 +4795,28 @@ function configIcindeSocialBlokunuYaz(icerik, girdiler) {
 /** Kullanıcının panelde girdiği serbest metinden (ör. "Google Scholar")
  * dahili bir YAML anahtarı üretir — Türkçe karakterleri sadeleştirir,
  * boşlukları alt çizgiye çevirir, sadece a-z/0-9/_ bırakır. Aynı anahtar
- * zaten varsa sonuna -2, -3 vb. ekleyerek çakışmayı önler. */
+ * zaten varsa sonuna -2, -3 vb. ekleyerek çakışmayı önler.
+ *
+ * BUG DÜZELTMESİ: Türkçe harf haritası (küçük harfe çevirmeden ÖNCE)
+ * hem küçük HEM büyük harfleri kapsamalı — profilDosyaAdiTemizle'deki
+ * (satır ~4302) AYNI harita burada da kullanılıyor. Bunun nedeni: JS'in
+ * String.prototype.toLowerCase() metodu "İ" (Türkçe büyük noktalı I)
+ * karakterini TÜRKÇE KURALINA GÖRE değil, Unicode genel kuralına göre
+ * çevirir — sonuç "i" değil, "i" + görünmez bir "combining dot above"
+ * karakterinden oluşan 2 kod noktalı bir dizidir. Bu görünmez karakter
+ * daha sonra harf sayılmayıp alt çizgiye dönüştüğü için "ORCİD" gibi bir
+ * etiket "orc_id" gibi beklenmedik şekilde bölünürdü. Çözüm: haritalamayı
+ * .toLowerCase() çağrılmadan ÖNCE, büyük harfleriyle birlikte yapmak. */
 function baglantiAnahtarUret(label, mevcutAnahtarlar) {
-  const TR_HARF = { ç: "c", ğ: "g", ı: "i", ö: "o", ş: "s", ü: "u" };
+  const TR_HARF = {
+    ç: "c", ğ: "g", ı: "i", ö: "o", ş: "s", ü: "u",
+    Ç: "c", Ğ: "g", I: "i", İ: "i", Ö: "o", Ş: "s", Ü: "u",
+  };
   let taban = String(label || "baglanti")
-    .toLowerCase()
     .split("")
     .map((c) => TR_HARF[c] || c)
     .join("")
+    .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
   if (!taban) taban = "baglanti";
@@ -4904,11 +4924,24 @@ async function baglantilariYukle() {
 }
 
 function baglantiYeniEkle() {
+  // BUG DÜZELTMESİ: eskiden burada "yeni_baglanti" SABİT metninden hemen
+  // bir "key" üretilip satıra yapıştırılıyordu — kullanıcı etikete ne
+  // yazarsa yazsın (ör. "1000 Kitap") bu anahtar bir daha HİÇ
+  // güncellenmiyordu, kaydedince YAML'a "yeni_baglanti" (ya da çakışma
+  // varsa "yeni_baglanti_2", "_3"...) olarak gidiyordu — kodun içindeki
+  // anahtar ile panelde görünen/girilen etiket birbirini hiç tutmuyordu.
+  // Çözüm: "key" burada SABİTLENMİYOR, sadece "yeniMi: true" ile
+  // işaretleniyor — gerçek anahtar, kaydetme anında (baglantilariKaydet)
+  // o satırın SON HÂLDEKİ etiketinden türetilir. "key" alanı yine de
+  // (geçici olarak) doldurulur çünkü baglantiSatiriOlustur/silme mantığı
+  // bir anahtara ihtiyaç duyar (ör. "Sil" onay mesajında) — ama bu geçici
+  // değer kaydetmeden önce mutlaka gerçek etikete göre YENİDEN üretilir.
   const mevcutAnahtarlar = BAGLANTILAR_LISTESI.map((g) => g.key);
   BAGLANTILAR_LISTESI.push({
-    key: baglantiAnahtarUret("yeni_baglanti", mevcutAnahtarlar),
+    key: baglantiAnahtarUret("", mevcutAnahtarlar),
     label: "",
     url: "",
+    yeniMi: true,
   });
   baglantilarListesiniCiz();
   // Az önce eklenen satırın etiket kutusuna odaklan — kullanıcı hemen
@@ -4929,15 +4962,31 @@ async function baglantilariKaydet() {
     return;
   }
 
-  // Etiketi boş bırakılmış (ama silinmemiş) satırlara dahili anahtarlarını
-  // etiket olarak düşmesin diye en azından anahtarını göster — tamamen
-  // boş bir buton metni kafa karıştırıcı olurdu. Kullanıcı isterse yine de
-  // düzenleyebilir, bu sadece bir güvenlik ağı.
-  const gonderilecek = BAGLANTILAR_LISTESI.map((g) => ({
-    key: g.key,
-    label: (g.label || "").trim() || g.key,
-    url: (g.url || "").trim(),
-  }));
+  // BUG DÜZELTMESİ: "key" artık burada, KAYDETME ANINDA belirleniyor —
+  // baglantiYeniEkle() sırasında SABİTLENMİYOR (bkz. o fonksiyondaki not).
+  // Mevcut (dosyadan yüklenmiş, yeniMi=false) satırlar için "key" SABİT
+  // kalır — kullanıcı sadece etiketi düzeltse bile YAML'daki anahtar
+  // (ve dolayısıyla index.md'deki buton sırası) değişmez. YENİ eklenen
+  // (yeniMi=true) satırlar için "key", o satırın SON HÂLDEKİ etiketinden
+  // türetilir — böylece "1000 Kitap" yazıp kaydettiğinizde YAML'a
+  // "1000_kitap" gibi ETİKETLE TUTARLI bir anahtar gider, "yeni_baglanti"
+  // gibi anlamsız bir isim DEĞİL. Anahtarlar SIRAYLA üretilir (bir öncekiyle
+  // çakışmayı da hesaba katarak) ki aynı oturumda iki yeni satıra aynı
+  // etiket yazılırsa ikisi de "_2" ekiyle ayrışsın.
+  const uretilenAnahtarlar = BAGLANTILAR_LISTESI.filter((g) => !g.yeniMi).map((g) => g.key);
+  const gonderilecek = BAGLANTILAR_LISTESI.map((g) => {
+    const temizLabel = (g.label || "").trim();
+    let key = g.key;
+    if (g.yeniMi) {
+      key = baglantiAnahtarUret(temizLabel, uretilenAnahtarlar);
+      uretilenAnahtarlar.push(key);
+    }
+    return {
+      key,
+      label: temizLabel || key,
+      url: (g.url || "").trim(),
+    };
+  });
 
   // Aynı anahtarın YAML'da iki kez geçmesi (ör. iki farklı satırın aynı
   // "key"e sahip olması, teorik olarak sadece elle _config.yml'i bozarsa
