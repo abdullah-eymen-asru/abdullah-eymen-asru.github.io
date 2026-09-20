@@ -353,28 +353,63 @@ function firstAvailableView(profile) {
 /* 6) Mobil hamburger                                                  */
 /* ------------------------------------------------------------------ */
 
-function closeMobileSidebar() {
-  document.getElementById("dash-sidebar")?.classList.remove("open");
-  document.getElementById("dash-overlay")?.setAttribute("hidden", "");
-  document.getElementById("dash-nav-toggle")?.setAttribute("aria-expanded", "false");
+/*
+ * MOBİL SIDEBAR AÇ/KAPA — üç şey birden yönetiliyor:
+ *
+ *  1) ARKA PLAN KAYDIRMA KİLİDİ: panel açıkken arkadaki sayfa parmakla
+ *     kaydırılabiliyordu; kullanıcı paneli kapattığında okuduğu yerden
+ *     bambaşka bir noktada buluyordu kendini. Sadece "overflow: hidden"
+ *     iOS Safari'de GÜVENİLİR DEĞİL (elastic/rubber-band kaydırma), o
+ *     yüzden body'yi position:fixed yapıp kaydırma konumunu saklıyoruz —
+ *     bu, assets/js/core/mobil-nav.js'teki site menüsüyle AYNI desen.
+ *  2) ODAK (klavye/ekran okuyucu): panel açılınca odak panele girer,
+ *     kapanınca düğmeye geri döner — odak asla görünmeyen bir elemanda
+ *     kalmaz.
+ *  3) inert/aria: düğmenin aria-expanded değeri her iki yolda da
+ *     (düğme, overlay, Escape, bir sekmeye tıklama) senkron kalır.
+ */
+let kilitlenmedenOncekiKaydirma = 0;
+
+function govdeKilidiAc() {
+  const body = document.body;
+  if (body.classList.contains("dash-nav-acik")) return;
+  kilitlenmedenOncekiKaydirma = window.scrollY || window.pageYOffset || 0;
+  body.style.top = `-${kilitlenmedenOncekiKaydirma}px`;
+  body.classList.add("dash-nav-acik");
 }
 
-/*
- * MADDE 1 — İKİ HAMBURGER ÜST ÜSTE GELİYORDU:
- * Panelin düğmesi eskiden "position: fixed; top:12px; left:12px" idi ve
- * tam olarak sitenin kendi header hamburger'ının (#nav-toggle) üstüne
- * oturuyordu; iki menü tek düğme gibi görünüyor, site menüsüne (sekmeler
- * arası geçiş) dokunmak mümkün olmuyordu. Düğme artık akışın içinde,
- * header'ın ALTINDAKİ kendi şeridinde (.dash-topbar). Bu şeridin sticky
- * konumunun header'ın gerçek yüksekliğini bilmesi gerekiyor (header mobilde
- * satır kaydırabiliyor), o yüzden yüksekliği burada ölçüp CSS değişkeni
- * olarak yazıyoruz.
- */
-function olcuHeaderYuksekligi() {
-  const header = document.querySelector(".site-header");
-  const shell = document.querySelector(".dash-shell");
-  if (!header || !shell) return;
-  shell.style.setProperty("--dash-header-h", `${Math.round(header.getBoundingClientRect().height)}px`);
+function govdeKilidiKapat() {
+  const body = document.body;
+  if (!body.classList.contains("dash-nav-acik")) return;
+  body.classList.remove("dash-nav-acik");
+  body.style.top = "";
+  window.scrollTo(0, kilitlenmedenOncekiKaydirma);
+}
+
+function openMobileSidebar() {
+  const sidebar = document.getElementById("dash-sidebar");
+  const overlay = document.getElementById("dash-overlay");
+  const toggle = document.getElementById("dash-nav-toggle");
+  if (!sidebar) return;
+  sidebar.classList.add("open");
+  if (overlay) overlay.hidden = false;
+  toggle?.setAttribute("aria-expanded", "true");
+  govdeKilidiAc();
+  // Odağı panele al: önce aktif sekme, yoksa ilk odaklanabilir eleman.
+  const ilk =
+    sidebar.querySelector("#dash-nav a.active") ||
+    sidebar.querySelector("#dash-nav a, .dash-nav-group");
+  ilk?.focus?.();
+}
+
+function closeMobileSidebar() {
+  const sidebar = document.getElementById("dash-sidebar");
+  const acikti = sidebar?.classList.contains("open");
+  sidebar?.classList.remove("open");
+  document.getElementById("dash-overlay")?.setAttribute("hidden", "");
+  document.getElementById("dash-nav-toggle")?.setAttribute("aria-expanded", "false");
+  govdeKilidiKapat();
+  if (acikti) document.getElementById("dash-nav-toggle")?.focus?.();
 }
 
 function wireMobileNav() {
@@ -384,19 +419,41 @@ function wireMobileNav() {
   if (!toggle || !sidebar || !overlay) return;
 
   toggle.addEventListener("click", () => {
-    const open = sidebar.classList.toggle("open");
-    overlay.hidden = !open;
-    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    if (sidebar.classList.contains("open")) closeMobileSidebar();
+    else openMobileSidebar();
   });
   overlay.addEventListener("click", closeMobileSidebar);
 
-  // Escape ile de kapansın (site menüsündeki desenle aynı).
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeMobileSidebar();
+    if (e.key === "Escape" && sidebar.classList.contains("open")) closeMobileSidebar();
   });
 
+  // Ekran masaüstü genişliğine çıkarsa (telefonu yatay çevirmek, pencereyi
+  // büyütmek, tablette klavyeyi kapatmak) sidebar zaten kalıcı olarak
+  // görünür hale gelir — açık kalan "mobil" durumu ve ONUNLA BİRLİKTE
+  // GÖVDE KİLİDİ burada temizlenmezse sayfa masaüstünde kaydırılamaz
+  // halde takılı kalırdı.
+  const mq = window.matchMedia("(min-width: 981px)");
+  const mqDinleyici = (e) => {
+    if (e.matches) closeMobileSidebar();
+    olcuHeaderYuksekligi();
+  };
+  // addEventListener("change") Safari 14+; eski Safari için addListener.
+  if (typeof mq.addEventListener === "function") mq.addEventListener("change", mqDinleyici);
+  else if (typeof mq.addListener === "function") mq.addListener(mqDinleyici);
+
   olcuHeaderYuksekligi();
-  window.addEventListener("resize", olcuHeaderYuksekligi);
+
+  // Header yüksekliği yazı tipi yüklenmesi/tema değişimi/döndürme ile
+  // değişebiliyor. ResizeObserver varsa onu kullanıyoruz (resize
+  // olayının yakalayamadığı durumları da görür), yoksa resize'a düşüyoruz.
+  const header = document.querySelector(".site-header");
+  if (header && "ResizeObserver" in window) {
+    new ResizeObserver(olcuHeaderYuksekligi).observe(header);
+  } else {
+    window.addEventListener("resize", olcuHeaderYuksekligi);
+  }
+  window.addEventListener("orientationchange", olcuHeaderYuksekligi);
 }
 
 /* ------------------------------------------------------------------ */
