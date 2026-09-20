@@ -383,6 +383,25 @@ function configAlaniniOku(icerik, anahtar) {
 }
 
 /**
+ * _config.yml içinden ÇOK SATIRLI bir YAML bloğunu (ör. "social:" — bkz.
+ * github-yonetim.js SOCIAL_BLOK_REGEX ile AYNI desen) HAM METİN olarak
+ * çıkarır — configAlaniniOku'nun tersine tek bir değer değil, "anahtar:"
+ * satırından bir SONRAKİ girintisiz satıra kadar olan TÜM gövdeyi döner.
+ * Bu fonksiyon bloğu ayrıştırmaz (parse etmez), sadece HAM METNİ verir —
+ * amaç TEK bir şey: eski/yeni içerik için bu ham metni karşılaştırıp
+ * "bu blok gerçekten değişti mi?" sorusuna cevap vermek (bkz. aşağıdaki
+ * "_config.yml" dalındaki "social" kontrolü). Bloğun içeriğini ANLAMAMIZA
+ * gerek yok, sadece bayt bazında aynı mı farklı mı olduğunu bilmemiz
+ * yeterli — bu yüzden github-yonetim.js'teki tam ayrıştırma mantığını
+ * (key/label/url çıkarma) burada TEKRARLAMIYORUZ, gereksiz karmaşıklık
+ * ve iki dosya arasında ayrışma (drift) riski olurdu.
+ */
+function configBlokunuOku(icerik, anahtar) {
+  const m = icerik.match(new RegExp(`^${anahtar}:[ \\t]*\\r?\\n((?:[ \\t]+.*(?:\\r?\\n|$))*)`, "m"));
+  return m ? m[0] : null;
+}
+
+/**
  * Mevcut bir dosyanın front-matter'ı, kendisini düzenlemeye/silmeye
  * çalışan editor'e mi ait? Önce (varsa) GÜVENİLİR yazar_id alanı karşılaştırılır.
  * yazar_id hiç yoksa (bu alan eklenmeden ÖNCE yazılmış, çok eski bir dosya)
@@ -1158,14 +1177,16 @@ export default {
           } else if (hedefYol === CONFIG_YOLU_SABIT) {
             // GÜVENLİK AÇIĞI DÜZELTMESİ — _config.yml hem "profile_image"
             // (profil_fotografi özelliği) hem "cv_url" (cv_yonetimi
-            // özelliği) alanlarını tutuyor. Yukarıdaki iki dal sadece
-            // GERÇEK DOSYA yollarını (assets/profil*, assets/cv/*)
-            // kontrol ediyordu — bu ORTAK ayar dosyasının KENDİSİ hiç
-            // kontrol edilmiyordu. Sonuç: owner "cv_yonetimi"ni admin
-            // için kapatsa bile, admin hiç PDF yüklemeden (assets/cv/*
-            // yoluna dokunmadan), SADECE _config.yml'deki cv_url satırını
-            // (dış bağlantı) doğrudan değiştirerek kısıtlamayı tamamen
-            // atlatabiliyordu — aynı açık profile_image için de geçerliydi.
+            // özelliği) hem de "social:" (baglanti_yonetimi özelliği —
+            // bkz. github-yonetim.js "BAĞLANTILAR" bölümü) alanlarını
+            // tutuyor. Yukarıdaki iki dal sadece GERÇEK DOSYA yollarını
+            // (assets/profil*, assets/cv/*) kontrol ediyordu — bu ORTAK
+            // ayar dosyasının KENDİSİ hiç kontrol edilmiyordu. Sonuç: owner
+            // "cv_yonetimi"ni admin için kapatsa bile, admin hiç PDF
+            // yüklemeden (assets/cv/* yoluna dokunmadan), SADECE
+            // _config.yml'deki cv_url satırını (dış bağlantı) doğrudan
+            // değiştirerek kısıtlamayı tamamen atlatabiliyordu — aynı açık
+            // profile_image ve (yeni eklenen) social için de geçerli.
             // Çözüm: PUT gövdesini oku, mevcut dosyayla karşılaştır,
             // SADECE GERÇEKTEN DEĞİŞEN alan(lar) için ilgili özelliği
             // kontrol listesine ekle (değişmeyen alanı gereksiz kısıtlama).
@@ -1185,18 +1206,26 @@ export default {
                   if (configAlaniniOku(yeniIcerik, "cv_url") !== configAlaniniOku(eskiIcerik, "cv_url")) {
                     ozellikAnahtarlari.push("cv_yonetimi");
                   }
+                  // "social:" çok satırlı bir blok olduğu için tek satırlık
+                  // configAlaniniOku ile KARŞILAŞTIRILAMAZ (sadece "social:"
+                  // satırının kendisini, boş bir satırı okurdu) — bu yüzden
+                  // configBlokunuOku ile TÜM bloğun ham metnini alıp
+                  // karşılaştırıyoruz (bkz. o fonksiyonun yorum notu).
+                  if (configBlokunuOku(yeniIcerik, "social") !== configBlokunuOku(eskiIcerik, "social")) {
+                    ozellikAnahtarlari.push("baglanti_yonetimi");
+                  }
                 }
               } catch (_err) {
                 // Gövde ayrıştırılamadıysa güvenli tarafta kal: HANGİ alanın
-                // değiştiğini bilemediğimiz için İKİSİNİ DE kontrol listesine
+                // değiştiğini bilemediğimiz için ÜÇÜNÜ DE kontrol listesine
                 // ekliyoruz (aksi hâlde açığı kapatmamış oluruz).
-                ozellikAnahtarlari = ["profil_fotografi", "cv_yonetimi"];
+                ozellikAnahtarlari = ["profil_fotografi", "cv_yonetimi", "baglanti_yonetimi"];
               }
             } else {
               // _config.yml için DELETE (normalde hiç kullanılmaz — site
               // yapılandırma dosyası silinmez) — hangi alanın etkilendiği
-              // belirsiz, güvenli tarafta kalıp ikisini de kontrol et.
-              ozellikAnahtarlari = ["profil_fotografi", "cv_yonetimi"];
+              // belirsiz, güvenli tarafta kalıp üçünü de kontrol et.
+              ozellikAnahtarlari = ["profil_fotografi", "cv_yonetimi", "baglanti_yonetimi"];
             }
           }
           for (const ozellikAnahtari of ozellikAnahtarlari) {
