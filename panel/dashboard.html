@@ -1,0 +1,1233 @@
+---
+layout: default
+title: "Yönetim Paneli"
+yayinda: true
+auth_css: true
+uye_ayarlari_css: true
+mesajlar_css: true
+permalink: "/panel/dashboard.html"
+---
+
+<link rel="stylesheet" href="{{ '/assets/css/github-yonetim.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/css/izleme-okuma-yonetim.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/css/dashboard.css' | relative_url }}">
+
+<div class="loading-overlay" id="loading">Yükleniyor...</div>
+
+<div id="app" hidden>
+<div class="dash-shell">
+
+  <button type="button" id="dash-nav-toggle" class="dash-nav-toggle" aria-label="Menüyü aç/kapat" aria-expanded="false">
+    <span class="dash-nav-toggle-bar" aria-hidden="true"></span>
+    <span class="dash-nav-toggle-bar" aria-hidden="true"></span>
+    <span class="dash-nav-toggle-bar" aria-hidden="true"></span>
+  </button>
+
+  <aside class="dash-sidebar" id="dash-sidebar">
+    <div class="dash-sidebar-head">
+      <strong id="dash-ad-soyad"></strong>
+      <span class="muted" id="dash-rol"></span>
+    </div>
+    <nav id="dash-nav" aria-label="Yönetim paneli navigasyonu"></nav>
+  </aside>
+
+  <div class="dash-overlay" id="dash-overlay" hidden></div>
+
+  <main class="dash-main" id="dash-main">
+
+    <section class="dash-view" id="view-content-all" hidden data-view="content-all">
+      <h1>Tüm Yazılar &amp; Projeler</h1>
+      <div class="dash-slot" id="slot-icerikler" data-default-variant="gy"></div>
+    </section>
+
+    <section class="dash-view" id="view-content-new" hidden data-view="content-new">
+      <h1>Yeni İçerik Ekle</h1>
+      <div class="dash-slot" id="slot-icerik-ekle" data-default-variant="gy"></div>
+    </section>
+
+    <section class="dash-view" id="view-content-private" hidden data-view="content-private">
+      <h1>Özel / Gizli Makaleler</h1>
+      <div class="dash-slot" id="slot-icerik-ekle-private" data-mirror-of="slot-icerik-ekle"></div>
+      <div class="dash-slot" id="slot-icerikler-private" data-mirror-of="slot-icerikler"></div>
+    </section>
+
+    <section class="dash-view" id="view-content-folders" hidden data-view="content-folders">
+      <h1>Klasör Yönetimi</h1>
+      <section id="klasorler" class="panel-section">
+              <h2>Klasörler (<code id="kl-baslik-koleksiyon">_posts</code>/ altındaki alt klasörler)</h2>
+              <p class="muted">
+                Blog yazıların <code>_posts/</code>, akademik projelerin ise
+                <code>_projects/</code> altında alt klasörlerde tutulur
+                (varsayılan olarak yıla göre, örn. <code>_posts/2026/</code>) —
+                hangi klasörde durdukları içeriğin linkini (permalink'ini)
+                ETKİLEMEZ, sadece depodaki dosya organizasyonunu ilgilendirir.
+                Aşağıdan blog/akademik proje klasörleri arasında geçiş
+                yapabilirsin. Burada yeni bir klasör oluşturabilir, mevcut bir
+                klasörü yeniden adlandırabilir (içindeki tüm dosyalar yeni
+                klasöre taşınır) ya da BOŞ bir klasörü silebilirsin. GitHub'da
+                "gerçek" boş klasör kavramı olmadığı için yeni klasör oluşturma
+                işlemi, o klasörün içine görünmez küçük bir <code>.gitkeep</code>
+                dosyası ekleyerek yapılır — bu dosya klasörü var eder ama sitede
+                hiçbir şekilde görünmez veya listelenmez.
+              </p>
+
+              <div class="gy-klasor-tur-sekmeleri" role="tablist" aria-label="Klasör türüne göre geçiş yap">
+                <button type="button" class="gy-klasor-tur-sekme active" data-klasor-tur="blog" role="tab" aria-selected="true">📰 Blog (<code>_posts/</code>)</button>
+                <button type="button" class="gy-klasor-tur-sekme" data-klasor-tur="proje" role="tab" aria-selected="false">🎓 Akademik Proje (<code>_projects/</code>)</button>
+              </div>
+
+              <button id="kl-liste-yenile-btn" type="button" class="btn-primary csp-w-auto csp-mb-12">Klasörleri Yükle / Yenile</button>
+
+              <div class="gy-klasor-olustur">
+                <input id="kl-yeni-ad" type="text" placeholder="Yeni klasör adı (örn. 2027 ya da seyahat)" autocomplete="off">
+                <button id="kl-olustur-btn" type="button" class="btn-primary csp-w-auto">➕ Klasör Oluştur</button>
+              </div>
+              <p id="kl-yonetimi-engelli-uyari" class="auth-message auth-message--error" hidden>
+                Site Sahibi, rolünün klasör oluşturma/silme/yeniden adlandırma yetkisini kapatmış — bu, kendi oluşturduğun klasörler için de geçerlidir.
+              </p>
+              <div id="kl-message" class="auth-message" hidden></div>
+
+              <div id="kl-liste"><p class="muted">Henüz yüklenmedi.</p></div>
+            </section>
+    </section>
+
+    <section class="dash-view" id="view-media-r2" hidden data-view="media-r2">
+      <h1>R2 Dosya Paylaşımı</h1>
+      <section id="dosya-paylasim" class="panel-section">
+              <h2>R2 Dosya Paylaşımı</h2>
+              <p class="muted">
+                Cloudflare R2 bucket'ındaki (<code>abdullah-eymen-asru-site-ozel-dosyalar</code>)
+                HERHANGİ BİR dosya yolu (key) için tek tıkla süreli (presigned)
+                indirme linki üret ve panoya kopyala. Dosya yolunu R2 Dashboard'dan
+                veya yukarıdaki "Özel İçerik" formunda yüklediğin dosyaların
+                yolundan (<code>içerik-id/dosya-adi</code>) alabilirsin.
+              </p>
+              <div class="form-field">
+                <label for="r2-dosya-key">Dosya Yolu (R2 key)</label>
+                <input id="r2-dosya-key" type="text" placeholder="ör. 3f2504e0-4f89-.../rapor.pdf">
+              </div>
+              <div class="form-field">
+                <label>Geçerlilik Süresi</label>
+                <div class="csp-flex-gap8-center-wrap">
+                  <span class="csp-flex-gap4-center">
+                    <input class="csp-w-70" id="r2-gecerlilik-saat" type="number" min="0" step="1" value="1">
+                    <label for="r2-gecerlilik-saat" class="muted csp-m-0">saat</label>
+                  </span>
+                  <span class="csp-flex-gap4-center">
+                    <input class="csp-w-70" id="r2-gecerlilik-dakika" type="number" min="0" max="59" step="1" value="0">
+                    <label for="r2-gecerlilik-dakika" class="muted csp-m-0">dk</label>
+                  </span>
+                  <span class="csp-flex-gap4-center">
+                    <input class="csp-w-70" id="r2-gecerlilik-saniye" type="number" min="0" max="59" step="1" value="0">
+                    <label for="r2-gecerlilik-saniye" class="muted csp-m-0">sn</label>
+                  </span>
+                </div>
+                <p class="muted csp-mt-4">ör. 2 saat 3 dk 5 sn için: saat=2, dk=3, sn=5. En az 60 saniye olmalı.</p>
+              </div>
+              <button id="r2-link-uret-btn" type="button" class="btn-primary csp-w-auto">
+                İmzalı Link Üret
+              </button>
+              <div id="r2-link-sonuc" class="auth-message" hidden></div>
+              <div id="r2-link-kutu-wrap" class="form-field csp-mt-10" hidden>
+                <label for="r2-link-kutu">Üretilen Link (seçip kopyalayabilirsin)</label>
+                <input id="r2-link-kutu" type="text" readonly>
+              </div>
+            </section>
+    </section>
+
+    <section class="dash-view" id="view-media-izleme" hidden data-view="media-izleme">
+      <h1>İzleme ve Okuma Yönetimi</h1>
+        <h1>İzleme/Okuma Yönetimi</h1>
+        <p class="muted">
+          Bu sayfa <strong>sadece Site Sahibi (owner)</strong> tarafından
+          kullanılabilir. Buradan doğrudan <code>{{ site.kutuphane_repo }}</code>
+          reposunda yeni bir Issue açabilir, ilgili GitHub Projects panosuna
+          (İzleme veya Okuma) ekleyip sütunlarını (Durum, Tür, Puan, vb.)
+          doldurabilir, ya da panoda zaten var olan bir kaydı arayıp
+          güncelleyebilirsin — GitHub'a hiç gitmeden. Panoya başka bir yoldan
+          (doğrudan GitHub üzerinden) eklediğin/düzenlediğin kayıtlar da her
+          zamanki gibi çalışmaya devam eder; bu sayfa sadece ek bir hızlı yol.
+        </p>
+
+        <nav id="iy-nav" class="gy-klasor-tur-sekmeleri" role="tablist" aria-label="İzleme/Okuma arasında geçiş yap">
+          <button type="button" class="gy-klasor-tur-sekme active" data-koleksiyon="izleme" role="tab" aria-selected="true">🎬 İzlediklerim</button>
+          <button type="button" class="gy-klasor-tur-sekme" data-koleksiyon="okuma" role="tab" aria-selected="false">📚 Okuduklarım</button>
+        </nav>
+
+        <nav id="iy-mod-nav" class="admin-tabs">
+          <a href="#ekle" data-mod="ekle" class="active">➕ Yeni Kayıt Ekle</a>
+          <a href="#mevcut" data-mod="mevcut">📋 Mevcut Kayıtlar</a>
+        </nav>
+
+        <div class="panel-grid">
+
+          <section id="iy-mod-ekle" class="panel-section">
+            <h2 id="iy-form-baslik">Yeni Kayıt Ekle — İzlediklerim</h2>
+            <p class="muted" id="iy-form-aciklama">
+              Başlık, filmin/dizinin adı olarak GitHub Issue başlığı olur.
+              Açıklama alanı issue'nun gövdesine (body) yazılır — notlar, alıntı,
+              kısa yorum vb. için kullanabilirsin, boş bırakılabilir. Aşağıdaki
+              diğer alanlar, <code>{{ site.izleme_projects_url }}</code>
+              panosundaki mevcut sütunlardan OTOMATİK olarak okunur — panoya yeni
+              bir sütun eklersen bu form da kendiliğinden güncellenir, bu sayfaya
+              dokunmana gerek kalmaz.
+            </p>
+
+            <form id="iy-form" novalidate>
+              <div class="form-field">
+                <label for="iy-title">Başlık (film/dizi adı ya da kitap adı)</label>
+                <input id="iy-title" type="text" required autocomplete="off">
+              </div>
+              <div id="iy-benzer-uyari" class="auth-message auth-message--warning" hidden></div>
+              <div class="form-field">
+                <label for="iy-aciklama">Açıklama (opsiyonel)</label>
+                <textarea id="iy-aciklama" rows="4" placeholder="Notlar, alıntı, kısa yorum…"></textarea>
+              </div>
+
+              <div id="iy-alanlar-container">
+                <p class="muted">Alanlar yükleniyor…</p>
+              </div>
+
+              <button type="submit" id="iy-submit-btn" class="btn-primary csp-w-auto">➕ Kaydı Ekle</button>
+            </form>
+            <div id="iy-message" class="auth-message" hidden></div>
+            <div id="iy-basari-kutu" class="gy-onizleme-kutusu" hidden>
+              <div class="gy-onizleme-baslik">✅ Kayıt eklendi</div>
+              <p class="muted" id="iy-basari-metin"></p>
+              <div class="gy-link-kutu">
+                <a id="iy-basari-issue-link" href="#" target="_blank" rel="noopener noreferrer" class="btn-secondary csp-inline-block-link">GitHub'da Issue'yu Aç</a>
+              </div>
+            </div>
+          </section>
+
+          <section id="iy-mod-mevcut" class="panel-section" hidden>
+            <h2 id="iy-liste-baslik">Mevcut Kayıtlar — İzlediklerim</h2>
+            <p class="muted">
+              Başlık, açıklama ya da herhangi bir sütun değeri (Durum, Tür, Yazar
+              vb.) içinde arama yapabilirsin. Bir kayda tıklayınca aşağıda
+              düzenleme formu açılır.
+            </p>
+
+            <div id="iy-duzenle-kutu" class="gy-onizleme-kutusu csp-mb-20" hidden>
+              <div class="gy-onizleme-baslik" id="iy-duzenle-baslik">Kaydı Düzenle</div>
+              <form id="iy-duzenle-form" novalidate>
+                <div class="form-field">
+                  <label for="iy-duzenle-title">Başlık</label>
+                  <input id="iy-duzenle-title" type="text" required autocomplete="off">
+                </div>
+                <div class="form-field">
+                  <label for="iy-duzenle-aciklama">Açıklama</label>
+                  <textarea id="iy-duzenle-aciklama" rows="4" placeholder="Notlar, alıntı, kısa yorum…"></textarea>
+                </div>
+                <div id="iy-duzenle-alanlar-container"></div>
+                <div class="csp-flex-gap10-wrap">
+                  <button type="submit" id="iy-duzenle-submit-btn" class="btn-primary csp-w-auto">💾 Güncelle</button>
+                  <button type="button" id="iy-duzenle-iptal-btn" class="btn-secondary csp-w-auto">İptal</button>
+                </div>
+              </form>
+              <div id="iy-duzenle-message" class="auth-message" hidden></div>
+            </div>
+
+            <div class="gy-arama-kutu csp-mb-14">
+              <span class="gy-arama-ikon" aria-hidden="true">🔎</span>
+              <input id="iy-liste-arama" type="search" placeholder="Ara…" autocomplete="off">
+              <button type="button" id="iy-liste-arama-temizle" class="gy-arama-temizle" hidden aria-label="Aramayı temizle">✕</button>
+            </div>
+
+            <button id="iy-liste-yenile-btn" type="button" class="btn-primary csp-w-auto csp-mb-12">Listeyi Yükle / Yenile</button>
+
+            <div id="iy-liste"><p class="muted">Henüz yüklenmedi.</p></div>
+            <p id="iy-liste-sonuc-yok" class="muted" hidden>Aramanla eşleşen kayıt bulunamadı.</p>
+          </section>
+
+        </div>
+    </section>
+
+    <section class="dash-view" id="view-media-cv" hidden data-view="media-cv">
+      <h1>Özgeçmiş (CV) &amp; Profil Görseli</h1>
+      <section id="profil-foto" class="panel-section">
+              <h2>Profil Fotoğrafı Yönetimi</h2>
+              <p class="muted">
+                Sitede favicon ve profil resmi olarak kullanılan dosyayı (yolu
+                <code>_config.yml → profile_image</code> alanından otomatik
+                okunur, dosya adı/uzantısı ne olursa olsun) buradan görüntüle,
+                değiştir veya sil. Yeni bir fotoğraf yüklediğinde dosya adı
+                eskisinden farklı olabilir — panel yeni dosyayı ekler, eskisini
+                siler ve <code>_config.yml</code>'i otomatik günceller.
+              </p>
+              <div id="pf-mevcut" class="gy-profil-onizleme">
+                <p class="muted">Görüntülemek için önce bağlantıyı doğrula.</p>
+              </div>
+              <div class="form-field">
+                <label for="pf-dosya">Yeni Fotoğraf Seç</label>
+                <input id="pf-dosya" type="file" accept="image/*">
+              </div>
+              <div class="csp-flex-gap10-wrap">
+                <button id="pf-yukle-btn" type="button" class="btn-primary csp-w-auto">Yükle / Değiştir</button>
+                <button id="pf-sil-btn" type="button" class="btn-danger csp-w-auto">Profil Fotoğrafını Sil</button>
+              </div>
+              <div id="pf-message" class="auth-message" hidden></div>
+            </section>
+      <section id="cv" class="panel-section">
+              <h2>CV (Özgeçmiş)</h2>
+              <p class="muted">
+                Anasayfada, CV varsa otomatik olarak beliren <strong>"📄 CV
+                Görüntüle"</strong> butonu ve <code>{{ site.url }}/cv/</code>
+                adresinden buraya erişimi buradan yönetirsin. CV yoksa (aşağıdaki
+                durum "CV eklenmemiş" ise) buton anasayfada HİÇ görünmez, <code>/cv/</code>
+                adresi de "CV henüz eklenmedi" mesajı gösterir — bu sayfayı elle
+                silmene gerek yok, davranışı otomatik değişir.
+              </p>
+              <p class="gy-yardim-metni">
+                <code>/cv/</code> adresi <strong>kalıcıdır</strong> — CV'nin
+                gerçek konumunu (aşağıdaki PDF'i güncellersen ya da dış linki
+                değiştirirsen) değiştirsen bile bu adres hep aynı kalır, daha önce
+                paylaştığın <code>/cv/</code> linki asla kırılmaz.
+              </p>
+
+              <div id="cv-mevcut" class="gy-profil-onizleme">
+                <p class="muted">Görüntülemek için önce bağlantıyı doğrula.</p>
+              </div>
+
+              <h3 class="csp-mt-18">Yöntem 1 — GitHub'a Yükle</h3>
+              <p class="gy-yardim-metni">
+                Bir PDF dosyası seçip yüklersin; panel dosyayı
+                <code>assets/cv/</code> altına GitHub'a COMMIT eder ve
+                <code>cv_url</code>'ü otomatik olarak bu dosyanın adresine
+                ayarlar. Blog yazılarındaki "GitHub'a Yayınla" ile aynı mantık —
+                dosya reponun içinde, git geçmişinde durur.
+              </p>
+              <div class="form-field">
+                <label for="cv-dosya">PDF Dosyası Seç</label>
+                <input id="cv-dosya" type="file" accept="application/pdf">
+              </div>
+              <button id="cv-yukle-btn" type="button" class="btn-primary csp-w-auto">GitHub'a Yükle / Değiştir</button>
+
+              <h3 class="csp-mt-18">Yöntem 2 — Sadece Supabase'e Yükle</h3>
+              <p class="gy-yardim-metni">
+                Blog yazılarındaki <strong>"Sadece Supabase'te Yayınla"</strong>
+                ile aynı mantık: dosya GitHub'a hiç commit edilmez, doğrudan
+                Supabase Storage'a (herkese açık, ayrı bir <code>cv-dosyalari</code>
+                bucket'ı) yüklenir ve <code>cv_url</code> o adrese ayarlanır. Git
+                geçmişine bir kayıt bırakmadan CV'yi hızlıca değiştirmek/kaldırmak
+                istediğinde bu yöntem daha pratiktir.
+              </p>
+              <div class="form-field">
+                <label for="cv-dosya-supabase">PDF Dosyası Seç</label>
+                <input id="cv-dosya-supabase" type="file" accept="application/pdf">
+              </div>
+              <button id="cv-supabase-yukle-btn" type="button" class="btn-primary csp-w-auto">Supabase'e Yükle / Değiştir</button>
+
+              <h3 class="csp-mt-18">Yöntem 3 — Dış Bağlantı Kullan</h3>
+              <p class="gy-yardim-metni">
+                PDF'i buraya yüklemek yerine, CV'nin zaten yayında olduğu başka
+                bir adresi (ör. Google Drive/Dropbox paylaşım linki, LinkedIn CV
+                adresi vb.) doğrudan bağlayabilirsin. Sadece <code>https://</code>
+                ile başlayan adresler kabul edilir.
+              </p>
+              <div class="form-field">
+                <label for="cv-dis-url">Dış CV Bağlantısı</label>
+                <input id="cv-dis-url" type="url" placeholder="https://...">
+              </div>
+              <button id="cv-dis-url-kaydet-btn" type="button" class="btn-primary csp-w-auto">Bu Bağlantıyı Kaydet</button>
+
+              <div class="csp-mt-18">
+                <button id="cv-sil-btn" type="button" class="btn-danger csp-w-auto">
+                  CV'yi Kaldır (Butonu ve /cv/ Yönlendirmesini Kapat)
+                </button>
+              </div>
+              <div id="cv-message" class="auth-message" hidden></div>
+            </section>
+    </section>
+
+    <section class="dash-view" id="view-users-uye" hidden data-view="users-uye">
+      <h1>Üye Ayarları</h1>
+        <div class="uya-header">
+          <div>
+            <h1>Üye Ayarları</h1>
+            <p class="muted">
+              Tüm üyeleri görüntüle, rolünü değiştir, ad/soyadını düzenle,
+              e-postasını (mail beklemeden anında) değiştir ya da hesabını sil.
+              Arama, rol filtresi ve sayfalama sayesinde liste büyüse de
+              yönetilebilir kalır.
+            </p>
+          </div>
+          <a href="{{ '/panel/admin.html' | relative_url }}" class="btn-secondary uya-geri-btn">← Admin Paneline Dön</a>
+        </div>
+
+        <div id="uya-stats" class="uya-stats"><p class="muted">Yükleniyor...</p></div>
+
+        <div class="uya-toolbar">
+          <div class="form-field uya-arama-alani">
+            <label for="uya-arama">Ara (isim veya e-posta)</label>
+            <input id="uya-arama" type="search" placeholder="ör. ayse@ornek.com veya Ayşe">
+          </div>
+          <div class="form-field uya-filtre-alani">
+            <label for="uya-rol-filtre">Rol</label>
+            <select id="uya-rol-filtre">
+              <option value="">Tüm roller</option>
+              <option value="user">Üye</option>
+              <option value="special_user">Özel Üye</option>
+              <option value="editor">Editör</option>
+              <option value="manager">İçerik Sorumlusu</option>
+              <option value="admin">Yönetici</option>
+            </select>
+          </div>
+          <div class="form-field uya-sayfa-boyutu-alani">
+            <label for="uya-sayfa-boyutu">Sayfa başına</label>
+            <select id="uya-sayfa-boyutu">
+              <option value="10">10</option>
+              <option value="20" selected>20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </div>
+        </div>
+
+        <p id="uya-sonuc-sayisi" class="muted uya-sonuc-sayisi"></p>
+
+        <div id="uya-liste" class="uya-liste"><p class="muted">Yükleniyor...</p></div>
+
+        <div id="uya-sayfalama-ust" class="uya-sayfalama"></div>
+
+        <!-- "E-posta Değiştir" butonuna basılınca uye-ayarlari.js bu alanı
+             doldurup gösterir: seçili üyenin adı + yeni e-posta formu. E-posta
+             hiçbir mail gönderilmeden ANINDA değişir, eski adres gerekmez (bkz.
+             uye-ayarlari.js -> wireAdminEmailChange() ve Edge Function
+             admin-change-email). -->
+        <div id="admin-eposta-degistir-kutu" class="panel-section csp-mt-16" hidden>
+          <h3 class="csp-mt-0">E-postasını Değiştir: <span id="admin-eposta-hedef-isim"></span></h3>
+          <p class="muted">
+            Bu, kullanıcının kendi panelinden yaptığı değişiklikten FARKLIDIR:
+            e-posta <strong>hiçbir mail gönderilmeden, anında</strong> değişir —
+            ne eski ne yeni adrese onay maili gitmez, eski adrese erişim gerekmez.
+            Bu yüzden bu bölümü SADECE kullanıcı eski mailine erişemediği için
+            seninle iletişime geçtiyse ve kimliğini (ör. panel üzerinden
+            gönderdiği mesajla) doğruladıysan kullan — asıl "kimlik doğrulama"
+            adımı burada senin elle yaptığın kontroldür.
+          </p>
+          <form id="admin-eposta-degistir-form" novalidate>
+            <input type="hidden" id="admin-eposta-hedef-id">
+            <div class="form-field">
+              <label for="admin-eposta-yeni">Yeni E-posta</label>
+              <input id="admin-eposta-yeni" type="email" autocomplete="off" required>
+            </div>
+            <div class="csp-flex-gap10">
+              <button type="submit" class="btn-primary csp-w-auto">E-postayı Şimdi Değiştir</button>
+              <button type="button" id="admin-eposta-degistir-iptal-btn" class="btn-secondary csp-w-auto">Vazgeç</button>
+            </div>
+          </form>
+          <div id="admin-eposta-message" class="auth-message" hidden></div>
+        </div>
+    </section>
+
+    <section class="dash-view" id="view-users-mesajlar" hidden data-view="users-mesajlar">
+      <h1>Sohbet / Mesajlar</h1>
+        <section class="mesajlar-sayfa" id="mesajlar-sayfa">
+          <div class="mesajlar-baslik">
+            <h1>Sohbet / Mesajlar</h1>
+            <p class="muted" id="mesajlar-aciklama">Yükleniyor...</p>
+          </div>
+
+          <div id="mesajlar-icerik"><p class="muted">Yükleniyor...</p></div>
+        </section>
+    </section>
+
+    <section class="dash-view" id="view-sys-guvenlik" hidden data-view="sys-guvenlik">
+      <h1>Admin Güvenliği</h1>
+        <h1>Admin Güvenliği</h1>
+        <p class="muted">
+          Buradan başka bir admin'i şüpheli bir durumda anında "askıya" alabilir
+          (tüm oturumları sonlanır), açık vakalara oy kullanabilir ve (sadece
+          Site Sahibi ise) bir vakayı tek başına kesin karara bağlayabilirsin.
+          Kimse kalıcı olarak düşürülmeden önce ya çoğunluk oylaması ya Site
+          Sahibi kararı ya da (kimse karar vermezse) otomatik süre dolumu
+          gerekir — bkz. aşağıdaki yardım metni.
+        </p>
+
+        <!-- BUG FİX (eksik geri dönüş linki): bu sayfaya SADECE admin.md'deki
+             "🛡️ Admin Güvenliği" sekmesinden geliniyordu ve buradan admin.md'ye
+             dönmenin tek yolu tarayıcının GERİ tuşuydu — panel/uye-ayarlari.md'de
+             zaten var olan "← Admin Paneline Dön" linkinin AYNISI burada da
+             eksikti. Tutarlılık ve daha hızlı/"sekme gibi" gezinme için eklendi
+             (bkz. assets/css/uye-ayarlari.css -> .uya-geri-btn, bu sayfa zaten
+             uye_ayarlari_css: true ile bu stil dosyasını yüklüyor). -->
+        <a href="{{ '/panel/admin.html' | relative_url }}" class="btn-secondary uya-geri-btn">← Admin Paneline Dön</a>
+
+        <div class="panel-grid">
+
+          <section class="panel-section">
+            <h2>Adminler / Site Sahibi</h2>
+            <div id="ag-admin-listesi"><p class="muted">Yükleniyor...</p></div>
+          </section>
+
+          <!-- SADECE owner (Site Sahibi) görür/kullanır — bkz. admin-guvenlik.js
+               init() içindeki ".sadece-owner" gizleme mantığı (admin/manager bu
+               bölümü hiç görmez). Gerçek/bağlayıcı kısıt her zaman veritabanında
+               (migration 0031_uyelik_kayitlarini_ac_kapat.sql, owner_kayitlari_ac_kapat
+               RPC'si + trg_kayitlar_acik_sadece_owner trigger'ı) — bu bölüm sadece
+               arayüz katmanıdır. -->
+          <section class="panel-section sadece-owner">
+            <h2>👥 Üyelik Kayıtları</h2>
+            <p class="muted">
+              Kapatırsan veri tabanına yeni bir üye kaydı düşmez — Google ile de,
+              normal (e-posta/şifre) ile de kimse kayıt olamaz, kayıt sayfası
+              yerine bir uyarı ekranı görür. Daha önce hesap oluşturmuş kimseler
+              bundan ETKİLENMEZ, girişe devam edebilirler. Bu yetki sadece Site
+              Sahibi'ne (owner) aittir, admin bile değiştiremez.
+            </p>
+            <p>
+              Şu an durum:
+              <strong id="ag-kayitlar-durum">Yükleniyor...</strong>
+            </p>
+            <div class="csp-flex-gap10">
+              <button id="ag-kayitlari-kapat-btn" type="button" class="btn-danger csp-w-auto">Kayıtları Kapat</button>
+              <button id="ag-kayitlari-ac-btn" type="button" class="btn-primary csp-w-auto">Kayıtları Aç</button>
+            </div>
+            <div id="ag-kayitlar-message" class="auth-message" hidden></div>
+          </section>
+
+          <section class="panel-section sadece-owner">
+            <h2>🚨 Kilit Modu (Acil Durdurma)</h2>
+            <p class="muted">
+              Açtığında Site Sahibi (sen) dışında hiçbir rol (admin/manager/editor)
+              içerik ekleyemez, düzenleyemez ya da silemez — panel açılıp mevcut
+              içerik görüntülenebilir, sadece yazma işlemleri Worker tarafında
+              reddedilir. Bir hesabın ele geçirildiğinden şüphelendiğinde, tek tek
+              rolleri değiştirmek yerine tüm yazma yetkisini anında durdurmak
+              içindir. Bu yetki sadece Site Sahibi'ne aittir.
+            </p>
+            <p>
+              Şu an durum:
+              <strong id="ag-kilit-durum">Yükleniyor...</strong>
+            </p>
+            <div class="csp-flex-gap10">
+              <button id="ag-kilit-ac-btn" type="button" class="btn-danger csp-w-auto">🔒 Kilit Modunu Aç — Yazmayı Durdur</button>
+              <button id="ag-kilit-kapat-btn" type="button" class="btn-primary csp-w-auto">🔓 Kilit Modunu Kapat — Yazmaya İzin Ver</button>
+            </div>
+            <div id="ag-kilit-message" class="auth-message" hidden></div>
+          </section>
+
+          <section class="panel-section">
+            <h2>🔴 Bir Admin'i Askıya Al ("Acil Fren")</h2>
+            <p class="muted">
+              Bu işlem hedefin TÜM oturumlarını anında sonlandırır ve hesabını
+              geçici olarak kilitler. Kalıcı bir sonuç DEĞİLDİR — sadece bir
+              soruşturma penceresi (varsayılan 72 saat) açar.
+            </p>
+            <form id="ag-askiya-al-form" novalidate>
+              <div class="form-field">
+                <label for="ag-hedef-admin">Askıya alınacak admin</label>
+                <select id="ag-hedef-admin" required></select>
+              </div>
+              <div class="form-field">
+                <label for="ag-sebep">Sebep (denetim kaydına geçer)</label>
+                <textarea id="ag-sebep" rows="3" required minlength="5"></textarea>
+              </div>
+              <button type="submit" class="btn-danger">Askıya Al</button>
+            </form>
+            <div id="ag-askiya-al-message" class="auth-message" hidden></div>
+          </section>
+
+          <section class="panel-section">
+            <h2>Denetim Vakaları</h2>
+            <p class="muted">
+              Vaka geçmişi sayfalanarak gösterilir. Kalıcı silme sadece Site
+              Sahibi'ne (owner) açıktır ve her vaka tek tek, geri alınamaz şekilde
+              silinir — açık ("askıda") vakalar önce sonuçlanmadan silinemez.
+            </p>
+            <div id="ag-vaka-listesi"><p class="muted">Yükleniyor...</p></div>
+            <div class="uya-sayfalama" id="ag-vaka-sayfalama"></div>
+          </section>
+
+          <section class="panel-section sadece-owner">
+            <h2>📜 Denetim Kaydı (Audit Log)</h2>
+            <p class="muted">
+              github-yonetim panelinin arkasındaki Worker'ın verdiği her yazma
+              (ekleme/düzenleme/silme) denemesinin izi — kim, ne zaman, hangi
+              dosyayı, ne sonuçla (izin verildi/reddedildi). Depolamayı
+              doldurmasın diye tek tek kayıt ya da belirli bir tarihten eskisinin
+              tamamı silinebilir; bu SADECE Site Sahibi'ne açıktır, admin bile
+              göremez/silemez.
+            </p>
+            <div class="csp-flex-gap10">
+              <label for="ag-denetim-filtre" class="muted">Göster:</label>
+              <select id="ag-denetim-filtre">
+                <option value="hepsi">Hepsi</option>
+                <option value="reddedildi">Sadece reddedilenler</option>
+                <option value="izin_verildi">Sadece izin verilenler</option>
+              </select>
+              <button id="ag-denetim-yenile-btn" type="button" class="btn-secondary csp-w-auto">🔄 Yenile</button>
+            </div>
+            <div id="ag-denetim-listesi"><p class="muted">Yükleniyor...</p></div>
+            <div class="uya-sayfalama" id="ag-denetim-sayfalama"></div>
+            <div class="csp-flex-gap10 csp-mt-14">
+              <button id="ag-denetim-30gun-temizle-btn" type="button" class="btn-secondary csp-w-auto">🧹 30 Günden Eskisini Sil</button>
+              <button id="ag-denetim-hepsi-temizle-btn" type="button" class="btn-danger csp-w-auto">🗑️ Tüm Kayıtları Sil</button>
+            </div>
+            <div id="ag-denetim-message" class="auth-message" hidden></div>
+          </section>
+
+          <section class="panel-section">
+            <h2>Nasıl Karara Bağlanır?</h2>
+            <ul>
+              <li><strong>Çoğunluk oylaması:</strong> hedef hariç, askıda olmayan tüm admin/Site Sahibi'nin basit çoğunluğu "Kalıcı Düşür" ya da "Geri Aç" derse vaka anında o yönde kapanır.</li>
+              <li><strong>Site Sahibi kararı:</strong> bir Site Sahibi varsa, oylama beklemeden tek başına vakayı kapatabilir.</li>
+              <li><strong>Süre dolumu (fail-safe):</strong> karar süresine kadar kimse karar veremezse hesap OTOMATİK olarak geri açılır — varsayılan her zaman güvenli taraftadır, kimse kalıcı olarak düşürülmüş olmaz.</li>
+              <li><strong>Sadece 2 admin varsa ve Site Sahibi yoksa:</strong> kalan tek admin'in kendi oyu "çoğunluk" sayılmaz (yetki gasbını önlemek için bilerek engellenmiştir) — vaka ancak bir Site Sahibi atanıp karar verirse ya da süre dolarsa kapanır.</li>
+            </ul>
+          </section>
+
+        </div>
+    </section>
+
+    <section class="dash-view" id="view-sys-github" hidden data-view="sys-github">
+      <h1>GitHub / Worker Bağlantı Durumu</h1>
+      <section id="baglanti" class="panel-section">
+              <h2>GitHub Bağlantısı</h2>
+              <p class="muted">
+                GitHub kullanıcı adı, repo adı ve yazma yetkisi olan token artık bu
+                panelde YOK — hiçbiri tarayıcına hiç girmiyor. Bunun yerine sitenin
+                Cloudflare Worker'ı (token'ı kendi sunucu-tarafı gizli anahtarı
+                olarak tutar) senin zaten sahip olduğun bu oturumu doğrulayıp
+                GitHub'a onun adına yazıyor — yani bağlantı otomatik kurulur, elle
+                bir şey yapıştırman gerekmez. Aşağıdaki durum mesajı sayfa
+                açıldığında kendiliğinden güncellenir; sorun yaşarsan butonla
+                tekrar deneyebilirsin.
+              </p>
+              <div class="form-field">
+                <label for="gh-branch">Branch (opsiyonel — boş bırakılırsa reponun varsayılan branch'i kullanılır)</label>
+                <input id="gh-branch" type="text" placeholder="main" autocomplete="off">
+              </div>
+              <button id="gh-baglan-btn" type="button" class="btn-primary csp-w-auto">Bağlantıyı Doğrula</button>
+              <div id="gh-baglanti-message" class="auth-message" hidden></div>
+            </section>
+      <section id="yetki-ayarlari" class="panel-section">
+              <h2>Yetki Ayarları</h2>
+              <p class="muted">
+                Bu sayfadaki (GitHub İçerik Yönetimi paneli) bazı özellikleri
+                hangi rollerin kullanabildiğini buradan <strong>kod yazmadan</strong>
+                değiştirebilirsin. Bir satırdaki anahtarı kapatırsan, o rol o
+                özelliği panelde artık hiç görmez VE sunucu tarafında da
+                (Cloudflare Worker) o işlemi yapmaya çalışsa reddedilir — sadece
+                görünürlük değil, gerçek bir yetki kısıtlamasıdır.
+              </p>
+              <p class="gy-yardim-metni">
+                <strong>Bu sadece owner'a (Site Sahibi'ne) özeldir.</strong>
+                owner'ın kendisi hiçbir zaman kısıtlanamaz (kendi panelinden
+                kilitlenmeni engellemek için bilerek böyle tasarlandı). Bir
+                anahtarı kapatman, ilgili rolün SADECE o tekil özelliğe erişimini
+                keser — o rolün panele genel girişini ya da diğer özelliklerini
+                etkilemez. Örnek: "CV Yönetimi" satırında "Admin" anahtarını
+                kapatırsan, adminler CV'yi artık göremez/değiştiremez, sadece sen
+                (owner) yönetebilirsin.
+              </p>
+
+              <div id="ya-tablo-alani">
+                <p class="muted">Yükleniyor...</p>
+              </div>
+              <div id="ya-message" class="auth-message" hidden></div>
+            </section>
+    </section>
+
+    <section class="dash-view" id="view-sys-hakkimda" hidden data-view="sys-hakkimda">
+      <h1>Hakkımda &amp; Sosyal Linkler</h1>
+      <section id="hakkimda" class="panel-section">
+              <h2>Hakkımda (Anasayfa)</h2>
+              <p class="muted">
+                Anasayfada görünen üstteki isim/unvan satırı ile aşağıdaki
+                İngilizce/Türkçe "Hakkımda" kutusunu buradan düzenleyebilirsin.
+                Bu alan doğrudan <code>_includes/hakkimda-kutusu.md</code> ve
+                <code>_includes/hakkimda-icerik.md</code> dosyalarına GitHub'a
+                commit atar — <strong>içerik HTML formatındadır, Markdown
+                DEĞİLDİR</strong>; aşağıdaki kutulara yazarken de düz metin değil
+                geçerli HTML (<code>&lt;p&gt;</code>, <code>&lt;strong&gt;</code>,
+                <code>&lt;ul&gt;</code>/<code>&lt;li&gt;</code> vb.) kullanmalısın,
+                aksi hâlde sayfanın mevcut görünümü/biçimlendirmesi bozulur. Sadece
+                admin/Site Sahibi bu bölümü görebilir ve düzenleyebilir.
+              </p>
+
+              <button id="hk-yukle-btn" type="button" class="btn-primary csp-w-auto csp-mb-12">Mevcut İçeriği Yükle</button>
+              <div id="hk-durum" class="muted">Yüklemek için yukarıdaki butona bas.</div>
+
+              <div id="hk-form-alani" hidden>
+
+                <h3>Üst Başlık</h3>
+                <p class="gy-yardim-metni">
+                  Anasayfada profil fotoğrafının hemen altında görünen isim ve
+                  unvan satırı (<code>_includes/hakkimda-kutusu.md</code>). Bu
+                  alan tek dilde tutulur, EN/TR ayrımı yoktur.
+                </p>
+                <div class="form-field">
+                  <label for="hk-baslik-html">Üst başlık (HTML)</label>
+                  <textarea id="hk-baslik-html" rows="4" spellcheck="false"></textarea>
+                </div>
+
+                <h3 class="csp-mt-18">Hakkımda Kutusu</h3>
+                <p class="gy-yardim-metni">
+                  Anasayfadaki İngilizce/Türkçe sekmeli "Hakkımda" kutusunun
+                  (<code>_includes/hakkimda-icerik.md</code>) içeriği. Sekme
+                  geçiş mekanizması (üstteki butonlar + script) otomatik olarak
+                  korunur — aşağıdaki iki kutuya SADECE her dilin kendi
+                  <code>&lt;div class="lang-panel"&gt;</code> içindeki HTML'ini
+                  yazman yeterli, geri kalan sarmalayıcı yapı (script, sekme
+                  butonları, <code>id="lang-en"</code>/<code>id="lang-tr"</code>)
+                  kaydederken otomatik olarak yeniden oluşturulur ve bozulmaz.
+                </p>
+
+                <div class="lang-tabs">
+                  <button type="button" class="lang-tab-btn active" data-hk-lang="en">🇬🇧 English</button>
+                  <button type="button" class="lang-tab-btn" data-hk-lang="tr">🇹🇷 Türkçe</button>
+                </div>
+
+                <div id="hk-panel-en" class="lang-panel active">
+                  <div class="form-field">
+                    <label for="hk-icerik-en">İngilizce içerik (HTML)</label>
+                    <textarea id="hk-icerik-en" rows="16" spellcheck="false"></textarea>
+                  </div>
+                </div>
+                <div id="hk-panel-tr" class="lang-panel">
+                  <div class="form-field">
+                    <label for="hk-icerik-tr">Türkçe içerik (HTML)</label>
+                    <textarea id="hk-icerik-tr" rows="16" spellcheck="false"></textarea>
+                  </div>
+                </div>
+
+                <p class="gy-yardim-metni">
+                  Değişiklikleri kaydetmeden önce dilediğin kadar düzenleyebilirsin;
+                  hiçbir şey kaydedip GitHub'a commit atılana kadar sitede
+                  görünmez. Kaydettikten sonra değişikliklerin sitede görünmesi
+                  (GitHub Pages derlemesi nedeniyle) 1-2 dakika sürebilir.
+                </p>
+                <button id="hk-kaydet-btn" type="button" class="btn-primary csp-w-auto">Kaydet ve Yayınla</button>
+              </div>
+              <div id="hk-message" class="auth-message" hidden></div>
+            </section>
+      <section id="baglantilar" class="panel-section">
+              <h2>Bağlantılar (Sosyal / Akademik)</h2>
+              <p class="muted">
+                Anasayfada profil bilgisinin altında görünen bağlantı düğmelerini
+                (GitHub, LinkedIn, Google Scholar, ORCID, vb.) buradan ekleyebilir,
+                düzenleyebilir veya silebilirsin. Bu alan doğrudan
+                <code>_config.yml</code> dosyasındaki <code>social:</code> bloğuna
+                GitHub'a commit atar. <strong>Bağlantı adresini (URL) boş
+                bırakırsan, o buton anasayfada hiç görünmez</strong> — satırı
+                silmene gerek yok, örneğin henüz bir Google Scholar profilin
+                yoksa alanı boş bırakman yeterli, hazır olduğunda doldurup
+                kaydedince otomatik görünür. Sadece admin/Site Sahibi bu bölümü
+                görebilir ve düzenleyebilir.
+              </p>
+              <p class="gy-yardim-metni">
+                Yeni eklediğin bir bağlantının dahili teknik kimliği (ekranda
+                görünmez, sadece <code>_config.yml</code> dosyasının içinde
+                kullanılır) <strong>Görünen Ad</strong>'dan otomatik türetilir —
+                ör. "1000 Kitap" yazarsan kodda <code>1000_kitap</code> olarak
+                kaydedilir. Zaten var olan bir bağlantının Görünen Adı'nı
+                değiştirdiğinde bu dahili kimlik SABİT kalır (sadece ekrandaki
+                isim değişir), sistemin başka bir yerinde bu bağlantıya yapılan
+                göndermeler bozulmaz.
+              </p>
+
+              <button id="bg-yukle-btn" type="button" class="btn-primary csp-w-auto csp-mb-12">Mevcut Bağlantıları Yükle</button>
+              <div id="bg-durum" class="muted">Yüklemek için yukarıdaki butona bas.</div>
+
+              <div id="bg-form-alani" hidden>
+                <div id="bg-liste"></div>
+
+                <button id="bg-yeni-ekle-btn" type="button" class="btn-secondary csp-w-auto csp-mt-10">
+                  + Yeni Bağlantı Ekle
+                </button>
+
+                <p class="gy-yardim-metni csp-mt-10">
+                  Değişiklikleri kaydetmeden önce dilediğin kadar ekleyip
+                  silebilirsin; hiçbir şey kaydedip GitHub'a commit atılana kadar
+                  sitede görünmez. Kaydettikten sonra değişikliklerin sitede
+                  görünmesi (Jekyll derlemesi nedeniyle) 1-2 dakika sürebilir.
+                </p>
+                <button id="bg-kaydet-btn" type="button" class="btn-primary csp-w-auto">Kaydet ve Yayınla</button>
+              </div>
+              <div id="bg-message" class="auth-message" hidden></div>
+            </section>
+    </section>
+
+    <section class="dash-view" id="view-sys-hesabim" hidden data-view="sys-hesabim">
+      <h1>Hesabım (Tehlikeli Bölge)</h1>
+      <section id="hesabim" class="panel-section danger-zone">
+              <h2>Hesabım — Tehlikeli Bölge</h2>
+              <p>
+                Kendi yönetici hesabını da buradan silebilirsin. Diğer üyelerin
+                hesaplarını silmek için <a href="{{ '/panel/uye-ayarlari.html' | relative_url }}">Üye Ayarları</a>
+                sayfasındaki <strong>Sil</strong> butonunu kullan.
+              </p>
+              <p>Hesabını sildiğinde profilin ve özel içerik erişimlerin dahil TÜM
+              verilerin kalıcı olarak silinir. Bu işlem geri alınamaz.</p>
+              <div class="form-field">
+                <label for="admin-kendi-hesap-sil-onay">Onaylamak için kutuya büyük harflerle <strong>SİL</strong> yaz</label>
+                <input id="admin-kendi-hesap-sil-onay" type="text" autocomplete="off">
+              </div>
+              <button id="admin-kendi-hesap-sil-btn" type="button" class="btn-danger">Hesabımı Kalıcı Olarak Sil</button>
+              <div id="admin-kendi-hesap-sil-message" class="auth-message" hidden></div>
+              <p class="csp-mt-16"><a href="{{ '/panel/panel.html' | relative_url }}">← Panelim sayfasına git (şifre değiştir, 2FA, KVKK)</a></p>
+            </section>
+    </section>
+
+  </main>
+</div>
+
+<!-- ============================================================
+     Kaynak (swap) şablonları — GERÇEK DOM'a hiçbir zaman ayrı ayrı
+     aynı anda eklenmezler (id çakışması: admin.md ve github-yonetim.md
+     içinde "icerik-ekle" / "icerikler" / "icerik-form" id'leri birebir
+     aynı). <template> içeriği document.getElementById() için görünmez
+     olduğundan, dashboard.js bunları SADECE gerektiğinde (ve HER ZAMAN
+     tek bir varyantı) #slot-icerik-ekle / #slot-icerikler içine taşır.
+     Bkz. panel/DASHBOARD-ENTEGRASYON.md.
+     ============================================================ -->
+<template id="tpl-gy-icerik-ekle">
+<section id="icerik-ekle" class="panel-section">
+        <h2 id="ic-form-baslik">Yeni İçerik Ekle</h2>
+        <p id="ic-yazi-ekleme-engelli-uyari" class="auth-message auth-message--error" hidden>
+          Site Sahibi, rolünün yeni yazı/proje ekleme yetkisini kapatmış — mevcut bir içeriği düzenlemek için "Mevcut İçerikler" sekmesindeki "Düzenle" butonunu kullanabilirsin.
+        </p>
+
+        <div class="form-field">
+          <label>İçerik Türü</label>
+          <div class="gy-tip-secim">
+            <label class="gy-radio"><input type="radio" name="icerik-turu" value="blog" checked> 📰 Blog Yazısı</label>
+            <label class="gy-radio"><input type="radio" name="icerik-turu" value="proje"> 🎓 Akademik Proje</label>
+          </div>
+        </div>
+
+        <form id="icerik-form" novalidate>
+          <div class="form-field">
+            <label for="ic-title">Başlık</label>
+            <input id="ic-title" type="text" required>
+          </div>
+          <div class="form-field" id="ic-yazar-wrap">
+            <label for="ic-yazar-arama">Yazar</label>
+            <div id="ic-yazar-arama-kutusu" class="gy-arama-wrap" hidden>
+              <input id="ic-yazar-arama" type="text" class="msg-uye-arama" placeholder="İsim veya e-posta ile ara..." autocomplete="off">
+              <input type="hidden" id="ic-yazar-secili-id">
+              <div id="ic-yazar-arama-sonuc" class="msg-uye-arama-sonuc" hidden></div>
+            </div>
+            <input id="ic-yazar-adi" type="text" placeholder="Yazar adı" autocomplete="off" readonly hidden>
+            <p class="gy-yardim-metni">
+              Yönetici (admin) iseniz, içerik yönetebilen (editör/İçerik
+              Sorumlusu/yönetici) kullanıcılar arasından isim veya e-posta ile
+              arayıp yazar seçebilirsiniz — liste yerine arama kutusu
+              kullanılır, çünkü yönetici/site sahibi sayısı arttıkça
+              sayfayı uzun bir açılır listeyle şişirmemek için.
+              Editör veya İçerik Sorumlusu iseniz bu alan otomatik olarak
+              kendi adınızla dolar ve değiştirilemez.
+            </p>
+          </div>
+          <div class="form-field" id="ic-admin-adina-wrap" hidden>
+            <label class="gy-toggle-satir" for="ic-admin-adina-kutu">
+              <span id="ic-admin-adina-etiket">Admin/Site Sahibi adına yayınla (onay gerekir)</span>
+              <input id="ic-admin-adina-kutu" type="checkbox" role="switch">
+            </label>
+            <select id="ic-admin-adina-hedef" hidden></select>
+            <p class="gy-yardim-metni">
+              İşaretlersen bu içerik seçtiğin admin'in adıyla kaydedilir ve
+              "taslak" (gizli) durumunda admin onayına düşer — admin
+              onaylamadan gerçekten yayına alınamaz. Onaya düşene kadar
+              "Yayında" anahtarı ve "GitHub'a gizli commit et (eski
+              yöntem)" seçeneği devre dışı bırakılır.
+            </p>
+          </div>
+          <div class="form-field">
+            <label for="ic-date">Tarih (yayınlandığı/yayınlanacağı tarih)</label>
+            <input id="ic-date" type="date" required>
+          </div>
+          <div class="form-field">
+            <label for="ic-guncelleme-tarihi">Güncellenme tarihi (isteğe bağlı)</label>
+            <input id="ic-guncelleme-tarihi" type="date">
+            <p class="gy-yardim-metni">
+              Boş bırakılırsa yazıda/projede hiç gösterilmez. Doldurursan
+              yukarıdaki "Tarih" (orijinal yayın tarihi) OLDUĞU GİBİ kalır,
+              sayfada ayrıca "Güncellendi: ..." olarak eklenir.
+            </p>
+          </div>
+          <div class="form-field">
+            <label class="gy-toggle-satir" for="ic-akademik">
+              <span class="gy-toggle">
+                <input id="ic-akademik" type="checkbox" role="switch">
+                <span class="gy-toggle-track"><span class="gy-toggle-thumb"></span></span>
+              </span>
+              <span class="gy-toggle-metin">
+                <strong>Akademik Yazı / Atıf Kutusu Göster</strong>
+                <span class="muted">
+                  İşaretlersen sayfanın sonunda çok dilli (TR/EN) APA 7,
+                  Chicago 17, MLA 9 ve BibTeX formatında otomatik bir atıf
+                  kutusu (<code>_includes/atif-kutusu.html</code>) görünür.
+                  Kapalıyken front-matter'a hiç yazılmaz ve atıf kutusu bu
+                  içerikte hiç render edilmez.
+                </span>
+              </span>
+            </label>
+          </div>
+          <div class="form-field" id="ic-last-modified-at-wrap" hidden>
+            <label for="ic-last-modified-at">Atıf Kutusu — Güncelleme Tarihi (last_modified_at, isteğe bağlı)</label>
+            <input id="ic-last-modified-at" type="date">
+            <p class="gy-yardim-metni">
+              Sadece yukarıdaki "Akademik Yazı" kutusu açıkken görünür.
+              Doluysa atıf kutusundaki APA/Chicago/MLA/BibTeX formatlarının
+              hepsinde "güncellendi / son güncelleme / versiyon" bilgisi
+              olarak (dile göre biçimlendirilerek) eklenir; yukarıdaki genel
+              "Güncellenme tarihi" (<code>guncelleme_tarihi</code>) alanından
+              BAĞIMSIZDIR ve doluysa ona ÖNCELİKLİDİR. Boş bırakılırsa atıf
+              kutusu, doluysa yukarıdaki genel güncelleme tarihini kullanır.
+            </p>
+          </div>
+          <div class="form-field">
+            <label for="ic-slug">Dosya adı / slug (boş bırakılırsa başlıktan otomatik üretilir)</label>
+            <input id="ic-slug" type="text" placeholder="ornek-yazi-basligi" autocomplete="off">
+          </div>
+          <div class="form-field" id="ic-klasor-wrap">
+            <label for="ic-klasor-secim">Klasör (blog yazısının <code>_posts/</code> altında hangi alt klasöre kaydedileceği)</label>
+            <select id="ic-klasor-secim">
+              <option value="__auto__">Otomatik — tarihe göre yıl klasörü (örn. _posts/2026/)</option>
+              <option value="__yeni__">➕ Yeni klasör oluştur…</option>
+            </select>
+            <input class="csp-mt-8" id="ic-klasor-yeni-ad" type="text" placeholder="örn. seyahat ya da 2027" autocomplete="off" hidden>
+            <p class="gy-yardim-metni" id="ic-klasor-yardim">
+              "Otomatik" seçiliyken dosya, yukarıdaki tarihin yılına göre
+              (<code>_posts/&lt;yıl&gt;/</code>) kaydedilir — hiçbir şey
+              yapmana gerek yok. Farklı bir klasör seçersen (örn. konuya
+              göre <code>_posts/seyahat/</code> ya da farklı bir yıl)
+              dosya SEÇTİĞİN klasöre gider; hangi klasörde durduğu
+              yazının linkini (permalink'ini) ETKİLEMEZ, link her zaman
+              tarih ve slug'dan üretilir. Yeni klasörleri "📁 Klasörler"
+              sekmesinden de yönetebilirsin (oluşturma, yeniden
+              adlandırma, silme).
+            </p>
+          </div>
+          <div class="form-field" id="ic-yil-oneki-wrap" hidden>
+            <label class="gy-checkbox"><input id="ic-yil-oneki" type="checkbox"> Dosya adına yıl önekini ekle (<code>YYYY-slug.md</code>)</label>
+          </div>
+
+          <div id="ic-proje-alanlar" hidden>
+            <div class="form-field">
+              <label for="ic-venue">Venue (Mekan / Mecra)</label>
+              <input id="ic-venue" type="text" placeholder="Dergi / Konferans Adı veya Kaynakça">
+            </div>
+            <div class="form-field">
+              <label for="ic-status">Durum</label>
+              <select id="ic-status">
+                <option value="Yayınlandı">Yayınlandı</option>
+                <option value="Devam Ediyor">Devam Ediyor</option>
+                <option value="İnceleme Aşamasında">İnceleme Aşamasında</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="ic-summary">Özet (listeleme sayfasında görünür, 1-2 cümle)</label>
+              <input id="ic-summary" type="text">
+            </div>
+            <div class="form-field">
+              <label for="ic-link">Dış Bağlantı URL (opsiyonel)</label>
+              <input id="ic-link" type="url" placeholder="https://...">
+            </div>
+            <div class="form-field">
+              <label for="ic-link-label">Bağlantı Etiketi (opsiyonel)</label>
+              <input id="ic-link-label" type="text" placeholder="Makaleyi Oku">
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label for="ic-body">İçerik (Markdown)</label>
+            <div class="gy-editor-toolbar" role="toolbar" aria-label="Markdown biçimlendirme">
+              <span class="gy-editor-grup">
+                <button type="button" data-md="bold" title="Kalın (**metin**)"><strong>K</strong></button>
+                <button type="button" data-md="italic" title="İtalik (*metin*)"><em>İ</em></button>
+                <button type="button" data-md="strikethrough" title="Üstü çizili (~~metin~~)"><s>Ü</s></button>
+                <button type="button" data-md="inline-code" title="Satır içi kod (`kod`)">&lt;/&gt;</button>
+              </span>
+              <span class="gy-editor-ayrac" aria-hidden="true"></span>
+              <span class="gy-editor-grup">
+                <button type="button" data-md="h2" title="Başlık (## metin)">H2</button>
+                <button type="button" data-md="h3" title="Alt başlık (### metin)">H3</button>
+                <button type="button" data-md="h4" title="Alt-alt başlık (#### metin)">H4</button>
+              </span>
+              <span class="gy-editor-ayrac" aria-hidden="true"></span>
+              <span class="gy-editor-grup">
+                <button type="button" data-md="list" title="Madde işaretli liste (- madde)">≡</button>
+                <button type="button" data-md="ordered-list" title="Numaralı liste (1. madde)">1.</button>
+                <button type="button" data-md="task-list" title="Yapılacaklar listesi (- [ ] madde)">☑</button>
+              </span>
+              <span class="gy-editor-ayrac" aria-hidden="true"></span>
+              <span class="gy-editor-grup">
+                <button type="button" data-md="quote" title="Alıntı (&gt; metin)">❝</button>
+                <button type="button" data-md="code-block" title="Kod bloğu (```)">{ }</button>
+                <button type="button" data-md="hr" title="Yatay çizgi (---)">―</button>
+                <button type="button" data-md="table" title="Tablo şablonu (2 sütun)">▦</button>
+              </span>
+              <span class="gy-editor-ayrac" aria-hidden="true"></span>
+              <span class="gy-editor-grup">
+                <button type="button" data-md="link" title="Bağlantı ([metin](url))">🔗</button>
+                <button type="button" data-md="image" title="Görsel — dış URL ile (![açıklama](url))">🖼️</button>
+              </span>
+              <span class="gy-editor-ayrac" aria-hidden="true"></span>
+              <span class="gy-editor-grup">
+                <button type="button" data-md="footnote" title="Dipnot ekle (kramdown [^N] / [^N]: açıklama)">¹</button>
+              </span>
+            </div>
+            <textarea id="ic-body" rows="14" placeholder="Markdown formatında içeriğini buraya yaz..."></textarea>
+          </div>
+
+          <div class="form-field">
+            <label class="gy-toggle-satir" for="ic-yayinda">
+              <span class="gy-toggle">
+                <input id="ic-yayinda" type="checkbox" checked role="switch">
+                <span class="gy-toggle-track"><span class="gy-toggle-thumb"></span></span>
+              </span>
+              <span class="gy-toggle-metin">
+                <strong>Yayında</strong>
+                <span class="muted">
+                  Kapatırsan içerik blog/proje listesinden ve arama motorlarından
+                  gizlenir; yalnızca aşağıdaki ön izleme linkine sahip olanlar
+                  görebilir. Link her zaman burada görüntülenebilir ve
+                  düzenlenebilir, içeriği görüntülerken de erişilebilir kalır;
+                  istediğin an tekrar düzenleyip yayına alabilirsin.
+                </span>
+              </span>
+            </label>
+          </div>
+          <div class="form-field" id="ic-sadece-supabase-wrap">
+            <label class="gy-toggle-satir" for="ic-sadece-supabase">
+              <span class="gy-toggle">
+                <input id="ic-sadece-supabase" type="checkbox" role="switch">
+                <span class="gy-toggle-track"><span class="gy-toggle-thumb"></span></span>
+              </span>
+              <span class="gy-toggle-metin">
+                <strong>GitHub yerine Supabase'te depola</strong>
+                <span class="muted">
+                  Açarsan içerik GitHub'a HİÇ commit edilmez, sadece
+                  Supabase'te durur — ama yine de GERÇEKTEN yayındadır: blog/proje
+                  listesinde görünür, kendi adresi vardır ve arama motorlarınca
+                  indekslenebilir. Kapalıyken içerik (mevcut yöntemle) GitHub'a
+                  commit edilir. Bu anahtar sadece "Yayında" açıkken geçerlidir;
+                  "Yayında" kapalıyken içerik zaten gizli olarak Supabase'e
+                  taslak gider.
+                </span>
+              </span>
+            </label>
+          </div>
+          <div class="form-field">
+            <label class="gy-toggle-satir" for="ic-reklam">
+              <span class="gy-toggle">
+                <input id="ic-reklam" type="checkbox" checked role="switch">
+                <span class="gy-toggle-track"><span class="gy-toggle-thumb"></span></span>
+              </span>
+              <span class="gy-toggle-metin">
+                <strong>Reklam</strong>
+                <span class="muted">
+                  Site genelinde reklam açıksa (bkz. <code>_config.yml</code> →
+                  <code>adsense_client_id</code>) bu yazıda/projede de gösterilir.
+                  Kapatırsan bu İÇERİĞE ÖZEL olarak (diğer yazılar etkilenmeden)
+                  hem otomatik hem manuel reklamlar hiç yüklenmez — ör. hassas/
+                  özel bir konu için. Site genelinde reklam hiç açık değilse bu
+                  anahtarın bir etkisi olmaz.
+                </span>
+              </span>
+            </label>
+          </div>
+          <div class="form-field">
+            <label class="gy-toggle-satir" for="ic-toc">
+              <span class="gy-toggle">
+                <input id="ic-toc" type="checkbox" role="switch">
+                <span class="gy-toggle-track"><span class="gy-toggle-thumb"></span></span>
+              </span>
+              <span class="gy-toggle-metin">
+                <strong>İçindekiler</strong>
+                <span class="muted">
+                  Açarsan yazının/projenin en başında, başlıkları ("##"/"###")
+                  otomatik listeleyen katlanabilir bir İçindekiler kutusu
+                  gösterilir. Uzun, alt başlıklara ayrılmış içerikler için
+                  önerilir; kısa yazılarda kapalı bırakabilirsin.
+                </span>
+              </span>
+            </label>
+          </div>
+          <div class="form-field">
+            <label for="ic-pdf-url">PDF Bağlantısı (opsiyonel)</label>
+            <input id="ic-pdf-url" type="url" placeholder="https://.../rapor.pdf">
+            <p class="gy-yardim-metni">
+              Doluysa yazının/projenin başında akademik/kurumsal görünümlü bir
+              "📄 PDF İndir" butonu çıkar — ör. tam metin makale, rapor ya da
+              sunum PDF'i için. Sadece <code>https://</code> ile başlayan
+              adresler kabul edilir.
+            </p>
+          </div>
+          <div class="form-field">
+            <label for="ic-veri-url">Veri Seti URL (veri_url, opsiyonel)</label>
+            <input id="ic-veri-url" type="url" placeholder="https://github.com/... veya https://zenodo.org/... veya https://osf.io/...">
+            <p class="gy-yardim-metni">
+              Doluysa yazının/projenin başında, PDF butonunun YANINDA "🗃️ Veri
+              Seti" butonu çıkar — analiz kodunun/veri setinin bulunduğu bir
+              GitHub reposu, Zenodo/OSF kaydı ya da Kaggle veri kümesi için.
+              PDF Bağlantısı ile TAMAMEN BAĞIMSIZDIR, ikisi birden ya da
+              sadece biri doldurulabilir. Sadece <code>https://</code> ile
+              başlayan adresler kabul edilir.
+            </p>
+          </div>
+          <div class="form-field" id="ic-gizli-hedef-wrap" hidden>
+            <label>Yayında değilken nerede saklansın?</label>
+            <div class="gy-tip-secim">
+              <label class="gy-radio">
+                <input type="radio" name="gizli-hedef" value="supabase" checked>
+                🗄️ Supabase'te taslak (önerilen — GitHub'a hiç commit edilmez)
+              </label>
+              <label class="gy-radio">
+                <input type="radio" name="gizli-hedef" value="github">
+                🐙 GitHub'a commit et (eski yöntem — <code>yayinda: false</code> + gizli linkle)
+              </label>
+            </div>
+            <p class="gy-yardim-metni">
+              <strong>Supabase'te taslak:</strong> içerik GitHub'a hiç
+              dokunmaz, reponun git geçmişinde hiçbir iz bırakmaz — en
+              gizli seçenek budur.
+              <strong>GitHub'a commit et:</strong> içerik yine bu depoya
+              <code>yayinda: false</code> ve tahmin edilemez bir
+              <code>permalink</code> ile commit edilir; dosya reponun
+              (herkese açık ise) git geçmişinde durmaya devam eder, sadece
+              adresi paylaşılmadığı için gizli sayılır. Bu eski yöntem;
+              içeriği GitHub üzerinden elle düzenlemek, zamanlanmış
+              otomatik yayınla birlikte kullanmak ya da tercihen Supabase
+              yerine git'te tutmak isteyenler için hâlâ burada duruyor
+              (bkz. <code>rehber/01-site-rehberi.md</code> § 9).
+            </p>
+          </div>
+          <div id="ic-onizleme-kutusu" class="gy-onizleme-kutusu" hidden>
+            <div class="gy-onizleme-baslik">🔒 Gizli ön izleme linki</div>
+            <p class="muted">
+              Sadece bu linki bilenler görebilir. Kod otomatik üretilir;
+              istersen aşağıdan kendi kodunu yazabilir ya da zar butonuyla
+              yeni bir tane üretebilirsin — link, sayfayı yayına alana kadar
+              her an burada görüntülenebilir ve değiştirilebilir.
+            </p>
+            <div class="gy-link-kutu">
+              <span class="gy-onizleme-onek" id="ic-onizleme-onek"></span>
+              <input type="text" id="ic-onizleme-kod" class="gy-onizleme-kod-girdi"
+                     placeholder="ozel-kod" autocomplete="off" spellcheck="false">
+              <button type="button" id="ic-onizleme-yenile-btn" class="gy-link-kopyala-btn" title="Yeni rastgele kod üret">🎲 Yenile</button>
+            </div>
+            <div class="gy-link-kutu">
+              <input type="text" id="ic-onizleme-link" readonly>
+              <button type="button" id="ic-onizleme-kopyala-btn" class="gy-link-kopyala-btn">Kopyala</button>
+            </div>
+          </div>
+
+          <p class="gy-yardim-metni" id="ic-yayin-secenek-yardim" hidden>
+            <strong>🅰️ Doğrudan GitHub'a Aktar ve Yayınla:</strong> içerik
+            Supabase'e hiç kaydedilmeden doğrudan GitHub'a commit edilir
+            (mevcut/varsayılan yöntem).
+            <strong>🅱️ Supabase'e Kaydet ve GitHub ile Yayınla:</strong>
+            içerik hem Supabase'e (kalıcı bir yedek/arama kaydı olarak) hem
+            de GitHub'a yazılır — ikisi de aynı içeriği gösterir, panelde
+            tek bir kart olarak listelenir. İçeriği GitHub'a hiç commit
+            etmeden sadece Supabase'te yayınlamak için yukarıdaki
+            "GitHub yerine Supabase'te depola" anahtarını aç. Sonradan
+            istersen "Mevcut İçerikler" listesinden aynı yazıyı GitHub'a da
+            aktarabilirsin.
+          </p>
+          <div class="csp-flex-gap10-wrap">
+            <button type="submit" id="ic-submit-btn" class="btn-primary csp-w-auto">🅰️ Doğrudan GitHub'a Aktar ve Yayınla</button>
+            <button type="button" id="ic-submit-b-btn" class="btn-primary csp-w-auto" hidden>🅱️ Supabase'e Kaydet ve GitHub ile Yayınla</button>
+            <button type="button" id="ic-iptal-btn" class="btn-danger csp-w-auto" hidden>Düzenlemeyi İptal Et</button>
+          </div>
+        </form>
+        <div id="ic-message" class="auth-message" hidden></div>
+      </section>
+</template>
+<template id="tpl-gy-icerikler">
+<section id="icerikler" class="panel-section">
+        <h2>Mevcut İçerikler</h2>
+        <p class="muted">Önce "GitHub Bağlantısı" sekmesinden bağlantını doğrula, sonra listeyi yükle.</p>
+        <button id="ic-liste-yenile-btn" type="button" class="btn-primary csp-w-auto csp-mb-12">Listeyi Yükle / Yenile</button>
+
+        <div class="gy-liste-araclar">
+          <div class="gy-arama-kutu">
+            <span class="gy-arama-ikon" aria-hidden="true">🔎</span>
+            <input id="ic-liste-arama" type="search" placeholder="Başlık, yazar veya içerik metninde ara..." autocomplete="off">
+            <button type="button" id="ic-liste-arama-temizle" class="gy-arama-temizle" hidden aria-label="Aramayı temizle">✕</button>
+          </div>
+          <div class="gy-tur-sekmeleri" role="tablist" aria-label="İçerik türüne göre filtrele">
+            <button type="button" class="gy-tur-sekme active" data-filtre-tur="tum" role="tab" aria-selected="true">Tümü</button>
+            <button type="button" class="gy-tur-sekme" data-filtre-tur="blog" role="tab" aria-selected="false">📰 Blog</button>
+            <button type="button" class="gy-tur-sekme" data-filtre-tur="proje" role="tab" aria-selected="false">🎓 Projeler</button>
+          </div>
+          <div class="gy-durum-sekmeleri" role="tablist" aria-label="Yayın durumuna göre filtrele">
+            <button type="button" class="gy-durum-sekme active" data-filtre-durum="tum" role="tab" aria-selected="true">Tümü</button>
+            <button type="button" class="gy-durum-sekme" data-filtre-durum="yayinda" role="tab" aria-selected="false">Yayında</button>
+            <button type="button" class="gy-durum-sekme" data-filtre-durum="gizli" role="tab" aria-selected="false">Gizli</button>
+          </div>
+        </div>
+
+        <div id="ic-liste"><p class="muted">Henüz yüklenmedi.</p></div>
+        <p id="ic-liste-sonuc-yok" class="muted" hidden>Aramanla/filtrenle eşleşen içerik bulunamadı.</p>
+      </section>
+</template>
+<template id="tpl-admin-icerik-ekle">
+<section id="icerik-ekle" class="panel-section">
+        <h2 id="icerik-form-baslik">Yeni Özel İçerik / Makale Ekle</h2>
+        <p class="muted">
+          Aşağıya gizli bir makale yazabilir ve/veya bir dosya ekleyebilirsin.
+          Alttaki listeden hangi özel üyelerin erişebileceğini ve (istersen)
+          o üye için erişimin ne zaman sona ereceğini seç. Tarih boş
+          bırakılırsa erişim sınırsızdır.
+        </p>
+        <form id="icerik-form" novalidate>
+          <div class="form-field">
+            <label for="title">Başlık</label>
+            <input id="title" name="title" type="text" required>
+          </div>
+          <div class="form-field">
+            <label for="slug">Slug (boş bırakılırsa başlıktan otomatik üretilir)</label>
+            <input id="slug" name="slug" type="text" placeholder="ozel-makale-1">
+          </div>
+          <div class="form-field">
+            <label for="summary">Kısa Özet</label>
+            <input id="summary" name="summary" type="text">
+          </div>
+          <div class="form-field">
+            <label for="body_md">Makale İçeriği (Markdown)</label>
+            <textarea id="body_md" name="body_md" rows="10"></textarea>
+          </div>
+          <div class="form-field">
+            <label for="dosya">Ek Dosya (opsiyonel, küçük/orta boy dosyalar için)</label>
+            <input id="dosya" name="dosya" type="file">
+          </div>
+          <div class="form-field">
+            <label for="harici_dosya_url">50GB gibi çok büyük dosya için harici link (opsiyonel)</label>
+            <input id="harici_dosya_url" name="harici_dosya_url" type="url" placeholder="https://pub-xxxx.r2.dev/dosya-adi.zip">
+            <p class="muted csp-m-2-0-0-fs085">
+              Dosyayı Supabase yerine Cloudflare R2'ye yüklediysen oradan aldığın linki buraya yapıştır.
+              Yukarıdaki "Ek Dosya" alanıyla aynı anda kullanma.
+            </p>
+          </div>
+          <div class="form-field">
+            <label>Erişim Verilecek Özel Üyeler / Yöneticiler (isteğe bağlı son geçerlilik tarih &amp; saatiyle, Türkiye saati)</label>
+            <div class="form-field atama-arama">
+              <input id="icerik-atama-arama" type="search" placeholder="Üye ara (isim)...">
+            </div>
+            <div id="icerik-atama-liste" class="atama-liste"><p class="muted">Yükleniyor...</p></div>
+          </div>
+          <div class="csp-flex-gap10">
+            <button type="submit" id="icerik-form-submit-btn" class="btn-primary csp-w-auto">Yayınla ve Ata</button>
+            <button type="button" id="icerik-duzenle-iptal-btn" class="btn-danger csp-w-auto" hidden>Düzenlemeyi İptal Et</button>
+          </div>
+        </form>
+        <div id="icerik-message" class="auth-message" hidden></div>
+      </section>
+</template>
+<template id="tpl-admin-icerikler">
+<section id="icerikler" class="panel-section">
+        <h2>Mevcut Özel İçerikler</h2>
+        <p class="muted">Bir içeriği yayınladıktan sonra da "Düzenle" ile geri dönüp değiştirebilirsin.</p>
+        <div id="icerik-liste"><p class="muted">Yükleniyor...</p></div>
+      </section>
+</template>
+
+</div>
+
+<script type="module" src="{{ '/assets/js/dashboard.js' | relative_url }}"></script>
