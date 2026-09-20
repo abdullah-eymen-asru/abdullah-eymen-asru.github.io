@@ -154,8 +154,16 @@ async function init() {
     // (bkz. dosya başındaki not) — normal bir üyeye "Admin Paneline Dön"
     // linki göstermek hem anlamsız hem de kafa karıştırıcı olurdu (o
     // sayfaya zaten girişi yok, requireAuth onu geri atardı).
+    // BUG FİX (2): bu sayfa artık /panel/dashboard.html'in "Sohbet /
+    // Mesajlar" sekmesi olarak da çalışıyor. Orada "← Admin Paneline Dön"
+    // linki hem ANLAMSIZ (zaten paneldesin) hem de YANLIŞ: kullanıcıyı
+    // dashboard'dan çıkarıp eski, bağımsız /panel/admin.html sayfasına
+    // atıyordu. Dashboard'un içindeysek (.dash-shell varsa) linki hiç
+    // eklemiyoruz; bağımsız /panel/mesajlar.html sayfasında eskisi gibi
+    // görünmeye devam ediyor.
+    const dashboardIcinde = !!document.querySelector(".dash-shell");
     const baslikWrap = document.querySelector(".mesajlar-baslik");
-    if (baslikWrap && !document.getElementById("mesajlar-admin-geri-btn")) {
+    if (!dashboardIcinde && baslikWrap && !document.getElementById("mesajlar-admin-geri-btn")) {
       const geriBtn = document.createElement("a");
       geriBtn.id = "mesajlar-admin-geri-btn";
       geriBtn.className = "btn-secondary uya-geri-btn";
