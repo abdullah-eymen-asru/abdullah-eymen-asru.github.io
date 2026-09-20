@@ -1057,110 +1057,12 @@ permalink: "/panel/dashboard.html"
             <label for="ic-title">Başlık</label>
             <input id="ic-title" type="text" required>
           </div>
-          <div class="form-field" id="ic-yazar-wrap">
-            <label for="ic-yazar-arama">Yazar</label>
-            <div id="ic-yazar-arama-kutusu" class="gy-arama-wrap" hidden>
-              <input id="ic-yazar-arama" type="text" class="msg-uye-arama" placeholder="İsim veya e-posta ile ara..." autocomplete="off">
-              <input type="hidden" id="ic-yazar-secili-id">
-              <div id="ic-yazar-arama-sonuc" class="msg-uye-arama-sonuc" hidden></div>
-            </div>
-            <input id="ic-yazar-adi" type="text" placeholder="Yazar adı" autocomplete="off" readonly hidden>
-            <p class="gy-yardim-metni">
-              Yönetici (admin) iseniz, içerik yönetebilen (editör/İçerik
-              Sorumlusu/yönetici) kullanıcılar arasından isim veya e-posta ile
-              arayıp yazar seçebilirsiniz — liste yerine arama kutusu
-              kullanılır, çünkü yönetici/site sahibi sayısı arttıkça
-              sayfayı uzun bir açılır listeyle şişirmemek için.
-              Editör veya İçerik Sorumlusu iseniz bu alan otomatik olarak
-              kendi adınızla dolar ve değiştirilemez.
-            </p>
-          </div>
-          <div class="form-field" id="ic-admin-adina-wrap" hidden>
-            <label class="gy-toggle-satir" for="ic-admin-adina-kutu">
-              <span id="ic-admin-adina-etiket">Admin/Site Sahibi adına yayınla (onay gerekir)</span>
-              <input id="ic-admin-adina-kutu" type="checkbox" role="switch">
-            </label>
-            <select id="ic-admin-adina-hedef" hidden></select>
-            <p class="gy-yardim-metni">
-              İşaretlersen bu içerik seçtiğin admin'in adıyla kaydedilir ve
-              "taslak" (gizli) durumunda admin onayına düşer — admin
-              onaylamadan gerçekten yayına alınamaz. Onaya düşene kadar
-              "Yayında" anahtarı ve "GitHub'a gizli commit et (eski
-              yöntem)" seçeneği devre dışı bırakılır.
-            </p>
-          </div>
-          <div class="form-field">
-            <label for="ic-date">Tarih (yayınlandığı/yayınlanacağı tarih)</label>
-            <input id="ic-date" type="date" required>
-          </div>
-          <div class="form-field">
-            <label for="ic-guncelleme-tarihi">Güncellenme tarihi (isteğe bağlı)</label>
-            <input id="ic-guncelleme-tarihi" type="date">
-            <p class="gy-yardim-metni">
-              Boş bırakılırsa yazıda/projede hiç gösterilmez. Doldurursan
-              yukarıdaki "Tarih" (orijinal yayın tarihi) OLDUĞU GİBİ kalır,
-              sayfada ayrıca "Güncellendi: ..." olarak eklenir.
-            </p>
-          </div>
-          <div class="form-field">
-            <label class="gy-toggle-satir" for="ic-akademik">
-              <span class="gy-toggle">
-                <input id="ic-akademik" type="checkbox" role="switch">
-                <span class="gy-toggle-track"><span class="gy-toggle-thumb"></span></span>
-              </span>
-              <span class="gy-toggle-metin">
-                <strong>Akademik Yazı / Atıf Kutusu Göster</strong>
-                <span class="muted">
-                  İşaretlersen sayfanın sonunda çok dilli (TR/EN) APA 7,
-                  Chicago 17, MLA 9 ve BibTeX formatında otomatik bir atıf
-                  kutusu (<code>_includes/atif-kutusu.html</code>) görünür.
-                  Kapalıyken front-matter'a hiç yazılmaz ve atıf kutusu bu
-                  içerikte hiç render edilmez.
-                </span>
-              </span>
-            </label>
-          </div>
-          <div class="form-field" id="ic-last-modified-at-wrap" hidden>
-            <label for="ic-last-modified-at">Atıf Kutusu — Güncelleme Tarihi (last_modified_at, isteğe bağlı)</label>
-            <input id="ic-last-modified-at" type="date">
-            <p class="gy-yardim-metni">
-              Sadece yukarıdaki "Akademik Yazı" kutusu açıkken görünür.
-              Doluysa atıf kutusundaki APA/Chicago/MLA/BibTeX formatlarının
-              hepsinde "güncellendi / son güncelleme / versiyon" bilgisi
-              olarak (dile göre biçimlendirilerek) eklenir; yukarıdaki genel
-              "Güncellenme tarihi" (<code>guncelleme_tarihi</code>) alanından
-              BAĞIMSIZDIR ve doluysa ona ÖNCELİKLİDİR. Boş bırakılırsa atıf
-              kutusu, doluysa yukarıdaki genel güncelleme tarihini kullanır.
-            </p>
-          </div>
           <div class="form-field">
             <label for="ic-slug">Dosya adı / slug (boş bırakılırsa başlıktan otomatik üretilir)</label>
             <input id="ic-slug" type="text" placeholder="ornek-yazi-basligi" autocomplete="off">
           </div>
-          <div class="form-field" id="ic-klasor-wrap">
-            <label for="ic-klasor-secim">Klasör (blog yazısının <code>_posts/</code> altında hangi alt klasöre kaydedileceği)</label>
-            <select id="ic-klasor-secim">
-              <option value="__auto__">Otomatik — tarihe göre yıl klasörü (örn. _posts/2026/)</option>
-              <option value="__yeni__">➕ Yeni klasör oluştur…</option>
-            </select>
-            <input class="csp-mt-8" id="ic-klasor-yeni-ad" type="text" placeholder="örn. seyahat ya da 2027" autocomplete="off" hidden>
-            <p class="gy-yardim-metni" id="ic-klasor-yardim">
-              "Otomatik" seçiliyken dosya, yukarıdaki tarihin yılına göre
-              (<code>_posts/&lt;yıl&gt;/</code>) kaydedilir — hiçbir şey
-              yapmana gerek yok. Farklı bir klasör seçersen (örn. konuya
-              göre <code>_posts/seyahat/</code> ya da farklı bir yıl)
-              dosya SEÇTİĞİN klasöre gider; hangi klasörde durduğu
-              yazının linkini (permalink'ini) ETKİLEMEZ, link her zaman
-              tarih ve slug'dan üretilir. Yeni klasörleri "📁 Klasörler"
-              sekmesinden de yönetebilirsin (oluşturma, yeniden
-              adlandırma, silme).
-            </p>
-          </div>
-          <div class="form-field" id="ic-yil-oneki-wrap" hidden>
-            <label class="gy-checkbox"><input id="ic-yil-oneki" type="checkbox"> Dosya adına yıl önekini ekle (<code>YYYY-slug.md</code>)</label>
-          </div>
 
-          <div id="ic-proje-alanlar" hidden>
+<div id="ic-proje-alanlar" hidden>
             <div class="form-field">
               <label for="ic-venue">Venue (Mekan / Mecra)</label>
               <input id="ic-venue" type="text" placeholder="Dergi / Konferans Adı veya Kaynakça">
@@ -1228,6 +1130,242 @@ permalink: "/panel/dashboard.html"
             <textarea id="ic-body" rows="14" placeholder="Markdown formatında içeriğini buraya yaz..."></textarea>
           </div>
 
+          <!--
+            PROGRESSIVE DISCLOSURE (Kademeli Gösterim): bu form eskiden 20+
+            alanı TEK SEFERDE gösteriyordu — yeni bir yazı eklerken "Yazar",
+            "Klasör", "İçindekiler" gibi çoğu zaman dokunulmayan alanlar,
+            asıl işe yarayan Başlık/Özet/İçerik'in arasına girip formu
+            kalabalıklaştırıyordu. Aşağıdaki alanların HİÇBİRİNİN DOM
+            KONUMU işlevini etkilemiyor — github-yonetim.js baştan sona
+            document.getElementById() ile çalışıyor, sıralamaya ya da
+            üst-alt ilişkiye bakmıyor (tek istisna: içindeki alanların
+            kendi wrapper div'leri — ör. "ic-proje-alanlar" — AYNEN
+            korundu). Bu yüzden alanlar burada, tarayıcının yerleşik
+            <details>/<summary> ile açılır-kapanır bir bölüme taşındı;
+            hiçbir JS koşullu görünürlük mantığı (ic-proje-alanlar,
+            ic-yil-oneki-wrap, ic-last-modified-at-wrap, ic-gizli-hedef-wrap,
+            ic-sadece-supabase-wrap vb.) DEĞİŞMEDİ — hepsi hâlâ kendi id'siyle
+            aranıp aynı şekilde gizlenip gösteriliyor, sadece artık
+            <details> kapalıyken görünmüyorlar (tarayıcının kendi
+            [hidden]/açık-kapalı davranışı bu ikisini doğal olarak
+            birleştiriyor: bir alan hem "hidden" hem <details> kapalıysa
+            açılınca yine görünmez, <details> açılınca da "hidden" değilse
+            görünür — çakışma yok).
+          -->
+          <details class="gy-gelismis-ayarlar" id="ic-gelismis-ayarlar">
+            <summary>⚙️ Gelişmiş Ayarlar (SEO, Tarih ve Medya)</summary>
+            <div class="gy-gelismis-ayarlar-govde">
+  <div class="form-field" id="ic-yazar-wrap">
+              <label for="ic-yazar-arama">Yazar</label>
+              <div id="ic-yazar-arama-kutusu" class="gy-arama-wrap" hidden>
+                <input id="ic-yazar-arama" type="text" class="msg-uye-arama" placeholder="İsim veya e-posta ile ara..." autocomplete="off">
+                <input type="hidden" id="ic-yazar-secili-id">
+                <div id="ic-yazar-arama-sonuc" class="msg-uye-arama-sonuc" hidden></div>
+              </div>
+              <input id="ic-yazar-adi" type="text" placeholder="Yazar adı" autocomplete="off" readonly hidden>
+              <p class="gy-yardim-metni">
+                Yönetici (admin) iseniz, içerik yönetebilen (editör/İçerik
+                Sorumlusu/yönetici) kullanıcılar arasından isim veya e-posta ile
+                arayıp yazar seçebilirsiniz — liste yerine arama kutusu
+                kullanılır, çünkü yönetici/site sahibi sayısı arttıkça
+                sayfayı uzun bir açılır listeyle şişirmemek için.
+                Editör veya İçerik Sorumlusu iseniz bu alan otomatik olarak
+                kendi adınızla dolar ve değiştirilemez.
+              </p>
+            </div>
+            <div class="form-field" id="ic-admin-adina-wrap" hidden>
+              <label class="gy-toggle-satir" for="ic-admin-adina-kutu">
+                <span id="ic-admin-adina-etiket">Admin/Site Sahibi adına yayınla (onay gerekir)</span>
+                <input id="ic-admin-adina-kutu" type="checkbox" role="switch">
+              </label>
+              <select id="ic-admin-adina-hedef" hidden></select>
+              <p class="gy-yardim-metni">
+                İşaretlersen bu içerik seçtiğin admin'in adıyla kaydedilir ve
+                "taslak" (gizli) durumunda admin onayına düşer — admin
+                onaylamadan gerçekten yayına alınamaz. Onaya düşene kadar
+                "Yayında" anahtarı ve "GitHub'a gizli commit et (eski
+                yöntem)" seçeneği devre dışı bırakılır.
+              </p>
+            </div>
+
+  <div class="form-field">
+              <label for="ic-date">Tarih (yayınlandığı/yayınlanacağı tarih)</label>
+              <input id="ic-date" type="date" required>
+            </div>
+            <div class="form-field">
+              <label for="ic-guncelleme-tarihi">Güncellenme tarihi (isteğe bağlı)</label>
+              <input id="ic-guncelleme-tarihi" type="date">
+              <p class="gy-yardim-metni">
+                Boş bırakılırsa yazıda/projede hiç gösterilmez. Doldurursan
+                yukarıdaki "Tarih" (orijinal yayın tarihi) OLDUĞU GİBİ kalır,
+                sayfada ayrıca "Güncellendi: ..." olarak eklenir.
+              </p>
+            </div>
+            <div class="form-field">
+              <label class="gy-toggle-satir" for="ic-akademik">
+                <span class="gy-toggle">
+                  <input id="ic-akademik" type="checkbox" role="switch">
+                  <span class="gy-toggle-track"><span class="gy-toggle-thumb"></span></span>
+                </span>
+                <span class="gy-toggle-metin">
+                  <strong>Akademik Yazı / Atıf Kutusu Göster</strong>
+                  <span class="muted">
+                    İşaretlersen sayfanın sonunda çok dilli (TR/EN) APA 7,
+                    Chicago 17, MLA 9 ve BibTeX formatında otomatik bir atıf
+                    kutusu (<code>_includes/atif-kutusu.html</code>) görünür.
+                    Kapalıyken front-matter'a hiç yazılmaz ve atıf kutusu bu
+                    içerikte hiç render edilmez.
+                  </span>
+                </span>
+              </label>
+            </div>
+            <div class="form-field" id="ic-last-modified-at-wrap" hidden>
+              <label for="ic-last-modified-at">Atıf Kutusu — Güncelleme Tarihi (last_modified_at, isteğe bağlı)</label>
+              <input id="ic-last-modified-at" type="date">
+              <p class="gy-yardim-metni">
+                Sadece yukarıdaki "Akademik Yazı" kutusu açıkken görünür.
+                Doluysa atıf kutusundaki APA/Chicago/MLA/BibTeX formatlarının
+                hepsinde "güncellendi / son güncelleme / versiyon" bilgisi
+                olarak (dile göre biçimlendirilerek) eklenir; yukarıdaki genel
+                "Güncellenme tarihi" (<code>guncelleme_tarihi</code>) alanından
+                BAĞIMSIZDIR ve doluysa ona ÖNCELİKLİDİR. Boş bırakılırsa atıf
+                kutusu, doluysa yukarıdaki genel güncelleme tarihini kullanır.
+              </p>
+            </div>
+
+  <div class="form-field" id="ic-klasor-wrap">
+              <label for="ic-klasor-secim">Klasör (blog yazısının <code>_posts/</code> altında hangi alt klasöre kaydedileceği)</label>
+              <select id="ic-klasor-secim">
+                <option value="__auto__">Otomatik — tarihe göre yıl klasörü (örn. _posts/2026/)</option>
+                <option value="__yeni__">➕ Yeni klasör oluştur…</option>
+              </select>
+              <input class="csp-mt-8" id="ic-klasor-yeni-ad" type="text" placeholder="örn. seyahat ya da 2027" autocomplete="off" hidden>
+              <p class="gy-yardim-metni" id="ic-klasor-yardim">
+                "Otomatik" seçiliyken dosya, yukarıdaki tarihin yılına göre
+                (<code>_posts/&lt;yıl&gt;/</code>) kaydedilir — hiçbir şey
+                yapmana gerek yok. Farklı bir klasör seçersen (örn. konuya
+                göre <code>_posts/seyahat/</code> ya da farklı bir yıl)
+                dosya SEÇTİĞİN klasöre gider; hangi klasörde durduğu
+                yazının linkini (permalink'ini) ETKİLEMEZ, link her zaman
+                tarih ve slug'dan üretilir. Yeni klasörleri "📁 Klasörler"
+                sekmesinden de yönetebilirsin (oluşturma, yeniden
+                adlandırma, silme).
+              </p>
+            </div>
+            <div class="form-field" id="ic-yil-oneki-wrap" hidden>
+              <label class="gy-checkbox"><input id="ic-yil-oneki" type="checkbox"> Dosya adına yıl önekini ekle (<code>YYYY-slug.md</code>)</label>
+            </div>
+
+  <div class="form-field">
+              <label class="gy-toggle-satir" for="ic-reklam">
+                <span class="gy-toggle">
+                  <input id="ic-reklam" type="checkbox" checked role="switch">
+                  <span class="gy-toggle-track"><span class="gy-toggle-thumb"></span></span>
+                </span>
+                <span class="gy-toggle-metin">
+                  <strong>Reklam</strong>
+                  <span class="muted">
+                    Site genelinde reklam açıksa (bkz. <code>_config.yml</code> →
+                    <code>adsense_client_id</code>) bu yazıda/projede de gösterilir.
+                    Kapatırsan bu İÇERİĞE ÖZEL olarak (diğer yazılar etkilenmeden)
+                    hem otomatik hem manuel reklamlar hiç yüklenmez — ör. hassas/
+                    özel bir konu için. Site genelinde reklam hiç açık değilse bu
+                    anahtarın bir etkisi olmaz.
+                  </span>
+                </span>
+              </label>
+            </div>
+
+  <div class="form-field">
+              <label class="gy-toggle-satir" for="ic-toc">
+                <span class="gy-toggle">
+                  <input id="ic-toc" type="checkbox" role="switch">
+                  <span class="gy-toggle-track"><span class="gy-toggle-thumb"></span></span>
+                </span>
+                <span class="gy-toggle-metin">
+                  <strong>İçindekiler</strong>
+                  <span class="muted">
+                    Açarsan yazının/projenin en başında, başlıkları ("##"/"###")
+                    otomatik listeleyen katlanabilir bir İçindekiler kutusu
+                    gösterilir. Uzun, alt başlıklara ayrılmış içerikler için
+                    önerilir; kısa yazılarda kapalı bırakabilirsin.
+                  </span>
+                </span>
+              </label>
+            </div>
+
+  <div class="form-field">
+              <label for="ic-pdf-url">PDF Bağlantısı (opsiyonel)</label>
+              <input id="ic-pdf-url" type="url" placeholder="https://.../rapor.pdf">
+              <p class="gy-yardim-metni">
+                Doluysa yazının/projenin başında akademik/kurumsal görünümlü bir
+                "📄 PDF İndir" butonu çıkar — ör. tam metin makale, rapor ya da
+                sunum PDF'i için. Sadece <code>https://</code> ile başlayan
+                adresler kabul edilir.
+              </p>
+            </div>
+            <div class="form-field">
+              <label for="ic-veri-url">Veri Seti URL (veri_url, opsiyonel)</label>
+              <input id="ic-veri-url" type="url" placeholder="https://github.com/... veya https://zenodo.org/... veya https://osf.io/...">
+              <p class="gy-yardim-metni">
+                Doluysa yazının/projenin başında, PDF butonunun YANINDA "🗃️ Veri
+                Seti" butonu çıkar — analiz kodunun/veri setinin bulunduğu bir
+                GitHub reposu, Zenodo/OSF kaydı ya da Kaggle veri kümesi için.
+                PDF Bağlantısı ile TAMAMEN BAĞIMSIZDIR, ikisi birden ya da
+                sadece biri doldurulabilir. Sadece <code>https://</code> ile
+                başlayan adresler kabul edilir.
+              </p>
+            </div>
+
+  <div class="form-field" id="ic-gizli-hedef-wrap" hidden>
+              <label>Yayında değilken nerede saklansın?</label>
+              <div class="gy-tip-secim">
+                <label class="gy-radio">
+                  <input type="radio" name="gizli-hedef" value="supabase" checked>
+                  🗄️ Supabase'te taslak (önerilen — GitHub'a hiç commit edilmez)
+                </label>
+                <label class="gy-radio">
+                  <input type="radio" name="gizli-hedef" value="github">
+                  🐙 GitHub'a commit et (eski yöntem — <code>yayinda: false</code> + gizli linkle)
+                </label>
+              </div>
+              <p class="gy-yardim-metni">
+                <strong>Supabase'te taslak:</strong> içerik GitHub'a hiç
+                dokunmaz, reponun git geçmişinde hiçbir iz bırakmaz — en
+                gizli seçenek budur.
+                <strong>GitHub'a commit et:</strong> içerik yine bu depoya
+                <code>yayinda: false</code> ve tahmin edilemez bir
+                <code>permalink</code> ile commit edilir; dosya reponun
+                (herkese açık ise) git geçmişinde durmaya devam eder, sadece
+                adresi paylaşılmadığı için gizli sayılır. Bu eski yöntem;
+                içeriği GitHub üzerinden elle düzenlemek, zamanlanmış
+                otomatik yayınla birlikte kullanmak ya da tercihen Supabase
+                yerine git'te tutmak isteyenler için hâlâ burada duruyor
+                (bkz. <code>rehber/01-site-rehberi.md</code> § 9).
+              </p>
+            </div>
+            <div id="ic-onizleme-kutusu" class="gy-onizleme-kutusu" hidden>
+              <div class="gy-onizleme-baslik">🔒 Gizli ön izleme linki</div>
+              <p class="muted">
+                Sadece bu linki bilenler görebilir. Kod otomatik üretilir;
+                istersen aşağıdan kendi kodunu yazabilir ya da zar butonuyla
+                yeni bir tane üretebilirsin — link, sayfayı yayına alana kadar
+                her an burada görüntülenebilir ve değiştirilebilir.
+              </p>
+              <div class="gy-link-kutu">
+                <span class="gy-onizleme-onek" id="ic-onizleme-onek"></span>
+                <input type="text" id="ic-onizleme-kod" class="gy-onizleme-kod-girdi"
+                       placeholder="ozel-kod" autocomplete="off" spellcheck="false">
+                <button type="button" id="ic-onizleme-yenile-btn" class="gy-link-kopyala-btn" title="Yeni rastgele kod üret">🎲 Yenile</button>
+              </div>
+              <div class="gy-link-kutu">
+                <input type="text" id="ic-onizleme-link" readonly>
+                <button type="button" id="ic-onizleme-kopyala-btn" class="gy-link-kopyala-btn">Kopyala</button>
+              </div>
+            </div>
+            </div>
+          </details>
+
           <div class="form-field">
             <label class="gy-toggle-satir" for="ic-yayinda">
               <span class="gy-toggle">
@@ -1266,111 +1404,6 @@ permalink: "/panel/dashboard.html"
               </span>
             </label>
           </div>
-          <div class="form-field">
-            <label class="gy-toggle-satir" for="ic-reklam">
-              <span class="gy-toggle">
-                <input id="ic-reklam" type="checkbox" checked role="switch">
-                <span class="gy-toggle-track"><span class="gy-toggle-thumb"></span></span>
-              </span>
-              <span class="gy-toggle-metin">
-                <strong>Reklam</strong>
-                <span class="muted">
-                  Site genelinde reklam açıksa (bkz. <code>_config.yml</code> →
-                  <code>adsense_client_id</code>) bu yazıda/projede de gösterilir.
-                  Kapatırsan bu İÇERİĞE ÖZEL olarak (diğer yazılar etkilenmeden)
-                  hem otomatik hem manuel reklamlar hiç yüklenmez — ör. hassas/
-                  özel bir konu için. Site genelinde reklam hiç açık değilse bu
-                  anahtarın bir etkisi olmaz.
-                </span>
-              </span>
-            </label>
-          </div>
-          <div class="form-field">
-            <label class="gy-toggle-satir" for="ic-toc">
-              <span class="gy-toggle">
-                <input id="ic-toc" type="checkbox" role="switch">
-                <span class="gy-toggle-track"><span class="gy-toggle-thumb"></span></span>
-              </span>
-              <span class="gy-toggle-metin">
-                <strong>İçindekiler</strong>
-                <span class="muted">
-                  Açarsan yazının/projenin en başında, başlıkları ("##"/"###")
-                  otomatik listeleyen katlanabilir bir İçindekiler kutusu
-                  gösterilir. Uzun, alt başlıklara ayrılmış içerikler için
-                  önerilir; kısa yazılarda kapalı bırakabilirsin.
-                </span>
-              </span>
-            </label>
-          </div>
-          <div class="form-field">
-            <label for="ic-pdf-url">PDF Bağlantısı (opsiyonel)</label>
-            <input id="ic-pdf-url" type="url" placeholder="https://.../rapor.pdf">
-            <p class="gy-yardim-metni">
-              Doluysa yazının/projenin başında akademik/kurumsal görünümlü bir
-              "📄 PDF İndir" butonu çıkar — ör. tam metin makale, rapor ya da
-              sunum PDF'i için. Sadece <code>https://</code> ile başlayan
-              adresler kabul edilir.
-            </p>
-          </div>
-          <div class="form-field">
-            <label for="ic-veri-url">Veri Seti URL (veri_url, opsiyonel)</label>
-            <input id="ic-veri-url" type="url" placeholder="https://github.com/... veya https://zenodo.org/... veya https://osf.io/...">
-            <p class="gy-yardim-metni">
-              Doluysa yazının/projenin başında, PDF butonunun YANINDA "🗃️ Veri
-              Seti" butonu çıkar — analiz kodunun/veri setinin bulunduğu bir
-              GitHub reposu, Zenodo/OSF kaydı ya da Kaggle veri kümesi için.
-              PDF Bağlantısı ile TAMAMEN BAĞIMSIZDIR, ikisi birden ya da
-              sadece biri doldurulabilir. Sadece <code>https://</code> ile
-              başlayan adresler kabul edilir.
-            </p>
-          </div>
-          <div class="form-field" id="ic-gizli-hedef-wrap" hidden>
-            <label>Yayında değilken nerede saklansın?</label>
-            <div class="gy-tip-secim">
-              <label class="gy-radio">
-                <input type="radio" name="gizli-hedef" value="supabase" checked>
-                🗄️ Supabase'te taslak (önerilen — GitHub'a hiç commit edilmez)
-              </label>
-              <label class="gy-radio">
-                <input type="radio" name="gizli-hedef" value="github">
-                🐙 GitHub'a commit et (eski yöntem — <code>yayinda: false</code> + gizli linkle)
-              </label>
-            </div>
-            <p class="gy-yardim-metni">
-              <strong>Supabase'te taslak:</strong> içerik GitHub'a hiç
-              dokunmaz, reponun git geçmişinde hiçbir iz bırakmaz — en
-              gizli seçenek budur.
-              <strong>GitHub'a commit et:</strong> içerik yine bu depoya
-              <code>yayinda: false</code> ve tahmin edilemez bir
-              <code>permalink</code> ile commit edilir; dosya reponun
-              (herkese açık ise) git geçmişinde durmaya devam eder, sadece
-              adresi paylaşılmadığı için gizli sayılır. Bu eski yöntem;
-              içeriği GitHub üzerinden elle düzenlemek, zamanlanmış
-              otomatik yayınla birlikte kullanmak ya da tercihen Supabase
-              yerine git'te tutmak isteyenler için hâlâ burada duruyor
-              (bkz. <code>rehber/01-site-rehberi.md</code> § 9).
-            </p>
-          </div>
-          <div id="ic-onizleme-kutusu" class="gy-onizleme-kutusu" hidden>
-            <div class="gy-onizleme-baslik">🔒 Gizli ön izleme linki</div>
-            <p class="muted">
-              Sadece bu linki bilenler görebilir. Kod otomatik üretilir;
-              istersen aşağıdan kendi kodunu yazabilir ya da zar butonuyla
-              yeni bir tane üretebilirsin — link, sayfayı yayına alana kadar
-              her an burada görüntülenebilir ve değiştirilebilir.
-            </p>
-            <div class="gy-link-kutu">
-              <span class="gy-onizleme-onek" id="ic-onizleme-onek"></span>
-              <input type="text" id="ic-onizleme-kod" class="gy-onizleme-kod-girdi"
-                     placeholder="ozel-kod" autocomplete="off" spellcheck="false">
-              <button type="button" id="ic-onizleme-yenile-btn" class="gy-link-kopyala-btn" title="Yeni rastgele kod üret">🎲 Yenile</button>
-            </div>
-            <div class="gy-link-kutu">
-              <input type="text" id="ic-onizleme-link" readonly>
-              <button type="button" id="ic-onizleme-kopyala-btn" class="gy-link-kopyala-btn">Kopyala</button>
-            </div>
-          </div>
-
           <p class="gy-yardim-metni" id="ic-yayin-secenek-yardim" hidden>
             <strong>🅰️ Doğrudan GitHub'a Aktar ve Yayınla:</strong> içerik
             Supabase'e hiç kaydedilmeden doğrudan GitHub'a commit edilir
