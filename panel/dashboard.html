@@ -17,12 +17,6 @@ permalink: "/panel/dashboard.html"
 <div id="app" hidden>
 <div class="dash-shell">
 
-  <button type="button" id="dash-nav-toggle" class="dash-nav-toggle" aria-label="Menüyü aç/kapat" aria-expanded="false">
-    <span class="dash-nav-toggle-bar" aria-hidden="true"></span>
-    <span class="dash-nav-toggle-bar" aria-hidden="true"></span>
-    <span class="dash-nav-toggle-bar" aria-hidden="true"></span>
-  </button>
-
   <aside class="dash-sidebar" id="dash-sidebar">
     <div class="dash-sidebar-head">
       <strong id="dash-ad-soyad"></strong>
@@ -34,6 +28,24 @@ permalink: "/panel/dashboard.html"
   <div class="dash-overlay" id="dash-overlay" hidden></div>
 
   <main class="dash-main" id="dash-main">
+
+    <!-- MADDE 1 (BUG FİX): bu düğme eskiden "position: fixed; top:12px;
+         left:12px" ile sayfanın sol üstünde duruyordu ve mobilde TAM olarak
+         sitenin kendi hamburger menüsünün (#nav-toggle, .site-header içinde)
+         üstüne biniyordu — ikisi tek bir düğme gibi görünüyor, site
+         menüsüne dokunmak (sekmeler arası geçiş) imkânsız hale geliyordu.
+         Artık akışın içinde, header'ın ALTINDAKİ kendi şeridinde duruyor;
+         şeridin z-index'i (30) header'ınkinden (50) düşük olduğu için
+         asla onun üstüne çıkmaz. Şerit ayrıca "şu an hangi sekmedesin"
+         bilgisini de gösteriyor. -->
+    <div class="dash-topbar" id="dash-topbar">
+      <button type="button" id="dash-nav-toggle" class="dash-nav-toggle" aria-label="Panel menüsünü aç/kapat" aria-expanded="false" aria-controls="dash-sidebar">
+        <span class="dash-nav-toggle-bar" aria-hidden="true"></span>
+        <span class="dash-nav-toggle-bar" aria-hidden="true"></span>
+        <span class="dash-nav-toggle-bar" aria-hidden="true"></span>
+      </button>
+      <span class="dash-topbar-baslik" id="dash-topbar-baslik"></span>
+    </div>
 
     <section class="dash-view" id="view-content-all" hidden data-view="content-all">
       <h1>Tüm Yazılar &amp; Projeler</h1>
@@ -137,7 +149,6 @@ permalink: "/panel/dashboard.html"
 
     <section class="dash-view" id="view-media-izleme" hidden data-view="media-izleme">
       <h1>İzleme ve Okuma Yönetimi</h1>
-        <h1>İzleme/Okuma Yönetimi</h1>
         <p class="muted">
           Bu sayfa <strong>sadece Site Sahibi (owner)</strong> tarafından
           kullanılabilir. Buradan doğrudan <code>{{ site.kutuphane_repo }}</code>
@@ -424,8 +435,14 @@ permalink: "/panel/dashboard.html"
     <section class="dash-view" id="view-users-mesajlar" hidden data-view="users-mesajlar">
       <h1>Sohbet / Mesajlar</h1>
         <section class="mesajlar-sayfa" id="mesajlar-sayfa">
+          <!-- MADDE 3 (BUG FİX): burada İKİNCİ bir <h1> daha vardı (eski
+               bağımsız /panel/mesajlar.html sayfasından miras) — görünümün
+               kendi başlığıyla üst üste biniyordu. Başlık tek; açıklama
+               paragrafı ve JS'in eklediği "Admin Paneline Dön" linki
+               kalıyor. Kutunun viewport'a göre ortalanması (mesajlar.css)
+               dashboard içinde assets/css/dashboard.css tarafından
+               etkisizleştiriliyor. -->
           <div class="mesajlar-baslik">
-            <h1>Sohbet / Mesajlar</h1>
             <p class="muted" id="mesajlar-aciklama">Yükleniyor...</p>
           </div>
 
@@ -602,6 +619,18 @@ permalink: "/panel/dashboard.html"
               <button id="gh-baglan-btn" type="button" class="btn-primary csp-w-auto">Bağlantıyı Doğrula</button>
               <div id="gh-baglanti-message" class="auth-message" hidden></div>
             </section>
+    </section>
+
+    <!-- MADDE 4: "Yetki Ayarları" eskiden "GitHub / Worker Bağlantı
+         Durumu" görünümünün ALTINDA ikinci bir blok olarak duruyordu —
+         oysa GitHub bağlantısıyla hiç ilgisi yok, rollerin hangi özelliği
+         kullanabileceğini belirleyen ayrı bir konu. Artık kendi sekmesi
+         (sidebar: Sistem & Güvenlik > 🔐 Yetki Ayarları). Bölümün id'si
+         ("yetki-ayarlari") ve içi AYNEN korundu, çünkü
+         assets/js/github-yonetim/github-yonetim.js -> wireYetkiAyarlari()
+         bu id'ye bağlanıyor ve owner değilsen bölümü DOM'dan siliyor. -->
+    <section class="dash-view" id="view-sys-yetki" hidden data-view="sys-yetki">
+      <h1>Yetki Ayarları</h1>
       <section id="yetki-ayarlari" class="panel-section">
               <h2>Yetki Ayarları</h2>
               <p class="muted">
