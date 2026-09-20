@@ -679,4 +679,82 @@
   font-style: italic;
 }
 
+/* ------------------------------------------------------------------------
+ * "GELİŞMİŞ AYARLAR" — PROGRESSIVE DISCLOSURE (<details>/<summary>)
+ * ------------------------------------------------------------------------
+ * İçerik ekleme formundaki ikincil alanlar (Yazar, Tarih, Klasör, İçindekiler,
+ * Reklam, PDF/Veri Seti URL, gizli hedef) artık burada, katlanabilir tek bir
+ * blokta. Yerleşik <details>/<summary> BİLİNÇLİ OLARAK seçildi: JS'siz de
+ * çalışır (native aç/kapa), klavye ile erişilebilirdir (Enter/Space ile
+ * summary'ye odaklanıp açılır — ekstra aria-expanded/tabindex yönetimine
+ * gerek yok, tarayıcı bunu kendi hallediyor) ve CSP'ye hiç dokunmaz (script
+ * gerektirmiyor). İçindeki alanların KENDİ koşullu görünürlük mantığı
+ * (ic-proje-alanlar, ic-yil-oneki-wrap vb.) tamamen ayrı ve değişmedi —
+ * bkz. dashboard.html'deki ilgili yorum.
+ * ---------------------------------------------------------------------- */
+.gy-gelismis-ayarlar {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card-bg);
+  margin: 4px 0 20px;
+  overflow: hidden; /* köşe yuvarlamayı summary'nin arka planına da uygula */
+}
 
+.gy-gelismis-ayarlar summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 16px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.94rem;
+  background: color-mix(in srgb, var(--accent) 6%, var(--card-bg));
+  background: var(--card-bg); /* color-mix desteklemeyen tarayıcılar için */
+  background: color-mix(in srgb, var(--accent) 6%, var(--card-bg));
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  list-style: none; /* Safari/Chrome'un varsayılan üçgen okunu kaldır —
+                        kendi okumuzu (aşağıdaki ::after) çiziyoruz. */
+}
+/* Firefox'un varsayılan okunu da kaldır (::-webkit-details-marker Firefox'ta
+   işe yaramıyor, ::marker'ı boşaltmak gerekiyor). */
+.gy-gelismis-ayarlar summary::-webkit-details-marker { display: none; }
+.gy-gelismis-ayarlar summary::marker { content: ""; }
+
+.gy-gelismis-ayarlar summary:hover {
+  background: color-mix(in srgb, var(--accent) 11%, var(--card-bg));
+}
+.gy-gelismis-ayarlar summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Kendi okumuz: kapalıyken sağa, <details open> olunca aşağı döner. */
+.gy-gelismis-ayarlar summary::after {
+  content: "›";
+  margin-left: auto;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--muted);
+  transform: rotate(0deg);
+  transition: transform 0.18s ease;
+}
+.gy-gelismis-ayarlar[open] summary::after {
+  transform: rotate(90deg);
+}
+.gy-gelismis-ayarlar[open] summary {
+  border-bottom: 1px solid var(--border);
+}
+
+.gy-gelismis-ayarlar-govde {
+  padding: 16px 16px 4px;
+}
+/* İçerideki form-field'lerin kendi alt boşluğu zaten var; son elemanın
+   fazladan boşluk bırakmasını önlüyoruz. */
+.gy-gelismis-ayarlar-govde > *:last-child {
+  margin-bottom: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gy-gelismis-ayarlar summary::after { transition: none; }
+}
