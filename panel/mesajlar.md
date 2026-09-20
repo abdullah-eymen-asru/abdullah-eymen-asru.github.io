@@ -2,36 +2,40 @@
 layout: default
 title: "Sohbet / Mesajlar"
 yayinda: true
-auth_css: true
-mesajlar_css: true
+auth_css: true  # yönlendirme bir anlık da olsa: btn-primary gibi sınıflar stilsiz görünmesin
 permalink: "/panel/mesajlar.html"
 ---
 
 <!--
-  panel/mesajlar.md — /panel/mesajlar.html
-  "Mesajlar" bölümü hem panel/panel.md (üye tarafı) hem panel/admin.md
-  (admin gelen kutusu) içinden BURAYA, ortak/bağımsız bir sayfaya taşındı
-  (istek: "sayfanın ortasına gelsin düzgün dursun"). Erişim SADECE giriş
-  yapmış olmayı gerektirir (requireAuth({role: null}) — bkz.
-  assets/js/mesajlar.js); hangi görünümün (üye sohbeti mi, admin gelen
-  kutusu mu) basılacağına, giriş yapan kişinin rolüne göre ÇALIŞMA
-  ZAMANINDA karar verilir. Asıl sohbet mantığı (mesaj gönderme, realtime,
-  okundu işaretleme) hiç değişmedi — aynen assets/js/chat.js'teki
-  wireUserChat()/wireAdminChat() kullanılıyor, sadece artık kendi
-  sayfasında.
+  ESKİ PANEL SAYFASI — ARTIK SADECE YÖNLENDİRME.
+
+  Bu sayfanın tüm içeriği /panel/dashboard.html içindeki "Sohbet / Mesajlar"
+  sekmesine taşındı (markup birebir, id'ler değiştirilmeden). Sayfa
+  SİLİNMEDİ, çünkü bu URL yer imlerinde, eski mesajlarda, Supabase'in
+  OAuth redirect listesinde ya da gözden kaçmış bir linkte hâlâ geçiyor
+  olabilir — 404 vermek yerine kullanıcıyı doğru sekmeye bırakıyoruz.
+
+  Yönlendirme mantığı assets/js/core/eski-panel-yonlendir.js içinde
+  (CSP inline script'e izin vermediği için ayrı dosya). Hedef sekme
+  aşağıdaki data-hedef özniteliğinde; gelen adreste zaten bir hash
+  varsa (ör. OAuth dönüşündeki #access_token=...) o korunur.
+
+  JavaScript kapalıysa aşağıdaki link elle tıklanabilir — panelin
+  kendisi zaten baştan sona JS (Supabase) ile çalıştığı için JS'siz
+  bir kullanım senaryosu yok.
 -->
 
-<div class="loading-overlay" id="loading">Yükleniyor...</div>
+<div id="eski-panel-yonlendir" data-hedef="#users-mesajlar"></div>
 
-<div id="app" hidden>
-  <section class="mesajlar-sayfa" id="mesajlar-sayfa">
-    <div class="mesajlar-baslik">
-      <h1>Sohbet / Mesajlar</h1>
-      <p class="muted" id="mesajlar-aciklama">Yükleniyor...</p>
-    </div>
+<h1>Panel taşındı</h1>
+<p class="muted">
+  Bu sayfa artık birleşik yönetim panelinin <strong>Sohbet / Mesajlar</strong>
+  sekmesi. Yönlendiriliyorsun&hellip;
+</p>
+<p>
+  <a class="btn-primary csp-inline-block-link" href="{{ '/panel/dashboard.html' | relative_url }}#users-mesajlar">
+    Panele git
+  </a>
+</p>
 
-    <div id="mesajlar-icerik"><p class="muted">Yükleniyor...</p></div>
-  </section>
-</div>
-
-<script type="module" src="{{ '/assets/js/mesajlar.js' | relative_url }}"></script>
+<script type="module" src="{{ '/assets/js/core/eski-panel-yonlendir.js' | relative_url }}"></script>
