@@ -52,11 +52,27 @@ const MODULES = {
   guvenlik: { src: "./admin-guvenlik.js", role: "admin" },
   izleme: { src: "./izleme-okuma-yonetim/izleme-okuma-yonetim.js", role: "owner" },
   mesajlar: { src: "./mesajlar.js", role: null },
+  // "Panelim" (eski /panel/panel.html) — giriş yapmış HERKESE açık:
+  // sıradan üye de, owner da aynı sekmeyi görür.
+  panelim: { src: "./panel.js", role: null },
 };
 
 // Sidebar hiyerarşisi. Her leaf: { id, label, view (gösterilecek
 // #view-* elemanının sonu), module (MODULES anahtarı) }
 const NAV = [
+  {
+    // Herkese açık grup — sıradan bir üye panele girdiğinde SADECE bunu
+    // (ve Sohbet/Mesajlar'ı) görür.
+    group: "Hesabım",
+    icon: "🙍",
+    items: [
+      // defaultAcilis:false -> yetkisi olan bir yönetici panele girdiğinde
+      // varsayılan olarak "Panelim" DEĞİL, ilk yetkili iş sekmesi açılır;
+      // başka hiçbir sekmeye yetkisi olmayan üye içinse zaten tek seçenek
+      // budur (bkz. firstAvailableView).
+      { id: "me-panel", icon: "🙍", label: "Panelim", module: "panelim", role: null, defaultAcilis: false },
+    ],
+  },
   {
     group: "İçerik Yönetimi",
     icon: "📝",
@@ -325,12 +341,12 @@ async function showView(viewId, moduleKey) {
 }
 
 function firstAvailableView(profile) {
-  for (const group of NAV) {
-    for (const item of group.items) {
-      if (roleAllowed(itemRole(item), profile)) return item;
-    }
-  }
-  return null;
+  const uygun = NAV.flatMap((g) => g.items).filter((it) =>
+    roleAllowed(itemRole(it), profile)
+  );
+  // Önce "varsayılan açılışa uygun" (iş) sekmeleri; hiçbiri yoksa (ör.
+  // sıradan üye) elde kalan ilk sekme — yani "Panelim".
+  return uygun.find((it) => it.defaultAcilis !== false) || uygun[0] || null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -387,6 +403,29 @@ function wireMobileNav() {
 /* 7) Başlangıç                                                        */
 /* ------------------------------------------------------------------ */
 
+/*
+ * PANEL İÇİ LİNKLER: dashboard'a taşınan eski sayfalarda birbirlerine
+ * verilen linkler (ör. "← Panelim sayfasına git", "Üye Ayarları")
+ * ESKİ, BAĞIMSIZ sayfalara (/panel/panel.html, /panel/uye-ayarlari.html)
+ * gidiyordu — yani kullanıcı dashboard'dan tamamen çıkıyordu. Artık bu
+ * linkler data-dash-git="<sekme-id>" taşıyor ve burada yakalanıp sayfa
+ * yenilemeden ilgili sekmeye geçiliyor. Delege dinleyici kullanılıyor,
+ * çünkü bu linklerin bir kısmı modüller tarafından SONRADAN üretiliyor.
+ */
+function wireDashIciLinkler() {
+  document.addEventListener("click", (e) => {
+    const link = e.target.closest("[data-dash-git]");
+    if (!link) return;
+    const hedefId = link.dataset.dashGit;
+    const item = NAV.flatMap((g) => g.items).find((it) => it.id === hedefId);
+    if (!item) return; // tanınmayan hedef: tarayıcı normal davransın
+    e.preventDefault();
+    showView(item.id, item.module);
+    closeMobileSidebar();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+}
+
 async function init() {
   // Tek, paylaşılan temel oturum/rol kontrolü — role:null, yani sadece
   // giriş yapmış olmak yeterli. Modül-özel rol kısıtları SADECE sidebar
@@ -401,6 +440,19 @@ async function init() {
 
   buildSidebar(profile);
   wireMobileNav();
+  wireDashIciLinkler();
+
+  // Sayfa YENİDEN YÜKLENMEDEN hash değişirse (ör. header'daki "Hesabım ▾"
+  // menüsünden, zaten dashboard'dayken "Panelim"e tıklamak —
+  // /panel/dashboard.html#me-panel aynı sayfa olduğu için tarayıcı sadece
+  // hash'i değiştirir, init() TEKRAR ÇALIŞMAZ) doğru sekmeye geç.
+  window.addEventListener("hashchange", () => {
+    const id = window.location.hash.replace("#", "");
+    const item = NAV.flatMap((g) => g.items).find((it) => it.id === id);
+    if (item && id !== activeViewId && roleAllowed(itemRole(item), profile)) {
+      showView(item.id, item.module);
+    }
+  });
 
   document.getElementById("loading")?.setAttribute("hidden", "");
   document.getElementById("app").hidden = false;
