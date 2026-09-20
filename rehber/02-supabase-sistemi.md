@@ -901,6 +901,33 @@ istemedim.
 
 Bu bölüm, siteye/Supabase kullanıcı sistemine sonradan yapılan düzeltmelerin tarih sırasıyla özetidir — hangi sorun bildirildi, kök nedeni neydi, nasıl çözüldü ve (varsa) senin elle yapman gereken adım neydi. Eskiden kökte ayrı `DEGISIKLIKLER_*.md` dosyaları halinde duruyordu, artık tek doğruluk kaynağı burası — en yeni turu en üstte bulursun.
 
+### 🗓️ 20.09.2026 — "GitHub yerine Supabase'te depola" anahtarı, arama motoru indekslemesi ve yazar taklidi açığı
+
+**İstek:** İçerik ekleme formunda (blog + akademik proje), "Yayında" kapalıyken içerik gizli olarak Supabase'e gitsin; altında "GitHub yerine Supabase'te depola" anahtarı olsun — açıksa içerik GitHub'a hiç commit edilmesin ama sitede görünsün ve arama motorlarınca indekslensin.
+
+**Bulunan durum:** Akış (migration 0015, eski 🅲️ butonu) zaten vardı; eksik olanlar şunlardı:
+1. Üç ayrı buton (🅰️/🅱️/🅲️) vardı, anahtar yoktu.
+2. **İndeksleme fiilen çalışmıyordu:** `supabase-yazi.html` tek bir şablon olduğu için her yazı için canonical/`<title>`/description AYNI (içeriksiz kabuk sayfa) üretiliyordu ve yazılar sitemap'te yoktu.
+3. **Yazar taklidi açığı:** Worker, bir admin'in başka bir admin/owner adına yayın yapmasını sadece GitHub'a giden yazmalarda (Seçenek A/B) engelliyordu; Supabase-only yayın Worker'a uğramadan doğrudan tabloya yazdığı için bu kural orada YOKTU (`taslak_admin_onay_koru` sadece "adına yayınla" bayraklı satırları koruyor).
+4. Aynı (tur, slug) ile birden çok yayında satır olursa `sadece_supabase_yazi_getir()` `limit 1` ile rastgele birini döndürürdü.
+
+**Çözüm:**
+- **Panel** (`panel/github-yonetim.md`, `github-yonetim.js`): "Yayında"nın altına "GitHub yerine Supabase'te depola" anahtarı. Açıksa ana buton "Sadece Supabase'te Yayınla" olur (eski Seçenek C akışı, GitHub'a commit yok); 🅱️ gizlenir; ayrı 🅲️ butonu kalktı. Mevcut bir `sadece_supabase` kaydı düzenlenirken anahtar açık gelir. İstemci tarafı "başkası adına yazma" kontrolü C yolunu da kapsıyor. Slug çakışması anlaşılır bir mesajla gösteriliyor.
+- **SEO** (`supabase-yazi.js`): içerik yüklenince yazıya özel canonical (ana site adresi, `?tur=&slug=`), `<title>`, description, Open Graph/Twitter, Scholar `citation_*` ve JSON-LD yazılır; kayıt yoksa `noindex` (geçici RPC hatasında değil).
+- **Sitemap:** `supabase/functions/sitemap-supabase` (herkese açık, `verify_jwt=false`) + `robots.txt`'te ikinci `Sitemap:` satırı.
+- **Feed:** `supabase/functions/feed-supabase` tam metinli Atom feed'i üretir; `_config.yml` `supabase_feed_url` doluysa `<head>`'de otomatik keşifle ilan edilir (statik `feed.xml`/`rss.xml` bu içerikleri bilemez).
+- **Migration 0055:** `taslak_yazar_taklit_koru` tetikleyicisi (owner olmayan biri, "adına yayınla" akışına girmeden owner/admin adına yayında satır oluşturamaz), `uq_taslak_icerikler_sadece_supabase_slug` benzersiz indeksi (çakışan veri varsa oluşturmaz ve NOTICE verir), hafif `sadece_supabase_sitemap_listele()` ve `sadece_supabase_feed_listele(p_limit)` RPC'leri.
+
+**Senin yapman gerekenler (SIRAYLA):**
+1. `supabase/migrations/0055_supabase_yayin_guvenlik_ve_seo_rpc.sql` dosyasını SQL Editor'e yapıştırıp **Run** et (NOTICE çakışan slug listeliyorsa onları düzeltip bloğu tekrar çalıştır).
+2. `supabase functions deploy sitemap-supabase` ve `supabase functions deploy feed-supabase`.
+3. Siteyi her zamanki gibi yayınla (push).
+4. Search Console'da ikinci sitemap adresini (`robots.txt`'teki) gönder.
+
+**Bilinen sınırlar:** Sayfa hâlâ tarayıcıda oluşturuluyor (Google JavaScript'i çalıştırır ama statik sayfa kadar hızlı/kesin indekslemez; Supabase Edge Function'ları HTML döndüremediği için sunucu tarafı render bu mimaride mümkün değil). Bir `sadece_supabase` yazıyı sonradan GitHub'a taşırsan eski `?tur=&slug=` adresi "bulunamadı" (noindex) olur — arama motorlarında eski adres zamanla düşer.
+
+---
+
 ### 🗓️ 29.08.2026 (2. Tur) — AdSense hazırlığı: Otomatik Reklamlar + yazı-içi manuel blok + yazı bazında aç/kapat
 
 İstek: siteyi herhangi bir AdSense reklamı ekleyebilmeye hazırlamak;
