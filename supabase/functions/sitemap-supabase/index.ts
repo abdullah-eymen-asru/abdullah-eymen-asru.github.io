@@ -14,13 +14,15 @@
 //
 // GÜVENLİK
 //   - Fonksiyon SADECE herkese açık (anon) RPC'yi çağırır:
-//     public.sadece_supabase_yayinlari_listele(p_tur) — bu RPC zaten yalnızca
-//     yayin_durumu='sadece_supabase' ve tarihi gelmiş satırları döndürür;
-//     gizli taslaklar (yayin_durumu='taslak') burada ASLA görünmez.
+//     public.sadece_supabase_sitemap_listele() (migration 0055) — bu RPC
+//     yalnızca yayin_durumu='sadece_supabase' ve tarihi gelmiş satırların
+//     (tur, slug, lastmod) bilgisini döndürür, gövde İÇERMEZ; gizli taslaklar
+//     (yayin_durumu='taslak') burada ASLA görünmez.
 //   - service_role anahtarı KULLANILMAZ, hiçbir yazma işlemi yapılmaz.
 //   - Bu yüzden JWT doğrulaması KAPALI olmalı (crawler'lar Authorization
 //     header'ı gönderemez) — bkz. supabase/config.toml [functions.sitemap-supabase].
 //
+// ÖN KOŞUL: supabase/migrations/0055_... çalıştırılmış olmalı (RPC orada).
 // Deploy:  supabase functions deploy sitemap-supabase
 // Secrets: SUPABASE_URL, SUPABASE_ANON_KEY (otomatik enjekte edilir)
 //          İsteğe bağlı: supabase secrets set SITE_URL=https://alan-adin.com
@@ -33,7 +35,7 @@ const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const VARSAYILAN_SITE_URL = "https://abdullah-eymen-asru.github.io";
 const SITE_URL = (Deno.env.get("SITE_URL") ?? VARSAYILAN_SITE_URL).replace(/\/$/, "");
 
-type Yayin = { slug: string; tarih: string | null };
+type Yayin = { tur: "blog" | "proje"; slug: string; lastmod: string | null };
 
 function xmlKacir(metin: string): string {
   return metin
@@ -44,18 +46,18 @@ function xmlKacir(metin: string): string {
     .replaceAll("'", "&apos;");
 }
 
-async function yayinlariGetir(tur: "blog" | "proje"): Promise<Yayin[]> {
-  const cevap = await fetch(`${SUPABASE_URL}/rest/v1/rpc/sadece_supabase_yayinlari_listele`, {
+async function yayinlariGetir(): Promise<Yayin[]> {
+  const cevap = await fetch(`${SUPABASE_URL}/rest/v1/rpc/sadece_supabase_sitemap_listele`, {
     method: "POST",
     headers: {
       apikey: ANON_KEY,
       Authorization: `Bearer ${ANON_KEY}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ p_tur: tur }),
+    body: "{}",
   });
   if (!cevap.ok) {
-    throw new Error(`RPC ${tur}: HTTP ${cevap.status}`);
+    throw new Error(`RPC sitemap: HTTP ${cevap.status}`);
   }
   return (await cevap.json()) as Yayin[];
 }
@@ -66,19 +68,16 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const [bloglar, projeler] = await Promise.all([yayinlariGetir("blog"), yayinlariGetir("proje")]);
+    const yayinlar = await yayinlariGetir();
 
-    const satirlar = [
-      ...bloglar.map((y) => ({ tur: "blog", ...y })),
-      ...projeler.map((y) => ({ tur: "proje", ...y })),
-    ]
-      .filter((y) => y.slug)
+    const satirlar = yayinlar
+      .filter((y) => y.slug && (y.tur === "blog" || y.tur === "proje"))
       .map((y) => {
         // icerik/supabase-yazi.md sayfasının gerçek adresi (bkz. blog.md /
         // akademik-projeler.md'deki kart linkleri ve supabase-yazi.js'teki
         // canonical) — sıra ve biçim BİREBİR aynı olmalı.
         const adres = `${SITE_URL}/icerik/supabase-yazi.html?tur=${y.tur}&slug=${encodeURIComponent(y.slug)}`;
-        const lastmod = y.tarih ? `<lastmod>${xmlKacir(String(y.tarih).slice(0, 10))}</lastmod>` : "";
+        const lastmod = y.lastmod ? `<lastmod>${xmlKacir(String(y.lastmod).slice(0, 10))}</lastmod>` : "";
         return `  <url><loc>${xmlKacir(adres)}</loc>${lastmod}</url>`;
       });
 
