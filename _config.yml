@@ -14,6 +14,12 @@ encoding: "UTF-8"
 baseurl: ""
 url: "https://abdullah-eymen-asru.github.io"   # Birincil site - Google bu adresi indeksler
 
+# "GitHub yerine Supabase'te depola" ile yayınlanan içeriklerin tam metinli Atom
+# feed'i (Supabase Edge Function: supabase/functions/feed-supabase). Dolu ise
+# _layouts/default.html <head>'inde otomatik keşif etiketiyle ilan edilir; boş
+# bırakırsan (ya da fonksiyonu deploy etmediysen) hiçbir şey eklenmez.
+supabase_feed_url: "https://eahvcirspmvntffzphye.supabase.co/functions/v1/feed-supabase"
+
 # ---- BURAYI DOLDUR ----
 github_username: "abdullah-eymen-asru"
 kutuphane_repo: "abdullah-eymen-asru/izleme-okuma-listem"   # izlediklerim/okuduklarım issue repo'sun
