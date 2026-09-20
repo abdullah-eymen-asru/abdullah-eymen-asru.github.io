@@ -27,6 +27,7 @@ permalink: "/panel/github-yonetim.html"
     <a href="#klasorler" data-section="klasorler">📁 Klasörler</a>
     <a href="#profil-foto" data-section="profil-foto">🖼️ Profil Fotoğrafı</a>
     <a href="#hakkimda" data-section="hakkimda">🙋 Hakkımda</a>
+    <a href="#baglantilar" data-section="baglantilar">🔗 Bağlantılar (Sosyal/Akademik)</a>
     <a href="#cv" data-section="cv">📄 CV</a>
     <a href="#yetki-ayarlari" data-section="yetki-ayarlari">🔐 Yetki Ayarları</a>
   </nav>
@@ -549,6 +550,42 @@ permalink: "/panel/github-yonetim.html"
           <button id="hk-kaydet-btn" type="button" class="btn-primary csp-w-auto">Kaydet ve Yayınla</button>
         </div>
         <div id="hk-message" class="auth-message" hidden></div>
+      </section>
+
+      <section id="baglantilar" class="panel-section">
+        <h2>Bağlantılar (Sosyal / Akademik)</h2>
+        <p class="muted">
+          Anasayfada profil bilgisinin altında görünen bağlantı düğmelerini
+          (GitHub, LinkedIn, Google Scholar, ORCID, vb.) buradan ekleyebilir,
+          düzenleyebilir veya silebilirsin. Bu alan doğrudan
+          <code>_config.yml</code> dosyasındaki <code>social:</code> bloğuna
+          GitHub'a commit atar. <strong>Bağlantı adresini (URL) boş
+          bırakırsan, o buton anasayfada hiç görünmez</strong> — satırı
+          silmene gerek yok, örneğin henüz bir Google Scholar profilin
+          yoksa alanı boş bırakman yeterli, hazır olduğunda doldurup
+          kaydedince otomatik görünür. Sadece admin/Site Sahibi bu bölümü
+          görebilir ve düzenleyebilir.
+        </p>
+
+        <button id="bg-yukle-btn" type="button" class="btn-primary csp-w-auto csp-mb-12">Mevcut Bağlantıları Yükle</button>
+        <div id="bg-durum" class="muted">Yüklemek için yukarıdaki butona bas.</div>
+
+        <div id="bg-form-alani" hidden>
+          <div id="bg-liste"></div>
+
+          <button id="bg-yeni-ekle-btn" type="button" class="btn-secondary csp-w-auto csp-mt-10">
+            + Yeni Bağlantı Ekle
+          </button>
+
+          <p class="gy-yardim-metni csp-mt-10">
+            Değişiklikleri kaydetmeden önce dilediğin kadar ekleyip
+            silebilirsin; hiçbir şey kaydedip GitHub'a commit atılana kadar
+            sitede görünmez. Kaydettikten sonra değişikliklerin sitede
+            görünmesi (Jekyll derlemesi nedeniyle) 1-2 dakika sürebilir.
+          </p>
+          <button id="bg-kaydet-btn" type="button" class="btn-primary csp-w-auto">Kaydet ve Yayınla</button>
+        </div>
+        <div id="bg-message" class="auth-message" hidden></div>
       </section>
 
       <section id="cv" class="panel-section">
