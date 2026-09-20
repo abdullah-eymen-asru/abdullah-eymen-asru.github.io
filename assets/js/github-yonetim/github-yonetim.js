@@ -2752,6 +2752,22 @@ async function icerikSupabaseeYaz(tur, alan, gizliKod, govde, slug, dosyaYolu, m
 }
 
 /**
+ * "Sadece Supabase'te Yayınla" yolunda Supabase'ten dönen hatayı kullanıcıya
+ * anlaşılır bir mesaja çevirir. Özellikle migration 0055'in eklediği benzersiz
+ * indeks (uq_taslak_icerikler_sadece_supabase_slug) ihlal edilirse — yani aynı
+ * türde (blog/proje) aynı adreste (slug) yayında başka bir içerik varsa —
+ * ham "duplicate key value violates unique constraint" yerine ne yapılacağı
+ * söylenir. Diğer hatalar (ör. yazar taklidi engeli) mesajıyla aynen geçer.
+ */
+function sadeceSupabaseHataMetni(error, slug) {
+  const mesaj = String(error?.message || "");
+  if (error?.code === "23505" || mesaj.includes("uq_taslak_icerikler_sadece_supabase_slug")) {
+    return `"${slug}" adresinde (slug) zaten yayında başka bir içerik var. Başlığı ya da adresi değiştirip tekrar dene.`;
+  }
+  return mesaj;
+}
+
+/**
  * "Yayında" AÇIK + Seçenek C ("Sadece Supabase'te Yayınla"): içerik GitHub'a
  * HİÇ commit edilmez, sadece Supabase `taslak_icerikler` tablosuna
  * `yayin_durumu: 'sadece_supabase'` olarak yazılır. `icerikSupabaseeYaz`'dan
@@ -2816,7 +2832,7 @@ async function icerikSadeceSupabaseeYayinla(tur, alan, gizliKod, govde, slug, do
       .eq("id", DUZENLENEN_TASLAK_ID)
       .select()
       .single();
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(sadeceSupabaseHataMetni(error, slug));
     taslakSonuc = data;
   } else {
     const {
@@ -2827,7 +2843,7 @@ async function icerikSadeceSupabaseeYayinla(tur, alan, gizliKod, govde, slug, do
       .insert({ ...satir, created_by: user?.id || null })
       .select()
       .single();
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(sadeceSupabaseHataMetni(error, slug));
     taslakSonuc = data;
   }
 
