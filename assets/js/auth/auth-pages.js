@@ -15,7 +15,9 @@ import {
   oturumHatirlamaTercihiniKaydet,
 } from "../core/supabase-client.js";
 
-const REDIRECT_AFTER_LOGIN = "/panel/panel.html";
+// PANEL BİRLEŞTİRİLDİ: giriş sonrası varış noktası birleşik panelin
+// "Panelim" sekmesi (eski /panel/panel.html artık sadece yönlendirme).
+const REDIRECT_AFTER_LOGIN = "/panel/dashboard.html#me-panel";
 // Google OAuth ve "şifre sıfırlama" e-postası kullanıcıyı bu sayfaya
 // geri döndürür; Supabase SDK URL'deki token'ı otomatik yakalar.
 const SITE_ORIGIN = window.location.origin;
@@ -1124,6 +1126,6 @@ export function initSifreGuncellePage() {
     }
 
     showMessage(msg, "Şifren güncellendi! Diğer cihazlardaki oturumların kapatıldı. Panele yönlendiriliyorsun...", "success");
-    setTimeout(() => (window.location.href = "/panel/panel.html"), 1500);
+    setTimeout(() => (window.location.href = REDIRECT_AFTER_LOGIN), 1500);
   });
 }
