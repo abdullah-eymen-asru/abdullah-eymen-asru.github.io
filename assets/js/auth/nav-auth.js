@@ -1,3 +1,4 @@
+
 /*
  * assets/js/auth/nav-auth.js
  *
@@ -181,12 +182,19 @@ function renderHesapMenusu(container, role) {
   menu.setAttribute("role", "menu");
   menu.hidden = true;
 
-  const linkler = [{ href: "/panel/panel.html", etiket: "Panelim" }];
+  // TÜM panel linkleri artık TEK sayfaya — /panel/dashboard.html'e —
+  // ilgili sekmenin hash'iyle gidiyor. Eski bağımsız sayfalar
+  // (/panel/panel.html, /panel/admin.html, /panel/uye-ayarlari.html ...)
+  // silinmedi, hâlâ çalışıyor; ama menü artık birleşik panele
+  // yönlendiriyor, böylece kullanıcı sekmeler arasında sayfa yenilemeden
+  // dolaşıyor.
+  const DASH = "/panel/dashboard.html";
+  const linkler = [{ href: `${DASH}#me-panel`, etiket: "Panelim" }];
   // Sohbet/Mesajlar artık ayrı, ortak bir sayfa (bkz. panel/mesajlar.md) —
   // giriş yapmış HERKES görür: admin için o sayfa gelen kutusunu, diğer
   // herkes için kendi yöneticiyle sohbet ekranını açar (karar
   // assets/js/mesajlar.js içinde, role'e göre çalışma zamanında verilir).
-  linkler.push({ href: "/panel/mesajlar.html", etiket: "Sohbet / Mesajlar" });
+  linkler.push({ href: `${DASH}#users-mesajlar`, etiket: "Sohbet / Mesajlar" });
   // Üye Ayarları (eski "Kullanıcılar & Roller") artık ayrı bir sayfa (bkz.
   // panel/uye-ayarlari.md) ve SADECE admin'e açık — manager (İçerik
   // Sorumlusu) bu linki hiç görmez, doğrudan URL'yi yazsa bile o sayfanın
@@ -195,7 +203,7 @@ function renderHesapMenusu(container, role) {
   // migration 0021 ve auth-guard.js'teki "owner her zaman geçer" kuralı.
   const adminGibi = role === "admin" || role === "owner";
   if (adminGibi) {
-    linkler.push({ href: "/panel/uye-ayarlari.html", etiket: "Üye Ayarları" });
+    linkler.push({ href: `${DASH}#users-uye`, etiket: "Üye Ayarları" });
   }
   // 'manager' (panelde "İçerik Sorumlusu") de admin paneline girebiliyor —
   // ama SADECE "Özel İçerik Ekle/Düzenle", "Mevcut Özel İçerikler" ve
@@ -203,12 +211,12 @@ function renderHesapMenusu(container, role) {
   // Linkin kendisi admin ile aynı, hangi sekmelerin görüneceğine admin.js
   // içeri girdikten sonra karar veriyor.
   if (adminGibi || role === "manager") {
-    linkler.push({ href: "/panel/admin.html", etiket: "Admin Paneli" });
+    linkler.push({ href: `${DASH}#content-private`, etiket: "Admin Paneli" });
   }
   // Admin Güvenliği (karşılıklı denetim / askıya alma / owner kararı) —
   // sadece admin/owner girebilir (bkz. admin-guvenlik.js).
   if (adminGibi) {
-    linkler.push({ href: "/panel/admin-guvenlik.html", etiket: "🛡️ Admin Güvenliği" });
+    linkler.push({ href: `${DASH}#sys-guvenlik`, etiket: "🛡️ Admin Güvenliği" });
   }
   // GitHub Pages'in kendi statik içeriğini (blog/proje yazıları, profil
   // fotoğrafı) yönetmek için ayrı, bağımsız bir sayfa — bkz.
@@ -223,7 +231,7 @@ function renderHesapMenusu(container, role) {
   // panele ulaşmanın tek yolu URL'yi elle yazmaktı. Şimdi editor, manager
   // veya admin iken gösteriliyor.
   if (adminGibi || role === "editor" || role === "manager") {
-    linkler.push({ href: "/panel/github-yonetim.html", etiket: "GitHub İçerik Yönetimi" });
+    linkler.push({ href: `${DASH}#content-all`, etiket: "GitHub İçerik Yönetimi" });
   }
   // İzleme/Okuma Yönetimi — bkz. panel/izleme-okuma-yonetim.md /
   // assets/js/izleme-okuma-yonetim/izleme-okuma-yonetim.js. Bu, GitHub
@@ -234,7 +242,7 @@ function renderHesapMenusu(container, role) {
   // OLARAK burada uygulanmıyor; requireAuth({role:'owner'}) da sayfanın
   // kendisinde aynı şekilde SADECE owner'ı geçiriyor (bkz. o dosya).
   if (role === "owner") {
-    linkler.push({ href: "/panel/izleme-okuma-yonetim.html", etiket: "🎬📚 İzleme/Okuma Yönetimi" });
+    linkler.push({ href: `${DASH}#media-izleme`, etiket: "🎬📚 İzleme/Okuma Yönetimi" });
   }
 
   linkler.forEach(({ href, etiket }) => {
