@@ -268,6 +268,12 @@ const OZELLIK_KATALOGU = [
     rolSutunlari: ["admin"],
   },
   {
+    anahtar: "baglanti_yonetimi",
+    baslik: "Bağlantılar (Sosyal/Akademik) Yönetimi",
+    aciklama: "Anasayfadaki sosyal/akademik bağlantı düğmelerini (GitHub, LinkedIn, Google Scholar, ORCID vb.) ekleme/düzenleme/silme.",
+    rolSutunlari: ["admin"],
+  },
+  {
     anahtar: "cv_yonetimi",
     baslik: "CV Yönetimi",
     aciklama: "CV PDF yükleme, dış bağlantı kaydetme, kaldırma.",
@@ -358,6 +364,7 @@ function rolBazliArayuzuUygula() {
   const kurallar = [
     { section: "profil-foto", gizle: () => rol !== "admin" && rol !== "owner" || (rol === "admin" && !ozellikErisimVarMiClient("profil_fotografi")) },
     { section: "hakkimda", gizle: () => rol !== "admin" && rol !== "owner" || (rol === "admin" && !ozellikErisimVarMiClient("hakkimda_duzenleme")) },
+    { section: "baglantilar", gizle: () => rol !== "admin" && rol !== "owner" || (rol === "admin" && !ozellikErisimVarMiClient("baglanti_yonetimi")) },
     { section: "cv", gizle: () => rol !== "admin" && rol !== "owner" || (rol === "admin" && !ozellikErisimVarMiClient("cv_yonetimi")) },
     // "Yetki Ayarları" — SADECE owner, İSTİSNASIZ (bkz. migration 0048 —
     // owner asla kısıtlanamaz, ama bu sekme de asla admin dahil kimseye
@@ -440,6 +447,7 @@ async function init() {
     ["klasör yönetimi", () => wireKlasorYonetimi()],
     ["profil fotoğrafı", () => wireProfilFoto()],
     ["hakkımda", () => wireHakkimda()],
+    ["bağlantılar (sosyal/akademik)", () => wireBaglantilarSosyal()],
     ["cv", () => wireCv()],
     ["yetki ayarları", () => wireYetkiAyarlari()],
   ];
@@ -4682,7 +4690,318 @@ async function hakkimdaIcerigiKaydet() {
 init();
 
 /* ---------------------------------------------------------------------- */
-/* CV (ÖZGEÇMİŞ) — anasayfadaki "📄 CV Görüntüle" butonu + /cv/ adresi.     */
+/* BAĞLANTILAR (Sosyal/Akademik) — anasayfadaki bağlantı düğmeleri.        */
+/*                                                                          */
+/* _config.yml'deki `social:` bloğuna yazar/okur. Bu blok (profile_image/  */
+/* cv_url'in aksine) TEK satırlık bir alan DEĞİL, çok satırlı bir YAML     */
+/* haritasıdır (bkz. _config.yml'deki güncel yorum) — bu yüzden tek        */
+/* satırlık PROFIL_IMAGE_SATIR_REGEX/CV_URL_SATIR_REGEX deseni burada      */
+/* KULLANILAMAZ. Bunun yerine "social:" satırından, bir SONRAKİ girintisiz */
+/* (üst seviye) satıra kadar olan TÜM bloğu yakalayıp, panelde düzenlenen  */
+/* girdilerden YENİDEN üretilen bir YAML bloğuyla TAMAMEN DEĞİŞTİRİYORUZ   */
+/* — kısmi/satır bazlı bir güncelleme değil, blok bazlı bir güncelleme.    */
+/*                                                                          */
+/* Her girdi { key, label, url } üçlüsüdür. "key" sadece dahili bir        */
+/* kimliktir (index.md'de <a> sırasını YAML'daki sırayla eşler); ekranda   */
+/* sadece "label" görünür. url BOŞSA index.md o girdiyi hiç render etmez   */
+/* (bkz. index.md {% if veri.url and veri.url != "" %}) — yani bir girdiyi */
+/* "hazır değil ama ileride doldurulacak" hâlde tutmak, satırı SİLMEDEN de */
+/* mümkündür.                                                              */
+/* ---------------------------------------------------------------------- */
+
+// "social:" satırından, İLK girintisiz (yani ^ ile başlayan, boşluk/tab
+// olmayan bir karakterle devam eden) sonraki satıra KADAR olan tüm bloğu
+// yakalar. Dosyanın sonuna kadar başka üst seviye anahtar yoksa dosya
+// sonuna kadar yakalar ($). "s" (dotAll) bayrağı YOK çünkü '.' zaten her
+// satırı [\s\S] ile kapsıyoruz; "m" ile ^ / $ satır başı/sonunu eşliyoruz.
+const SOCIAL_BLOK_REGEX = /^social:[ \t]*\r?\n((?:[ \t]+.*(?:\r?\n|$))*)/m;
+
+/** _config.yml içindeki "social:" bloğunu ayrıştırıp
+ * [{ key, label, url }, ...] dizisi döner. Blok yoksa boş dizi döner
+ * (panel yine de çalışır, kaydedince blok baştan oluşturulur). */
+function socialBlokunuAyristir(icerik) {
+  const m = icerik.match(SOCIAL_BLOK_REGEX);
+  if (!m) return [];
+  const gövde = m[1];
+  const sonuc = [];
+  // Üst seviye girdi satırı: tam olarak 2 boşluk girintili "anahtar:"
+  // (alt alanlar 4 boşluk girintili "label:"/"url:"). Bu, mevcut
+  // _config.yml'in kendi girinti biçimiyle (bkz. dosyanın social: bloğu)
+  // birebir uyumludur — panel de HER ZAMAN aynı girinti ile yazar, bu
+  // yüzden okuma/yazma döngüsü kararlıdır.
+  const GIRDI_BASLIK_REGEX = /^ {2}([A-Za-z0-9_-]+):[ \t]*\r?\n((?:[ \t]{3,}.*(?:\r?\n|$))*)/gm;
+  let e;
+  while ((e = GIRDI_BASLIK_REGEX.exec(gövde)) !== null) {
+    const key = e[1];
+    const altGovde = e[2] || "";
+    const labelM = altGovde.match(/^[ \t]+label:[ \t]*("(?:[^"\\]|\\.)*"|'[^']*'|[^#\r\n]*?)[ \t]*(#.*)?$/m);
+    const urlM = altGovde.match(/^[ \t]+url:[ \t]*("(?:[^"\\]|\\.)*"|'[^']*'|[^#\r\n]*?)[ \t]*(#.*)?$/m);
+    const temizle = (ham) => {
+      if (!ham) return "";
+      let v = ham.trim();
+      if (v.startsWith('"') && v.endsWith('"') && v.length >= 2) {
+        v = v.slice(1, -1).replace(/\\"/g, '"');
+      } else if (v.startsWith("'") && v.endsWith("'") && v.length >= 2) {
+        v = v.slice(1, -1).replace(/''/g, "'");
+      }
+      return v;
+    };
+    sonuc.push({
+      key,
+      label: temizle(labelM ? labelM[1] : "") || key,
+      url: temizle(urlM ? urlM[1] : ""),
+    });
+  }
+  return sonuc;
+}
+
+/** YAML içinde güvenli çift tırnaklı bir string üretir (" ve \ karakterlerini
+ * escape eder) — hem label hem url için kullanılır, ikisi de kullanıcı
+ * girdisi olduğundan tırnak/özel karakter içerebilir. */
+function yamlCiftTirnakliYaz(deger) {
+  const guvenli = String(deger || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return `"${guvenli}"`;
+}
+
+/** [{ key, label, url }, ...] dizisinden _config.yml uyumlu "social:" YAML
+ * bloğunu (baştaki "social:" satırı DAHİL, sondaki "# ---..." ayırıcı
+ * HARİÇ) üretir. socialBlokunuAyristir ile TAM SİMETRİK girinti kullanır. */
+function socialBlokuUret(girdiler) {
+  const satirlar = ["social:"];
+  for (const { key, label, url } of girdiler) {
+    satirlar.push(`  ${key}:`);
+    satirlar.push(`    label: ${yamlCiftTirnakliYaz(label)}`);
+    satirlar.push(`    url: ${yamlCiftTirnakliYaz(url)}`);
+  }
+  return satirlar.join("\n") + "\n";
+}
+
+function configIcindeSocialBlokunuYaz(icerik, girdiler) {
+  const yeniBlok = socialBlokuUret(girdiler);
+  if (SOCIAL_BLOK_REGEX.test(icerik)) {
+    return icerik.replace(SOCIAL_BLOK_REGEX, yeniBlok);
+  }
+  // Blok hiç yoksa (ör. biri _config.yml'den elle sildiyse) dosya sonuna ekle.
+  const ayirici = icerik.endsWith("\n") ? "" : "\n";
+  return `${icerik}${ayirici}${yeniBlok}`;
+}
+
+/** Kullanıcının panelde girdiği serbest metinden (ör. "Google Scholar")
+ * dahili bir YAML anahtarı üretir — Türkçe karakterleri sadeleştirir,
+ * boşlukları alt çizgiye çevirir, sadece a-z/0-9/_ bırakır. Aynı anahtar
+ * zaten varsa sonuna -2, -3 vb. ekleyerek çakışmayı önler. */
+function baglantiAnahtarUret(label, mevcutAnahtarlar) {
+  const TR_HARF = { ç: "c", ğ: "g", ı: "i", ö: "o", ş: "s", ü: "u" };
+  let taban = String(label || "baglanti")
+    .toLowerCase()
+    .split("")
+    .map((c) => TR_HARF[c] || c)
+    .join("")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  if (!taban) taban = "baglanti";
+  let aday = taban;
+  let sayac = 2;
+  while (mevcutAnahtarlar.includes(aday)) {
+    aday = `${taban}_${sayac}`;
+    sayac += 1;
+  }
+  return aday;
+}
+
+let BAGLANTILAR_SHA = null;
+// Panelde o an düzenlenmekte olan girdiler — DOM'a bire bir yansır,
+// kaydetme anında buradan YAML üretilir (hakkimda formundaki iki
+// textarea'nın tersine, burada girdi sayısı değişken olduğu için tek bir
+// dizi state'i tutmak, her satırı DOM'dan tek tek okumaktan daha güvenilirdir).
+let BAGLANTILAR_LISTESI = [];
+
+function baglantiSatiriOlustur(girdi, index) {
+  const satir = document.createElement("div");
+  const bosMu = !girdi.url || !girdi.url.trim();
+  satir.className = bosMu ? "bg-satir bg-satir-bos" : "bg-satir";
+  satir.dataset.index = String(index);
+  satir.innerHTML = `
+    ${bosMu ? '<span class="bg-satir-bos-etiket">URL boş — kaydedilse bile anasayfada görünmeyecek</span>' : ""}
+    <div class="form-field">
+      <label>Görünen Ad (Etiket)</label>
+      <input type="text" class="bg-label-input" value="${escapeHtml(girdi.label)}" placeholder="ör. Google Scholar">
+    </div>
+    <div class="form-field">
+      <label>Bağlantı (URL)</label>
+      <input type="url" class="bg-url-input" value="${escapeHtml(girdi.url)}" placeholder="https://...">
+    </div>
+    <button type="button" class="btn-danger bg-satir-sil-btn">Sil</button>
+  `;
+  satir.querySelector(".bg-label-input").addEventListener("input", (e) => {
+    BAGLANTILAR_LISTESI[index].label = e.target.value;
+  });
+  satir.querySelector(".bg-url-input").addEventListener("input", (e) => {
+    BAGLANTILAR_LISTESI[index].url = e.target.value;
+    // Boş/dolu durumu değiştikçe ipucu şeridini canlı güncelle.
+    const yeniBosMu = !e.target.value.trim();
+    satir.classList.toggle("bg-satir-bos", yeniBosMu);
+    let ipucu = satir.querySelector(".bg-satir-bos-etiket");
+    if (yeniBosMu && !ipucu) {
+      ipucu = document.createElement("span");
+      ipucu.className = "bg-satir-bos-etiket";
+      ipucu.textContent = "URL boş — kaydedilse bile anasayfada görünmeyecek";
+      satir.prepend(ipucu);
+    } else if (!yeniBosMu && ipucu) {
+      ipucu.remove();
+    }
+  });
+  satir.querySelector(".bg-satir-sil-btn").addEventListener("click", () => {
+    if (!confirm(`"${girdi.label || girdi.key}" bağlantısını silmek istediğine emin misin?`)) return;
+    BAGLANTILAR_LISTESI.splice(index, 1);
+    baglantilarListesiniCiz();
+  });
+  return satir;
+}
+
+function baglantilarListesiniCiz() {
+  const liste = document.getElementById("bg-liste");
+  liste.innerHTML = "";
+  if (BAGLANTILAR_LISTESI.length === 0) {
+    const bos = document.createElement("p");
+    bos.className = "muted";
+    bos.textContent = 'Henüz hiç bağlantı yok — "+ Yeni Bağlantı Ekle" ile ilk bağlantını ekleyebilirsin.';
+    liste.appendChild(bos);
+    return;
+  }
+  BAGLANTILAR_LISTESI.forEach((girdi, i) => {
+    liste.appendChild(baglantiSatiriOlustur(girdi, i));
+  });
+}
+
+async function baglantilariYukle() {
+  const durumEl = document.getElementById("bg-durum");
+  const msgEl = document.getElementById("bg-message");
+  if (!GH_BAGLI) {
+    showMessage(msgEl, 'Önce "GitHub Bağlantısı" sekmesinden bağlantını doğrula.', "error");
+    return;
+  }
+  const btn = document.getElementById("bg-yukle-btn");
+  btn.disabled = true;
+  btn.textContent = "Yükleniyor...";
+  try {
+    const dosya = await ghGetContents(CONFIG_YOLU);
+    if (!dosya) throw new Error("_config.yml repoda bulunamadı.");
+    BAGLANTILAR_SHA = dosya.sha;
+    const icerik = b64Decode(dosya.content.replace(/\n/g, ""));
+    BAGLANTILAR_LISTESI = socialBlokunuAyristir(icerik);
+    baglantilarListesiniCiz();
+
+    document.getElementById("bg-form-alani").hidden = false;
+    durumEl.textContent = "Mevcut bağlantılar yüklendi — aşağıdan ekleyip/düzenleyip kaydedebilirsin.";
+    msgEl.hidden = true;
+  } catch (err) {
+    showMessage(msgEl, `Yüklenemedi: ${err.message}`, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Mevcut Bağlantıları Yükle";
+  }
+}
+
+function baglantiYeniEkle() {
+  const mevcutAnahtarlar = BAGLANTILAR_LISTESI.map((g) => g.key);
+  BAGLANTILAR_LISTESI.push({
+    key: baglantiAnahtarUret("yeni_baglanti", mevcutAnahtarlar),
+    label: "",
+    url: "",
+  });
+  baglantilarListesiniCiz();
+  // Az önce eklenen satırın etiket kutusuna odaklan — kullanıcı hemen
+  // yazmaya başlayabilsin.
+  const satirlar = document.querySelectorAll("#bg-liste .bg-satir");
+  const sonuncu = satirlar[satirlar.length - 1];
+  sonuncu?.querySelector(".bg-label-input")?.focus();
+}
+
+async function baglantilariKaydet() {
+  const msgEl = document.getElementById("bg-message");
+  if (!GH_BAGLI) {
+    showMessage(msgEl, 'Önce "GitHub Bağlantısı" sekmesinden bağlantını doğrula.', "error");
+    return;
+  }
+  if (!BAGLANTILAR_SHA) {
+    showMessage(msgEl, 'Önce "Mevcut Bağlantıları Yükle" ile dosyayı çek.', "error");
+    return;
+  }
+
+  // Etiketi boş bırakılmış (ama silinmemiş) satırlara dahili anahtarlarını
+  // etiket olarak düşmesin diye en azından anahtarını göster — tamamen
+  // boş bir buton metni kafa karıştırıcı olurdu. Kullanıcı isterse yine de
+  // düzenleyebilir, bu sadece bir güvenlik ağı.
+  const gonderilecek = BAGLANTILAR_LISTESI.map((g) => ({
+    key: g.key,
+    label: (g.label || "").trim() || g.key,
+    url: (g.url || "").trim(),
+  }));
+
+  // Aynı anahtarın YAML'da iki kez geçmesi (ör. iki farklı satırın aynı
+  // "key"e sahip olması, teorik olarak sadece elle _config.yml'i bozarsa
+  // olur) geçersiz/öngörülemez bir YAML üretir — kaydetmeden önce erkenden
+  // ve açıkça reddediyoruz.
+  const anahtarlar = gonderilecek.map((g) => g.key);
+  const tekrarEden = anahtarlar.find((k, i) => anahtarlar.indexOf(k) !== i);
+  if (tekrarEden) {
+    showMessage(msgEl, `İç hata: "${tekrarEden}" anahtarı birden fazla satırda var. Sayfayı yenileyip tekrar dene.`, "error");
+    return;
+  }
+
+  const btn = document.getElementById("bg-kaydet-btn");
+  btn.disabled = true;
+  btn.textContent = "Kaydediliyor...";
+  try {
+    const dosya = await ghGetContents(CONFIG_YOLU);
+    if (!dosya) throw new Error("_config.yml repoda bulunamadı.");
+    const icerik = b64Decode(dosya.content.replace(/\n/g, ""));
+    const guncel = configIcindeSocialBlokunuYaz(icerik, gonderilecek);
+    await ghPutFile(CONFIG_YOLU, b64Encode(guncel), "_config.yml: bağlantılar (social) güncellendi", dosya.sha);
+
+    showMessage(msgEl, "Kaydedildi ve GitHub'a commit edildi — 1-2 dakika içinde anasayfada güncellenecektir.", "success");
+    // SHA artık eski — tekrar kaydetmeden önce yeniden yüklenmesi gerekir.
+    BAGLANTILAR_SHA = null;
+    document.getElementById("bg-form-alani").hidden = true;
+    document.getElementById("bg-durum").textContent =
+      "Kaydedildi. Tekrar düzenlemek için önce bağlantıları yeniden yükle.";
+  } catch (err) {
+    showMessage(msgEl, `Kaydedilemedi: ${err.message}`, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Kaydet ve Yayınla";
+  }
+}
+
+function wireBaglantilarSosyal() {
+  const navLink = document.querySelector('#gy-nav a[data-section="baglantilar"]');
+  const bolum = document.getElementById("baglantilar");
+
+  // SADECE admin/owner — bkz. worker.js "_config.yml" için "social" alan
+  // karşılaştırması (yalnizAdminYolu bloğu, CONFIG_YOLU_SABIT dalı) ve
+  // profil fotoğrafı/hakkımda/CV ile AYNI desen. Bu istemci tarafı kontrol
+  // sadece bir kolaylık; gerçek yetki sınırı Worker'dadır.
+  if (GIRIS_YAPAN_PROFIL?.role !== "admin" && GIRIS_YAPAN_PROFIL?.role !== "owner") {
+    navLink?.remove();
+    bolum?.remove();
+    return;
+  }
+  // "Yetki Ayarları" (migration 0048 deseni) — owner bu özelliği admin
+  // için kapatmış olabilir (bkz. OZELLIK_KATALOGU "baglanti_yonetimi").
+  // owner bu kontrole hiç girmez (yukarıdaki if zaten geçirdi).
+  if (GIRIS_YAPAN_PROFIL?.role === "admin" && !ozellikErisimVarMiClient("baglanti_yonetimi")) {
+    navLink?.remove();
+    bolum?.remove();
+    return;
+  }
+
+  document.getElementById("bg-yukle-btn").addEventListener("click", baglantilariYukle);
+  document.getElementById("bg-yeni-ekle-btn").addEventListener("click", baglantiYeniEkle);
+  document.getElementById("bg-kaydet-btn").addEventListener("click", baglantilariKaydet);
+}
+
+
 /*                                                                          */
 /* _config.yml'deki `cv_url` alanına yazar/okur (profilYapilandirmasiniOku/ */
 /* configIcindeProfilYoluYaz ile AYNI regex tabanlı yaklaşım, farklı bir    */
