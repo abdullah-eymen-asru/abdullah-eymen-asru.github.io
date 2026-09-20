@@ -804,46 +804,70 @@ async function guncelleIcerikTuru() {
   const yeniEklemeEngelli = !duzenlemeModuMu() && !ozellikErisimVarMiClient("yazi_ekleme");
   const yeniEklemeUyariEl = document.getElementById("ic-yazi-ekleme-engelli-uyari");
   if (yeniEklemeUyariEl) yeniEklemeUyariEl.hidden = !yeniEklemeEngelli;
-  ["ic-submit-btn", "ic-submit-b-btn", "ic-submit-c-btn"].forEach((id) => {
+  ["ic-submit-btn", "ic-submit-b-btn"].forEach((id) => {
     const btn = document.getElementById(id);
     if (btn) btn.disabled = yeniEklemeEngelli;
   });
 }
 
 /**
+ * "GitHub yerine Supabase'te depola" anahtarı AÇIK mı? Bu anahtar SADECE
+ * "Yayında" açıkken anlamlıdır (Yayında kapalıyken içerik zaten gizli
+ * Supabase taslağı olarak gider, bkz. "gizli-hedef" seçimi) — bu yüzden
+ * anahtarın kendisi işaretli kalsa bile "Yayında" kapalıysa false döner.
+ * true ise ana gönder butonu eski "Seçenek C" akışını (icerikKaydet("c") →
+ * icerikSadeceSupabaseeYayinla) çalıştırır: içerik GitHub'a HİÇ commit
+ * edilmez, yayin_durumu='sadece_supabase' olarak sadece Supabase'te durur
+ * ama blog/proje listesinde görünür ve indekslenebilir (bkz. migration
+ * 0015, icerik/supabase-yazi.md, supabase-yazi.js).
+ */
+function sadeceSupabaseAcikMi() {
+  return !!document.getElementById("ic-yayinda")?.checked && !!document.getElementById("ic-sadece-supabase")?.checked;
+}
+
+/**
  * Kaydet butonunun metnini o an düzenlenen/kaydedilecek içeriğin durumuna
  * göre günceller: mevcut bir kaydı düzenliyorsak her zaman "Güncelle" (hem
  * GitHub'daki bir dosya hem Supabase'teki bir taslak için — hangisine
- * kaydedileceği "Yayında" anahtarına göre otomatik belirlenir), yeni içerik
- * ekleniyorsa "Yayında" anahtarına göre "GitHub'a Yayınla" ya da "Taslağı
- * Kaydet (Gizli)".
+ * kaydedileceği "Yayında" ve "GitHub yerine Supabase'te depola"
+ * anahtarlarına göre otomatik belirlenir), yeni içerik ekleniyorsa
+ * anahtarlara göre "GitHub'a Yayınla", "Sadece Supabase'te Yayınla" ya da
+ * "Taslağı Kaydet (Gizli)".
  */
 function submitButonMetniGuncelle() {
   const btn = document.getElementById("ic-submit-btn");
   const btnB = document.getElementById("ic-submit-b-btn");
-  const btnC = document.getElementById("ic-submit-c-btn");
   const yardimEl = document.getElementById("ic-yayin-secenek-yardim");
+  const sadeceSupabaseWrap = document.getElementById("ic-sadece-supabase-wrap");
   if (!btn) return;
   const yayinda = document.getElementById("ic-yayinda")?.checked;
+  const sadeceSupabase = sadeceSupabaseAcikMi();
 
-  // "Seçenek B/C" (ikisi de GitHub'a değil ya da GitHub'la BİRLİKTE
-  // Supabase'e yazan alternatif yayın yolları) SADECE "Yayında" açıkken
-  // anlamlıdır — kapalıyken zaten mevcut "Nerede saklansın?"
-  // (Supabase/GitHub) seçimi gizli taslak için bu ayrımı yapıyor.
-  if (btnB) btnB.hidden = !yayinda;
-  if (btnC) btnC.hidden = !yayinda;
-  if (yardimEl) yardimEl.hidden = !yayinda;
+  // "GitHub yerine Supabase'te depola" anahtarı SADECE "Yayında" açıkken
+  // gösterilir — kapalıyken zaten mevcut "Nerede saklansın?" (Supabase/
+  // GitHub) seçimi gizli taslak için bu ayrımı yapıyor.
+  if (sadeceSupabaseWrap) sadeceSupabaseWrap.hidden = !yayinda;
+
+  // "Seçenek B" (Supabase'e kaydet + GitHub ile yayınla) SADECE "Yayında"
+  // açık VE "GitHub yerine Supabase'te depola" KAPALIYKEN anlamlıdır —
+  // anahtar açıkken içerik GitHub'a hiç gitmeyeceği için gizlenir.
+  if (btnB) btnB.hidden = !yayinda || sadeceSupabase;
+  if (yardimEl) yardimEl.hidden = !yayinda || sadeceSupabase;
 
   if (duzenlemeModuMu()) {
-    btn.textContent = yayinda ? "🅰️ Güncelle ve Doğrudan Yayınla" : "Güncelle";
+    if (sadeceSupabase) {
+      btn.textContent = "🗄️ Güncelle (Sadece Supabase)";
+    } else {
+      btn.textContent = yayinda ? "🅰️ Güncelle ve Doğrudan Yayınla" : "Güncelle";
+    }
     if (btnB) btnB.textContent = "🅱️ Güncelle (Supabase Yedekli)";
-    if (btnC) btnC.textContent = "🅲️ Güncelle (Sadece Supabase)";
     return;
   }
-  if (yayinda) {
+  if (sadeceSupabase) {
+    btn.textContent = "🗄️ Sadece Supabase'te Yayınla (GitHub'a Commit Atma)";
+  } else if (yayinda) {
     btn.textContent = "🅰️ Doğrudan GitHub'a Aktar ve Yayınla";
     if (btnB) btnB.textContent = "🅱️ Supabase'e Kaydet ve GitHub ile Yayınla";
-    if (btnC) btnC.textContent = "🅲️ Sadece Supabase'te Yayınla (GitHub'a Commit Atma)";
   } else if (gizliHedefDegeriniAl() === "github") {
     btn.textContent = "GitHub'a Gizli Commit Et";
   } else {
@@ -2264,9 +2288,12 @@ function wireYayindaCanliOnizleme() {
 /* İÇERİK EKLE / DÜZENLE FORMU                                            */
 /* ---------------------------------------------------------------------- */
 function wireIcerikForm() {
+  // Ana gönder butonu (type="submit"): "GitHub yerine Supabase'te depola"
+  // anahtarı açıksa Seçenek C'yi ("Sadece Supabase'te Yayınla", GitHub'a
+  // commit yok), değilse Seçenek A'yı (doğrudan GitHub'a commit) çalıştırır.
   document.getElementById("icerik-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    await icerikKaydet("a");
+    await icerikKaydet(sadeceSupabaseAcikMi() ? "c" : "a");
   });
   const btnB = document.getElementById("ic-submit-b-btn");
   if (btnB) {
@@ -2274,12 +2301,9 @@ function wireIcerikForm() {
       await icerikKaydet("b");
     });
   }
-  const btnC = document.getElementById("ic-submit-c-btn");
-  if (btnC) {
-    btnC.addEventListener("click", async () => {
-      await icerikKaydet("c");
-    });
-  }
+  // Anahtar değiştiğinde buton metinleri/B butonu/yardım metni yeniden
+  // hesaplanır (bkz. submitButonMetniGuncelle).
+  document.getElementById("ic-sadece-supabase")?.addEventListener("change", submitButonMetniGuncelle);
   document.getElementById("ic-iptal-btn").addEventListener("click", duzenlemeyiIptalEt);
 }
 
@@ -2318,10 +2342,14 @@ function duzenlemeyiIptalEt() {
   document.getElementById("ic-akademik")?.dispatchEvent(new Event("change"));
 }
 
+// Seçenek C artık ayrı bir butona sahip DEĞİL: "GitHub yerine Supabase'te
+// depola" anahtarı açıkken ana gönder butonu (ic-submit-btn) C'yi çalıştırır
+// (bkz. wireIcerikForm/submitButonMetniGuncelle) — "Gönderiliyor..." durumu
+// da bu yüzden ana butonda görünür.
 const SECENEK_BUTON_ID = {
   a: "ic-submit-btn",
   b: "ic-submit-b-btn",
-  c: "ic-submit-c-btn",
+  c: "ic-submit-btn",
 };
 
 async function icerikKaydet(secenek = "a") {
@@ -2389,7 +2417,7 @@ async function icerikKaydet(secenek = "a") {
     !ADMIN_ADINA_HEDEF &&
     yazar.id &&
     yazar.id !== GIRIS_YAPAN_PROFIL.id &&
-    (secenek === "a" || secenek === "b") &&
+    (secenek === "a" || secenek === "b" || secenek === "c") &&
     document.getElementById("ic-yayinda")?.checked
   ) {
     const hedefProfil = (YAZAR_ADAYLARI || []).find((u) => u.id === yazar.id);
@@ -2488,7 +2516,7 @@ async function icerikKaydet(secenek = "a") {
   const digerBtnler = Object.entries(SECENEK_BUTON_ID)
     .filter(([s]) => s !== secenek)
     .map(([, id]) => document.getElementById(id))
-    .filter(Boolean);
+    .filter((b) => b && b !== submitBtn);
   submitBtn.disabled = true;
   digerBtnler.forEach((b) => (b.disabled = true));
   const oncekiMetin = submitBtn.textContent;
@@ -4189,6 +4217,15 @@ async function icerikDuzenlemeyeYukle(item, tur) {
   const yayinda = item.data.yayinda !== false;
   document.getElementById("ic-yayinda").checked = yayinda;
   document.getElementById("ic-gizli-hedef-wrap").hidden = yayinda;
+  // "GitHub yerine Supabase'te depola": içerik şu an GERÇEKTEN yayında ama
+  // sadece Supabase'te duruyorsa (yayin_durumu='sadece_supabase') anahtar
+  // açık gelir — aksi hâlde (GitHub'da duran dosya, 'supabase_ve_github'
+  // ya da gizli taslak) kapalı gelir; kullanıcı isterse açıp içeriği
+  // GitHub'dan Supabase'e taşıyabilir (bkz. icerikSadeceSupabaseeYayinla).
+  const sadeceSupabaseAnahtari = document.getElementById("ic-sadece-supabase");
+  if (sadeceSupabaseAnahtari) {
+    sadeceSupabaseAnahtari.checked = item.kaynak === "supabase" && item.data.yayin_durumu === "sadece_supabase";
+  }
   document.getElementById("ic-reklam").checked = item.data.reklam !== false;
   document.getElementById("ic-toc").checked = item.data.toc === true;
   document.getElementById("ic-pdf-url").value = item.data.pdf_url || "";
