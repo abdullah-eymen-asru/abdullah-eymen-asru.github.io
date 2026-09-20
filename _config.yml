@@ -52,18 +52,54 @@ giscus:
   category: "Announcements"
   category_id: "DIC_kwDOTVoWUs4DBEO0"
   
+# SOSYAL / AKADEMİK BAĞLANTILAR — anasayfadaki bağlantı listesini besler.
+# Panelden ("GitHub İçerik Yönetimi" → "🔗 Bağlantılar" sekmesi, sadece
+# admin/owner) kod yazmadan yönetilebilir: yeni bir platform eklemek,
+# birini silmek ya da url'sini değiştirmek panelden GitHub'a otomatik
+# commit atar. Her girdinin "label" (buton üzerinde görünen metin) ve
+# "url" alanı vardır. url BOŞSA ("") o girdi anasayfada HİÇ görünmez —
+# yani örneğin henüz bir Google Scholar hesabın yoksa satırı SİLMENE
+# gerek yok, url'yi boş bırakman yeterli, buton otomatik gizli kalır.
+# Panelden eklenen YENİ bir platform da (anahtarı burada önceden
+# tanımlı olmasa dahi) otomatik olarak listeye eklenir ve anasayfada
+# görünür — anahtar sadece dahili bir kimliktir, ekranda "label" görünür.
 social:
-  github: "https://github.com/abdullah-eymen-asru"
-  linkedin: "https://linkedin.com/in/abdullah-eymen-asru"
-  twitter: "https://x.com/abdullaheymena"
-  instagram: "https://www.instagram.com/abdullah_eymen_asru/"
-  youtube: "https://www.youtube.com/@abdullah_eymen_asru"
-  nsosyal: "https://nsosyal.com/abdullah_eymen_asru"
-  orcid: "https://orcid.org/0009-0006-8670-4317"
-  academia: "https://29mayis.academia.edu/AbdullahEymenAsru"
-  researchgate: "https://www.researchgate.net/profile/Abdullah-Eymen-Asru"
-  kitap1000: "https://1000kitap.com/Abdullah_Eymen_Asru"
-  playstore: "https://play.google.com/store/apps/details?id=com.aeymena.blog"
+  github:
+    label: "GitHub"
+    url: "https://github.com/abdullah-eymen-asru"
+  linkedin:
+    label: "LinkedIn"
+    url: "https://linkedin.com/in/abdullah-eymen-asru"
+  twitter:
+    label: "X (Twitter)"
+    url: "https://x.com/abdullaheymena"
+  instagram:
+    label: "Instagram"
+    url: "https://www.instagram.com/abdullah_eymen_asru/"
+  youtube:
+    label: "YouTube"
+    url: "https://www.youtube.com/@abdullah_eymen_asru"
+  nsosyal:
+    label: "NSosyal"
+    url: "https://nsosyal.com/abdullah_eymen_asru"
+  orcid:
+    label: "ORCID"
+    url: "https://orcid.org/0009-0006-8670-4317"
+  academia:
+    label: "Academia.edu"
+    url: "https://29mayis.academia.edu/AbdullahEymenAsru"
+  researchgate:
+    label: "ResearchGate"
+    url: "https://www.researchgate.net/profile/Abdullah-Eymen-Asru"
+  scholar:
+    label: "Google Scholar"
+    url: ""
+  kitap1000:
+    label: "1000Kitap"
+    url: "https://1000kitap.com/Abdullah_Eymen_Asru"
+  playstore:
+    label: "Uygulama (Play Store)"
+    url: "https://play.google.com/store/apps/details?id=com.aeymena.blog"
 # ------------------------
 
 markdown: kramdown
