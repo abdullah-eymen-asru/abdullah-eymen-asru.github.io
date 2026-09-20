@@ -566,6 +566,16 @@ permalink: "/panel/github-yonetim.html"
           kaydedince otomatik görünür. Sadece admin/Site Sahibi bu bölümü
           görebilir ve düzenleyebilir.
         </p>
+        <p class="gy-yardim-metni">
+          Yeni eklediğin bir bağlantının dahili teknik kimliği (ekranda
+          görünmez, sadece <code>_config.yml</code> dosyasının içinde
+          kullanılır) <strong>Görünen Ad</strong>'dan otomatik türetilir —
+          ör. "1000 Kitap" yazarsan kodda <code>1000_kitap</code> olarak
+          kaydedilir. Zaten var olan bir bağlantının Görünen Adı'nı
+          değiştirdiğinde bu dahili kimlik SABİT kalır (sadece ekrandaki
+          isim değişir), sistemin başka bir yerinde bu bağlantıya yapılan
+          göndermeler bozulmaz.
+        </p>
 
         <button id="bg-yukle-btn" type="button" class="btn-primary csp-w-auto csp-mb-12">Mevcut Bağlantıları Yükle</button>
         <div id="bg-durum" class="muted">Yüklemek için yukarıdaki butona bas.</div>
