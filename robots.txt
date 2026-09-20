@@ -164,3 +164,13 @@ Disallow: /cloudflare*worker/
 Allow: /
 
 Sitemap: https://abdullah-eymen-asru.github.io/sitemap.xml
+
+# "GitHub yerine Supabase'te depola" ile yayınlanan (GitHub'a hiç commit
+# edilmemiş ama herkese açık) yazı/projelerin sitemap'i — Jekyll build'i
+# bunları bilmediği için yukarıdaki sitemap.xml'de YOKLAR; bu adres her
+# istekte güncel listeyi üretir (bkz. supabase/functions/sitemap-supabase/
+# index.ts). Farklı host'ta durması sorun değil: sitemap, URL'lerin ait olduğu
+# sitenin robots.txt'inde belirtildiği için kabul edilir. NOT: fonksiyon
+# deploy edilene kadar bu satır 404 döner (zararsızdır, sadece Search
+# Console'da "alınamadı" uyarısı görünür).
+Sitemap: https://eahvcirspmvntffzphye.supabase.co/functions/v1/sitemap-supabase
