@@ -44,3 +44,12 @@ verify_jwt = false
 
 [functions.admin-denetim-zaman-asimi]
 verify_jwt = false
+
+# sitemap-supabase: "GitHub yerine Supabase'te depola" ile yayınlanan
+# içeriklerin sitemap'ini üretir (bkz. supabase/functions/sitemap-supabase/
+# index.ts). Arama motoru crawler'ları Authorization header'ı GÖNDEREMEZ, bu
+# yüzden gateway'in JWT zorunluluğu kapalı olmalı — fonksiyon zaten yalnızca
+# herkese açık (anon) bir RPC'yi okuyor, gizli/yazılabilir hiçbir şeye
+# dokunmuyor. Deploy: supabase functions deploy sitemap-supabase
+[functions.sitemap-supabase]
+verify_jwt = false
