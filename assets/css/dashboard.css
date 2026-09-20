@@ -4,31 +4,80 @@
  * Mevcut :root / [data-theme="dark"] değişkenleriyle (assets/style.css)
  * uyumlu çalışır — yeni renk tanımlamaz, sadece var(--bg), var(--text),
  * var(--border), var(--accent) kullanır.
- */
+ *
+ * ==========================================================================
+ * BU SÜRÜMDE DÜZELTİLEN 5 SORUN
+ * --------------------------------------------------------------------------
+ * 1) MOBİLDE İKİ HAMBURGER ÜST ÜSTE: panelin kendi düğmesi
+ *    "position: fixed; top:12px; left:12px; z-index:50" idi — sitenin
+ *    header'ı da (.site-header) sticky ve z-index:50 olduğu için panel
+ *    düğmesi TAM OLARAK header'daki site hamburger'ının (#nav-toggle)
+ *    üstüne oturuyordu: iki ayrı menü tek bir düğme gibi görünüyor, site
+ *    menüsüne (sekmeler arası geçiş) dokunmak imkânsız hale geliyordu.
+ *    ÇÖZÜM: panel düğmesi artık "fixed" DEĞİL — içerik akışının içinde,
+ *    header'ın ALTINDA duran kendi şeridinde (.dash-topbar). Şerit sticky
+ *    ama z-index'i (30) header'ınkinden (50) DÜŞÜK, yani hiçbir zaman
+ *    onun üstüne binmez; header yüksekliği JS'ten gelen
+ *    --dash-header-h değişkeniyle hesaba katılır.
+ *
+ * 2) DAR SÜTUN: dashboard, layout'taki "main.wrap" (max-width: 860px)
+ *    içinde çiziliyordu; 260px sidebar düşünce içeriğe ~560px kalıyordu.
+ *    ÇÖZÜM: .dash-shell negatif margin ("full-bleed") ile .wrap'ın
+ *    dışına taşar ve min(1460px, 100vw - 40px) genişliğe oturur.
+ *    Transform DEĞİL margin kullanılıyor — çünkü transform, içerideki
+ *    "position: fixed" elemanlar (mobil sidebar, sohbet modal'ları) için
+ *    yeni bir containing block yaratıp onları bozardı.
+ *
+ * 3) SOHBET/MESAJLAR BOZUK AÇILIYORDU: assets/css/mesajlar.css içindeki
+ *    ".mesajlar-sayfa { left:50%; transform:translateX(-50%) }" kuralı
+ *    bağımsız sayfa için yazılmıştı; dashboard'un grid'i içinde kutuyu
+ *    sidebar'ın ÜSTÜNE kaydırıp taşırıyordu. O dosyaya dokunmadan burada
+ *    etkisiz kılınıyor (aşağıdaki "viewport-ortalama kuralını iptal et").
+ *
+ * 4/5) BÖLÜM ARASI BOŞLUK: bir görünümde birden fazla .panel-section
+ *    yan yana/bitişik duruyordu. Artık .dash-view doğrudan bir flex
+ *    kolon: tüm alt bloklar arasında 24px nefes payı var.
+ * ========================================================================== */
 
 .dash-shell {
+  /* Header yüksekliği JS'te ölçülüp buraya yazılır (dashboard.js ->
+     olcuHeaderYuksekligi). JS çalışmazsa 72px makul bir varsayılan. */
+  --dash-header-h: 72px;
+  --dash-sidebar-w: 268px;
+  --dash-max-w: 1460px;
+
+  /* "Full-bleed": .wrap'ın (860px) dışına taşıp gerçek genişliğe otur.
+     Ebeveyn ortalı olduğu için margin = 50% - hedef/2 formülü tam
+     ortalar; hedef ebeveynden darsa margin pozitif olur ve düzen yine
+     bozulmaz. 100vw yerine "100vw - 40px" kullanmak dikey kaydırma
+     çubuğunun yol açabileceği yatay taşmayı da önler. */
+  margin-inline: calc(50% - min(var(--dash-max-w), 100vw - 40px) / 2);
+
   display: grid;
-  grid-template-columns: 260px 1fr;
-  min-height: 100vh;
+  grid-template-columns: var(--dash-sidebar-w) minmax(0, 1fr);
+  gap: 0;
   align-items: start;
+  min-height: 70vh;
 }
 
 /* ---------- Sidebar ---------- */
 
 .dash-sidebar {
   position: sticky;
-  top: 0;
-  height: 100vh;
+  top: calc(var(--dash-header-h) + 8px);
+  max-height: calc(100vh - var(--dash-header-h) - 16px);
   overflow-y: auto;
-  border-right: 1px solid var(--border);
-  background: var(--bg);
-  padding: 16px 0 32px;
+  overscroll-behavior: contain;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card-bg, var(--bg));
+  padding: 14px 0 18px;
 }
 
 .dash-sidebar-head {
-  padding: 0 16px 16px;
+  padding: 0 16px 14px;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -46,25 +95,89 @@
 #dash-nav {
   display: flex;
   flex-direction: column;
+  gap: 2px;
+  padding: 0 8px;
 }
 
-.dash-nav-group-title {
-  font-size: 0.72rem;
+/*
+ * ANA SEKME (GRUP) BAŞLIĞI — artık düz bir yazı değil, AÇILIR/KAPANIR bir
+ * düğme (accordion). Sol menüde aynı anda onlarca satır yazı durduğu için
+ * odak dağılıyordu; şimdi 4 ana sekme görünüyor, sadece içinde bulunduğun
+ * grup açık kalıyor (dashboard.js -> buildSidebar/accordion mantığı).
+ */
+.dash-nav-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px 10px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.dash-nav-group:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.dash-nav-group-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Sağdaki ok: kapalıyken sağa, açıkken aşağı bakar. */
+.dash-nav-group-ok {
+  flex: 0 0 auto;
+  font-size: 0.7rem;
   opacity: 0.6;
-  padding: 16px 16px 6px;
+  transition: transform 0.18s ease;
+}
+
+.dash-nav-group[aria-expanded="true"] .dash-nav-group-ok {
+  transform: rotate(90deg);
+}
+
+/* İçinde AKTİF sekme olan grup, kapalıyken bile belli olsun. */
+.dash-nav-group[data-aktif-icerir="true"] .dash-nav-group-label {
+  color: var(--accent);
+}
+
+.dash-nav-group-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0 6px;
+}
+
+.dash-nav-group-items[hidden] {
+  display: none;
 }
 
 #dash-nav a {
-  padding: 9px 16px 9px 20px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px 9px 12px;
+  border-radius: 10px;
   color: var(--text);
   text-decoration: none;
-  font-size: 0.92rem;
-  border-left: 3px solid transparent;
+  font-size: 0.9rem;
   line-height: 1.3;
+}
+
+#dash-nav a .dash-nav-ikon {
+  flex: 0 0 auto;
+  width: 1.15em;
+  text-align: center;
 }
 
 #dash-nav a:hover {
@@ -72,25 +185,89 @@
 }
 
 #dash-nav a.active {
-  border-left-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
   color: var(--accent);
   font-weight: 600;
 }
 
-/* ---------- Main content ---------- */
+/* ---------- Üst şerit (mobilde hamburger + bulunduğun sekme) ---------- */
+
+.dash-topbar {
+  display: none; /* sadece dar ekranda görünür */
+  position: sticky;
+  top: var(--dash-header-h);
+  z-index: 30; /* .site-header (50) ALTINDA kalmalı — bkz. yukarıdaki not */
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.dash-nav-toggle {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card-bg, var(--bg));
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dash-nav-toggle-bar {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--text);
+}
+
+.dash-topbar-baslik {
+  min-width: 0;
+  font-weight: 600;
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Ana içerik ---------- */
 
 .dash-main {
-  padding: 28px 32px 64px;
+  padding: 4px 0 64px 28px;
   min-width: 0;
 }
 
-.dash-view h1 {
-  margin-top: 0;
+.dash-view {
+  /* MADDE 5: bir görünümdeki bloklar (ör. "GitHub Bağlantısı" +
+     "Yetki Ayarları") bitişikti. Artık her alt blok arasında sabit
+     24px boşluk var — ayrıca .panel-grid kullanan görünümler de
+     kendi 24px'ini koruyor. */
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 1120px;
 }
 
-.dash-view {
-  max-width: 980px;
+.dash-view[hidden] {
+  display: none;
+}
+
+.dash-view > h1 {
+  margin: 0;
+}
+
+.dash-view > .muted {
+  margin: -12px 0 0;
 }
 
 .dash-slot:empty::before {
@@ -99,38 +276,33 @@
   opacity: 0.6;
 }
 
-/* Özel/Gizli Makaleler görünümünde iki blok (form + liste) arasına
-   biraz nefes payı ver. */
-#view-content-private .dash-slot + .dash-slot {
-  margin-top: 32px;
+/* Bir görünümün içinde arka arkaya gelen bölümler (ör. iç içe
+   <section class="panel-section">) — flex gap'in ulaşamadığı iç
+   seviyeler için ek güvence. */
+.dash-view .panel-section + .panel-section,
+.dash-view .panel-grid + .panel-section,
+.dash-view .panel-section + .panel-grid {
+  margin-top: 24px;
 }
 
-/* ---------- Mobil hamburger ---------- */
-
-.dash-nav-toggle {
-  display: none;
-  position: fixed;
-  top: 12px;
-  left: 12px;
-  z-index: 50;
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  cursor: pointer;
+/* MADDE 3: mesajlar.css / auth.css içindeki "viewport'a göre ortala"
+   kuralını dashboard'un içinde iptal et — burada kutu zaten kendi
+   sütununun tamamını kullanıyor. */
+.dash-main .mesajlar-sayfa,
+.dash-main .panel-section--wide {
+  position: static;
+  left: auto;
+  width: auto;
+  max-width: none;
+  transform: none;
 }
 
-.dash-nav-toggle-bar {
-  width: 20px;
-  height: 2px;
-  background: var(--text);
-  display: block;
+.dash-main .msg-panel {
+  height: min(640px, 72vh);
+  max-height: none;
 }
+
+/* ---------- Mobil ---------- */
 
 .dash-overlay {
   position: fixed;
@@ -139,12 +311,16 @@
   z-index: 39;
 }
 
-@media (max-width: 860px) {
+.dash-overlay[hidden] {
+  display: none;
+}
+
+@media (max-width: 980px) {
   .dash-shell {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .dash-nav-toggle {
+  .dash-topbar {
     display: flex;
   }
 
@@ -152,24 +328,35 @@
     position: fixed;
     top: 0;
     left: 0;
-    width: 260px;
-    max-width: 82vw;
+    width: 280px;
+    max-width: 84vw;
     height: 100vh;
-    z-index: 40;
+    max-height: none;
+    z-index: 40; /* header'ın (50) altında; panel açıkken overlay 39 */
+    border-radius: 0;
+    border-right: 1px solid var(--border);
     transform: translateX(-100%);
     transition: transform 0.2s ease;
     box-shadow: 2px 0 12px rgba(0, 0, 0, 0.25);
+    padding-top: calc(var(--dash-header-h) + 8px);
   }
 
   .dash-sidebar.open {
     transform: translateX(0);
   }
 
-  .dash-sidebar-head {
-    padding-top: 52px;
+  .dash-main {
+    padding: 0 0 48px;
   }
 
-  .dash-main {
-    padding: 72px 18px 48px;
+  .dash-view {
+    max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-sidebar,
+  .dash-nav-group-ok {
+    transition: none;
   }
 }
