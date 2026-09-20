@@ -53,3 +53,10 @@ verify_jwt = false
 # dokunmuyor. Deploy: supabase functions deploy sitemap-supabase
 [functions.sitemap-supabase]
 verify_jwt = false
+
+# feed-supabase: "GitHub yerine Supabase'te depola" ile yayınlanan içeriklerin
+# tam metinli Atom feed'i (bkz. supabase/functions/feed-supabase/index.ts).
+# Feed okuyucuları Authorization header'ı GÖNDEREMEZ; fonksiyon yalnızca
+# herkese açık (anon) bir RPC'yi okuyor. Deploy: supabase functions deploy feed-supabase
+[functions.feed-supabase]
+verify_jwt = false
