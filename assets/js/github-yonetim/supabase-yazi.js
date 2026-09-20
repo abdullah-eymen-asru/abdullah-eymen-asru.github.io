@@ -7,6 +7,19 @@
  * kullanılmıyor — bu içerik zaten herkese açık/yayında, tıpkı normal bir
  * GitHub tabanlı blog yazısı/proje gibi giriş yapmamış ziyaretçiler de
  * görebilmeli.
+ *
+ * ARAMA MOTORLARI (SEO): bu sayfa TEK bir Jekyll şablonu olduğu için
+ * build-time'da <title>/<meta description>/canonical hep AYNI (içeriksiz
+ * "Yazı" sayfası) değerlerle üretiliyor. Google/Bing JavaScript'i çalıştırıp
+ * render edilmiş DOM'u indekslediğinden, içerik geldikten SONRA bu değerler
+ * burada (seoBilgisiniUygula) o yazıya özgü değerlerle EZİLİYOR: canonical
+ * (?tur=&slug= dahil, ana site adresi — mirror değil), description,
+ * Open Graph/Twitter, Google Scholar citation_* etiketleri (bkz.
+ * _includes/head.html) ve JSON-LD. İçerik bulunamazsa sayfa noindex
+ * yapılır (soft-404 olarak indekslenmesin). Ayrıca yayınlanan yazıların
+ * adresleri, supabase/functions/sitemap-supabase Edge Function'ı ile
+ * robots.txt'teki ikinci "Sitemap:" satırı üzerinden arama motorlarına
+ * bildirilir.
  */
 import { supabase, escapeHtml, guvenliDisUrlMi } from "../core/supabase-client.js";
 import { okumaSuresiHesapla, kaynakButonlariHtml, tocOlustur } from "../okuma-araclari/okuma-meta-yardimci.js";
@@ -265,6 +278,133 @@ function atifKutusuDinamikTarihleriDoldur(kutu) {
   kutu.querySelectorAll("[data-atif-urldate]").forEach((span) => { span.textContent = iso; });
 }
 
+/* ---------------------------------------------------------------------- */
+/* ARAMA MOTORU (SEO) META YÖNETİMİ                                       */
+/* ---------------------------------------------------------------------- */
+
+/** <head> içinde `selector`'a uyan elementi döner; yoksa `olustur()` ile yaratıp ekler. */
+function headElementiBulVeyaOlustur(selector, olustur) {
+  let el = document.head.querySelector(selector);
+  if (!el) {
+    el = olustur();
+    document.head.appendChild(el);
+  }
+  return el;
+}
+
+/** <meta name|property="..." content="..."> değerini ayarlar (yoksa oluşturur). */
+function metaAyarla(ozellik, ad, deger) {
+  const el = headElementiBulVeyaOlustur(`meta[${ozellik}="${ad}"]`, () => {
+    const yeni = document.createElement("meta");
+    yeni.setAttribute(ozellik, ad);
+    return yeni;
+  });
+  el.setAttribute("content", deger);
+}
+
+function canonicalAyarla(url) {
+  const el = headElementiBulVeyaOlustur('link[rel="canonical"]', () => {
+    const yeni = document.createElement("link");
+    yeni.setAttribute("rel", "canonical");
+    return yeni;
+  });
+  el.setAttribute("href", url);
+}
+
+/** İçerik yok/geçersiz link: arama motorları bu sayfayı (soft-404 olarak) indekslemesin. */
+function noindexYap() {
+  metaAyarla("name", "robots", "noindex, nofollow");
+}
+
+/**
+ * Markdown gövdesinden meta description için düz metin özeti çıkarır:
+ * kod blokları, görseller, başlık satırları, vurgu işaretleri, kramdown
+ * dipnot işaretleri atılır, bağlantılar sadece metniyle bırakılır, boşluklar
+ * sadeleştirilir; kelime sınırında "…" ile kesilir.
+ */
+function duzMetinOzeti(md, azamiUzunluk = 155) {
+  const duz = String(md || "")
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/^\[\^[^\]]+\]:.*$/gm, " ")
+    .replace(/\[\^[^\]]+\]/g, "")
+    .replace(/^#{1,6}[ \t]+.*$/gm, " ")
+    .replace(/[*_`>]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (duz.length <= azamiUzunluk) return duz;
+  const kesilmis = duz.slice(0, azamiUzunluk);
+  const sonBosluk = kesilmis.lastIndexOf(" ");
+  return `${(sonBosluk > 80 ? kesilmis.slice(0, sonBosluk) : kesilmis).trim()}…`;
+}
+
+/**
+ * Yazıya özgü canonical, description, Open Graph/Twitter, Scholar (citation_
+ * öneki) ve JSON-LD değerlerini <head>'e yazar. Canonical'ın tabanı ana site adresidir
+ * (data-site-url = _config.yml url, GitHub Pages) — aynı içerik Cloudflare
+ * Pages mirror'ında da açılsa arama motorları tek bir adrese (ana site)
+ * yönlendirilir; bkz. _layouts/default.html'deki canonical ile AYNI mantık.
+ */
+function seoBilgisiniUygula(kayit, tur, slug, appEl) {
+  const siteTitle = appEl?.dataset.siteTitle || "";
+  const taban = (appEl?.dataset.siteUrl || window.location.origin).replace(/\/$/, "");
+  const canonicalUrl = `${taban}${relUrl("/icerik/supabase-yazi.html")}?tur=${encodeURIComponent(tur)}&slug=${encodeURIComponent(slug)}`;
+  const baslik = kayit.baslik || "";
+  const yazar = kayit.yazar_adi || siteTitle;
+  const aciklama = (kayit.ozet && String(kayit.ozet).trim()) || duzMetinOzeti(kayit.govde);
+  const yayinIso = String(kayit.tarih || "").slice(0, 10);
+  const degisiklikIso = String(kayit.last_modified_at || kayit.guncelleme_tarihi || kayit.tarih || "").slice(0, 10);
+
+  document.title = siteTitle ? `${baslik} · ${siteTitle}` : baslik;
+  canonicalAyarla(canonicalUrl);
+  // Bir önceki (ör. bulunamadı) durumdan kalmış bir noindex olursa kaldır.
+  document.head.querySelector('meta[name="robots"]')?.remove();
+
+  if (aciklama) {
+    metaAyarla("name", "description", aciklama);
+    metaAyarla("property", "og:description", aciklama);
+    metaAyarla("name", "twitter:description", aciklama);
+  }
+  metaAyarla("property", "og:title", baslik);
+  metaAyarla("name", "twitter:title", baslik);
+  metaAyarla("property", "og:type", "article");
+  metaAyarla("property", "og:url", canonicalUrl);
+  if (yayinIso) metaAyarla("property", "article:published_time", yayinIso);
+  if (degisiklikIso) metaAyarla("property", "article:modified_time", degisiklikIso);
+
+  // Google Scholar / Highwire Press etiketleri — _includes/head.html'in
+  // GitHub tabanlı yazılar için build-time'da ürettiği etiketlerin AYNISI.
+  metaAyarla("name", "citation_title", baslik);
+  metaAyarla("name", "citation_author", yazar);
+  if (yayinIso) metaAyarla("name", "citation_publication_date", yayinIso.replaceAll("-", "/"));
+  if (kayit.pdf_url && guvenliDisUrlMi(kayit.pdf_url)) metaAyarla("name", "citation_pdf_url", kayit.pdf_url);
+  if (kayit.veri_url && guvenliDisUrlMi(kayit.veri_url)) metaAyarla("name", "citation_data_url", kayit.veri_url);
+
+  // JSON-LD: <script type="application/ld+json"> çalıştırılan bir betik
+  // DEĞİL, veri bloğudur — CSP script-src (hash listesi) bunu engellemez,
+  // eval/inline-script izni de gerektirmez.
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": kayit.akademik === true ? "ScholarlyArticle" : tur === "blog" ? "BlogPosting" : "Article",
+    headline: baslik,
+    inLanguage: document.documentElement.lang || "tr",
+    author: { "@type": "Person", name: yazar },
+    mainEntityOfPage: { "@type": "WebPage", "@id": canonicalUrl },
+    url: canonicalUrl,
+  };
+  if (aciklama) jsonLd.description = aciklama;
+  if (yayinIso) jsonLd.datePublished = yayinIso;
+  if (degisiklikIso) jsonLd.dateModified = degisiklikIso;
+
+  headElementiBulVeyaOlustur('script[type="application/ld+json"][data-seo]', () => {
+    const yeni = document.createElement("script");
+    yeni.type = "application/ld+json";
+    yeni.dataset.seo = "supabase-yazi";
+    return yeni;
+  }).textContent = JSON.stringify(jsonLd).replaceAll("<", "\\u003c");
+}
+
 async function init() {
   const govdeEl = document.getElementById("supabase-yazi-govde");
   const geriLink = document.getElementById("supabase-yazi-geri-link");
@@ -279,6 +419,7 @@ async function init() {
   }
 
   if (!tur || !slug || !["blog", "proje"].includes(tur)) {
+    noindexYap();
     govdeEl.innerHTML = `<h1>Geçersiz bağlantı</h1><p>Bu linkte gerekli bilgiler eksik ya da hatalı.</p>`;
     return;
   }
@@ -292,6 +433,10 @@ async function init() {
     const kayit = Array.isArray(data) ? data[0] : data;
 
     if (error || !kayit) {
+      // noindex SADECE gerçekten "kayıt yok" (hata olmadan boş dönüş) iken:
+      // geçici bir ağ/RPC hatasında arama motoruna "bu sayfayı indeksleme"
+      // sinyali göndermek, var olan bir yazının indeksten düşmesine yol açardı.
+      if (!error) noindexYap();
       govdeEl.innerHTML = `
         <h1>İçerik bulunamadı</h1>
         <p>Bu yazı artık burada değil — GitHub'a taşınmış, silinmiş ya da
@@ -299,7 +444,9 @@ async function init() {
       return;
     }
 
-    document.title = kayit.baslik;
+    // <title>, canonical, description, OG/Twitter, citation_*, JSON-LD —
+    // bkz. dosya başındaki "ARAMA MOTORLARI (SEO)" notu ve seoBilgisiniUygula.
+    seoBilgisiniUygula(kayit, tur, slug, document.getElementById("supabase-yazi-app"));
 
     const okumaSuresiMetni = okumaSuresiHesapla(kayit.govde);
 
