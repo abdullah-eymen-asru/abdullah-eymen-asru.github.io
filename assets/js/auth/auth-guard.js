@@ -185,7 +185,10 @@ export async function requireAuth({ role = null, redirectTo = "/hesap/giris.html
 
   if (!roleOk || askidaAdminEngeli) {
     // Giriş yapmış ama yetkisi yok -> panel sayfasına yolla, giriş sayfasına değil
-    window.location.replace("/panel/panel.html?hata=yetkisiz");
+    // PANEL BİRLEŞTİRİLDİ: yetkisiz kullanıcı artık birleşik panelin
+    // "Panelim" sekmesine düşüyor (eski /panel/panel.html sadece bir
+    // yönlendirme sayfası — oraya atmak gereksiz bir ikinci hop olurdu).
+    window.location.replace("/panel/dashboard.html?hata=yetkisiz#me-panel");
     return new Promise(() => {});
   }
 
