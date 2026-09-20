@@ -412,6 +412,25 @@ function closeMobileSidebar() {
   if (acikti) document.getElementById("dash-nav-toggle")?.focus?.();
 }
 
+/*
+ * BUG FİX (ReferenceError: olcuHeaderYuksekligi tanımsızdı): bu fonksiyon
+ * önceki bir düzenlemede yanlışlıkla silinmişti — sadece ÇAĞRILDIĞI yerler
+ * (wireMobileNav içinde ve matchMedia/ResizeObserver dinleyicilerinde)
+ * kalmış, TANIMI kaybolmuştu. Sonuç: wireMobileNav() ilk çağrıldığı anda
+ * "Can't find variable: olcuHeaderYuksekligi" hatasıyla PATLIYOR, bu da
+ * init()'i (üstündeki await zincirinden dolayı) yarıda kesiyor — #loading
+ * asla gizlenmiyor, #app asla gösterilmiyor, sayfa SONSUZA DEK
+ * "Yükleniyor..." ekranında kalıyor. Header'ın gerçek yüksekliğini ölçüp
+ * --dash-header-h CSS değişkenine yazan fonksiyon burada, olduğu gibi
+ * geri eklendi.
+ */
+function olcuHeaderYuksekligi() {
+  const header = document.querySelector(".site-header");
+  const shell = document.querySelector(".dash-shell");
+  if (!header || !shell) return;
+  shell.style.setProperty("--dash-header-h", `${Math.round(header.getBoundingClientRect().height)}px`);
+}
+
 function wireMobileNav() {
   const toggle = document.getElementById("dash-nav-toggle");
   const sidebar = document.getElementById("dash-sidebar");
