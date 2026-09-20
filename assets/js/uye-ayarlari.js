@@ -392,7 +392,7 @@ function rolSecimHtml(u) {
 function rolSecimNotuHtml(u) {
   const benOwnerMi = GIRIS_YAPAN_PROFIL?.role === "owner";
   if (u.role !== "admin" || benOwnerMi) return "";
-  return `<p class="muted uya-rol-notu">Bir admin'in rolü buradan değiştirilemez — <a href="/panel/admin-guvenlik.html">Admin Güvenliği</a> sayfasından askıya alma/oylama süreci başlatılmalı.</p>`;
+  return `<p class="muted uya-rol-notu">Bir admin'in rolü buradan değiştirilemez — <a href="#sys-guvenlik" data-dash-git="sys-guvenlik">Admin Güvenliği</a> sayfasından askıya alma/oylama süreci başlatılmalı.</p>`;
 }
 
 /**
@@ -574,7 +574,7 @@ async function kendiYetkimiDusur(btn) {
   // edemez (requireAuth({role:'admin'}) yeni rol admin/owner değilse
   // reddeder), o yüzden panelim sayfasına yönlendiriyoruz.
   alert("Yetkin düşürüldü. Panelim sayfasına yönlendiriliyorsun.");
-  window.location.href = "/panel/panel.html";
+  window.location.href = "/panel/dashboard.html#me-panel";
 }
 
 /* ---------------------------------------------------------------------- */
