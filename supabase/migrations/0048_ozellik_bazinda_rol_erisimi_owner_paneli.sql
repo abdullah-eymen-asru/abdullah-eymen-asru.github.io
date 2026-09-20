@@ -218,6 +218,13 @@ revoke all on public.ozellik_erisimleri from public, anon, authenticated;
 --                          SADECE admin/owner ARASINDAKİ ayrımı etkiler).
 --   "hakkimda_duzenleme" — "🙋 Hakkımda" sekmesi (EN/TR metin + üst başlık).
 --                          Varsayılan: admin/owner.
+--   "baglanti_yonetimi"  — "🔗 Bağlantılar (Sosyal/Akademik)" sekmesi (site
+--                          genelindeki sosyal/akademik bağlantı düğmelerini
+--                          ekleme/düzenleme/silme — bkz. migration sonrası
+--                          not: bu anahtar 0048'den SONRA, ayrı bir migration
+--                          olmadan eklendi, tam olarak bu dosyanın öngördüğü
+--                          "yeni migration GEREKMEZ" mekanizmasıyla).
+--                          Varsayılan: admin/owner.
 --   "cv_yonetimi"        — "📄 CV" sekmesi (PDF yükle / dış link / kaldır).
 --                          Varsayılan: admin/owner. (Kullanıcının verdiği
 --                          örnek: "CV yükleme sadece owner'da olsun, admin
