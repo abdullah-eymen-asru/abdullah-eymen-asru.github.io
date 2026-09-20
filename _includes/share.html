@@ -1,5 +1,5 @@
-<div class="share-buttons" id="share-buttons">
-  <span class="share-label">Paylaş:</span>
+<div class="paylas-alani" id="paylas-alani">
+  <span class="paylas-etiket">Paylaş:</span>
   {% comment %}
     RESMİ MARKA İKONLARI (Simple Icons CDN): her platform linkinin
     başına, o markanın resmi renk/logosunu barındıran Simple Icons
@@ -24,24 +24,24 @@
     placeholder/kırık-resim simgesi asla görünmez, buton SADECE ESKİ
     (ikonsuz, salt metin) hâline geri döner.
   {% endcomment %}
-  <a class="share-btn" data-share="whatsapp" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/whatsapp?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy">WhatsApp</a>
-  <a class="share-btn" data-share="x" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/x?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy">X</a>
-  <a class="share-btn" data-share="linkedin" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/linkedin?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy">LinkedIn</a>
-  <a class="share-btn" data-share="telegram" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/telegram?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy">Telegram</a>
-  <a class="share-btn" data-share="facebook" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/facebook?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy">Facebook</a>
-  <a class="share-btn" data-share="reddit" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/reddit?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy">Reddit</a>
-  <a class="share-btn" data-share="pinterest" target="_blank" rel="noopener noreferrer" href="#"><img class="share-btn-icon" src="https://cdn.simpleicons.org/pinterest?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy">Pinterest</a>
-  <button class="share-btn" id="native-share-btn" type="button" hidden>📤 Paylaş</button>
-  <button class="share-btn" id="copy-link-btn" type="button">Linki Kopyala</button>
+  <a class="paylas-dugme" data-paylas="whatsapp" target="_blank" rel="noopener noreferrer" href="#"><img class="paylas-dugme-ikon" src="https://cdn.simpleicons.org/whatsapp?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy">WhatsApp</a>
+  <a class="paylas-dugme" data-paylas="x" target="_blank" rel="noopener noreferrer" href="#"><img class="paylas-dugme-ikon" src="https://cdn.simpleicons.org/x?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy">X</a>
+  <a class="paylas-dugme" data-paylas="linkedin" target="_blank" rel="noopener noreferrer" href="#"><img class="paylas-dugme-ikon" src="https://cdn.simpleicons.org/linkedin?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy">LinkedIn</a>
+  <a class="paylas-dugme" data-paylas="telegram" target="_blank" rel="noopener noreferrer" href="#"><img class="paylas-dugme-ikon" src="https://cdn.simpleicons.org/telegram?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy">Telegram</a>
+  <a class="paylas-dugme" data-paylas="facebook" target="_blank" rel="noopener noreferrer" href="#"><img class="paylas-dugme-ikon" src="https://cdn.simpleicons.org/facebook?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy">Facebook</a>
+  <a class="paylas-dugme" data-paylas="reddit" target="_blank" rel="noopener noreferrer" href="#"><img class="paylas-dugme-ikon" src="https://cdn.simpleicons.org/reddit?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy">Reddit</a>
+  <a class="paylas-dugme" data-paylas="pinterest" target="_blank" rel="noopener noreferrer" href="#"><img class="paylas-dugme-ikon" src="https://cdn.simpleicons.org/pinterest?viewbox=auto" width="16" height="16" alt="" aria-hidden="true" loading="lazy">Pinterest</a>
+  <button class="paylas-dugme" id="yerel-paylas-btn" type="button" hidden>📤 Paylaş</button>
+  <button class="paylas-dugme" id="link-kopyala-btn" type="button">Linki Kopyala</button>
 </div>
-<p class="share-alinti-notu" id="share-alinti-notu" hidden>
-  Seçtiğin alıntıyla paylaşılacak: <span id="share-alinti-onizleme"></span>
-  <button type="button" class="share-alinti-iptal-btn" id="share-alinti-iptal-btn">Vazgeç, normal paylaş</button>
+<p class="paylas-alinti-notu" id="paylas-alinti-notu" hidden>
+  Seçtiğin alıntıyla paylaşılacak: <span id="paylas-alinti-onizleme"></span>
+  <button type="button" class="paylas-alinti-iptal-btn" id="paylas-alinti-iptal-btn">Vazgeç, normal paylaş</button>
 </p>
 
 <script>
   (function () {
-    const wrap = document.getElementById("share-buttons");
+    const wrap = document.getElementById("paylas-alani");
     if (!wrap) return;
 
     // İKON GERİ DÜŞMESİ (fallback) — bkz. yukarıdaki <img> etiketlerinin
@@ -54,7 +54,7 @@
     // reddeder. İkisi birlikte, ikonun her türlü başarısızlık senaryosunda
     // (gerçek hata VEYA sahte-başarılı-ama-boş yanıt) DOM'dan kaldırılıp
     // butonun eski (ikonsuz) görünümüne dönmesini garantiler.
-    wrap.querySelectorAll(".share-btn-icon").forEach((img) => {
+    wrap.querySelectorAll(".paylas-dugme-ikon").forEach((img) => {
       const kaldir = () => img.remove();
       img.addEventListener("error", kaldir);
       if (img.decode) {
@@ -106,8 +106,8 @@
     }
 
     const gercekUrl = window.location.origin + window.location.pathname;
-    const notuEl = document.getElementById("share-alinti-notu");
-    const onizlemeEl = document.getElementById("share-alinti-onizleme");
+    const notuEl = document.getElementById("paylas-alinti-notu");
+    const onizlemeEl = document.getElementById("paylas-alinti-onizleme");
 
     function paylasimMetniUret() {
       const alinti = aktifAlintiyiOku();
@@ -139,7 +139,7 @@
       notuGuncelle();
     });
 
-    const iptalBtn = document.getElementById("share-alinti-iptal-btn");
+    const iptalBtn = document.getElementById("paylas-alinti-iptal-btn");
     if (iptalBtn) {
       iptalBtn.addEventListener("click", () => {
         alintiIptalEdildi = true;
@@ -162,9 +162,9 @@
     // kullanıcı sayfayı açık tutup FARKLI cümleler seçtikçe (veya seçimi
     // kaldırdıkça) her linkin hedefi güncel kalmalı, sayfayı yenilemesi
     // gerekmemeli.
-    wrap.querySelectorAll("[data-share]").forEach((a) => {
+    wrap.querySelectorAll("[data-paylas]").forEach((a) => {
       a.addEventListener("click", () => {
-        const uretici = LINK_URETICI[a.dataset.share];
+        const uretici = LINK_URETICI[a.dataset.paylas];
         if (!uretici) return;
         a.href = uretici(paylasimMetniUret(), gercekUrl || sayfaUrlYedek);
       });
@@ -224,7 +224,7 @@
         ? uaMobilBilgisi
         : /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
 
-    const nativeBtn = document.getElementById("native-share-btn");
+    const nativeBtn = document.getElementById("yerel-paylas-btn");
     if (nativeBtn && navigator.share && muhtemelenMobil) {
       nativeBtn.hidden = false;
 
@@ -285,7 +285,7 @@
       });
     }
 
-    const copyBtn = document.getElementById("copy-link-btn");
+    const copyBtn = document.getElementById("link-kopyala-btn");
     if (copyBtn) {
       copyBtn.addEventListener("click", () => {
         const hedefUrl = gercekUrl || sayfaUrlYedek;
