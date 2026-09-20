@@ -11,14 +11,17 @@ title: Anasayfa
   {% include hakkimda-kutusu.md %}
 
   <div class="baglanti-listesi">
-    {% assign labels = "github:GitHub|linkedin:LinkedIn|twitter:X (Twitter)|instagram:Instagram|youtube:YouTube|nsosyal:NSosyal|orcid:ORCID|academia:Academia.edu|researchgate:ResearchGate|kitap1000:1000Kitap|playstore:Uygulama (Play Store)" | split: "|" %}
-    {% for pair in labels %}
-      {% assign parts = pair | split: ":" %}
-      {% assign key = parts[0] %}
-      {% assign label = parts[1] %}
-      {% assign link = site.social[key] %}
-      {% if link and link != "" %}
-        <a href="{{ link }}" target="_blank" rel="noopener noreferrer">{{ label }}</a>
+    {% comment %}
+      _config.yml -> social: altındaki HER girdi (sabit tanımlı olsun ya
+      da panelden sonradan eklenmiş olsun FARK ETMEZ) buradan otomatik
+      okunur — yeni bir platform eklemek için bu dosyanın değişmesine
+      gerek yoktur (bkz. panel/github-yonetim.md "🔗 Bağlantılar" sekmesi).
+      url boş ("") olan girdiler sessizce atlanır, hiç render edilmez.
+    {% endcomment %}
+    {% for baglanti in site.social %}
+      {% assign veri = baglanti[1] %}
+      {% if veri.url and veri.url != "" %}
+        <a href="{{ veri.url | escape }}" target="_blank" rel="noopener noreferrer">{{ veri.label | default: baglanti[0] | escape }}</a>
       {% endif %}
     {% endfor %}
     <a href="{{ site.substack_url }}" target="_blank" rel="noopener noreferrer">Substack</a>
