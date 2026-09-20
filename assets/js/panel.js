@@ -446,7 +446,15 @@ async function renderBagliHesaplar() {
     btn.disabled = true;
     const { error: linkErr } = await supabase.auth.linkIdentity({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/panel/panel.html` },
+      // PANEL BİRLEŞTİRİLDİ: Google hesabı bağlandıktan sonra kullanıcı
+        // birleşik panelin "Panelim" sekmesine döner.
+        // !!! Bu adresin Supabase > Authentication > URL Configuration >
+        // "Redirect URLs" listesinde de EKLİ olması gerekir; aksi halde
+        // Supabase dönüşü Site URL'ine düşürür. Eski adres
+        // (/panel/panel.html) listede kalabilir — o sayfa zaten
+        // dashboard'a yönlendiriyor ve query/hash'i koruyor, yani
+        // listeye eklemeyi unutsan bile akış bozulmaz.
+        options: { redirectTo: `${window.location.origin}/panel/dashboard.html#me-panel` },
     });
     if (linkErr) {
       btn.disabled = false;
