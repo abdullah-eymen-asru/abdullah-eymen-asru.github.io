@@ -10,7 +10,7 @@ title: Anasayfa
 
   {% include hakkimda-kutusu.md %}
 
-  <div class="social-links">
+  <div class="baglanti-listesi">
     {% assign labels = "github:GitHub|linkedin:LinkedIn|twitter:X (Twitter)|instagram:Instagram|youtube:YouTube|nsosyal:NSosyal|orcid:ORCID|academia:Academia.edu|researchgate:ResearchGate|kitap1000:1000Kitap|playstore:Uygulama (Play Store)" | split: "|" %}
     {% for pair in labels %}
       {% assign parts = pair | split: ":" %}
