@@ -14,7 +14,9 @@
 # Supabase'te yayınla" seçeneğiyle eklenen projeler (bkz.
 # icerik/akademik-projeler.md) sayfaya build ANINDAN SONRA JS ile
 # eklendiği için bu statik feed'e giremiyor — sadece _projects/ altında
-# GERÇEK DOSYA olarak duran projeler feed'e girer.
+# GERÇEK DOSYA olarak duran projeler feed'e girer. Onlar için AYRI bir
+# tam metinli Atom feed var: supabase/functions/feed-supabase (adresi
+# _config.yml `supabase_feed_url`, <head> otomatik keşfinde ilan edilir).
 #
 # TAM METİN (FULL-TEXT) NOTU: <content> etiketi post.content'in TAMAMINI
 # CDATA içinde taşıyor (xml_escape yerine) — böylece Inoreader/Feedly gibi
