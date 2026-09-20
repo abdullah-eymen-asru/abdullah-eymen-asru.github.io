@@ -812,14 +812,14 @@ h2 { font-size: 1.3rem; margin-top: 2em; }
 }
 .hero .subtitle { color: var(--muted); font-size: 1.05rem; }
 
-.social-links {
+.baglanti-listesi {
   display: flex;
   gap: 14px;
   margin: 20px 0;
   flex-wrap: wrap;
 }
 
-.social-links a {
+.baglanti-listesi a {
   padding: 6px 14px;
   border: 1px solid var(--border);
   border-radius: 20px;
@@ -828,7 +828,7 @@ h2 { font-size: 1.3rem; margin-top: 2em; }
   font-size: 0.9rem;
 }
 
-.social-links a:hover { border-color: var(--accent); color: var(--accent); }
+.baglanti-listesi a:hover { border-color: var(--accent); color: var(--accent); }
 
 .cv-link-wrap { margin: 4px 0 20px; }
 
@@ -1214,7 +1214,7 @@ th { color: var(--muted); font-weight: 600; }
   color-scheme: dark;
 }
 
-.share-buttons {
+.paylas-alani {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -1224,9 +1224,9 @@ th { color: var(--muted); font-weight: 600; }
   border-top: 1px solid var(--border);
 }
 
-.share-label { color: var(--muted); font-size: 0.88rem; margin-right: 4px; }
+.paylas-etiket { color: var(--muted); font-size: 0.88rem; margin-right: 4px; }
 
-.share-btn {
+.paylas-dugme {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1241,35 +1241,35 @@ th { color: var(--muted); font-weight: 600; }
   cursor: pointer;
 }
 
-.share-btn:hover { border-color: var(--accent); color: var(--accent); }
+.paylas-dugme:hover { border-color: var(--accent); color: var(--accent); }
 
 /* Paylaşım isteği SÜRERKEN (bkz. share.html'deki "paylasimSuruyor"
    bayrağı) buton devre dışı bırakılır — kullanıcı dokunmasının
    "boşa gittiğini" değil, isteğin işlendiğini görsün diye soluklaştırılır.
    Bu, tekrar tıklamayı (ve WebKit'te buna bağlı askıda kalma riskini)
    caydırmaya da yardımcı olur. */
-.share-btn:disabled {
+.paylas-dugme:disabled {
   opacity: 0.55;
   cursor: default;
   pointer-events: none;
 }
 
 /* BUG FİX ("Paylaş" butonu masaüstünde/desteklenmeyen tarayıcılarda GÖRÜNÜP
-   tıklanınca hiçbir şey yapmıyordu): ".share-btn" kuralı "display:
+   tıklanınca hiçbir şey yapmıyordu): ".paylas-dugme" kuralı "display:
    inline-flex" verdiği için, tarayıcının [hidden] özniteliğine normalde
    uyguladığı "display: none" bu kural tarafından EZİLİYORDU — AYNEN
-   ".auth-nav-menu[hidden]" ve ".share-alinti-notu[hidden]" için bu
+   ".auth-nav-menu[hidden]" ve ".paylas-alinti-notu[hidden]" için bu
    dosyada zaten iki kez düzeltilmiş olan BİREBİR AYNI hata sınıfı (yazar
    stil sayfası kuralları, özgüllük eşit olsa bile tarayıcının varsayılan
    stilini her zaman ezer). Sonuç: _includes/share.html'deki
-   "#native-share-btn" öğesi HTML'de "hidden" ile başladığı ve JS SADECE
+   "#yerel-paylas-btn" öğesi HTML'de "hidden" ile başladığı ve JS SADECE
    gerçekten mobil bir tarayıcıda "nativeBtn.hidden = false" yaptığı hâlde
    — masaüstünde, navigator.share() olmayan tarayıcılarda ya da mobil
    algısı yanlış çıkan cihazlarda (bkz. share.html'deki iPad/masaüstü
    algı notu) buton HER ZAMAN görünür kalıyor, JS ise o durumlarda tıklama
    dinleyicisini hiç bağlamadığı için buton "çalışmıyormuş" gibi
    duruyordu. Bunu açıkça geri kazandırıyoruz. */
-.share-btn[hidden] { display: none; }
+.paylas-dugme[hidden] { display: none; }
 
 /* Resmi marka ikonu (Simple Icons CDN) — bkz. _includes/share.html
    içindeki açıklama ve <script> bloğu. İkon yüklenemezse ("error" event)
@@ -1277,9 +1277,9 @@ th { color: var(--muted); font-weight: 600; }
    <img> zaten JS ile DOM'dan tamamen kaldırılıyor; buradaki kurallar
    SADECE başarıyla yüklenen ikonun boyutunu/hizasını düzenler, kırık
    ikon için ayrıca bir gizleme kuralı GEREKMEZ. gap: 6px zaten
-   .share-btn'de tanımlı olduğundan ikon kaldırıldığında metin otomatik
+   .paylas-dugme'de tanımlı olduğundan ikon kaldırıldığında metin otomatik
    olarak eski (ikonsuz) boşluk düzenine geri döner. */
-.share-btn-icon {
+.paylas-dugme-ikon {
   display: block;
   flex-shrink: 0;
   width: 16px;
@@ -2125,7 +2125,7 @@ th { color: var(--muted); font-weight: 600; }
   .okuma-ilerleme-cubugu,
   .secim-baloncugu,
   .back-link,
-  .share-buttons,
+  .paylas-alani,
   .comments-section,
   .reklam-alani,
   .pdf-indir-alani,
@@ -2523,7 +2523,7 @@ a.reversefootnote:hover {
    bkz. _includes/share.html — yazıda bir alıntı kopyalandıysa, sayfa
    sonundaki paylaş butonlarının o alıntıyla paylaşım yapacağını
    hatırlatan küçük bir not. */
-.share-alinti-notu {
+.paylas-alinti-notu {
   margin: 10px 0 0;
   padding: 8px 12px;
   border-left: 3px solid var(--accent);
@@ -2536,20 +2536,20 @@ a.reversefootnote:hover {
   align-items: baseline;
   gap: 4px 10px;
 }
-/* BUG FİX: ".share-alinti-notu" kuralı "display: flex" verdiği için,
+/* BUG FİX: ".paylas-alinti-notu" kuralı "display: flex" verdiği için,
    tarayıcının [hidden] özniteliğine normalde uyguladığı "display: none"
    bu kural tarafından EZİLİYORDU (bkz. ".auth-nav-menu[hidden]" için
    yukarıdaki AYNI gerekçe) — sonuç: share.html içindeki JS notuEl.hidden
    = true yapsa bile ("Vazgeç, normal paylaş" tıklansa dahi) not sayfada
    görünmeye devam ediyordu. Bunu açıkça geri kazandırıyoruz. */
-.share-alinti-notu[hidden] { display: none; }
+.paylas-alinti-notu[hidden] { display: none; }
 
-.share-alinti-notu span {
+.paylas-alinti-notu span {
   color: var(--text);
   font-style: italic;
 }
 
-.share-alinti-iptal-btn {
+.paylas-alinti-iptal-btn {
   border: none;
   background: none;
   padding: 0;
@@ -2562,7 +2562,7 @@ a.reversefootnote:hover {
   white-space: nowrap;
 }
 
-.share-alinti-iptal-btn:hover {
+.paylas-alinti-iptal-btn:hover {
   color: var(--text);
 }
 
