@@ -4265,6 +4265,31 @@ async function icerikDuzenlemeyeYukle(item, tur) {
 
   document.getElementById("ic-iptal-btn").hidden = false;
   submitButonMetniGuncelle();
+
+  // BUG FİX ("Düzenle" hiçbir şey yapmıyormuş gibi görünüyordu): eski
+  // bağımsız sayfada "Tüm Yazılar" listesi ile "Yeni İçerik Ekle" formu
+  // AYNI sayfanın iki bölümüydü, o yüzden düzenlemeye basılınca tek
+  // gereken şey scrollIntoView() idi. Birleşik dashboard'da ise bunlar
+  // artık birbirini KARŞILIKLI DIŞLAYAN iki AYRI sekme
+  // (#view-content-all / #view-content-new) — kullanıcı "Tüm Yazılar &
+  // Projeler" sekmesindeyken "Düzenle"ye bastığında form yukarıdaki
+  // satırlarla doğru dolduruluyordu ama görünmez (display:none) kalan
+  // #view-content-new'ın İÇİNDE kaldığı için scrollIntoView() hiçbir şey
+  // yapmıyordu — kullanıcıya "Düzenle çalışmıyor" izlenimi veriyordu.
+  // ÇÖZÜM: dashboard içindeysek (bkz. mesajlar.js'teki aynı ".dash-shell"
+  // kontrolü) önce "Yeni İçerik Ekle" sekmesine GEÇİYORUZ — bunu kendi
+  // showView() mantığımızı burada tekrarlamadan, dashboard.js'in ZATEN
+  // sidebar'a taktığı nav linkine tıklayarak yapıyoruz (dashboard.js'e
+  // TEK bir satır bile dokunmadan, sadece var olan genel amaçlı
+  // mekanizmayı kullanarak). Bağımsız (dashboard dışı) sayfada bu dal
+  // hiç çalışmaz (öyle bir link yok), eski davranış (doğrudan scroll)
+  // aynen korunur.
+  const dashIcerikYeniLink = document.querySelector(
+    '.dash-shell #dash-nav a[data-view-id="content-new"]'
+  );
+  if (dashIcerikYeniLink && !dashIcerikYeniLink.classList.contains("active")) {
+    dashIcerikYeniLink.click();
+  }
   document.getElementById("icerik-ekle").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
