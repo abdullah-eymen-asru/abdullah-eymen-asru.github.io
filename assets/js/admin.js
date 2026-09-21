@@ -173,8 +173,11 @@ function kisitliManagerGorunumunuUygula() {
   const nav = document.getElementById("admin-nav");
   if (nav) {
     const notu = document.createElement("p");
-    notu.className = "muted";
-    notu.style.cssText = "margin:8px 0 16px;font-size:0.85rem;";
+    // BUG FİX (CSP style-src ihlali): style.cssText de style="..."
+    // attribute'uyla AYNI kısıtlamaya tabi — bkz. dashboard.css'teki
+    // ".panel-muted-sm-mt" (panel.js) ve ".dash-btn-row" bloğunun başındaki
+    // açıklama. Sabitler artık ".admin-manager-notu" sınıfında.
+    notu.className = "muted admin-manager-notu";
     notu.textContent =
       "İçerik Sorumlusu rolündesin: sadece özel içerik ekleme/düzenleme ve R2 dosya paylaşımı bölümlerine erişimin var. Üye ayarları ve mesajlar sadece admin'e özeldir.";
     nav.insertAdjacentElement("afterend", notu);
@@ -614,10 +617,10 @@ async function loadContents() {
           ${c.content_access?.[0]?.count ?? 0} kullanıcıya atanmış ·
           ${c.is_published ? "Yayında" : "Taslak"}
         </p>
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <button class="btn-primary icerik-duzenle-btn" data-id="${c.id}" style="width:auto;padding:8px 14px;">Düzenle</button>
+        <div class="dash-btn-row">
+          <button class="btn-primary icerik-duzenle-btn dash-card-btn" data-id="${c.id}">Düzenle</button>
           <button class="erisim-detay-ac-btn icerik-detay-btn" data-id="${c.id}">Erişim &amp; Okundu Detayları</button>
-          <button class="btn-danger icerik-sil-btn" data-id="${c.id}" style="width:auto;padding:8px 14px;">Sil</button>
+          <button class="btn-danger icerik-sil-btn dash-card-btn" data-id="${c.id}">Sil</button>
         </div>
         <div class="icerik-detay-alani" data-id="${c.id}" hidden></div>
       </div>`
@@ -715,7 +718,7 @@ async function icerikDetaylariniYukle(contentId, alan, btn) {
             <td>${row.okundu_mu ? "✓ Okudu" : '<span class="muted">Henüz açmadı</span>'}</td>
             <td>${row.okundu_tarihi ? new Date(row.okundu_tarihi).toLocaleString("tr-TR") : '<span class="muted">—</span>'}</td>
             <td>${row.son_gecerlilik_tarihi ? new Date(row.son_gecerlilik_tarihi).toLocaleString("tr-TR") : "Süresiz"}</td>
-            <td><button class="btn-danger erisim-kaldir-btn" data-content-id="${contentId}" data-user-id="${row.user_id}" style="padding:4px 8px;font-size:0.76rem;">Erişimi Kaldır</button></td>
+            <td><button class="btn-danger erisim-kaldir-btn dash-table-btn" data-content-id="${contentId}" data-user-id="${row.user_id}">Erişimi Kaldır</button></td>
           </tr>`
           )
           .join("")}
