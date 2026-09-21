@@ -337,6 +337,38 @@ body {
   max-height: none;
 }
 
+/* MADDE 6: masaüstü mesajlaşma paneli sidebar'la SIKIŞIYORDU. auth.css'teki
+   ".msg-panel" iki-sütun/tek-sütun eşiği (max-width: 760px) VIEWPORT
+   genişliğine göre hesaplanıyor — bu, panelin neredeyse tüm viewport
+   genişliğini kullandığı BAĞIMSIZ /panel/mesajlar.html sayfası için
+   doğruydu (nitekim chat.js'in başındaki not, bu arayüzün GEÇMİŞTE tam da
+   bu yüzden — başka bir sayfaya gömülüyken "ortalanmış/düzgün durmadığı"
+   için — ayrı bir sayfaya taşındığını anlatıyor). Ama dashboard'da sabit
+   ~268px'lik sidebar (+ 28px iç boşluk) her zaman yer kapladığından, aynı
+   viewport genişliğinde panelin GERÇEK kullanılabilir genişliği çok daha
+   dar: örn. 900px'lik bir viewport'ta bağımsız sayfada panel ~860px
+   genişlik kullanırken, dashboard içinde sidebar yüzünden ~560px'e
+   düşüyor — iki panel (liste + mesaj akışı) bu dar alanda sıkışık/oransız
+   görünüyordu. ÇÖZÜM: dashboard içindeyken tek-panel (mobil tarzı,
+   "← Geri" ile geçişli) görünümün eşiğini daha yüksek bir viewport
+   genişliğine taşı — sidebar'ın kapladığı alanı telafi eder. JS tarafı
+   zaten viewport'tan bağımsız, aynı ".msg-panel--thread-aktif" sınıfını/
+   "← Geri" butonunu kullanıyor (bkz. chat.js), o yüzden ek bir JS
+   değişikliği gerekmiyor — sadece auth.css'in 760px'lik mobil kurallarını
+   dashboard'a özel daha geniş bir aralıkta tekrarlıyoruz. */
+@media (min-width: 761px) and (max-width: 1100px) {
+  .dash-main .msg-panel {
+    grid-template-columns: 1fr;
+    height: 78vh;
+    max-height: none;
+  }
+  .dash-main .msg-list-pane { display: flex; border-right: none; }
+  .dash-main .msg-thread-pane { display: none; }
+  .dash-main .msg-panel--thread-aktif .msg-list-pane { display: none; }
+  .dash-main .msg-panel--thread-aktif .msg-thread-pane { display: flex; }
+  .dash-main .msg-geri-btn { display: inline-flex; align-items: center; justify-content: center; }
+}
+
 /* ---------- Mobil ---------- */
 
 .dash-overlay {
