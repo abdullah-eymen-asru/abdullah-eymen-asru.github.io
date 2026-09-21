@@ -219,7 +219,7 @@ async function mfaKoduIste(msg, hedefUrl) {
     mfaKutu = document.createElement("div");
     mfaKutu.id = "mfa-giris-kutu";
     mfaKutu.innerHTML = `
-      <p class="muted" id="mfa-giris-aciklama" style="margin-bottom:12px;">
+      <p class="muted csp-mb-12" id="mfa-giris-aciklama">
         Hesabında iki adımlı doğrulama (2FA) açık. Authenticator
         uygulamandaki 6 haneli kodu gir.
       </p>
@@ -228,8 +228,8 @@ async function mfaKoduIste(msg, hedefUrl) {
         <input id="mfa-giris-kod" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456">
       </div>
       <button type="button" id="mfa-giris-dogrula-btn" class="btn-primary">Doğrula ve Giriş Yap</button>
-      <p style="margin-top:12px;">
-        <a href="#" id="mfa-yedek-kod-toggle" style="font-size:0.9rem;">Authenticator'a erişemiyorum, yedek kod kullanacağım</a>
+      <p class="csp-mt-12">
+        <a href="#" id="mfa-yedek-kod-toggle" class="csp-fs-09">Authenticator'a erişemiyorum, yedek kod kullanacağım</a>
       </p>
     `;
     authBox?.appendChild(mfaKutu);
