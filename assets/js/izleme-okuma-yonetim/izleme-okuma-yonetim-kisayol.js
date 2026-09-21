@@ -51,8 +51,13 @@ async function init() {
     const base = document.documentElement.dataset.baseurl || "";
     const a = document.createElement("a");
     a.href = base + "/panel/dashboard.html#media-izleme";
-    a.className = "btn-primary";
-    a.style.cssText = "width:auto; display:inline-block; text-decoration:none; margin-bottom:14px;";
+    // BUG FİX (CSP style-src ihlali): "Refused to apply a stylesheet..."
+    // — a.style.cssText de, style="..." ATTRIBUTE'unu ayarlamakla AYNI
+    // şeydir (CSP açısından ikisi de "inline style", plugin bunu
+    // GÖREMEZ/hash'leyemez çünkü çalışma zamanında JS ile ekleniyor).
+    // Sabit değerler artık assets/style.css'teki ".izleme-kisayol-btn"
+    // sınıfına taşındı.
+    a.className = "btn-primary izleme-kisayol-btn";
     a.textContent = "➕ Yeni Kayıt Ekle (Site Sahibi)";
     container.appendChild(a);
   } catch (err) {
