@@ -169,20 +169,81 @@ function swapSlot(slotId, templateId) {
   }
 }
 
+// Bir slotu boşaltır (içindeki düğümü DOM'dan söker) ama düğümü SİLMEZ —
+// swapCache'te canlı referans olarak kalmaya devam eder, event listener'ları
+// korunur ve swapSlot() ile daha sonra başka/aynı bir slota tekrar
+// taşınabilir. detachSlot sadece "şu an bu slotta bir şey varsa çıkar"
+// yapar; slot zaten boşsa no-op'tur.
+function detachSlot(slotId) {
+  const slot = document.getElementById(slotId);
+  if (slot && slot.firstElementChild) slot.replaceChildren();
+}
+
 // content-all / content-new: gy varyantı slot-icerikler / slot-icerik-ekle'de
 // content-private: admin varyantı slot-icerikler-private / slot-icerik-ekle-private'ta
-// NOT: gy ve admin varyantları FARKLI slot'larda oturduğu için (view
-// değiştiğinde iki view aynı anda görünmez) aynı anda çakışma olmaz —
-// ama aynı ("icerikler") id'li iki düğüm asla aynı anda gerçek DOM'a
-// EKLİ olmamalı; bu yüzden ilgili view ilk açıldığında ilgili tek
-// varyant o view'ın kendi slot'una taşınır, diğer view'ın slot'u boş
-// kalır ta ki KENDİSİ açılana kadar (bkz. ensureView).
-function ensureContentSlots(viewId) {
-  if (viewId === "content-all") swapSlot("slot-icerikler", "tpl-gy-icerikler");
-  else if (viewId === "content-new") swapSlot("slot-icerik-ekle", "tpl-gy-icerik-ekle");
-  else if (viewId === "content-private") {
+//
+// BUG FİX 1 (kaybolan "Yazar" alanı / çalışmayan "Yeni İçerik Ekle" formu):
+// gy ("github-yonetim.js") modülü SADECE İLK yüklendiğinde çalışan tek bir
+// init() içinde hem "icerik-ekle" (content-new) HEM "icerikler"
+// (content-all) bölümlerindeki elemanlara bağlanıyor (wireYazarAlani,
+// wireIcerikForm, wireEditorToolbar, wireIcerikListe, wireAkademikToggle,
+// wireIcerikTuruToggle, wireYayindaCanliOnizleme, wireAdminAdinaTalep vb. —
+// bkz. github-yonetim.js -> init()). ensureModuleLoaded() bu init()'i bir
+// DAHA ASLA tekrar çalıştırmıyor. Eskiden bu fonksiyon SADECE o an
+// gösterilecek viewId'nin şablonunu gerçek DOM'a taşıyordu — yani kullanıcı
+// ilk "Tüm Yazılar & Projeler"e (content-all) girdiğinde gy modülü
+// yüklenip init() çalışırken "Yeni İçerik Ekle" (content-new) şablonu
+// HENÜZ DOM'da değildi; wireYazarAlani/wireIcerikForm gibi fonksiyonlar
+// document.getElementById() ile o elemanları bulamayıp sessizce hiçbir şey
+// yapmadan çıkıyordu (bu fonksiyonların başındaki "if (!el) return"
+// korumaları yüzünden hata bile fırlatmıyordu). Kullanıcı SONRA "Yeni
+// İçerik Ekle"ye geçtiğinde şablon DOM'a taşınıyordu ama artık ona
+// bağlanacak hiçbir olay dinleyicisi yoktu — yazar arama kutusu hiç
+// görünmüyor, kaydet butonları hiçbir şey yapmıyordu.
+//
+// ÇÖZÜM: gy modülüne ait HER İKİ şablon da (icerikler + icerik-ekle),
+// hangi gy sekmesi önce açılırsa açılsın, HER ZAMAN BİRLİKTE gerçek DOM'a
+// taşınır. Böylece gy modülünün TEK SEFERLİK init()'i çalıştığı anda ikisi
+// de DOM'da hazır olur ve tüm wireX() fonksiyonları elemanları sorunsuz
+// bulur.
+//
+// BUG FİX 1b (admin.js için AYNI hastalık): admin.js -> init() de SADECE
+// İLK yüklendiğinde çalışan tek bir adımlar dizisiyle "içerik listesi"
+// (loadContents -> #icerik-liste), "içerik atama arama"
+// (wireIcerikAtamaArama -> #icerik-atama-arama) ve "içerik formu"
+// (wireContentForm -> #icerik-form) elemanlarına bağlanıyor — ama admin
+// modülü content-private DIŞINDA media-r2 ve sys-hesabim sekmelerinden de
+// yüklenebiliyor. Kullanıcı "Özel / Gizli Makaleler"den ÖNCE "R2 Dosya
+// Paylaşımı"nı ya da "Hesabım"ı ziyaret ederse, admin.js'in init()'i o
+// anda çalışır ama admin'in private şablonu HENÜZ DOM'da değildir — gy
+// tarafındakiyle BİREBİR AYNI sessiz başarısızlık.
+//
+// BUG FİX 2 (id çakışması riski): "icerikler"/"icerik-ekle"/"icerik-form"
+// id'leri gy VE admin (content-private) varyantlarında BİREBİR AYNI. Her
+// iki modül de kendi varyantını (BUG FİX 1/1b sayesinde artık) HANGİ
+// kendi sekmesinden girilirse girilsin DOM'a taşıdığından, owner/admin bir
+// gy sekmesini VE bir admin sekmesini aynı oturumda ziyaret ederse iki
+// farklı "icerik-form" düğümü AYNI ANDA gerçek DOM'da bulunur —
+// document.getElementById("icerik-form") gibi çağrılar o zaman (belge
+// sırasında önce gelen) YANLIŞ düğümü bulur ve diğer modülün formu
+// sessizce bozulur. ÇÖZÜM: gy varyantı ile admin (private) varyantı
+// KARŞILIKLI DIŞLAMALI — hangisine geçiliyorsa ÖNCE diğeri kendi
+// slot'undan söktürülür (detachSlot, düğüm silinmez/listener'lar
+// kaybolmaz), SONRA istenen varyant kendi slot'una taşınır. Böylece
+// "icerikler"/"icerik-ekle" id'li düğümlerden HER ZAMAN sadece biri (gy
+// VEYA admin) gerçek DOM'dadır — hangi modülün sekmesindeysek o modülün
+// varyantı.
+function ensureContentSlots(viewId, moduleKey) {
+  if (moduleKey === "admin") {
+    detachSlot("slot-icerikler");
+    detachSlot("slot-icerik-ekle");
     swapSlot("slot-icerik-ekle-private", "tpl-admin-icerik-ekle");
     swapSlot("slot-icerikler-private", "tpl-admin-icerikler");
+  } else if (moduleKey === "gy") {
+    detachSlot("slot-icerik-ekle-private");
+    detachSlot("slot-icerikler-private");
+    swapSlot("slot-icerikler", "tpl-gy-icerikler");
+    swapSlot("slot-icerik-ekle", "tpl-gy-icerik-ekle");
   }
 }
 
@@ -315,7 +376,7 @@ async function showView(viewId, moduleKey) {
   const target = document.getElementById(`view-${viewId}`);
   if (!target) return;
 
-  ensureContentSlots(viewId);
+  ensureContentSlots(viewId, moduleKey);
 
   document.querySelectorAll(".dash-view").forEach((v) => (v.hidden = true));
   document.querySelectorAll("#dash-nav a").forEach((a) => a.classList.remove("active"));
