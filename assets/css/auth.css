@@ -630,7 +630,14 @@
   font-size: 0.88rem;
 }
 .msg-yeni-form-btnler { display: flex; gap: 8px; }
-.msg-yeni-form-btnler button { font-size: 0.85rem; padding: 8px 14px; }
+/* BUG FİX (CSP style-src ihlali): bu iki buton (.btn-primary/.btn-secondary
+   varsayılanı width:100%) yan yana durabilsin diye ÖNCEDEN mesajlar.js/
+   chat.js'te satır içi style="width:auto" kullanılıyordu — CSP'nin
+   style-src'si sadece <style> ELEMENT hash'lerini kapsıyor, style
+   ATTRIBUTE'ları ('unsafe-hashes' gerektirdiğinden) hiç kapsamıyor, o
+   yüzden bu inline style'lar tarayıcıda sessizce reddediliyordu. width
+   artık doğrudan bu (zaten var olan) kurala taşındı. */
+.msg-yeni-form-btnler button { font-size: 0.85rem; padding: 8px 14px; width: auto; }
 
 .msg-filtre-bar {
   display: flex;
@@ -848,6 +855,14 @@
 }
 .chat-mesaj-sil:hover { opacity: 1; }
 .chat-bos { color: var(--muted); font-size: 0.88rem; padding: 8px; }
+/* BUG FİX (CSP style-src ihlali): arama sonucu kutularındaki (yazar arama,
+   üye arama) "sonuç yok" mesajları ÖNCEDEN satır içi style="padding:8px
+   10px" ile biraz daha geniş bir iç boşluk alıyordu — style ATTRIBUTE'ları
+   CSP'nin hash tabanlı style-src'sinden muaf DEĞİL ('unsafe-hashes'
+   gerektirir, bu sitede yok), o yüzden tarayıcıda sessizce reddediliyordu.
+   Aynı görünüm artık bu sınıfla veriliyor (bkz. chat.js, github-yonetim.js
+   -> yazarSonuclariniCiz). */
+.chat-bos--arama { padding: 8px 10px; }
 .chat-form {
   display: flex;
   gap: 8px;
