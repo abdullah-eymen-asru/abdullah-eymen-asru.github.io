@@ -436,7 +436,7 @@ async function renderBagliHesaplar() {
     </div>
     ${
       !eposta
-        ? `<p class="muted" style="font-size:0.85rem; margin-top:8px;">Aşağıdaki "Şifre Değiştir" bölümünden bir şifre belirlersen e-posta + şifre ile de giriş yapabilir hâle gelirsin — Google bağlantını ileride kesmek istersen bu gerekli.</p>`
+        ? `<p class="muted panel-muted-sm-mt">Aşağıdaki "Şifre Değiştir" bölümünden bir şifre belirlersen e-posta + şifre ile de giriş yapabilir hâle gelirsin — Google bağlantını ileride kesmek istersen bu gerekli.</p>`
         : ""
     }
   `;
@@ -599,7 +599,7 @@ async function renderAcikOturumlar() {
             <strong>${escapeHtml(cihazEtiketiCikar(o.user_agent))}</strong>
             ${buCihaz ? '<span class="eposta-onay-rozet eposta-onay-rozet--ok">Bu cihaz</span>' : ""}
             <br>
-            <span class="muted" style="font-size:0.85rem;">
+            <span class="muted panel-muted-sm">
               Son aktivite: ${tarihFormatla(o.guncellenme || o.olusturulma)}
               ${o.ip ? " · " + escapeHtml(o.ip) : ""}
             </span>
@@ -673,13 +673,13 @@ function wireKvkk(profile) {
 
   if (aydinlatmaGuncelMi) {
     html += `
-      <p class="auth-message auth-message--success" style="position:static;">
+      <p class="auth-message auth-message--success">
         ✓ KVKK Aydınlatma Metni'ni okudum beyanını verdin
         (${new Date(profile.kvkk_onay_tarihi).toLocaleDateString("tr-TR")}).
       </p>`;
   } else {
     html += `
-      <p class="auth-message auth-message--error" style="position:static;">
+      <p class="auth-message auth-message--error">
         ${
           profile.kvkk_onay_verildi
             ? "Gizlilik politikası/KVKK Aydınlatma Metni güncellendi, lütfen tekrar okuduğunu beyan et."
@@ -690,7 +690,7 @@ function wireKvkk(profile) {
         <a href="/kurumsal/gizlilik-politikasi.html" target="_blank" rel="noopener noreferrer">KVKK Aydınlatma Metni ve Gizlilik Politikası</a>'nı
         okudun mu?
       </p>
-      <button id="kvkk-aydinlatma-onayla-btn" type="button" class="btn-primary" style="width:auto;">Okudum</button>`;
+      <button id="kvkk-aydinlatma-onayla-btn" type="button" class="btn-primary">Okudum</button>`;
   }
 
   // YURT DIŞI AKTARIM RIZASI: aydınlatma durumundan TAMAMEN bağımsız bir
@@ -698,28 +698,28 @@ function wireKvkk(profile) {
   // "Onayla" butonuna kadar hiçbir yerde önceden işaretlenmiyor.
   if (yurtdisiGuncelMi) {
     html += `
-      <p class="auth-message auth-message--success" style="position:static;">
+      <p class="auth-message auth-message--success">
         ✓ Verilerinin yurt dışına (Almanya/Frankfurt) aktarılmasına açık rıza verdin
         (${new Date(profile.yurtdisi_onay_tarihi).toLocaleDateString("tr-TR")}).
       </p>`;
   } else {
     html += `
-      <p class="auth-message auth-message--error" style="position:static;">
+      <p class="auth-message auth-message--error">
         ${
           profile.yurtdisi_onay_verildi
             ? "Yurt dışına aktarım metni güncellendi, lütfen rızanı yeniden ver."
             : "Henüz yurt dışına aktarım için açık rıza vermemişsin."
         }
       </p>
-      <label style="display:flex; gap:8px; align-items:flex-start; margin:10px 0;">
-        <input type="checkbox" id="yurtdisi-checkbox" style="margin-top:3px;">
+      <label class="panel-onay-satiri">
+        <input type="checkbox" id="yurtdisi-checkbox">
         <span>
           Kişisel verilerimin üyelik işlemlerinin yürütülmesi amacıyla yurt
           dışında (Almanya/Frankfurt) bulunan güvenli Supabase sunucularına
           aktarılmasına açık rıza veriyorum.
         </span>
       </label>
-      <button id="yurtdisi-onayla-btn" type="button" class="btn-primary" style="width:auto;">Onayla</button>`;
+      <button id="yurtdisi-onayla-btn" type="button" class="btn-primary">Onayla</button>`;
   }
 
   box.innerHTML = html;
@@ -816,12 +816,12 @@ async function renderMfaDurumu(box) {
 
   if (dogrulanmisFactors.length > 0) {
     box.innerHTML = `
-      <p class="auth-message auth-message--success" style="position:static;">
+      <p class="auth-message auth-message--success">
         ✓ İki faktörlü doğrulama (2FA) aktif.
       </p>
-      <button id="mfa-kaldir-btn" type="button" class="btn-danger" style="width:auto;">2FA'yı Kaldır</button>
+      <button id="mfa-kaldir-btn" type="button" class="btn-danger">2FA'yı Kaldır</button>
       <div id="mfa-message" class="auth-message" hidden></div>
-      <div id="yedek-kod-alani" style="margin-top:20px; border-top:1px solid var(--border); padding-top:16px;">
+      <div id="yedek-kod-alani">
         <p class="muted">Yükleniyor...</p>
       </div>`;
 
@@ -855,18 +855,18 @@ async function renderMfaDurumu(box) {
       2FA aktif değil. Google Authenticator, Authy veya benzeri bir uygulamayla
       QR kodu okutarak hesabını ekstra korumaya alabilirsin.
     </p>
-    <button id="mfa-baslat-btn" type="button" class="btn-primary" style="width:auto;">2FA'yı Etkinleştir</button>
-    <div id="mfa-kurulum-alani" hidden style="margin-top:16px;">
-      <div id="mfa-qr-wrap" style="margin-bottom:12px;"></div>
-      <p class="muted" style="font-size:0.85rem;">
+    <button id="mfa-baslat-btn" type="button" class="btn-primary">2FA'yı Etkinleştir</button>
+    <div id="mfa-kurulum-alani" hidden>
+      <div id="mfa-qr-wrap"></div>
+      <p class="muted panel-muted-sm">
         QR kodu okutamıyorsan bu kodu uygulamana elle girebilirsin:
-        <code id="mfa-secret" style="user-select:all;"></code>
+        <code id="mfa-secret"></code>
       </p>
       <div class="form-field">
         <label for="mfa-kod-input">Uygulamada görünen 6 haneli kodu gir</label>
         <input id="mfa-kod-input" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456">
       </div>
-      <button id="mfa-dogrula-btn" type="button" class="btn-primary" style="width:auto;">Doğrula ve Etkinleştir</button>
+      <button id="mfa-dogrula-btn" type="button" class="btn-primary">Doğrula ve Etkinleştir</button>
     </div>
     <div id="mfa-message" class="auth-message" hidden></div>`;
 
@@ -1015,7 +1015,7 @@ function mfaDogrulamayiBagla(enrollData, msg, box) {
         return;
       }
       box.innerHTML = `
-        <p class="auth-message auth-message--success" style="position:static;">
+        <p class="auth-message auth-message--success">
           ✓ İki faktörlü doğrulama (2FA) aktif.
         </p>
         <div id="yedek-kod-goster-alani"></div>`;
@@ -1053,16 +1053,16 @@ async function renderYedekKodDurumu(alan) {
       : `${kalan} / ${toplam} yedek kod kullanılabilir.`;
 
   alan.innerHTML = `
-    <h3 style="margin:0 0 6px; font-size:1rem;">Yedek Kodlar</h3>
-    <p class="muted" style="margin-top:0;">
+    <h3 class="panel-yedek-baslik">Yedek Kodlar</h3>
+    <p class="muted panel-muted-notop">
       Authenticator uygulamana erişimini kaybedersen (telefon değişimi,
       uygulama silinmesi vb.) hesabına girmeni sağlar. ${escapeHtml(durumMetni)}
     </p>
-    <button id="yedek-kod-olustur-btn" type="button" class="btn-secondary" style="width:auto;">
+    <button id="yedek-kod-olustur-btn" type="button" class="btn-secondary">
       ${toplam === 0 ? "Yedek Kodları Oluştur" : "Yeni Yedek Kodlar Oluştur"}
     </button>
     <div id="yedek-kod-durum-message" class="auth-message" hidden></div>
-    <div id="yedek-kod-goster-alani" style="margin-top:12px;"></div>`;
+    <div id="yedek-kod-goster-alani"></div>`;
 
   document.getElementById("yedek-kod-olustur-btn").addEventListener("click", async () => {
     if (
@@ -1110,21 +1110,21 @@ function yedekKodlariGosterVeIndir(alan, kodlar, devamCallback) {
   const dosyaAdi = `2fa-yedek-kodlar-${new Date().toISOString().slice(0, 10)}.txt`;
 
   alan.innerHTML = `
-    <p class="auth-message auth-message--success" style="position:static;">
+    <p class="auth-message auth-message--success">
       Yeni yedek kodların hazır. Bu kodlar SADECE ŞİMDİ gösteriliyor —
       bir daha görüntülenemez, mutlaka kaydet.
     </p>
     <div class="yedek-kod-liste">
       ${kodlar.map((k) => `<code>${escapeHtml(k)}</code>`).join("")}
     </div>
-    <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
-      <a id="yedek-kod-indir-link" class="btn-secondary" style="width:auto;" href="${blobUrl}" download="${dosyaAdi}">
+    <div class="panel-yedek-btn-satiri">
+      <a id="yedek-kod-indir-link" class="btn-secondary" href="${blobUrl}" download="${dosyaAdi}">
         İndir (.txt)
       </a>
-      <button id="yedek-kod-kopyala-btn" type="button" class="btn-secondary" style="width:auto;">Panoya Kopyala</button>
-      <button id="yedek-kod-devam-btn" type="button" class="btn-primary" style="width:auto;">Kaydettim, Devam Et</button>
+      <button id="yedek-kod-kopyala-btn" type="button" class="btn-secondary">Panoya Kopyala</button>
+      <button id="yedek-kod-devam-btn" type="button" class="btn-primary">Kaydettim, Devam Et</button>
     </div>
-    <p id="yedek-kod-indir-durum" class="muted" style="font-size:0.85rem; margin-top:8px;">
+    <p id="yedek-kod-indir-durum" class="muted">
       İndirme bağlantısı yaklaşık 2 dakika içinde geçersiz olur.
     </p>`;
 
