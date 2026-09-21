@@ -1954,6 +1954,7 @@ th { color: var(--muted); font-weight: 600; }
 .csp-m-0 { margin: 0; }
 .csp-mb-12 { margin-bottom: 12px; }
 .csp-mb-14 { margin-bottom: 14px; }
+.csp-mb-16 { margin-bottom: 16px; }
 .csp-mb-20 { margin-bottom: 20px; }
 .csp-mt-0 { margin-top: 0; }
 .csp-mt-3 { margin-top: 3px; }
@@ -1961,6 +1962,7 @@ th { color: var(--muted); font-weight: 600; }
 .csp-mt-6 { margin-top: 6px; }
 .csp-mt-8 { margin-top: 8px; }
 .csp-mt-10 { margin-top: 10px; }
+.csp-mt-12 { margin-top: 12px; }
 .csp-mt-14 { margin-top: 14px; }
 .csp-mt-16 { margin-top: 16px; }
 .csp-mt-18 { margin-top: 18px; }
@@ -1970,6 +1972,7 @@ th { color: var(--muted); font-weight: 600; }
 .csp-m-2-0-0-fs085 { margin: 2px 0 0; font-size: 0.85rem; }
 .csp-mt8-fs085 { font-size: 0.85rem; margin-top: 8px; }
 .csp-mt10-fs085 { font-size: 0.85rem; margin-top: 10px; }
+.csp-fs-09 { font-size: 0.9rem; }
 
 .csp-bakim-body { text-align: center; font-family: sans-serif; margin-top: 100px; }
 
