@@ -7,15 +7,23 @@
  *
  * ÖNEMLİ: Bu script sadece bir KOLAYLIK/UX katmanıdır, güvenlik sınırı
  * DEĞİLDİR — buton görünmese bile URL'yi bilen biri doğrudan
- * /panel/izleme-okuma-yonetim.html adresine gidebilir, ama o sayfa kendi
- * requireAuth({role:'owner'}) kontrolünden geçer (bkz. o dosya) ve
- * arkasındaki Worker de AYRICA sunucu tarafında owner kontrolü yapar
- * (bkz. cloudflare worker/izleme_okuma_yonetim_worker/worker.js). Yani
- * owner olmayan biri bu butonu hiçbir şekilde göremez VE URL'yi elle
- * yazsa bile içeri giremez.
+ * /panel/dashboard.html#media-izleme adresine gidebilir, ama o sayfa kendi
+ * requireAuth({role:'owner'}) kontrolünden geçer (bkz. izleme-okuma-
+ * yonetim.js) ve arkasındaki Worker de AYRICA sunucu tarafında owner
+ * kontrolü yapar (bkz. cloudflare worker/izleme_okuma_yonetim_worker/
+ * worker.js). Yani owner olmayan biri bu butonu hiçbir şekilde göremez VE
+ * URL'yi elle yazsa bile içeri giremez.
  *
  * Giriş yapmamış ya da owner olmayan ziyaretçiler için bu script hiçbir
  * DOM değişikliği yapmaz — sayfa öncekiyle birebir aynı kalır.
+ *
+ * BUG FİX (eski panel linki): bu buton eskiden bağımsız
+ * /panel/izleme-okuma-yonetim.html sayfasına gidiyordu. O sayfa panel
+ * birleştirmesiyle (bkz. panel/izleme-okuma-yonetim.md) SİLİNMEDİ, sadece
+ * /panel/dashboard.html#media-izleme'ye yönlendiren ince bir yönlendirme
+ * sayfasına dönüştü — yani eski link hâlâ ÇALIŞIR ama kullanıcıyı
+ * gereksiz bir ara yönlendirme adımından geçirir. Buton artık doğrudan
+ * birleşik panelin "İzleme ve Okuma Yönetimi" sekmesine gidiyor.
  */
 import { supabase } from "../core/supabase-client.js";
 
@@ -42,7 +50,7 @@ async function init() {
 
     const base = document.documentElement.dataset.baseurl || "";
     const a = document.createElement("a");
-    a.href = base + "/panel/izleme-okuma-yonetim.html";
+    a.href = base + "/panel/dashboard.html#media-izleme";
     a.className = "btn-primary";
     a.style.cssText = "width:auto; display:inline-block; text-decoration:none; margin-bottom:14px;";
     a.textContent = "➕ Yeni Kayıt Ekle (Site Sahibi)";
