@@ -500,8 +500,8 @@ export async function wireAdminChat(adminId) {
           <form id="chat-yeni-sohbet-form-admin" novalidate>
             <input id="chat-yeni-sohbet-konu-admin" type="text" maxlength="120" placeholder="Konu (ör. Ödeme sorunu)" required>
             <div class="msg-yeni-form-btnler">
-              <button type="submit" class="btn-primary" style="width:auto;">Başlat</button>
-              <button type="button" id="chat-yeni-sohbet-iptal-admin" class="btn-secondary" style="width:auto;">Vazgeç</button>
+              <button type="submit" class="btn-primary">Başlat</button>
+              <button type="button" id="chat-yeni-sohbet-iptal-admin" class="btn-secondary">Vazgeç</button>
             </div>
           </form>
         </div>`;
@@ -643,14 +643,14 @@ export async function wireAdminChat(adminId) {
 
       if (error) {
         console.error("Üye arama başarısız:", error);
-        aramaSonucEl.innerHTML = `<p class="chat-bos" style="padding:8px 10px;">Arama yapılamadı.</p>`;
+        aramaSonucEl.innerHTML = `<p class="chat-bos chat-bos--arama">Arama yapılamadı.</p>`;
         aramaSonucEl.hidden = false;
         return;
       }
 
       const eslesenler = data || [];
       if (eslesenler.length === 0) {
-        aramaSonucEl.innerHTML = `<p class="chat-bos" style="padding:8px 10px;">Eşleşen üye yok.</p>`;
+        aramaSonucEl.innerHTML = `<p class="chat-bos chat-bos--arama">Eşleşen üye yok.</p>`;
         aramaSonucEl.hidden = false;
         return;
       }
