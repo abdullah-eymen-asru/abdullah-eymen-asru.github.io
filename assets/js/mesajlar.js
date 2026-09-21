@@ -35,8 +35,8 @@ function uyeMarkup() {
               </div>
               <input id="chat-yeni-sohbet-konu" type="text" maxlength="120" placeholder="Konu (ör. Ödeme sorunu)" required>
               <div class="msg-yeni-form-btnler">
-                <button type="submit" class="btn-primary" style="width:auto;">Başlat</button>
-                <button type="button" id="chat-yeni-sohbet-iptal" class="btn-secondary" style="width:auto;">Vazgeç</button>
+                <button type="submit" class="btn-primary">Başlat</button>
+                <button type="button" id="chat-yeni-sohbet-iptal" class="btn-secondary">Vazgeç</button>
               </div>
             </form>
           </div>
