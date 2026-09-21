@@ -2659,3 +2659,18 @@ a.reversefootnote:hover {
   font-size: 1.15rem;
   color: var(--text);
 }
+
+/* izleme-okuma-yonetim-kisayol.js -> "Listelerim" sayfalarındaki (İzlediklerim/
+   Okuduklarim) "➕ Yeni Kayıt Ekle (Site Sahibi)" kısayol butonu. BUG FİX
+   (CSP style-src ihlali): önceden a.style.cssText ile satır içi
+   uygulanıyordu — style ATTRIBUTE'ları (element.style.cssText DAHİL) CSP'nin
+   hash tabanlı style-src'sinden muaf değil ('unsafe-hashes' bu sitede yok),
+   üstelik bu içerik çalışma zamanında JS ile eklendiği için Jekyll build'i
+   sırasında hash'lenen statik HTML'in de hiç parçası değildi — tarayıcı
+   sessizce reddediyordu. */
+.izleme-kisayol-btn {
+  width: auto;
+  display: inline-block;
+  text-decoration: none;
+  margin-bottom: 14px;
+}
