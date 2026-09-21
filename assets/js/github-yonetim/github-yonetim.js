@@ -907,7 +907,7 @@ function yazarSecimiUygula(id, ad) {
 function yazarSonuclariniCiz(sonucEl, adaylar, q) {
   const eslesenler = adaylar.filter((u) => kullaniciAramayaUyuyorMu(u, q)).slice(0, 8);
   if (eslesenler.length === 0) {
-    sonucEl.innerHTML = `<p class="chat-bos" style="padding:8px 10px;">Eşleşen kullanıcı yok.</p>`;
+    sonucEl.innerHTML = `<p class="chat-bos chat-bos--arama">Eşleşen kullanıcı yok.</p>`;
     sonucEl.hidden = false;
     return;
   }
