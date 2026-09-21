@@ -476,3 +476,96 @@ body.dash-nav-acik {
 .dash-main .gy-gelismis-ayarlar[open] {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
 }
+
+/* ------------------------------------------------------------------------
+ * CSP UYUMLULUĞU — satır içi (inline) style'ların kaldırılması
+ * ------------------------------------------------------------------------
+ * _plugins/csp_hash_enjekte.rb, sayfanın STATİK HTML'indeki <style>
+ * ELEMENT bloklarının SHA-256 hash'ini hesaplayıp CSP'nin style-src'sine
+ * ekliyor — ama bu, style="..." ATTRIBUTE'ları için GEÇERLİ DEĞİL (onlar
+ * ayrı bir CSP alt-mekanizması olan 'unsafe-hashes'i gerektirir, ki bu
+ * sitede bilinçli olarak YOK, bkz. o plugin'in başındaki not). Üstelik bu
+ * üç script (admin.js, chat.js/mesajlar.js, github-yonetim.js) içeriği
+ * innerHTML ile ÇALIŞMA ZAMANINDA ekliyor — yani bu içerik Jekyll build'i
+ * sırasında diske YAZILAN statik HTML'in bir parçası bile değil, plugin
+ * onu hiçbir şekilde GÖREMEZ. Sonuç: bu script'lerdeki her style="..."
+ * attribute'u tarayıcı tarafından SESSİZCE reddediliyordu (konsolda
+ * "Refused to apply a stylesheet..." uyarısı). Aşağıdaki sınıflar, o
+ * satır içi stillerin YERİNE geçiyor — sadece bu dashboard'da (bu
+ * sayfada, panel/dashboard.html) kullanılan, admin.js'in "Özel / Gizli
+ * Makaleler" listesinde ürettiği kart/tablo butonları için.
+ * ---------------------------------------------------------------------- */
+
+/* admin.js -> loadContents(): her özel içerik kartının altındaki
+   "Düzenle / Erişim & Okundu Detayları / Sil" buton satırı. */
+.dash-btn-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* admin.js -> loadContents(): kart içindeki "Düzenle"/"Sil" butonları —
+   .btn-primary/.btn-danger'ın varsayılan width:100%'ünü, formlardaki gibi
+   tam satır değil, kompakt bir aksiyon butonu olacak şekilde ezer. */
+.dash-card-btn {
+  width: auto;
+  padding: 8px 14px;
+}
+
+/* admin.js -> erisimDetaylariniGoster(): "Erişim & Okundu Detayları"
+   tablosundaki satır başına "Erişimi Kaldır" butonu — tablo hücresine
+   sığacak kadar küçük, kompakt bir varyant. */
+.dash-table-btn {
+  width: auto;
+  padding: 4px 8px;
+  font-size: 0.76rem;
+}
+
+/* panel.js ("Panelim" sekmesi) -> AYNI CSP sorunu. Burada id'si zaten
+   benzersiz olan elemanlar için (buton/kutu id'leri) doğrudan id
+   seçiciyle hedefliyoruz — JS şablonuna ayrıca bir class eklemeye gerek
+   kalmıyor, sadece style="..." attribute'u siliniyor. */
+#kvkk-aydinlatma-onayla-btn,
+#yurtdisi-onayla-btn,
+#mfa-kaldir-btn,
+#mfa-baslat-btn,
+#mfa-dogrula-btn,
+#yedek-kod-olustur-btn,
+#yedek-kod-indir-link,
+#yedek-kod-kopyala-btn,
+#yedek-kod-devam-btn {
+  width: auto;
+}
+#yurtdisi-checkbox { margin-top: 3px; }
+#yedek-kod-alani { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 16px; }
+#mfa-kurulum-alani { margin-top: 16px; }
+#mfa-qr-wrap { margin-bottom: 12px; }
+#mfa-secret { user-select: all; }
+#yedek-kod-goster-alani { margin-top: 12px; }
+#yedek-kod-indir-durum { font-size: 0.85rem; margin-top: 8px; }
+
+/* panel.js: id'si olmayan (veya paylaşılan/tekrar kullanılan) elemanlar
+   için küçük, betimleyici sınıflar. */
+.panel-muted-sm-mt { font-size: 0.85rem; margin-top: 8px; }
+.panel-muted-sm { font-size: 0.85rem; }
+.panel-muted-notop { margin-top: 0; }
+.panel-onay-satiri {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 10px 0;
+}
+.panel-yedek-baslik { margin: 0 0 6px; font-size: 1rem; }
+.panel-yedek-btn-satiri {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* admin.js -> wireManagerGorunumu(): "İçerik Sorumlusu" rolündeki
+   kullanıcıya gösterilen bilgi notu (bkz. .cssText BUG FİX notu orada). */
+.admin-manager-notu {
+  margin: 8px 0 16px;
+  font-size: 0.85rem;
+}
