@@ -42,7 +42,7 @@ async function init() {
     let html = `
       <h1>${escapeHtml(content.title)}</h1>
       <p class="meta">${new Date(content.created_at).toLocaleDateString("tr-TR")}</p>
-      <div id="okundu-durum" class="muted" style="margin-bottom:16px;"></div>
+      <div id="okundu-durum" class="muted csp-mb-16"></div>
     `;
 
     if (content.body_md) {
