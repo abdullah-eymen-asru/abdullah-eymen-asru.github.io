@@ -5,7 +5,8 @@ permalink: "/kurumsal/iletisim.html"
 ---
 
 <h1>İletişim</h1>
-<p>Aşağıdaki formu doldurarak bana mesaj gönderebilirsin.</p>
+
+<p>İletişim için doğrudan mail adresim: <strong>info.abdullaheymenasru@gmail.com</strong> ya da aşağıdaki formu doldurarak bana mesaj gönderebilirsin.</p>
 
 <p class="format-hint">
   Form Google'ın kendi sayfası olduğu için her zaman açık renkte görünür —
