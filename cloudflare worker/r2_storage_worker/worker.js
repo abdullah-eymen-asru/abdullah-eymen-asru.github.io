@@ -137,6 +137,16 @@ export default {
       });
     }
 
+    // "arsiv/" öneki YENİ R2 Dosya Yöneticisi'ne (r2_arsiv_worker) aittir ve oradaki
+    // izin tablosuyla (r2_arsiv_izinleri) yönetilir. Eski worker'ın "blanket" yetkisiyle
+    // bu önekin imzalanması, owner'ın yeni izin kısıtlamalarını atlatırdı.
+    if (objectKey.startsWith("arsiv/")) {
+      return new Response(JSON.stringify({ error: "Bu yol Dosya Yöneticisi'ne aittir." }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Path traversal / bucket dışına çıkma girişimlerini engelle.
     if (objectKey.includes("..") || objectKey.startsWith("/")) {
       return new Response(JSON.stringify({ error: "Geçersiz 'key' parametresi." }), {
