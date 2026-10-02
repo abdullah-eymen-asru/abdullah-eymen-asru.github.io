@@ -12,6 +12,7 @@ permalink: "/panel/dashboard.html"
 <link rel="stylesheet" href="{{ '/assets/css/izleme-okuma-yonetim.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/dashboard.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/notlar.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/css/r2-arsiv.css' | relative_url }}">
 
 <div class="loading-overlay" id="loading">Yükleniyor...</div>
 
@@ -376,6 +377,16 @@ permalink: "/panel/dashboard.html"
                 <input id="r2-link-kutu" type="text" readonly>
               </div>
             </section>
+    </section>
+
+    <section class="dash-view" id="view-media-arsiv" hidden data-view="media-arsiv">
+      <h1>Dosya Yöneticisi</h1>
+      <p class="muted">
+        Klasörler, dosya adları ve arama <strong>veritabanından</strong> okunur; R2'ye liste isteği
+        atılmaz. Dosyalar tarayıcıdan doğrudan R2'ye yüklenir. "Uçtan uca şifrele" seçeneğiyle
+        yüklenen dosyalar tarayıcında şifrelenir ve yalnızca seçtiğin kişiler açabilir.
+      </p>
+      <div id="slot-arsiv"></div>
     </section>
 
     <section class="dash-view" id="view-media-izleme" hidden data-view="media-izleme">
@@ -891,6 +902,17 @@ permalink: "/panel/dashboard.html"
               </div>
               <div id="ya-message" class="auth-message" hidden></div>
             </section>
+              <section id="ra-izin-bolumu" class="panel-section">
+                <h2>R2 Erişim İzni</h2>
+                <p class="muted">
+                  "Dosya Yöneticisi" varsayılan olarak yalnızca Site Sahibi ve Adminler içindir.
+                  Buradan bir rolü ya da tek tek kullanıcıları açıp kapatabilirsin; kullanıcıya özel
+                  kayıt, rol kaydının önüne geçer. Kontrol sunucuda (Cloudflare Worker + RLS)
+                  yapılır, yetkisiz istek <code>403</code> alır.
+                </p>
+                <div id="ra-izin-kok"><p class="muted">Yükleniyor...</p></div>
+                <div id="ra-izin-mesaj" class="auth-message" hidden></div>
+              </section>
     </section>
 
     <section class="dash-view" id="view-sys-hakkimda" hidden data-view="sys-hakkimda">
@@ -1699,3 +1721,53 @@ permalink: "/panel/dashboard.html"
 </div>
 
 <script type="module" src="{{ '/assets/js/dashboard.js' | relative_url }}"></script>
+
+<template id="tmpl-dosya-yonetici">
+  <div class="ra">
+    <div id="ra-mesaj" class="auth-message" hidden role="status"></div>
+
+    <div class="ra-sekmeler" role="tablist">
+      <button type="button" class="ra-sekme" id="ra-sekme-arsiv" role="tab" aria-selected="true">Arşiv</button>
+      <button type="button" class="ra-sekme" id="ra-sekme-paylasilan" role="tab" aria-selected="false">Benimle paylaşılanlar</button>
+    </div>
+
+    <div id="ra-arac" class="ra-arac">
+      <input type="search" id="ra-ara" placeholder="Tüm klasörlerde ara…" aria-label="Dosya ara" autocomplete="off">
+    </div>
+
+    <div id="ra-klasor-bolum" class="ra-arac">
+      <input type="text" id="ra-klasor-ad" placeholder="Yeni klasör adı" maxlength="200" aria-label="Yeni klasör adı" autocomplete="off">
+      <button type="button" class="ra-btn" id="ra-klasor-ekle">📁 Klasör oluştur</button>
+    </div>
+
+    <ol id="ra-yol" class="ra-yol" aria-label="Klasör yolu"></ol>
+
+    <div id="ra-yukleme" class="ra">
+      <div id="ra-birak" class="ra-birak">
+        <p>Dosyaları buraya sürükle-bırak</p>
+        <label class="ra-btn">veya dosya seç
+          <input type="file" id="ra-dosya-sec" multiple>
+        </label>
+      </div>
+
+      <div class="ra-sifreli-blok">
+        <label><input type="checkbox" id="ra-sifreli"> Uçtan uca şifrele (özel paylaşım)</label>
+        <div id="ra-alici-blok" hidden>
+          <p class="ra-yardim">
+            Dosya tarayıcında şifrelenir; R2 ve veritabanı yalnızca şifreli veriyi görür. Alıcı seçmezsen
+            sadece sen açabilirsin. Alıcının panele en az bir kez girmiş olması gerekir. Dosya adı ve
+            boyutu şifrelenmez.
+          </p>
+          <input type="search" id="ra-alici-ara" placeholder="Alıcı ara (isim)…" aria-label="Alıcı ara" autocomplete="off">
+          <ul id="ra-alici-sonuc" class="ra-alici-sonuc"></ul>
+          <ul id="ra-alici-secili" class="ra-alici-secili" aria-label="Seçili alıcılar"></ul>
+        </div>
+      </div>
+
+      <ul id="ra-kuyruk" class="ra-kuyruk" aria-live="polite"></ul>
+    </div>
+
+    <ul id="ra-liste" class="ra-liste"></ul>
+    <button type="button" class="ra-btn" id="ra-daha" hidden>Daha fazla göster</button>
+  </div>
+</template>
