@@ -23,6 +23,7 @@
 
 const IZINLI_ORIGINLER = new Set([
   "https://abdullah-eymen-asru.github.io",
+  "https://abdullah-eymen-asru.pages.dev",
   "http://127.0.0.1:5500",
   "http://localhost:5500",
 ]);
