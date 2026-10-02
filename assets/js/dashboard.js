@@ -36,6 +36,7 @@
  */
 
 import { requireAuthOrShowError } from "./auth/auth-guard.js";
+import { supabase } from "./core/supabase-client.js";
 
 /* ------------------------------------------------------------------ */
 /* 1) Modül tanımları                                                  */
@@ -55,6 +56,10 @@ const MODULES = {
   // Fikir & Araştırma Tezgâhı (uçtan uca şifreli not sistemi) — yayıncılık akışındaki
   // roller (editor/manager; admin ve owner otomatik geçer). SQL: not_modulu_yetkili().
   notlar: { src: "./notlar/notlar.js", role: ["editor", "manager"] },
+  // R2 Dosya Yöneticisi: sekme görünürlüğü role DEĞİL, r2_arsiv_yetkilerim() izinlerine bağlı
+  // (bkz. NAV'daki izin:"arsiv" ve gorunurMu()). Gerçek yetki: RLS + r2_arsiv_worker.
+  arsiv: { src: "./r2-arsiv/r2-arsiv.js", role: null },
+  arsivIzin: { src: "./r2-arsiv/izin-paneli.js", role: "owner" },
   // "Panelim" (eski /panel/panel.html) — giriş yapmış HERKESE açık:
   // sıradan üye de, owner da aynı sekmeyi görür.
   panelim: { src: "./panel.js", role: null },
@@ -92,6 +97,7 @@ const NAV = [
     icon: "📁",
     items: [
       { id: "media-r2", icon: "🗂️", label: "R2 Dosya Paylaşımı", module: "admin" },
+      { id: "media-arsiv", icon: "🗄️", label: "Dosya Yöneticisi", module: "arsiv", role: null, izin: "arsiv", defaultAcilis: false },
       { id: "media-izleme", icon: "🎬", label: "İzleme ve Okuma Yönetimi", module: "izleme" },
       { id: "media-cv", icon: "📄", label: "Özgeçmiş (CV) & Profil Görseli", module: "gy" },
     ],
@@ -143,6 +149,24 @@ function roleAllowed(required, profile) {
     profile.role === "owner";
   const suspendedBlock = profile.role === "admin" && profile.is_suspended === true;
   return roleOk && !suspendedBlock;
+}
+
+// Rol kuralı + (varsa) dinamik izin kuralı. izin:"arsiv" -> r2_arsiv_yetkilerim()
+// sonucundan en az biri true (ya da kendisine şifreli dosya paylaşılmış) olmalı.
+function gorunurMu(item, profile) {
+  if (!roleAllowed(itemRole(item), profile)) return false;
+  if (item.izin === "arsiv") {
+    const y = profile.izinler?.arsiv;
+    return !!(y && (y.oku || y.yukle || y.sil || y.paylasilan_var));
+  }
+  return true;
+}
+
+async function izinleriYukle() {
+  try {
+    const { data, error } = await supabase.rpc("r2_arsiv_yetkilerim");
+    return error ? {} : { arsiv: data };
+  } catch { return {}; }
 }
 
 /* ------------------------------------------------------------------ */
@@ -283,7 +307,7 @@ function buildSidebar(profile) {
 
   for (const group of NAV) {
     const visibleItems = group.items.filter((it) =>
-      roleAllowed(itemRole(it), profile)
+      gorunurMu(it, profile)
     );
     if (visibleItems.length === 0) continue;
 
@@ -406,11 +430,13 @@ async function showView(viewId, moduleKey) {
   history.replaceState(null, "", `#${viewId}`);
 
   await ensureModuleLoaded(moduleKey);
+  // Yetki Ayarları: owner için "R2 Erişim İzni" bölümü (ayrı modül; gy modülüne dokunmaz)
+  if (viewId === "sys-yetki") await ensureModuleLoaded("arsivIzin");
 }
 
 function firstAvailableView(profile) {
   const uygun = NAV.flatMap((g) => g.items).filter((it) =>
-    roleAllowed(itemRole(it), profile)
+    gorunurMu(it, profile)
   );
   // Önce "varsayılan açılışa uygun" (iş) sekmeleri; hiçbiri yoksa (ör.
   // sıradan üye) elde kalan ilk sekme — yani "Panelim".
@@ -582,6 +608,13 @@ async function init() {
     profile.full_name || [profile.first_name, profile.last_name].filter(Boolean).join(" ") || profile.email || "";
   document.getElementById("dash-rol").textContent = `Rol: ${profile.role}`;
 
+  profile.izinler = await izinleriYukle();
+
+  // E2EE anahtar çiftini HERKES için sessizce hazırla: bir kullanıcı, panele en az bir kez
+  // girdiyse başkaları ona şifreli dosya gönderebilir (alıcının açık anahtarı gerekir).
+  // Worker kapalıysa/yoksa sessizce atlanır; paneli asla bozmaz.
+  import("./r2-arsiv/e2ee.js").then((m) => m.anahtarlariHazirla()).catch(() => {});
+
   buildSidebar(profile);
   wireMobileNav();
   wireDashIciLinkler();
@@ -602,7 +635,7 @@ async function init() {
   window.addEventListener("hashchange", () => {
     const id = window.location.hash.replace("#", "");
     const item = NAV.flatMap((g) => g.items).find((it) => it.id === id);
-    if (item && id !== activeViewId && roleAllowed(itemRole(item), profile)) {
+    if (item && id !== activeViewId && gorunurMu(item, profile)) {
       showView(item.id, item.module);
     }
   });
@@ -615,7 +648,7 @@ async function init() {
     ? NAV.flatMap((g) => g.items).find((it) => it.id === requestedId)
     : null;
   const target =
-    requested && roleAllowed(itemRole(requested), profile)
+    requested && gorunurMu(requested, profile)
       ? requested
       : firstAvailableView(profile);
 
