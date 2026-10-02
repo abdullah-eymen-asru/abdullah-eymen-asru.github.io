@@ -47,3 +47,7 @@ permalink: "/hesap/giris.html"
   import { initGirisPage } from "{{ '/assets/js/auth/auth-pages.js' | relative_url }}";
   initGirisPage();
 </script>
+
+<!-- Not Kasası: şifreli girişte parolayı dışa aktarılamaz bir anahtara çevirir (ham parola saklanmaz).
+     auth-pages.js'e dokunmaz; sadece submit olayını capture fazında dinler. Dosya yüklenemezse giriş etkilenmez. -->
+<script type="module" src="{{ '/assets/js/notlar/kasa-kancalari.js' | relative_url }}"></script>
