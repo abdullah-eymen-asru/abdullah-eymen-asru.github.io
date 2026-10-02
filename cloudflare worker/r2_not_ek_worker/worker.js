@@ -20,19 +20,21 @@
  *  - Token Supabase /auth/v1/user ile doğrulanır; key'in <uid> kısmı token'daki
  *    kullanıcıyla BİREBİR eşleşmelidir (başkasının klasörüne yazma/okuma yok).
  *  - Rol: editor/manager/admin/owner (askıdaki admin hariç) — SQL'deki
- *    not_modulu_yetkili() ile aynı küme.
+ *    not_modulu_yetkili() ile aynı küme; ayrıca RLS de aynı kuralı uygular.
  *  - Boyut: tek dosya en fazla 25 MB; kullanıcı başına toplam kota KOTA_BAYT
  *    (not_ek_kayitlari tablosundan okunur).
  *  - İçerik şifreli olduğundan Content-Type HER ZAMAN application/octet-stream;
  *    MIME ve dosya adı zaten şifreli notun içinde.
  *
- * Ortam değişkenleri (Worker > Settings > Variables and Secrets):
- *   SUPABASE_URL                 ör. https://eahvcirspmvntffzphye.supabase.co
- *   SUPABASE_SERVICE_ROLE_KEY    (Secret) — sadece rol/kota sorgusu için
- *   KOTA_BAYT                    (opsiyonel) varsayılan 524288000 (500 MB)
- * R2 Binding:  NOT_EK_BUCKET  → mevcut bucket'ı bağlayabilirsin (anahtarlar
- *              "notlar/" önekiyle ayrıştığı için özel dosyalarla çakışmaz) ya da
- *              ayrı bir bucket açabilirsin (daha temiz, önerilen).
+ * Ortam değişkenleri (Worker > Settings > Variables and Secrets) — GİZLİ ANAHTAR YOK:
+ *   SUPABASE_URL        ör. https://eahvcirspmvntffzphye.supabase.co            (Text)
+ *   SUPABASE_ANON_KEY   assets/js/core/supabase-client.js'teki herkese açık anon key (Text)
+ *   KOTA_BAYT           (opsiyonel) varsayılan 524288000 (500 MB)               (Text)
+ * R2 Binding:  NOT_EK_BUCKET  → bir R2 bucket'ı (önerilen: yeni, ayrı bir bucket)
+ *
+ * NEDEN service_role YOK?  Worker, kullanıcının KENDİ jetonuyla Supabase'e soru sorar;
+ * profil ve kota sorguları RLS'ten geçer (0056 migration'ı: sadece kendi satırın).
+ * Worker ele geçirilse bile saldırganın elinde tüm veritabanını açan bir anahtar olmaz.
  * -----------------------------------------------------------------------
  */
 
@@ -71,6 +73,10 @@ export default {
     if (!["GET", "PUT", "DELETE"].includes(istek.method)) return json({ error: "Desteklenmeyen yöntem." }, 405, cors);
     if (!izinli) return json({ error: "Erişim reddedildi: yetkisiz Origin." }, 403, cors);
 
+    if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY || !env.NOT_EK_BUCKET) {
+      return json({ error: "Worker yapılandırması eksik (SUPABASE_URL, SUPABASE_ANON_KEY, NOT_EK_BUCKET)." }, 500, cors);
+    }
+
     // --- 1) Anahtar biçimi ---
     const url = new URL(istek.url);
     const anahtar = url.searchParams.get("key") || "";
@@ -84,7 +90,7 @@ export default {
     let kullaniciId;
     try {
       const r = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
-        headers: { Authorization: baslik, apikey: env.SUPABASE_SERVICE_ROLE_KEY },
+        headers: { Authorization: baslik, apikey: env.SUPABASE_ANON_KEY },
       });
       if (!r.ok) throw new Error("oturum");
       kullaniciId = String((await r.json()).id || "").toLowerCase();
@@ -98,7 +104,8 @@ export default {
     }
 
     // --- 4) Rol ---
-    const servis = { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` };
+    // Kullanıcının kendi jetonu + anon key: sorgular RLS'ten geçer (service_role KULLANMIYORUZ).
+    const servis = { apikey: env.SUPABASE_ANON_KEY, Authorization: baslik };
     try {
       const pr = await fetch(`${env.SUPABASE_URL}/rest/v1/profiles?id=eq.${kullaniciId}&select=role,is_suspended`, {
         headers: servis,
