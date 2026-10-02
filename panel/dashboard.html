@@ -11,6 +11,7 @@ permalink: "/panel/dashboard.html"
 <link rel="stylesheet" href="{{ '/assets/css/github-yonetim.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/izleme-okuma-yonetim.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/dashboard.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/css/notlar.css' | relative_url }}">
 
 <div class="loading-overlay" id="loading">Yükleniyor...</div>
 
@@ -277,6 +278,14 @@ permalink: "/panel/dashboard.html"
     <section class="dash-view" id="view-content-new" hidden data-view="content-new">
       <h1>Yeni İçerik Ekle</h1>
       <div class="dash-slot" id="slot-icerik-ekle" data-default-variant="gy"></div>
+    </section>
+
+    <!-- FİKİR & ARAŞTIRMA TEZGÂHI (Not Sistemi). İçerik <template id="tmpl-notlar">'tadır
+         (sayfa sonu); dashboard.js -> ensureContentSlots() sekme açılınca onu bu slota taşır.
+         Kodu: assets/js/notlar/notlar.js (tembel yüklenir). -->
+    <section class="dash-view" id="view-content-notlar" hidden data-view="content-notlar">
+      <h1>Fikir &amp; Araştırma Tezgâhı</h1>
+      <div class="dash-slot" id="slot-notlar"></div>
     </section>
 
     <section class="dash-view" id="view-content-private" hidden data-view="content-private">
@@ -1513,6 +1522,178 @@ permalink: "/panel/dashboard.html"
         <p class="muted">Bir içeriği yayınladıktan sonra da "Düzenle" ile geri dönüp değiştirebilirsin.</p>
         <div id="icerik-liste"><p class="muted">Yükleniyor...</p></div>
       </section>
+</template>
+
+<!-- ============================================================
+     FİKİR & ARAŞTIRMA TEZGÂHI — Not Sistemi şablonu.
+     Tek kök eleman (<section id="notlar">) olmak ZORUNDA: dashboard.js
+     nodeFor() template.content.firstElementChild'i taşıyor. Bu şablondaki
+     id'lerin hepsi "nt-" öneklidir (+ kök "notlar"); dashboard'daki
+     hiçbir modülün id'iyle çakışmaz (kontrol edildi).
+     ============================================================ -->
+<template id="tmpl-notlar">
+<section id="notlar" class="panel-section nt-kok">
+  <div id="nt-mesaj" class="auth-message" hidden></div>
+
+  <!-- KİLİT KARTI: bu cihazda anahtar yoksa (Google girişi, yeni cihaz, "Kilitle") -->
+  <div id="nt-kilit" class="nt-kilit" hidden>
+    <h2>🔐 Not Kasası</h2>
+    <p id="nt-kilit-aciklama" class="muted"></p>
+    <p id="nt-google-ipucu" class="muted" hidden>
+      Google ile giriş yapıyorsan henüz bir parolan olmayabilir. Önce
+      <a href="#me-panel" data-dash-git="me-panel">Panelim → Şifre Değiştir</a>
+      bölümünden bir parola belirle; bu parola Google girişini bozmaz.
+    </p>
+    <form id="nt-kilit-form" novalidate>
+      <div class="form-field">
+        <label for="nt-kilit-parola">Giriş parolan</label>
+        <input id="nt-kilit-parola" type="password" autocomplete="current-password">
+      </div>
+      <div id="nt-kurtarma-alan" hidden>
+        <div class="form-field">
+          <label for="nt-kilit-kurtarma">Kurtarma anahtarı</label>
+          <input id="nt-kilit-kurtarma" type="text" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX-XXXX-…">
+        </div>
+      </div>
+      <div class="nt-kilit-eylemler">
+        <button type="submit" id="nt-kilit-btn" class="btn-primary csp-w-auto">Kasayı aç</button>
+        <button type="button" id="nt-kurtarma-toggle" class="btn-secondary csp-w-auto">Parolam değişti, kurtarma anahtarı kullan</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- KURTARMA ANAHTARI KARTI: kasa kurulunca / yenilenince BİR KEZ gösterilir -->
+  <div id="nt-kurtarma-goster" class="nt-kurtarma" hidden>
+    <h2>🗝️ Kurtarma anahtarını sakla</h2>
+    <p class="muted">
+      Notların cihazında şifrelenir; sunucu içeriği okuyamaz. Bunun bedeli: parolanı unutur ya da
+      “şifremi unuttum” ile sıfırlarsan, <strong>bu anahtar olmadan notların kalıcı olarak açılamaz</strong>.
+      Bir parola yöneticisine ya da çıktıya kaydet; bir daha gösterilmeyecek.
+    </p>
+    <code id="nt-kurtarma-metin" class="nt-kurtarma-metin"></code>
+    <div class="csp-flex-gap10-wrap">
+      <button type="button" id="nt-kurtarma-kopyala" class="btn-secondary csp-w-auto">Kopyala</button>
+      <button type="button" id="nt-kurtarma-indir" class="btn-secondary csp-w-auto">.txt olarak indir</button>
+    </div>
+    <label class="nt-onay" for="nt-kurtarma-onay">
+      <input id="nt-kurtarma-onay" type="checkbox">
+      <span>Kurtarma anahtarını güvenli bir yere kaydettim.</span>
+    </label>
+    <button type="button" id="nt-kurtarma-devam" class="btn-primary csp-w-auto" disabled>Notlarıma geç</button>
+  </div>
+
+  <!-- ANA EKRAN -->
+  <div id="nt-ana" hidden>
+    <div class="nt-ust">
+      <div class="nt-arama">
+        <span class="nt-arama-ikon" aria-hidden="true">🔎</span>
+        <input id="nt-arama" type="search" autocomplete="off"
+               placeholder="Başlıkta, etiketlerde ve notların içinde ara  ( / )"
+               aria-label="Notlarda ara">
+        <button type="button" id="nt-arama-temizle" class="nt-arama-temizle" hidden aria-label="Aramayı temizle">✕</button>
+      </div>
+      <button type="button" id="nt-yeni-btn" class="btn-primary csp-w-auto">➕ Yeni not</button>
+    </div>
+
+    <div class="nt-filtre">
+      <div id="nt-durum-chips" class="nt-chips" role="tablist" aria-label="Olgunlaşma aşamasına göre filtrele">
+        <button type="button" class="active" role="tab" aria-selected="true"  data-durum="tum"   data-etiket="Tümü">Tümü</button>
+        <button type="button" role="tab" aria-selected="false" data-durum="tohum" data-etiket="🌱 Tohum">🌱 Tohum</button>
+        <button type="button" role="tab" aria-selected="false" data-durum="filiz" data-etiket="🌿 Filiz">🌿 Filiz</button>
+        <button type="button" role="tab" aria-selected="false" data-durum="agac"  data-etiket="🌳 Ağaç">🌳 Ağaç</button>
+        <button type="button" role="tab" aria-selected="false" data-durum="cop"   data-etiket="🗑️ Çöp">🗑️ Çöp</button>
+      </div>
+      <select id="nt-etiket-filtre" aria-label="Etikete göre filtrele"><option value="">Tüm etiketler</option></select>
+      <span id="nt-sayac" class="nt-sayac muted" aria-live="polite"></span>
+    </div>
+
+    <div id="nt-duzen" class="nt-duzen">
+      <div id="nt-liste" class="nt-liste"></div>
+
+      <div id="nt-editor" class="nt-editor" hidden>
+        <form id="nt-form" novalidate>
+          <div class="nt-editor-bas">
+            <button type="button" id="nt-geri-btn" class="btn-secondary csp-w-auto nt-sadece-mobil">← Listeye dön</button>
+            <span id="nt-kayit-durumu" class="nt-kayit-durumu muted" aria-live="polite"></span>
+            <button type="button" id="nt-kapat-btn" class="btn-secondary csp-w-auto nt-kapat nt-sadece-masaustu" aria-label="Düzenleyiciyi kapat">✕</button>
+          </div>
+
+          <div class="form-field">
+            <label for="nt-baslik">Başlık</label>
+            <input id="nt-baslik" type="text" maxlength="200" autocomplete="off">
+          </div>
+
+          <div class="form-field">
+            <label id="nt-seviye-etiket">Olgunluk</label>
+            <div class="nt-seviye" role="radiogroup" aria-labelledby="nt-seviye-etiket">
+              <label class="nt-seviye-secenek"><input type="radio" name="nt-durum" value="tohum" checked><span>🌱 Tohum</span><small>Hızlı fikir</small></label>
+              <label class="nt-seviye-secenek"><input type="radio" name="nt-durum" value="filiz"><span>🌿 Filiz</span><small>Geliştirilen argüman</small></label>
+              <label class="nt-seviye-secenek"><input type="radio" name="nt-durum" value="agac"><span>🌳 Ağaç</span><small>Yayına hazır taslak</small></label>
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label for="nt-etiketler">Etiketler (virgülle ayır)</label>
+            <input id="nt-etiketler" type="text" autocomplete="off" placeholder="ör. sosyoloji, alan çalışması, metodoloji">
+          </div>
+
+          <div class="form-field">
+            <label for="nt-govde">Kendi yorumum ve ana metin (Markdown)</label>
+            <textarea id="nt-govde" rows="12" placeholder="Fikrini, argümanını ya da taslağını yaz. Görsel yapıştırabilir ya da buraya sürükleyebilirsin."></textarea>
+          </div>
+
+          <h3>Kaynaklı alıntılar</h3>
+          <p class="muted">
+            Doğrudan alıntıyı kendi yorumundan ayrı tut. “Yazıya dönüştür” dediğinde her alıntı
+            <code>&lt;blockquote&gt;</code> olur; yorumun hemen altına gelir.
+          </p>
+          <div id="nt-alintilar"></div>
+          <button type="button" id="nt-alinti-ekle-btn" class="btn-secondary csp-w-auto">➕ Alıntı ekle</button>
+
+          <h3>Ekler</h3>
+          <div id="nt-birak" class="nt-birak" tabindex="0">
+            Görsel ya da PDF'i buraya sürükle-bırak, ya da
+            <button type="button" id="nt-dosya-sec-btn">dosya seç</button>.
+            Dosyalar tarayıcında şifrelenip Cloudflare R2'ye yüklenir.
+            <input id="nt-dosya" type="file" multiple hidden accept="image/png,image/jpeg,image/webp,image/gif,application/pdf">
+          </div>
+          <div id="nt-ekler" class="nt-ekler"></div>
+
+          <div class="nt-editor-eylemler">
+            <button type="submit" id="nt-kaydet-btn" class="btn-primary csp-w-auto">💾 Şifrele ve kaydet</button>
+            <button type="button" id="nt-donustur-btn" class="btn-secondary csp-w-auto" hidden>✍️ Yazıya dönüştür</button>
+            <button type="button" id="nt-sil-btn" class="btn-danger csp-w-auto" hidden>🗑️ Çöpe at</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <details class="nt-guvenlik">
+      <summary>🛡️ Kasa ve yedek</summary>
+      <div class="nt-guvenlik-govde">
+        <p class="muted">
+          Başlık, etiket, metin, alıntı ve ek adları sunucuya yalnızca şifreli gider; arama bu cihazda,
+          çözülmüş notlar üzerinde çalışır.
+        </p>
+        <div class="nt-guvenlik-satir">
+          <button type="button" id="nt-kilitle-btn" class="btn-secondary csp-w-auto">🔒 Kasayı kilitle</button>
+          <label for="nt-otokilit" class="muted">Hareketsizlikte otomatik kilitle:</label>
+          <select id="nt-otokilit">
+            <option value="0">Kapalı</option>
+            <option value="15">15 dakika</option>
+            <option value="60">1 saat</option>
+          </select>
+        </div>
+        <div class="nt-guvenlik-satir">
+          <button type="button" id="nt-yenile-btn" class="btn-secondary csp-w-auto">🔄 Notları yeniden yükle</button>
+          <button type="button" id="nt-yedek-sifreli-btn" class="btn-secondary csp-w-auto">Şifreli yedek (.json)</button>
+          <button type="button" id="nt-yedek-okunur-btn" class="btn-secondary csp-w-auto">Okunabilir yedek (.md)</button>
+          <button type="button" id="nt-kurtarma-yenile-btn" class="btn-secondary csp-w-auto">Kurtarma anahtarını yenile</button>
+        </div>
+      </div>
+    </details>
+  </div>
+</section>
 </template>
 
 </div>
