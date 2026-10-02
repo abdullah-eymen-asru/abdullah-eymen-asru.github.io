@@ -52,6 +52,9 @@ const MODULES = {
   guvenlik: { src: "./admin-guvenlik.js", role: "admin" },
   izleme: { src: "./izleme-okuma-yonetim/izleme-okuma-yonetim.js", role: "owner" },
   mesajlar: { src: "./mesajlar.js", role: null },
+  // Fikir & Araştırma Tezgâhı (uçtan uca şifreli not sistemi) — yayıncılık akışındaki
+  // roller (editor/manager; admin ve owner otomatik geçer). SQL: not_modulu_yetkili().
+  notlar: { src: "./notlar/notlar.js", role: ["editor", "manager"] },
   // "Panelim" (eski /panel/panel.html) — giriş yapmış HERKESE açık:
   // sıradan üye de, owner da aynı sekmeyi görür.
   panelim: { src: "./panel.js", role: null },
@@ -79,6 +82,7 @@ const NAV = [
     items: [
       { id: "content-all", icon: "📚", label: "Tüm Yazılar & Projeler", module: "gy" },
       { id: "content-new", icon: "➕", label: "Yeni İçerik Ekle", module: "gy" },
+      { id: "content-notlar", icon: "🌱", label: "Fikir & Araştırma Tezgâhı", module: "notlar" },
       { id: "content-private", icon: "🔒", label: "Özel / Gizli Makaleler", module: "admin" },
       { id: "content-folders", icon: "📁", label: "Klasör Yönetimi", module: "gy" },
     ],
@@ -244,6 +248,9 @@ function ensureContentSlots(viewId, moduleKey) {
     detachSlot("slot-icerikler-private");
     swapSlot("slot-icerikler", "tpl-gy-icerikler");
     swapSlot("slot-icerik-ekle", "tpl-gy-icerik-ekle");
+  } else if (moduleKey === "notlar") {
+    // Not sistemi id çakışması yaratmaz ("nt-" önekli); tek yönlü taşıma yeterli.
+    swapSlot("slot-notlar", "tmpl-notlar");
   }
 }
 
@@ -578,6 +585,15 @@ async function init() {
   buildSidebar(profile);
   wireMobileNav();
   wireDashIciLinkler();
+
+  // Not Kasası kancaları (parola değişince zarf yenileme + çıkışta anahtar temizliği):
+  // Notlar sekmesi hiç açılmasa bile Şifre Değiştir / çıkış anında çalışmaları gerektiği
+  // için burada, rol uygunsa ve AYRI bir import ile (hata olsa panel açılışı etkilenmez).
+  if (roleAllowed(MODULES.notlar.role, profile)) {
+    import("./notlar/kasa-kancalari.js")
+      .then((m) => m.dashboardKancalariniKur())
+      .catch((err) => console.warn("Not Kasası kancaları kurulamadı:", err));
+  }
 
   // Sayfa YENİDEN YÜKLENMEDEN hash değişirse (ör. header'daki "Hesabım ▾"
   // menüsünden, zaten dashboard'dayken "Panelim"e tıklamak —
