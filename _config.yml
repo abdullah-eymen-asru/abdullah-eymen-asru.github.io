@@ -142,6 +142,7 @@ include:
 exclude:
   - supabase
   - "cloudflare worker"
+  - tests   # gatekeeper birim testleri (node) — canlı siteye kopyalanmasın
 
 # NOT: jekyll-feed plugin'i BİLEREK kullanılmıyor. Bunun yerine kökte
 # elle yazılmış bir feed.xml var (bkz. o dosyanın başındaki açıklama) —
