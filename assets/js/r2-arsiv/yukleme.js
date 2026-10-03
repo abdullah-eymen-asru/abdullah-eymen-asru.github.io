@@ -13,7 +13,7 @@ const ESZAMANLI = 2;
 const MAKS_DOSYA = 500;       // tek seferde en çok dosya
 const MAKS_DERINLIK = 10;     // r2_arsiv.klasor_yolu kuralıyla aynı
 
-const temizAd = (s) => s.replace(/[\/\\\u0000-\u001f\u007f]/g, "_").trim();
+const temizAd = (s) => s.normalize("NFC").replace(/[\/\\\u0000-\u001f\u007f]/g, "_").trim();   // NFC: Mac (NFD) adlarındaki "ö" gibi harfleri tek parçaya çevirir
 
 /* ------------------------------ dosya toplama ------------------------------ */
 function girisOku(entry) {
@@ -174,7 +174,8 @@ export function kuyrukKur({ liste, ozet, temizleBtn, baglam, bitti }) {
     }
 
     is.durumYaz("Hazırlanıyor…");
-    let ad = file.name, baslat = null;
+    const dosyaAdi = file.name.normalize("NFC");
+    let ad = dosyaAdi, baslat = null;
     for (let n = 1; n <= 6; n++) {                     // ad çakışırsa "ad (2).ext" dene
       try {
         baslat = await worker("/yukle-baslat", {
@@ -184,7 +185,7 @@ export function kuyrukKur({ liste, ozet, temizleBtn, baglam, bitti }) {
         break;
       } catch (e) {
         if (!/aynı ada/i.test(e.message) || n === 6) throw e;
-        ad = ekliAd(file.name, n + 1);
+        ad = ekliAd(dosyaAdi, n + 1);
       }
     }
 
@@ -203,30 +204,41 @@ export function kuyrukKur({ liste, ozet, temizleBtn, baglam, bitti }) {
         const { error } = await supabase.from("ozel_icerik_anahtarlar").insert(satirlar);
         if (error) throw new Error("Şifre zarfları kaydedilemedi.");
       }
-      is.bitirYaz(sifreli ? "Şifrelendi ve yüklendi ✓" : (ad !== file.name ? `Yüklendi ✓ (adı "${ad}" oldu)` : "Yüklendi ✓"));
+      is.bitirYaz(sifreli ? "Şifrelendi ve yüklendi ✓" : (ad !== dosyaAdi ? `Yüklendi ✓ (adı "${ad}" oldu)` : "Yüklendi ✓"));
     } catch (e) {
       await worker("/sil", { id: baslat.id }).catch(() => {});   // yarım kaydı/nesneyi temizle
       throw e;
     }
   }
 
-  /** girdiler: dosyalariTopla() çıktısı. Klasörler önce oluşturulur, sonra dosyalar kuyruğa girer. */
+  /**
+   * girdiler: dosyalariTopla() çıktısı. Arşiv yüklemesinde klasörler önce oluşturulur, sonra dosyalar
+   * kuyruğa girer. ÖZEL (şifreli) gönderimde klasör kavramı yoktur: alt klasörler düzleştirilir.
+   * Dönüş: { kisaltildi, duzlestirildi }
+   */
   async function ekle(girdiler) {
     const b = baglam();
     if (!b.yukleyebilir) throw new Error("Yükleme yetkin yok.");
     if (!girdiler.length) throw new Error("Yüklenecek dosya bulunamadı.");
     const kisaltildi = girdiler.length >= MAKS_DOSYA;
-    const derinlik = (y) => y.split("/").filter(Boolean).length;
-    if (girdiler.some((g) => derinlik(b.klasor) + derinlik(g.altYol) > MAKS_DERINLIK))
-      throw new Error(`Klasör derinliği en fazla ${MAKS_DERINLIK} olabilir.`);
-    await klasorleriHazirla(b.klasor, new Set(girdiler.map((g) => g.altYol).filter(Boolean)));
+    let duzlestirildi = false;
+
+    if (b.sifreli) {
+      duzlestirildi = girdiler.some((g) => g.altYol);
+      girdiler = girdiler.map((g) => ({ file: g.file, altYol: "" }));
+    } else {
+      const derinlik = (y) => y.split("/").filter(Boolean).length;
+      if (girdiler.some((g) => derinlik(b.klasor) + derinlik(g.altYol) > MAKS_DERINLIK))
+        throw new Error(`Klasör derinliği en fazla ${MAKS_DERINLIK} olabilir.`);
+      await klasorleriHazirla(b.klasor, new Set(girdiler.map((g) => g.altYol).filter(Boolean)));
+    }
 
     girdiler.forEach((g) => {
       const is = { file: g.file, altYol: g.altYol, sifreli: b.sifreli, klasor: b.klasor + g.altYol, sifre: { uid: b.uid, alicilar: [...b.alicilar] } };
       satirKur(is); toplam++; bekleyen.push(is);
     });
     isle();
-    return kisaltildi;
+    return { kisaltildi, duzlestirildi };
   }
 
   return { ekle };
