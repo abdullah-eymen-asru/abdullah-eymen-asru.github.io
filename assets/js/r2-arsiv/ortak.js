@@ -34,21 +34,42 @@ export function tarihYaz(iso) {
   return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("tr-TR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-// SQL'deki public.tr_ara_normalize() ile AYNI eşleme (birebir karakter; uzunluk korunur).
-const TR_HARITA = { "İ": "i", "I": "i", "ı": "i", "Ğ": "g", "ğ": "g", "Ü": "u", "ü": "u", "Ş": "s", "ş": "s", "Ö": "o", "ö": "o", "Ç": "c", "ç": "c" };
-export function normalize(s) {
-  return String(s ?? "").replace(/[İIıĞğÜüŞşÖöÇç]/g, (m) => TR_HARITA[m]).toLowerCase();
+// SQL'deki public.tr_ara_normalize() ile AYNI mantık:
+//   NFD'ye ayır -> birleştirici işaretleri at (ö->o, ş->s, ğ->g, ç->c, ü->u; Mac/NFD dosya adları da eşleşir)
+//   -> İ / I / ı hepsi "i" -> küçük harf.  Böylece "ISIK", "ışık", "isik", "Işık" aynı şeydir.
+function katla(ch) {
+  return ch.normalize("NFD").replace(/\p{M}+/gu, "").replace(/[İIı]/g, "i").toLowerCase();
 }
+export function normalize(s) {
+  let o = "";
+  for (const ch of String(s ?? "")) o += katla(ch);
+  return o;
+}
+/** normalize() + katlanmış her karakterin ORİJİNAL metindeki başlangıç indeksi (vurgulama için). */
+function katlaIndeksli(s) {
+  let n = "";
+  const harita = [];
+  let i = 0;
+  for (const ch of s) {
+    const k = katla(ch);
+    for (let j = 0; j < k.length; j++) { n += k[j]; harita.push(i); }
+    i += ch.length;
+  }
+  return { n, harita };
+}
+
+/** Türkçe alfabe sırası (a b c ç d e f g ğ h ı i j k l m n o ö p r s ş t u ü v y z), "dosya2" < "dosya10". */
+export const trSirala = new Intl.Collator("tr", { sensitivity: "variant", numeric: true });
 
 export function aramaKelimeleri(q) {
   return normalize(q.trim()).split(/\s+/).filter(Boolean);
 }
 
-/** Arama eşleşmelerini <mark> ile vurgulayarak `hedef` içine yazar. */
+/** Arama eşleşmelerini <mark> ile vurgulayarak `hedef` içine yazar (Türkçe harf / NFD farkı gözetmeden). */
 export function vurgulu(hedef, metin, kelimeler) {
   hedef.replaceChildren();
   if (!kelimeler?.length) { hedef.textContent = metin; return; }
-  const n = normalize(metin);
+  const { n, harita } = katlaIndeksli(metin);
   const aralik = [];
   kelimeler.forEach((k) => {
     let i = n.indexOf(k);
@@ -62,9 +83,12 @@ export function vurgulu(hedef, metin, kelimeler) {
   });
   let imlec = 0;
   birlesik.forEach(([a, b]) => {
-    if (a > imlec) hedef.appendChild(document.createTextNode(metin.slice(imlec, a)));
-    hedef.appendChild(el("mark", "ra-vurgu", metin.slice(a, b)));
-    imlec = b;
+    const bas = harita[a];
+    let bit = harita[b - 1] + 1;
+    while (bit < metin.length && /\p{M}/u.test(metin[bit])) bit++;     // sonda kalan birleştirici işaretleri de kapsa
+    if (bas > imlec) hedef.appendChild(document.createTextNode(metin.slice(imlec, bas)));
+    hedef.appendChild(el("mark", "ra-vurgu", metin.slice(bas, bit)));
+    imlec = bit;
   });
   if (imlec < metin.length) hedef.appendChild(document.createTextNode(metin.slice(imlec)));
 }
@@ -117,3 +141,37 @@ export function kategori(s) {
   return "belge";
 }
 export const KATEGORI_IKON = { klasor: "📁", gorsel: "🖼️", pdf: "📕", medya: "🎞️", arsiv: "🗜️", belge: "📄" };
+
+/* ---------------------------- tarih / zaman gösterimi ---------------------------- */
+const GUN_MS = 86400000;
+const gunBasi = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+
+/** { goreli: "3 sa önce" | "Dün 14:20" | "03 Eki 2026", tam: "3 Ekim 2026 Cumartesi 14:20" } */
+export function zamanYaz(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return { goreli: "", tam: "" };
+  const saat = d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+  const tam = d.toLocaleString("tr-TR", { day: "numeric", month: "long", year: "numeric", weekday: "long", hour: "2-digit", minute: "2-digit" });
+  const simdi = new Date();
+  const fark = simdi.getTime() - d.getTime();
+  const gunFarki = Math.round((gunBasi(simdi) - gunBasi(d)) / GUN_MS);
+  let goreli;
+  if (fark < 60000) goreli = "az önce";
+  else if (fark < 3600000) goreli = `${Math.floor(fark / 60000)} dk önce`;
+  else if (gunFarki === 0) goreli = `${Math.floor(fark / 3600000)} sa önce`;
+  else if (gunFarki === 1) goreli = `Dün ${saat}`;
+  else if (gunFarki < 7) goreli = `${d.toLocaleDateString("tr-TR", { weekday: "long" })} ${saat}`;
+  else goreli = d.toLocaleDateString("tr-TR", { day: "2-digit", month: "short", year: "numeric" });
+  return { goreli, tam };
+}
+
+/** Listeleri bölümlemek için: "Bugün" | "Dün" | "Bu hafta" | "Eylül 2026" */
+export function gunGrubu(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "Tarihsiz";
+  const gunFarki = Math.round((gunBasi(new Date()) - gunBasi(d)) / GUN_MS);
+  if (gunFarki <= 0) return "Bugün";
+  if (gunFarki === 1) return "Dün";
+  if (gunFarki < 7) return "Bu hafta";
+  return d.toLocaleDateString("tr-TR", { month: "long", year: "numeric" });
+}
