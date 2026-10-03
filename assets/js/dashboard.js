@@ -87,7 +87,10 @@ const NAV = [
     items: [
       { id: "content-all", icon: "📚", label: "Tüm Yazılar & Projeler", module: "gy" },
       { id: "content-new", icon: "➕", label: "Yeni İçerik Ekle", module: "gy" },
-      { id: "content-notlar", icon: "🌱", label: "Fikir & Araştırma Tezgâhı", module: "notlar" },
+      // defaultAcilis:false -> owner bir üyeye modülü açtığında o üyenin giriş sonrası varsayılan sekmesi
+      // (adreste # yokken) değişmesin; notlar kendiliğinden açılmasın. Editor/manager/admin için
+      // varsayılan açılış zaten daha önceki "içerik" sekmeleridir, onlar değişmez.
+      { id: "content-notlar", icon: "🌱", label: "Fikir & Araştırma Tezgâhı", module: "notlar", defaultAcilis: false },
       { id: "content-private", icon: "🔒", label: "Özel / Gizli Makaleler", module: "admin" },
       { id: "content-folders", icon: "📁", label: "Klasör Yönetimi", module: "gy" },
     ],
@@ -609,6 +612,31 @@ async function init() {
   document.getElementById("dash-rol").textContent = `Rol: ${profile.role}`;
 
   profile.izinler = await izinleriYukle();
+
+  // Fikir & Araştırma Tezgâhı: erişimi owner belirler (migration 0059/0060, Yetki Ayarları).
+  // Karar TEK yerden gelir: veritabanındaki not_modulu_yetkili(). Menüyü kuran mevcut kurala
+  // (gorunurMu -> roleAllowed(itemRole)) dokunmuyoruz; sadece modülün rolünü duruma göre ayarlıyoruz:
+  //   - rol kuralı "evet" ama owner kapatmış  -> role:"owner" (owner dışında herkesi, admin dahil, eler)
+  //   - rol kuralı "hayır" (user/special_user) ama owner o üyeye açmış -> role:null (giriş yapmış herkes;
+  //     kapı yine veritabanındaki RLS ve worker'dadır, başkası yetkisiz zaten veri göremez)
+  // Sorgu başarısız olursa (migration yok/ağ) eski davranış korunur; asıl engel RLS ve worker'dadır.
+  if (profile.role !== "owner") {
+    const rolKurali = roleAllowed(MODULES.notlar.role, profile);
+    try {
+      const { data, error } = await supabase.rpc("not_modulu_yetkili");
+      if (!error && rolKurali && data === false) {
+        MODULES.notlar.role = "owner";
+        // Kapalı kullanıcının cihazında şifre çözme anahtarı kalmasın.
+        import("./notlar/kasa.js")
+          .then((k) => k.tumAnahtarlariTemizle())
+          .catch(() => {});
+      } else if (!error && !rolKurali && data === true) {
+        MODULES.notlar.role = null;
+      }
+    } catch (_err) {
+      /* eski davranış */
+    }
+  }
 
   // E2EE anahtar çiftini HERKES için sessizce hazırla: bir kullanıcı, panele en az bir kez
   // girdiyse başkaları ona şifreli dosya gönderebilir (alıcının açık anahtarı gerekir).
