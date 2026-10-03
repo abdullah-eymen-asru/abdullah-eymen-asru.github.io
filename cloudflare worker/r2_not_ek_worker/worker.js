@@ -5,7 +5,7 @@
  * (ciphertext) nesne deposu. Dosyalar tarayıcıda AES-GCM ile şifrelenip buraya
  * gelir; Worker ve R2 sadece anlamsız bayt yığını görür.
  *
- * NEDEN AYRI BİR WORKER? Mevcut r2_storage_worker sadece GET (imzalı indirme)
+ * NEDEN AYRI BİR WORKER? Mevcut r2_imza_worker (eski adı r2_storage_worker) sadece GET (imzalı indirme)
  * yapıyor ve "özel içerik" (content_access) mantığına bağlı. Not ekleri farklı
  * bir güven modeli: her kullanıcı SADECE kendi klasörüne (notlar/<uid>/...) yazar,
  * okur, siler. İkisini karıştırmak mevcut worker'ın yetki mantığını kirletirdi.
@@ -16,11 +16,12 @@
  *   DELETE ?key=notlar/<uid>/<uuid>                            → 200 {ok}
  *
  * Güvenlik:
- *  - Origin TAM eşleşme (r2_storage_worker'daki düzeltmeyle aynı mantık).
+ *  - Origin TAM eşleşme (r2_imza_worker'daki düzeltmeyle aynı mantık).
  *  - Token Supabase /auth/v1/user ile doğrulanır; key'in <uid> kısmı token'daki
  *    kullanıcıyla BİREBİR eşleşmelidir (başkasının klasörüne yazma/okuma yok).
- *  - Rol: editor/manager/admin/owner (askıdaki admin hariç) — SQL'deki
- *    not_modulu_yetkili() ile aynı küme; ayrıca RLS de aynı kuralı uygular.
+ *  - Yetki: SQL'deki not_modulu_yetkili() (rol listesi + owner'ın Yetki Ayarları'ndaki
+ *    rol/kullanıcı bazlı kapatmaları, migration 0059). RLS de aynı fonksiyonu kullanır.
+ *    Kapatılan kullanıcı ekleri indiremez/yükleyemez/silemez.
  *  - Boyut: tek dosya en fazla 25 MB; kullanıcı başına toplam kota KOTA_BAYT
  *    (not_ek_kayitlari tablosundan okunur).
  *  - İçerik şifreli olduğundan Content-Type HER ZAMAN application/octet-stream;
@@ -48,7 +49,6 @@ const IZINLI_ORIGINLER = [
 const TEK_DOSYA_UST_SINIR = 25 * 1024 * 1024;
 const VARSAYILAN_KOTA = 500 * 1024 * 1024;
 const ANAHTAR_DESENI = /^notlar\/([0-9a-f-]{36})\/([0-9a-f-]{36})$/i;
-const YAZMA_ROLLERI = new Set(["editor", "manager", "admin", "owner"]);
 
 function json(govde, durum, cors) {
   return new Response(JSON.stringify(govde), {
@@ -103,16 +103,21 @@ export default {
       return json({ error: "Bu klasöre erişim izniniz yok." }, 403, cors);
     }
 
-    // --- 4) Rol ---
-    // Kullanıcının kendi jetonu + anon key: sorgular RLS'ten geçer (service_role KULLANMIYORUZ).
+    // --- 4) Yetki: SQL'deki not_modulu_yetkili() — TEK doğruluk kaynağı ---
+    // Rol listesi + askıdaki admin + owner'ın Yetki Ayarları'ndaki rol bazlı ve kullanıcı bazlı
+    // kapatmaları (migration 0059) hepsi o fonksiyonda. Kullanıcının KENDİ jetonuyla çağrılır.
+    // Kullanıcının KENDİ jetonu + anon key: sorgular RLS'ten geçer (service_role KULLANMIYORUZ).
     const servis = { apikey: env.SUPABASE_ANON_KEY, Authorization: baslik };
     try {
-      const pr = await fetch(`${env.SUPABASE_URL}/rest/v1/profiles?id=eq.${kullaniciId}&select=role,is_suspended`, {
-        headers: servis,
+      const pr = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/not_modulu_yetkili`, {
+        method: "POST",
+        headers: { ...servis, "Content-Type": "application/json" },
+        body: "{}",
       });
-      const profil = pr.ok ? (await pr.json())?.[0] : null;
-      const rolOk = profil && YAZMA_ROLLERI.has(profil.role) && !(profil.role === "admin" && profil.is_suspended);
-      if (!rolOk) return json({ error: "Bu modül için yetkin yok." }, 403, cors);
+      if (!pr.ok) throw new Error("rpc");
+      if ((await pr.json()) !== true) {
+        return json({ error: "Bu özellik hesabın için kapalı ya da yetkin yok." }, 403, cors);
+      }
     } catch {
       return json({ error: "Yetki doğrulanamadı." }, 502, cors);
     }
