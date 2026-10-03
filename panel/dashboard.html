@@ -1723,51 +1723,153 @@ permalink: "/panel/dashboard.html"
 <script type="module" src="{{ '/assets/js/dashboard.js' | relative_url }}"></script>
 
 <template id="tmpl-dosya-yonetici">
-  <div class="ra">
-    <div id="ra-mesaj" class="auth-message" hidden role="status"></div>
+  <div class="ra" id="ra-kok">
+    <div id="ra-mesaj" class="ra-toast" hidden role="status" aria-live="polite"></div>
 
-    <div class="ra-sekmeler" role="tablist">
-      <button type="button" class="ra-sekme" id="ra-sekme-arsiv" role="tab" aria-selected="true">Arşiv</button>
-      <button type="button" class="ra-sekme" id="ra-sekme-paylasilan" role="tab" aria-selected="false">Benimle paylaşılanlar</button>
+    <div class="ra-ust">
+      <div class="ra-sekmeler" role="tablist" aria-label="Görünüm">
+        <button type="button" class="ra-sekme" id="ra-sekme-arsiv" role="tab" aria-selected="true">🗄️ Arşiv</button>
+        <button type="button" class="ra-sekme" id="ra-sekme-paylastiklarim" role="tab" aria-selected="false">📤 Paylaştıklarım</button>
+        <button type="button" class="ra-sekme" id="ra-sekme-paylasilan" role="tab" aria-selected="false">📥 Benimle paylaşılanlar</button>
+      </div>
+      <p id="ra-ozet" class="ra-ozet" hidden></p>
     </div>
 
-    <div id="ra-arac" class="ra-arac">
-      <input type="search" id="ra-ara" placeholder="Tüm klasörlerde ara…" aria-label="Dosya ara" autocomplete="off">
+    <div class="ra-arac">
+      <div class="ra-ara-kutu">
+        <span class="ra-ara-ikon" aria-hidden="true">🔍</span>
+        <input type="search" id="ra-ara" placeholder="Tüm klasörlerde ara (örn. rapor 2026)" aria-label="Dosya ve klasör ara" autocomplete="off">
+        <button type="button" id="ra-ara-temizle" class="ra-ikon-btn" hidden aria-label="Aramayı temizle">✕</button>
+      </div>
+      <div class="ra-arac-sag">
+        <select id="ra-sirala" class="ra-secim" aria-label="Sırala">
+          <option value="ad-asc">Ad (A→Z)</option>
+          <option value="ad-desc">Ad (Z→A)</option>
+          <option value="tarih-desc">En yeni</option>
+          <option value="tarih-asc">En eski</option>
+          <option value="boyut-desc">En büyük</option>
+          <option value="boyut-asc">En küçük</option>
+        </select>
+        <div class="ra-grup" role="group" aria-label="Görünüm biçimi">
+          <button type="button" class="ra-ikon-btn" id="ra-gorunum-liste" aria-label="Liste görünümü" aria-pressed="true" title="Liste">☰</button>
+          <button type="button" class="ra-ikon-btn" id="ra-gorunum-izgara" aria-label="Izgara görünümü" aria-pressed="false" title="Izgara">▦</button>
+        </div>
+      </div>
     </div>
 
-    <div id="ra-klasor-bolum" class="ra-arac">
-      <input type="text" id="ra-klasor-ad" placeholder="Yeni klasör adı" maxlength="200" aria-label="Yeni klasör adı" autocomplete="off">
-      <button type="button" class="ra-btn" id="ra-klasor-ekle">📁 Klasör oluştur</button>
+    <div class="ra-eylem" id="ra-eylem">
+      <button type="button" class="ra-btn ra-btn-birincil" id="ra-yukle-dosya">⬆ Dosya yükle</button>
+      <button type="button" class="ra-btn" id="ra-yukle-klasor">📂 Klasör yükle</button>
+      <button type="button" class="ra-btn" id="ra-klasor-yeni">➕ Yeni klasör</button>
+      <input type="file" id="ra-girdi-dosya" class="ra-gizli" multiple>
+      <input type="file" id="ra-girdi-klasor" class="ra-gizli" multiple webkitdirectory>
+      <span class="ra-bosluk"></span>
+      <span id="ra-hedef" class="ra-meta"></span>
+    </div>
+
+    <section class="ra-sifre-kart" id="ra-sifre-kart" aria-label="Şifreli paylaşım">
+      <label class="ra-anahtar">
+        <input type="checkbox" id="ra-sifreli">
+        <span class="ra-anahtar-kayar" aria-hidden="true"></span>
+        <span class="ra-anahtar-metin"><strong>🔒 Uçtan uca şifrele</strong> <span class="ra-meta">Yükleyeceğin dosyalar tarayıcında şifrelenir; yalnızca seçtiğin kişiler açabilir.</span></span>
+      </label>
+      <div id="ra-sifre-detay" hidden>
+        <div id="ra-alici-kok"></div>
+        <ul id="ra-alici-secili" class="ra-chipler" aria-label="Seçili alıcılar"></ul>
+        <p class="ra-yardim">Alıcı seçmezsen yalnızca sen açabilirsin. Alıcının panele en az bir kez girmiş olması gerekir. Dosya adı, boyutu ve tarihi şifrelenmez.</p>
+      </div>
+    </section>
+
+    <section class="ra-kuyruk-kart" id="ra-kuyruk-kart" hidden aria-label="Yüklemeler">
+      <div class="ra-kuyruk-baslik">
+        <strong>Yüklemeler</strong>
+        <span id="ra-kuyruk-ozet" class="ra-meta" hidden></span>
+        <button type="button" class="ra-btn ra-btn-kucuk" id="ra-kuyruk-temizle" hidden>Tamamlananları temizle</button>
+      </div>
+      <ul id="ra-kuyruk" class="ra-kuyruk" aria-live="polite"></ul>
+    </section>
+
+    <div class="ra-filtreler" id="ra-filtreler" role="group" aria-label="Tür filtresi">
+      <button type="button" class="ra-filtre" data-filtre="hepsi" aria-pressed="true">Hepsi</button>
+      <button type="button" class="ra-filtre" data-filtre="klasor" aria-pressed="false">📁 Klasörler</button>
+      <button type="button" class="ra-filtre" data-filtre="gorsel" aria-pressed="false">🖼️ Görseller</button>
+      <button type="button" class="ra-filtre" data-filtre="pdf" aria-pressed="false">📕 PDF</button>
+      <button type="button" class="ra-filtre" data-filtre="belge" aria-pressed="false">📄 Belgeler</button>
+      <button type="button" class="ra-filtre" data-filtre="medya" aria-pressed="false">🎞️ Medya</button>
+      <button type="button" class="ra-filtre" data-filtre="arsiv" aria-pressed="false">🗜️ Arşivler</button>
+      <button type="button" class="ra-filtre" data-filtre="sifreli" aria-pressed="false">🔒 Şifreli</button>
     </div>
 
     <ol id="ra-yol" class="ra-yol" aria-label="Klasör yolu"></ol>
 
-    <div id="ra-yukleme" class="ra">
-      <div id="ra-birak" class="ra-birak">
-        <p>Dosyaları buraya sürükle-bırak</p>
-        <label class="ra-btn">veya dosya seç
-          <input type="file" id="ra-dosya-sec" multiple>
-        </label>
-      </div>
-
-      <div class="ra-sifreli-blok">
-        <label><input type="checkbox" id="ra-sifreli"> Uçtan uca şifrele (özel paylaşım)</label>
-        <div id="ra-alici-blok" hidden>
-          <p class="ra-yardim">
-            Dosya tarayıcında şifrelenir; R2 ve veritabanı yalnızca şifreli veriyi görür. Alıcı seçmezsen
-            sadece sen açabilirsin. Alıcının panele en az bir kez girmiş olması gerekir. Dosya adı ve
-            boyutu şifrelenmez.
-          </p>
-          <input type="search" id="ra-alici-ara" placeholder="Alıcı ara (isim)…" aria-label="Alıcı ara" autocomplete="off">
-          <ul id="ra-alici-sonuc" class="ra-alici-sonuc"></ul>
-          <ul id="ra-alici-secili" class="ra-alici-secili" aria-label="Seçili alıcılar"></ul>
-        </div>
-      </div>
-
-      <ul id="ra-kuyruk" class="ra-kuyruk" aria-live="polite"></ul>
+    <div class="ra-secim-bar" id="ra-secim-bar" hidden>
+      <label class="ra-secim-hepsi"><input type="checkbox" id="ra-hepsini-sec"> Tümünü seç</label>
+      <span id="ra-secim-sayi" class="ra-meta"></span>
+      <span class="ra-bosluk"></span>
+      <button type="button" class="ra-btn ra-btn-kucuk" id="ra-secim-iptal">Seçimi kaldır</button>
+      <button type="button" class="ra-btn ra-btn-kucuk ra-btn-tehlike" id="ra-secim-sil">🗑 Seçilenleri sil</button>
     </div>
 
-    <ul id="ra-liste" class="ra-liste"></ul>
-    <button type="button" class="ra-btn" id="ra-daha" hidden>Daha fazla göster</button>
+    <ul id="ra-liste" class="ra-liste" aria-busy="false"></ul>
+    <div id="ra-bos" class="ra-bos" hidden></div>
+    <button type="button" class="ra-btn ra-daha" id="ra-daha" hidden>Daha fazla göster</button>
+
+    <div class="ra-katman" id="ra-katman" hidden aria-hidden="true">
+      <div class="ra-katman-kutu">⬆ Dosya veya klasörleri bırak<span class="ra-meta" id="ra-katman-alt"></span></div>
+    </div>
+
+    <!-- Metin soran pencere: yeni klasör / yeniden adlandırma -->
+    <dialog class="ra-dlg" id="ra-dlg-metin" aria-labelledby="ra-dlg-metin-baslik">
+      <form method="dialog" class="ra-dlg-form" id="ra-dlg-metin-form">
+        <h3 id="ra-dlg-metin-baslik"></h3>
+        <label class="ra-alan"><span id="ra-dlg-metin-etiket"></span>
+          <input type="text" id="ra-dlg-metin-girdi" maxlength="200" autocomplete="off" required>
+        </label>
+        <p class="ra-hata-satiri" id="ra-dlg-metin-hata" hidden></p>
+        <div class="ra-dlg-alt">
+          <button type="button" class="ra-btn" id="ra-dlg-metin-iptal">Vazgeç</button>
+          <button type="submit" class="ra-btn ra-btn-birincil" id="ra-dlg-metin-tamam">Tamam</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Onay penceresi -->
+    <dialog class="ra-dlg" id="ra-dlg-onay" aria-labelledby="ra-dlg-onay-baslik">
+      <form method="dialog" class="ra-dlg-form">
+        <h3 id="ra-dlg-onay-baslik"></h3>
+        <p id="ra-dlg-onay-metin"></p>
+        <div class="ra-dlg-alt">
+          <button type="button" class="ra-btn" id="ra-dlg-onay-iptal">Vazgeç</button>
+          <button type="submit" class="ra-btn ra-btn-tehlike-dolu" id="ra-dlg-onay-tamam">Sil</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Paylaşım yönetimi (şifreli dosyanın göndereni) -->
+    <dialog class="ra-dlg ra-dlg-genis" id="ra-dlg-paylas" aria-labelledby="ra-dlg-paylas-baslik">
+      <div class="ra-dlg-form">
+        <h3 id="ra-dlg-paylas-baslik">Paylaşım</h3>
+        <p class="ra-meta" id="ra-dlg-paylas-dosya"></p>
+        <div id="ra-paylas-kok"></div>
+        <p class="ra-hata-satiri" id="ra-paylas-hata" hidden></p>
+        <h4 class="ra-alt-baslik">Erişimi olanlar</h4>
+        <ul id="ra-paylas-liste" class="ra-paylas-liste"></ul>
+        <p class="ra-yardim">Birini kaldırmak, onun daha önce indirmiş olabileceği kopyaları geri almaz; yalnızca bundan sonraki erişimini keser.</p>
+        <div class="ra-dlg-alt"><button type="button" class="ra-btn ra-btn-birincil" id="ra-dlg-paylas-kapat">Kapat</button></div>
+      </div>
+    </dialog>
+
+    <!-- Görsel önizleme -->
+    <dialog class="ra-dlg ra-dlg-genis" id="ra-dlg-onizleme" aria-labelledby="ra-dlg-onizleme-baslik">
+      <div class="ra-dlg-form">
+        <h3 id="ra-dlg-onizleme-baslik"></h3>
+        <div class="ra-onizleme-alan"><img id="ra-onizleme-img" alt=""></div>
+        <p class="ra-hata-satiri" id="ra-onizleme-hata" hidden></p>
+        <div class="ra-dlg-alt">
+          <button type="button" class="ra-btn" id="ra-onizleme-indir">⬇ İndir</button>
+          <button type="button" class="ra-btn ra-btn-birincil" id="ra-onizleme-kapat">Kapat</button>
+        </div>
+      </div>
+    </dialog>
   </div>
 </template>
