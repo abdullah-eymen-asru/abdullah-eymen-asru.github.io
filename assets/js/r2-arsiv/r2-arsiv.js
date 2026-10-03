@@ -1,184 +1,326 @@
 /*
  * assets/js/r2-arsiv/r2-arsiv.js — R2 Dosya Yöneticisi (dashboard modülü "arsiv")
  *
- * KOTA İLKESİ: liste/gezinme/arama/klasör işlemleri YALNIZCA Supabase `r2_arsiv`
- * tablosundan (PostgREST) yapılır — R2'ye ListObjectsV2 atılmaz. R2'ye sadece
- * yükleme (PUT), indirme (GET) ve doğrulama (HEAD) gider; hepsi presigned URL
- * ile tarayıcıdan doğrudan, Worker sadece imzalar ve kotayı sayar.
+ * KOTA İLKESİ: liste / gezinme / arama / klasör işlemleri YALNIZCA Supabase `r2_arsiv`
+ * tablosundan çalışır; R2'ye ListObjectsV2 atılmaz. R2'ye sadece yükleme (PUT), indirme (GET)
+ * ve doğrulama (HEAD) gider; hepsi presigned URL ile tarayıcıdan, Worker yalnızca imzalar
+ * ve kotayı sayar.
  *
- * CSP: inline style/handler yok; DOM yalnızca createElement/textContent ile kurulur
- * (kullanıcı verisi asla innerHTML'e girmez).
+ * CSP: inline style/handler yok; DOM yalnızca createElement/textContent ile kurulur.
  */
 import { supabase } from "../core/supabase-client.js";
+import { anahtarlariHazirla, aliciAnahtarlariniGetir, dosyaCoz, anahtariYenidenZarfla } from "./e2ee.js";
 import {
-  ARSIV_WORKER_URL, E2EE_MAX_BAYT, anahtarlariHazirla, aliciAnahtarlariniGetir,
-  sifreliBoyut, dosyaSifrele, anahtariZarfla, dosyaCoz,
-} from "./e2ee.js";
+  el, btn, boyutYaz, tarihYaz, aramaKelimeleri, normalize, vurgulu, worker, adGecerli,
+  kategori, KATEGORI_IKON, basHarfler, avatarSinifi, ROL_ETIKETI,
+} from "./ortak.js";
+import { aliciSeciciKur } from "./alici-secici.js";
+import { dosyalariTopla, kuyrukKur } from "./yukleme.js";
 
 const SAYFA = 100;
-const ESZAMANLI = 2;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-// Şifreli dosya çözüldükten sonra Blob'a verilecek tür: yalnızca güvenli bir alt küme.
+const SUTUNLAR = "id,tur,ad,klasor_yolu,boyut,mime,gercek_mime,sifreli,sahip_id,created_at";
 const GUVENLI_BLOB_TURLERI = new Set([
   "application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp", "image/avif",
   "text/plain", "text/csv", "application/json", "application/zip",
 ]);
+const GORSEL_TURLERI = /^image\/(png|jpeg|gif|webp|avif)$/;
+const SIRA_ALANI = { ad: "ad", tarih: "created_at", boyut: "boyut" };
 
 const durum = {
   uid: null, yetki: { oku: false, yukle: false, sil: false, paylasilan_var: false },
-  sekme: "arsiv", yol: "", arama: "", sayfa: 0, alicilar: new Map(), kuyruk: [], aktif: 0,
+  sekme: "arsiv", yol: "", arama: "", filtre: "hepsi", sirala: "ad-asc", gorunum: "liste",
+  sayfa: 0, veri: [], dahaVar: false, secili: new Set(), alicilar: new Map(), gonderen: new Map(),
+  istekNo: 0, yuklenenArama: false,
 };
-let k = {}; // DOM referansları
+let k = {};
+let kuyruk = null;
 
-/* ------------------------------ yardımcılar ------------------------------ */
-function el(etiket, sinif, metin) {
-  const e = document.createElement(etiket);
-  if (sinif) e.className = sinif;
-  if (metin != null) e.textContent = metin;
-  return e;
-}
-function btn(metin, sinif, tikla, ozellikler = {}) {
-  const b = el("button", sinif || "ra-btn", metin);
-  b.type = "button";
-  Object.entries(ozellikler).forEach(([a, v]) => b.setAttribute(a, v));
-  b.addEventListener("click", tikla);
-  return b;
-}
-function mesaj(metin, tur = "hata") {
+/* ------------------------------ küçük yardımcılar ------------------------------ */
+let toastZamanlayici = null;
+function bildir(metin, tur = "hata") {
+  clearTimeout(toastZamanlayici);
   k.mesaj.textContent = metin || "";
   k.mesaj.hidden = !metin;
-  k.mesaj.className = `auth-message ${tur === "hata" ? "error" : "success"}`;
+  k.mesaj.className = `ra-toast ${tur === "hata" ? "ra-toast-hata" : "ra-toast-ok"}`;
+  if (metin) toastZamanlayici = setTimeout(() => { k.mesaj.hidden = true; }, tur === "hata" ? 12000 : 5000);
 }
-function boyutYaz(b) {
-  if (b == null) return "";
-  const birim = ["B", "KB", "MB", "GB"]; let i = 0, v = b;
-  while (v >= 1024 && i < birim.length - 1) { v /= 1024; i++; }
-  return `${v.toFixed(v >= 10 || i === 0 ? 0 : 1)} ${birim[i]}`;
-}
-const likeKacis = (s) => s.replace(/[\\%_]/g, (c) => "\\" + c);
-const adGecerli = (a) => a.length >= 1 && a.length <= 200 && !/[\/\\\u0000-\u001f\u007f]/.test(a) && a !== "." && a !== "..";
+function tercihOku(anahtar, varsayilan) { try { return localStorage.getItem(anahtar) || varsayilan; } catch { return varsayilan; } }
+function tercihYaz(anahtar, deger) { try { localStorage.setItem(anahtar, deger); } catch { /* özel pencere vb. */ } }
 
-async function worker(yol, govde) {
-  const { data } = await supabase.auth.getSession();
-  if (!data.session) throw new Error("Oturum bulunamadı.");
-  const r = await fetch(`${ARSIV_WORKER_URL}${yol}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session.access_token}` },
-    body: JSON.stringify(govde),
-  });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.hata || `İşlem başarısız (${r.status}).`);
-  return j;
-}
+const arsivSekmesi = () => durum.sekme === "arsiv";
+const yukleyebilir = () => durum.yetki.yukle;
+const kendimin = (s) => s.sahip_id === durum.uid;
 
-function r2yePutla(url, basliklar, govde, ilerleme) {
-  return new Promise((coz, red) => {
-    const x = new XMLHttpRequest();
-    x.open("PUT", url);
-    Object.entries(basliklar).forEach(([a, v]) => x.setRequestHeader(a, v));
-    x.upload.addEventListener("progress", (e) => e.lengthComputable && ilerleme(e.loaded / e.total));
-    x.addEventListener("load", () => (x.status >= 200 && x.status < 300 ? coz()
-      : red(new Error(`R2 yüklemeyi reddetti (${x.status}).`))));
-    x.addEventListener("error", () => red(new Error("R2'ye ulaşılamadı (ağ ya da bucket CORS ayarı).")));
-    x.send(govde);
+/* --------------------------------- diyaloglar --------------------------------- */
+function metinSor({ baslik, etiket, deger = "", tamam = "Tamam", dogrula }) {
+  const dlg = k.dlgMetin, girdi = k.dlgMetinGirdi, hata = k.dlgMetinHata, form = k.dlgMetinForm;
+  k.dlgMetinBaslik.textContent = baslik; k.dlgMetinEtiket.textContent = etiket;
+  k.dlgMetinTamam.textContent = tamam; girdi.value = deger; hata.hidden = true;
+  return new Promise((coz) => {
+    const bitir = (v) => {
+      form.removeEventListener("submit", gonder); k.dlgMetinIptal.removeEventListener("click", vazgec);
+      dlg.removeEventListener("cancel", vazgec); if (dlg.open) dlg.close(); coz(v);
+    };
+    const vazgec = (e) => { e?.preventDefault?.(); bitir(null); };
+    const gonder = (e) => {
+      e.preventDefault();
+      const v = girdi.value.trim();
+      const h = dogrula?.(v);
+      if (h) { hata.textContent = h; hata.hidden = false; girdi.focus(); return; }
+      bitir(v);
+    };
+    form.addEventListener("submit", gonder); k.dlgMetinIptal.addEventListener("click", vazgec); dlg.addEventListener("cancel", vazgec);
+    dlg.showModal(); girdi.focus(); girdi.select();
   });
 }
 
-/* --------------------------------- liste --------------------------------- */
+function onayAl({ baslik, metin, tamam = "Sil" }) {
+  const dlg = k.dlgOnay;
+  k.dlgOnayBaslik.textContent = baslik; k.dlgOnayMetin.textContent = metin; k.dlgOnayTamam.textContent = tamam;
+  return new Promise((coz) => {
+    const form = dlg.querySelector("form");
+    const bitir = (v) => {
+      form.removeEventListener("submit", gonder); k.dlgOnayIptal.removeEventListener("click", vazgec);
+      dlg.removeEventListener("cancel", vazgec); if (dlg.open) dlg.close(); coz(v);
+    };
+    const vazgec = (e) => { e?.preventDefault?.(); bitir(false); };
+    const gonder = (e) => { e.preventDefault(); bitir(true); };
+    form.addEventListener("submit", gonder); k.dlgOnayIptal.addEventListener("click", vazgec); dlg.addEventListener("cancel", vazgec);
+    dlg.showModal(); k.dlgOnayIptal.focus();
+  });
+}
+
+/* --------------------------------- liste çekme --------------------------------- */
 async function listele(devam = false) {
-  if (!devam) { durum.sayfa = 0; k.liste.replaceChildren(); }
-  let q = supabase.from("r2_arsiv")
-    .select("id,tur,ad,klasor_yolu,boyut,gercek_mime,sifreli,sahip_id,created_at")
-    .eq("durum", "hazir");
+  const no = ++durum.istekNo;
+  if (!devam) {
+    durum.sayfa = 0; durum.veri = []; durum.secili.clear(); durum.dahaVar = false;
+    k.liste.setAttribute("aria-busy", "true");
+    secimGuncelle();
+  }
 
-  if (durum.sekme === "paylasilan") q = q.eq("sifreli", true).neq("sahip_id", durum.uid);
-  else if (durum.arama) q = q.ilike("ad", `%${likeKacis(durum.arama)}%`);
-  else q = q.eq("klasor_yolu", durum.yol);
+  let veri = null, hata = null;
+  const aramaVar = !!durum.arama;
+  const [alan, yon] = durum.sirala.split("-");
 
-  const bas = durum.sayfa * SAYFA;
-  const { data, error } = await q.order("tur", { ascending: false }).order("ad").range(bas, bas + SAYFA - 1);
-  if (error) { mesaj("Liste alınamadı."); return; }
-  mesaj("");
+  if (arsivSekmesi() && aramaVar) {
+    const r = await supabase.rpc("r2_arsiv_ara", { p_q: durum.arama, p_sinir: 100 });
+    veri = r.data; hata = r.error; durum.dahaVar = false;
+  } else {
+    let q = supabase.from("r2_arsiv").select(SUTUNLAR).eq("durum", "hazir");
+    if (durum.sekme === "paylasilan") q = q.eq("sifreli", true).neq("sahip_id", durum.uid);
+    else if (durum.sekme === "paylastiklarim") q = q.eq("sifreli", true).eq("sahip_id", durum.uid);
+    else q = q.eq("klasor_yolu", durum.yol).or(`sifreli.eq.false,sahip_id.eq.${durum.uid}`);   // başkasının şifreli dosyası "Benimle paylaşılanlar"da
+    q = q.order("tur", { ascending: false }).order(SIRA_ALANI[alan], { ascending: yon === "asc" });
+    if (alan !== "ad") q = q.order("ad");
+    const bas = durum.sayfa * SAYFA;
+    const sinir = arsivSekmesi() ? SAYFA : 200;
+    const r = await q.range(bas, bas + sinir - 1);
+    veri = r.data; hata = r.error;
+    durum.dahaVar = arsivSekmesi() && (veri?.length || 0) === SAYFA;
+  }
+  if (no !== durum.istekNo) return;                 // daha yeni bir istek var; bunu at
 
-  data.forEach((s) => k.liste.appendChild(satirYap(s)));
-  if (!devam && data.length === 0) k.liste.appendChild(Object.assign(el("li", "ra-bos", durum.arama ? "Sonuç yok." : "Bu klasör boş.")));
-  k.daha.hidden = data.length < SAYFA;
+  k.liste.setAttribute("aria-busy", "false");
+  if (hata) {
+    console.warn("liste:", hata.message);
+    bildir("Liste alınamadı. 0057 ve 0058 SQL dosyalarının Supabase'te çalıştığından emin ol.");
+    durum.veri = []; ciz(true); return;
+  }
+  durum.veri = durum.veri.concat(veri || []);
   durum.sayfa++;
-  yolCiz();
+
+  if (durum.sekme === "paylasilan" && durum.veri.length) {
+    const { data } = await supabase.rpc("arsiv_gonderen_getir", { p_dosya_idleri: durum.veri.map((s) => s.id) });
+    (data || []).forEach((g) => durum.gonderen.set(g.dosya_id, g.ad));
+    if (no !== durum.istekNo) return;
+  }
+  ciz();
 }
 
-function satirYap(s) {
-  const li = el("li", "ra-satir");
-  li.appendChild(el("span", "ra-ikon", s.tur === "klasor" ? "📁" : s.sifreli ? "🔒" : "📄"));
+/* -------------------------------- çizim -------------------------------- */
+function gorunenler() {
+  let v = durum.veri;
+  if (!arsivSekmesi() && durum.arama) {            // diğer sekmelerde arama istemci tarafında
+    const kel = aramaKelimeleri(durum.arama);
+    v = v.filter((s) => { const n = normalize(s.ad); return kel.every((x) => n.includes(x)); });
+  }
+  if (durum.filtre === "sifreli") return v.filter((s) => s.sifreli);
+  if (durum.filtre !== "hepsi") return v.filter((s) => kategori(s) === durum.filtre);
+  return v;
+}
 
-  const orta = el("div");
-  const ad = el("button", `ra-ad${s.tur === "klasor" ? " ra-tiklanir" : ""}`, s.ad);
-  ad.type = "button";
-  if (s.tur === "klasor") ad.addEventListener("click", () => klasoreGit(s.klasor_yolu + s.ad + "/"));
-  orta.appendChild(ad);
-  const meta = [];
-  if (s.tur === "dosya") meta.push(boyutYaz(s.boyut));
-  if (s.sifreli) meta.push("uçtan uca şifreli");
-  if (durum.arama && s.klasor_yolu) meta.push(`/${s.klasor_yolu}`);
-  meta.push(new Date(s.created_at).toLocaleDateString("tr-TR"));
-  orta.appendChild(el("span", "ra-meta", meta.filter(Boolean).join(" · ")));
-  li.appendChild(orta);
+function bosMesaji(hataVar) {
+  if (hataVar) return "Liste yüklenemedi.";
+  if (durum.arama) return `“${durum.arama}” için sonuç bulunamadı. Daha kısa ya da farklı bir kelime dene.`;
+  if (durum.filtre !== "hepsi") return "Bu filtreyle eşleşen öğe yok.";
+  if (durum.sekme === "paylasilan") return "Seninle paylaşılmış şifreli dosya yok.";
+  if (durum.sekme === "paylastiklarim") return "Henüz şifreli dosya paylaşmadın. “Uçtan uca şifrele” ile yüklerken alıcı seçebilirsin.";
+  return yukleyebilir() ? "Bu klasör boş. Dosyaları buraya sürükleyip bırakabilir ya da yukarıdan yükleyebilirsin." : "Bu klasör boş.";
+}
+
+function ciz(hataVar = false) {
+  const liste = gorunenler();
+  const kel = arsivSekmesi() && durum.arama ? aramaKelimeleri(durum.arama) : [];
+  k.liste.replaceChildren(...liste.map((s) => satirYap(s, kel)));
+  k.bos.hidden = liste.length > 0;
+  if (!liste.length) k.bos.textContent = bosMesaji(hataVar);
+  k.daha.hidden = !durum.dahaVar;
+  k.liste.classList.toggle("ra-izgara", durum.gorunum === "izgara");
+  yolCiz(liste.length);
+  secimGuncelle();
+}
+
+function ikonButonu(simge, etiket, tikla, ekSinif = "") {
+  return btn(simge, `ra-ikon-btn ${ekSinif}`.trim(), tikla, { "aria-label": etiket, title: etiket });
+}
+
+function satirYap(s, kelimeler) {
+  const kat = kategori(s);
+  const li = el("li", `ra-satir ra-k-${kat}`);
+  li.dataset.id = s.id;
+  if (durum.secili.has(s.id)) li.classList.add("ra-secili");
+
+  const secilebilir = arsivSekmesi() && durum.yetki.sil;
+  if (secilebilir) {
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.className = "ra-sec"; cb.checked = durum.secili.has(s.id);
+    cb.setAttribute("aria-label", `${s.ad} seç`);
+    cb.addEventListener("change", () => {
+      if (cb.checked) durum.secili.add(s.id); else durum.secili.delete(s.id);
+      li.classList.toggle("ra-secili", cb.checked); secimGuncelle();
+    });
+    li.appendChild(cb);
+  } else li.appendChild(el("span", "ra-sec-yer"));
+
+  li.appendChild(el("span", "ra-ikon", s.sifreli && s.tur === "dosya" ? "🔒" : KATEGORI_IKON[kat]));
+
+  const govde = el("div", "ra-govde");
+  const adBtn = el("button", `ra-ad ${s.tur === "klasor" || kat === "gorsel" || kat === "pdf" ? "ra-tiklanir" : ""}`.trim());
+  adBtn.type = "button"; adBtn.title = s.ad;
+  vurgulu(adBtn, s.ad, kelimeler);
+  adBtn.addEventListener("click", () => {
+    if (s.tur === "klasor") klasoreGit(s.klasor_yolu + s.ad + "/");
+    else if (kat === "gorsel" || (kat === "pdf" && !s.sifreli)) onizle(s);
+    else indir(s);
+  });
+  govde.appendChild(adBtn);
+
+  const meta = el("div", "ra-meta-satir");
+  if (s.tur === "dosya") meta.appendChild(el("span", "ra-meta", boyutYaz(s.boyut)));
+  meta.appendChild(el("span", "ra-meta", tarihYaz(s.created_at)));
+  if (s.sifreli) meta.appendChild(el("span", "ra-rozet", "Şifreli"));
+  if (durum.sekme === "paylasilan" && durum.gonderen.has(s.id)) meta.appendChild(el("span", "ra-meta", `Gönderen: ${durum.gonderen.get(s.id)}`));
+  if (arsivSekmesi() && durum.arama && s.klasor_yolu) {
+    meta.appendChild(btn(`📁 /${s.klasor_yolu}`, "ra-yol-chip", () => klasoreGit(s.klasor_yolu), { title: "Klasörü aç" }));
+  }
+  govde.appendChild(meta);
+  li.appendChild(govde);
 
   const islem = el("div", "ra-islemler");
-  if (s.tur === "dosya") islem.appendChild(btn("İndir", "ra-btn", (e) => indir(s, e.currentTarget)));
-  if (durum.sekme === "arsiv" && durum.yetki.yukle) islem.appendChild(btn("Adlandır", "ra-btn", () => adlandir(s)));
-  if (durum.sekme === "arsiv" && durum.yetki.sil) islem.appendChild(btn("Sil", "ra-btn ra-btn-tehlike", (e) => sil(s, e.currentTarget)));
+  if (s.tur === "dosya") {
+    if (kat === "gorsel" || (kat === "pdf" && !s.sifreli)) islem.appendChild(ikonButonu("👁", "Önizle", () => onizle(s)));
+    islem.appendChild(ikonButonu("⬇", "İndir", (e) => indir(s, e.currentTarget)));
+    if (s.sifreli && kendimin(s)) islem.appendChild(ikonButonu("👥", "Paylaşımı yönet", () => paylasAc(s)));
+  }
+  if (arsivSekmesi() && yukleyebilir() && (!s.sifreli || kendimin(s))) islem.appendChild(ikonButonu("✏️", "Yeniden adlandır", () => adlandir(s)));
+  if (durum.yetki.sil && (arsivSekmesi() || durum.sekme === "paylastiklarim")) islem.appendChild(ikonButonu("🗑", "Sil", () => sil(s), "ra-btn-tehlike"));
   li.appendChild(islem);
   return li;
 }
 
-function yolCiz() {
+function yolCiz(sonucSayisi) {
   k.yol.replaceChildren();
+  k.yol.hidden = !arsivSekmesi();
+  if (!arsivSekmesi()) return;
+  if (durum.arama) {
+    const li = el("li", "ra-yol-bilgi");
+    li.append(el("span", "", `“${durum.arama}” için ${sonucSayisi} sonuç${durum.veri.length >= 100 ? " (ilk 100)" : ""}`));
+    li.appendChild(btn("Aramayı temizle", "ra-yol-chip", () => aramayiTemizle()));
+    k.yol.appendChild(li); return;
+  }
   const parcalar = durum.yol.split("/").filter(Boolean);
-  const ekle = (etiket, hedef, sonMu) => {
-    const li = el("li");
-    const b = btn(etiket, "", () => !sonMu && klasoreGit(hedef));
+  const ekle = (etiket, hedef, son) => {
+    const li = el("li"); const b = btn(etiket, "", () => { if (!son) klasoreGit(hedef); });
+    if (son) b.setAttribute("aria-current", "page");
     li.appendChild(b); k.yol.appendChild(li);
   };
-  ekle("Ana klasör", "", parcalar.length === 0);
+  ekle("🏠 Ana klasör", "", parcalar.length === 0);
   let birikim = "";
   parcalar.forEach((p, i) => { birikim += p + "/"; ekle(p, birikim, i === parcalar.length - 1); });
-  k.yol.hidden = durum.sekme !== "arsiv" || !!durum.arama;
 }
 
-function klasoreGit(yol) { durum.yol = yol; durum.arama = ""; k.ara.value = ""; listele(); }
+function hedefYaz() { k.hedef.textContent = `Yükleme hedefi: /${durum.yol}`; }
 
-/* ----------------------------- klasör / ad işlemleri ----------------------------- */
-async function klasorOlustur() {
-  const ad = k.klasorAd.value.trim();
-  if (!adGecerli(ad)) return mesaj("Geçerli bir klasör adı gir ('/' ve '\\' içeremez).");
-  k.klasorEkle.disabled = true;
+function klasoreGit(yol) {
+  if (durum.sekme !== "arsiv") sekmeDegistir("arsiv", false);
+  durum.yol = yol; durum.arama = ""; k.ara.value = ""; k.araTemizle.hidden = true; k.sirala.disabled = false;
+  hedefYaz(); listele();
+}
+
+function aramayiTemizle() {
+  k.ara.value = ""; durum.arama = ""; k.araTemizle.hidden = true; k.sirala.disabled = false; listele();
+}
+
+/* ------------------------------- seçim / toplu işlem ------------------------------- */
+function secimGuncelle() {
+  const n = durum.secili.size;
+  k.secimBar.hidden = n === 0;
+  k.secimSayi.textContent = `${n} öğe seçili`;
+  const gorunen = gorunenler();
+  k.hepsiniSec.checked = n > 0 && gorunen.length > 0 && gorunen.every((s) => durum.secili.has(s.id));
+}
+
+async function topluSil() {
+  const idler = [...durum.secili];
+  if (!idler.length) return;
+  const ok = await onayAl({ baslik: `${idler.length} öğe silinsin mi?`, metin: "Seçilen dosyalar ve klasörlerin (içindekiler dahil) kalıcı olarak silinecek. Bu işlem geri alınamaz.", tamam: "Hepsini sil" });
+  if (!ok) return;
+  let basarili = 0, basarisiz = 0;
+  for (const id of idler) {
+    bildir(`Siliniyor… ${basarili + basarisiz + 1}/${idler.length}`, "ok");
+    try { await worker("/sil", { id }); basarili++; }
+    catch (e) { if (e.durum === 404) basarili++; else basarisiz++; }   // üst klasörle birlikte zaten gitmiş olabilir
+  }
+  bildir(basarisiz ? `${basarili} öğe silindi, ${basarisiz} öğe silinemedi.` : `${basarili} öğe silindi.`, basarisiz ? "hata" : "ok");
+  listele(); ozetYukle();
+}
+
+/* ---------------------------- klasör / ad / silme ---------------------------- */
+async function yeniKlasor() {
+  const ad = await metinSor({
+    baslik: "Yeni klasör", etiket: `Klasör adı (/${durum.yol})`, tamam: "Oluştur",
+    dogrula: (v) => (adGecerli(v) ? "" : "Geçerli bir ad gir ('/' ve '\\' kullanılamaz)."),
+  });
+  if (!ad) return;
   const { error } = await supabase.rpc("r2_arsiv_klasor_olustur", { p_klasor_yolu: durum.yol, p_ad: ad });
-  k.klasorEkle.disabled = false;
-  if (error) return mesaj(error.message || "Klasör oluşturulamadı.");
-  k.klasorAd.value = ""; listele();
+  if (error) return bildir(error.message || "Klasör oluşturulamadı.");
+  bildir("Klasör oluşturuldu.", "ok"); listele();
 }
 
 async function adlandir(s) {
-  const yeni = window.prompt("Yeni ad:", s.ad)?.trim();
+  const yeni = await metinSor({
+    baslik: s.tur === "klasor" ? "Klasörü yeniden adlandır" : "Dosyayı yeniden adlandır",
+    etiket: "Yeni ad", deger: s.ad, tamam: "Kaydet",
+    dogrula: (v) => (!adGecerli(v) ? "Geçerli bir ad gir ('/' ve '\\' kullanılamaz)." : ""),
+  });
   if (!yeni || yeni === s.ad) return;
-  if (!adGecerli(yeni)) return mesaj("Geçersiz ad.");
   const { error } = await supabase.rpc("r2_arsiv_yeniden_adlandir", { p_id: s.id, p_yeni_ad: yeni });
-  if (error) return mesaj(error.message || "Yeniden adlandırılamadı.");
-  listele(); // R2 işlemi yok: anahtarlar opak, yalnızca DB satırı değişti
+  if (error) return bildir(error.message || "Yeniden adlandırılamadı.");
+  bildir("Ad güncellendi.", "ok"); listele();             // R2 işlemi yok: anahtarlar opak
 }
 
-async function sil(s, dugme) {
-  const uyari = s.tur === "klasor"
-    ? `"${s.ad}" klasörü ve İÇİNDEKİ HER ŞEY kalıcı olarak silinecek. Emin misin?`
-    : `"${s.ad}" kalıcı olarak silinecek. Emin misin?`;
-  if (!window.confirm(uyari)) return;
-  dugme.disabled = true;
-  try { await worker("/sil", { id: s.id }); mesaj("Silindi.", "ok"); listele(); }
-  catch (e) { mesaj(e.message); dugme.disabled = false; }
+async function sil(s) {
+  const ok = await onayAl({
+    baslik: s.tur === "klasor" ? "Klasör silinsin mi?" : "Dosya silinsin mi?",
+    metin: s.tur === "klasor" ? `“${s.ad}” klasörü ve İÇİNDEKİ HER ŞEY kalıcı olarak silinecek.` : `“${s.ad}” kalıcı olarak silinecek.`,
+  });
+  if (!ok) return;
+  try { await worker("/sil", { id: s.id }); bildir("Silindi.", "ok"); listele(); ozetYukle(); }
+  catch (e) { bildir(e.message); }
 }
 
-/* ---------------------------------- indirme ---------------------------------- */
+/* ---------------------------- indirme / önizleme ---------------------------- */
 function blobIndir(blob, ad) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -187,153 +329,181 @@ function blobIndir(blob, ad) {
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
+async function sifreliBlob(s) {
+  const { url } = await worker("/indir", { id: s.id });
+  const [{ data: zarf, error }, r] = await Promise.all([
+    supabase.from("ozel_icerik_anahtarlar").select("sarili_dosya_anahtari").eq("dosya_id", s.id).eq("alici_id", durum.uid).maybeSingle(),
+    fetch(url),
+  ]);
+  if (error || !zarf) throw new Error("Bu dosya için anahtarın yok.");
+  if (!r.ok) throw new Error("Dosya R2'den alınamadı.");
+  const duz = await dosyaCoz(await r.arrayBuffer(), zarf.sarili_dosya_anahtari, s.id);
+  const tur = GUVENLI_BLOB_TURLERI.has(s.gercek_mime) ? s.gercek_mime : "application/octet-stream";
+  return new Blob([duz], { type: tur });
+}
+
 async function indir(s, dugme) {
-  dugme.disabled = true; mesaj("");
+  if (dugme) dugme.disabled = true;
   try {
-    const { url, sifreli } = await worker("/indir", { id: s.id });
-    if (!sifreli) { window.location.assign(url); return; } // Content-Disposition: attachment (imzalı)
-
-    // Şifreli: indir -> zarfı Supabase'ten al -> TARAYICIDA çöz -> Blob.
-    const [{ data: zarf, error }, r] = await Promise.all([
-      supabase.from("ozel_icerik_anahtarlar").select("sarili_dosya_anahtari")
-        .eq("dosya_id", s.id).eq("alici_id", durum.uid).maybeSingle(),
-      fetch(url),
-    ]);
-    if (error || !zarf) throw new Error("Bu dosya için anahtarın yok.");
-    if (!r.ok) throw new Error("Dosya R2'den alınamadı.");
-    const duz = await dosyaCoz(await r.arrayBuffer(), zarf.sarili_dosya_anahtari, s.id);
-    const tur = GUVENLI_BLOB_TURLERI.has(s.gercek_mime) ? s.gercek_mime : "application/octet-stream";
-    blobIndir(new Blob([duz], { type: tur }), s.ad);
-  } catch (e) { mesaj(e.message); }
-  finally { dugme.disabled = false; }
+    if (!s.sifreli) { const { url } = await worker("/indir", { id: s.id }); window.location.assign(url); }
+    else { bildir("Çözülüyor…", "ok"); blobIndir(await sifreliBlob(s), s.ad); bildir(""); }
+  } catch (e) { bildir(e.message); }
+  finally { if (dugme) dugme.disabled = false; }
 }
 
-/* ---------------------------------- yükleme ---------------------------------- */
-function kuyrugaEkle(dosyalar) {
-  if (!durum.yetki.yukle) return mesaj("Yükleme yetkin yok.");
-  const sifreli = k.sifreli.checked;
-  for (const dosya of dosyalar) {
-    const li = el("li");
-    const ad = el("span", "", dosya.name);
-    const durumEtiketi = el("span", "ra-meta", "Sırada");
-    const ilerleme = document.createElement("progress");
-    ilerleme.max = 1; ilerleme.value = 0;
-    li.append(ad, durumEtiketi, ilerleme);
-    k.kuyruk.appendChild(li);
-    durum.kuyruk.push({ dosya, sifreli, klasor: durum.yol, alicilar: [...durum.alicilar.keys()], durumEtiketi, ilerleme });
-  }
-  kuyrukIsle();
+let onizlemeUrl = null;
+function onizlemeKapat() {
+  if (onizlemeUrl) { URL.revokeObjectURL(onizlemeUrl); onizlemeUrl = null; }
+  k.onizlemeImg.removeAttribute("src");
+  if (k.dlgOnizleme.open) k.dlgOnizleme.close();
 }
 
-function kuyrukIsle() {
-  while (durum.aktif < ESZAMANLI && durum.kuyruk.length) {
-    const is = durum.kuyruk.shift();
-    durum.aktif++;
-    yukle(is).catch((e) => {
-      is.durumEtiketi.textContent = e.message; is.durumEtiketi.className = "ra-meta ra-durum-hata";
-    }).finally(() => { durum.aktif--; kuyrukIsle(); });
-  }
-}
-
-async function yukle({ dosya, sifreli, klasor, alicilar, durumEtiketi, ilerleme }) {
-  const aciklama = (m) => { durumEtiketi.textContent = m; };
-  if (sifreli && dosya.size > E2EE_MAX_BAYT)
-    throw new Error(`Şifreli yüklemede en fazla ${E2EE_MAX_BAYT / 1048576} MB desteklenir.`);
-
-  let anahtarlar = null;
-  if (sifreli) {
-    aciklama("Anahtarlar hazırlanıyor…");
-    const ben = await anahtarlariHazirla();
-    const hepsi = [...new Set([durum.uid, ...alicilar])];
-    const { harita, eksik } = await aliciAnahtarlariniGetir(hepsi);
-    if (eksik.length) throw new Error("Bazı alıcılar henüz panele girmediği için anahtarları yok; panele bir kez girince tekrar dene.");
-    harita.set(durum.uid, ben.acik);
-    anahtarlar = harita;
-  }
-
-  aciklama("Hazırlanıyor…");
-  const baslat = await worker("/yukle-baslat", {
-    ad: dosya.name, klasor_yolu: klasor, mime: dosya.type || "application/octet-stream",
-    boyut: sifreli ? sifreliBoyut(dosya.size) : dosya.size, sifreli,
-  });
-
+async function onizle(s) {
+  const kat = kategori(s);
   try {
-    let govde = dosya, ham = null;
-    if (sifreli) {
-      aciklama("Şifreleniyor…");
-      const s = await dosyaSifrele(dosya, baslat.id);
-      govde = s.blob; ham = s.hamAnahtar;
+    if (kat === "pdf" && !s.sifreli) {                 // PDF: yeni sekmede (satır içi imzalı bağlantı)
+      const { url } = await worker("/indir", { id: s.id, satir_ici: true });
+      const a = document.createElement("a"); a.href = url; a.target = "_blank"; a.rel = "noopener noreferrer";
+      document.body.appendChild(a); a.click(); a.remove(); return;
     }
-    aciklama("Yükleniyor…");
-    await r2yePutla(baslat.url, baslat.basliklar, govde, (o) => { ilerleme.value = o; });
-    aciklama("Doğrulanıyor…");
-    await worker("/yukle-bitir", { id: baslat.id });
-
-    if (sifreli) {
-      const satirlar = [];
-      for (const [kid, acik] of anahtarlar) {
-        satirlar.push({ dosya_id: baslat.id, alici_id: kid, sarili_dosya_anahtari: await anahtariZarfla(ham, acik) });
-      }
-      const { error } = await supabase.from("ozel_icerik_anahtarlar").insert(satirlar);
-      if (error) throw new Error("Şifre zarfları kaydedilemedi.");
+    if (kat !== "gorsel") return indir(s);
+    k.onizlemeBaslik.textContent = s.ad; k.onizlemeImg.alt = s.ad; k.onizlemeHata.hidden = true;
+    k.onizlemeImg.removeAttribute("src");
+    k.onizlemeIndir.onclick = () => indir(s, k.onizlemeIndir);
+    k.dlgOnizleme.showModal();
+    if (s.sifreli) {
+      const blob = await sifreliBlob(s);
+      if (!GORSEL_TURLERI.test(blob.type)) throw new Error("Bu dosya görsel olarak önizlenemiyor; indir.");
+      onizlemeUrl = URL.createObjectURL(blob); k.onizlemeImg.src = onizlemeUrl;
+    } else {
+      const { url } = await worker("/indir", { id: s.id, satir_ici: true });
+      k.onizlemeImg.src = url;
     }
-    ilerleme.value = 1;
-    durumEtiketi.textContent = sifreli ? "Şifrelendi ve yüklendi ✓" : "Yüklendi ✓";
-    durumEtiketi.className = "ra-meta ra-durum-tamam";
-    if (durum.sekme === "arsiv" && !durum.arama && durum.yol === klasor) listele();
   } catch (e) {
-    // Yarım kalan kaydı/nesneyi temizle (anahtarsız şifreli dosya erişilemez olurdu).
-    await worker("/sil", { id: baslat.id }).catch(() => {});
-    throw e;
+    if (k.dlgOnizleme.open) { k.onizlemeHata.textContent = e.message; k.onizlemeHata.hidden = false; }
+    else bildir(e.message);
   }
 }
 
-/* --------------------------- alıcı seçimi (E2EE) --------------------------- */
-let aliciZamanlayici = null;
-function aliciAra() {
-  clearTimeout(aliciZamanlayici);
-  const q = k.aliciAra.value.trim();
-  k.aliciSonuc.replaceChildren();
-  if (q.length < 2) return;
-  aliciZamanlayici = setTimeout(async () => {
-    const { data, error } = await supabase.rpc("arsiv_kullanici_ara", { p_q: q });
-    if (error) return mesaj("Kullanıcı aranamadı.");
-    k.aliciSonuc.replaceChildren();
-    (data || []).filter((u) => u.id !== durum.uid && !durum.alicilar.has(u.id)).forEach((u) => {
-      const li = el("li");
-      li.appendChild(btn(`+ ${u.full_name || "(adsız)"}`, "ra-chip", () => {
-        durum.alicilar.set(u.id, u.full_name || "(adsız)"); aliciCiz(); k.aliciSonuc.replaceChildren(); k.aliciAra.value = "";
-      }));
-      k.aliciSonuc.appendChild(li);
-    });
-  }, 300);
+/* ------------------------------ paylaşım yönetimi ------------------------------ */
+let paylasDosya = null;
+let paylasIdler = new Set();
+function paylasHata(m) { k.paylasHata.textContent = m || ""; k.paylasHata.hidden = !m; }
+
+async function paylasListele() {
+  const { data, error } = await supabase.rpc("ozel_icerik_alicilari_getir", { p_dosya_id: paylasDosya.id });
+  k.paylasListe.replaceChildren();
+  if (error) { paylasHata("Alıcılar alınamadı."); return; }
+  paylasIdler = new Set((data || []).map((u) => u.kullanici_id));
+  if (!data.length) k.paylasListe.appendChild(el("li", "ra-bos ra-bos-kucuk", "Şu an yalnızca sen erişebiliyorsun."));
+  data.forEach((u) => {
+    const li = el("li", "ra-paylas-oge");
+    li.appendChild(el("span", `ra-avatar ${avatarSinifi(u.ad)}`, basHarfler(u.ad)));
+    const m = el("span", "ra-as-metin");
+    m.append(el("span", "ra-as-ad", u.ad), el("span", "ra-meta", ROL_ETIKETI[u.rol] || u.rol));
+    li.appendChild(m);
+    li.appendChild(btn("Kaldır", "ra-btn ra-btn-kucuk ra-btn-tehlike", async (e) => {
+      const b = e.currentTarget; b.disabled = true;
+      const { error: h } = await supabase.rpc("ozel_icerik_alici_kaldir", { p_dosya_id: paylasDosya.id, p_alici_id: u.kullanici_id });
+      if (h) { paylasHata(h.message || "Kaldırılamadı."); b.disabled = false; return; }
+      paylasHata(""); paylasListele();
+    }));
+    k.paylasListe.appendChild(li);
+  });
 }
+
+async function paylasEkle(u) {
+  paylasHata("");
+  try {
+    const { harita, eksik } = await aliciAnahtarlariniGetir([u.id]);
+    if (eksik.length) throw new Error(`${u.ad} panele henüz giriş yapmadığı için şifreli dosya alamaz.`);
+    const { data: zarf, error } = await supabase.from("ozel_icerik_anahtarlar").select("sarili_dosya_anahtari")
+      .eq("dosya_id", paylasDosya.id).eq("alici_id", durum.uid).maybeSingle();
+    if (error || !zarf) throw new Error("Bu dosyanın anahtarı bulunamadı.");
+    const yeni = await anahtariYenidenZarfla(zarf.sarili_dosya_anahtari, harita.get(u.id));
+    const { error: ek } = await supabase.from("ozel_icerik_anahtarlar").insert({ dosya_id: paylasDosya.id, alici_id: u.id, sarili_dosya_anahtari: yeni });
+    if (ek) throw new Error(ek.code === "23505" ? `${u.ad} zaten erişebiliyor.` : "Paylaşım kaydedilemedi.");
+  } catch (e) { paylasHata(e.message); }
+  await paylasListele();
+}
+
+async function paylasAc(s) {
+  paylasDosya = s; paylasIdler = new Set();
+  k.paylasDosyaAd.textContent = `📄 ${s.ad}`;
+  paylasHata(""); k.paylasKok.replaceChildren();
+  aliciSeciciKur({
+    kok: k.paylasKok, yerTutucu: "Paylaşmak için isim ara…", anahtarGerekli: true,
+    haric: () => new Set([durum.uid, ...paylasIdler]), sec: paylasEkle,
+  });
+  k.dlgPaylas.showModal();
+  await paylasListele();
+}
+
+/* -------------------------------- alıcı çipleri -------------------------------- */
 function aliciCiz() {
   k.aliciSecili.replaceChildren();
   durum.alicilar.forEach((ad, id) => {
     const li = el("li");
-    li.appendChild(btn(`${ad} ✕`, "ra-chip", () => { durum.alicilar.delete(id); aliciCiz(); }, { "aria-label": `${ad} alıcısını kaldır` }));
-    k.aliciSecili.appendChild(li);
+    const c = el("span", "ra-chip");
+    c.append(el("span", `ra-avatar ra-avatar-k ${avatarSinifi(ad)}`, basHarfler(ad)), el("span", "", ad));
+    c.appendChild(btn("✕", "ra-chip-x", () => { durum.alicilar.delete(id); aliciCiz(); }, { "aria-label": `${ad} alıcısını kaldır` }));
+    li.appendChild(c); k.aliciSecili.appendChild(li);
   });
 }
 
-/* ---------------------------------- kurulum ---------------------------------- */
-function sekmeDegistir(sekme) {
-  durum.sekme = sekme; durum.arama = ""; k.ara.value = "";
-  k.sekmeArsiv.setAttribute("aria-selected", String(sekme === "arsiv"));
-  k.sekmePaylasilan.setAttribute("aria-selected", String(sekme === "paylasilan"));
-  const arsivModu = sekme === "arsiv";
-  k.arac.hidden = !arsivModu; k.yuklemeBolumu.hidden = !(arsivModu && durum.yetki.yukle);
-  k.klasorBolumu.hidden = !(arsivModu && durum.yetki.yukle);
-  listele();
+/* ------------------------------- özet / kota ------------------------------- */
+async function ozetYukle() {
+  try {
+    const { data, error } = await supabase.rpc("r2_arsiv_ozet");
+    if (error || !data?.length) { k.ozet.hidden = true; return; }
+    const o = data[0];
+    const parca = [`${o.dosya_sayisi} dosya`, `${o.klasor_sayisi} klasör`, boyutYaz(o.toplam_boyut)];
+    if (yukleyebilir()) {
+      const { data: kota } = await supabase.rpc("r2_kota_durumu");
+      if (kota?.length) {
+        const a = kota.find((x) => x.sinif === "A")?.sayi ?? 0, b = kota.find((x) => x.sinif === "B")?.sayi ?? 0;
+        parca.push(`bu ay R2: ${a} yazma · ${b} okuma işlemi`);
+      }
+    }
+    k.ozet.textContent = parca.join(" · "); k.ozet.hidden = false;
+  } catch { k.ozet.hidden = true; }
+}
+
+/* ------------------------------- sekmeler / kurulum ------------------------------- */
+function kontrolleriGuncelle() {
+  const goster = arsivSekmesi() && yukleyebilir();
+  k.eylem.hidden = !goster; k.sifreKart.hidden = !goster;
+  k.sekmeler.forEach(([id, ad]) => k[id].setAttribute("aria-selected", String(durum.sekme === ad)));
+}
+
+function sekmeDegistir(sekme, yenile = true) {
+  durum.sekme = sekme; durum.arama = ""; k.ara.value = ""; k.araTemizle.hidden = true; k.sirala.disabled = false;
+  durum.filtre = "hepsi"; k.filtreler.querySelectorAll(".ra-filtre").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.filtre === "hepsi")));
+  kontrolleriGuncelle(); hedefYaz();
+  if (yenile) listele();
+}
+
+function yuklemeBaslat(girdiSozu) {
+  Promise.resolve(girdiSozu).then(async (girdiler) => {
+    k.kuyrukKart.hidden = false;
+    const kisaltildi = await kuyruk.ekle(girdiler);
+    if (kisaltildi) bildir("Tek seferde en fazla 500 dosya alınır; ilk 500 dosya kuyruğa eklendi.", "ok");
+  }).catch((e) => bildir(e.message || "Yükleme başlatılamadı."));
 }
 
 function surukleBirak() {
-  const bolge = k.birak;
-  ["dragenter", "dragover"].forEach((o) => bolge.addEventListener(o, (e) => { e.preventDefault(); bolge.classList.add("ra-surukleniyor"); }));
-  ["dragleave", "drop"].forEach((o) => bolge.addEventListener(o, (e) => { e.preventDefault(); bolge.classList.remove("ra-surukleniyor"); }));
-  bolge.addEventListener("drop", (e) => kuyrugaEkle([...e.dataTransfer.files]));
-  k.dosyaSec.addEventListener("change", () => { kuyrugaEkle([...k.dosyaSec.files]); k.dosyaSec.value = ""; });
+  let sayac = 0;
+  const dosyaVar = (e) => [...(e.dataTransfer?.types || [])].includes("Files");
+  const goster = (v) => { k.katman.hidden = !v; };
+  k.kok.addEventListener("dragenter", (e) => { if (!dosyaVar(e)) return; e.preventDefault(); sayac++; if (arsivSekmesi() && yukleyebilir()) { k.katmanAlt.textContent = ` → /${durum.yol}`; goster(true); } });
+  k.kok.addEventListener("dragover", (e) => { if (dosyaVar(e)) e.preventDefault(); });
+  k.kok.addEventListener("dragleave", (e) => { if (!dosyaVar(e)) return; sayac = Math.max(0, sayac - 1); if (!sayac) goster(false); });
+  k.kok.addEventListener("drop", (e) => {
+    if (!dosyaVar(e)) return;
+    e.preventDefault(); sayac = 0; goster(false);
+    if (!arsivSekmesi() || !yukleyebilir()) return bildir("Bu görünümde ya da yetkiyle yükleme yapılamaz.");
+    yuklemeBaslat(dosyalariTopla(e.dataTransfer));     // entry'ler senkron okunur (dosyalariTopla'nın ilk satırları)
+  });
 }
 
 async function basla() {
@@ -345,38 +515,103 @@ async function basla() {
 
   const q = (id) => slot.querySelector(`#${id}`);
   k = {
-    mesaj: q("ra-mesaj"), yol: q("ra-yol"), liste: q("ra-liste"), daha: q("ra-daha"), ara: q("ra-ara"), arac: q("ra-arac"),
-    sekmeArsiv: q("ra-sekme-arsiv"), sekmePaylasilan: q("ra-sekme-paylasilan"),
-    yuklemeBolumu: q("ra-yukleme"), klasorBolumu: q("ra-klasor-bolum"), klasorAd: q("ra-klasor-ad"), klasorEkle: q("ra-klasor-ekle"),
-    birak: q("ra-birak"), dosyaSec: q("ra-dosya-sec"), kuyruk: q("ra-kuyruk"),
-    sifreli: q("ra-sifreli"), aliciBlok: q("ra-alici-blok"), aliciAra: q("ra-alici-ara"),
-    aliciSonuc: q("ra-alici-sonuc"), aliciSecili: q("ra-alici-secili"),
+    kok: q("ra-kok"), mesaj: q("ra-mesaj"), ozet: q("ra-ozet"), yol: q("ra-yol"), liste: q("ra-liste"), bos: q("ra-bos"), daha: q("ra-daha"),
+    ara: q("ra-ara"), araTemizle: q("ra-ara-temizle"), sirala: q("ra-sirala"), filtreler: q("ra-filtreler"),
+    gorunumListe: q("ra-gorunum-liste"), gorunumIzgara: q("ra-gorunum-izgara"),
+    sekmeArsiv: q("ra-sekme-arsiv"), sekmePaylastiklarim: q("ra-sekme-paylastiklarim"), sekmePaylasilan: q("ra-sekme-paylasilan"),
+    eylem: q("ra-eylem"), hedef: q("ra-hedef"), girdiDosya: q("ra-girdi-dosya"), girdiKlasor: q("ra-girdi-klasor"),
+    sifreKart: q("ra-sifre-kart"), sifreli: q("ra-sifreli"), sifreDetay: q("ra-sifre-detay"), aliciKok: q("ra-alici-kok"), aliciSecili: q("ra-alici-secili"),
+    kuyrukKart: q("ra-kuyruk-kart"), kuyrukListe: q("ra-kuyruk"), kuyrukOzet: q("ra-kuyruk-ozet"), kuyrukTemizle: q("ra-kuyruk-temizle"),
+    secimBar: q("ra-secim-bar"), secimSayi: q("ra-secim-sayi"), hepsiniSec: q("ra-hepsini-sec"),
+    katman: q("ra-katman"), katmanAlt: q("ra-katman-alt"),
+    dlgMetin: q("ra-dlg-metin"), dlgMetinForm: q("ra-dlg-metin-form"), dlgMetinBaslik: q("ra-dlg-metin-baslik"), dlgMetinEtiket: q("ra-dlg-metin-etiket"),
+    dlgMetinGirdi: q("ra-dlg-metin-girdi"), dlgMetinHata: q("ra-dlg-metin-hata"), dlgMetinIptal: q("ra-dlg-metin-iptal"), dlgMetinTamam: q("ra-dlg-metin-tamam"),
+    dlgOnay: q("ra-dlg-onay"), dlgOnayBaslik: q("ra-dlg-onay-baslik"), dlgOnayMetin: q("ra-dlg-onay-metin"), dlgOnayIptal: q("ra-dlg-onay-iptal"), dlgOnayTamam: q("ra-dlg-onay-tamam"),
+    dlgPaylas: q("ra-dlg-paylas"), paylasDosyaAd: q("ra-dlg-paylas-dosya"), paylasKok: q("ra-paylas-kok"), paylasListe: q("ra-paylas-liste"), paylasHata: q("ra-paylas-hata"),
+    dlgOnizleme: q("ra-dlg-onizleme"), onizlemeBaslik: q("ra-dlg-onizleme-baslik"), onizlemeImg: q("ra-onizleme-img"), onizlemeHata: q("ra-onizleme-hata"), onizlemeIndir: q("ra-onizleme-indir"),
   };
+  k.sekmeler = [["sekmeArsiv", "arsiv"], ["sekmePaylastiklarim", "paylastiklarim"], ["sekmePaylasilan", "paylasilan"]];
 
   const { data: oturum } = await supabase.auth.getSession();
   durum.uid = oturum.session?.user.id;
   const { data: yetki } = await supabase.rpc("r2_arsiv_yetkilerim");
   if (yetki) durum.yetki = yetki;
+  anahtarlariHazirla().catch((e) => console.warn("e2ee:", e.message));   // alıcı olabilmek için sessizce
 
-  // Şifreli paylaşımı kullanabilecek herkes için anahtarlar sessizce hazırlanır (alıcı olabilsinler).
-  anahtarlariHazirla().catch((e) => console.warn("e2ee:", e.message));
-
+  durum.gorunum = tercihOku("ra-gorunum", "liste") === "izgara" ? "izgara" : "liste";
   const arsivGorunur = durum.yetki.oku || durum.yetki.yukle;
   k.sekmeArsiv.hidden = !arsivGorunur;
+  k.sekmePaylastiklarim.hidden = !yukleyebilir();
   k.sekmePaylasilan.hidden = !(durum.yetki.paylasilan_var || arsivGorunur);
 
-  k.sekmeArsiv.addEventListener("click", () => sekmeDegistir("arsiv"));
-  k.sekmePaylasilan.addEventListener("click", () => sekmeDegistir("paylasilan"));
-  k.daha.addEventListener("click", () => listele(true));
-  k.klasorEkle.addEventListener("click", klasorOlustur);
-  k.klasorAd.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); klasorOlustur(); } });
+  kuyruk = kuyrukKur({
+    liste: k.kuyrukListe, ozet: k.kuyrukOzet, temizleBtn: k.kuyrukTemizle,
+    baglam: () => ({ yukleyebilir: yukleyebilir(), klasor: durum.yol, sifreli: k.sifreli.checked, alicilar: [...durum.alicilar.keys()], uid: durum.uid }),
+    bitti: () => { if (arsivSekmesi() && !durum.arama) listele(); ozetYukle(); },
+  });
+
+  /* sekmeler, arama, filtre, sıralama, görünüm */
+  k.sekmeler.forEach(([id, ad]) => k[id].addEventListener("click", () => sekmeDegistir(ad)));
   let aramaZ = null;
-  k.ara.addEventListener("input", () => { clearTimeout(aramaZ); aramaZ = setTimeout(() => { durum.arama = k.ara.value.trim(); listele(); }, 300); });
-  k.sifreli.addEventListener("change", () => { k.aliciBlok.hidden = !k.sifreli.checked; });
-  k.aliciAra.addEventListener("input", aliciAra);
+  k.ara.addEventListener("input", () => {
+    k.araTemizle.hidden = !k.ara.value;
+    clearTimeout(aramaZ);
+    aramaZ = setTimeout(() => { durum.arama = k.ara.value.trim(); k.sirala.disabled = !!durum.arama && arsivSekmesi(); listele(); }, 250);
+  });
+  k.ara.addEventListener("keydown", (e) => { if (e.key === "Escape" && k.ara.value) { e.preventDefault(); aramayiTemizle(); } });
+  k.araTemizle.addEventListener("click", () => { aramayiTemizle(); k.ara.focus(); });
+  k.filtreler.addEventListener("click", (e) => {
+    const b = e.target.closest(".ra-filtre"); if (!b) return;
+    durum.filtre = b.dataset.filtre;
+    k.filtreler.querySelectorAll(".ra-filtre").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    ciz();
+  });
+  k.sirala.addEventListener("change", () => { durum.sirala = k.sirala.value; listele(); });
+  const gorunumUygula = () => {
+    k.gorunumListe.setAttribute("aria-pressed", String(durum.gorunum === "liste"));
+    k.gorunumIzgara.setAttribute("aria-pressed", String(durum.gorunum === "izgara"));
+    k.liste.classList.toggle("ra-izgara", durum.gorunum === "izgara");
+  };
+  k.gorunumListe.addEventListener("click", () => { durum.gorunum = "liste"; tercihYaz("ra-gorunum", "liste"); gorunumUygula(); });
+  k.gorunumIzgara.addEventListener("click", () => { durum.gorunum = "izgara"; tercihYaz("ra-gorunum", "izgara"); gorunumUygula(); });
+  gorunumUygula();
+  k.daha.addEventListener("click", () => listele(true));
+
+  /* seçim */
+  k.hepsiniSec.addEventListener("change", () => {
+    gorunenler().forEach((s) => { if (k.hepsiniSec.checked) durum.secili.add(s.id); else durum.secili.delete(s.id); });
+    ciz();
+  });
+  q("ra-secim-iptal").addEventListener("click", () => { durum.secili.clear(); ciz(); });
+  q("ra-secim-sil").addEventListener("click", topluSil);
+
+  /* yükleme */
+  q("ra-yukle-dosya").addEventListener("click", () => k.girdiDosya.click());
+  q("ra-yukle-klasor").addEventListener("click", () => k.girdiKlasor.click());
+  q("ra-klasor-yeni").addEventListener("click", yeniKlasor);
+  [k.girdiDosya, k.girdiKlasor].forEach((g) => g.addEventListener("change", () => {
+    yuklemeBaslat(dosyalariTopla(g)); // FileList'i await'ten ÖNCE kopyalanır (dosyalariTopla ilk satırlarda okur)
+    setTimeout(() => { g.value = ""; }, 0);
+  }));
+  k.sifreli.addEventListener("change", () => { k.sifreDetay.hidden = !k.sifreli.checked; });
+  aliciSeciciKur({
+    kok: k.aliciKok, yerTutucu: "Alıcı ekle (isim ara)…", anahtarGerekli: true,
+    haric: () => new Set(durum.alicilar.keys()),
+    sec: (u) => { durum.alicilar.set(u.id, u.ad); aliciCiz(); },
+  });
   surukleBirak();
 
-  sekmeDegistir(arsivGorunur ? "arsiv" : "paylasilan");
+  /* diyalog kapatma */
+  q("ra-dlg-paylas-kapat").addEventListener("click", () => { k.dlgPaylas.close(); listele(); });
+  k.dlgPaylas.addEventListener("click", (e) => { if (e.target === k.dlgPaylas) k.dlgPaylas.close(); });
+  q("ra-onizleme-kapat").addEventListener("click", onizlemeKapat);
+  k.dlgOnizleme.addEventListener("click", (e) => { if (e.target === k.dlgOnizleme) onizlemeKapat(); });
+  k.dlgOnizleme.addEventListener("close", onizlemeKapat);
+
+  kontrolleriGuncelle(); hedefYaz();
+  if (!arsivGorunur) sekmeDegistir("paylasilan", false);
+  ozetYukle();
+  listele();
 }
 
 basla().catch((e) => console.error("r2-arsiv.js:", e));
