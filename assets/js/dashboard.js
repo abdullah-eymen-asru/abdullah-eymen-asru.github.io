@@ -60,6 +60,9 @@ const MODULES = {
   // (bkz. NAV'daki izin:"arsiv" ve gorunurMu()). Gerçek yetki: RLS + r2_arsiv_worker.
   arsiv: { src: "./r2-arsiv/r2-arsiv.js", role: null },
   arsivIzin: { src: "./r2-arsiv/izin-paneli.js", role: "owner" },
+  // Yetki Ayarları > "Alan Adı & Sayfa Erişim Kalkanı" (gatekeeper; migration 0061).
+  // Gerçek yetki: site_ayarlari UPDATE politikası + owner RPC'leri is_owner() ister.
+  kalkan: { src: "./gatekeeper/kalkan-paneli.js", role: "owner" },
   // "Panelim" (eski /panel/panel.html) — giriş yapmış HERKESE açık:
   // sıradan üye de, owner da aynı sekmeyi görür.
   panelim: { src: "./panel.js", role: null },
@@ -435,6 +438,7 @@ async function showView(viewId, moduleKey) {
   await ensureModuleLoaded(moduleKey);
   // Yetki Ayarları: owner için "R2 Erişim İzni" bölümü (ayrı modül; gy modülüne dokunmaz)
   if (viewId === "sys-yetki") await ensureModuleLoaded("arsivIzin");
+  if (viewId === "sys-yetki") await ensureModuleLoaded("kalkan");
 }
 
 function firstAvailableView(profile) {
