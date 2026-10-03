@@ -243,6 +243,15 @@
 
   <link rel="stylesheet" href="{{ '/assets/style.css' | relative_url }}">
 
+  <!-- ALAN ADI & SAYFA ERİŞİM KALKANI (Gatekeeper) — bkz. assets/js/core/gatekeeper.js
+       başındaki tasarım notu. Bilerek: (1) style.css'ten HEMEN SONRA — kilit kartının
+       stilleri hazırken çalışsın; (2) senkron, defer/async YOK — kilitlenirse sonraki
+       <head> scriptleri (GA, Umami, diğer scriptler) ve <body> çalışmasın (uçuştaki
+       istekler iptal edilir), ve içerik ilk boyadan ÖNCE gizlenebilsin; (3) HARİCİ dosya — inline script olmadığı için CSP
+       hash eklentisini (_plugins/csp_hash_enjekte.rb) etkilemez. /hesap/, /panel/ ve
+       gizlilik politikası hiçbir koşulda kilitlenmez. -->
+  <script src="{{ '/assets/js/core/gatekeeper.js' | relative_url }}"></script>
+
   <!-- GÜVENLİK (CSP) + ANDROID WEBVIEW UYUMLULUĞU: bu <style> etiketi
        ÖNCEDEN JS ile (document.createElement("style")) ÇALIŞMA ZAMANINDA
        oluşturuluyordu — ama dinamik oluşturulan bir <style> elementinin
