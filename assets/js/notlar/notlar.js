@@ -1435,9 +1435,36 @@ function baglantilariKur() {
 /* ------------------------------------------------------------------ */
 
 async function init() {
-  const { session } = await requireAuthOrShowError({ role: ["editor", "manager"] });
+  // Rol şartı KOYMUYORUZ: modülü owner'ın açtığı bir üye (user/special_user) de girebilmeli.
+  // Yetki kararı veritabanındaki not_modulu_yetkili()'den gelir (rol listesi + owner'ın rol/kişi
+  // bazlı kapatmaları + üyeye açmaları, migration 0059/0060); RLS ve R2 worker'ı da aynısını sorar.
+  const { session, profile } = await requireAuthOrShowError();
   S.session = session;
   if (!$("notlar")) return;
+
+  const { data: yetkili, error: yetkiHatasi } = await supabase.rpc("not_modulu_yetkili");
+  // RPC yoksa/erişilemezse (migration eksik, ağ) eski rol kuralına düş; RLS yine veriyi korur.
+  const izinVar = yetkiHatasi
+    ? ["editor", "manager", "admin", "owner"].includes(profile?.role)
+    : yetkili === true;
+  if (!izinVar) {
+    await Kasa.tumAnahtarlariTemizle();
+    $("notlar").replaceChildren(
+      el(
+        "div",
+        { class: "nt-kilit" },
+        el("h2", { text: "🔒 Fikir & Araştırma Tezgâhı hesabın için etkin değil" }),
+        el("p", {
+          class: "muted",
+          text:
+            "Bu özelliğe erişimi site sahibi yönetir. Daha önce notların varsa silinmedi; erişim " +
+            "(yeniden) açıldığında aynen geri gelecek.",
+        })
+      )
+    );
+    return;
+  }
+
   baglantilariKur();
 
   try {
