@@ -569,3 +569,14 @@ body.dash-nav-acik {
   margin: 8px 0 16px;
   font-size: 0.85rem;
 }
+
+/* Yetki Ayarları > Alan Adı & Sayfa Erişim Kalkanı (assets/js/gatekeeper/kalkan-paneli.js).
+   Matris ve anahtarlar github-yonetim.css'teki .ya-tablo / .ya-mini-toggle'ı yeniden kullanır;
+   üye izni listesi notlar.css'teki .nt-ya-* sınıflarını. Burada sadece yerleşim. */
+.gk-p-anahtarlar { display: grid; gap: 12px; margin: 12px 0 8px; }
+.gk-p-anahtar { display: flex; align-items: center; gap: 12px; }
+.gk-p-anahtar > label:last-child { cursor: pointer; }
+.gk-p-tablo-sarmal { overflow-x: auto; }
+.gk-p-kucuk { font-size: 0.82rem; margin: 8px 0 0; }
+#gk-bakim-mesaji { width: 100%; box-sizing: border-box; resize: vertical; }
+#gk-kalkan-bolumu .nt-ya-bolum { margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--border); }
