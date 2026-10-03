@@ -9,7 +9,7 @@
  *   GET  /kasa-anahtari   -> kullanıcıya özel E2EE kasa anahtarı (HKDF)
  *   POST /yukle-baslat    -> yetki + MIME/boyut doğrulama + kota rezervi + presigned PUT
  *   POST /yukle-bitir     -> R2'de HEAD ile boyut doğrula, kaydı 'hazir' yap
- *   POST /indir           -> yetki + presigned GET (kısa ömürlü)
+ *   POST /indir           -> yetki + presigned GET (kısa ömürlü); {satir_ici:true} görsel/PDF önizleme
  *   POST /sil             -> yetki + R2 toplu silme (binding) + DB kaydı silme
  *
  * Gerekli Secret/Var (wrangler secret put ...):
@@ -23,7 +23,6 @@
 
 const IZINLI_ORIGINLER = new Set([
   "https://abdullah-eymen-asru.github.io",
-  "https://abdullah-eymen-asru.pages.dev",
   "http://127.0.0.1:5500",
   "http://localhost:5500",
 ]);
@@ -280,7 +279,12 @@ async function indir(env, uid, g) {
   await kotaRezerve(env, "B", 1);                       // GET = Class B
   const ek = {};
   if (!satir.sifreli) {
-    ek["response-content-disposition"] = `attachment; filename*=UTF-8''${rfc3986(satir.ad)}`;
+    // Önizleme (satir_ici) YALNIZCA görsel ve PDF için; diğer her şey "attachment" (indirme).
+    // Güvenlik: tür, yükleme anında beyaz listeden geçmiş saklı türdür (HTML/SVG zaten yok).
+    const satirIciUygun = g.satir_ici === true &&
+      (/^image\/(png|jpeg|gif|webp|avif)$/.test(satir.mime || "") || satir.mime === "application/pdf");
+    ek["response-content-disposition"] =
+      `${satirIciUygun ? "inline" : "attachment"}; filename*=UTF-8''${rfc3986(satir.ad)}`;
     ek["response-content-type"] = satir.mime || "application/octet-stream";
   }
   const url = await presign(env, { method: "GET", key: satir.r2_key, saniye: INDIRME_SURESI, ekSorgu: ek });
