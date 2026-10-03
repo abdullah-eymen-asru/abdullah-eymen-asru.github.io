@@ -7,6 +7,7 @@
  * kayıt yoksa varsayılan: owner tam, admin tam, diğer roller YOK.
  */
 import { supabase } from "../core/supabase-client.js";
+import { aliciSeciciKur } from "./alici-secici.js";
 
 const ROLLER = [
   ["admin", "Admin"], ["manager", "İçerik Sorumlusu"], ["editor", "İçerik Editörü"],
@@ -76,33 +77,22 @@ async function basla() {
     kullanicilar.forEach((u) => satir("kullanici", u.hedef, `👤 ${u.ad}`, u, true));
     tablo.appendChild(tbody);
 
-    // kullanıcı ekleme
-    const ekle = el("div", "ra-arac");
-    const giris = document.createElement("input");
-    giris.type = "search"; giris.placeholder = "Kullanıcıya özel izin için isim ara (en az 2 harf)";
-    const sonuc = el("ul", "ra-alici-sonuc");
-    let z = null;
-    giris.addEventListener("input", () => {
-      clearTimeout(z); sonuc.replaceChildren();
-      if (giris.value.trim().length < 2) return;
-      z = setTimeout(async () => {
-        const { data: u, error: hata } = await supabase.rpc("arsiv_kullanici_ara", { p_q: giris.value.trim() });
-        if (hata) return goster("Kullanıcı aranamadı.");
-        sonuc.replaceChildren();
-        (u || []).filter((x) => x.role !== "owner" && !kullanicilar.some((k) => k.hedef === x.id)).forEach((x) => {
-          const li = el("li"); const b = el("button", "ra-chip", `+ ${x.full_name || "(adsız)"}`); b.type = "button";
-          b.addEventListener("click", async () => {
-            const { error: h2 } = await supabase.rpc("r2_arsiv_izin_ayarla", { p_tur: "kullanici", p_hedef: x.id, p_oku: true, p_yukle: false, p_sil: false });
-            if (h2) return goster(h2.message || "Eklenemedi."); ciz();
-          });
-          li.appendChild(b); sonuc.appendChild(li);
-        });
-      }, 300);
+    // kullanıcı ekleme (ortak alıcı seçici: Türkçe-duyarsız, öneri listeli)
+    const ekle = el("div", "ra-izin-ekle");
+    ekle.appendChild(el("p", "ra-yardim", "Tek bir kişiye özel izin vermek ya da onu kısıtlamak için ara:"));
+    aliciSeciciKur({
+      kok: ekle, yerTutucu: "Kullanıcı ara (isim)…", anahtarGerekli: false,
+      haric: () => new Set(kullanicilar.map((x) => x.hedef)),
+      sec: async (u) => {
+        if (u.rol === "owner") return goster("Site Sahibi zaten tam yetkilidir; kısıtlanamaz.");
+        const { error: h } = await supabase.rpc("r2_arsiv_izin_ayarla", { p_tur: "kullanici", p_hedef: u.id, p_oku: true, p_yukle: false, p_sil: false });
+        if (h) return goster(h.message || "Eklenemedi.");
+        goster(`${u.ad} için kayıt eklendi (varsayılan: yalnızca görüntüleme).`, false); ciz();
+      },
     });
-    ekle.appendChild(giris);
 
     const kaydirma = el("div", "ra-izin-kaydirma"); kaydirma.appendChild(tablo);
-    kok.replaceChildren(kaydirma, ekle, sonuc);
+    kok.replaceChildren(kaydirma, ekle);
   }
   ciz();
 }
