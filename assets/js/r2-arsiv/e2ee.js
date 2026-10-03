@@ -143,3 +143,15 @@ export async function dosyaCoz(sifreliBuf, zarfB64, kayitId) {
     throw new Error("Dosya doğrulanamadı: bozulmuş ya da değiştirilmiş olabilir.");
   }
 }
+
+/**
+ * Var olan bir dosyayı sonradan başkasıyla paylaşmak için: kendi zarfımızı açıp ham dosya
+ * anahtarını yeni alıcının açık anahtarıyla yeniden zarflar (dosyanın kendisine dokunulmaz).
+ */
+export async function anahtariYenidenZarfla(kendiZarfB64, aliciAcikAnahtarB64) {
+  const { ozel } = await anahtarlariHazirla();
+  let ham;
+  try { ham = await crypto.subtle.decrypt({ name: "RSA-OAEP" }, ozel, b64coz(kendiZarfB64)); }
+  catch { throw new Error("Dosya anahtarı açılamadı."); }
+  return anahtariZarfla(ham, aliciAcikAnahtarB64);
+}
