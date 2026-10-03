@@ -333,6 +333,16 @@ const OZELLIK_KATALOGU = [
     aciklama: "_posts/_projects altında BOŞ bir alt klasör oluşturma, silme ya da yeniden adlandırma (site yapısını değiştirme). Editor kendi oluşturduğu boş klasörü hariç, bu kapalıyken hiçbir klasör işlemi yapamaz.",
     rolSutunlari: ["editor", "manager", "admin"],
   },
+  {
+    // bkz. migration 0059 — Fikir & Araştırma Tezgâhı (uçtan uca şifreli not sistemi).
+    // Rol bazlı kapatma BU matristen; tek tek KİŞİYE kapatma bu matrisin altındaki
+    // "kullanıcı bazlı erişim" bölümünden (assets/js/notlar/yetki-paneli.js).
+    // Kapalıyken: modül menüden kalkar; RLS ve R2 worker'ı da reddeder. Notlar silinmez.
+    anahtar: "notlar_modulu",
+    baslik: "Fikir & Araştırma Tezgâhı (Not Sistemi)",
+    aciklama: "Uçtan uca şifreli not modülü: not yazma/okuma ve ek yükleme/indirme. Kapatılan rolün notları SİLİNMEZ, yeniden açılınca aynen döner. Tek tek kişiye kapatmak için matrisin altındaki bölümü kullan.",
+    rolSutunlari: ["editor", "manager", "admin"],
+  },
 ];
 
 /** Sıradan bir kullanıcının (owner OLMAYAN) kendi rolü için bir özelliğe
@@ -5587,6 +5597,11 @@ function wireYetkiAyarlari() {
   }
 
   yetkiAyarlariTablosunuYukle();
+
+  // Kullanıcı bazlı bölüm (Fikir & Araştırma Tezgâhı) — ayrı dosya, hata olsa matris etkilenmez.
+  import("../notlar/yetki-paneli.js")
+    .then((m) => m.kur())
+    .catch((err) => console.warn("Kullanıcı bazlı yetki paneli yüklenemedi:", err));
 }
 
 async function yetkiAyarlariTablosunuYukle() {
@@ -5614,7 +5629,10 @@ async function yetkiAyarlariTablosunuYukle() {
       });
     });
 
-    const basliklar = tumRoller.map((r) => `<th>${escapeHtml(YA_ROL_ETIKETLERI[r] || r)}</th>`).join("");
+    // "Tüm roller" sütunu: bir satırdaki (birden çok rolü olan) özelliği o satırın BÜTÜN
+    // rolleri için tek tıkla kapatır/açar (altta yetkiAyariniTopluKaydet).
+    const basliklar =
+      tumRoller.map((r) => `<th>${escapeHtml(YA_ROL_ETIKETLERI[r] || r)}</th>`).join("") + "<th>Tüm roller</th>";
 
     const satirlarHtml = OZELLIK_KATALOGU.map((ozellik) => {
       const ozellikRolleri = ozellik.rolSutunlari || ["admin"];
@@ -5635,6 +5653,16 @@ async function yetkiAyarlariTablosunuYukle() {
             </label>
           </td>`;
       }).join("");
+      const hepsiIzinli = ozellikRolleri.every((r) => kisitHaritasi[`${ozellik.anahtar}::${r}`] !== false);
+      const masterHucre =
+        ozellikRolleri.length > 1
+          ? `<td>
+            <label class="ya-mini-toggle" title="Bu özelliği tüm roller için aç/kapat">
+              <input type="checkbox" data-ya-master="${escapeHtml(ozellik.anahtar)}" ${hepsiIzinli ? "checked" : ""}>
+              <span class="ya-mini-track"><span class="ya-mini-thumb"></span></span>
+            </label>
+          </td>`
+          : `<td class="ya-hucre-yok" aria-hidden="true">—</td>`;
       return `
         <tr>
           <td>
@@ -5642,6 +5670,7 @@ async function yetkiAyarlariTablosunuYukle() {
             <span class="ya-ozellik-aciklama">${escapeHtml(ozellik.aciklama)}</span>
           </td>
           ${hucreler}
+          ${masterHucre}
         </tr>`;
     }).join("");
 
@@ -5652,11 +5681,63 @@ async function yetkiAyarlariTablosunuYukle() {
       </table>`;
 
     alan.querySelectorAll('input[data-ya-ozellik]').forEach((input) => {
-      input.addEventListener("change", () => yetkiAyariniKaydet(input));
+      input.addEventListener("change", async () => {
+        await yetkiAyariniKaydet(input);
+        yaMasterSenkronla(alan, input.dataset.yaOzellik);
+      });
+    });
+    alan.querySelectorAll("input[data-ya-master]").forEach((master) => {
+      master.addEventListener("change", () => yetkiAyariniTopluKaydet(master, alan));
     });
   } catch (err) {
     alan.innerHTML = '<p class="muted">Yüklenemedi.</p>';
     showMessage(msgEl, `Yetki ayarları yüklenemedi: ${err.message}`, "error");
+  }
+}
+
+// Satırdaki rol anahtarlarının hepsi açıksa "Tüm roller" anahtarı da açık görünsün.
+function yaMasterSenkronla(alan, ozellik) {
+  const master = alan.querySelector(`input[data-ya-master="${ozellik}"]`);
+  if (!master) return;
+  const roller = [...alan.querySelectorAll(`input[data-ya-ozellik="${ozellik}"]`)];
+  master.checked = roller.length > 0 && roller.every((r) => r.checked);
+}
+
+// "Tüm roller": satırın her rolü için MEVCUT owner_ozellik_erisimi_ayarla RPC'sini çağırır.
+async function yetkiAyariniTopluKaydet(master, alan) {
+  const msgEl = document.getElementById("ya-message");
+  const ozellik = master.dataset.yaMaster;
+  const yeniDeger = master.checked;
+  const roller = [...alan.querySelectorAll(`input[data-ya-ozellik="${ozellik}"]`)];
+
+  master.disabled = true;
+  roller.forEach((r) => (r.disabled = true));
+  try {
+    for (const r of roller) {
+      const { error } = await supabase.rpc("owner_ozellik_erisimi_ayarla", {
+        p_ozellik: ozellik,
+        p_rol: r.dataset.yaRol,
+        p_izinli: yeniDeger,
+      });
+      if (error) throw error;
+      r.checked = yeniDeger;
+    }
+    const baslik = OZELLIK_KATALOGU.find((o) => o.anahtar === ozellik)?.baslik || ozellik;
+    showMessage(
+      msgEl,
+      yeniDeger
+        ? `"${baslik}" tüm roller için yeniden açıldı.`
+        : `"${baslik}" tüm roller için kapatıldı. Bu rollerdeki hiç kimse artık kullanamaz.`,
+      "success"
+    );
+  } catch (err) {
+    showMessage(msgEl, `Kaydedilemedi: ${err.message}`, "error");
+    // kısmen uygulanmış olabilir: gerçek durumu yeniden yükleyip tabloyu doğrulat
+    yetkiAyarlariTablosunuYukle();
+  } finally {
+    master.disabled = false;
+    roller.forEach((r) => (r.disabled = false));
+    yaMasterSenkronla(alan, ozellik);
   }
 }
 
