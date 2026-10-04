@@ -1,6 +1,6 @@
 [⬅️ README'ye dön](../README.md)
 
-**📖 Site Rehberi** · [🔐 Supabase Sistemi](./02-supabase-sistemi.md) · [🍴 Fork Kurulumu](./03-fork-kurulumu.md)
+**📖 Site Rehberi** · [🔐 Supabase Sistemi](./02-supabase-sistemi.md) · [🍴 Fork Kurulumu](./03-fork-kurulumu.md) · [☁️ Cloudflare Secret & Ayarlar](./04-cloudflare-secretlar.md)
 
 ---
 
@@ -869,7 +869,7 @@ isteği 200 ile kabul eder ama hiçbir yere bildirim göndermez (loglar).
 
 [⬅️ README'ye dön](../README.md)
 
-**📖 Site Rehberi** · [🔐 Supabase Sistemi](./02-supabase-sistemi.md) · [🍴 Fork Kurulumu](./03-fork-kurulumu.md)
+**📖 Site Rehberi** · [🔐 Supabase Sistemi](./02-supabase-sistemi.md) · [🍴 Fork Kurulumu](./03-fork-kurulumu.md) · [☁️ Cloudflare Secret & Ayarlar](./04-cloudflare-secretlar.md)
 
 ---
 
