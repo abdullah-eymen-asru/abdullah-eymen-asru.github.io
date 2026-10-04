@@ -1,6 +1,6 @@
 [⬅️ README'ye dön](../README.md)
 
-[📖 Site Rehberi](./01-site-rehberi.md) · [🔐 Supabase Sistemi](./02-supabase-sistemi.md) · **🍴 Fork Kurulumu**
+[📖 Site Rehberi](./01-site-rehberi.md) · [🔐 Supabase Sistemi](./02-supabase-sistemi.md) · **🍴 Fork Kurulumu** · [☁️ Cloudflare Secret & Ayarlar](./04-cloudflare-secretlar.md)
 
 ---
 
@@ -168,7 +168,7 @@ onlara dokunmuyorsun.
   GitHub Pages adresini yaz
 - `robots.txt` içindeki `Sitemap:` satırını GitHub Pages adresine güncelle
   (Senaryo A'daki tabloyla aynı satır)
-- Cloudflare Worker'lardaki (`r2_storage_worker`, `izleme_okuma_worker`,
+- Cloudflare Worker'lardaki (`r2_imza_worker`, `r2_arsiv_worker`, `r2_not_ek_worker`, `izleme_okuma_worker`,
   `github_icerik_yonetim_worker`, `substack_feed_proxy_worker`)
   ve Edge Function'lardaki (`delete-account`, `admin-change-email`)
   `pages.dev` referanslarını silmen ZORUNLU değil (kullanılmayan bir
@@ -249,6 +249,8 @@ içindeki `substack_url`/`substack_feed` satırlarını sil.
 
 ### 7. Secret / Gizli Anahtarlar — Nerede, Nasıl Tanımlanır
 
+> 📌 **Tüm Worker secret'ları, değerlerin nereden bulunacağı ve Pages ayarları (build, `LANG` vb.) için adım adım rehber:** [☁️ Cloudflare Secret & Ayarlar](./04-cloudflare-secretlar.md). Aşağıdaki tablo sadece kısa bir özettir.
+
 Bu projede kod içine **asla düz yazılmaması gereken** secret'lar:
 Cloudflare Pages'i otomatik build tetikleyen deploy hook URL'i, ve (Bölüm
 6'daki) GitHub İçerik Yönetimi Worker'ının `GITHUB_PAT` /
@@ -260,7 +262,7 @@ ayarları secret değildir, herkese açık görünebilir bilgilerdir, bu yüzden
 |---|---|---|---|
 | `CLOUDFLARE_DEPLOY_HOOK_URL` | `.github/workflows/zamanlanmis-yayin.yml` | Cloudflare Pages projeni aç → **Settings → Builds & deployments → Deploy Hooks** → yeni bir hook oluştur, verdiği URL'i kopyala | GitHub repo'nda **Settings → Secrets and variables → Actions → New repository secret** → isim: `CLOUDFLARE_DEPLOY_HOOK_URL`, değer: kopyaladığın URL |
 | `GITHUB_PAT` | `cloudflare worker/github_icerik_yonetim_worker/worker.js` | Bkz. Bölüm 6, adım 3 | Worker → **Settings → Variables and Secrets** (Secret/Encrypt olarak) |
-| `SUPABASE_SERVICE_ROLE_KEY` | `cloudflare worker/github_icerik_yonetim_worker/worker.js` (ve varsa diğer Worker'ların — `r2_storage_worker`, `izleme_okuma_worker`) | Supabase Dashboard → **Project Settings → API** | İlgili Worker'ın **Settings → Variables and Secrets** (Secret/Encrypt olarak) |
+| `SUPABASE_SERVICE_ROLE_KEY` | `cloudflare worker/github_icerik_yonetim_worker/worker.js` (ve diğer Worker'ların — `r2_imza_worker`, `r2_arsiv_worker`, `izleme_okuma_yonetim_worker`; hangisine ne girileceği için bkz. [☁️ Cloudflare Secret & Ayarlar](./04-cloudflare-secretlar.md)) | Supabase Dashboard → **Project Settings → API** | İlgili Worker'ın **Settings → Variables and Secrets** (Secret/Encrypt olarak) |
 
 Bu projede kullanılan diğer üçüncü parti servisler (Google Analytics,
 giscus, Google Forms) API anahtarı değil, herkese açık/genel amaçlı ID'ler
@@ -273,11 +275,13 @@ yazman güvenlidir, GitHub Secrets'a eklemene gerek yoktur.
 2. `assets/data/schema.json` ve `llms.txt`'i kendi bilgilerinle yeniden yaz (Bölüm 2)
 3. İstemediğin özellikleri "Bölüm 4"e göre sil
 4. Cloudflare Pages'te yeni bir proje oluştur, bu repo'yu bağla
-   - Build command: `bundle exec jekyll build --config _config.yml,_config_cloudflare.yml`
+   - Build command: `bundle install && bundle exec jekyll build --config _config.yml,_config_cloudflare.yml`
    - Build output directory: `_site`
+   - Settings → Variables and secrets → Text olarak `LANG`, `LANGUAGE`, `LC_ALL` = `C.UTF-8` (kodlama hatalarını önler; ayrıntı: [☁️ Cloudflare Secret & Ayarlar → Bölüm 5](./04-cloudflare-secretlar.md))
 5. Zamanlanmış yayın özelliğini kullanacaksan `CLOUDFLARE_DEPLOY_HOOK_URL` secret'ını ekle (Bölüm 7)
 6. GitHub İçerik Yönetimi'ni kullanacaksan Worker'ı kur (Bölüm 6)
 6b. Substack kullanacaksan feed proxy Worker'ını kur (Bölüm 6b)
+6c. Diğer Worker'lar (R2 dosya arşivi/imza, not ekleri, izleme/okuma, admin bildirimleri) için [☁️ Cloudflare Secret & Ayarlar](./04-cloudflare-secretlar.md) rehberini izle
 7. GitHub Pages'i de kullanacaksan repo **Settings → Pages → Build and
    deployment → Source** kısmını **"GitHub Actions"** olarak seç (ARTIK
    "Deploy from a branch" DEĞİL — proje `.github/workflows/
@@ -293,7 +297,7 @@ yazman güvenlidir, GitHub Secrets'a eklemene gerek yoktur.
 
 [⬅️ README'ye dön](../README.md)
 
-[📖 Site Rehberi](./01-site-rehberi.md) · [🔐 Supabase Sistemi](./02-supabase-sistemi.md) · **🍴 Fork Kurulumu**
+[📖 Site Rehberi](./01-site-rehberi.md) · [🔐 Supabase Sistemi](./02-supabase-sistemi.md) · **🍴 Fork Kurulumu** · [☁️ Cloudflare Secret & Ayarlar](./04-cloudflare-secretlar.md)
 
 ---
 
