@@ -876,59 +876,86 @@ permalink: "/panel/dashboard.html"
          bu id'ye bağlanıyor ve owner değilsen bölümü DOM'dan siliyor. -->
     <section class="dash-view" id="view-sys-yetki" hidden data-view="sys-yetki">
       <h1>Yetki Ayarları</h1>
-      <section id="yetki-ayarlari" class="panel-section">
-              <h2>Yetki Ayarları</h2>
-              <p class="muted">
-                Bu sayfadaki (GitHub İçerik Yönetimi paneli) bazı özellikleri
-                hangi rollerin kullanabildiğini buradan <strong>kod yazmadan</strong>
-                değiştirebilirsin. Bir satırdaki anahtarı kapatırsan, o rol o
-                özelliği panelde artık hiç görmez VE sunucu tarafında da
-                (Cloudflare Worker) o işlemi yapmaya çalışsa reddedilir — sadece
-                görünürlük değil, gerçek bir yetki kısıtlamasıdır.
-              </p>
-              <p class="gy-yardim-metni">
-                <strong>Bu sadece owner'a (Site Sahibi'ne) özeldir.</strong>
-                owner'ın kendisi hiçbir zaman kısıtlanamaz (kendi panelinden
-                kilitlenmeni engellemek için bilerek böyle tasarlandı). Bir
-                anahtarı kapatman, ilgili rolün SADECE o tekil özelliğe erişimini
-                keser — o rolün panele genel girişini ya da diğer özelliklerini
-                etkilemez. Örnek: "CV Yönetimi" satırında "Admin" anahtarını
-                kapatırsan, adminler CV'yi artık göremez/değiştiremez, sadece sen
-                (owner) yönetebilirsin.
-              </p>
 
-              <div id="ya-tablo-alani">
-                <p class="muted">Yükleniyor...</p>
-              </div>
-              <div id="ya-message" class="auth-message" hidden></div>
+      <!-- "Sayfa içinde sayfa": her konu kendi alt sekmesinde. Tüm paneller DOM'da
+           kalır (id'ler ve modüllerin bağlandığı kökler değişmedi), yalnızca
+           seçili olanı görünür. Şerit mobilde yatay kaydırılır (dashboard.js ->
+           wireYetkiAltSekmeler). Yeni bölüm eklemek için buraya bir buton + aşağıya
+           aynı id'li bir <section class="panel-section ya-pane" hidden> eklemek yeter. -->
+      <div class="ya-altsekmeler" id="ya-altsekmeler" role="tablist" aria-label="Yetki ayarları bölümleri">
+        <button type="button" role="tab" class="ya-altsekme" id="ya-tab-ozellik" data-ya-pane="yetki-ayarlari" aria-controls="yetki-ayarlari" aria-selected="true">🎚️ Özellikler</button>
+        <button type="button" role="tab" class="ya-altsekme" id="ya-tab-tezgah" data-ya-pane="ya-pane-tezgah" aria-controls="ya-pane-tezgah" aria-selected="false" tabindex="-1">🌱 Tezgâh (kişi bazlı)</button>
+        <button type="button" role="tab" class="ya-altsekme" id="ya-tab-r2" data-ya-pane="ra-izin-bolumu" aria-controls="ra-izin-bolumu" aria-selected="false" tabindex="-1">🗄️ Dosya Yöneticisi</button>
+        <button type="button" role="tab" class="ya-altsekme" id="ya-tab-kalkan" data-ya-pane="gk-kalkan-bolumu" aria-controls="gk-kalkan-bolumu" aria-selected="false" tabindex="-1">🛡️ Erişim Kalkanı</button>
+        <button type="button" role="tab" class="ya-altsekme" id="ya-tab-kilit-izin" data-ya-pane="gk-izin-bolumu" aria-controls="gk-izin-bolumu" aria-selected="false" tabindex="-1">🔑 Kilit İzinleri</button>
+      </div>
 
-              <!-- Kullanıcı bazlı erişim (Fikir & Araştırma Tezgâhı): içeriği
-                   assets/js/notlar/yetki-paneli.js doldurur (sadece owner'da çalışır). -->
-              <div id="ya-kullanici-alani" class="nt-ya-kok"></div>
-            </section>
-              <section id="ra-izin-bolumu" class="panel-section" lang="tr">
-                <h2>R2 Erişim İzni</h2>
-                <p class="muted">
-                  "Dosya Yöneticisi" varsayılan olarak yalnızca Site Sahibi ve Adminler içindir.
-                  Buradan bir rolü ya da tek tek kullanıcıları açıp kapatabilirsin; kullanıcıya özel
-                  kayıt, rol kaydının önüne geçer. Kontrol sunucuda (Cloudflare Worker + RLS)
-                  yapılır, yetkisiz istek <code>403</code> alır.
-                </p>
-                <div id="ra-izin-kok"><p class="muted">Yükleniyor...</p></div>
-                <div id="ra-izin-mesaj" class="auth-message" hidden></div>
-              </section>
-              <section id="gk-kalkan-bolumu" class="panel-section">
-                <h2>Alan Adı &amp; Sayfa Erişim Kalkanı</h2>
-                <p class="muted">
-                  Siteni <code>github.io</code> ve <code>pages.dev</code> üzerinde ayrı ayrı, ya da sayfa/bölüm bazında
-                  <strong>kod değiştirmeden ve yeniden deploy etmeden</strong> kilitleyip açabilirsin. Ziyaretçiler kilit
-                  ekranı görür; owner, adminler ve izin verdiğin üyeler siteyi eksiksiz görmeye devam eder. Yalnızca
-                  Site Sahibi (owner) değiştirebilir. Kaynak: <code>assets/js/core/gatekeeper.js</code>, tablo
-                  <code>site_ayarlari</code> (migration 0061).
-                </p>
-                <div id="gk-kok"><p class="muted">Yükleniyor...</p></div>
-                <div id="gk-mesaj" class="auth-message" hidden></div>
-              </section>
+      <!-- 1) Özellik matrisi. id="yetki-ayarlari" ve içindeki id'ler AYNEN korundu:
+           github-yonetim.js -> wireYetkiAyarlari() / rolBazliArayuzuUygula() bu id'ye
+           bağlanıyor ve owner değilsen bölümü DOM'dan siliyor. -->
+      <section id="yetki-ayarlari" class="panel-section ya-pane" role="tabpanel" aria-labelledby="ya-tab-ozellik">
+        <h2>Özellik Erişimi</h2>
+        <p class="muted">
+          Hangi rolün hangi özelliği kullanabileceğini <strong>kod yazmadan</strong> buradan belirlersin.
+          Anahtarı kapatırsan o rol özelliği panelde göremez ve sunucu tarafında (Cloudflare Worker) da reddedilir.
+        </p>
+        <details class="ya-detay">
+          <summary>Nasıl çalışır?</summary>
+          <p class="gy-yardim-metni">
+            <strong>Bu sadece owner'a (Site Sahibi'ne) özeldir.</strong>
+            owner'ın kendisi hiçbir zaman kısıtlanamaz (kendi panelinden
+            kilitlenmeni engellemek için bilerek böyle tasarlandı). Bir
+            anahtarı kapatman, ilgili rolün SADECE o tekil özelliğe erişimini
+            keser — o rolün panele genel girişini ya da diğer özelliklerini
+            etkilemez. Örnek: "CV Yönetimi" satırında "Admin" anahtarını
+            kapatırsan, adminler CV'yi artık göremez/değiştiremez, sadece sen
+            (owner) yönetebilirsin.
+          </p>
+        </details>
+
+        <div id="ya-tablo-alani">
+          <p class="muted">Yükleniyor...</p>
+        </div>
+        <div id="ya-message" class="auth-message" hidden></div>
+      </section>
+
+      <!-- 2) Fikir & Araştırma Tezgâhı: kişi bazlı erişim (assets/js/notlar/yetki-paneli.js doldurur). -->
+      <section id="ya-pane-tezgah" class="panel-section ya-pane" role="tabpanel" aria-labelledby="ya-tab-tezgah" hidden>
+        <div id="ya-kullanici-alani" class="nt-ya-kok"></div>
+      </section>
+
+      <!-- 3) R2 Dosya Yöneticisi izni (assets/js/r2-arsiv/izin-paneli.js) -->
+      <section id="ra-izin-bolumu" class="panel-section ya-pane" lang="tr" role="tabpanel" aria-labelledby="ya-tab-r2" hidden>
+        <h2>R2 Erişim İzni</h2>
+        <p class="muted">
+          "Dosya Yöneticisi" varsayılan olarak yalnızca Site Sahibi ve Adminler içindir.
+          Buradan bir rolü ya da tek tek kullanıcıları açıp kapatabilirsin; kullanıcıya özel
+          kayıt, rol kaydının önüne geçer. Kontrol sunucuda (Cloudflare Worker + RLS)
+          yapılır, yetkisiz istek <code>403</code> alır.
+        </p>
+        <div id="ra-izin-kok"><p class="muted">Yükleniyor...</p></div>
+        <div id="ra-izin-mesaj" class="auth-message" hidden></div>
+      </section>
+
+      <!-- 4) Alan adı & sayfa kilidi (assets/js/gatekeeper/kalkan-paneli.js) -->
+      <section id="gk-kalkan-bolumu" class="panel-section ya-pane" role="tabpanel" aria-labelledby="ya-tab-kalkan" hidden>
+        <h2>Alan Adı &amp; Sayfa Erişim Kalkanı</h2>
+        <p class="muted">
+          Siteni <code>github.io</code> ve <code>pages.dev</code> üzerinde ayrı ayrı, ya da sayfa/bölüm bazında
+          <strong>kod değiştirmeden ve yeniden deploy etmeden</strong> kilitleyip açabilirsin. Ziyaretçiler kilit
+          ekranı görür; owner, adminler ve izin verdiğin üyeler siteyi eksiksiz görmeye devam eder. Yalnızca
+          Site Sahibi (owner) değiştirebilir. Kaynak: <code>assets/js/core/gatekeeper.js</code>, tablo
+          <code>site_ayarlari</code> (migration 0061).
+        </p>
+        <div id="gk-kok"><p class="muted">Yükleniyor...</p></div>
+        <div id="gk-mesaj" class="auth-message" hidden></div>
+      </section>
+
+      <!-- 5) Kilitli siteyi yine de görebilecek üyeler (aynı modül, ayrı kök) -->
+      <section id="gk-izin-bolumu" class="panel-section ya-pane" role="tabpanel" aria-labelledby="ya-tab-kilit-izin" hidden>
+        <div id="gk-izin-kok"><p class="muted">Yükleniyor...</p></div>
+        <div id="gk-izin-mesaj" class="auth-message" hidden></div>
+      </section>
     </section>
 
     <section class="dash-view" id="view-sys-hakkimda" hidden data-view="sys-hakkimda">
