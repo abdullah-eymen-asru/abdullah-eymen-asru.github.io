@@ -171,6 +171,13 @@ async function kur() {
   if (!kok || kok.dataset.hazir) return;
   kok.dataset.hazir = "1";
 
+  // Üye bazlı izin listesi artık kendi alt sekmesinde ("Kilit İzinleri"): ayrı kök + ayrı mesaj
+  // alanı (mesaj o sekmede görünür olmalı). Ana ayarlar yüklenemese bile bu liste bağımsız
+  // çalışsın diye en başta kurulur. Eski HTML'de kök yoksa eskisi gibi ana kökün altına eklenir.
+  const izinKok = document.getElementById("gk-izin-kok");
+  const izinKurucu = () => izinBolumuKur(document.getElementById("gk-izin-mesaj") || mesaj);
+  if (izinKok) izinKok.replaceChildren(izinKurucu());
+
   const katalog = window.AeaGatekeeper?.ROTALAR;
   if (!katalog) {
     kok.replaceChildren(el("p", { class: "muted", text: "gatekeeper.js yüklenemedi: rota kataloğu okunamadı." }));
@@ -207,22 +214,22 @@ async function kur() {
   const mevcutKilitler = mevcut.kilitli_rotalar || {};
   const katalogAnahtarlari = new Set(katalog.map((r) => r.anahtar));
   const hucre = {}; // `${host}::${rota}` -> input
-  const govde = el("tbody");
+  const govde = el("tbody", { role: "rowgroup" });
   for (const rota of katalog) {
-    const tr = el("tr", {}, el("td", {}, el("span", { class: "ya-ozellik-adi", text: rota.ad }), el("span", { class: "ya-ozellik-aciklama", text: rota.anahtar })));
+    const tr = el("tr", { role: "row" }, el("td", { role: "rowheader", class: "ya-ozellik-hucre" }, el("span", { class: "ya-ozellik-adi", text: rota.ad }), el("span", { class: "ya-ozellik-aciklama", text: rota.anahtar })));
     for (const h of HOSTLAR) {
       const kilitli = Array.isArray(mevcutKilitler[h.anahtar]) && mevcutKilitler[h.anahtar].includes(rota.anahtar);
       const input = el("input", { type: "checkbox", "data-gk-host": h.anahtar, "data-gk-rota": rota.anahtar, "aria-label": `${rota.ad} — ${h.ad}` });
       input.checked = !kilitli;
       hucre[`${h.anahtar}::${rota.anahtar}`] = input;
-      tr.append(el("td", {}, el("label", { class: "ya-mini-toggle" }, input, el("span", { class: "ya-mini-track" }, el("span", { class: "ya-mini-thumb" })))));
+      tr.append(el("td", { role: "cell", "data-label": h.ad }, el("label", { class: "ya-mini-toggle" }, input, el("span", { class: "ya-mini-track" }, el("span", { class: "ya-mini-thumb" })))));
     }
     govde.append(tr);
   }
   const tablo = el(
     "table",
-    { class: "ya-tablo" },
-    el("thead", {}, el("tr", {}, el("th", { text: "Sayfa / bölüm" }), ...HOSTLAR.map((h) => el("th", { text: h.ad })))),
+    { class: "ya-tablo", role: "table" },
+    el("thead", { role: "rowgroup" }, el("tr", { role: "row" }, el("th", { scope: "col", text: "Sayfa / bölüm" }), ...HOSTLAR.map((h) => el("th", { scope: "col", text: h.ad })))),
     govde
   );
 
@@ -302,7 +309,7 @@ async function kur() {
         "İşaretli = erişime açık, işaretsiz = kilitli. Alan adı tamamen kapalıysa o sütun pasif kalır (kapalı alan adında hiçbir sayfa açılmaz). " +
         "Giriş sayfaları (/hesap), panel ve gizlilik politikası hiçbir koşulda kilitlenmez; böylece kendini dışarıda bırakamazsın.",
     }),
-    el("div", { class: "gk-p-tablo-sarmal" }, tablo),
+    el("div", { class: "gk-p-tablo-sarmal ya-tablo-sarmal" }, tablo),
     el("div", { class: "form-field csp-mt-16" }, el("label", { for: "gk-bakim-mesaji", text: "Kilit ekranında görünecek mesaj (en çok 500 karakter)" }), mesajAlani),
     el("div", { class: "csp-flex-gap10-wrap csp-mt-12" }, kaydetBtn),
     sonGuncelleme,
@@ -311,9 +318,9 @@ async function kur() {
       text:
         "Kilidi görmek için gizli pencere aç: owner/admin olarak giriş yaptıysan kilit seni etkilemez. " +
         "Bu kilit, sayfayı tarayıcıda gizleyen bir perdedir; HTML dosyalarını, RSS/sitemap'i ve R2 bağlantılarını sunucudan kaldırmaz.",
-    }),
-    izinBolumuKur(mesaj)
+    })
   );
+  if (!izinKok) kok.append(izinKurucu()); // eski HTML: ayrı kök yok
 }
 
 function sonGuncellemeMetni(zaman) {
