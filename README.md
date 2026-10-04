@@ -7,16 +7,16 @@
 
 > 🤖 **Not:** Bu projenin kodu büyük ölçüde **yapay zeka** yardımıyla üretilmiş/geliştirilmiştir. Mimari kararlar ve yapılandırma insan gözetiminde yapılsa da, kaynak kodun tamamını kullanmadan/gözden geçirmeden production ortamına almanız önerilmez.
 
-> 📌 Aşağıdaki üç bölüm artık ayrı sekme dosyaları halinde — sekme adına tıklayınca ilgili rehbere geçersin (GitHub üzerinde gerçek/canlı sekme desteği olmadığı için bu, dosya bağlantılarıyla simüle edilen bir sekme şeridi).
+> 📌 Aşağıdaki dört bölüm artık ayrı sekme dosyaları halinde — sekme adına tıklayınca ilgili rehbere geçersin (GitHub üzerinde gerçek/canlı sekme desteği olmadığı için bu, dosya bağlantılarıyla simüle edilen bir sekme şeridi).
 
-| [📖 Site Rehberi](rehber/01-site-rehberi.md) | [🔐 Supabase Sistemi](rehber/02-supabase-sistemi.md) | [🍴 Fork Kurulumu](rehber/03-fork-kurulumu.md) |
-|---|---|---|
-| Hangi dosya ne işe yarar, neyi nerede değiştiririm? Tema, yorumlar, izlediklerim/okuduklarım tablosu, hesabım menüsü ve güvenlik notları da bu sekmede. | Supabase kurulum adımları, RLS, sorun giderme, e-posta/2FA/dosya paylaşımı akışları **ve en son yapılan düzeltmelerin değişiklik geçmişi (changelog)**. | Bu depoyu fork edip kendi sitene uyarlamak istersen atman gereken adımlar. |
+| [📖 Site Rehberi](rehber/01-site-rehberi.md) | [🔐 Supabase Sistemi](rehber/02-supabase-sistemi.md) | [🍴 Fork Kurulumu](rehber/03-fork-kurulumu.md) | [☁️ Cloudflare Secret & Ayarlar](rehber/04-cloudflare-secretlar.md) |
+|---|---|---|---|
+| Hangi dosya ne işe yarar, neyi nerede değiştiririm? Tema, yorumlar, izlediklerim/okuduklarım tablosu, hesabım menüsü ve güvenlik notları da bu sekmede. | Supabase kurulum adımları, RLS, sorun giderme, e-posta/2FA/dosya paylaşımı akışları **ve en son yapılan düzeltmelerin değişiklik geçmişi (changelog)**. | Bu depoyu fork edip kendi sitene uyarlamak istersen atman gereken adımlar. | Hangi Cloudflare Worker'a hangi secret/değişken girilir, değer nereden bulunur; Pages build ve `LANG` ayarları. |
 
 ## Bu depo hakkında kısa özet
 
 - **Jekyll** ile üretilen, **Cloudflare Pages** ve **GitHub Pages**'te aynı anda barınabilen kişisel bir site.
 - Blog, akademik projeler, izlediklerim/okuduklarım (Cloudflare Worker ile GitHub Projects'ten çekilir), iletişim formu ve **Supabase tabanlı** üyelik/panel/admin sistemi içerir.
-- Detaylı dokümantasyon uzun olduğu için üstteki 3 sekmeye bölündü (`rehber/` klasörü) — bu sayede README kısa kalıyor, her konu kendi dosyasında.
+- Detaylı dokümantasyon uzun olduğu için üstteki 4 sekmeye bölündü (`rehber/` klasörü) — bu sayede README kısa kalıyor, her konu kendi dosyasında.
 
 ---
