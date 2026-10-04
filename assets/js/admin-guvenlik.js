@@ -39,6 +39,7 @@
  */
 import { supabase, showMessage, escapeHtml } from "./core/supabase-client.js";
 import { requireAuthOrShowError } from "./auth/auth-guard.js";
+import { el, tarihMetni, uyeAdi, uyeBilgileri, bilgiSatiri, ROL_ETIKETI } from "./gatekeeper/degisiklik-kaydi.js";
 
 const DURUM_ETIKETLERI = {
   askida: "🔴 Askıda — karar bekleniyor",
@@ -247,19 +248,30 @@ async function loadDenetimKayitlari() {
   // RLS (migration 0052 "denetim_kayitlari_select_owner") zaten sadece
   // owner'ın SELECT yapmasına izin veriyor — admin bu sorguyu atsa bile
   // boş sonuç alır, bu bölüm admin'den ".sadece-owner" ile zaten gizli.
-  const { data, error } = await supabase
+  // ip / user_agent / aktor_bilgi migration 0068 ile geldi; henüz çalıştırılmadıysa
+  // eski sütunlarla devam edilir (panel bozulmaz).
+  const TEMEL = "id, olusturuldu, aktor_id, aktor_email, aktor_rol, yontem, hedef_yol, sonuc, ret_nedeni";
+  let { data, error } = await supabase
     .from("denetim_kayitlari")
-    .select("id, olusturuldu, aktor_email, aktor_rol, yontem, hedef_yol, sonuc, ret_nedeni")
+    .select(`${TEMEL}, ip, user_agent, aktor_bilgi`)
     .order("olusturuldu", { ascending: false })
     .limit(500);
+  if (error && /ip|user_agent|aktor_bilgi|column/i.test(error.message || "")) {
+    ({ data, error } = await supabase
+      .from("denetim_kayitlari")
+      .select(TEMEL)
+      .order("olusturuldu", { ascending: false })
+      .limit(500));
+  }
 
   if (error) {
-    kutu.innerHTML = `<p class="muted">Denetim kaydı yüklenemedi: ${escapeHtml(error.message)}</p>`;
+    kutu.replaceChildren(el("p", { class: "muted", text: `Denetim kaydı yüklenemedi: ${error.message}` }));
     renderDenetimSayfalama(0, 0);
     return;
   }
 
   TUM_DENETIM_KAYITLARI = data || [];
+  renderDenetimSonKutusu();
   renderDenetimListesi();
 }
 
@@ -276,7 +288,7 @@ function renderDenetimListesi() {
     filtre === "hepsi" ? TUM_DENETIM_KAYITLARI : TUM_DENETIM_KAYITLARI.filter((k) => k.sonuc === filtre);
 
   if (filtreliListe.length === 0) {
-    kutu.innerHTML = `<p class="muted">Bu filtreyle eşleşen kayıt yok.</p>`;
+    kutu.replaceChildren(el("p", { class: "muted", text: "Bu filtreyle eşleşen kayıt yok." }));
     renderDenetimSayfalama(0, 0);
     return;
   }
@@ -286,31 +298,108 @@ function renderDenetimListesi() {
   const baslangic = (DENETIM_SAYFA - 1) * DENETIM_SAYFA_BOYUTU;
   const sayfaVerisi = filtreliListe.slice(baslangic, baslangic + DENETIM_SAYFA_BOYUTU);
 
-  kutu.innerHTML = sayfaVerisi.map((k) => denetimKayitKartHtml(k)).join("");
-  wireDenetimKayitOlaylari(kutu);
+  kutu.replaceChildren(el("div", { class: "gk-log-liste" }, sayfaVerisi.map((k) => denetimKayitOgesi(k))));
   renderDenetimSayfalama(toplamSayfa, filtreliListe.length);
 }
 
-function denetimKayitKartHtml(k) {
-  const basariliMi = k.sonuc === "izin_verildi";
-  return `
-    <div class="uya-kart" data-id="${k.id}">
-      <div class="uya-kart-ust">
-        <div class="uya-kart-kimlik">
-          <strong>${escapeHtml(k.aktor_email || "—")}</strong>
-          <span class="uya-email muted">${escapeHtml(k.aktor_rol || "—")} · ${escapeHtml(k.yontem)}</span>
-        </div>
-        <span class="uya-rol-etiket">${basariliMi ? "🟢 İzin verildi" : "🔴 Reddedildi"}</span>
-      </div>
-      <p><strong>Yol:</strong> ${escapeHtml(k.hedef_yol)}</p>
-      ${k.ret_nedeni ? `<p class="muted"><strong>Neden:</strong> ${escapeHtml(k.ret_nedeni)}</p>` : ""}
-      <div class="uya-kart-meta">
-        <span>${new Date(k.olusturuldu).toLocaleString("tr-TR")}</span>
-      </div>
-      <div class="uya-kart-aksiyonlar">
-        <button class="btn-danger tablo-aksiyon-btn ag-denetim-sil-btn" data-id="${k.id}">🗑️ Bu Kaydı Sil</button>
-      </div>
-    </div>`;
+// Üstteki "Son kayıt" kutusu: filtreden bağımsız, en yeni kayıt (kim ne yaptı) — tıklayınca ayrıntı açılır.
+function renderDenetimSonKutusu() {
+  const liste = document.getElementById("ag-denetim-listesi");
+  if (!liste) return;
+  let kutu = document.getElementById("ag-denetim-son");
+  if (!kutu) {
+    kutu = el("div", { id: "ag-denetim-son", class: "gk-log-kutu-alani", "aria-live": "polite" });
+    liste.before(kutu);
+  }
+  kutu.replaceChildren(
+    TUM_DENETIM_KAYITLARI.length
+      ? denetimKayitOgesi(TUM_DENETIM_KAYITLARI[0], { vurgulu: true })
+      : el("p", { class: "muted", text: "Henüz denetim kaydı yok." })
+  );
+}
+
+// Her kayıt: küçük özet satırı (tıklanabilir) -> genişleyince üye bilgileri, IP, tarayıcı, neden, silme.
+function denetimKayitOgesi(k, { vurgulu = false } = {}) {
+  const basarili = k.sonuc === "izin_verildi";
+  const bilgi = k.aktor_bilgi && Object.keys(k.aktor_bilgi).length ? k.aktor_bilgi : null;
+  const ad = bilgi ? uyeAdi(bilgi) : k.aktor_email || "Bilinmeyen üye";
+  const rol = ROL_ETIKETI[k.aktor_rol] || k.aktor_rol || "";
+
+  const silBtn = el("button", {
+    type: "button",
+    class: "btn-danger csp-w-auto gk-log-sil",
+    text: "🗑️ Bu kaydı sil (sadece Site Sahibi)",
+    onclick: async (olay) => {
+      if (!confirm("Bu denetim kaydını kalıcı olarak silmek istediğine emin misin? Bu işlem GERİ ALINAMAZ.")) return;
+      const d = olay.currentTarget;
+      d.disabled = true;
+      const { error } = await supabase.rpc("owner_denetim_kaydi_sil", { p_id: k.id });
+      if (error) {
+        d.disabled = false;
+        alert("Kayıt silinemedi: " + error.message);
+        return;
+      }
+      await loadDenetimKayitlari();
+    },
+  });
+
+  const uyeAlani = el("div", { class: "gk-log-uye-alani" });
+  const uyeCiz = (b, baslik) => uyeAlani.replaceChildren(uyeBilgileri(b, baslik));
+  if (bilgi) {
+    uyeCiz(bilgi, "İşlemi yapan üye (işlem anındaki bilgiler)");
+  } else {
+    uyeCiz({ email: k.aktor_email, role: k.aktor_rol, id: k.aktor_id }, "İşlemi yapan üye (kayıtta sadece bu kadarı var)");
+  }
+
+  const islem = el(
+    "div",
+    { class: "gk-log-blok" },
+    el("h5", { text: "İşlem bilgisi" }),
+    el(
+      "dl",
+      { class: "gk-log-dl" },
+      bilgiSatiri("Zaman", tarihMetni(k.olusturuldu)),
+      bilgiSatiri("Yöntem", k.yontem),
+      bilgiSatiri("Yol", k.hedef_yol),
+      bilgiSatiri("Sonuç", basarili ? "İzin verildi" : "Reddedildi"),
+      bilgiSatiri("Neden", k.ret_nedeni),
+      bilgiSatiri("IP adresi", k.ip),
+      bilgiSatiri("Tarayıcı / cihaz", k.user_agent),
+      bilgiSatiri("Kayıt no", k.id)
+    )
+  );
+
+  const ozet = el(
+    "summary",
+    { class: "gk-log-ozet" },
+    el(
+      "span",
+      { class: "gk-log-baslik" },
+      vurgulu ? el("span", { class: "gk-log-etiket", text: "Son kayıt" }) : null,
+      el("strong", { text: ad }),
+      rol ? el("span", { class: "muted", text: ` · ${rol}` }) : null,
+      el("span", { class: basarili ? "gk-log-durum-ok" : "gk-log-durum-red", text: basarili ? "🟢 İzin verildi" : "🔴 Reddedildi" })
+    ),
+    el("span", { class: "gk-log-zaman muted", text: tarihMetni(k.olusturuldu) }),
+    el("span", { class: "gk-log-metin", text: `${k.yontem} · ${k.hedef_yol}` }),
+    el("span", { class: "gk-log-ipucu muted", text: "Ayrıntı için tıkla" })
+  );
+
+  const kok = el("details", { class: `gk-log${vurgulu ? " gk-log-vurgulu" : ""}` }, ozet, el("div", { class: "gk-log-ayrinti" }, islem, uyeAlani, el("div", { class: "csp-flex-gap10-wrap" }, silBtn)));
+
+  // Eski kayıtlarda (migration 0068 öncesi) anlık görüntü yok: ilk açılışta üyenin GÜNCEL bilgisini getir.
+  if (!bilgi && k.aktor_id) {
+    kok.addEventListener(
+      "toggle",
+      async () => {
+        if (!kok.open) return;
+        const { data } = await supabase.rpc("owner_uye_goruntusu", { p_user_id: k.aktor_id });
+        if (data && Object.keys(data).length) uyeCiz(data, "İşlemi yapan üye (GÜNCEL bilgiler — kayıt eski, anlık görüntüsü yok)");
+      },
+      { once: true }
+    );
+  }
+  return kok;
 }
 
 function renderDenetimSayfalama(toplamSayfa, toplamSonuc) {
@@ -341,24 +430,6 @@ function renderDenetimSayfalama(toplamSayfa, toplamSonuc) {
   });
 }
 
-function wireDenetimKayitOlaylari(kutu) {
-  kutu.querySelectorAll(".ag-denetim-sil-btn").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      if (!confirm("Bu denetim kaydını kalıcı olarak silmek istediğine emin misin? Bu işlem GERİ ALINAMAZ.")) return;
-
-      btn.disabled = true;
-      const { error } = await supabase.rpc("owner_denetim_kaydi_sil", { p_id: btn.dataset.id });
-      btn.disabled = false;
-
-      if (error) {
-        alert("Kayıt silinemedi: " + error.message);
-        return;
-      }
-      await loadDenetimKayitlari();
-    });
-  });
-}
-
 function wireDenetimKaydiKontrolleri() {
   const filtre = document.getElementById("ag-denetim-filtre");
   const yenileBtn = document.getElementById("ag-denetim-yenile-btn");
@@ -373,6 +444,18 @@ function wireDenetimKaydiKontrolleri() {
   });
 
   yenileBtn?.addEventListener("click", () => loadDenetimKayitlari());
+
+  // "Hepsini genişlet / daralt": o sayfadaki tüm küçük kartları tek tıkla geniş ayrıntıya çevirir.
+  if (yenileBtn && !document.getElementById("ag-denetim-genislet-btn")) {
+    const genisletBtn = el("button", { id: "ag-denetim-genislet-btn", type: "button", class: "btn-secondary csp-w-auto", text: "↕ Hepsini genişlet" });
+    genisletBtn.addEventListener("click", () => {
+      const kartlar = [...document.querySelectorAll("#ag-denetim-listesi details.gk-log")];
+      const hepsiAcik = kartlar.length > 0 && kartlar.every((d) => d.open);
+      kartlar.forEach((d) => (d.open = !hepsiAcik));
+      genisletBtn.textContent = hepsiAcik ? "↕ Hepsini genişlet" : "↕ Hepsini daralt";
+    });
+    yenileBtn.after(genisletBtn);
+  }
 
   otuzGunBtn?.addEventListener("click", async () => {
     if (
