@@ -2697,10 +2697,15 @@ html.gk-bekle body { visibility: hidden; animation: gk-yedek-goster 0.001s linea
    (en geç 4 sn, gatekeeper.js BYPASS_ZAMAN_ASIMI_MS) verilene dek içerik görünmez. */
 html.gk-kilit-bekle body { visibility: hidden; }
 
+/* Kilit ekranı: tam ekran SABİT katman. Altındaki sayfa görünmez (visibility düzeni
+   değiştirmez => CLS üretmez) ve kısa süre sonra gatekeeper.js tarafından DOM'dan sökülür. */
+html.gk-kilitli, html.gk-kilitli body { overflow: hidden; margin: 0; }
+html.gk-kilitli body > :not(.gk-govde) { visibility: hidden; }
 .gk-govde {
-  margin: 0;
-  min-height: 100vh;
-  min-height: 100dvh;
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  overflow: auto;
   display: grid;
   place-items: center;
   padding: 24px;
