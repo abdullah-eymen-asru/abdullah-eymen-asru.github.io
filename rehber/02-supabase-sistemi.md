@@ -1,6 +1,6 @@
 [⬅️ README'ye dön](../README.md)
 
-[📖 Site Rehberi](./01-site-rehberi.md) · **🔐 Supabase Sistemi** · [🍴 Fork Kurulumu](./03-fork-kurulumu.md)
+[📖 Site Rehberi](./01-site-rehberi.md) · **🔐 Supabase Sistemi** · [🍴 Fork Kurulumu](./03-fork-kurulumu.md) · [☁️ Cloudflare Secret & Ayarlar](./04-cloudflare-secretlar.md)
 
 ---
 
@@ -1618,7 +1618,7 @@ Bu dosya, bildirdiğin 5 sorun için yapılan değişikliklerin özetidir. Deği
 
 [⬅️ README'ye dön](../README.md)
 
-[📖 Site Rehberi](./01-site-rehberi.md) · **🔐 Supabase Sistemi** · [🍴 Fork Kurulumu](./03-fork-kurulumu.md)
+[📖 Site Rehberi](./01-site-rehberi.md) · **🔐 Supabase Sistemi** · [🍴 Fork Kurulumu](./03-fork-kurulumu.md) · [☁️ Cloudflare Secret & Ayarlar](./04-cloudflare-secretlar.md)
 
 ---
 
