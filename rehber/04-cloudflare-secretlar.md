@@ -295,7 +295,36 @@ listeleri) değiştirmeyi unutursan, tarayıcı Worker'a erişirken **CORS /
 
 - **Binding:** `MY_R2_BUCKET` → arşiv kovası.
 - **Adres nereye yazılır?** `assets/js/r2-arsiv/e2ee.js` → `ARSIV_WORKER_URL`
-- **R2 kovasında CORS:** Tarayıcı dosyayı doğrudan R2'ye yüklediği için kovada CORS kuralı gerekir: **R2 → kovan → Settings → CORS policy → Add** → izinli origin olarak site adreslerin, metotlar `GET, PUT, HEAD`, izinli header `*`. (Yükleme "CORS" hatasıyla başarısız oluyorsa sebep genelde budur.)
+- **R2 kovasında CORS (zorunlu):** Tarayıcı dosyayı Worker'dan geçirmeden **doğrudan R2'ye** yükler/indirir; bu yüzden kovada CORS kuralı olmazsa yükleme "R2'ye ulaşılamadı (ağ ya da bucket CORS ayarı)" hatasıyla düşer.
+
+  **Nereye girilir?** Cloudflare → **R2 object storage** → kovanı seç (ör. `abdullah-eymen-asru-site-ozel-dosyalar`) → **Settings** → **CORS Policy** → **Add CORS policy** → **JSON** sekmesine aşağıdakini yapıştır → **Save**:
+
+  ```json
+  [
+    {
+      "AllowedOrigins": [
+        "https://abdullah-eymen-asru.github.io",
+        "https://abdullah-eymen-asru.pages.dev"
+      ],
+      "AllowedMethods": [
+        "GET",
+        "PUT"
+      ],
+      "AllowedHeaders": [
+        "Content-Type"
+      ],
+      "MaxAgeSeconds": 3600
+    }
+  ]
+  ```
+
+  **Neden bu ayarlar?**
+  - `PUT` → yükleme, `GET` → indirme/önizleme. `HEAD` gerekmez: yükleme sonrası boyut doğrulamasını Worker, R2 binding'i üzerinden kendisi yapar (tarayıcı yapmaz).
+  - `AllowedHeaders: Content-Type` → tarayıcının imzalı `PUT` isteğinde gönderdiği tek header bu. `*` yazmaya gerek yok; daha dar olan daha güvenlidir.
+  - `MaxAgeSeconds: 3600` → tarayıcı CORS ön kontrolünü 1 saat önbelleğe alır, her yüklemede tekrar sormaz.
+  - `AllowedOrigins` → sadece kendi site adreslerin; sonunda `/` olmadan, `https://` ile. **Fork edenler:** bu iki adresi kendi `github.io` ve `pages.dev` adresinle değiştir.
+  - Bu kural **kova bazlıdır**: 4.4'teki `r2-imza-worker` ile 4.5'teki `r2-arsiv-worker` aynı kovayı kullanıyorsa tek kural ikisine de yeter. Not ekleri için ayrı bir kova (`NOT_EK_BUCKET`) kullanıyorsan ona CORS **gerekmez**; o kovaya tarayıcı doğrudan değil, Worker üzerinden erişir.
+  - Kuralı kaydettikten sonra yürürlüğe girmesi birkaç saniye sürebilir; hata devam ediyorsa tarayıcı önbelleğini temizleyip sayfayı sert yenile (Cmd/Ctrl+Shift+R).
 - **Kod içinde değiştirilecekler:** `IZINLI_ORIGINLER` listesi.
 
 ---
@@ -455,7 +484,7 @@ Kurulumdan sonra tek tek işaretle:
 | Worker `401` / `403` döner | Supabase oturumu geçersiz, rol yetersiz, ya da secret yanlış | Çıkış-giriş yap; rolünü kontrol et; `SUPABASE_URL` ve anahtarın **aynı projeye** ait olduğunu doğrula |
 | `... is not configured` / `... ayarlanmamış` benzeri mesaj | Bir değişken eksik ya da adı yanlış yazılmış | Bölüm 1 tablosuyla karşılaştır; büyük/küçük harf ve alt çizgi birebir olmalı; Deploy etmeyi unutma |
 | Değişkeni ekledim ama etkisi yok | Deploy edilmedi veya yanlış ortama (Production/Preview) eklendi | Settings'te **Production** sekmesinde olduğundan emin ol, Deploy et |
-| Dosya yüklerken CORS hatası (arşiv) | R2 kovasında CORS kuralı yok | Bölüm 4.5'teki CORS adımı |
+| Dosya yüklerken "R2'ye ulaşılamadı (ağ ya da bucket CORS ayarı)" | R2 kovasında CORS kuralı yok ya da `AllowedOrigins`'te site adresin eksik | Bölüm 4.5'teki CORS policy JSON'unu kovaya ekle; adreslerin birebir doğru olduğunu kontrol et |
 | Dosya imzalı link alınamıyor | `R2_ACCESS_KEY_ID`/`SECRET` yanlış ya da token'ın izni kovana yetmiyor | Yeni R2 API token oluştur, **Object Read & Write** + doğru kova |
 | Daha önce yüklenen şifreli dosyalar açılmıyor | `E2EE_KASA_SECRET` değişmiş | Eski değeri geri gir (yedekten). Eski değer kayıpsa o dosyalar kurtarılamaz |
 | Telegram mesajı gelmiyor | `webhook_url` sonunda `/GIZLI_YOL` yok, `webhook_secret` farklı, bota `/start` yazılmamış, ya da `aktif = false` | Bölüm 4.7 SQL'ini tekrar çalıştır; Worker → Logs'a bak |
