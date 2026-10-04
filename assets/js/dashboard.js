@@ -63,6 +63,9 @@ const MODULES = {
   // Yetki Ayarları > "Alan Adı & Sayfa Erişim Kalkanı" (gatekeeper; migration 0061).
   // Gerçek yetki: site_ayarlari UPDATE politikası + owner RPC'leri is_owner() ister.
   kalkan: { src: "./gatekeeper/kalkan-paneli.js", role: "owner" },
+  // Yetki Ayarları > "KVKK Sürümü" (site_ayarlari.guncel_kvkk_surumu; migration 0064).
+  // Gerçek yetki: kolon UPDATE'i + owner_kvkk_onay_ozeti() is_owner() ister.
+  kvkkSurum: { src: "./kvkk/kvkk-surum-paneli.js", role: "owner" },
   // "Panelim" (eski /panel/panel.html) — giriş yapmış HERKESE açık:
   // sıradan üye de, owner da aynı sekmeyi görür.
   panelim: { src: "./panel.js", role: null },
@@ -439,6 +442,7 @@ async function showView(viewId, moduleKey) {
   // Yetki Ayarları: owner için "R2 Erişim İzni" bölümü (ayrı modül; gy modülüne dokunmaz)
   if (viewId === "sys-yetki") await ensureModuleLoaded("arsivIzin");
   if (viewId === "sys-yetki") await ensureModuleLoaded("kalkan");
+  if (viewId === "sys-yetki") await ensureModuleLoaded("kvkkSurum");
 }
 
 function firstAvailableView(profile) {
