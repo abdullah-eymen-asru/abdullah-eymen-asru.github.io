@@ -292,13 +292,15 @@ const OZELLIK_KATALOGU = [
     // (admin.js'te TAM_YETKILI kontrolü bu bölümü hiç kapsamıyor) — bu
     // yüzden owner'ın ikisini de AYRI AYRI kısabilmesi gerekiyor (bkz.
     // migration 0051).
-    rolSutunlari: ["admin", "manager"],
+    // editor (Yazar) da artık bu bölüme erişebiliyor ve owner onu da AYRI
+    // kısabiliyor (bkz. migration 0066, dashboard.js, admin.js).
+    rolSutunlari: ["admin", "manager", "editor"],
   },
   {
     anahtar: "dosya_paylasimi_yonetimi",
     baslik: "R2 Dosya Paylaşımı",
     aciklama: "Admin panelindeki R2 dosya paylaşım linki oluşturma — content_access ataması aranmadan HERHANGİ bir dosyaya erişim.",
-    rolSutunlari: ["admin", "manager"],
+    rolSutunlari: ["admin", "manager", "editor"],
   },
   {
     // bkz. migration 0053 — bu üçü (yazi_ekleme/duzenleme/silme) editor/
