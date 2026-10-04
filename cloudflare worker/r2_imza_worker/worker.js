@@ -257,12 +257,12 @@ export default {
       // erişimini (content_access ataması ARANMADAN her dosyaya erişim)
       // KISMIŞ olabilir. Kısıtlanmışsa bu kullanıcı artık role='user' ile
       // AYNI yolu izler: sadece content_access'te açıkça kendisine
-      // atanmış dosyalara erişebilir. special_user/editor/owner bu ek
-      // kontrole hiç girmez (katalogda sadece admin+manager sütunu var,
-      // owner zaten hiç kısıtlanamaz) — gereksiz ağ isteğinden kaçınmak
+      // atanmış dosyalara erişebilir. special_user/owner bu ek
+      // kontrole hiç girmez (katalogda admin+manager+editor sütunu var — editor
+      // için bkz. migration 0066 —, owner zaten hiç kısıtlanamaz) — gereksiz ağ isteğinden kaçınmak
       // için erkenden atlanıyor.
       let herkeseAcikRolMu = herkeseAcikRolMuVarsayilan;
-      if (herkeseAcikRolMu && (rol === "admin" || rol === "manager")) {
+      if (herkeseAcikRolMu && (rol === "admin" || rol === "manager" || rol === "editor")) {
         const izinli = await ozellikErisimVarMi(env, rol, "dosya_paylasimi_yonetimi");
         if (!izinli) herkeseAcikRolMu = false;
       }
