@@ -888,7 +888,6 @@ permalink: "/panel/dashboard.html"
         <button type="button" role="tab" class="ya-altsekme" id="ya-tab-r2" data-ya-pane="ra-izin-bolumu" aria-controls="ra-izin-bolumu" aria-selected="false" tabindex="-1">🗄️ Dosya Yöneticisi</button>
         <button type="button" role="tab" class="ya-altsekme" id="ya-tab-kalkan" data-ya-pane="gk-kalkan-bolumu" aria-controls="gk-kalkan-bolumu" aria-selected="false" tabindex="-1">🛡️ Erişim Kalkanı</button>
         <button type="button" role="tab" class="ya-altsekme" id="ya-tab-kilit-izin" data-ya-pane="gk-izin-bolumu" aria-controls="gk-izin-bolumu" aria-selected="false" tabindex="-1">🔑 Kilit İzinleri</button>
-        <button type="button" role="tab" class="ya-altsekme" id="ya-tab-kvkk" data-ya-pane="kvkk-surum-bolumu" aria-controls="kvkk-surum-bolumu" aria-selected="false" tabindex="-1">📜 KVKK Sürümü</button>
       </div>
 
       <!-- 1) Özellik matrisi. id="yetki-ayarlari" ve içindeki id'ler AYNEN korundu:
@@ -957,14 +956,17 @@ permalink: "/panel/dashboard.html"
         <div id="gk-izin-kok"><p class="muted">Yükleniyor...</p></div>
         <div id="gk-izin-mesaj" class="auth-message" hidden></div>
       </section>
+    </section>
 
-      <!-- 6) KVKK metin sürümü (assets/js/kvkk/kvkk-surum-paneli.js; tablo site_ayarlari, migration 0064) -->
-      <section id="kvkk-surum-bolumu" class="panel-section ya-pane" role="tabpanel" aria-labelledby="ya-tab-kvkk" hidden>
-        <h2>KVKK Metin Sürümü</h2>
+    <!-- KVKK metin sürümü (assets/js/kvkk/kvkk-surum-paneli.js; tablo site_ayarlari, migration 0064/0065).
+         Owner her zaman görür; adminler yalnızca owner anahtarı açıksa. -->
+    <section class="dash-view" id="view-sys-kvkk" hidden data-view="sys-kvkk">
+      <h1>KVKK Metin Sürümü</h1>
+      <section class="panel-section">
         <p class="muted">
           Gizlilik Politikası / Aydınlatma Metni'nin yürürlükteki sürüm etiketi. Yükselttiğinde onayı eşleşmeyen
           üyeler bir sonraki girişlerinde yeniden onay verir. <strong>Kod değiştirmeden ve deploy etmeden</strong>
-          değişir. Yalnızca Site Sahibi (owner) değiştirebilir.
+          değişir.
         </p>
         <div id="kvkk-surum-kok"><p class="muted">Yükleniyor...</p></div>
         <div id="kvkk-surum-mesaj" class="auth-message" hidden></div>
