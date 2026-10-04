@@ -1,10 +1,12 @@
 /*
- * assets/js/kvkk/kvkk-surum-paneli.js — Yetki Ayarları > "KVKK Sürümü"
+ * assets/js/kvkk/kvkk-surum-paneli.js — "KVKK Sürümü" sekmesi (sys-kvkk)
  * -----------------------------------------------------------------------------
- * dashboard.js, "Yetki Ayarları" sekmesi (sys-yetki) açılınca bu modülü import() eder
- * (MODULES.kvkkSurum, role: "owner"). Asıl sınır veritabanında (migration 0064):
- *   - site_ayarlari.guncel_kvkk_surumu için UPDATE yalnızca owner (RLS + kolon GRANT),
- *   - owner_kvkk_onay_ozeti() is_owner() ister.
+ * dashboard.js, sekme açılınca bu modülü import() eder (MODULES.kvkkSurum). Sekmeyi owner
+ * her zaman, admin ise yalnızca owner "adminler değiştirebilsin" anahtarını açtıysa görür.
+ * Asıl sınır veritabanında (migration 0064/0065):
+ *   - sürümü yalnızca kvkk_surumunu_degistir() yazar (owner; admin ise anahtar açıkken),
+ *   - özeti kvkk_onay_ozeti() verir (aynı yetki),
+ *   - anahtar (kvkk_surum_admin_degistirebilir) için UPDATE yalnızca owner (RLS + kolon GRANT).
  * Bu dosya yalnızca arayüzdür.
  *
  * innerHTML YOK; inline style YOK (CSP). Görünüm mevcut .ya-* / .gk-p-* / .form-field
@@ -38,7 +40,7 @@ async function kur() {
   if (!kok || kok.dataset.hazir) return;
   kok.dataset.hazir = "1";
 
-  const { data: ozet, error } = await supabase.rpc("owner_kvkk_onay_ozeti");
+  const { data: ozet, error } = await supabase.rpc("kvkk_onay_ozeti");
   const satir = Array.isArray(ozet) ? ozet[0] : ozet;
   if (error || !satir) {
     const yok = /does not exist|42883|PGRST202|42703|schema cache/i.test(error?.message || error?.code || "");
@@ -46,7 +48,7 @@ async function kur() {
       el("p", {
         class: "muted",
         text: yok || (!error && !satir)
-          ? "0064_guncel_kvkk_surumu.sql henüz çalıştırılmamış görünüyor: dosyayı SQL Editor'de çalıştır."
+          ? "0064 ve 0065 numaralı KVKK migration'ları henüz çalıştırılmamış görünüyor: dosyaları SQL Editor'de çalıştır."
           : `Yüklenemedi: ${error.message}`,
       })
     );
@@ -95,17 +97,12 @@ async function kur() {
 
     yayinlaBtn.disabled = true;
     try {
-      // .select() ŞART: RLS yetkisiz UPDATE'i hata vermeden 0 satıra çevirir.
-      const { data, error: hata } = await supabase
-        .from("site_ayarlari")
-        .update({ guncel_kvkk_surumu: yeni })
-        .eq("id", 1)
-        .select("guncel_kvkk_surumu")
-        .maybeSingle();
+      // Tek yazma yolu RPC: yetkiyi (owner / anahtarı açık admin) sunucu denetler.
+      const { data, error: hata } = await supabase.rpc("kvkk_surumunu_degistir", { p_surum: yeni });
       if (hata) throw hata;
-      if (!data) throw new Error("Kayıt güncellenmedi (yetkin yok ya da satır bulunamadı).");
+      if (!data) throw new Error("Sürüm güncellenmedi.");
 
-      mevcut = data.guncel_kvkk_surumu;
+      mevcut = data;
       await guncelKvkkSurumu({ yenile: true }); // bu sekmenin önbelleğini tazele
       mevcutMetin.textContent = mevcut;
       girdi.value = "";
@@ -119,6 +116,63 @@ async function kur() {
     }
   });
 
+  // Yetki anahtarı: YALNIZCA owner görür ve değiştirir (admin bu bölümü hiç görmez).
+  let yetkiBolumu = null;
+  if (satir.sahip_mi) {
+    const kutu = el("input", { type: "checkbox", id: "kvkk-admin-anahtar" });
+    kutu.checked = !!satir.admin_degistirebilir;
+    kutu.addEventListener("change", async () => {
+      const istenen = kutu.checked;
+      kutu.disabled = true;
+      try {
+        // .select() ŞART: RLS yetkisiz UPDATE'i hata vermeden 0 satıra çevirir.
+        const { data, error: hata } = await supabase
+          .from("site_ayarlari")
+          .update({ kvkk_surum_admin_degistirebilir: istenen })
+          .eq("id", 1)
+          .select("kvkk_surum_admin_degistirebilir")
+          .maybeSingle();
+        if (hata) throw hata;
+        if (!data) throw new Error("Kayıt güncellenmedi (yetkin yok ya da satır bulunamadı).");
+        kutu.checked = !!data.kvkk_surum_admin_degistirebilir;
+        showMessage(
+          mesaj,
+          kutu.checked
+            ? "Adminler artık KVKK sürümünü değiştirebilir (menüleri bir sonraki panel yüklemesinde görünür)."
+            : "Admin yetkisi kapatıldı: sürümü yalnızca sen değiştirebilirsin (yetki sunucuda anında kalkar).",
+          "success"
+        );
+      } catch (hata) {
+        kutu.checked = !istenen; // başarısız: eski haline dön
+        showMessage(mesaj, `Kaydedilemedi: ${hata.message || hata}`, "error");
+      } finally {
+        kutu.disabled = false;
+      }
+    });
+    yetkiBolumu = el(
+      "div",
+      { class: "csp-mt-18" },
+      el("h3", { text: "Yetki" }),
+      el(
+        "div",
+        { class: "gk-p-anahtar" },
+        el(
+          "label",
+          { class: "ya-mini-toggle", for: "kvkk-admin-anahtar" },
+          kutu,
+          el("span", { class: "ya-mini-track" }, el("span", { class: "ya-mini-thumb" }))
+        ),
+        el("label", { for: "kvkk-admin-anahtar", text: "Adminler de KVKK sürümünü değiştirebilsin" })
+      ),
+      el("p", {
+        class: "gy-yardim-metni",
+        text:
+          "Kapalıyken yalnızca Site Sahibi (owner) değiştirir. Sürüm yükseltmek tüm üyelere yeniden onay ekranı " +
+          "gösterdiği için varsayılan KAPALIDIR.",
+      })
+    );
+  }
+
   kok.replaceChildren(
     el("p", {}, "Yürürlükteki sürüm: ", mevcutMetin),
     ozetMetin,
@@ -130,7 +184,8 @@ async function kur() {
         "Sıra: (1) kurumsal/gizlilik-politikasi.md değişikliğini deploy et, (2) burada sürümü yükselt. " +
         "Sadece yazım düzeltmesi için sürümü değiştirme; her değişiklik tüm üyelere yeniden onay ekranı gösterir. " +
         "Onay damgasını tarayıcı değil veritabanı yazar; sürüm okunamazsa kimse kilitlenmez.",
-    })
+    }),
+    yetkiBolumu
   );
 }
 
