@@ -679,11 +679,21 @@ async function panelListeleriniTazele() {
   // yenilemede henüz görünmeyebiliyordu. Burada GitHub'a yayılma zamanı
   // tanımak için okumadan önce kısa bir bekleme ekliyoruz.
   await new Promise((resolve) => setTimeout(resolve, 900));
-  try {
-    await panelVerisiniYukle();
-  } catch (err) {
-    console.error("Panel verisi tazelenemedi (bir sonraki yenilemede tekrar denenecek):", err);
+  // Geçici ağ kesintisi (Safari'de "Load failed": mobilde bağlantı değişimi, sekme
+  // arka plana alınması, Worker'ın soğuk açılışı) tek bir yeniden denemeyle çoğunlukla
+  // geçer; bu yüzden hemen pes etmeden bir kez daha deniyoruz. Hâlâ başarısızsa eskisi
+  // gibi sessizce eski önbellekle devam edilir (kullanıcının işlemi zaten başarılı).
+  let sonHata = null;
+  for (let deneme = 0; deneme < 2; deneme++) {
+    try {
+      await panelVerisiniYukle();
+      return;
+    } catch (err) {
+      sonHata = err;
+      if (deneme === 0) await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
   }
+  console.warn("Panel verisi tazelenemedi (bir sonraki yenilemede tekrar denenecek):", sonHata);
 }
 
 async function ghHataMesaji(res) {
