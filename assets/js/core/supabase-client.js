@@ -263,26 +263,45 @@ export function rolEtiketi(rol) {
 }
 
 /**
- * Bugünün Gizlilik Politikası / KVKK metni sürüm etiketi. Metni
- * (kurumsal/gizlilik-politikasi.md) gerçekten değiştirdiğinde bu değeri de
- * güncelle — o andan itibaren yeni kayıt olanlar bu sürüme onay verir ve
- * eski üyeler ekranı kilitleyen "Rıza Yenileme" modalıyla karşılaşır (bkz.
- * auth-guard.js -> kvkkVersiyonKontroluVeModal()) ve panelde de ayrıca
- * "güncellenmiş metni onaylaman gerekiyor" uyarısı görür (bkz. panel.js).
+ * Yürürlükteki Gizlilik Politikası / Aydınlatma Metni sürüm etiketi.
  *
- * SÜRÜM FORMATI: "v1.0", "v1.1", ... — semantik bir anlamı yok, sadece
- * SIRALI ve HER DEĞİŞİKLİKTE FARKLI olması yeterli. (Not: bu değer daha
- * önce "2026-08" gibi tarih temelli bir biçimdeydi; okunabilirlik ve
- * "Sözleşme Versiyon Takibi" özelliğiyle birebir örtüşmesi için "vX.Y"
- * biçimine geçirildi. Format değişikliği tek başına eski/yeni sürüm
- * karşılaştırmasını bozmaz — kontrol her zaman düz metin EŞİTLİK
- * karşılaştırmasıdır, "v1.0" ile "2026-08" zaten farklı string olduğu
- * için bu geçişin kendisi mevcut tüm kullanıcılara otomatik olarak BİR
- * SEFERLİK rıza yenileme modalı gösterecektir — bu istenen/beklenen bir
- * yan etkidir, çünkü versiyon şeması değiştiği için gerçek onay tarihinin
- * yeni şemaya göre yeniden teyit edilmesi doğrudur.)
+ * ARTIK KODDA DEĞİL: site_ayarlari.guncel_kvkk_surumu (migration 0064). Owner,
+ * panelde Yetki Ayarları > "KVKK Sürümü" sekmesinden değiştirir — deploy gerekmez.
+ * Metni (kurumsal/gizlilik-politikasi.md) yayınladıktan SONRA sürümü yükselt: o andan
+ * itibaren yeni kayıt olanlar bu sürüme onay verir, eski üyeler giriş sonrası ekranı
+ * kilitleyen "Rıza Yenileme" modalıyla karşılaşır (auth-guard.js ->
+ * kvkkVersiyonKontroluVeModal()) ve panelde "güncellenmiş metni onaylaman gerekiyor"
+ * uyarısı görür (panel.js).
+ *
+ * Sürüm biçimi "vX.Y" (DB check kısıtı zorlar). Kontrol düz metin EŞİTLİĞİDİR.
+ *
+ * GÜVENLİK: bu değer yalnızca ARAYÜZ içindir. Onay damgasını kvkk_onayini_ver() ve
+ * handle_new_user() DB'den okuyarak yazar; istemci sahte sürüm yazamaz.
+ *
+ * Okunamazsa (ağ/RLS hatası) null döner. Çağıranlar null'ı "bilinmiyor" sayıp
+ * kullanıcıyı KİLİTLEMEZ; sonraki sayfa yüklemesinde yeniden denenir.
+ * Sayfa başına tek istek (promise önbelleği); yenile:true önbelleği atlar.
  */
-export const KVKK_METIN_SURUMU = "v1.1";
+let _kvkkSurumSozu = null;
+export function guncelKvkkSurumu({ yenile = false } = {}) {
+  if (!_kvkkSurumSozu || yenile) {
+    const sozu = (async () => {
+      const { data, error } = await supabase
+        .from("site_ayarlari")
+        .select("guncel_kvkk_surumu")
+        .eq("id", 1)
+        .maybeSingle();
+      if (error || !data?.guncel_kvkk_surumu) {
+        console.error("Güncel KVKK sürümü okunamadı:", error);
+        if (_kvkkSurumSozu === sozu) _kvkkSurumSozu = null; // başarısızlık önbelleğe alınmasın
+        return null;
+      }
+      return data.guncel_kvkk_surumu;
+    })();
+    _kvkkSurumSozu = sozu;
+  }
+  return _kvkkSurumSozu;
+}
 
 /*
  * ÜYELİK KAYITLARI AÇIK/KAPALI (bkz. migration
