@@ -8,7 +8,7 @@ import {
   supabase,
   showMessage,
   showSpamNotice,
-  KVKK_METIN_SURUMU,
+  guncelKvkkSurumu,
   KAYITLAR_KAPALI_ISARETI,
   kayitlarAcikMi,
   turkceOtpHatasi,
@@ -700,14 +700,14 @@ export async function initKayitPage() {
             // yükümlülüğünün ifasının log'udur, bu yüzden formda ayrı bir
             // onay kutusu yoktur ve buraya her zaman true yazılır.
             kvkk_onay: true,
-            kvkk_versiyon: KVKK_METIN_SURUMU,
+            // Sürüm etiketi BURADAN GÖNDERİLMEZ: user_metadata kullanıcı kontrollüdür.
+            // handle_new_user() güncel sürümü site_ayarlari'ndan kendisi okur (0064).
             // "yurtdisi_onay": KVKK m.9 kapsamında AYRI açık rıza — yukarıda
             // zaten işaretli olmadan bu noktaya gelinemeyeceği doğrulandı,
             // ama gerçek değeri (true) burada da kasıtlı olarak ayrı bir
             // alanda taşınıyor ki veritabanı tarafında iki onay birbirine
             // asla karışmasın.
             yurtdisi_onay: yurtdisiOnay,
-            yurtdisi_versiyon: KVKK_METIN_SURUMU,
           },
           emailRedirectTo: `${SITE_ORIGIN}/hesap/giris.html`,
         },
@@ -838,9 +838,10 @@ function googleKayitDonusunuIsle(msg) {
     // zaman true olarak RPC'ye gönderilir; aydınlatma onayı (p_versiyon)
     // ile AYRI parametreler olarak taşınır, birbirine karıştırılmaz.
     const { error } = await supabase.rpc("kvkk_onayini_ver", {
-      p_versiyon: KVKK_METIN_SURUMU,
+      // Sürüm değerleri bilgi amaçlıdır; DB kendi güncel sürümünü yazar (0064).
+      p_versiyon: (await guncelKvkkSurumu()) ?? "bilinmiyor", // dolu = damgala
       p_yurtdisi_onay: true,
-      p_yurtdisi_versiyon: KVKK_METIN_SURUMU,
+      p_yurtdisi_versiyon: await guncelKvkkSurumu(),
     });
     if (error) {
       console.error("Google ile kayıtta onaylar kaydedilemedi:", error);
