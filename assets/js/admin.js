@@ -55,9 +55,9 @@ let DUZENLENEN_ICERIK_ID = null; // null: yeni içerik ekleniyor, doluysa düzen
 let ATAMA_DURUMU = new Map();
 
 async function init() {
-  const { session, profile } = await requireAuthOrShowError({ role: ["admin", "manager"] });
-  // TAM_YETKILI=false demek: giren kişi 'manager' (İçerik Sorumlusu) —
-  // admin DEĞİL. Aşağıdaki dallanmalar bunu hem hangi adımların
+  const { session, profile } = await requireAuthOrShowError({ role: ["admin", "manager", "editor"] });
+  // TAM_YETKILI=false demek: giren kişi 'manager' (İçerik Sorumlusu) ya da
+  // 'editor' (Yazar; bkz. migration 0066) — admin DEĞİL. Aşağıdaki dallanmalar bunu hem hangi adımların
   // çalıştırılacağını hem de hangi sekmelerin görüneceğini belirlemek için
   // kullanır.
   const TAM_YETKILI = profile.role === "admin" || profile.role === "owner";
@@ -168,7 +168,7 @@ function kisitliManagerGorunumunuUygula() {
   });
 
   const baslik = document.querySelector("#app > h1");
-  if (baslik) baslik.textContent = "Admin Paneli — İçerik Sorumlusu Görünümü";
+  if (baslik) baslik.textContent = "Admin Paneli — İçerik Görünümü";
 
   const nav = document.getElementById("admin-nav");
   if (nav) {
@@ -179,7 +179,7 @@ function kisitliManagerGorunumunuUygula() {
     // açıklama. Sabitler artık ".admin-manager-notu" sınıfında.
     notu.className = "muted admin-manager-notu";
     notu.textContent =
-      "İçerik Sorumlusu rolündesin: sadece özel içerik ekleme/düzenleme ve R2 dosya paylaşımı bölümlerine erişimin var. Üye ayarları ve mesajlar sadece admin'e özeldir.";
+      "Bu görünümde sadece özel içerik ekleme/düzenleme ve R2 dosya paylaşımı bölümlerine erişimin var (Site Sahibi'nin açtığı ölçüde). Üye ayarları ve mesajlar sadece admin'e özeldir.";
     nav.insertAdjacentElement("afterend", notu);
   }
 }
