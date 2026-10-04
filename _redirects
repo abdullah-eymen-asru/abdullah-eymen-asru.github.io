@@ -1,0 +1,6 @@
+# Cloudflare Pages yönlendirme kuralları (GitHub Pages bu dosyayı okumaz; orada iletisim.md
+# içindeki yedek yönlendirme sayfası çalışır).
+# Hedefte ".html" YOK: Cloudflare Pages /x.html adreslerini zaten /x'e 308 ile yönlendirir,
+# ".html" yazmak çift yönlendirme (zincir) üretirdi.
+/iletisim.html  /kurumsal/iletisim  301
+/iletisim       /kurumsal/iletisim  301
