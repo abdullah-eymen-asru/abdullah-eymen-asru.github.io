@@ -581,6 +581,38 @@ body.dash-nav-acik {
 #gk-bakim-mesaji { width: 100%; box-sizing: border-box; resize: vertical; }
 #gk-kalkan-bolumu .nt-ya-bolum { margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--border); }
 
+/* Erişim Kalkanı > "Son değişiklik" kutusu + geçmiş (assets/js/gatekeeper/degisiklik-kaydi.js).
+   Native <details>: tıklayınca üye bilgileri ve eski -> yeni değerler açılır. */
+.gk-log-kok { margin-bottom: 8px; }
+.gk-log-kutu-alani, .gk-log-liste { display: grid; gap: 8px; margin-top: 8px; }
+.gk-log { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; }
+.gk-log-vurgulu { border-left: 3px solid var(--accent, #6f9bff); }
+.gk-log-ozet { display: grid; gap: 2px; padding: 10px 14px; cursor: pointer; list-style: none; }
+.gk-log-ozet::-webkit-details-marker { display: none; }
+.gk-log-ozet:focus-visible { outline: 2px solid var(--accent, #6f9bff); outline-offset: 2px; border-radius: 10px; }
+.gk-log-baslik { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.gk-log-etiket { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; color: var(--accent, #6f9bff); }
+.gk-log-zaman { font-size: 0.8rem; }
+.gk-log-metin { font-size: 0.92rem; overflow-wrap: anywhere; }
+.gk-log-ipucu { font-size: 0.75rem; }
+.gk-log[open] .gk-log-ipucu { display: none; }
+.gk-log-ayrinti { display: grid; gap: 14px; padding: 4px 14px 14px; border-top: 1px dashed var(--border); }
+.gk-log-blok h5 { margin: 12px 0 6px; font-size: 0.85rem; }
+.gk-log-dl { display: grid; grid-template-columns: minmax(110px, max-content) minmax(0, 1fr); gap: 4px 14px; margin: 0; font-size: 0.85rem; }
+.gk-log-dl dt { color: var(--muted); }
+.gk-log-dl dd { margin: 0; overflow-wrap: anywhere; }
+.gk-log-degisiklikler { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; font-size: 0.88rem; }
+.gk-log-degisiklikler li { display: grid; gap: 2px; }
+.gk-log-fark { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; overflow-wrap: anywhere; }
+.gk-log-eski { color: #b3261e; text-decoration: line-through; }
+.gk-log-yeni { color: #1e6b3a; }
+.gk-log-gecmis { margin-top: 12px; }
+.gk-log-gecmis > summary { cursor: pointer; font-size: 0.9rem; padding: 4px 0; }
+@media (max-width: 600px) {
+  .gk-log-dl { grid-template-columns: minmax(0, 1fr); }
+  .gk-log-dl dt { margin-top: 6px; }
+}
+
 /* ==========================================================================
    YETKİ AYARLARI — alt sekmeler ("sayfa içinde sayfa") + dar alanda kart düzeni
    Renkler yalnızca mevcut değişkenlerden (--bg/--text/--border/--accent/--card-bg/
