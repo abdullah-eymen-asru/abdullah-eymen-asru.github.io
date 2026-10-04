@@ -5,7 +5,7 @@ permalink: "/kurumsal/gizlilik-politikasi.html"
 ---
 
 <h1>Gizlilik Politikası ve KVKK Aydınlatma Metni</h1>
-<p class="meta">Son güncelleme: Ekim 2026 · Sürüm: v1.2</p>
+<p class="meta">Son güncelleme: Ekim 2026 · Sürüm: v1.1</p>
 
 <div class="project-body">
 
