@@ -169,6 +169,13 @@ permalink: "/kurumsal/gizlilik-politikasi.html"
   olarak koruma altına alabilirsiniz (bkz. Panelim &gt; İki Faktörlü
   Doğrulama).
 </p>
+<p>
+  <strong>Veri ihlali bildirimi:</strong> Kişisel verilerinizin hukuka
+  aykırı olarak üçüncü kişilerce ele geçirilmesi durumunda, durumu
+  öğrendiğim andan itibaren en kısa sürede ve KVKK m.12/5 uyarınca en geç
+  72 saat içinde Kişisel Verileri Koruma Kurulu'na, ayrıca etkilenen
+  üyelere kayıtlı e-posta adresleri üzerinden bildirim yaparım.
+</p>
 
 <h2>7. Haklarınız (KVKK Madde 11)</h2>
 <p>KVKK'nın 11. maddesi uyarınca aşağıdaki haklara sahipsiniz:</p>
