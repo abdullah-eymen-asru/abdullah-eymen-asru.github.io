@@ -14,7 +14,7 @@ import { supabase, showMessage } from "../core/supabase-client.js";
 
 const SAYFA = 20;
 
-const ROL_ETIKETI = {
+export const ROL_ETIKETI = {
   owner: "Site Sahibi",
   admin: "Yönetici (Admin)",
   manager: "İçerik Sorumlusu",
@@ -37,7 +37,7 @@ const ALAN_ETIKETI = {
   onizleme_izni: "Kilitli siteyi görme izni",
 };
 
-function el(etiket, ozellikler = {}, ...cocuklar) {
+export function el(etiket, ozellikler = {}, ...cocuklar) {
   const d = document.createElement(etiket);
   for (const [k, v] of Object.entries(ozellikler)) {
     if (v == null || v === false) continue;
@@ -50,7 +50,7 @@ function el(etiket, ozellikler = {}, ...cocuklar) {
   return d;
 }
 
-function tarihMetni(z) {
+export function tarihMetni(z) {
   if (!z) return "—";
   const d = new Date(z);
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString("tr-TR");
@@ -70,15 +70,15 @@ function degerMetni(alan, v) {
   return String(v);
 }
 
-function uyeAdi(b) {
+export function uyeAdi(b) {
   return b?.full_name || [b?.first_name, b?.last_name].filter(Boolean).join(" ") || b?.email || "Bilinmeyen üye";
 }
 
-function bilgiSatiri(etiket, deger) {
+export function bilgiSatiri(etiket, deger) {
   return [el("dt", { text: etiket }), el("dd", { text: deger == null || deger === "" ? "—" : String(deger) })];
 }
 
-function uyeBilgileri(b, baslik) {
+export function uyeBilgileri(b, baslik) {
   const k = b || {};
   return el(
     "div",
