@@ -9,7 +9,7 @@
  * genelindeki "Hakkımda" metninin sadece admin panelinden yönetilmesi
  * istendiği için). Ad Soyad hâlâ düzenlenebilir.
  */
-import { supabase, showMessage, showSpamNotice, escapeHtml, turkceOtpHatasi, KVKK_METIN_SURUMU } from "./core/supabase-client.js";
+import { supabase, showMessage, showSpamNotice, escapeHtml, turkceOtpHatasi, guncelKvkkSurumu } from "./core/supabase-client.js";
 import { requireAuthOrShowError } from "./auth/auth-guard.js";
 // NOT (TAŞINDI): Mesajlaşma (wireUserChat) artık bu sayfada değil — bkz.
 // panel/mesajlar.md + assets/js/mesajlar.js. "Yöneticiyle Mesajlaş" linki
@@ -661,13 +661,16 @@ async function renderAcikOturumlar() {
  * ayrıca ve açıkça istenir; aydınlatma onayı zaten güncelse o kutu tekrar
  * gösterilmez.
  */
-function wireKvkk(profile) {
+async function wireKvkk(profile) {
   const box = document.getElementById("kvkk-durum");
   if (!box) return;
 
-  const aydinlatmaGuncelMi = profile.kvkk_onay_verildi && profile.kvkk_onay_versiyonu === KVKK_METIN_SURUMU;
-  const yurtdisiGuncelMi =
-    profile.yurtdisi_onay_verildi && profile.yurtdisi_onay_versiyonu === KVKK_METIN_SURUMU;
+  // Güncel sürüm site_ayarlari'ndan (migration 0064). Okunamazsa (null) sürüm farkı
+  // yüzünden yanlış "güncel değil" uyarısı göstermemek için sürüm eşleşmesi aranmaz.
+  const guncelSurum = await guncelKvkkSurumu();
+  const surumGuncelMi = (v) => !guncelSurum || v === guncelSurum;
+  const aydinlatmaGuncelMi = profile.kvkk_onay_verildi && surumGuncelMi(profile.kvkk_onay_versiyonu);
+  const yurtdisiGuncelMi = profile.yurtdisi_onay_verildi && surumGuncelMi(profile.yurtdisi_onay_versiyonu);
 
   let html = "";
 
@@ -731,7 +734,7 @@ function wireKvkk(profile) {
     // günceller, yurt dışı rızasına DOKUNMAZ (bkz. migration 0042 —
     // p_yurtdisi_onay null bırakılırsa ilgili kolonlar olduğu gibi kalır).
     const { error } = await supabase.rpc("kvkk_onayini_ver", {
-      p_versiyon: KVKK_METIN_SURUMU,
+      p_versiyon: guncelSurum ?? "bilinmiyor", // dolu = damgala; DB kendi güncel sürümünü yazar (0064)
       p_yurtdisi_onay: null,
       p_yurtdisi_versiyon: null,
     });
@@ -761,9 +764,9 @@ function wireKvkk(profile) {
     // alınır, ki bu iki onayın veritabanında AYRI sütunlarda tutulmasının
     // doğal bir sonucu, "paket rıza" oluşturmaz.
     const { error } = await supabase.rpc("kvkk_onayini_ver", {
-      p_versiyon: profile.kvkk_onay_versiyonu || KVKK_METIN_SURUMU,
+      p_versiyon: null, // NULL = aydınlatma beyanına dokunma (0064); sürümü DB yazar
       p_yurtdisi_onay: true,
-      p_yurtdisi_versiyon: KVKK_METIN_SURUMU,
+      p_yurtdisi_versiyon: guncelSurum,
     });
     yurtdisiBtn.disabled = false;
     if (error) {
@@ -789,7 +792,7 @@ function wireKvkk(profile) {
     if (!fetchErr && guncelProfil) {
       Object.assign(profile, guncelProfil);
     }
-    wireKvkk(profile);
+    await wireKvkk(profile);
   }
 }
 
