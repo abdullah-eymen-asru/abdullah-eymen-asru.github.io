@@ -227,7 +227,7 @@ export function kur() {
     el("p", {
       class: "muted",
       text:
-        "Yukarıdaki matristen bir rolün TAMAMI için kapatabilirsin. Burada ise tek tek kişilerle çalışırsın. " +
+        "\"Özellikler\" sekmesindeki matristen bir rolün TAMAMI için kapatabilirsin. Burada ise tek tek kişilerle çalışırsın. " +
         "Yazar/içerik sorumlusu/yönetici için modül, rol kapalıysa VEYA kişi kapalıysa kapalıdır (ikisinin de açık olması gerekir). " +
         "Üye ve özel üye için modül varsayılan olarak kapalıdır; yalnızca sen açarsan çalışır.",
     }),
