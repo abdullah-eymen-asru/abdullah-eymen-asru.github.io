@@ -5632,7 +5632,8 @@ async function yetkiAyarlariTablosunuYukle() {
     // "Tüm roller" sütunu: bir satırdaki (birden çok rolü olan) özelliği o satırın BÜTÜN
     // rolleri için tek tıkla kapatır/açar (altta yetkiAyariniTopluKaydet).
     const basliklar =
-      tumRoller.map((r) => `<th>${escapeHtml(YA_ROL_ETIKETLERI[r] || r)}</th>`).join("") + "<th>Tüm roller</th>";
+      tumRoller.map((r) => `<th scope="col">${escapeHtml(YA_ROL_ETIKETLERI[r] || r)}</th>`).join("") +
+      '<th scope="col">Tüm roller</th>';
 
     const satirlarHtml = OZELLIK_KATALOGU.map((ozellik) => {
       const ozellikRolleri = ozellik.rolSutunlari || ["admin"];
@@ -5641,14 +5642,15 @@ async function yetkiAyarlariTablosunuYukle() {
         // satırında "manager" sütunu) — manager zaten bu özelliğe sabit
         // kodda hiç erişemiyor, kısacak bir şey yok, boş hücre göster.
         if (!ozellikRolleri.includes(rol)) {
-          return `<td class="ya-hucre-yok" aria-hidden="true">—</td>`;
+          return `<td class="ya-hucre-yok" aria-hidden="true" role="presentation">—</td>`;
         }
         const anahtar = `${ozellik.anahtar}::${rol}`;
         const izinli = kisitHaritasi[anahtar] !== false; // yoksa varsayılan: izinli
+        const rolEtiketi = YA_ROL_ETIKETLERI[rol] || rol;
         return `
-          <td>
+          <td role="cell" data-label="${escapeHtml(rolEtiketi)}">
             <label class="ya-mini-toggle">
-              <input type="checkbox" data-ya-ozellik="${escapeHtml(ozellik.anahtar)}" data-ya-rol="${escapeHtml(rol)}" ${izinli ? "checked" : ""}>
+              <input type="checkbox" aria-label="${escapeHtml(`${ozellik.baslik} — ${rolEtiketi}`)}" data-ya-ozellik="${escapeHtml(ozellik.anahtar)}" data-ya-rol="${escapeHtml(rol)}" ${izinli ? "checked" : ""}>
               <span class="ya-mini-track"><span class="ya-mini-thumb"></span></span>
             </label>
           </td>`;
@@ -5656,16 +5658,16 @@ async function yetkiAyarlariTablosunuYukle() {
       const hepsiIzinli = ozellikRolleri.every((r) => kisitHaritasi[`${ozellik.anahtar}::${r}`] !== false);
       const masterHucre =
         ozellikRolleri.length > 1
-          ? `<td>
+          ? `<td role="cell" data-label="Tüm roller">
             <label class="ya-mini-toggle" title="Bu özelliği tüm roller için aç/kapat">
-              <input type="checkbox" data-ya-master="${escapeHtml(ozellik.anahtar)}" ${hepsiIzinli ? "checked" : ""}>
+              <input type="checkbox" aria-label="${escapeHtml(`${ozellik.baslik} — tüm roller`)}" data-ya-master="${escapeHtml(ozellik.anahtar)}" ${hepsiIzinli ? "checked" : ""}>
               <span class="ya-mini-track"><span class="ya-mini-thumb"></span></span>
             </label>
           </td>`
-          : `<td class="ya-hucre-yok" aria-hidden="true">—</td>`;
+          : `<td class="ya-hucre-yok" aria-hidden="true" role="presentation">—</td>`;
       return `
-        <tr>
-          <td>
+        <tr role="row">
+          <td role="rowheader" class="ya-ozellik-hucre">
             <span class="ya-ozellik-adi">${escapeHtml(ozellik.baslik)}</span>
             <span class="ya-ozellik-aciklama">${escapeHtml(ozellik.aciklama)}</span>
           </td>
@@ -5674,11 +5676,15 @@ async function yetkiAyarlariTablosunuYukle() {
         </tr>`;
     }).join("");
 
+    // .ya-tablo-sarmal: dar alanda (telefon) tablo satırları karta dönüşür (dashboard.css,
+    // container query); desteklemeyen eski tarayıcıda yatay kaydırma yedeği çalışır.
     alan.innerHTML = `
-      <table class="ya-tablo">
-        <thead><tr><th>Özellik</th>${basliklar}</tr></thead>
-        <tbody>${satirlarHtml}</tbody>
-      </table>`;
+      <div class="ya-tablo-sarmal">
+        <table class="ya-tablo" role="table">
+          <thead role="rowgroup"><tr role="row"><th scope="col">Özellik</th>${basliklar}</tr></thead>
+          <tbody role="rowgroup">${satirlarHtml}</tbody>
+        </table>
+      </div>`;
 
     alan.querySelectorAll('input[data-ya-ozellik]').forEach((input) => {
       input.addEventListener("change", async () => {
