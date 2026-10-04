@@ -1653,12 +1653,19 @@ permalink: "/panel/dashboard.html"
       <div class="nt-arama">
         <span class="nt-arama-ikon" aria-hidden="true">🔎</span>
         <input id="nt-arama" type="search" autocomplete="off"
-               placeholder="Başlıkta, etiketlerde ve notların içinde ara  ( / )"
-               aria-label="Notlarda ara">
+               placeholder="Tüm klasörlerde ara  ( / )"
+               aria-label="Tüm klasörlerde ara">
         <button type="button" id="nt-arama-temizle" class="nt-arama-temizle" hidden aria-label="Aramayı temizle">✕</button>
       </div>
-      <button type="button" id="nt-yeni-btn" class="btn-primary csp-w-auto">➕ Yeni not</button>
     </div>
+
+    <div class="nt-eylemler">
+      <button type="button" id="nt-hizli-btn" class="btn-primary csp-w-auto" title="Başlığı tarih-saatle açılır, doğrudan yazmaya başlarsın">⚡ Hızlı not</button>
+      <button type="button" id="nt-yeni-btn" class="btn-secondary csp-w-auto">➕ Yeni not</button>
+      <button type="button" id="nt-klasor-btn" class="btn-secondary csp-w-auto">📁 Yeni klasör</button>
+    </div>
+
+    <nav id="nt-yol" class="nt-yol" aria-label="Klasör yolu"></nav>
 
     <div class="nt-filtre">
       <div id="nt-durum-chips" class="nt-chips" role="tablist" aria-label="Olgunlaşma aşamasına göre filtrele">
@@ -1673,62 +1680,116 @@ permalink: "/panel/dashboard.html"
     </div>
 
     <div id="nt-duzen" class="nt-duzen">
-      <div id="nt-liste" class="nt-liste"></div>
+      <div id="nt-sol" class="nt-sol">
+        <section id="nt-son-kutu" class="nt-son" hidden aria-label="Son düzenlenen notlar">
+          <h3 class="nt-bolum-baslik">Son düzenlenenler</h3>
+          <div id="nt-son" class="nt-son-liste"></div>
+        </section>
+        <section id="nt-klasorler-kutu" hidden aria-label="Klasörler">
+          <h3 class="nt-bolum-baslik" id="nt-klasorler-baslik">Klasörler</h3>
+          <div id="nt-klasorler" class="nt-klasorler"></div>
+        </section>
+        <section id="nt-liste-kutu" aria-label="Notlar">
+          <h3 class="nt-bolum-baslik" id="nt-liste-baslik" hidden>Notlar</h3>
+          <div id="nt-liste" class="nt-liste"></div>
+        </section>
+      </div>
 
       <div id="nt-editor" class="nt-editor" hidden>
         <form id="nt-form" novalidate>
           <div class="nt-editor-bas">
             <button type="button" id="nt-geri-btn" class="btn-secondary csp-w-auto nt-sadece-mobil">← Listeye dön</button>
             <span id="nt-kayit-durumu" class="nt-kayit-durumu muted" aria-live="polite"></span>
-            <button type="button" id="nt-kapat-btn" class="btn-secondary csp-w-auto nt-kapat nt-sadece-masaustu" aria-label="Düzenleyiciyi kapat">✕</button>
+            <span class="nt-editor-bas-sag">
+              <button type="button" id="nt-genis-btn" class="btn-secondary csp-w-auto nt-sadece-masaustu" aria-pressed="false" title="Listeyi gizle, yazı alanını genişlet">⤢ Geniş</button>
+              <button type="button" id="nt-kapat-btn" class="btn-secondary csp-w-auto nt-kapat nt-sadece-masaustu" aria-label="Düzenleyiciyi kapat">✕</button>
+            </span>
           </div>
 
-          <div class="form-field">
-            <label for="nt-baslik">Başlık</label>
-            <input id="nt-baslik" type="text" maxlength="200" autocomplete="off">
+          <label for="nt-baslik" class="nt-gizli">Başlık</label>
+          <input id="nt-baslik" class="nt-baslik-girdi" type="text" maxlength="200" autocomplete="off" placeholder="Başlık">
+
+          <div class="nt-konum-satiri">
+            <label for="nt-klasor-sec" class="nt-konum-etiket">📁 Klasör</label>
+            <select id="nt-klasor-sec" aria-label="Notun klasörü"></select>
+            <select id="nt-sablon" aria-label="Şablon ekle">
+              <option value="">Şablon ekle…</option>
+              <option value="ders">Ders notu</option>
+              <option value="etkinlik">Panel / etkinlik</option>
+              <option value="toplanti">Toplantı</option>
+              <option value="kaynak">Kitap / makale</option>
+            </select>
+            <span id="nt-sozcuk" class="nt-sozcuk muted" aria-live="off"></span>
           </div>
 
-          <div class="form-field">
-            <label id="nt-seviye-etiket">Olgunluk</label>
-            <div class="nt-seviye" role="radiogroup" aria-labelledby="nt-seviye-etiket">
-              <label class="nt-seviye-secenek"><input type="radio" name="nt-durum" value="tohum" checked><span>🌱 Tohum</span><small>Hızlı fikir</small></label>
-              <label class="nt-seviye-secenek"><input type="radio" name="nt-durum" value="filiz"><span>🌿 Filiz</span><small>Geliştirilen argüman</small></label>
-              <label class="nt-seviye-secenek"><input type="radio" name="nt-durum" value="agac"><span>🌳 Ağaç</span><small>Yayına hazır taslak</small></label>
+          <div id="nt-arac" class="nt-arac" role="toolbar" aria-label="Biçimlendirme">
+            <button type="button" data-kmt="bold" title="Kalın (Ctrl+B)" aria-label="Kalın"><b>B</b></button>
+            <button type="button" data-kmt="italic" title="İtalik (Ctrl+I)" aria-label="İtalik"><i>I</i></button>
+            <button type="button" data-kmt="underline" title="Altını çiz (Ctrl+U)" aria-label="Altı çizili"><u>U</u></button>
+            <button type="button" data-kmt="strikeThrough" title="Üstünü çiz" aria-label="Üstü çizili"><s>S</s></button>
+            <button type="button" data-kmt="mark" title="Vurgula (Ctrl+Shift+H)" aria-label="Vurgula"><mark>A</mark></button>
+            <span class="nt-arac-ayrac" aria-hidden="true"></span>
+            <button type="button" data-kmt="h2" title="Başlık" aria-label="Başlık">H1</button>
+            <button type="button" data-kmt="h3" title="Alt başlık" aria-label="Alt başlık">H2</button>
+            <span class="nt-arac-ayrac" aria-hidden="true"></span>
+            <button type="button" data-kmt="ul" title="Madde işaretli liste" aria-label="Madde işaretli liste">•&nbsp;Liste</button>
+            <button type="button" data-kmt="ol" title="Numaralı liste" aria-label="Numaralı liste">1.&nbsp;Liste</button>
+            <button type="button" data-kmt="gorev" title="Yapılacaklar (onay kutulu)" aria-label="Yapılacaklar listesi">☑&nbsp;Görev</button>
+            <button type="button" data-kmt="girinti" title="Girinti ekle (listede Tab)" aria-label="Girinti ekle">⇥</button>
+            <button type="button" data-kmt="girintiAzalt" title="Girintiyi azalt (listede Shift+Tab)" aria-label="Girintiyi azalt">⇤</button>
+            <span class="nt-arac-ayrac" aria-hidden="true"></span>
+            <button type="button" data-kmt="quote" title="Alıntı bloğu" aria-label="Alıntı bloğu">❝</button>
+            <button type="button" data-kmt="hr" title="Ayraç çizgisi" aria-label="Ayraç çizgisi">―</button>
+            <button type="button" data-kmt="temizle" title="Biçimi temizle" aria-label="Biçimi temizle">Tₓ</button>
+            <span class="nt-arac-ayrac" aria-hidden="true"></span>
+            <button type="button" data-kmt="undo" title="Geri al (Ctrl+Z)" aria-label="Geri al">↶</button>
+            <button type="button" data-kmt="redo" title="Yinele (Ctrl+Y)" aria-label="Yinele">↷</button>
+          </div>
+          <div id="nt-govde" class="nt-yazi" contenteditable="true" role="textbox" aria-multiline="true"
+               aria-label="Not metni" lang="tr" spellcheck="true"
+               data-yer="Yazmaya başla… Hızlı not için düz yaz; satır başında “- ” madde, “1. ” numara, “# ” başlık, “[] ” görev açar."></div>
+
+          <details class="nt-detay" id="nt-detay">
+            <summary>Aşama, etiketler, alıntılar ve ekler</summary>
+
+            <div class="form-field">
+              <label id="nt-seviye-etiket">Olgunluk</label>
+              <div class="nt-seviye" role="radiogroup" aria-labelledby="nt-seviye-etiket">
+                <label class="nt-seviye-secenek"><input type="radio" name="nt-durum" value="tohum" checked><span>🌱 Tohum</span><small>Hızlı fikir</small></label>
+                <label class="nt-seviye-secenek"><input type="radio" name="nt-durum" value="filiz"><span>🌿 Filiz</span><small>Geliştirilen argüman</small></label>
+                <label class="nt-seviye-secenek"><input type="radio" name="nt-durum" value="agac"><span>🌳 Ağaç</span><small>Yayına hazır taslak</small></label>
+              </div>
             </div>
-          </div>
 
-          <div class="form-field">
-            <label for="nt-etiketler">Etiketler (virgülle ayır)</label>
-            <input id="nt-etiketler" type="text" autocomplete="off" placeholder="ör. sosyoloji, alan çalışması, metodoloji">
-          </div>
+            <div class="form-field">
+              <label for="nt-etiketler">Etiketler (virgülle ayır)</label>
+              <input id="nt-etiketler" type="text" autocomplete="off" placeholder="ör. sosyoloji, alan çalışması, metodoloji">
+            </div>
 
-          <div class="form-field">
-            <label for="nt-govde">Kendi yorumum ve ana metin (Markdown)</label>
-            <textarea id="nt-govde" rows="12" placeholder="Fikrini, argümanını ya da taslağını yaz. Görsel yapıştırabilir ya da buraya sürükleyebilirsin."></textarea>
-          </div>
+            <h3>Kaynaklı alıntılar</h3>
+            <p class="muted">
+              Doğrudan alıntıyı kendi yorumundan ayrı tut. “Yazıya dönüştür” dediğinde her alıntı
+              <code>&lt;blockquote&gt;</code> olur; yorumun hemen altına gelir.
+            </p>
+            <div id="nt-alintilar"></div>
+            <button type="button" id="nt-alinti-ekle-btn" class="btn-secondary csp-w-auto">➕ Alıntı ekle</button>
 
-          <h3>Kaynaklı alıntılar</h3>
-          <p class="muted">
-            Doğrudan alıntıyı kendi yorumundan ayrı tut. “Yazıya dönüştür” dediğinde her alıntı
-            <code>&lt;blockquote&gt;</code> olur; yorumun hemen altına gelir.
-          </p>
-          <div id="nt-alintilar"></div>
-          <button type="button" id="nt-alinti-ekle-btn" class="btn-secondary csp-w-auto">➕ Alıntı ekle</button>
-
-          <h3>Ekler</h3>
-          <div id="nt-birak" class="nt-birak" tabindex="0">
-            Görsel ya da PDF'i buraya sürükle-bırak, ya da
-            <button type="button" id="nt-dosya-sec-btn">dosya seç</button>.
-            Dosyalar tarayıcında şifrelenip Cloudflare R2'ye yüklenir.
-            <input id="nt-dosya" type="file" multiple hidden accept="image/png,image/jpeg,image/webp,image/gif,application/pdf">
-          </div>
-          <div id="nt-ekler" class="nt-ekler"></div>
+            <h3>Ekler</h3>
+            <div id="nt-birak" class="nt-birak" tabindex="0">
+              Görsel ya da PDF'i buraya (ya da doğrudan yazı alanına) sürükle-bırak, ya da
+              <button type="button" id="nt-dosya-sec-btn">dosya seç</button>.
+              Dosyalar tarayıcında şifrelenip Cloudflare R2'ye yüklenir. Görseller yazının içinde görünür.
+              <input id="nt-dosya" type="file" multiple hidden accept="image/png,image/jpeg,image/webp,image/gif,application/pdf">
+            </div>
+            <div id="nt-ekler" class="nt-ekler"></div>
+          </details>
 
           <div class="nt-editor-eylemler">
             <button type="submit" id="nt-kaydet-btn" class="btn-primary csp-w-auto">💾 Şifrele ve kaydet</button>
             <button type="button" id="nt-donustur-btn" class="btn-secondary csp-w-auto" hidden>✍️ Yazıya dönüştür</button>
             <button type="button" id="nt-sil-btn" class="btn-danger csp-w-auto" hidden>🗑️ Çöpe at</button>
           </div>
+          <p class="muted nt-koru-notu">Notlar sen silene kadar durur: yazıya dönüştürmek ya da yayına almak notu silmez; çöpe attıkların da otomatik silinmez.</p>
         </form>
       </div>
     </div>
@@ -1737,7 +1798,7 @@ permalink: "/panel/dashboard.html"
       <summary>🛡️ Kasa ve yedek</summary>
       <div class="nt-guvenlik-govde">
         <p class="muted">
-          Başlık, etiket, metin, alıntı ve ek adları sunucuya yalnızca şifreli gider; arama bu cihazda,
+          Başlık, etiket, metin, alıntı, klasör adı ve ek adları sunucuya yalnızca şifreli gider; arama bu cihazda,
           çözülmüş notlar üzerinde çalışır.
         </p>
         <div class="nt-guvenlik-satir">
