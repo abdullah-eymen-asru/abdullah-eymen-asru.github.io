@@ -26,7 +26,7 @@ Worker'ını hiç kurmak zorunda değilsin (bkz. [🍴 Fork Kurulumu → Bölüm
 2. [Değer sözlüğü: hangi değer nereden bulunur?](#2-değer-sözlüğü-hangi-değer-nereden-bulunur)
 3. [Cloudflare panelinde değişken / secret / binding nasıl eklenir?](#3-cloudflare-panelinde-değişken--secret--binding-nasıl-eklenir)
 4. [Worker bazlı ayrıntılı kurulum](#4-worker-bazlı-ayrıntılı-kurulum)
-5. [Cloudflare Pages ayarları (build, LANG, deploy hook)](#5-cloudflare-pages-ayarları)
+5. [Cloudflare Pages ayarları (build, LANG, Kasa/Erişim Kalkanı değişkenleri, deploy hook)](#5-cloudflare-pages-ayarları)
 6. [GitHub Actions secret'ları](#6-github-actions-secretları)
 7. [Güvenlik kontrol listesi](#7-güvenlik-kontrol-listesi)
 8. [Sık karşılaşılan hatalar](#8-sık-karşılaşılan-hatalar)
@@ -130,6 +130,7 @@ bir terminal (Mac/Linux: Terminal, Windows: PowerShell veya WSL):
 |---|---|---|---|
 | `WEBHOOK_SHARED_SECRET` | Supabase'in Worker'a gönderdiği isteği doğrular | `openssl rand -hex 32` → 64 karakterlik bir yazı çıkar | **Aynı değer** Supabase'e de yazılacak (Bölüm 4.7, adım 4). Secret. |
 | `GIZLI_YOL` | Worker adresinin sonuna eklenen tahmin edilemez parça | `openssl rand -hex 12` → ör. `a1b2c3...` (sadece harf/rakam/tire; `/` koyma) | Secret. Adresin sonuna `/` ile eklenir. |
+| `GK_COOKIE_SECRET` | Kasa / Erişim Kalkanı uç katmanının yetkili-geçiş cookie'sini **imzalar** (Cloudflare **Pages** projesinde durur, Worker'da değil) | `openssl rand -base64 48` (en az 32 karakter) | Değiştirirsen tüm cookie'ler anında iptal olur (acil durdurma); veri kaybı yok. Secret. Bkz. Bölüm 5.2-B |
 | `E2EE_KASA_SECRET` | Dosya şifreleme anahtarlarının **ana tohumu** | `openssl rand -base64 32` → 44 karakterlik base64 yazı | 🛑 **Kaybedersen/değiştirirsen, daha önce şifrelenmiş dosyalar açılamaz hale gelir.** Bir parola yöneticisine yedekle. Secret. |
 
 Terminalin yoksa: bir parola yöneticisinin "güçlü parola üret" özelliğini
@@ -155,8 +156,11 @@ beklendiğinden onu mutlaka `openssl rand -base64 32` ile üret.
 | `R2_SINIF_A_LIMIT` | `r2-arsiv-worker` | `800000` (~0,8 MB) | A sınıfı (küçük) dosya limiti (bayt) |
 | `R2_SINIF_B_LIMIT` | `r2-arsiv-worker` | `8000000` (~8 MB) | B sınıfı dosya limiti (bayt) |
 | `KOTA_BAYT` | `r2-not-ek-worker` | `524288000` (500 MB) | Kullanıcı başına toplam not eki kotası (bayt) |
+| `GK_COOKIE_DAKIKA` | Pages projesi (Kasa uç katmanı) | `15` | Yetkili-geçiş cookie ömrü, dakika (1–120) |
+| `GK_AYAR_TTL_SN` | Pages projesi (Kasa uç katmanı) | `30` | `site_ayarlari` önbellek süresi, saniye (5–300) |
+| `GK_HATA_KILIT` | Pages projesi (Kasa uç katmanı) | boş (açık kal) | `1` ise: ayarlar okunamazsa **ve** bilinen son ayar yoksa siteyi kilitle |
 
-Hepsi **Variable (Text)**, değer sadece rakam (nokta/virgül/birim yok).
+Hepsi **Variable (Text)**, değer sadece rakam (nokta/virgül/birim yok). `GK_*` değişkenleri Worker'a değil **Cloudflare Pages projesine** girilir (Bölüm 5.2-B).
 
 ---
 
@@ -409,6 +413,17 @@ Siteyi Cloudflare Pages'e bağladığında (**Workers & Pages → Create → Pag
 
 ### 5.2 Variables and secrets (Settings → Variables and secrets)
 
+Pages projesine **iki ayrı grup** değişken girilir: (A) build kodlaması için
+üç Text değişkeni, (B) Kasa / Erişim Kalkanı uç katmanı için altı değişken.
+Hepsi aynı yerde durur: **Workers & Pages → proje adın → Settings →
+Variables and secrets**.
+
+> 📌 **Production ve Preview ayrı ortamlardır.** Aşağıdaki değişkenleri **hem
+> Production hem Preview** için gir; yalnızca birine eklersen diğer ortamda
+> değişken yokmuş gibi davranılır.
+
+#### A) Build kodlaması (her kurulumda gerekli)
+
 Jekyll build'i Türkçe karakterli dosyalarda "invalid byte sequence" /
 "US-ASCII" gibi kodlama hataları verebilir. Bunu önlemek için **üç Text
 değişkeni** ekle (Type: **Text**):
@@ -420,9 +435,61 @@ değişkeni** ekle (Type: **Text**):
 | Text | `LC_ALL` | `C.UTF-8` |
 
 - Bunlar **gizli değil**, kodlama ayarıdır; Secret yapma, Text olsun.
-- Üretim (Production) ortamı için ekle. Önizleme (Preview) dallarını da build'liyorsan aynı üçünü **Preview** için de ekle.
-- **Bindings** bölümü bu projede **boş** kalır (Pages Functions kullanılmıyor); bir şey eklemene gerek yok.
-- Pages'te **API anahtarı/secret girmezsin.** Siteye gömülen her şey zaten herkese açıktır; gizli değerler yalnızca Worker'larda ya da GitHub Actions secret'larında durur.
+
+#### B) Kasa / Erişim Kalkanı uç katmanı (`functions/_middleware.js`)
+
+`pages.dev` adresindeki kilidi (Panel → Yetki Ayarları → Erişim Kalkanı)
+**sunucu tarafında** da uygulayan Pages Functions katmanını kuruyorsan şu
+değişkenleri gir. Kurmayacaksan bu bölümü atla; yalnızca tarayıcıda çalışan
+`gatekeeper.js` perdesi kullanılır.
+
+| Ad | Tür | Değer |
+|---|---|---|
+| `SUPABASE_URL` | Text | `https://<proje-ref>.supabase.co` (Bölüm 2.2) |
+| `SUPABASE_ANON_KEY` | Text | Supabase → Project Settings → API → **anon public** (gizli değil; `service_role` **ASLA**) |
+| `GK_COOKIE_SECRET` | **Secret** | En az 32 karakter rastgele. Üretmek için: `openssl rand -base64 48` (Bölüm 2.4) |
+| `GK_COOKIE_DAKIKA` | Text, opsiyonel | Cookie ömrü, varsayılan `15` (1–120) |
+| `GK_AYAR_TTL_SN` | Text, opsiyonel | `site_ayarlari` önbellek süresi (sn), varsayılan `30` (5–300) |
+| `GK_HATA_KILIT` | Text, opsiyonel | `1` yaparsan: ayarlar okunamazsa **ve** bilinen son ayar yoksa siteyi kilitle. Varsayılan: açık kal (`gatekeeper.js` ile aynı ilke) |
+
+**Önemli notlar**
+
+- **`GK_COOKIE_SECRET` neden gerekli?** Cookie'nin sahte üretilememesi için
+  imzalanması şart. Değerini değiştirmek **tüm cookie'leri anında iptal eder**
+  (acil durdurma olarak da kullanılabilir). Yetkili kullanıcılar için kilit
+  sayfası işlemi sessizce tekrarlar; yani değiştirmek veri kaybettirmez.
+- **Anahtar türleri:** `SUPABASE_ANON_KEY` olarak yalnızca **anon public**
+  anahtarını gir. `service_role` anahtarı bu projeye hiçbir koşulda yazılmaz.
+  Parola/imza niteliğindeki `GK_COOKIE_SECRET` mutlaka **Secret** olmalı.
+- **Yetkili geçiş nasıl çalışır?** Oturum tarayıcının `localStorage`'ında
+  durur, sayfa isteğiyle sunucuya gitmez. Bu yüzden kilit sayfası
+  (`/_gk/el-sikisma.js`) sitenin kendi `supabase-client.js`'iyle oturumu alır,
+  JWT'yi `POST /_gk/oturum`'a gönderir; uç katman JWT'yi Supabase'in
+  `gk_bypass_var_mi()` RPC'siyle doğrular (**yetki kararı veritabanında
+  kalır**: owner / askıda olmayan admin / izinli roller). Olumluysa
+  `HttpOnly; Secure; SameSite=Lax; Path=/` (`__Host-gk`), HMAC imzalı,
+  varsayılan **15 dk** ömürlü cookie verilir; sonrasında cookie yerelde
+  doğrulanır. Süre dolunca kilit sayfası aynı işlemi sessizce tekrarlar.
+- **Rotaya bağlı varlıklar:** `/assets/cv/*` → `/cv`, `/feed.xml` ve
+  `/rss.xml` → `/blog`. Alan adı komple kilitliyken bunlar ve diğer tüm
+  görsel/pdf/feed dosyaları da **403** döner. Listeyi `_middleware.js`
+  içindeki `VARLIK_ROTALARI` ve `ACIK_VARLIK_*` sabitlerinden düzenlersin.
+- **Dosya yeri:** `functions/_middleware.js` → repo **kökündeki** `functions/`
+  klasörüne (Cloudflare Git entegrasyonu bu klasörü otomatik bulur; Jekyll
+  build komutunu değiştirmene gerek yok). İstersen `tests/edge-kasa.test.mjs`
+  → `tests/`. Kurulumun tüm adımları paketteki `KURULUM-KASA.md` dosyasında.
+
+#### Genel notlar
+
+- Değişken ekledikten/değiştirdikten sonra **yeni bir deploy** gerekir; mevcut
+  yayın eski değerlerle çalışmaya devam eder.
+- **Bindings** bölümüne yukarıdaki değişkenler için bir şey eklemene gerek
+  yok; `KURULUM-KASA.md` ayrıca bir binding isterse orayı izle.
+- Pages'te **`service_role` ya da başka bir yetkili anahtar girmezsin.**
+  Build'e gömülen her şey zaten herkese açıktır. Pages'e giren tek gerçek
+  sır `GK_COOKIE_SECRET`'tır ve yalnızca sunucu tarafı uç katman tarafından
+  okunur, siteye gömülmez; diğer gizli değerler yalnızca Worker'larda ya da
+  GitHub Actions secret'larında durur.
 
 ### 5.3 Deploy Hook (zamanlanmış yazılar için)
 
@@ -464,9 +531,10 @@ Her workflow dosyasının en üstündeki yorum satırlarında kendi kurulum adı
 
 Kurulumdan sonra tek tek işaretle:
 
-- [ ] Parola/token/key niteliğindeki her değer **Secret** (panelde `Value encrypted`). Özellikle: `TELEGRAM_BOT_TOKEN`, `WEBHOOK_SHARED_SECRET`, `GIZLI_YOL`, `GITHUB_*`, `R2_*`, `SUPABASE_SERVICE_ROLE_KEY`, `E2EE_KASA_SECRET`, `TWILIO_AUTH_TOKEN`.
+- [ ] Parola/token/key niteliğindeki her değer **Secret** (panelde `Value encrypted`). Özellikle: `TELEGRAM_BOT_TOKEN`, `WEBHOOK_SHARED_SECRET`, `GIZLI_YOL`, `GITHUB_*`, `R2_*`, `SUPABASE_SERVICE_ROLE_KEY`, `E2EE_KASA_SECRET`, `TWILIO_AUTH_TOKEN`, `GK_COOKIE_SECRET` (Pages).
 - [ ] `SUPABASE_SERVICE_ROLE_KEY` hiçbir `.js`/`.md`/`.yml` dosyasında ve hiçbir commit'te yok.
 - [ ] `r2-not-ek-worker`'da `service_role` yok.
+- [ ] Kasa uç katmanını kurduysan: Pages'te `SUPABASE_ANON_KEY` olarak **anon public** var (`service_role` değil) ve `GK_COOKIE_SECRET` en az 32 karakterli bir **Secret**; değişkenler hem Production hem Preview'a girildi.
 - [ ] İki `GITHUB_TOKEN` (okuma/yazma) **farklı** token'lar; okuma olan yazma yetkisi taşımıyor.
 - [ ] R2 API token'ı **sadece kendi kovalarına** izinli.
 - [ ] `E2EE_KASA_SECRET` bir parola yöneticisinde yedekli.
@@ -491,6 +559,8 @@ Kurulumdan sonra tek tek işaretle:
 | Pages build'i "invalid byte sequence in US-ASCII" veya benzeri kodlama hatasıyla düşüyor | `LANG`/`LANGUAGE`/`LC_ALL` yok | Bölüm 5.2'deki üç Text değişkenini ekle, yeniden deploy et |
 | Pages build'i `bundle: command not found` / gem hatası | Build command'da `bundle install` yok | Bölüm 5.1'deki komutu **aynen** kullan |
 | Build komutu değişikliği etkisiz | Build cache eski | Settings → Build → Build cache → **Clear Cache**, sonra yeniden deploy |
+| Kasa kuruldu ama yetkili kullanıcılar (owner/admin) da kilit ekranında kalıyor | `GK_COOKIE_SECRET` eksik ya da 32 karakterden kısa; `SUPABASE_URL` / `SUPABASE_ANON_KEY` o ortama (Production/Preview) girilmemiş | Bölüm 5.2-B tablosunu kontrol et, hem Production hem Preview'a gir, yeniden deploy et |
+| Alan adı kilitliyken `/feed.xml`, `/rss.xml`, CV ve görseller `403` dönüyor | Beklenen davranış: rotaya bağlı varlıklar kilitli rotayla birlikte kapanır | Açmak istediğin dosya için `_middleware.js` içindeki `VARLIK_ROTALARI` / `ACIK_VARLIK_*` sabitlerini düzenle (Bölüm 5.2-B) |
 | Zamanlanmış yazı yayına çıkmıyor | `CLOUDFLARE_DEPLOY_HOOK_URL` GitHub'da yok ya da hook silinmiş | Bölüm 5.3 |
 
 ---
