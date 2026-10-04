@@ -32,7 +32,7 @@
  *
  * KESİN KURAL: bu dosya admin.js/panel.js/uye-ayarlari.js/admin-guvenlik.js/
  * github-yonetim.js/izleme-okuma-yonetim.js/mesajlar.js içindeki TEK BİR
- * SATIRA bile dokunmaz. Hepsi olduğu gibi, deÄŸiÅŸtirilmeden import edilir.
+ * SATIRA bile dokunmaz. Hepsi olduğu gibi, değiştirilmeden import edilir.
  */
 
 import { requireAuthOrShowError } from "./auth/auth-guard.js";
@@ -603,6 +603,76 @@ function wireDashIciLinkler() {
   });
 }
 
+/*
+ * YETKİ AYARLARI ALT SEKMELERİ ("sayfa içinde sayfa").
+ * Yetki Ayarları tek uzun bir sayfaydı; her konu artık kendi sekmesinde ve aynı anda
+ * yalnızca biri görünür. Paneller DOM'dan SÖKÜLMEZ (yalnızca hidden), böylece
+ * github-yonetim.js / izin-paneli.js / kalkan-paneli.js / yetki-paneli.js'in id'lerle
+ * bağlandığı düğümler ve event listener'lar olduğu gibi kalır.
+ * Seçili sekme oturum boyunca hatırlanır (sessionStorage; kapalıysa sorun değil).
+ * Klavye: ← → / Home / End (WAI-ARIA tabs deseni). Inline style/JS yok (CSP).
+ */
+const YA_ALTSEKME_ANAHTARI = "aea_yetki_altsekme";
+
+function wireYetkiAltSekmeler() {
+  const serit = document.getElementById("ya-altsekmeler");
+  if (!serit) return;
+  // Owner değilse github-yonetim.js ilgili paneli DOM'dan silebilir; paneli olmayan sekmeyi at.
+  const sekmeler = [...serit.querySelectorAll("[data-ya-pane]")].filter((s) => {
+    if (document.getElementById(s.dataset.yaPane)) return true;
+    s.remove();
+    return false;
+  });
+  if (sekmeler.length === 0) return;
+
+  const azHareket = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+  function sec(hedef, { odak = false } = {}) {
+    for (const s of sekmeler) {
+      const aktif = s === hedef;
+      s.setAttribute("aria-selected", String(aktif));
+      s.tabIndex = aktif ? 0 : -1;
+      const panel = document.getElementById(s.dataset.yaPane);
+      if (panel) panel.hidden = !aktif;
+    }
+    // Şeridi yatay kaydırıp aktif sekmeyi ortala (sayfayı DİKEY kaydırmaz).
+    const sol = hedef.offsetLeft - (serit.clientWidth - hedef.offsetWidth) / 2;
+    serit.scrollTo({ left: Math.max(0, sol), behavior: azHareket ? "auto" : "smooth" });
+    if (odak) hedef.focus();
+    try {
+      sessionStorage.setItem(YA_ALTSEKME_ANAHTARI, hedef.dataset.yaPane);
+    } catch {
+      /* depo kapalı: hatırlanmaz, önemli değil */
+    }
+  }
+
+  serit.addEventListener("click", (e) => {
+    const s = e.target.closest("[data-ya-pane]");
+    if (s && sekmeler.includes(s)) sec(s);
+  });
+
+  serit.addEventListener("keydown", (e) => {
+    const i = sekmeler.indexOf(document.activeElement);
+    if (i === -1) return;
+    let j = null;
+    if (e.key === "ArrowRight") j = (i + 1) % sekmeler.length;
+    else if (e.key === "ArrowLeft") j = (i - 1 + sekmeler.length) % sekmeler.length;
+    else if (e.key === "Home") j = 0;
+    else if (e.key === "End") j = sekmeler.length - 1;
+    if (j === null) return;
+    e.preventDefault();
+    sec(sekmeler[j], { odak: true });
+  });
+
+  let kayitli = null;
+  try {
+    kayitli = sessionStorage.getItem(YA_ALTSEKME_ANAHTARI);
+  } catch {
+    /* yok say */
+  }
+  sec(sekmeler.find((s) => s.dataset.yaPane === kayitli) || sekmeler[0]);
+}
+
 async function init() {
   // Tek, paylaşılan temel oturum/rol kontrolü — role:null, yani sadece
   // giriş yapmış olmak yeterli. Modül-özel rol kısıtları SADECE sidebar
@@ -650,6 +720,7 @@ async function init() {
   buildSidebar(profile);
   wireMobileNav();
   wireDashIciLinkler();
+  wireYetkiAltSekmeler();
 
   // Not Kasası kancaları (parola değişince zarf yenileme + çıkışta anahtar temizliği):
   // Notlar sekmesi hiç açılmasa bile Şifre Değiştir / çıkış anında çalışmaları gerektiği
