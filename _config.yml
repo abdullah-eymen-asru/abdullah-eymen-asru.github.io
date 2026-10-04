@@ -120,6 +120,7 @@ sass:
 include:
   - .well-known
   - llms.txt
+  - _redirects   # Cloudflare Pages yönlendirmeleri (başında "_" olduğu için Jekyll varsayılanda atlar)
 
 # GÜVENLİK: "supabase/" (veritabanı migration'ları + Edge Function kaynak
 # kodu, ör. admin-change-email/index.ts) ve "cloudflare worker/" (Cloudflare
