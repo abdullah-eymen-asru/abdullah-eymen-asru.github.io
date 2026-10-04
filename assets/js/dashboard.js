@@ -98,7 +98,10 @@ const NAV = [
       // (adreste # yokken) değişmesin; notlar kendiliğinden açılmasın. Editor/manager/admin için
       // varsayılan açılış zaten daha önceki "içerik" sekmeleridir, onlar değişmez.
       { id: "content-notlar", icon: "🌱", label: "Fikir & Araştırma Tezgâhı", module: "notlar", defaultAcilis: false },
-      { id: "content-private", icon: "🔒", label: "Özel / Gizli Makaleler", module: "admin" },
+      // role override: admin modülü (MODULES.admin) editor'e AÇILMAZ (sys-hesabim gibi sekmeler admin/manager
+      // kalsın); bu iki sekme ise Yetki Ayarları'nda editor için de açılıp kapanır (migration 0066).
+      // ozellik: owner kapattıysa (admin/manager/editor fark etmez) sekme hiç çizilmez; gerçek sınır RLS + worker.
+      { id: "content-private", icon: "🔒", label: "Özel / Gizli Makaleler", module: "admin", role: ["admin", "manager", "editor"], ozellik: "ozel_icerik_yonetimi" },
       { id: "content-folders", icon: "📁", label: "Klasör Yönetimi", module: "gy" },
     ],
   },
@@ -106,7 +109,7 @@ const NAV = [
     group: "Medya & Takip",
     icon: "📁",
     items: [
-      { id: "media-r2", icon: "🗂️", label: "R2 Dosya Paylaşımı", module: "admin" },
+      { id: "media-r2", icon: "🗂️", label: "R2 Dosya Paylaşımı", module: "admin", role: ["admin", "manager", "editor"], ozellik: "dosya_paylasimi_yonetimi" },
       { id: "media-arsiv", icon: "🗄️", label: "Dosya Yöneticisi", module: "arsiv", role: null, izin: "arsiv", defaultAcilis: false },
       { id: "media-izleme", icon: "🎬", label: "İzleme ve Okuma Yönetimi", module: "izleme" },
       { id: "media-cv", icon: "📄", label: "Özgeçmiş (CV) & Profil Görseli", module: "gy" },
@@ -168,6 +171,10 @@ function roleAllowed(required, profile) {
 // sonucundan en az biri true (ya da kendisine şifreli dosya paylaşılmış) olmalı.
 function gorunurMu(item, profile) {
   if (!roleAllowed(itemRole(item), profile)) return false;
+  // Owner'ın Yetki Ayarları'ndan kapattığı özellik: sekme hiç görünmesin (owner etkilenmez).
+  if (item.ozellik && profile.role !== "owner" && profile.izinler?.ozellikler?.[item.ozellik] === false) {
+    return false;
+  }
   if (item.izin === "kvkk") {
     return profile.role === "owner" || !!profile.izinler?.kvkk;
   }
@@ -178,12 +185,25 @@ function gorunurMu(item, profile) {
   return true;
 }
 
-async function izinleriYukle() {
-  const [arsiv, kvkk] = await Promise.all([
+async function izinleriYukle(rol) {
+  // Yetki Ayarları'nda rol bazında kapatılabilen özellikler (ozellik_erisimi_var_mi; hata/ağ sorununda
+  // güvenli varsayılan "açık" — asıl sınır RLS ve worker'da).
+  const ozellikSor = (anahtar) =>
+    supabase
+      .rpc("ozellik_erisimi_var_mi", { p_ozellik: anahtar, p_rol: rol })
+      .then((r) => (r.error ? true : r.data !== false))
+      .catch(() => true);
+  const [arsiv, kvkk, ozelIcerik, dosyaPaylasimi] = await Promise.all([
     supabase.rpc("r2_arsiv_yetkilerim").then((r) => (r.error ? undefined : r.data)).catch(() => undefined),
     supabase.rpc("kvkk_surum_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
+    ozellikSor("ozel_icerik_yonetimi"),
+    ozellikSor("dosya_paylasimi_yonetimi"),
   ]);
-  return { arsiv, kvkk };
+  return {
+    arsiv,
+    kvkk,
+    ozellikler: { ozel_icerik_yonetimi: ozelIcerik, dosya_paylasimi_yonetimi: dosyaPaylasimi },
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -696,7 +716,7 @@ async function init() {
     profile.full_name || [profile.first_name, profile.last_name].filter(Boolean).join(" ") || profile.email || "";
   document.getElementById("dash-rol").textContent = `Rol: ${profile.role}`;
 
-  profile.izinler = await izinleriYukle();
+  profile.izinler = await izinleriYukle(profile.role);
 
   // Fikir & Araştırma Tezgâhı: erişimi owner belirler (migration 0059/0060, Yetki Ayarları).
   // Karar TEK yerden gelir: veritabanındaki not_modulu_yetkili(). Menüyü kuran mevcut kurala
