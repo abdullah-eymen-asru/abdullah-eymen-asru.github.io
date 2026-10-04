@@ -642,6 +642,14 @@
 .ya-mini-toggle input:checked ~ .ya-mini-track { background: #1e6b3a; }
 .ya-mini-toggle input:checked ~ .ya-mini-track .ya-mini-thumb { transform: translateX(15px); }
 .ya-mini-toggle input:disabled ~ .ya-mini-track { opacity: 0.35; }
+.ya-mini-toggle input:focus-visible ~ .ya-mini-track { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Parmakla kullanılan ekranlarda anahtar ve dokunma alanı büyür (36x21 dokunmak için küçüktü) */
+@media (pointer: coarse) {
+  .ya-mini-toggle { width: 46px; height: 27px; }
+  .ya-mini-toggle input { inset: -8px; width: calc(100% + 16px); height: calc(100% + 16px); }
+  .ya-mini-toggle .ya-mini-thumb { top: 3px; left: 3px; width: 21px; height: 21px; }
+  .ya-mini-toggle input:checked ~ .ya-mini-track .ya-mini-thumb { transform: translateX(19px); }
+}
 
 .ya-owner-hucre { color: var(--muted); font-size: 0.82rem; font-style: italic; }
 
