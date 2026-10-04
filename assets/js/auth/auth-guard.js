@@ -17,7 +17,7 @@
  *       document.getElementById('app').hidden = false;
  *     </script>
  */
-import { supabase, KVKK_METIN_SURUMU } from "../core/supabase-client.js";
+import { supabase, guncelKvkkSurumu } from "../core/supabase-client.js";
 
 /**
  * @param {Object} opts
@@ -118,7 +118,7 @@ export async function requireAuth({ role = null, redirectTo = "/hesap/giris.html
   // SÖZLEŞME VERSİYON TAKİBİ + ESKİ KULLANICILAR İÇİN RIZA YENİLEME MODALI
   // ---------------------------------------------------------------------
   // Kullanıcının en son onayladığı Aydınlatma Metni sürümü (kvkk_onay_versiyonu)
-  // güncel sürümle (KVKK_METIN_SURUMU) eşleşmiyorsa, aşağıdaki (ve rol
+  // güncel sürümle (site_ayarlari.guncel_kvkk_surumu) eşleşmiyorsa, aşağıdaki (ve rol
   // kontrolünden ÖNCE çalışan) modal ekranı kilitler. Rol kontrolünden önce
   // çalıştırılması bilinçlidir: yetkisi olmayan bir sayfaya giren birine
   // "önce rıza ver, sonra zaten yetkisiz olduğunu öğren" demek yerine, rıza
@@ -133,8 +133,11 @@ export async function requireAuth({ role = null, redirectTo = "/hesap/giris.html
   // için panel içindeki kendi checkbox'ıyla (bkz. panel.js -> wireKvkk)
   // ayrı olarak yönetilmeye devam eder. Bu modalın "Onayla" butonu yurt
   // dışı rızasına HİÇ dokunmaz.
-  if (profile.kvkk_onay_versiyonu !== KVKK_METIN_SURUMU) {
-    await kvkkRizaYenilemeModaliniGosterVeBekle(profile);
+  // Güncel sürüm site_ayarlari'ndan gelir (migration 0064). Okunamazsa (null)
+  // kullanıcı kilitlenmez; bağlayıcı olan damga zaten DB'de (kvkk_onayini_ver).
+  const guncelSurum = await guncelKvkkSurumu();
+  if (guncelSurum && profile.kvkk_onay_versiyonu !== guncelSurum) {
+    await kvkkRizaYenilemeModaliniGosterVeBekle(profile, guncelSurum);
   }
 
   // BUG FİX: bu kontrol öncesinde SADECE role==='special_user' özel olarak
@@ -256,9 +259,10 @@ function redirectWithReturnUrl(target) {
  * kalan sayfa script'inin çalışmaya devam etmesine gerek yok).
  *
  * @param {{id:string, kvkk_onay_versiyonu:string|null}} profile
+ * @param {string} guncelSurum site_ayarlari.guncel_kvkk_surumu
  * @returns {Promise<void>}
  */
-function kvkkRizaYenilemeModaliniGosterVeBekle(profile) {
+function kvkkRizaYenilemeModaliniGosterVeBekle(profile, guncelSurum) {
   return new Promise((resolve) => {
     // CSS'i harici bir <link rel="stylesheet"> ile ekliyoruz — inline
     // <style> DEĞİL (Sıkı CSP: inline stil yasak). requireAuth() birçok
@@ -370,7 +374,7 @@ function kvkkRizaYenilemeModaliniGosterVeBekle(profile) {
       onaylaBtn.textContent = "Kaydediliyor...";
 
       const { error } = await supabase.rpc("kvkk_onayini_ver", {
-        p_versiyon: KVKK_METIN_SURUMU,
+        p_versiyon: guncelSurum, // bilgi amaçlı; DB kendi değerini yazar (0064)
         p_yurtdisi_onay: null,
         p_yurtdisi_versiyon: null,
       });
@@ -389,7 +393,7 @@ function kvkkRizaYenilemeModaliniGosterVeBekle(profile) {
       // requireAuth(), profile'ı olduğu gibi çağırana döndürüyor; sayfa
       // script'i (panel.js vb.) tekrar bir DB round-trip yapmadan doğru
       // sürümü görsün diye burada senkron güncelliyoruz.
-      profile.kvkk_onay_versiyonu = KVKK_METIN_SURUMU;
+      profile.kvkk_onay_versiyonu = guncelSurum;
       profile.kvkk_onay_verildi = true;
       profile.kvkk_onay_tarihi = new Date().toISOString();
 
