@@ -63,9 +63,10 @@ const MODULES = {
   // Yetki Ayarları > "Alan Adı & Sayfa Erişim Kalkanı" (gatekeeper; migration 0061).
   // Gerçek yetki: site_ayarlari UPDATE politikası + owner RPC'leri is_owner() ister.
   kalkan: { src: "./gatekeeper/kalkan-paneli.js", role: "owner" },
-  // Yetki Ayarları > "KVKK Sürümü" (site_ayarlari.guncel_kvkk_surumu; migration 0064).
-  // Gerçek yetki: kolon UPDATE'i + owner_kvkk_onay_ozeti() is_owner() ister.
-  kvkkSurum: { src: "./kvkk/kvkk-surum-paneli.js", role: "owner" },
+  // "KVKK Sürümü" (site_ayarlari.guncel_kvkk_surumu; migration 0064/0065). Owner her zaman,
+  // admin yalnızca owner anahtarı açıksa görür (NAV'daki izin:"kvkk"). Gerçek yetki:
+  // kvkk_surum_yetkisi_var_mi() -> kvkk_surumunu_degistir() / kvkk_onay_ozeti().
+  kvkkSurum: { src: "./kvkk/kvkk-surum-paneli.js", role: "admin" },
   // "Panelim" (eski /panel/panel.html) — giriş yapmış HERKESE açık:
   // sıradan üye de, owner da aynı sekmeyi görür.
   panelim: { src: "./panel.js", role: null },
@@ -131,6 +132,9 @@ const NAV = [
       // -> wireYetkiAyarlari() zaten owner değilse bölümü DOM'dan siliyor,
       // burada da sidebar linkini hiç çizmiyoruz (item.role override'ı).
       { id: "sys-yetki", icon: "🔐", label: "Yetki Ayarları", module: "gy", role: "owner" },
+      // role:"admin" + izin:"kvkk": owner her zaman görür; admin sadece owner "adminler KVKK
+      // sürümünü değiştirebilsin" anahtarını açtıysa (bkz. gorunurMu / izinleriYukle).
+      { id: "sys-kvkk", icon: "📜", label: "KVKK Sürümü", module: "kvkkSurum", role: "admin", izin: "kvkk" },
       { id: "sys-github", icon: "🔑", label: "GitHub / Worker Bağlantısı", module: "gy" },
       { id: "sys-hakkimda", icon: "🙋", label: "Hakkımda & Sosyal Linkler", module: "gy" },
       { id: "sys-hesabim", icon: "⚠️", label: "Hesabım (Tehlikeli Bölge)", module: "admin" },
@@ -164,6 +168,9 @@ function roleAllowed(required, profile) {
 // sonucundan en az biri true (ya da kendisine şifreli dosya paylaşılmış) olmalı.
 function gorunurMu(item, profile) {
   if (!roleAllowed(itemRole(item), profile)) return false;
+  if (item.izin === "kvkk") {
+    return profile.role === "owner" || !!profile.izinler?.kvkk;
+  }
   if (item.izin === "arsiv") {
     const y = profile.izinler?.arsiv;
     return !!(y && (y.oku || y.yukle || y.sil || y.paylasilan_var));
@@ -172,10 +179,11 @@ function gorunurMu(item, profile) {
 }
 
 async function izinleriYukle() {
-  try {
-    const { data, error } = await supabase.rpc("r2_arsiv_yetkilerim");
-    return error ? {} : { arsiv: data };
-  } catch { return {}; }
+  const [arsiv, kvkk] = await Promise.all([
+    supabase.rpc("r2_arsiv_yetkilerim").then((r) => (r.error ? undefined : r.data)).catch(() => undefined),
+    supabase.rpc("kvkk_surum_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
+  ]);
+  return { arsiv, kvkk };
 }
 
 /* ------------------------------------------------------------------ */
@@ -442,7 +450,6 @@ async function showView(viewId, moduleKey) {
   // Yetki Ayarları: owner için "R2 Erişim İzni" bölümü (ayrı modül; gy modülüne dokunmaz)
   if (viewId === "sys-yetki") await ensureModuleLoaded("arsivIzin");
   if (viewId === "sys-yetki") await ensureModuleLoaded("kalkan");
-  if (viewId === "sys-yetki") await ensureModuleLoaded("kvkkSurum");
 }
 
 function firstAvailableView(profile) {
