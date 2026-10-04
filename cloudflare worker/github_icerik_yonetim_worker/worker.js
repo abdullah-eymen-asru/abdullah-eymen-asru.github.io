@@ -97,8 +97,11 @@ const GITHUB_API = "https://api.github.com";
  * yüzden her çağrı kendi try/catch'i içinde, sonucu ne olursa olsun akışın
  * geri kalanını etkilemez (bkz. çağrı noktalarındaki "await ... catch(() => {})").
  */
-async function denetimKaydiYaz(env, { userId, kullaniciEmail, rol, yontem, hedefYol, sonuc, retNedeni }) {
+async function denetimKaydiYaz(env, { userId, kullaniciEmail, rol, yontem, hedefYol, sonuc, retNedeni, istek }) {
   try {
+    // IP + tarayıcı (migration 0068): Cloudflare gerçek istemci IP'sini CF-Connecting-IP ile verir.
+    const ip = istek?.headers?.get("CF-Connecting-IP") || null;
+    const userAgent = (istek?.headers?.get("User-Agent") || "").slice(0, 300) || null;
     await fetch(`${env.SUPABASE_URL}/rest/v1/denetim_kayitlari`, {
       method: "POST",
       headers: {
@@ -115,6 +118,8 @@ async function denetimKaydiYaz(env, { userId, kullaniciEmail, rol, yontem, hedef
         hedef_yol: hedefYol,
         sonuc,
         ret_nedeni: sonuc === "reddedildi" ? retNedeni || null : null,
+        ip,
+        user_agent: userAgent,
       }),
     });
   } catch (_err) {
@@ -832,6 +837,7 @@ export default {
           "Site şu anda kilit modunda — Site Sahibi (owner) dışında kimse içerik ekleyemez/düzenleyemez/silemez. Bu geçicidir, Site Sahibi kilidi kaldırana kadar sürer.";
         await denetimKaydiYaz(env, {
           userId,
+          istek: request,
           kullaniciEmail,
           rol,
           yontem: request.method,
@@ -977,6 +983,7 @@ export default {
                 : "Site Sahibi, rolünün yazı/proje silme yetkisini kapatmış — düzenleme yetkin olsa bile silemezsin.";
             await denetimKaydiYaz(env, {
               userId,
+              istek: request,
               kullaniciEmail,
               rol,
               yontem: request.method,
@@ -1070,6 +1077,7 @@ export default {
                 : "Bu içeriği düzenleme/silme yetkin yok — başka bir yazara ait.";
               await denetimKaydiYaz(env, {
                 userId,
+                istek: request,
                 kullaniciEmail,
                 rol,
                 yontem: request.method,
@@ -1132,6 +1140,7 @@ export default {
           const yalnizAdminRetMesaji = "Bu dosya sadece admin tarafından değiştirilebilir.";
           await denetimKaydiYaz(env, {
             userId,
+            istek: request,
             kullaniciEmail,
             rol,
             yontem: request.method,
@@ -1235,6 +1244,7 @@ export default {
                 "Site Sahibi, bu özelliğe erişimini kısıtlamış — bu işlemi sadece Site Sahibi (owner) yapabilir.";
               await denetimKaydiYaz(env, {
                 userId,
+                istek: request,
                 kullaniciEmail,
                 rol,
                 yontem: request.method,
@@ -1289,6 +1299,7 @@ export default {
       if (request.method === "PUT" || request.method === "DELETE") {
         await denetimKaydiYaz(env, {
           userId,
+          istek: request,
           kullaniciEmail,
           rol,
           yontem: request.method,
