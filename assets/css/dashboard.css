@@ -606,6 +606,9 @@ body.dash-nav-acik {
 .gk-log-fark { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; overflow-wrap: anywhere; }
 .gk-log-eski { color: #b3261e; text-decoration: line-through; }
 .gk-log-yeni { color: #1e6b3a; }
+.gk-log-durum-ok { color: #1e6b3a; font-size: 0.8rem; }
+.gk-log-durum-red { color: #b3261e; font-size: 0.8rem; }
+#ag-denetim-son { margin: 12px 0; }
 .gk-log-gecmis { margin-top: 12px; }
 .gk-log-gecmis > summary { cursor: pointer; font-size: 0.9rem; padding: 4px 0; }
 @media (max-width: 600px) {
