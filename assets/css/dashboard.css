@@ -580,3 +580,94 @@ body.dash-nav-acik {
 .gk-p-kucuk { font-size: 0.82rem; margin: 8px 0 0; }
 #gk-bakim-mesaji { width: 100%; box-sizing: border-box; resize: vertical; }
 #gk-kalkan-bolumu .nt-ya-bolum { margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--border); }
+
+/* ==========================================================================
+   YETKİ AYARLARI — alt sekmeler ("sayfa içinde sayfa") + dar alanda kart düzeni
+   Renkler yalnızca mevcut değişkenlerden (--bg/--text/--border/--accent/--card-bg/
+   --tag-bg); inline style yok (CSP).
+   ========================================================================== */
+
+/* Akış içindeki tüm çocuklar daralabilsin: geniş bir tablo/satır, kendi kutusunu
+   (ve sayfayı) yana taşırmasın — mobildeki "ekran kesiliyor" sorununun ilk sebebi. */
+.dash-view > * { min-width: 0; }
+
+/* hidden niteliği, .panel-section'ın display kuralına yenilmesin */
+.ya-pane[hidden] { display: none !important; }
+/* Gizli kardeşten dolayı çifte boşluk olmasın (flex gap zaten 24px) */
+.dash-view .ya-pane.panel-section + .ya-pane.panel-section { margin-top: 0; }
+/* Kendi sekmesinde tek başına duran içeriklerin üstündeki ayraç/boşluk gereksiz */
+.ya-pane .nt-ya-kok { margin-top: 0; padding-top: 0; border-top: 0; }
+.ya-pane .nt-ya-bolum:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+
+/* Alt sekme şeridi: dar ekranda yatay kaydırılır (parmakla), taşma yapmaz */
+.ya-altsekmeler {
+  position: relative;
+  display: flex;
+  gap: 6px;
+  max-width: 100%;
+  padding: 5px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card-bg);
+}
+.ya-altsekmeler::-webkit-scrollbar { display: none; }
+.ya-altsekme {
+  flex: 0 0 auto;
+  scroll-snap-align: center;
+  min-height: 40px;
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ya-altsekme:hover { background: var(--tag-bg); }
+.ya-altsekme[aria-selected="true"] { background: var(--accent); color: #fff; }
+.ya-altsekme:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Uzun açıklamalar katlanır: sayfa kısa, bilgi bir dokunuş uzakta */
+.ya-detay { margin: 0 0 16px; }
+.ya-detay summary { cursor: pointer; padding: 6px 0; font-weight: 600; color: var(--accent); }
+.ya-detay summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ya-detay[open] summary { margin-bottom: 6px; }
+
+/* Matris / rota tablosu: kapsayıcı genişliğine göre (viewport'a değil) davranır.
+   Dar: her satır bir kart, her rol "etiket ........ anahtar" satırı (yatay kaydırma YOK).
+   Container query desteklemeyen eski tarayıcıda tablo kalır ve sarmalayıcı kaydırılır. */
+.ya-tablo-sarmal {
+  max-width: 100%;
+  overflow-x: auto;
+  container-type: inline-size;
+  container-name: ya-tablo;
+}
+.ya-ozellik-adi, .ya-ozellik-aciklama { overflow-wrap: anywhere; }
+
+@container ya-tablo (max-width: 720px) {
+  .ya-tablo, .ya-tablo tbody, .ya-tablo tr, .ya-tablo td { display: block; width: 100%; box-sizing: border-box; }
+  /* Başlık satırı görsel olarak gizli ama ekran okuyucuya açık */
+  .ya-tablo thead { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .ya-tablo tr { margin: 0 0 12px; padding: 12px 14px 4px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); }
+  .ya-tablo td { padding: 0; border: 0; text-align: left; }
+  .ya-tablo td.ya-ozellik-hucre { padding-bottom: 8px; }
+  .ya-tablo td[data-label] {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    min-height: 46px; padding: 8px 0; border-top: 1px solid var(--border);
+  }
+  .ya-tablo td[data-label]::before { content: attr(data-label); font-size: 0.9rem; font-weight: 500; color: var(--text); }
+  .ya-tablo td[data-label="Tüm roller"]::before { font-weight: 700; }
+  .ya-tablo td.ya-hucre-yok { display: none; }
+}
+
+@media (max-width: 480px) {
+  .ya-altsekme { padding: 9px 12px; font-size: 0.88rem; }
+}
