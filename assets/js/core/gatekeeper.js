@@ -365,17 +365,26 @@
     document.title = neden === "alan_adi" ? "Site erişime kapalı" : "Sayfa erişime kapalı";
 
     // 3) Kartı DOM API ile kur (bakim_mesaji kullanıcı verisi: yalnızca textContent).
+    //
+    // CLS (düzen kayması) NOTU: eskiden burada body'nin TÜM çocukları senkron silinip yerine
+    // kart konuyordu. Sayfa o ana kadar boyanmışsa (bayat önbellek / bypass sorgusu sürerken
+    // içerik zaten yerleşmiş olur) bu, "bütün sayfa bir anda yok oldu" diye ölçülür ve Core Web
+    // Vitals'ta büyük bir CLS (ör. 0.56) üretir. Artık kart, tam ekran SABİT bir katman olarak
+    // ÜSTE eklenir; eski içerik önce visibility:hidden ile görünmez kalır (düzeni değiştirmez,
+    // CLS saymaz — bkz. style.css .gk-kilitli) ve ancak kart boyandıktan SONRA DOM'dan sökülür.
     var govde = document.body;
     if (!govde) {
       govde = document.createElement("body");
       kok.appendChild(govde);
     }
-    while (govde.firstChild) govde.removeChild(govde.firstChild);
-    govde.className = "gk-govde";
+    var eskiler = [];
+    for (var c = govde.firstChild; c; c = c.nextSibling) eskiler.push(c);
 
     var mesaj = (ayar && typeof ayar.bakim_mesaji === "string" && ayar.bakim_mesaji.trim()) || VARSAYILAN_MESAJ;
     var taban = kok.getAttribute("data-baseurl") || "";
 
+    var katman = document.createElement("div");
+    katman.className = "gk-govde";
     var kart = document.createElement("main");
     kart.className = "gk-kart";
     var ikon = document.createElement("div");
@@ -399,7 +408,23 @@
     kart.appendChild(baslik);
     kart.appendChild(metin);
     kart.appendChild(alt);
-    govde.appendChild(kart);
+    katman.appendChild(kart);
+    govde.appendChild(katman);
+
+    function eskileriSok() {
+      for (var i = 0; i < eskiler.length; i++) {
+        if (eskiler[i].parentNode === govde) govde.removeChild(eskiler[i]);
+      }
+    }
+    if (eskiler.length) {
+      if (typeof requestAnimationFrame === "function") {
+        requestAnimationFrame(function () {
+          requestAnimationFrame(eskileriSok);
+        });
+      } else {
+        setTimeout(eskileriSok, 50);
+      }
+    }
   }
 
   function basla() {
