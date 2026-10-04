@@ -15,6 +15,12 @@
  * .ya-tablo/.ya-mini-toggle sınıflarından gelir.
  */
 import { supabase, showMessage } from "../core/supabase-client.js";
+import { logPaneliKur } from "./degisiklik-kaydi.js";
+
+// "Son değişiklik" kutuları (Erişim Kalkanı + Kilit İzinleri sekmeleri): bir işlem kaydedilince
+// ikisi de aynı anda tazelenir. Kayıtları veritabanı trigger/RPC'si yazar (migration 0067).
+const logYenileyiciler = [];
+const logYenile = () => logYenileyiciler.forEach((f) => f());
 
 const HOSTLAR = [
   { anahtar: "github.io", ad: "GitHub Pages" },
@@ -104,6 +110,7 @@ function izinBolumuKur(mesaj) {
         "success"
       );
       await Promise.all([izinlileriYukle(), aramayiYenile()]);
+      logYenile();
     } catch (hata) {
       showMessage(mesaj, `Kaydedilemedi: ${hata.message || hata}`, "error");
     } finally {
@@ -176,7 +183,11 @@ async function kur() {
   // çalışsın diye en başta kurulur. Eski HTML'de kök yoksa eskisi gibi ana kökün altına eklenir.
   const izinKok = document.getElementById("gk-izin-kok");
   const izinKurucu = () => izinBolumuKur(document.getElementById("gk-izin-mesaj") || mesaj);
-  if (izinKok) izinKok.replaceChildren(izinKurucu());
+  const izinLog = logPaneliKur({ gecmis: false });
+  logYenileyiciler.push(izinLog.yenile);
+  if (izinKok) izinKok.replaceChildren(izinLog.kok, izinKurucu());
+  const kalkanLog = logPaneliKur({ gecmis: true });
+  logYenileyiciler.push(kalkanLog.yenile);
 
   const katalog = window.AeaGatekeeper?.ROTALAR;
   if (!katalog) {
@@ -292,6 +303,7 @@ async function kur() {
       }
       sonGuncelleme.textContent = sonGuncellemeMetni(data.guncellenme_tarihi);
       showMessage(mesaj, "Kaydedildi. Ziyaretçilere en geç yaklaşık 1 dakika içinde yansır; deploy gerekmez.", "success");
+      logYenile();
     } catch (hata) {
       showMessage(mesaj, `Kaydedilemedi: ${hata.message || hata}`, "error");
     } finally {
@@ -300,7 +312,8 @@ async function kur() {
   });
 
   kok.replaceChildren(
-    el("h3", { text: "Alan adı erişimi" }),
+    kalkanLog.kok,
+    el("h3", { class: "csp-mt-18", text: "Alan adı erişimi" }),
     anahtarKutusu,
     el("h3", { class: "csp-mt-18", text: "Sayfa / bölüm bazlı kısıtlama" }),
     el("p", {
