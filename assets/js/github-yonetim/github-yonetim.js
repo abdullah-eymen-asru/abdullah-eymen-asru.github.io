@@ -336,12 +336,12 @@ const OZELLIK_KATALOGU = [
     rolSutunlari: ["editor", "manager", "admin"],
   },
   {
-    // bkz. migration 0059 — Fikir & Araştırma Tezgâhı (uçtan uca şifreli not sistemi).
+    // bkz. migration 0059 — Notlarım (uçtan uca şifreli not sistemi).
     // Rol bazlı kapatma BU matristen; tek tek KİŞİYE kapatma bu matrisin altındaki
     // "kullanıcı bazlı erişim" bölümünden (assets/js/notlar/yetki-paneli.js).
     // Kapalıyken: modül menüden kalkar; RLS ve R2 worker'ı da reddeder. Notlar silinmez.
     anahtar: "notlar_modulu",
-    baslik: "Fikir & Araştırma Tezgâhı (Not Sistemi)",
+    baslik: "Notlarım (Not Sistemi)",
     aciklama: "Uçtan uca şifreli not modülü: not yazma/okuma ve ek yükleme/indirme. Kapatılan rolün notları SİLİNMEZ, yeniden açılınca aynen döner. Tek tek kişiye kapatmak için matrisin altındaki bölümü kullan.",
     rolSutunlari: ["editor", "manager", "admin"],
   },
