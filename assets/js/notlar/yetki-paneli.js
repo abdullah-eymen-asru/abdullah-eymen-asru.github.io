@@ -3,7 +3,7 @@
  * -----------------------------------------------------------------------
  * "Yetki Ayarları" sekmesine eklenen KULLANICI BAZLI bölümler (sadece owner).
  *   - Rol bazlı kapatma/açma (tüm editörler / tüm adminler / tümü) zaten
- *     Yetki Ayarları matrisinin "Fikir & Araştırma Tezgâhı" satırında.
+ *     Yetki Ayarları matrisinin "Notlarım" satırında.
  *   - Bu dosya iki bölüm kurar:
  *       1) KAPAT : modülü zaten kullanabilen (editor/manager/admin) tek bir kişiye kapat.
  *       2) AÇ    : modülü NORMALDE kullanamayan (user/special_user) tek bir üyeye aç.
@@ -54,13 +54,13 @@ const BOLUMLER = {
         : { durum: "Açık", dugme: "Kapat", tehlikeli: true, kapaliGorunum: false },
     basariMesaji: (ad, izinli) =>
       izinli
-        ? `${ad} için Fikir & Araştırma Tezgâhı yeniden açıldı.`
+        ? `${ad} için Notlarım yeniden açıldı.`
         : `${ad} için kapatıldı. Notları silinmedi; yeniden açınca geri gelir.`,
   },
   ac: {
     baslik: "Aç: normalde erişimi olmayan bir üyeye modülü ver",
     aciklama:
-      "Üye ya da özel üye olan tek bir kişiye Fikir & Araştırma Tezgâhı'nı açarsın. Kişi YALNIZCA kendi şifreli " +
+      "Üye ya da özel üye olan tek bir kişiye Notlarım'nı açarsın. Kişi YALNIZCA kendi şifreli " +
       "notlarını görür; yazı yayınlama, içerik/dosya yönetimi ya da başka hiçbir panel yetkisi kazanmaz, başkasının " +
       "hiçbir verisini göremez. Hesabı askıya alınırsa kullanamaz. İzni kaldırınca notları SİLİNMEZ; yeniden " +
       "verince aynen geri gelir.",
@@ -79,7 +79,7 @@ const BOLUMLER = {
         : { durum: "İzni yok", dugme: "İzin ver", tehlikeli: false, kapaliGorunum: true },
     basariMesaji: (ad, izinli) =>
       izinli
-        ? `${ad} artık Fikir & Araştırma Tezgâhı'nı kullanabilir (yalnızca kendi notlarını görür).`
+        ? `${ad} artık Notlarım'nı kullanabilir (yalnızca kendi notlarını görür).`
         : `${ad} için izin kaldırıldı. Notları silinmedi; izin yeniden verilirse geri gelir.`,
   },
 };
@@ -223,7 +223,7 @@ export function kur() {
   const mesaj = el("div", { class: "auth-message", hidden: true });
 
   kok.replaceChildren(
-    el("h3", { text: "🌱 Fikir & Araştırma Tezgâhı — kullanıcı bazlı erişim" }),
+    el("h3", { text: "Notlarım — kullanıcı bazlı erişim" }),
     el("p", {
       class: "muted",
       text:
