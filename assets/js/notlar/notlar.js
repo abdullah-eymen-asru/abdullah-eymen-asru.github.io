@@ -1,22 +1,24 @@
 /*
  * assets/js/notlar/notlar.js
  * -----------------------------------------------------------------------
- * "Fikir & Araştırma Tezgâhı" — arayüz ve veri katmanı.
+ * "Notlarım" — arayüz ve veri katmanı (uçtan uca şifreli not sistemi).
  *
- * v2: iç içe KLASÖRLER (klasör de şifreli bir kayıt: payload.tur === "klasor"; yeni tablo/migration yok),
- * zengin metin editörü (contenteditable, beyaz listeli HTML — bkz. bicim.js) ve OTOMATİK SİLME YOK:
- * çöp kutusu 30 gün sonra kendiliğinden boşalmaz, notlar yalnızca kullanıcı silince gider.
- * dashboard.js bu dosyayı SADECE kullanıcı "Fikir & Araştırma Tezgâhı"
- * sekmesine ilk kez tıkladığında dynamic import() ile yükler (diğer modüllerle
- * aynı desen); import edilince init() kendiliğinden çalışır.
+ * v3: üç panelli çalışma alanı (klasör ağacı · not listesi · düzenleyici), tür + durum
+ * sistemi (Tohum/Filiz/Ağaç kalktı), konu tarihi, arşiv, çoklu seçim ve her biçimde
+ * (PDF, Word, Markdown, HTML, metin, ZIP) dışa aktarma. Veri modeli geriye uyumludur:
+ * eski notlardaki tohum/filiz/ağaç değerleri açılışta gelen/devam/tamam olarak okunur;
+ * yeni tablo ya da migration gerekmez (yeni alanlar şifreli yükün içinde).
+ *
+ * dashboard.js bu dosyayı SADECE kullanıcı "Notlarım" sekmesine ilk kez tıkladığında
+ * dynamic import() ile yükler; import edilince init() kendiliğinden çalışır.
  *
  * KURALLAR
  *  - Sunucuya giden TEK içerik: Kasa.notuSifrele() çıktısı (ciphertext + iv).
  *  - Arama, filtre, sıralama TAMAMEN tarayıcıda, bellekte çözülmüş nesneler üzerinde.
- *  - HİÇ innerHTML yok: tüm metinler textContent / DOM düğümü ile basılır
- *    (not içeriği = güvenilmeyen girdi; ayrıca XSS, şifre çözme anahtarını
- *    "kullanabilir" — bkz. kasa.js başındaki tehdit modeli notu).
+ *  - Not içeriği HİÇBİR ZAMAN innerHTML ile basılmaz: tüm metinler textContent / DOM düğümü
+ *    ile üretilir (not içeriği = güvenilmeyen girdi; bkz. kasa.js tehdit modeli notu).
  *  - Ekler (görsel/PDF) R2'ye ŞİFRELİ bayt olarak gider (bkz. r2_not_ek_worker).
+ *  - Dışa aktarma (disa-aktar/) yalnızca bu cihazda, çözülmüş veriyle çalışır.
  * -----------------------------------------------------------------------
  */
 import { supabase, showMessage, kucukHarfeCevirTr, guvenliDisUrlMi } from "../core/supabase-client.js";
@@ -32,16 +34,50 @@ import * as Bicim from "./bicim.js";
 const EK_WORKER_URL = "https://r2-not-ek-worker.aeymena.workers.dev";
 // -------------------------------------------------------------------------------
 
+/** Çalışma durumu: notun hayat döngüsü. */
 const DURUMLAR = {
-  tohum: { simge: "🌱", ad: "Tohum", sonraki: "filiz", ipucu: "Hızlı fikir" },
-  filiz: { simge: "🌿", ad: "Filiz", sonraki: "agac", ipucu: "Geliştirilen argüman" },
-  agac: { simge: "🌳", ad: "Ağaç", sonraki: null, ipucu: "Yayına hazır taslak" },
+  gelen: { ad: "Gelen kutusu", ipucu: "Henüz düzenlenmedi" },
+  devam: { ad: "Devam ediyor", ipucu: "Üzerinde çalışıyorsun" },
+  tamam: { ad: "Tamamlandı", ipucu: "Hazır, gözden geçirildi" },
 };
+/** Eski (tohum/filiz/ağaç) kayıtların yeni karşılığı. */
+const ESKI_DURUM = { tohum: "gelen", filiz: "devam", agac: "tamam" };
+
+/** İçerik türü: ders, sunum, proje, etkinlik… Renk, CSS'te nt-tur-<anahtar> sınıfıyla verilir. */
+const TURLER = {
+  genel: { ad: "Genel" },
+  ders: { ad: "Ders" },
+  sunum: { ad: "Sunum" },
+  proje: { ad: "Proje" },
+  etkinlik: { ad: "Etkinlik" },
+  toplanti: { ad: "Toplantı" },
+  kaynak: { ad: "Kitap / makale" },
+  fikir: { ad: "Fikir" },
+};
+
+const SIRALAMA_AD = { guncelleme: "Son düzenlenen", olusturma: "Oluşturulma", baslik: "Başlık (A–Z)", tarih: "Konu tarihi" };
+const SIRALAMA = {
+  guncelleme: (a, b) => b.guncelleme.localeCompare(a.guncelleme),
+  olusturma: (a, b) => b.olusturma.localeCompare(a.olusturma),
+  baslik: (a, b) => (a.baslik || "").localeCompare(b.baslik || "", "tr"),
+  tarih: (a, b) => (b.tarih || "").localeCompare(a.tarih || "") || b.guncelleme.localeCompare(a.guncelleme),
+};
+
+const GORUNUMLER = [
+  { id: "tum", ad: "Tüm notlar", ikon: "layers" },
+  { id: "son", ad: "Son düzenlenenler", ikon: "clock" },
+  { id: "sabit", ad: "Sabitlenenler", ikon: "pin" },
+];
+const GORUNUMLER_ALT = [
+  { id: "arsiv", ad: "Arşiv", ikon: "archive" },
+  { id: "cop", ad: "Çöp kutusu", ikon: "trash" },
+];
 
 const IZINLI_EK_TIPLERI = new Set(["image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf"]);
 const EK_UST_SINIR = 15 * 1024 * 1024; // tek dosya 15 MB (Worker'da 25 MB tavan var)
 const NOT_BASINA_EK = 20;
-const SAYFA_BOYUTU = 60;
+const SAYFA_BOYUTU = 80;
+const SON_SAYISI = 30;
 const OTOKAYIT_MS = 2500;
 
 /* ------------------------------------------------------------------ */
@@ -52,13 +88,17 @@ const S = {
   session: null,
   notlar: new Map(), // id -> not modeli
   klasorler: new Map(), // id -> klasör modeli
-  konum: null, // açık klasörün id'si (null = kök)
+  gorunum: "tum", // tum | son | sabit | arsiv | cop | klasor
+  konum: null, // gorunum === "klasor" iken klasör id'si
+  acik: new Set(), // ağaçta açık klasörler
   otoBaslik: "", // hızlı notun otomatik başlığı
   surukle: null,
   menu: null,
   menuBagla: null,
-  genis: false,
-  filtre: { durum: "tum", etiket: "", arama: "" },
+  odak: false,
+  filtre: { etiket: "", arama: "", durum: "", tur: "", sirala: "guncelleme" },
+  secimModu: false,
+  secim: new Set(),
   gorunenSayi: SAYFA_BOYUTU,
   duz: null, // düzenlenen nokta (çalışma kopyası)
   duzYeni: false,
@@ -198,6 +238,74 @@ function ozetUret(m, tokenler) {
 }
 
 /* ------------------------------------------------------------------ */
+/* 2b) Simgeler (satır içi SVG, innerHTML'siz)                         */
+/* ------------------------------------------------------------------ */
+
+const IKONLAR = {
+  menu: "M4 6h16M4 12h16M4 18h16",
+  search: "M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0zM21 21l-4.3-4.3",
+  x: "M18 6L6 18M6 6l12 12",
+  zap: "M13 2L3 14h9l-1 8 10-12h-9l1-8z",
+  "chevron-down": "M6 9l6 6 6-6",
+  "chevron-right": "M9 6l6 6-6 6",
+  download: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3",
+  more: "M12 12h.01M5 12h.01M19 12h.01",
+  folder: "M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z",
+  "folder-plus": "M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2zM12 10v6M9 13h6",
+  "file-text": "M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7zM14 2v4a2 2 0 0 0 2 2h4M10 9H8M16 13H8M16 17H8",
+  "arrow-left": "M19 12H5M12 19l-7-7 7-7",
+  maximize: "M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3",
+  plus: "M12 5v14M5 12h14",
+  pin: "M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z",
+  archive: "M21 8v13H3V8M1 3h22v5H1zM10 12h4",
+  trash: "M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6",
+  calendar: "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z",
+  paperclip: "M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48",
+  layers: "M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5",
+  clock: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2",
+  check: "M20 6L9 17l-5-5",
+  quote: "M10 11H6a1 1 0 0 1-1-1V8a2 2 0 0 1 2-2h1M20 11h-4a1 1 0 0 1-1-1V8a2 2 0 0 1 2-2h1M5 11v2a4 4 0 0 0 4 4M15 11v2a4 4 0 0 0 4 4",
+};
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+function ikon(ad) {
+  const s = document.createElementNS(SVG_NS, "svg");
+  s.setAttribute("viewBox", "0 0 24 24");
+  s.setAttribute("fill", "none");
+  s.setAttribute("stroke", "currentColor");
+  s.setAttribute("stroke-width", ad === "more" ? "3" : "2");
+  s.setAttribute("stroke-linecap", "round");
+  s.setAttribute("stroke-linejoin", "round");
+  s.setAttribute("aria-hidden", "true");
+  s.setAttribute("focusable", "false");
+  const p = document.createElementNS(SVG_NS, "path");
+  p.setAttribute("d", IKONLAR[ad] || "");
+  s.append(p);
+  return s;
+}
+
+function ikonlariKur(kok = document) {
+  kok.querySelectorAll("[data-ikon]").forEach((k) => {
+    if (!k.firstChild) k.append(ikon(k.dataset.ikon));
+  });
+}
+
+/** 4 Ekim 17:03 → "17:03", dün → "Dün", bu hafta → "Salı", eski → "4 Eki". */
+function zamanYaz(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const bugun = new Date();
+  const gun = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const fark = Math.round((gun(bugun) - gun(d)) / 86400000);
+  if (fark === 0) return saatYaz(d);
+  if (fark === 1) return "Dün";
+  if (fark > 1 && fark < 7) return d.toLocaleDateString("tr-TR", { weekday: "long" });
+  return d.toLocaleDateString("tr-TR", { day: "numeric", month: "short", ...(d.getFullYear() !== bugun.getFullYear() ? { year: "numeric" } : {}) });
+}
+const konuTarihiYaz = (t) => (t ? new Date(t + "T12:00:00").toLocaleDateString("tr-TR", { day: "numeric", month: "short" }) : "");
+const yerelTarih = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+/* ------------------------------------------------------------------ */
 /* 4) Model ⇄ şifreli zarf                                             */
 /* ------------------------------------------------------------------ */
 
@@ -211,10 +319,13 @@ function modelOlustur(id, satir, yuk) {
     tur: "not",
     klasor: yuk?.klasor ? String(yuk.klasor) : null,
     sabit: !!yuk?.sabit,
+    arsiv: !!yuk?.arsiv,
     html: String(yuk?.html || ""),
     baslik: String(yuk?.baslik || ""),
     etiketler: Array.isArray(yuk?.etiketler) ? yuk.etiketler.map(String) : [],
-    durum: DURUMLAR[yuk?.durum] ? yuk.durum : "tohum",
+    durum: DURUMLAR[yuk?.durum] ? yuk.durum : ESKI_DURUM[yuk?.durum] || "gelen",
+    kategori: TURLER[yuk?.kategori] ? yuk.kategori : "genel",
+    tarih: /^\d{4}-\d{2}-\d{2}$/.test(yuk?.tarih || "") ? yuk.tarih : "",
     govde: String(yuk?.govde || ""),
     alintilar: Array.isArray(yuk?.alintilar)
       ? yuk.alintilar.map((a) => ({
@@ -257,15 +368,18 @@ function klasorModeli(id, satir, yuk) {
   return m;
 }
 
-/** Şifreli zarfın içine giren yük. v2: html (kaynak) + govde (türetilmiş Markdown) + klasor/sabit. */
+/** Şifreli zarfın içine giren yük. v3: v2 + kategori, tarih, arsiv (eski okuyucular fazlalığı yok sayar). */
 const yukuHazirla = (m) =>
   m.tur === "klasor"
     ? { v: 2, tur: "klasor", ad: m.ad, ust: m.ust, simge: m.simge, sabit: m.sabit }
     : {
-        v: 2,
+        v: 3,
         baslik: m.baslik,
         etiketler: m.etiketler,
         durum: m.durum,
+        kategori: m.kategori,
+        tarih: m.tarih,
+        arsiv: m.arsiv,
         klasor: m.klasor,
         sabit: m.sabit,
         html: m.html,
@@ -318,21 +432,21 @@ function haritayaIsle(m) {
   }
   S.notlar.set(m.id, m);
 
-  // Aynı not editörde açıkken kart üzerinden bir işlem (aşama değiştirme, "yazıya aktarıldı" izi vb.)
-  // rev'i ilerletir; editör eski rev'le kaydetmeye kalkarsa gereksiz "çakışma" sorusu çıkmasın.
+  // Aynı not editörde açıkken menü/seçim üzerinden bir işlem rev'i ilerletir; editör eski rev'le
+  // kaydetmeye kalkarsa gereksiz "çakışma" sorusu çıkmasın.
   if (S.duz && S.duz.id === m.id) {
     S.duz.rev = m.rev;
     S.duz.guncelleme = m.guncelleme;
     S.duz.aktarildi = m.aktarildi;
-    // Kart/sürükleme ile taşıma ya da sabitleme, açık editörün eski değeriyle ezilmesin
+    // Taşıma, sabitleme, arşivleme açık editörün eski değeriyle ezilmesin
     S.duz.klasor = m.klasor;
     S.duz.sabit = m.sabit;
+    S.duz.arsiv = m.arsiv;
     const ks = $("nt-klasor-sec");
     if (ks && [...ks.options].some((o) => o.value === (m.klasor || ""))) ks.value = m.klasor || "";
     if (!S.kirli && S.duz.durum !== m.durum) {
       S.duz.durum = m.durum;
-      const radyo = document.querySelector(`input[name="nt-durum"][value="${m.durum}"]`);
-      if (radyo) radyo.checked = true;
+      $("nt-durum-sec").value = m.durum;
     }
   }
 }
@@ -400,7 +514,7 @@ async function yetimEkleriSupur() {
 }
 
 /* ------------------------------------------------------------------ */
-/* 6) Klasör ağacı + liste çizimi                                      */
+/* 6) Klasör ağacı, görünümler, liste, seçim, menüler                  */
 /* ------------------------------------------------------------------ */
 
 const SIMGELER = ["📁", "📚", "🎓", "🎤", "🧠", "📝", "💼", "🔬", "🗓️", "💡", "⭐", "🌍", "🎧", "🧪"];
@@ -488,49 +602,47 @@ const ustCopKlasorleri = () => [...S.klasorler.values()].filter((k) => k.silindi
 const ustCopNotlari = () => [...S.notlar.values()].filter((m) => m.silindiAt && S.klasorler.get(m.klasor)?.silindiAt !== m.silindiAt);
 
 const genelAramaMi = () => !!(S.filtre.arama || S.filtre.etiket);
+const filtreAktifMi = () => !!(S.filtre.durum || S.filtre.tur || S.filtre.etiket || S.filtre.arama);
 
 function filtrelenmisNotlar() {
-  const { durum, etiket, arama } = S.filtre;
+  const { etiket, arama, durum, tur, sirala } = S.filtre;
   const tokenler = aramaTokenleri(arama);
   const etiketK = katla(etiket);
   const genel = !!(tokenler.length || etiketK);
 
   let liste;
-  if (durum === "cop") {
+  if (S.gorunum === "cop") {
     liste = ustCopNotlari();
   } else {
     liste = [...S.notlar.values()].filter((m) => !m.silindiAt);
-    if (!genel) liste = liste.filter((m) => notKlasoru(m) === S.konum);
-    if (durum !== "tum") liste = liste.filter((m) => m.durum === durum);
+    if (!genel) {
+      if (S.gorunum === "arsiv") liste = liste.filter((m) => m.arsiv);
+      else {
+        liste = liste.filter((m) => !m.arsiv);
+        if (S.gorunum === "klasor") liste = liste.filter((m) => notKlasoru(m) === S.konum);
+        else if (S.gorunum === "sabit") liste = liste.filter((m) => m.sabit);
+      }
+    }
   }
+  if (durum) liste = liste.filter((m) => m.durum === durum);
+  if (tur) liste = liste.filter((m) => m.kategori === tur);
   if (etiketK) liste = liste.filter((m) => m.etiketler.some((e) => katla(e) === etiketK));
   if (tokenler.length) liste = liste.filter((m) => tokenler.every((t) => m.ara.includes(t)));
 
-  const puan = (m) =>
-    tokenler.reduce((p, t) => p + (m.araBaslik.includes(t) ? 3 : 0) + (m.araEtiket.includes(t) ? 2 : 0), 0);
-  liste.sort(
-    (a, b) =>
-      (tokenler.length ? puan(b) - puan(a) : 0) ||
-      (b.sabit - a.sabit) ||
-      b.guncelleme.localeCompare(a.guncelleme)
-  );
+  const puan = (m) => tokenler.reduce((p, t) => p + (m.araBaslik.includes(t) ? 3 : 0) + (m.araEtiket.includes(t) ? 2 : 0), 0);
+  const kiyas = SIRALAMA[S.gorunum === "son" ? "guncelleme" : sirala] || SIRALAMA.guncelleme;
+  const sabitOnce = S.gorunum !== "son" && S.gorunum !== "cop";
+  liste.sort((a, b) => (tokenler.length ? puan(b) - puan(a) : 0) || (sabitOnce ? b.sabit - a.sabit : 0) || kiyas(a, b));
+  if (S.gorunum === "son" && !genel) liste = liste.slice(0, SON_SAYISI);
   return { liste, tokenler };
 }
 
 function gorunenKlasorler(tokenler) {
-  if (S.filtre.durum === "cop") return ustCopKlasorleri().sort(adSirala);
+  if (S.gorunum === "cop") return ustCopKlasorleri().sort(adSirala);
   if (tokenler.length) return [...S.klasorler.values()].filter((k) => !k.silindiAt && tokenler.every((t) => k.ara.includes(t))).sort(adSirala);
-  if (S.filtre.etiket) return [];
-  return altKlasorler(S.konum);
-}
-
-function sayilariGuncelle() {
-  const kapsam = [...S.notlar.values()].filter((m) => !m.silindiAt && (genelAramaMi() || notKlasoru(m) === S.konum));
-  const sayi = { tum: kapsam.length, tohum: 0, filiz: 0, agac: 0, cop: ustCopNotlari().length + ustCopKlasorleri().length };
-  for (const m of kapsam) sayi[m.durum]++;
-  document.querySelectorAll("#nt-durum-chips [data-durum]").forEach((b) => {
-    b.textContent = `${b.dataset.etiket} (${sayi[b.dataset.durum] ?? 0})`;
-  });
+  if (S.filtre.etiket || filtreAktifMi()) return [];
+  if (S.gorunum === "klasor") return altKlasorler(S.konum);
+  return [];
 }
 
 function etiketFiltresiniDoldur() {
@@ -541,7 +653,7 @@ function etiketFiltresiniDoldur() {
     if (m.silindiAt) continue;
     for (const e of m.etiketler) tum.set(katla(e), e);
   }
-  sec.replaceChildren(el("option", { value: "", text: "Tüm etiketler" }));
+  sec.replaceChildren(el("option", { value: "", text: "Etiket" }));
   [...tum.values()]
     .sort((a, b) => a.localeCompare(b, "tr"))
     .forEach((e) => sec.append(el("option", { value: e, text: e })));
@@ -549,79 +661,550 @@ function etiketFiltresiniDoldur() {
   if (!sec.value) S.filtre.etiket = "";
 }
 
-/* ---- gezinme ---- */
-
-function durumSec(d) {
-  S.filtre.durum = d;
-  document.querySelectorAll("#nt-durum-chips [data-durum]").forEach((x) => {
-    const secili = x.dataset.durum === d;
-    x.classList.toggle("active", secili);
-    x.setAttribute("aria-selected", String(secili));
-  });
+function filtreSecenekleriniKur() {
+  $("nt-durum-filtre").replaceChildren(el("option", { value: "", text: "Durum" }), ...Object.entries(DURUMLAR).map(([k, v]) => el("option", { value: k, text: v.ad })));
+  $("nt-tur-filtre").replaceChildren(el("option", { value: "", text: "Tür" }), ...Object.entries(TURLER).map(([k, v]) => el("option", { value: k, text: v.ad })));
+  $("nt-sirala").replaceChildren(...Object.entries(SIRALAMA_AD).map(([k, v]) => el("option", { value: k, text: `Sırala: ${v}` })));
+  $("nt-tur-sec").replaceChildren(...Object.entries(TURLER).map(([k, v]) => el("option", { value: k, text: v.ad })));
+  $("nt-durum-sec").replaceChildren(...Object.entries(DURUMLAR).map(([k, v]) => el("option", { value: k, text: v.ad })));
+  $("nt-sablon").replaceChildren(el("option", { value: "", text: "Şablon ekle…" }), ...Object.entries(Bicim.SABLONLAR).map(([k, v]) => el("option", { value: k, text: v.ad })));
 }
 
-function klasoreGit(id) {
-  S.konum = id && klasorVarMi(id) ? id : null;
-  S.filtre.arama = "";
-  S.filtre.etiket = "";
+function filtreleriTemizle() {
+  S.filtre.durum = S.filtre.tur = S.filtre.etiket = S.filtre.arama = "";
+  $("nt-durum-filtre").value = $("nt-tur-filtre").value = $("nt-etiket-filtre").value = $("nt-arama").value = "";
+  $("nt-arama-temizle").hidden = true;
+  S.gorunenSayi = SAYFA_BOYUTU;
+  listeyiCiz();
+}
+
+/* ---- gezinme ---- */
+
+function seciminiSifirla() {
+  S.secim.clear();
+}
+
+function gorunumeGit(id) {
+  S.gorunum = id;
+  S.konum = null;
+  S.filtre.arama = S.filtre.etiket = "";
   $("nt-arama").value = "";
   $("nt-arama-temizle").hidden = true;
   $("nt-etiket-filtre").value = "";
-  durumSec("tum");
   S.gorunenSayi = SAYFA_BOYUTU;
+  seciminiSifirla();
+  navKapat();
+  panelGoster(S.duz ? "editor" : "liste");
   listeyiCiz();
+  $("nt-liste-pane").querySelector(".nt-liste-kaydirma").scrollTop = 0;
+}
+
+function klasoreGit(id) {
+  if (!id || !klasorVarMi(id)) return gorunumeGit("tum");
+  gorunumeGit("klasor");
+  S.konum = id;
+  for (const k of yolDizisi(id)) S.acik.add(k.id);
+  listeyiCiz();
+}
+
+function panelGoster(p) {
+  $("nt-duzen").dataset.panel = p;
+}
+
+function navAc(ac) {
+  $("nt-duzen").classList.toggle("nt-nav-acik", ac);
+  $("nt-nav-perde").hidden = !ac;
+  $("nt-nav-btn").setAttribute("aria-expanded", String(ac));
+}
+const navKapat = () => navAc(false);
+
+function odakAcKapa(ac = !S.odak) {
+  S.odak = ac && !$("nt-editor").hidden;
+  $("nt-duzen").classList.toggle("nt-odak", S.odak);
+  $("nt-odak-btn").setAttribute("aria-pressed", String(S.odak));
+}
+
+function arayuzuSifirla() {
+  S.notlar.clear();
+  S.klasorler.clear();
+  S.gorunum = "tum";
+  S.konum = null;
+  S.secim.clear();
+  S.secimModu = false;
+  menuKapat();
+  S.duz = null;
+  S.kirli = false;
+  blobUrlleriniBirak();
+  $("nt-liste").replaceChildren();
+  $("nt-klasorler").replaceChildren();
+  $("nt-agac").replaceChildren();
+  $("nt-editor").hidden = true;
+  $("nt-bos-editor").hidden = false;
+  odakAcKapa(false);
+  panelGoster("liste");
+}
+
+/* ---- sol gezinti: görünümler + klasör ağacı ---- */
+
+function gorunumSayilari() {
+  const s = { tum: 0, sabit: 0, arsiv: 0, cop: ustCopNotlari().length + ustCopKlasorleri().length };
+  for (const m of S.notlar.values()) {
+    if (m.silindiAt) continue;
+    if (m.arsiv) s.arsiv++;
+    else {
+      s.tum++;
+      if (m.sabit) s.sabit++;
+    }
+  }
+  return s;
+}
+
+function gorunumleriCiz() {
+  const say = gorunumSayilari();
+  const yap = (g) => {
+    const aktif = S.gorunum === g.id;
+    const n = say[g.id];
+    const b = el(
+      "button",
+      { type: "button", class: `nt-gorunum${aktif ? " nt-aktif" : ""}`, "aria-current": aktif ? "page" : null, onclick: () => gorunumeGit(g.id) },
+      ikon(g.ikon),
+      el("span", { class: "nt-gorunum-ad", text: g.ad }),
+      n ? el("span", { class: "nt-sayi", text: String(n) }) : null
+    );
+    if (g.id === "tum") birakHedefiYap(b, null);
+    return b;
+  };
+  $("nt-gorunumler").replaceChildren(...GORUNUMLER.map(yap));
+  $("nt-nav-alt").replaceChildren(...GORUNUMLER_ALT.map(yap));
+}
+
+function klasorMenuOgeleri(k) {
+  return [
+    { ad: "Adı ve simgesi…", islem: () => klasorDuzenle(k) },
+    { ad: "Alt klasör ekle…", islem: () => klasorOlustur(k.id) },
+    { ad: k.sabit ? "Sabitlemeyi kaldır" : "Sabitle", islem: () => kayitSabitle(k) },
+    { ad: "Başka klasöre taşı…", islem: () => tasimaDiyalogu(k) },
+    { ad: "Dışa aktar…", islem: () => disaAktarAc("klasor", k) },
+    { ad: "Çöpe at", islem: () => klasorCopeAt(k), tehlike: true },
+  ];
+}
+
+function menuDugmesi(etiket, ogeler, sinif = "nt-menu-ac") {
+  const dugme = el("button", { type: "button", class: sinif, "aria-label": etiket, "aria-haspopup": "menu", "aria-expanded": "false" }, ikon("more"));
+  dugme.addEventListener("click", (o) => {
+    o.stopPropagation();
+    if (S.menu && S.menuBagla === dugme) return menuKapat();
+    menuAc(dugme, typeof ogeler === "function" ? ogeler() : ogeler);
+  });
+  return dugme;
+}
+
+function suruklenebilirYap(dugum, tur, id) {
+  dugum.draggable = true;
+  dugum.addEventListener("dragstart", (o) => {
+    S.surukle = { tur, id };
+    o.dataTransfer.setData("text/plain", id);
+    o.dataTransfer.effectAllowed = "move";
+    dugum.classList.add("nt-suruklenen");
+  });
+  dugum.addEventListener("dragend", () => {
+    S.surukle = null;
+    dugum.classList.remove("nt-suruklenen");
+  });
+}
+
+function agacCiz() {
+  const kap = $("nt-agac");
+  const sayim = sayimlariHesapla();
+  kap.replaceChildren();
+
+  const yurut = (ustId, derinlik) => {
+    for (const k of altKlasorler(ustId)) {
+      const alt = altKlasorler(k.id);
+      const acik = S.acik.has(k.id);
+      const aktif = S.gorunum === "klasor" && S.konum === k.id;
+      const n = sayim.notSayisi.get(k.id) || 0;
+
+      const ok = el(
+        "button",
+        {
+          type: "button",
+          class: "nt-agac-ok",
+          tabindex: alt.length ? null : "-1",
+          disabled: alt.length ? null : true,
+          "aria-label": `${k.ad} ${acik ? "daralt" : "genişlet"}`,
+          onclick: (o) => {
+            o.stopPropagation();
+            if (acik) S.acik.delete(k.id);
+            else S.acik.add(k.id);
+            agacCiz();
+          },
+        },
+        ikon("chevron-right")
+      );
+      const ana = el(
+        "button",
+        {
+          type: "button",
+          class: "nt-agac-ana",
+          "aria-current": aktif ? "page" : null,
+          onclick: () => {
+            if (alt.length) S.acik.add(k.id);
+            klasoreGit(k.id);
+          },
+        },
+        el("span", { class: "nt-agac-simge", "aria-hidden": "true", text: k.simge }),
+        el("span", { class: "nt-agac-ad", text: k.ad }),
+        k.sabit ? el("span", { class: "nt-agac-sabit", title: "Sabitlendi" }, ikon("pin")) : null,
+        n ? el("span", { class: "nt-sayi", text: String(n) }) : null
+      );
+      const satir = el(
+        "div",
+        {
+          class: `nt-agac-oge nt-d${Math.min(derinlik, 6)}${aktif ? " nt-aktif" : ""}${acik ? " nt-acik" : ""}`,
+          role: "treeitem",
+          "aria-expanded": alt.length ? String(acik) : null,
+          "aria-selected": String(aktif),
+          data: { id: k.id },
+        },
+        ok,
+        ana,
+        el("span", { class: "nt-mk" }, menuDugmesi(`${k.ad} klasör işlemleri`, () => klasorMenuOgeleri(k)))
+      );
+      suruklenebilirYap(satir, "klasor", k.id);
+      birakHedefiYap(satir, k.id);
+      kap.append(satir);
+      if (acik) yurut(k.id, derinlik + 1);
+    }
+  };
+  yurut(null, 0);
+  if (!kap.children.length) {
+    kap.append(el("p", { class: "nt-agac-bos", text: "Henüz klasör yok. Ders, proje ya da etkinlik için bir klasör aç." }));
+  }
+}
+
+/* ---- orta panel: başlık, yol, klasör satırları, liste ---- */
+
+function listeBasligi() {
+  if (S.filtre.arama) return `“${S.filtre.arama}” için sonuçlar`;
+  if (S.filtre.etiket) return `Etiket: ${S.filtre.etiket}`;
+  if (S.gorunum === "klasor") {
+    const k = S.klasorler.get(S.konum);
+    return k ? `${k.simge} ${k.ad}` : "Klasör";
+  }
+  return [...GORUNUMLER, ...GORUNUMLER_ALT].find((g) => g.id === S.gorunum)?.ad || "Notlar";
 }
 
 function yolCiz() {
   const nav = $("nt-yol");
   nav.replaceChildren();
+  let goster = false;
 
-  if (S.filtre.durum === "cop") {
-    nav.append(el("span", { class: "nt-yol-son", text: "🗑️ Çöp kutusu — buradaki her şey sen silene kadar durur" }));
+  if (S.gorunum === "cop" && !genelAramaMi()) {
+    goster = true;
+    nav.append(el("span", { class: "nt-yol-bilgi", text: "Çöpteki her şey sen silene kadar durur." }));
     if (ustCopNotlari().length || ustCopKlasorleri().length) {
-      nav.append(el("button", { type: "button", class: "btn-danger csp-w-auto nt-yol-eylem", text: "Çöpü boşalt", onclick: copuBosalt }));
+      nav.append(el("button", { type: "button", class: "nt-btn nt-btn-kucuk nt-btn-tehlike nt-yol-eylem", text: "Çöpü boşalt", onclick: copuBosalt }));
     }
-    return;
-  }
-  if (genelAramaMi()) {
-    nav.append(
-      el("button", { type: "button", class: "nt-yol-oge", text: "← Klasörlere dön", onclick: () => klasoreGit(S.konum) }),
-      el("span", { class: "nt-yol-son muted", text: "Arama sonuçları — tüm klasörlerde" })
-    );
-    return;
-  }
-
-  const kok = el("button", {
-    type: "button",
-    class: `nt-yol-oge${S.konum ? "" : " nt-yol-aktif"}`,
-    text: "🏠 Tüm notlar",
-    "aria-current": S.konum ? null : "page",
-    onclick: () => klasoreGit(null),
-  });
-  birakHedefiYap(kok, null);
-  nav.append(kok);
-
-  const yol = yolDizisi(S.konum);
-  yol.forEach((k, i) => {
-    const son = i === yol.length - 1;
-    const oge = el("button", {
-      type: "button",
-      class: `nt-yol-oge${son ? " nt-yol-aktif" : ""}`,
-      text: `${k.simge} ${k.ad}`,
-      "aria-current": son ? "page" : null,
-      onclick: () => klasoreGit(k.id),
+  } else if (S.gorunum === "klasor" && !genelAramaMi()) {
+    goster = true;
+    nav.append(el("button", { type: "button", class: "nt-yol-oge", text: "Tüm notlar", onclick: () => gorunumeGit("tum") }));
+    const yol = yolDizisi(S.konum);
+    yol.forEach((k, i) => {
+      const son = i === yol.length - 1;
+      nav.append(
+        el("span", { class: "nt-yol-ayrac", "aria-hidden": "true" }, ikon("chevron-right")),
+        el("button", { type: "button", class: `nt-yol-oge${son ? " nt-aktif" : ""}`, "aria-current": son ? "page" : null, text: k.ad, onclick: () => klasoreGit(k.id) })
+      );
     });
-    birakHedefiYap(oge, k.id);
-    nav.append(el("span", { class: "nt-yol-ayrac", "aria-hidden": "true", text: "›" }), oge);
-  });
-  if (S.konum) {
-    nav.append(el("button", { type: "button", class: "nt-yol-oge nt-yol-alt", text: "＋ Alt klasör", onclick: () => klasorOlustur(S.konum) }));
+    nav.append(el("button", { type: "button", class: "nt-btn nt-btn-kucuk nt-yol-eylem", onclick: () => klasorOlustur(S.konum) }, ikon("folder-plus"), "Alt klasör"));
+  } else if (S.gorunum === "arsiv" && !genelAramaMi()) {
+    goster = true;
+    nav.append(el("span", { class: "nt-yol-bilgi", text: "Bitirdiğin ders ve projeleri buraya kaldır; aramada yine bulunur." }));
   }
+  nav.hidden = !goster;
 }
 
-/* ---- klasör kartı + menü ---- */
+function klasorSatiri(k, sayim, tokenler, copta) {
+  const ad = el("span", { class: "nt-klasor-ad" });
+  vurguluMetin(ad, k.ad, tokenler);
+  const alt = sayim.altSayisi.get(k.id) || 0;
+  const n = sayim.notSayisi.get(k.id) || 0;
+  const bilgi = copta ? "" : [alt ? `${alt} klasör` : "", `${n} not`].filter(Boolean).join(" · ");
+  const ana = el(
+    "button",
+    { type: "button", class: "nt-klasor-ana", disabled: copta ? true : null, "aria-label": `${k.ad} klasörünü aç`, onclick: () => klasoreGit(k.id) },
+    el("span", { class: "nt-klasor-simge", "aria-hidden": "true", text: k.simge }),
+    ad,
+    bilgi ? el("span", { class: "nt-klasor-bilgi", text: bilgi }) : null
+  );
+  const kart = el("div", { class: `nt-klasor${k.sabit ? " nt-sabit" : ""}`, data: { id: k.id } }, ana);
+  if (copta) {
+    kart.append(
+      el("span", { class: "nt-klasor-cop" },
+        el("button", { type: "button", class: "nt-btn nt-btn-kucuk", text: "Geri al", onclick: () => klasorGeriAl(k) }),
+        el("button", { type: "button", class: "nt-btn nt-btn-kucuk nt-btn-tehlike", text: "Kalıcı sil", onclick: () => klasorKaliciSilOnayli(k) })
+      )
+    );
+    return kart;
+  }
+  suruklenebilirYap(kart, "klasor", k.id);
+  birakHedefiYap(kart, k.id);
+  return kart;
+}
+
+function notMenuOgeleri(m) {
+  return [
+    { ad: "Yazıya dönüştür", islem: () => yaziyaDonustur(m) },
+    { ad: m.sabit ? "Sabitlemeyi kaldır" : "Sabitle", islem: () => kayitSabitle(m) },
+    { ad: m.arsiv ? "Arşivden çıkar" : "Arşivle", islem: () => arsivle(m) },
+    { ad: "Taşı…", islem: () => tasimaDiyalogu(m) },
+    { ad: "Dışa aktar…", islem: () => disaAktarAc("bu", m) },
+    { ad: "Çöpe at", islem: () => copeAt(m), tehlike: true },
+  ];
+}
+
+function satirCiz(m, tokenler) {
+  const secili = S.duz?.id === m.id;
+  const secimde = S.secim.has(m.id);
+  const baslik = el("h3", { class: "nt-satir-baslik" });
+  vurguluMetin(baslik, m.baslik || "Başlıksız not", tokenler);
+
+  const ozet = el("p", { class: "nt-ozet" });
+  vurguluMetin(ozet, ozetUret(m, tokenler), tokenler);
+
+  const rozetler = el("div", { class: "nt-satir-alt" });
+  rozetler.append(el("span", { class: `nt-rozet nt-tur-${m.kategori}`, text: TURLER[m.kategori].ad }));
+  if (m.durum !== "devam") rozetler.append(el("span", { class: `nt-durum nt-durum-${m.durum}`, text: DURUMLAR[m.durum].ad, title: DURUMLAR[m.durum].ipucu }));
+  if (m.tarih) rozetler.append(el("span", { class: "nt-meta-oge" }, ikon("calendar"), konuTarihiYaz(m.tarih)));
+  const klasorAdi = (genelAramaMi() || S.gorunum !== "klasor") && notKlasoru(m) ? yolMetni(notKlasoru(m)) : "";
+  if (klasorAdi) rozetler.append(el("span", { class: "nt-meta-oge nt-meta-klasor", title: klasorAdi }, ikon("folder"), klasorAdi));
+  for (const e of m.etiketler.slice(0, 3)) {
+    const r = el("button", {
+      type: "button",
+      class: "nt-etiket",
+      title: "Bu etikete göre filtrele",
+      onclick: (o) => {
+        o.stopPropagation();
+        S.filtre.etiket = e;
+        $("nt-etiket-filtre").value = e;
+        S.gorunenSayi = SAYFA_BOYUTU;
+        listeyiCiz();
+      },
+    });
+    vurguluMetin(r, `#${e}`, tokenler.map((t) => t));
+    rozetler.append(r);
+  }
+  if (m.etiketler.length > 3) rozetler.append(el("span", { class: "nt-meta-oge", text: `+${m.etiketler.length - 3}` }));
+  if (m.alintilar.length) rozetler.append(el("span", { class: "nt-meta-oge", title: `${m.alintilar.length} alıntı` }, ikon("quote"), String(m.alintilar.length)));
+  if (m.ekler.length) rozetler.append(el("span", { class: "nt-meta-oge", title: `${m.ekler.length} ek` }, ikon("paperclip"), String(m.ekler.length)));
+
+  const ust = el("div", { class: "nt-satir-ust" }, m.sabit ? el("span", { class: "nt-satir-sabit", title: "Sabitlendi" }, ikon("pin")) : null, baslik, el("time", { class: "nt-satir-zaman", datetime: m.guncelleme, text: zamanYaz(m.guncelleme), title: `Son güncelleme: ${tarihYaz(m.guncelleme)}` }));
+
+  const govde = el("div", { class: "nt-satir-govde" }, ust, ozet.textContent ? ozet : null, rozetler);
+
+  let ana;
+  if (m.silindiAt) {
+    ana = el("div", { class: "nt-satir-ana nt-satir-cop" }, govde,
+      el("div", { class: "nt-satir-cop-eylem" },
+        el("button", { type: "button", class: "nt-btn nt-btn-kucuk", text: "Geri al", onclick: () => copTenGeriAl(m) }),
+        el("button", { type: "button", class: "nt-btn nt-btn-kucuk nt-btn-tehlike", text: "Kalıcı sil", onclick: () => kaliciSilOnayli(m) })
+      )
+    );
+  } else {
+    ana = el("button", { type: "button", class: "nt-satir-ana", "aria-pressed": S.secimModu ? String(secimde) : null, "aria-current": !S.secimModu && secili ? "true" : null }, govde);
+    ana.addEventListener("click", () => (S.secimModu ? secimiDegistir(m.id) : duzenleyiciAc(m)));
+  }
+
+  const kart = el("article", { class: `nt-satir nt-tur-${m.kategori}${secili ? " nt-secili" : ""}${secimde ? " nt-secimde" : ""}${m.silindiAt ? " nt-copte" : ""}`, data: { id: m.id } });
+  if (S.secimModu && !m.silindiAt) {
+    const kutu = el("input", { type: "checkbox", class: "nt-satir-kutu", "aria-label": `${m.baslik || "Başlıksız not"} seç`, tabindex: "-1" });
+    kutu.checked = secimde;
+    kutu.addEventListener("click", (o) => o.stopPropagation());
+    kutu.addEventListener("change", () => secimiDegistir(m.id));
+    kart.append(kutu);
+  }
+  kart.append(ana);
+  if (!m.silindiAt && !S.secimModu) {
+    kart.append(el("span", { class: "nt-mk nt-satir-menu" }, menuDugmesi(`${m.baslik || "Başlıksız not"} işlemleri`, () => notMenuOgeleri(S.notlar.get(m.id) || m))));
+    suruklenebilirYap(kart, "not", m.id);
+  }
+  return kart;
+}
+
+function bosDurumCiz(cop) {
+  const kutu = el("div", { class: "nt-bos" });
+  const hic = !S.notlar.size && !S.klasorler.size;
+  let baslik = "Bu görünümde not yok.";
+  let aciklama = "";
+  const dugmeler = [];
+
+  if (filtreAktifMi()) {
+    baslik = S.filtre.arama ? `“${S.filtre.arama}” ile eşleşen not yok.` : "Bu filtrelere uyan not yok.";
+    aciklama = "Başka bir sözcük dene ya da filtreleri temizle.";
+    dugmeler.push(el("button", { type: "button", class: "nt-btn", text: "Filtreleri temizle", onclick: filtreleriTemizle }));
+  } else if (cop) {
+    baslik = "Çöp kutusu boş.";
+  } else if (S.gorunum === "arsiv") {
+    baslik = "Arşiv boş.";
+    aciklama = "Bitirdiğin ders ve projeleri bir notun ⋯ menüsünden arşive kaldır.";
+  } else if (S.gorunum === "sabit") {
+    baslik = "Sabitlenmiş not yok.";
+    aciklama = "Sık döndüğün notları ⋯ menüsünden sabitle; burada ve listenin başında durur.";
+  } else if (hic) {
+    baslik = "İlk notunu yaz.";
+    aciklama = "Ders, sunum, proje ya da etkinlik için bir şablonla başla; ya da aklına geleni hızlıca not et.";
+    dugmeler.push(el("button", { type: "button", class: "nt-btn nt-btn-birincil", onclick: hizliNot }, ikon("zap"), "Hızlı not"), el("button", { type: "button", class: "nt-btn", text: "Şablon seç", onclick: (o) => yeniNotMenusu(o.currentTarget) }));
+  } else if (S.gorunum === "klasor") {
+    baslik = "Bu klasör boş.";
+    aciklama = "Buraya not ekle ya da bir alt klasör aç.";
+    dugmeler.push(el("button", { type: "button", class: "nt-btn nt-btn-birincil", onclick: () => yeniNot("") }, ikon("plus"), "Yeni not"));
+  }
+  kutu.append(el("p", { class: "nt-bos-baslik", text: baslik }));
+  if (aciklama) kutu.append(el("p", { class: "muted", text: aciklama }));
+  if (dugmeler.length) kutu.append(el("div", { class: "nt-bos-eylem" }, dugmeler));
+  return kutu;
+}
+
+function listeyiCiz() {
+  gorunumleriCiz();
+  agacCiz();
+
+  const { liste, tokenler } = filtrelenmisNotlar();
+  const sayim = sayimlariHesapla();
+  const klasorler = gorunenKlasorler(tokenler);
+  const cop = S.gorunum === "cop";
+
+  for (const id of [...S.secim]) if (!liste.some((m) => m.id === id)) S.secim.delete(id);
+
+  $("nt-liste-baslik").textContent = listeBasligi();
+  const parcalar = [];
+  if (klasorler.length) parcalar.push(`${klasorler.length} klasör`);
+  parcalar.push(`${liste.length} ${S.filtre.arama ? "sonuç" : "not"}`);
+  $("nt-sayac").textContent = parcalar.join(" · ");
+  yolCiz();
+
+  const kk = $("nt-klasorler");
+  kk.replaceChildren(...klasorler.map((k) => klasorSatiri(k, sayim, tokenler, cop)));
+  kk.hidden = !klasorler.length;
+
+  const kap = $("nt-liste");
+  kap.replaceChildren();
+  if (!liste.length) {
+    if (!klasorler.length) kap.append(bosDurumCiz(cop));
+  } else {
+    for (const m of liste.slice(0, S.gorunenSayi)) kap.append(satirCiz(m, tokenler));
+    if (liste.length > S.gorunenSayi) {
+      kap.append(
+        el("button", {
+          type: "button",
+          class: "nt-btn nt-daha",
+          text: `${liste.length - S.gorunenSayi} not daha göster`,
+          onclick: () => {
+            S.gorunenSayi += SAYFA_BOYUTU;
+            listeyiCiz();
+          },
+        })
+      );
+    }
+  }
+  secimCubuguGuncelle(liste);
+  $("nt-sec-btn").hidden = cop;
+}
+
+/* ---- çoklu seçim ---- */
+
+function secimiDegistir(id) {
+  if (S.secim.has(id)) S.secim.delete(id);
+  else S.secim.add(id);
+  const satir = $("nt-liste").querySelector(`[data-id="${CSS.escape(id)}"]`);
+  if (satir) {
+    const secimde = S.secim.has(id);
+    satir.classList.toggle("nt-secimde", secimde);
+    const k = satir.querySelector(".nt-satir-kutu");
+    if (k) k.checked = secimde;
+    satir.querySelector(".nt-satir-ana")?.setAttribute("aria-pressed", String(secimde));
+  }
+  secimCubuguGuncelle();
+}
+
+function secimModuAyarla(ac) {
+  S.secimModu = ac;
+  if (!ac) S.secim.clear();
+  listeyiCiz();
+}
+
+function secimCubuguGuncelle(liste) {
+  const cubuk = $("nt-secim-cubugu");
+  cubuk.hidden = !S.secimModu;
+  const sec = $("nt-sec-btn");
+  sec.setAttribute("aria-pressed", String(S.secimModu));
+  sec.textContent = S.secimModu ? "Bitti" : "Seç";
+  const n = S.secim.size;
+  $("nt-secim-sayi").textContent = n ? `${n} not seçildi` : "Not seçmek için satırlara dokun";
+  for (const id of ["nt-secim-aktar", "nt-secim-tasi", "nt-secim-durum", "nt-secim-cop"]) $(id).disabled = !n;
+  if (liste) $("nt-secim-hepsi").dataset.toplam = String(liste.length);
+}
+
+function gorunenleriSec() {
+  const { liste } = filtrelenmisNotlar();
+  const hepsiSecili = liste.length && liste.every((m) => S.secim.has(m.id));
+  if (hepsiSecili) S.secim.clear();
+  else for (const m of liste) S.secim.add(m.id);
+  listeyiCiz();
+}
+
+const secilenNotlar = () => [...S.secim].map((id) => S.notlar.get(id)).filter(Boolean);
+
+async function topluTasi() {
+  const notlar = secilenNotlar();
+  if (!notlar.length) return;
+  const sec = el("select", { "aria-label": "Hedef klasör" });
+  klasorSecenekleriDoldur(sec, { secili: null, kok: "Ana klasör (kök)" });
+  const ok = await diyalog({
+    baslik: `${notlar.length} not nereye taşınsın?`,
+    tamam: "Taşı",
+    govde: el("div", { class: "form-field" }, el("label", { text: "Hedef klasör" }), sec),
+  });
+  if (!ok) return;
+  for (const m of notlar) await hizliGuncelle(S.notlar.get(m.id) || m, { klasor: sec.value || null });
+  bildir(`${notlar.length} not ${sec.value ? `“${yolMetni(sec.value)}” klasörüne` : "ana klasöre"} taşındı.`);
+}
+
+async function topluDurum(d) {
+  const notlar = secilenNotlar();
+  for (const m of notlar) await hizliGuncelle(S.notlar.get(m.id) || m, { durum: d });
+  bildir(`${notlar.length} not “${DURUMLAR[d].ad}” yapıldı.`);
+}
+
+async function topluCope() {
+  const notlar = secilenNotlar();
+  if (!notlar.length) return;
+  if (!window.confirm(`${notlar.length} not çöp kutusuna taşınsın mı?\n\nÇöptekiler sen silene kadar durur; istediğin an geri alabilirsin.`)) return;
+  if (S.duz && S.secim.has(S.duz.id)) {
+    S.kirli = false;
+    await duzenleyiciKapat();
+  }
+  try {
+    await topluSilindiAyarla(notlar, new Date().toISOString());
+  } catch (h) {
+    return bildir("Çöpe taşınamadı: " + (h.message || h), "error");
+  }
+  S.secim.clear();
+  bildir(`${notlar.length} not çöpe taşındı.`);
+  etiketFiltresiniDoldur();
+  listeyiCiz();
+}
+
+async function arsivle(m) {
+  const yeni = await hizliGuncelle(m, { arsiv: !m.arsiv });
+  if (yeni) bildir(yeni.arsiv ? `“${yeni.baslik || "Başlıksız not"}” arşive kaldırıldı.` : `“${yeni.baslik || "Başlıksız not"}” arşivden çıkarıldı.`);
+}
+
+/* ---- menüler (position: fixed; kaydırma alanlarında kırpılmaz) ---- */
 
 function menuKapat() {
+  S.menuBagla?.setAttribute("aria-expanded", "false");
   S.menu?.remove();
   S.menu = null;
   S.menuBagla = null;
@@ -636,85 +1219,83 @@ function menuAc(bagla, ogeler) {
       el("button", {
         type: "button",
         role: "menuitem",
-        class: o.tehlike ? "nt-menu-tehlike" : "",
+        class: o.tehlike ? "nt-menu-tehlike" : o.ayrac ? "nt-menu-ayrac-oge" : "",
         text: o.ad,
         onclick: () => {
           menuKapat();
+          bagla.focus?.({ preventScroll: true });
           o.islem();
         },
       })
     )
   );
-  bagla.parentElement.append(menu);
+  $("notlar").append(menu);
+  const r = bagla.getBoundingClientRect();
+  const mr = menu.getBoundingClientRect();
+  let ust = r.bottom + 4;
+  if (ust + mr.height > window.innerHeight - 8) ust = Math.max(8, r.top - mr.height - 4);
+  const sol = Math.min(Math.max(8, r.right - mr.width), window.innerWidth - mr.width - 8);
+  menu.style.top = `${ust}px`;
+  menu.style.left = `${sol}px`;
   S.menu = menu;
   S.menuBagla = bagla;
+  bagla.setAttribute("aria-expanded", "true");
   menu.querySelector("button")?.focus();
+  menu.addEventListener("keydown", (o) => {
+    const dugmeler = [...menu.querySelectorAll("button")];
+    const i = dugmeler.indexOf(document.activeElement);
+    if (o.key === "ArrowDown") {
+      o.preventDefault();
+      dugmeler[(i + 1) % dugmeler.length].focus();
+    } else if (o.key === "ArrowUp") {
+      o.preventDefault();
+      dugmeler[(i - 1 + dugmeler.length) % dugmeler.length].focus();
+    } else if (o.key === "Escape") {
+      o.stopPropagation();
+      const b = S.menuBagla;
+      menuKapat();
+      b?.focus();
+    } else if (o.key === "Tab") menuKapat();
+  });
 }
 
-function klasorKartiCiz(k, sayim, tokenler, copta) {
-  const ad = el("span", { class: "nt-klasor-ad" });
-  vurguluMetin(ad, k.ad, tokenler);
-  const alt = sayim.altSayisi.get(k.id) || 0;
-  const n = sayim.notSayisi.get(k.id) || 0;
-  const bilgi = copta
-    ? `Çöpe taşındı: ${tarihYaz(k.silindiAt)}`
-    : [alt ? `${alt} klasör` : "", `${n} not`].filter(Boolean).join(" · ");
+function yeniNotMenusu(bagla) {
+  menuAc(bagla, [
+    { ad: "Boş not", islem: () => yeniNot("") },
+    ...Object.entries(Bicim.SABLONLAR).map(([k, v]) => ({ ad: v.ad, islem: () => yeniNot(k) })),
+  ]);
+}
 
-  const ana = el(
-    "button",
-    {
-      type: "button",
-      class: "nt-klasor-ana",
-      disabled: copta ? true : null,
-      "aria-label": `${k.ad} klasörünü aç`,
-      onclick: () => klasoreGit(k.id),
-    },
-    el("span", { class: "nt-klasor-simge", "aria-hidden": "true", text: k.simge }),
-    el("span", { class: "nt-klasor-metin" }, ad, el("span", { class: "nt-klasor-bilgi muted", text: bilgi }))
-  );
+function dahaMenusu(bagla) {
+  menuAc(bagla, [
+    { ad: "Kasa ve yedek…", islem: () => $("nt-kasa-dlg").showModal() },
+    { ad: "Notları yeniden yükle", islem: () => notlariYukle().catch((h) => bildir("Yenilenemedi: " + h.message, "error")) },
+    { ad: "Kasayı kilitle", islem: () => kilitle("Kasa kilitlendi; bu cihazdaki anahtar silindi.") },
+  ]);
+}
 
-  const kart = el("div", { class: `nt-klasor${k.sabit ? " nt-sabit" : ""}`, data: { id: k.id } }, ana);
-  if (k.sabit) kart.append(el("span", { class: "nt-sabit-isaret", title: "Sabitlendi", "aria-label": "Sabitlendi", text: "📌" }));
-
-  if (copta) {
-    kart.append(
-      el(
-        "div",
-        { class: "nt-klasor-cop" },
-        el("button", { type: "button", class: "btn-secondary csp-w-auto", text: "Geri al", onclick: () => klasorGeriAl(k) }),
-        el("button", { type: "button", class: "btn-danger csp-w-auto", text: "Kalıcı sil", onclick: () => klasorKaliciSilOnayli(k) })
-      )
-    );
-    return kart;
-  }
-
-  const dugme = el("button", { type: "button", class: "nt-menu-ac", "aria-label": `${k.ad} klasör işlemleri`, "aria-haspopup": "menu", text: "⋯" });
-  dugme.addEventListener("click", (o) => {
-    o.stopPropagation();
-    if (S.menu && S.menuBagla === dugme) return menuKapat();
-    menuAc(dugme, [
-      { ad: "✏️ Adı ve simgesi", islem: () => klasorDuzenle(k) },
-      { ad: "＋ Alt klasör ekle", islem: () => klasorOlustur(k.id) },
-      { ad: k.sabit ? "📌 Sabitlemeyi kaldır" : "📌 Sabitle", islem: () => kayitSabitle(k) },
-      { ad: "↗ Başka klasöre taşı", islem: () => tasimaDiyalogu(k) },
-      { ad: "🗑️ Çöpe at", islem: () => klasorCopeAt(k), tehlike: true },
-    ]);
-  });
-  kart.append(el("div", { class: "nt-menu-kap" }, dugme));
-
-  kart.draggable = true;
-  kart.addEventListener("dragstart", (o) => {
-    S.surukle = { tur: "klasor", id: k.id };
-    o.dataTransfer.setData("text/plain", k.id);
-    o.dataTransfer.effectAllowed = "move";
-    kart.classList.add("nt-suruklenen");
-  });
-  kart.addEventListener("dragend", () => {
-    S.surukle = null;
-    kart.classList.remove("nt-suruklenen");
-  });
-  birakHedefiYap(kart, k.id);
-  return kart;
+function editorMenusu(bagla) {
+  const m = S.notlar.get(S.duz?.id);
+  if (!m) return;
+  menuAc(bagla, [
+    { ad: "Yazıya dönüştür", islem: async () => {
+        if (S.kirli) await kaydet({ sessiz: true });
+        yaziyaDonustur(S.notlar.get(S.duz.id) || S.duz);
+      } },
+    { ad: m.sabit ? "Sabitlemeyi kaldır" : "Sabitle", islem: () => kayitSabitle(S.notlar.get(S.duz.id) || m) },
+    { ad: m.arsiv ? "Arşivden çıkar" : "Arşivle", islem: () => arsivle(S.notlar.get(S.duz.id) || m) },
+    { ad: "Dışa aktar…", islem: async () => {
+        if (S.kirli) await kaydet({ sessiz: true });
+        disaAktarAc("bu", S.notlar.get(S.duz.id) || m);
+      } },
+    { ad: "Çöpe at", tehlike: true, islem: async () => {
+        if (!window.confirm("Bu not çöp kutusuna taşınsın mı? Çöpteki notlar sen silene kadar durur; istediğin an geri alabilirsin.")) return;
+        const g = S.notlar.get(S.duz.id) || m;
+        S.kirli = false;
+        await copeAt(g);
+        await duzenleyiciKapat();
+      } },
+  ]);
 }
 
 /* ---- sürükle-bırak taşıma ---- */
@@ -742,177 +1323,8 @@ function birakHedefiYap(dugum, hedefId) {
   });
 }
 
-/* ---- ana çizim ---- */
-
-function sonDuzenlenenleriCiz() {
-  const kutu = $("nt-son-kutu");
-  const goster = S.konum === null && !genelAramaMi() && S.filtre.durum === "tum";
-  const son = goster
-    ? [...S.notlar.values()].filter((m) => !m.silindiAt).sort((a, b) => b.guncelleme.localeCompare(a.guncelleme)).slice(0, 4)
-    : [];
-  kutu.hidden = son.length < 2; // tek not varsa ayrıca göstermeye gerek yok
-  $("nt-son").replaceChildren(
-    ...son.map((m) =>
-      el(
-        "button",
-        { type: "button", class: "nt-son-oge", onclick: () => duzenleyiciAc(m) },
-        el("strong", { text: m.baslik || "Başlıksız not" }),
-        el("span", { class: "muted", text: notKlasoru(m) ? `📁 ${yolMetni(notKlasoru(m))}` : tarihYaz(m.guncelleme) })
-      )
-    )
-  );
-}
-
-function listeyiCiz() {
-  sayilariGuncelle();
-  yolCiz();
-  sonDuzenlenenleriCiz();
-
-  const { liste, tokenler } = filtrelenmisNotlar();
-  const sayim = sayimlariHesapla();
-  const klasorler = gorunenKlasorler(tokenler);
-  const cop = S.filtre.durum === "cop";
-
-  const kk = $("nt-klasorler");
-  kk.replaceChildren(...klasorler.map((k) => klasorKartiCiz(k, sayim, tokenler, cop)));
-  $("nt-klasorler-kutu").hidden = !klasorler.length;
-  $("nt-klasorler-baslik").hidden = !liste.length && !klasorler.length;
-  $("nt-liste-baslik").hidden = !(klasorler.length && liste.length);
-
-  const sayac = $("nt-sayac");
-  const parcalar = [];
-  if (klasorler.length) parcalar.push(`${klasorler.length} klasör`);
-  parcalar.push(`${liste.length} ${S.filtre.arama ? "sonuç" : cop ? "not çöpte" : "not"}`);
-  sayac.textContent = parcalar.join(" · ");
-
-  const kap = $("nt-liste");
-  kap.replaceChildren();
-
-  if (!liste.length) {
-    if (klasorler.length) return;
-    const bosMesaj =
-      S.filtre.arama || S.filtre.etiket
-        ? "Aramanla eşleşen not yok. Başka bir sözcük dene ya da filtreleri temizle."
-        : cop
-          ? "Çöp kutusu boş."
-          : S.konum
-            ? "Bu klasör boş. ⚡ Hızlı not ile başla ya da bir alt klasör aç."
-            : S.klasorler.size || S.notlar.size
-              ? "Bu görünümde not yok."
-              : "Henüz notun yok. Bir klasör açarak başla ya da aklına gelen ilk şeyi ⚡ Hızlı not olarak yaz.";
-    kap.append(el("p", { class: "muted nt-bos", text: bosMesaj }));
-    return;
-  }
-
-  for (const m of liste.slice(0, S.gorunenSayi)) kap.append(kartCiz(m, tokenler));
-
-  if (liste.length > S.gorunenSayi) {
-    kap.append(
-      el("button", {
-        type: "button",
-        class: "btn-secondary csp-w-auto nt-daha",
-        text: `${liste.length - S.gorunenSayi} not daha göster`,
-        onclick: () => {
-          S.gorunenSayi += SAYFA_BOYUTU;
-          listeyiCiz();
-        },
-      })
-    );
-  }
-}
-
-function kartCiz(m, tokenler) {
-  const d = DURUMLAR[m.durum];
-  const baslik = el("h3", { class: "nt-kart-baslik" });
-  vurguluMetin(baslik, m.baslik || "Başlıksız not", tokenler);
-  if (m.sabit) baslik.prepend(el("span", { class: "nt-sabit-isaret", title: "Sabitlendi", text: "📌 " }));
-
-  const ozet = el("p", { class: "nt-ozet" });
-  vurguluMetin(ozet, ozetUret(m, tokenler), tokenler);
-
-  const etiketler = el(
-    "div",
-    { class: "nt-etiketler" },
-    m.etiketler.map((e) => {
-      const rozet = el("button", {
-        type: "button",
-        class: "nt-etiket",
-        title: "Bu etikete göre filtrele",
-        onclick: (olay) => {
-          olay.stopPropagation();
-          S.filtre.etiket = e;
-          $("nt-etiket-filtre").value = e;
-          S.gorunenSayi = SAYFA_BOYUTU;
-          listeyiCiz();
-        },
-      });
-      vurguluMetin(rozet, e, tokenler);
-      return rozet;
-    })
-  );
-
-  const meta = [`Güncellendi: ${tarihYaz(m.guncelleme)}`];
-  if (m.alintilar.length) meta.push(`❝ ${m.alintilar.length} alıntı`);
-  if (m.ekler.length) meta.push(`📎 ${m.ekler.length} ek`);
-  if (m.aktarildi) meta.push(`✍️ ${tarihYaz(m.aktarildi)} tarihinde yazıya aktarıldı (not duruyor)`);
-
-  const alt = el("div", { class: "nt-kart-alt" });
-  if (m.silindiAt) {
-    alt.append(
-      el("button", { type: "button", class: "btn-secondary csp-w-auto", text: "Geri al", onclick: () => copTenGeriAl(m) }),
-      el("button", { type: "button", class: "btn-danger csp-w-auto", text: "Kalıcı olarak sil", onclick: () => kaliciSilOnayli(m) })
-    );
-  } else {
-    alt.append(
-      el("button", { type: "button", class: "btn-primary csp-w-auto nt-donustur", text: "✍️ Yazıya dönüştür", onclick: () => yaziyaDonustur(m) }),
-      el("button", { type: "button", class: "btn-secondary csp-w-auto", text: "Aç", onclick: () => duzenleyiciAc(m) }),
-      el("button", { type: "button", class: "btn-secondary csp-w-auto", text: "↗ Taşı", onclick: () => tasimaDiyalogu(m) }),
-      el("button", { type: "button", class: "btn-secondary csp-w-auto", text: m.sabit ? "📌 Kaldır" : "📌 Sabitle", title: "Listenin başına sabitle", onclick: () => kayitSabitle(m) })
-    );
-    if (d.sonraki) {
-      const s = DURUMLAR[d.sonraki];
-      alt.append(
-        el("button", {
-          type: "button",
-          class: "btn-secondary csp-w-auto",
-          text: `${s.simge} ${s.ad} aşamasına geçir`,
-          onclick: () => durumIlerlet(m),
-        })
-      );
-    }
-  }
-
-  const kart = el(
-    "article",
-    { class: `nt-kart nt-seviye-${m.durum}${S.duz?.id === m.id ? " nt-kart-secili" : ""}`, data: { id: m.id } },
-    el("div", { class: "nt-kart-ust" }, baslik, el("span", { class: `nt-rozet nt-rozet-${m.durum}`, text: `${d.simge} ${d.ad}`, title: d.ipucu })),
-    (genelAramaMi() || m.silindiAt) && m.klasor && S.klasorler.has(m.klasor)
-      ? el("p", { class: "nt-konum muted", text: `📁 ${yolMetni(m.klasor)}` })
-      : null,
-    ozet,
-    etiketler,
-    el("p", { class: "nt-meta muted", text: meta.join(" · ") }),
-    alt
-  );
-
-  if (!m.silindiAt) {
-    kart.draggable = true;
-    kart.addEventListener("dragstart", (o) => {
-      S.surukle = { tur: "not", id: m.id };
-      o.dataTransfer.setData("text/plain", m.id);
-      o.dataTransfer.effectAllowed = "move";
-      kart.classList.add("nt-suruklenen");
-    });
-    kart.addEventListener("dragend", () => {
-      S.surukle = null;
-      kart.classList.remove("nt-suruklenen");
-    });
-  }
-  return kart;
-}
-
 /* ------------------------------------------------------------------ */
-/* 7) Hızlı işlemler (kart üzerinden)                                  */
+/* 7) Hızlı işlemler                                                  */
 /* ------------------------------------------------------------------ */
 
 async function hizliGuncelle(m, degisiklik) {
@@ -929,13 +1341,6 @@ async function hizliGuncelle(m, degisiklik) {
     bildir("İşlem kaydedilemedi: " + (h.message || h), "error");
     return null;
   }
-}
-
-async function durumIlerlet(m) {
-  const sonraki = DURUMLAR[m.durum].sonraki;
-  if (!sonraki) return;
-  const yeni = await hizliGuncelle(m, { durum: sonraki });
-  if (yeni) bildir(`“${yeni.baslik || "Başlıksız not"}” artık ${DURUMLAR[sonraki].simge} ${DURUMLAR[sonraki].ad}.`);
 }
 
 async function copeAt(m) {
@@ -1164,7 +1569,13 @@ async function klasorCopeAt(k) {
     console.error(h);
     return bildir("Çöpe taşınamadı: " + (h.message || h), "error");
   }
-  if (S.konum && klasorler.some((x) => x.id === S.konum)) S.konum = ustId;
+  if (S.gorunum === "klasor" && klasorler.some((x) => x.id === S.konum)) {
+    if (ustId) S.konum = ustId;
+    else {
+      S.gorunum = "tum";
+      S.konum = null;
+    }
+  }
   bildir(`“${k.ad}” çöpe taşındı. Sen silene kadar durur.`);
   etiketFiltresiniDoldur();
   listeyiCiz();
@@ -1306,6 +1717,7 @@ async function ekiTamamenSil(anahtar) {
 }
 
 function eklerCiz() {
+  detayBasliklari();
   const kap = $("nt-ekler");
   kap.replaceChildren();
   if (!S.duz.ekler.length) return;
@@ -1717,6 +2129,8 @@ function sablonEkle(anahtar) {
     s.removeAllRanges();
     s.addRange(r);
   }
+  const tur = Bicim.SABLONLAR[anahtar]?.tur;
+  if (tur && $("nt-tur-sec").value === "genel") $("nt-tur-sec").value = tur;
   yaziyiKontrolEt();
   kirlendi();
   sozcukGuncelle();
@@ -1725,8 +2139,37 @@ function sablonEkle(anahtar) {
 /* ---- açma ---- */
 
 function hizliNot() {
-  const t = new Date().toLocaleString("tr-TR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
-  duzenleyiciAc(null, { otoBaslik: `Not · ${t}`, govdeyeOdak: true });
+  yeniNot("");
+}
+
+/** sablon: "" (boş/hızlı) ya da Bicim.SABLONLAR anahtarı. */
+function yeniNot(sablon = "") {
+  const s = sablon ? Bicim.SABLONLAR[sablon] : null;
+  const simdi = new Date();
+  const t = simdi.toLocaleString("tr-TR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
+  duzenleyiciAc(null, {
+    otoBaslik: s ? `${s.ad} · ${simdi.toLocaleDateString("tr-TR", { day: "numeric", month: "long" })}` : `Not · ${t}`,
+    tur: s?.tur || "genel",
+    durum: s ? "devam" : "gelen",
+    tarih: s ? yerelTarih(simdi) : "",
+    sablon,
+    govdeyeOdak: !s,
+  });
+}
+
+/** Başlık çok satıra sarabilsin (tek satırlık input uzun başlığı kesiyordu). */
+function baslikBoyutla() {
+  const b = $("nt-baslik");
+  b.style.height = "auto";
+  b.style.height = `${b.scrollHeight}px`;
+}
+
+function detayBasliklari() {
+  if (!S.duz) return;
+  const a = S.duz.alintilar.length;
+  const e = S.duz.ekler.length;
+  $("nt-alinti-baslik").textContent = a ? `Kaynaklı alıntılar (${a})` : "Kaynaklı alıntılar";
+  $("nt-ek-baslik").textContent = e ? `Ekler (${e})` : "Ekler";
 }
 
 function duzenleyiciAc(m, secenek = {}) {
@@ -1736,33 +2179,44 @@ function duzenleyiciAc(m, secenek = {}) {
   S.duzYeni = !m;
   S.duz = m
     ? structuredClone(m)
-    : modelOlustur(crypto.randomUUID(), null, { durum: "tohum", etiketler: [], klasor: S.konum });
+    : modelOlustur(crypto.randomUUID(), null, {
+        durum: secenek.durum || "gelen",
+        kategori: secenek.tur || "genel",
+        tarih: secenek.tarih || "",
+        etiketler: [],
+        klasor: S.gorunum === "klasor" ? S.konum : null,
+      });
   S.otoBaslik = !m && secenek.otoBaslik ? secenek.otoBaslik : "";
   if (S.otoBaslik) S.duz.baslik = S.otoBaslik;
   S.kirli = false;
 
   $("nt-baslik").value = S.duz.baslik;
+  baslikBoyutla();
   $("nt-etiketler").value = S.duz.etiketler.join(", ");
   editoreIcerikKur(S.duz);
-  klasorSecenekleriDoldur($("nt-klasor-sec"), { secili: klasorVarMi(S.duz.klasor) ? S.duz.klasor : null, kok: "🏠 Ana klasör" });
-  document.querySelector(`input[name="nt-durum"][value="${S.duz.durum}"]`).checked = true;
-  $("nt-sil-btn").hidden = S.duzYeni || !!S.duz.silindiAt;
-  $("nt-donustur-btn").hidden = S.duzYeni || !!S.duz.silindiAt;
-  $("nt-detay").open = !!(S.duz.alintilar.length || S.duz.ekler.length || S.duz.etiketler.length);
+  klasorSecenekleriDoldur($("nt-klasor-sec"), { secili: klasorVarMi(S.duz.klasor) ? S.duz.klasor : null, kok: "Ana klasör" });
+  $("nt-tur-sec").value = S.duz.kategori;
+  $("nt-durum-sec").value = S.duz.durum;
+  $("nt-tarih").value = S.duz.tarih;
+  $("nt-editor-menu-btn").hidden = S.duzYeni;
   durumYaz(S.duzYeni ? "Yeni not — yazmaya başla, kendiliğinden kaydedilir." : `Son güncelleme: ${tarihYaz(S.duz.guncelleme)}`);
 
   alintilariCiz();
   eklerCiz();
+  $("nt-alinti-detay").open = !!S.duz.alintilar.length;
+  $("nt-ek-detay").open = !!S.duz.ekler.length;
   $("nt-editor").hidden = false;
-  $("nt-duzen").classList.add("nt-editor-acik");
+  $("nt-bos-editor").hidden = true;
+  panelGoster("editor");
   sozcukGuncelle();
   araciGuncelle();
+  if (secenek.sablon) sablonEkle(secenek.sablon);
   if (secenek.govdeyeOdak) {
     yazi().focus();
     imleciSonaTasi();
-  } else $("nt-baslik").focus();
+  } else if (!m && !secenek.sablon) $("nt-baslik").focus();
   listeyiCiz();
-  if (window.matchMedia("(max-width: 900px)").matches) $("nt-editor").scrollIntoView({ behavior: "smooth", block: "start" });
+  $("nt-editor").scrollTop = 0;
 }
 
 async function duzenleyiciKapat() {
@@ -1772,7 +2226,9 @@ async function duzenleyiciKapat() {
   S.kirli = false;
   blobUrlleriniBirak();
   $("nt-editor").hidden = true;
-  $("nt-duzen").classList.remove("nt-editor-acik");
+  $("nt-bos-editor").hidden = false;
+  odakAcKapa(false);
+  panelGoster("liste");
   listeyiCiz();
 }
 
@@ -1782,14 +2238,16 @@ function formuOku() {
     ...new Set(
       $("nt-etiketler")
         .value.split(",")
-        .map((e) => e.trim().replace(/\s+/g, " "))
+        .map((e) => e.trim().replace(/^#/, "").replace(/\s+/g, " "))
         .filter(Boolean)
         .slice(0, 20)
     ),
   ];
   S.duz.html = Bicim.duzenleyiciHtml(yazi());
   S.duz.govde = Bicim.htmlMarkdown(S.duz.html);
-  S.duz.durum = document.querySelector('input[name="nt-durum"]:checked')?.value || "tohum";
+  S.duz.durum = $("nt-durum-sec").value in DURUMLAR ? $("nt-durum-sec").value : "gelen";
+  S.duz.kategori = $("nt-tur-sec").value in TURLER ? $("nt-tur-sec").value : "genel";
+  S.duz.tarih = $("nt-tarih").value || "";
   S.duz.klasor = $("nt-klasor-sec").value || null;
   return S.duz;
 }
@@ -1806,7 +2264,7 @@ async function kaydet({ sessiz = false } = {}) {
 
   clearTimeout(S.otoKayitZamanlayici);
   S.kaydediliyor = true;
-  durumYaz("🔐 Şifreleniyor ve kaydediliyor…");
+  durumYaz("Şifreleniyor ve kaydediliyor…");
   const kaydedilecek = structuredClone(m);
   try {
     const sonuc = await modeliKaydet(kaydedilecek, S.duzYeni).catch(async (h) => {
@@ -1818,12 +2276,11 @@ async function kaydet({ sessiz = false } = {}) {
       S.duz.guncelleme = sonuc.guncelleme;
       S.duz.olusturma = sonuc.olusturma;
       S.duzYeni = false;
-      $("nt-sil-btn").hidden = false;
-      $("nt-donustur-btn").hidden = false;
+      $("nt-editor-menu-btn").hidden = false;
     }
     haritayaIsle(sonuc);
     S.kirli = false;
-    durumYaz(`Kaydedildi ✓ ${saatYaz()} · uçtan uca şifreli`);
+    durumYaz(`Kaydedildi ${saatYaz()} · uçtan uca şifreli`);
     etiketFiltresiniDoldur();
     listeyiCiz();
 
@@ -1834,7 +2291,7 @@ async function kaydet({ sessiz = false } = {}) {
     if (!sessiz) bildir("Not şifrelenip kaydedildi.");
   } catch (h) {
     console.error(h);
-    durumYaz("⚠️ Kaydedilemedi");
+    durumYaz("Kaydedilemedi");
     bildir("Not kaydedilemedi: " + (h.message || h), "error");
   } finally {
     S.kaydediliyor = false;
@@ -1846,6 +2303,7 @@ async function kaydet({ sessiz = false } = {}) {
 }
 
 function alintilariCiz() {
+  detayBasliklari();
   const kap = $("nt-alintilar");
   kap.replaceChildren();
   S.duz.alintilar.forEach((a, i) => {
@@ -2155,17 +2613,7 @@ async function kasaVarMi() {
 async function kilitle(sebep) {
   if (S.kirli) await kaydet({ sessiz: true }).catch(() => {});
   await Kasa.kilitle();
-  S.notlar.clear();
-  S.klasorler.clear();
-  S.konum = null;
-  menuKapat();
-  S.duz = null;
-  S.kirli = false;
-  blobUrlleriniBirak();
-  $("nt-liste").replaceChildren();
-  $("nt-klasorler").replaceChildren();
-  $("nt-editor").hidden = true;
-  $("nt-duzen").classList.remove("nt-editor-acik");
+  arayuzuSifirla();
   kilitKartiniHazirla({ kasaVar: true, kurtarmaGerekli: false });
   if (sebep) bildir(sebep, "success");
 }
@@ -2208,19 +2656,6 @@ async function sifreliYedekIndir() {
   bildir("Şifreli yedek indirildi. Parolan ya da kurtarma anahtarın olmadan açılamaz.");
 }
 
-function okunurYedekIndir() {
-  if (!window.confirm("Bu dosya notlarını ŞİFRESİZ, düz metin olarak içerecek. Yalnızca güvendiğin bir yerde sakla. Devam edilsin mi?")) return;
-  const canli = [...S.notlar.values()].filter((m) => !m.silindiAt).sort((a, b) => a.baslik.localeCompare(b.baslik, "tr"));
-  const metin = canli
-    .map((m) => {
-      const parcalar = [`# ${m.baslik || "Başlıksız not"}`, `Klasör: ${yolMetni(m.klasor) || "-"} · Durum: ${DURUMLAR[m.durum].ad} · Etiketler: ${m.etiketler.join(", ") || "-"}`, "", m.govde];
-      m.alintilar.forEach((a, i) => parcalar.push("", `> ${a.alinti.replaceAll("\n", "\n> ")}`, `> — ${a.kaynak} ${a.sayfa}`.trim(), a.yorum ? `\nYorumum: ${a.yorum}` : ""));
-      return parcalar.join("\n");
-    })
-    .join("\n\n---\n\n");
-  dosyaIndir(`notlar-okunur-yedek-${new Date().toISOString().slice(0, 10)}.md`, metin, "text/markdown");
-}
-
 async function kurtarmaAnahtariniYenile() {
   if (!window.confirm("Yeni bir kurtarma anahtarı üretilecek; ESKİSİ GEÇERSİZ olacak. Devam edilsin mi?")) return;
   try {
@@ -2231,10 +2666,87 @@ async function kurtarmaAnahtariniYenile() {
 }
 
 /* ------------------------------------------------------------------ */
+/* 12b) Dışa aktarma (PDF · Word · Markdown · HTML · metin · ZIP)      */
+/* ------------------------------------------------------------------ */
+
+function kayitaCevir(m) {
+  const yol = yolDizisi(notKlasoru(m));
+  let html = m.html || "";
+  let govde = m.govde || "";
+  if (!html.trim() && govde.trim()) {
+    const g = document.createElement("div");
+    Bicim.markdownKur(govde, g);
+    html = Bicim.duzenleyiciHtml(g);
+  } else if (html.trim() && !govde.trim()) govde = Bicim.htmlMarkdown(html);
+  return {
+    id: m.id,
+    baslik: m.baslik,
+    klasorYolu: yol.map((k) => k.ad),
+    klasorTarihleri: yol.map((k) => k.guncelleme),
+    olusturma: m.olusturma,
+    guncelleme: m.guncelleme,
+    tarih: m.tarih,
+    kategori: m.kategori,
+    durum: m.durum,
+    etiketler: m.etiketler,
+    html,
+    govde,
+    alintilar: m.alintilar,
+    ekler: m.ekler,
+  };
+}
+
+const klasorKaydi = (k) => ({ yol: yolDizisi(k.id).map((x) => x.ad), guncelleme: k.guncelleme });
+
+/** baslangic: "bu" | "secili" | "klasor" | "gorunen" | "tum"; oge: not ya da klasör. */
+async function disaAktarAc(baslangic = "tum", oge = null) {
+  if (S.kirli) await kaydet({ sessiz: true });
+  const Aktar = await import("./disa-aktar/disa-aktar.js");
+
+  const canli = () => [...S.notlar.values()].filter((m) => !m.silindiAt);
+  const sirali = (l) => l.sort((a, b) => a.olusturma.localeCompare(b.olusturma));
+  const kapsamlar = [];
+  const ekle = (id, ad, notlarFn, klasorlerFn, paketAdi) => {
+    const n = notlarFn();
+    kapsamlar.push({ id, ad, sayi: n.length, ekVar: n.some((m) => m.ekler.length), kayitlar: () => sirali(notlarFn()).map(kayitaCevir), klasorler: klasorlerFn, paketAdi });
+  };
+
+  if (oge && oge.tur !== "klasor") ekle("bu", `Bu not: ${oge.baslik || "Başlıksız not"}`, () => [S.notlar.get(oge.id) || oge], null, oge.baslik);
+  if (S.secim.size) ekle("secili", "Seçili notlar", () => secilenNotlar(), null, "Seçili notlar");
+  const klasor = oge?.tur === "klasor" ? oge : S.gorunum === "klasor" ? S.klasorler.get(S.konum) : null;
+  if (klasor) {
+    ekle("klasor", `Klasör: ${klasor.ad} (alt klasörlerle)`, () => altAgac(klasor).notlar, () => altAgac(klasor).klasorler.map(klasorKaydi), klasor.ad);
+  }
+  if (S.gorunum !== "tum" || filtreAktifMi()) ekle("gorunen", "Şu an listelenenler", () => filtrelenmisNotlar().liste.filter((m) => !m.silindiAt), null, listeBasligi());
+  ekle("tum", "Tüm notlar (arşiv dahil)", canli, () => [...S.klasorler.values()].filter((k) => !k.silindiAt).map(klasorKaydi), "Notlarım");
+
+  const secilen = kapsamlar.find((k) => k.id === baslangic && k.sayi) || kapsamlar.find((k) => k.sayi) || kapsamlar[0];
+  const meta = S.session?.user?.user_metadata || {};
+  const ctx = {
+    turAdi: (k) => TURLER[k]?.ad || "Genel",
+    durumAdi: (d) => DURUMLAR[d]?.ad || d,
+    yazar: meta.full_name || meta.name || "",
+    temizHtml: (h) => {
+      const d = document.createElement("div");
+      Bicim.htmlKur(h, d);
+      return d.innerHTML; // yalnızca OKUMA: beyaz listeyle yeniden kurulmuş ağaç
+    },
+    ekBayt: async (ek) => {
+      const yanit = await ekIstegi("GET", ek.anahtar);
+      return new Uint8Array(await Kasa.ekiCoz(await yanit.arrayBuffer(), ek.anahtar));
+    },
+  };
+  await Aktar.disaAktarDiyalogu({ kapsamlar, ctx, baslangic: { kapsam: secilen.id, bicimler: ["pdf"] }, kok: $("notlar"), bildir });
+}
+
+/* ------------------------------------------------------------------ */
 /* 13) Olay bağlama                                                    */
 /* ------------------------------------------------------------------ */
 
 function baglantilariKur() {
+  ikonlariKur($("notlar"));
+  filtreSecenekleriniKur();
+
   // Arama (anlık, 90 ms sönümleme)
   let aramaT;
   $("nt-arama").addEventListener("input", (o) => {
@@ -2246,6 +2758,15 @@ function baglantilariKur() {
       listeyiCiz();
     }, 90);
   });
+  $("nt-arama").addEventListener("keydown", (o) => {
+    if (o.key === "Escape" && $("nt-arama").value) {
+      o.stopPropagation();
+      $("nt-arama-temizle").click();
+    } else if (o.key === "ArrowDown") {
+      o.preventDefault();
+      $("nt-liste").querySelector(".nt-satir-ana")?.focus();
+    }
+  });
   $("nt-arama-temizle").addEventListener("click", () => {
     $("nt-arama").value = "";
     S.filtre.arama = "";
@@ -2254,36 +2775,119 @@ function baglantilariKur() {
     $("nt-arama").focus();
   });
 
-  // Filtreler
-  $("nt-durum-chips").addEventListener("click", (o) => {
-    const b = o.target.closest("[data-durum]");
-    if (!b) return;
-    durumSec(b.dataset.durum);
-    S.gorunenSayi = SAYFA_BOYUTU;
-    listeyiCiz();
-  });
-  $("nt-etiket-filtre").addEventListener("change", (o) => {
-    S.filtre.etiket = o.target.value;
-    S.gorunenSayi = SAYFA_BOYUTU;
-    listeyiCiz();
-  });
+  // Süzgeçler
+  const suz = (id, anahtar) =>
+    $(id).addEventListener("change", (o) => {
+      S.filtre[anahtar] = o.target.value;
+      S.gorunenSayi = SAYFA_BOYUTU;
+      listeyiCiz();
+    });
+  suz("nt-durum-filtre", "durum");
+  suz("nt-tur-filtre", "tur");
+  suz("nt-etiket-filtre", "etiket");
+  suz("nt-sirala", "sirala");
 
-  $("nt-yeni-btn").addEventListener("click", () => duzenleyiciAc(null));
+  // Üst çubuk
   $("nt-hizli-btn").addEventListener("click", hizliNot);
-  $("nt-klasor-btn").addEventListener("click", () => klasorOlustur(S.konum));
-  $("nt-genis-btn").addEventListener("click", () => {
-    S.genis = !S.genis;
-    $("nt-duzen").classList.toggle("nt-genis", S.genis);
-    $("nt-genis-btn").setAttribute("aria-pressed", String(S.genis));
-    $("nt-genis-btn").textContent = S.genis ? "⤡ Listeyi göster" : "⤢ Geniş";
+  $("nt-yeni-menu-btn").addEventListener("click", (o) => {
+    o.stopPropagation();
+    if (S.menu && S.menuBagla === o.currentTarget) return menuKapat();
+    yeniNotMenusu(o.currentTarget);
+  });
+  $("nt-aktar-btn").addEventListener("click", () => {
+    const acik = S.duz ? S.notlar.get(S.duz.id) : null;
+    if (acik) return disaAktarAc("bu", acik);
+    disaAktarAc(S.secim.size ? "secili" : S.gorunum === "klasor" ? "klasor" : filtreAktifMi() || S.gorunum !== "tum" ? "gorunen" : "tum");
+  });
+  $("nt-daha-btn").addEventListener("click", (o) => {
+    o.stopPropagation();
+    if (S.menu && S.menuBagla === o.currentTarget) return menuKapat();
+    dahaMenusu(o.currentTarget);
+  });
+  $("nt-klasor-btn").addEventListener("click", () => klasorOlustur(S.gorunum === "klasor" ? S.konum : null));
+  $("nt-nav-btn").addEventListener("click", () => navAc(!$("nt-duzen").classList.contains("nt-nav-acik")));
+  $("nt-nav-perde").addEventListener("click", navKapat);
+  $("nt-odak-btn").addEventListener("click", () => odakAcKapa());
+  $("nt-editor-menu-btn").addEventListener("click", (o) => {
+    o.stopPropagation();
+    if (S.menu && S.menuBagla === o.currentTarget) return menuKapat();
+    editorMenusu(o.currentTarget);
   });
 
-  // Klasör menüsü: dışarı tıklayınca / Esc ile kapanır
+  // Çoklu seçim
+  $("nt-sec-btn").addEventListener("click", () => secimModuAyarla(!S.secimModu));
+  $("nt-secim-hepsi").addEventListener("click", gorunenleriSec);
+  $("nt-secim-aktar").addEventListener("click", () => disaAktarAc("secili"));
+  $("nt-secim-tasi").addEventListener("click", topluTasi);
+  $("nt-secim-cop").addEventListener("click", topluCope);
+  $("nt-secim-durum").addEventListener("click", (o) => {
+    o.stopPropagation();
+    if (S.menu && S.menuBagla === o.currentTarget) return menuKapat();
+    menuAc(o.currentTarget, Object.entries(DURUMLAR).map(([k, v]) => ({ ad: `${v.ad} yap`, islem: () => topluDurum(k) })));
+  });
+
+  // Başlık: tek satırlık anlam (Enter gövdeye geçer), uzun başlık sarılır
+  $("nt-baslik").addEventListener("keydown", (o) => {
+    if (o.key === "Enter") {
+      o.preventDefault();
+      yazi().focus();
+    }
+  });
+  $("nt-baslik").addEventListener("input", (o) => {
+    if (/[\r\n]/.test(o.target.value)) o.target.value = o.target.value.replace(/\s*[\r\n]+\s*/g, " ");
+    baslikBoyutla();
+  });
+  window.addEventListener("resize", () => !$("nt-editor").hidden && baslikBoyutla());
+
+  // Listede ok tuşlarıyla gezinme
+  $("nt-liste").addEventListener("keydown", (o) => {
+    if (o.key !== "ArrowDown" && o.key !== "ArrowUp") return;
+    const dugmeler = [...$("nt-liste").querySelectorAll(".nt-satir-ana")];
+    const i = dugmeler.indexOf(document.activeElement);
+    if (i < 0) return;
+    o.preventDefault();
+    if (o.key === "ArrowUp" && i === 0) return $("nt-arama").focus();
+    dugmeler[Math.min(dugmeler.length - 1, Math.max(0, i + (o.key === "ArrowDown" ? 1 : -1)))].focus();
+  });
+
+  // Menüler: dışarı tıklayınca / kaydırınca kapanır
   document.addEventListener("click", (o) => {
     if (S.menu && !S.menu.contains(o.target)) menuKapat();
   });
+  document.addEventListener("scroll", () => S.menu && menuKapat(), true);
+  window.addEventListener("resize", () => {
+    menuKapat();
+    if (window.innerWidth >= 1280) navKapat();
+  });
   document.addEventListener("keydown", (o) => {
-    if (o.key === "Escape") menuKapat();
+    if (o.key !== "Escape" || o.defaultPrevented) return;
+    if (S.menu) return menuKapat();
+    if ($("nt-duzen").classList.contains("nt-nav-acik")) return navKapat();
+    if (S.secimModu && $("nt-ana") && !$("nt-ana").hidden) secimModuAyarla(false);
+  });
+
+  // Kasa penceresi
+  $("nt-kasa-kapat").addEventListener("click", () => $("nt-kasa-dlg").close());
+  $("nt-yenile-btn").addEventListener("click", () => {
+    $("nt-kasa-dlg").close();
+    notlariYukle().catch((h) => bildir("Yenilenemedi: " + h.message, "error"));
+  });
+  $("nt-kilitle-btn").addEventListener("click", () => {
+    $("nt-kasa-dlg").close();
+    kilitle("Kasa kilitlendi; bu cihazdaki anahtar silindi.");
+  });
+  $("nt-otokilit").addEventListener("change", (o) => {
+    try {
+      localStorage.setItem("aea_nt_otokilit", o.target.value);
+    } catch {
+      /* depo kapalı */
+    }
+    otoKilidiKur();
+  });
+  $("nt-yedek-sifreli-btn").addEventListener("click", sifreliYedekIndir);
+  $("nt-kurtarma-yenile-btn").addEventListener("click", () => {
+    $("nt-kasa-dlg").close();
+    kurtarmaAnahtariniYenile();
   });
 
   // Zengin metin editörü
@@ -2318,20 +2922,6 @@ function baglantilariKur() {
     }
   });
   document.addEventListener("selectionchange", araciGuncelle);
-  $("nt-yenile-btn").addEventListener("click", () => notlariYukle().catch((h) => bildir("Yenilenemedi: " + h.message, "error")));
-  $("nt-kilitle-btn").addEventListener("click", () => kilitle("Kasa kilitlendi; bu cihazdaki anahtar silindi."));
-  $("nt-otokilit").addEventListener("change", (o) => {
-    try {
-      localStorage.setItem("aea_nt_otokilit", o.target.value);
-    } catch {
-      /* depo kapalı */
-    }
-    otoKilidiKur();
-  });
-  $("nt-yedek-sifreli-btn").addEventListener("click", sifreliYedekIndir);
-  $("nt-yedek-okunur-btn").addEventListener("click", okunurYedekIndir);
-  $("nt-kurtarma-yenile-btn").addEventListener("click", kurtarmaAnahtariniYenile);
-
   // Kilit / kurtarma
   $("nt-kilit-form").addEventListener("submit", kilitFormuGonderildi);
   $("nt-kurtarma-toggle").addEventListener("click", () => {
@@ -2384,19 +2974,6 @@ function baglantilariKur() {
     kirlendi();
     $("nt-alintilar").lastElementChild?.querySelector("textarea")?.focus();
   });
-  $("nt-sil-btn").addEventListener("click", async () => {
-    const m = S.duz;
-    if (!m || !window.confirm("Bu not çöp kutusuna taşınsın mı? Çöpteki notlar sen silene kadar durur; istediğin an geri alabilirsin.")) return;
-    if (S.kirli) await kaydet({ sessiz: true });
-    S.kirli = false;
-    await copeAt(S.notlar.get(m.id) || m);
-    await duzenleyiciKapat();
-  });
-  $("nt-donustur-btn").addEventListener("click", async () => {
-    if (S.kirli) await kaydet({ sessiz: true });
-    yaziyaDonustur(S.notlar.get(S.duz.id) || S.duz);
-  });
-
   // Sürükle-bırak
   const birak = $("nt-birak");
   for (const ad of ["dragenter", "dragover"]) {
@@ -2447,11 +3024,18 @@ function baglantilariKur() {
     }
   });
   document.addEventListener("keydown", (o) => {
-    const yaziyor = /^(input|textarea|select)$/i.test(document.activeElement?.tagName || "");
-    const gorunur = $("nt-ana") && !$("nt-ana").hidden && !$("view-content-notlar").hidden;
-    if (o.key === "/" && !yaziyor && gorunur) {
+    const gorunur = $("nt-ana") && !$("nt-ana").hidden && $("view-content-notlar") && !$("view-content-notlar").hidden;
+    if (!gorunur) return;
+    const yaziyor = /^(input|textarea|select)$/i.test(document.activeElement?.tagName || "") || document.activeElement?.isContentEditable;
+    if (o.key === "/" && !yaziyor && !o.ctrlKey && !o.metaKey) {
       o.preventDefault();
       $("nt-arama").focus();
+    } else if ((o.key === "n" || o.key === "N") && !yaziyor && !o.ctrlKey && !o.metaKey && !o.altKey && !document.querySelector("dialog[open]")) {
+      o.preventDefault();
+      hizliNot();
+    } else if ((o.ctrlKey || o.metaKey) && o.shiftKey && o.key.toLowerCase() === "f" && !$("nt-editor").hidden) {
+      o.preventDefault();
+      odakAcKapa();
     }
   });
   document.addEventListener("visibilitychange", () => {
@@ -2486,7 +3070,7 @@ async function init() {
       el(
         "div",
         { class: "nt-kilit" },
-        el("h2", { text: "🔒 Fikir & Araştırma Tezgâhı hesabın için etkin değil" }),
+        el("h2", { text: "🔒 Notlarım hesabın için etkin değil" }),
         el("p", {
           class: "muted",
           text:
