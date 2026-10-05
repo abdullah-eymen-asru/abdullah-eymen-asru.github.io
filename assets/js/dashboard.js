@@ -53,7 +53,7 @@ const MODULES = {
   guvenlik: { src: "./admin-guvenlik.js", role: "admin" },
   izleme: { src: "./izleme-okuma-yonetim/izleme-okuma-yonetim.js", role: "owner" },
   mesajlar: { src: "./mesajlar.js", role: null },
-  // Fikir & Araştırma Tezgâhı (uçtan uca şifreli not sistemi) — yayıncılık akışındaki
+  // Notlarım (uçtan uca şifreli not sistemi) — yayıncılık akışındaki
   // roller (editor/manager; admin ve owner otomatik geçer). SQL: not_modulu_yetkili().
   notlar: { src: "./notlar/notlar.js", role: ["editor", "manager"] },
   // R2 Dosya Yöneticisi: sekme görünürlüğü role DEĞİL, r2_arsiv_yetkilerim() izinlerine bağlı
@@ -97,7 +97,7 @@ const NAV = [
       // defaultAcilis:false -> owner bir üyeye modülü açtığında o üyenin giriş sonrası varsayılan sekmesi
       // (adreste # yokken) değişmesin; notlar kendiliğinden açılmasın. Editor/manager/admin için
       // varsayılan açılış zaten daha önceki "içerik" sekmeleridir, onlar değişmez.
-      { id: "content-notlar", icon: "🌱", label: "Fikir & Araştırma Tezgâhı", module: "notlar", defaultAcilis: false },
+      { id: "content-notlar", icon: "🗒️", label: "Notlarım", module: "notlar", defaultAcilis: false },
       // role override: admin modülü (MODULES.admin) editor'e AÇILMAZ (sys-hesabim gibi sekmeler admin/manager
       // kalsın); bu iki sekme ise Yetki Ayarları'nda editor için de açılıp kapanır (migration 0066).
       // ozellik: owner kapattıysa (admin/manager/editor fark etmez) sekme hiç çizilmez; gerçek sınır RLS + worker.
@@ -718,7 +718,7 @@ async function init() {
 
   profile.izinler = await izinleriYukle(profile.role);
 
-  // Fikir & Araştırma Tezgâhı: erişimi owner belirler (migration 0059/0060, Yetki Ayarları).
+  // Notlarım: erişimi owner belirler (migration 0059/0060, Yetki Ayarları).
   // Karar TEK yerden gelir: veritabanındaki not_modulu_yetkili(). Menüyü kuran mevcut kurala
   // (gorunurMu -> roleAllowed(itemRole)) dokunmuyoruz; sadece modülün rolünü duruma göre ayarlıyoruz:
   //   - rol kuralı "evet" ama owner kapatmış  -> role:"owner" (owner dışında herkesi, admin dahil, eler)
