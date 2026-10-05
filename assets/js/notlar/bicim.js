@@ -342,18 +342,21 @@ export function markdownKur(md, hedef) {
 /* ------------------------------------------------------------------ */
 
 export const SABLONLAR = {
-  ders: { ad: "Ders notu", parcalar: [["h3", "Konu"], ["p", ""], ["h3", "Anahtar kavramlar"], ["ul", ["", ""]], ["h3", "Notlar"], ["p", ""], ["h3", "Anlamadıklarım"], ["ul", [""]], ["h3", "Kısa özet"], ["p", ""]] },
-  etkinlik: { ad: "Panel / etkinlik", parcalar: [["h3", "Konuşmacı ve konu"], ["p", ""], ["h3", "Öne çıkanlar"], ["ul", ["", ""]], ["h3", "Not alınacak cümleler"], ["quote", ""], ["h3", "Takip"], ["gorev", [""]]] },
-  toplanti: { ad: "Toplantı", parcalar: [["h3", "Katılımcılar"], ["p", ""], ["h3", "Konuşulanlar"], ["ul", [""]], ["h3", "Kararlar"], ["ul", [""]], ["h3", "Yapılacaklar"], ["gorev", [""]]] },
-  kaynak: { ad: "Kitap / makale", parcalar: [["h3", "Künye"], ["p", ""], ["h3", "Ana argüman"], ["p", ""], ["h3", "Önemli alıntılar"], ["quote", ""], ["h3", "Kendi yorumum"], ["p", ""]] },
+  ders: { ad: "Ders notu", tur: "ders", parcalar: [["h3", "Konu"], ["p", ""], ["h3", "Anahtar kavramlar"], ["ul", ["", ""]], ["h3", "Notlar"], ["p", ""], ["h3", "Anlamadıklarım"], ["ul", [""]], ["h3", "Kısa özet"], ["p", ""]] },
+  sunum: { ad: "Sunum", tur: "sunum", parcalar: [["h3", "Amaç ve dinleyici"], ["p", ""], ["h3", "Akış"], ["ol", ["", "", ""]], ["h3", "Ana mesajlar"], ["ul", ["", ""]], ["h3", "Konuşma notları"], ["p", ""], ["h3", "Kaynaklar"], ["ul", [""]], ["h3", "Hazırlık"], ["gorev", ["Slaytları bitir", "Prova yap"]]] },
+  proje: { ad: "Proje", tur: "proje", parcalar: [["h3", "Özet"], ["p", ""], ["h3", "Hedefler"], ["ul", ["", ""]], ["h3", "Aşamalar"], ["gorev", ["", ""]], ["h3", "Kaynaklar ve literatür"], ["ul", [""]], ["h3", "Açık sorular"], ["ul", [""]], ["h3", "Kararlar"], ["ul", [""]]] },
+  etkinlik: { ad: "Panel / etkinlik", tur: "etkinlik", parcalar: [["h3", "Konuşmacı ve konu"], ["p", ""], ["h3", "Öne çıkanlar"], ["ul", ["", ""]], ["h3", "Not alınacak cümleler"], ["quote", ""], ["h3", "Takip"], ["gorev", [""]]] },
+  toplanti: { ad: "Toplantı", tur: "toplanti", parcalar: [["h3", "Katılımcılar"], ["p", ""], ["h3", "Konuşulanlar"], ["ul", [""]], ["h3", "Kararlar"], ["ul", [""]], ["h3", "Yapılacaklar"], ["gorev", [""]]] },
+  kaynak: { ad: "Kitap / makale", tur: "kaynak", parcalar: [["h3", "Künye"], ["p", ""], ["h3", "Ana argüman"], ["p", ""], ["h3", "Önemli alıntılar"], ["quote", ""], ["h3", "Kendi yorumum"], ["p", ""]] },
+  fikir: { ad: "Fikir", tur: "fikir", parcalar: [["h3", "Fikir"], ["p", ""], ["h3", "Neden önemli?"], ["p", ""], ["h3", "Dayanak ve kaynaklar"], ["ul", [""]], ["h3", "Sonraki adım"], ["gorev", [""]]] },
 };
 
 export function sablonDugumleri(anahtar) {
   const s = SABLONLAR[anahtar];
   if (!s) return [];
   return s.parcalar.map(([tur, icerikDegeri]) => {
-    if (tur === "ul" || tur === "gorev") {
-      const u = yap("ul");
+    if (tur === "ul" || tur === "ol" || tur === "gorev") {
+      const u = yap(tur === "ol" ? "ol" : "ul");
       if (tur === "gorev") u.className = "nt-gorev";
       for (const m of icerikDegeri) {
         const li = yap("li");
