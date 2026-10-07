@@ -12,7 +12,7 @@
  * innerHTML YOK; inline style YOK (CSP). Görünüm mevcut .ya-* / .gk-p-* / .form-field
  * sınıflarından gelir.
  */
-import { supabase, showMessage, guncelKvkkSurumu } from "../core/supabase-client.js";
+import { supabase, showMessage, guncelKvkkSurumu, guncelOnaySurumleri } from "../core/supabase-client.js";
 
 const BICIM = /^v[0-9]{1,3}\.[0-9]{1,3}$/; // DB check kısıtıyla aynı
 
@@ -34,6 +34,65 @@ function sonrakiOneri(surum) {
   return m ? `v${m[1]}.${Number(m[2]) + 1}` : "v1.0";
 }
 
+/**
+ * "Açık Rıza Sürümü" bölümü (migration 0070): yurt dışı açık rıza metninin AYRI sürümü. Yükseltince, daha önce
+ * rıza vermiş üyelere bir sonraki girişte (kutusu işaretsiz) rızayı yeniden soran modal düşer.
+ */
+function rizaBolumu(satir, mesaj) {
+  if (satir.riza_surumu === undefined || satir.riza_surumu === null) {
+    return el("p", { class: "muted csp-mt-18", text: "Açık rıza için ayrı sürüm (0070 numaralı migration) henüz çalıştırılmamış görünüyor." });
+  }
+  let mevcut = satir.riza_surumu;
+  const verenler = Number(satir.riza_verenler);
+  const eski = Number(satir.riza_eski);
+  const mevcutMetin = el("strong", { text: mevcut });
+  const ozet = el("p", {
+    class: "muted",
+    text:
+      `${verenler} üye açık rıza vermiş; ${verenler - eski}'i bu sürümü onaylamış` +
+      (eski > 0 ? `, ${eski}'ine bir sonraki girişte rızayı yenileme modalı çıkacak.` : "."),
+  });
+  const girdi = el("input", { type: "text", id: "riza-surum-girdi", maxlength: "8", autocomplete: "off", spellcheck: "false", placeholder: sonrakiOneri(mevcut), "aria-label": "Yeni açık rıza sürüm etiketi" });
+  const btn = el("button", { type: "button", id: "riza-surum-kaydet", class: "btn-primary csp-w-auto", text: "Açık Rıza Sürümünü Yayınla" });
+  btn.addEventListener("click", async () => {
+    const yeni = girdi.value.trim();
+    if (!BICIM.test(yeni)) return showMessage(mesaj, 'Sürüm "v1.2" biçiminde olmalı (v + sayı + nokta + sayı).', "error");
+    if (yeni === mevcut) return showMessage(mesaj, "Bu zaten yürürlükteki açık rıza sürümü.", "error");
+    if (!window.confirm(`Açık rıza sürümü ${mevcut} -> ${yeni} olacak.\n\nŞu an rıza vermiş ${verenler} üyenin hepsi bir sonraki girişte rızayı yeniden verme/geri çekme ekranını görecek. Açık rıza metnini ÖNCE yayınladığından emin ol. Devam edilsin mi?`)) return;
+    btn.disabled = true;
+    try {
+      const { data, error } = await supabase.rpc("riza_surumunu_degistir", { p_surum: yeni });
+      if (error) throw error;
+      if (!data) throw new Error("Sürüm güncellenmedi.");
+      mevcut = data;
+      await guncelOnaySurumleri({ yenile: true });
+      mevcutMetin.textContent = mevcut;
+      girdi.value = "";
+      girdi.placeholder = sonrakiOneri(mevcut);
+      showMessage(mesaj, `Kaydedildi: yürürlükteki açık rıza sürümü ${mevcut}. Deploy gerekmez.`, "success");
+    } catch (hata) {
+      showMessage(mesaj, `Kaydedilemedi: ${hata.message || hata}`, "error");
+    } finally {
+      btn.disabled = false;
+    }
+  });
+  return el(
+    "div",
+    { class: "csp-mt-18" },
+    el("h3", { text: "Açık Rıza Sürümü" }),
+    el("p", {}, "Yürürlükteki açık rıza sürümü: ", mevcutMetin),
+    ozet,
+    el("div", { class: "form-field csp-mt-16" }, el("label", { for: "riza-surum-girdi", text: "Yeni açık rıza sürüm etiketi" }), girdi),
+    el("div", { class: "csp-flex-gap10-wrap csp-mt-12" }, btn),
+    el("p", {
+      class: "gy-yardim-metni",
+      text:
+        "Aydınlatma sürümünden BAĞIMSIZDIR: yalnızca açık rıza metni değiştiğinde bunu yükselt. Rıza, üyelik şartı değildir; " +
+        "modalda kutu işaretsiz gelir, işaretlemeden devam eden üyenin rızası geri çekilmiş sayılır.",
+    })
+  );
+}
+
 async function kur() {
   const kok = document.getElementById("kvkk-surum-kok");
   const mesaj = document.getElementById("kvkk-surum-mesaj");
@@ -48,7 +107,7 @@ async function kur() {
       el("p", {
         class: "muted",
         text: yok || (!error && !satir)
-          ? "0064 ve 0065 numaralı KVKK migration'ları henüz çalıştırılmamış görünüyor: dosyaları SQL Editor'de çalıştır."
+          ? "0064, 0065 ve 0070 numaralı KVKK migration'ları henüz çalıştırılmamış görünüyor: dosyaları SQL Editor'de çalıştır."
           : `Yüklenemedi: ${error.message}`,
       })
     );
@@ -185,6 +244,7 @@ async function kur() {
         "Sadece yazım düzeltmesi için sürümü değiştirme; her değişiklik tüm üyelere yeniden onay ekranı gösterir. " +
         "Onay damgasını tarayıcı değil veritabanı yazar; sürüm okunamazsa kimse kilitlenmez.",
     }),
+    rizaBolumu(satir, mesaj),
     yetkiBolumu
   );
 }
