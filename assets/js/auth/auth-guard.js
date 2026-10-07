@@ -17,7 +17,7 @@
  *       document.getElementById('app').hidden = false;
  *     </script>
  */
-import { supabase, guncelKvkkSurumu } from "../core/supabase-client.js";
+import { supabase, guncelOnaySurumleri } from "../core/supabase-client.js";
 
 /**
  * @param {Object} opts
@@ -135,10 +135,14 @@ export async function requireAuth({ role = null, redirectTo = "/hesap/giris.html
   // dışı rızasına HİÇ dokunmaz.
   // Güncel sürüm site_ayarlari'ndan gelir (migration 0064). Okunamazsa (null)
   // kullanıcı kilitlenmez; bağlayıcı olan damga zaten DB'de (kvkk_onayini_ver).
-  const guncelSurum = await guncelKvkkSurumu();
-  if (guncelSurum && profile.kvkk_onay_versiyonu !== guncelSurum) {
-    await kvkkRizaYenilemeModaliniGosterVeBekle(profile, guncelSurum);
-  }
+  // AÇIK RIZA ENTEGRASYONU (migration 0070): Aydınlatma Metni (kvkk_onay_*) ve yurt dışı açık rıza metni
+  // (yurtdisi_onay_*) artık AYRI sürüm etiketleri taşır ama TEK modal akışından geçer:
+  //   - Aydınlatma sürümü eskiyse  -> ekranı kilitleyen "okudum" onayı (eskisi gibi),
+  //   - Açık rıza sürümü eskiyse   -> YALNIZCA daha önce rıza vermiş üyeye, kutu İŞARETSİZ gelir
+  //     (paket rıza yasağı: işaretlemek serbest, rıza üyelik şartı DEĞİL; işaretlemezse rıza geri çekilir).
+  // Sürümler okunamazsa (null) kimse kilitlenmez; bağlayıcı damgayı DB yazar (kvkk_onayini_ver + tetikleyici).
+  await onayModaliniGerekirseGoster(profile);
+  onayYenidenDenetimiKur(profile);
 
   // BUG FİX: bu kontrol öncesinde SADECE role==='special_user' özel olarak
   // ele alınıyordu (zaten yukarıdaki profile.role === role satırı bunu
@@ -246,31 +250,69 @@ function redirectWithReturnUrl(target) {
   window.location.replace(url.toString());
 }
 
+/** Hangi onaylar eski? (sürüm okunamadıysa ilgili onay "güncel" sayılır → kimse yanlışlıkla kilitlenmez) */
+function onayDurumu(profile, surumler) {
+  return {
+    aydinlatmaEski: !!surumler.kvkk && profile.kvkk_onay_versiyonu !== surumler.kvkk,
+    rizaEski: !!surumler.riza && profile.yurtdisi_onay_verildi === true && profile.yurtdisi_onay_versiyonu !== surumler.riza,
+  };
+}
+
+let _onayModaliAcik = false;
+
+async function onayModaliniGerekirseGoster(profile) {
+  if (_onayModaliAcik) return;
+  const surumler = await guncelOnaySurumleri();
+  const durum = onayDurumu(profile, surumler);
+  if (!durum.aydinlatmaEski && !durum.rizaEski) return;
+  _onayModaliAcik = true;
+  try {
+    await onayYenilemeModaliniGosterVeBekle(profile, surumler, durum);
+  } finally {
+    _onayModaliAcik = false;
+  }
+}
+
 /**
- * Ekranı kilitleyen "Rıza Yenileme" modalı. DOM'a tamamen JS ile eklenir
- * (CSP: inline script/style/onclick YOK — tüm stil assets/css/kvkk-modal.css
- * dosyasındaki sınıflar üzerinden, tüm etkileşim addEventListener ile).
- *
- * Döndürdüğü promise, kullanıcı "Onayla"ya basıp rıza veritabanına
- * yazılana kadar RESOLVE OLMAZ. "Reddet / Çıkış Yap" seçilirse
- * supabase.auth.signOut() çalıştırılıp ana sayfaya yönlendirilir ve —
- * requireAuth() içindeki diğer redirect'lerle tutarlı olarak — promise
- * KASITLI OLARAK hiç resolve edilmez (sayfa zaten terk ediliyor, geri
- * kalan sayfa script'inin çalışmaya devam etmesine gerek yok).
- *
- * @param {{id:string, kvkk_onay_versiyonu:string|null}} profile
- * @param {string} guncelSurum site_ayarlari.guncel_kvkk_surumu
- * @returns {Promise<void>}
+ * Uzun süre açık kalan sekmede de sürüm yükseltmesi yakalansın: sekme tekrar görünür olunca (en çok 5 dakikada bir)
+ * sürümler ve profilin onay kolonları DB'den tazelenir; eski onay varsa modal yeniden düşer.
  */
-function kvkkRizaYenilemeModaliniGosterVeBekle(profile, guncelSurum) {
+let _yenidenDenetimKuruldu = false;
+function onayYenidenDenetimiKur(profile) {
+  if (_yenidenDenetimKuruldu) return;
+  _yenidenDenetimKuruldu = true;
+  let son = Date.now();
+  document.addEventListener("visibilitychange", async () => {
+    if (document.visibilityState !== "visible" || _onayModaliAcik || Date.now() - son < 5 * 60 * 1000) return;
+    son = Date.now();
+    try {
+      await guncelOnaySurumleri({ yenile: true });
+      const { data } = await supabase
+        .from("profiles")
+        .select("kvkk_onay_verildi, kvkk_onay_versiyonu, kvkk_onay_tarihi, yurtdisi_onay_verildi, yurtdisi_onay_versiyonu, yurtdisi_onay_tarihi")
+        .eq("id", profile.id)
+        .single();
+      if (data) Object.assign(profile, data);
+      await onayModaliniGerekirseGoster(profile);
+    } catch (hata) {
+      console.error("Onay sürümü yeniden denetlenemedi:", hata);
+    }
+  });
+}
+
+/**
+ * Ekranı kilitleyen "Onay Yenileme" modalı (Aydınlatma Metni + açık rıza). DOM tamamen JS ile eklenir
+ * (CSP: inline script/style/onclick YOK — tüm stil assets/css/kvkk-modal.css, etkileşim addEventListener).
+ *
+ * Döndürdüğü promise, kullanıcı devam edip onay veritabanına yazılana kadar RESOLVE OLMAZ. "Çıkış Yap" seçilirse
+ * signOut() + ana sayfaya yönlendirme yapılır ve promise KASITLI olarak resolve edilmez (sayfa terk ediliyor).
+ *
+ * Tek RPC çağrısı iki beyanı birlikte ama BAĞIMSIZ yazar (kvkk_onayini_ver):
+ *   p_versiyon       dolu  -> yalnızca aydınlatma eskiyse (DB kendi güncel sürümünü yazar)
+ *   p_yurtdisi_onay  true/false -> yalnızca açık rıza eskiyse (kutu işaretli = yenile, işaretsiz = geri çek)
+ */
+function onayYenilemeModaliniGosterVeBekle(profile, surumler, durum) {
   return new Promise((resolve) => {
-    // CSS'i harici bir <link rel="stylesheet"> ile ekliyoruz — inline
-    // <style> DEĞİL (Sıkı CSP: inline stil yasak). requireAuth() birçok
-    // farklı sayfadan (panel, admin, github-yönetim, mesajlar, özel
-    // içerik...) çağrıldığı için stylesheet'i her sayfanın kendi .md
-    // dosyasına tek tek eklemek yerine, modalı gerçekten DOM'a
-    // eklediğimiz an burada bir kez ekliyoruz — modal hiç açılmazsa
-    // (kullanıcının rızası zaten güncelse) bu dosya hiç yüklenmez.
     if (!document.getElementById("kvkk-modal-css")) {
       const link = document.createElement("link");
       link.id = "kvkk-modal-css";
@@ -278,6 +320,8 @@ function kvkkRizaYenilemeModaliniGosterVeBekle(profile, guncelSurum) {
       link.href = "/assets/css/kvkk-modal.css";
       document.head.append(link);
     }
+    const { aydinlatmaEski, rizaEski } = durum;
+    const iki = aydinlatmaEski && rizaEski;
 
     const backdrop = document.createElement("div");
     backdrop.className = "kvkk-modal-backdrop";
@@ -290,28 +334,47 @@ function kvkkRizaYenilemeModaliniGosterVeBekle(profile, guncelSurum) {
 
     const baslik = document.createElement("h2");
     baslik.id = "kvkk-modal-baslik";
-    baslik.textContent = "Gizlilik Politikamız Güncellendi";
+    baslik.textContent = iki ? "Gizlilik Metinlerimiz Güncellendi" : aydinlatmaEski ? "Gizlilik Politikamız Güncellendi" : "Açık Rıza Metnimiz Güncellendi";
+    modal.append(baslik);
 
-    const metin = document.createElement("p");
-    // NOT: metin içindeki link, DOM API'siyle (innerHTML ile DEĞİL)
-    // kuruluyor ki hem CSP'ye (inline olay/attribute yok, sadece normal
-    // <a href>) hem "kullanıcıdan gelen hiçbir veri innerHTML'e
-    // basılmasın" ilkesine uysun — burada kullanıcıdan gelen bir veri
-    // olmasa da tutarlı bir alışkanlık olarak DOM API'si tercih edildi.
-    metin.append(
-      "Gizlilik Politikası ve Yurt Dışı Aktarım Şartlarımız güncellendi. İncelemek için ",
-    );
     const link = document.createElement("a");
     link.href = "/kurumsal/gizlilik-politikasi.html";
     link.target = "_blank";
     link.rel = "noopener noreferrer";
     link.textContent = "Aydınlatma Metni";
-    metin.append(link, "'ni okuyabilirsin.");
 
-    const altYazi = document.createElement("p");
-    altYazi.className = "kvkk-modal-altyazi";
-    altYazi.textContent =
-      "Devam etmek için güncel metni okuduğunu onaylaman gerekiyor. Onaylamak istemiyorsan hesabından çıkış yapabilirsin.";
+    if (aydinlatmaEski) {
+      const metin = document.createElement("p");
+      metin.append("Gizlilik Politikası ve Yurt Dışı Aktarım Şartlarımız güncellendi. İncelemek için ", link.cloneNode(true), "'ni okuyabilirsin.");
+      const altYazi = document.createElement("p");
+      altYazi.className = "kvkk-modal-altyazi";
+      altYazi.textContent = "Devam etmek için güncel metni okuduğunu onaylaman gerekiyor. Onaylamak istemiyorsan hesabından çıkış yapabilirsin.";
+      modal.append(metin, altYazi);
+    }
+
+    let rizaKutusu = null;
+    if (rizaEski) {
+      const bolum = document.createElement("div");
+      bolum.className = "kvkk-modal-riza";
+      const ust = document.createElement("p");
+      ust.append("Yurt dışına aktarım ", document.createElement("strong"), " metni güncellendi. Daha önce verdiğin açık rıza güncel metni kapsamadığı için yeniden soruyoruz. Detaylar: ", link.cloneNode(true), ".");
+      ust.querySelector("strong").textContent = "açık rıza";
+      rizaKutusu = document.createElement("input");
+      rizaKutusu.type = "checkbox";
+      rizaKutusu.id = "kvkk-modal-riza-kutu";
+      rizaKutusu.checked = false; // asla önceden işaretli gelmez
+      const etiket = document.createElement("label");
+      etiket.className = "kvkk-modal-riza-satir";
+      etiket.htmlFor = "kvkk-modal-riza-kutu";
+      const aciklama = document.createElement("span");
+      aciklama.textContent = "Kişisel verilerimin üyelik işlemlerinin yürütülmesi amacıyla yurt dışında (Almanya/Frankfurt) bulunan güvenli Supabase sunucularına aktarılmasına açık rıza veriyorum.";
+      etiket.append(rizaKutusu, aciklama);
+      const not = document.createElement("p");
+      not.className = "kvkk-modal-altyazi";
+      not.textContent = "Bu rıza üyeliğin için şart değildir. Kutuyu işaretlemeden devam edersen rızan geri çekilmiş olur; istediğin zaman Panelim sayfasından yeniden verebilirsin.";
+      bolum.append(ust, etiket, not);
+      modal.append(bolum);
+    }
 
     const hataKutusu = document.createElement("p");
     hataKutusu.className = "kvkk-modal-hata";
@@ -319,84 +382,75 @@ function kvkkRizaYenilemeModaliniGosterVeBekle(profile, guncelSurum) {
 
     const aksiyonlar = document.createElement("div");
     aksiyonlar.className = "kvkk-modal-aksiyonlar";
-
     const reddetBtn = document.createElement("button");
     reddetBtn.type = "button";
     reddetBtn.className = "kvkk-modal-btn kvkk-modal-btn--ikincil";
-    reddetBtn.textContent = "Reddet / Çıkış Yap";
-
+    reddetBtn.textContent = aydinlatmaEski ? "Reddet / Çıkış Yap" : "Çıkış Yap";
     const onaylaBtn = document.createElement("button");
     onaylaBtn.type = "button";
     onaylaBtn.className = "kvkk-modal-btn kvkk-modal-btn--birincil";
-    onaylaBtn.textContent = "Okudum, Onaylıyorum";
-
+    const dugmeMetni = iki ? "Okudum, Devam Et" : aydinlatmaEski ? "Okudum, Onaylıyorum" : "Kaydet ve Devam Et";
+    onaylaBtn.textContent = dugmeMetni;
     aksiyonlar.append(reddetBtn, onaylaBtn);
-    modal.append(baslik, metin, altYazi, hataKutusu, aksiyonlar);
+
+    modal.append(hataKutusu, aksiyonlar);
     backdrop.append(modal);
     document.body.append(backdrop);
 
-    // Arka plandaki sayfanın kaydırılmasını da engelle — "ekranı kilitleyen
-    // modal" isteğinin bir parçası (sadece modal görünürken; kapanınca geri
-    // alınır).
     const oncekiOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-
-    function temizleVeKapat() {
+    const temizleVeKapat = () => {
       backdrop.remove();
       document.body.style.overflow = oncekiOverflow;
-    }
+    };
 
-    // REDDET / ÇIKIŞ YAP: zorlama yok — kullanıcı güncel metni onaylamak
-    // istemiyorsa, oturumu kapatılır ve anonim/statik içerik okumaya
-    // (ana sayfa) yönlendirilir. Herhangi bir veri YAZILMAZ; kvkk_onay_*
-    // olduğu gibi kalır, bir sonraki girişte modal yine gösterilir.
+    // REDDET / ÇIKIŞ: veri YAZILMAZ; bir sonraki girişte modal yine gösterilir.
     reddetBtn.addEventListener("click", async () => {
       reddetBtn.disabled = true;
       onaylaBtn.disabled = true;
       try {
         await supabase.auth.signOut();
       } catch (err) {
-        console.error("Rıza reddedilirken çıkış yapılamadı:", err);
+        console.error("Onay reddedilirken çıkış yapılamadı:", err);
       }
       window.location.href = "/";
-      // Sayfa zaten terk ediliyor — requireAuth()'un diğer redirect
-      // dallarıyla tutarlı olarak promise'i BİLEREK resolve etmiyoruz.
     });
 
-    // ONAYLA: SADECE aydınlatma beyanını (kvkk_onay_*) günceller. Yurt
-    // dışına aktarım açık rızasına (yurtdisi_onay_*) kasıtlı olarak
-    // dokunulmuyor — bkz. kvkk_onayini_ver()'e p_yurtdisi_onay=null
-    // (yani "değiştirme") gönderimi, migration 0042.
     onaylaBtn.addEventListener("click", async () => {
       hataKutusu.hidden = true;
       onaylaBtn.disabled = true;
       reddetBtn.disabled = true;
       onaylaBtn.textContent = "Kaydediliyor...";
 
+      const rizaVerildi = rizaEski ? !!rizaKutusu.checked : null;
       const { error } = await supabase.rpc("kvkk_onayini_ver", {
-        p_versiyon: guncelSurum, // bilgi amaçlı; DB kendi değerini yazar (0064)
-        p_yurtdisi_onay: null,
-        p_yurtdisi_versiyon: null,
+        p_versiyon: aydinlatmaEski ? surumler.kvkk : null, // dolu = damgala (DB kendi sürümünü yazar); null = dokunma
+        p_yurtdisi_onay: rizaEski ? rizaVerildi : null,
+        p_yurtdisi_versiyon: rizaEski && rizaVerildi ? surumler.riza : null, // bilgi amaçlı; DB tetikleyicisi yazar
       });
 
       if (error) {
-        console.error("KVKK rıza yenileme kaydedilemedi:", error);
+        console.error("Onay yenileme kaydedilemedi:", error);
         hataKutusu.textContent = "Onayın kaydedilemedi, lütfen tekrar dene: " + error.message;
         hataKutusu.hidden = false;
         onaylaBtn.disabled = false;
         reddetBtn.disabled = false;
-        onaylaBtn.textContent = "Okudum, Onaylıyorum";
+        onaylaBtn.textContent = dugmeMetni;
         return;
       }
 
-      // Bellekteki profile nesnesini de güncelle — bu fonksiyonu çağıran
-      // requireAuth(), profile'ı olduğu gibi çağırana döndürüyor; sayfa
-      // script'i (panel.js vb.) tekrar bir DB round-trip yapmadan doğru
-      // sürümü görsün diye burada senkron güncelliyoruz.
-      profile.kvkk_onay_versiyonu = guncelSurum;
-      profile.kvkk_onay_verildi = true;
-      profile.kvkk_onay_tarihi = new Date().toISOString();
-
+      // Bellekteki profili senkron güncelle (çağıran sayfa ekstra DB turu yapmadan doğru durumu görsün)
+      const simdi = new Date().toISOString();
+      if (aydinlatmaEski) {
+        profile.kvkk_onay_versiyonu = surumler.kvkk;
+        profile.kvkk_onay_verildi = true;
+        profile.kvkk_onay_tarihi = simdi;
+      }
+      if (rizaEski) {
+        profile.yurtdisi_onay_verildi = rizaVerildi;
+        profile.yurtdisi_onay_versiyonu = rizaVerildi ? surumler.riza : null;
+        profile.yurtdisi_onay_tarihi = rizaVerildi ? simdi : null;
+      }
       temizleVeKapat();
       resolve();
     });
