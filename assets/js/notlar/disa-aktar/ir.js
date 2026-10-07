@@ -132,6 +132,8 @@ export function htmlBloklari(htmlMetni) {
         const runs = [];
         satirIci(d, {}, runs, []);
         if (!bosMu(runs)) bloklar.push({ t: "h", s: d.localName === "h3" ? 2 : 1, runs });
+        // (savunma) başlığın içine yazılmış liste/paragraf içerik kaybolmasın: başlıktan sonra normal bloklar olarak ekle
+        for (const alt of d.children) if (["ul", "ol", "p", "blockquote"].includes(alt.localName)) blok(alt);
         return;
       }
       case "ul":
@@ -181,8 +183,11 @@ export function htmlBloklari(htmlMetni) {
 export function bloklariMetneCevir(bloklar, resimAdi = (ek) => `[Görsel: ${ek}]`) {
   const duz = (runs) => runs.map((r) => (r.br ? "\n" : r.text)).join("");
   const satirlar = [];
+  let onceki = "";
   for (const b of bloklar) {
-    if (b.t === "h") satirlar.push("", b.s === 1 ? duz(b.runs).toUpperCase() : duz(b.runs), "");
+    if (onceki === "li" && b.t !== "li") satirlar.push(""); // liste ile sonraki blok birbirine yapışmasın
+    onceki = b.t;
+    if (b.t === "h") satirlar.push("", `${b.s === 1 ? "##" : "###"} ${duz(b.runs)}`, "");
     else if (b.t === "p") satirlar.push(duz(b.runs), "");
     else if (b.t === "li") satirlar.push(`${"    ".repeat(b.d)}${b.isaret === "☐" ? "[ ]" : b.isaret === "☑" ? "[x]" : b.isaret} ${duz(b.runs)}`);
     else if (b.t === "q") satirlar.push(...duz(b.runs).split("\n").map((s) => `  | ${s}`), "");
