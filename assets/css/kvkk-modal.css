@@ -149,3 +149,25 @@ body.kvkk-modal-acik {
     transition: none !important;
   }
 }
+
+/* Açık rıza bölümü (aydınlatma onayından AYRI; kutu hiçbir zaman önceden işaretli gelmez) */
+.kvkk-modal-riza {
+  margin: 4px 0 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+.kvkk-modal-riza p { margin: 0 0 10px; }
+.kvkk-modal-riza p:last-child { margin-bottom: 0; }
+.kvkk-modal-riza-satir {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  margin: 0 0 10px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  cursor: pointer;
+}
+.kvkk-modal-riza-satir input { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--accent); }
