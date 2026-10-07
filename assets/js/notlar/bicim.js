@@ -16,6 +16,7 @@
 
 const SATIR_ICI = new Set(["strong", "em", "u", "s", "mark", "br", "img"]);
 const BLOK_SECICI = "p,div,ul,ol,li,h1,h2,h3,h4,h5,h6,blockquote,hr";
+const BLOK_AD = new Set(BLOK_SECICI.split(","));
 
 const ETIKET = {
   b: "strong", strong: "strong", i: "em", em: "em", u: "u", s: "s", strike: "s", del: "s", mark: "mark",
@@ -60,6 +61,28 @@ function dugumuKur(d, hedef) {
   if (SATIR_ICI.has(yeni) && d.querySelector(BLOK_SECICI)) return void guvenliKur(d, hedef);
   // div/p içinde başka blok varsa (ör. <div><p>…</p></div>) sarmalayıcıyı at
   if (yeni === "p" && d.querySelector(BLOK_SECICI)) return void guvenliKur(d, hedef);
+
+  // BAŞLIK İÇİNDE BLOK (ör. <h3><ul><li>…</li></ul></h3>; listeye sonradan başlık biçimi verilince oluşur):
+  // başlığın içine liste/paragraf konmaz; satır içi kısım başlık olarak kalır, bloklar kardeş olarak çıkar.
+  // Böylece içerik ne editörde, ne dışa aktarmada, ne de Markdown'da kaybolur ya da tek satıra yapışır.
+  if ((yeni === "h2" || yeni === "h3") && d.querySelector(BLOK_SECICI)) {
+    const blokDugumu = (c) => c.nodeType === 1 && (BLOK_AD.has(c.localName) || c.querySelector?.(BLOK_SECICI));
+    let baslik = null;
+    for (const c of [...d.childNodes]) {
+      if (blokDugumu(c)) {
+        baslik = null;
+        dugumuKur(c, hedef);
+      } else {
+        if (!baslik) {
+          baslik = yap(yeni);
+          hedef.append(baslik);
+        }
+        dugumuKur(c, baslik);
+      }
+    }
+    for (const h of hedef.querySelectorAll(":scope > h2, :scope > h3")) if (!h.textContent.trim() && !h.querySelector("img")) h.remove();
+    return;
+  }
 
   if (yeni === "li") {
     const li = yap("li");
@@ -167,7 +190,9 @@ export function duzMetinHtml(htmlMetni) {
 /* 3) HTML → Markdown (yayın hattı / okunur yedek)                     */
 /* ------------------------------------------------------------------ */
 
-const kacis = (s) => s.replace(/\\/g, "\\\\").replace(/([*_`])/g, "\\$1").replace(/</g, "&lt;");
+const kacis = (s) => s.replace(/\\/g, "\\\\").replace(/([*_`~])/g, "\\$1").replace(/</g, "&lt;");
+/** Paragraf başındaki "# ", "- ", "1. ", ">" gibi metinler Markdown'da yapı sanılmasın. */
+const satirBasiKacis = (t) => t.replace(/^(\s*)(\d+)([.)])(?=\s)/, "$1$2\\$3").replace(/^(\s*)(#{1,6}(?=\s)|[-+>]|---+\s*$)/, "$1\\$2");
 
 function satirDugum(n) {
   if (n.nodeType === 3) return kacis(n.nodeValue.replace(/\s+/g, " "));
@@ -212,13 +237,13 @@ function bloklar(kap) {
   let cikti = "";
   for (const n of kap.childNodes) {
     if (n.nodeType === 3) {
-      if (n.nodeValue.trim()) cikti += kacis(n.nodeValue.trim()) + "\n\n";
+      if (n.nodeValue.trim()) cikti += satirBasiKacis(kacis(n.nodeValue.trim())) + "\n\n";
       continue;
     }
     if (n.nodeType !== 1) continue;
     const a = n.localName;
     if (a === "p") {
-      const t = satirIci(n).trim();
+      const t = satirBasiKacis(satirIci(n).trim());
       if (t) cikti += t + "\n\n";
     } else if (a === "h2" || a === "h3") {
       const t = satirIci(n).trim();
@@ -247,37 +272,50 @@ export function htmlMarkdown(htmlMetni) {
 /* 4) Markdown → DOM (eski notları editörde açmak için)                */
 /* ------------------------------------------------------------------ */
 
+const INLINE_RE = /\\([\\`*_{}[\]()#+\-.!|<>~&])|&lt;|!\[([^\]]*)\]\(ek:([^)]+)\)|\*\*\*([^*]+?)\*\*\*|\*\*(.+?)\*\*|~~(.+?)~~|<(u|mark)>(.+?)<\/\7>|\*([^*\n]+)\*/g;
+
+/** Satır içi Markdown → DOM. İç içe biçimler (kalın içinde altı çizili vb.) özyinelemeli kurulur. */
 function satirIciKur(s, hedef) {
-  const re = /!\[([^\]]*)\]\(ek:([^)]+)\)|\*\*([^*]+)\*\*|\*([^*\n]+)\*/g;
+  const re = new RegExp(INLINE_RE.source, "g");
   let son = 0;
   let m;
+  const sar = (ad, ic) => {
+    const e = yap(ad);
+    satirIciKur(ic, e);
+    hedef.append(e);
+  };
   while ((m = re.exec(s))) {
     if (m.index > son) hedef.append(s.slice(son, m.index));
-    if (m[2]) {
+    if (m[0] === "&lt;") hedef.append("<");
+    else if (m[0][0] === "\\") hedef.append(m[1]);
+    else if (m[3] !== undefined) {
       const i = yap("img");
-      i.setAttribute("data-ek", m[2].slice(0, 64));
-      i.setAttribute("alt", m[1].slice(0, 200));
+      i.setAttribute("data-ek", m[3].slice(0, 64));
+      i.setAttribute("alt", m[2].slice(0, 200));
       hedef.append(i);
-    } else if (m[3]) {
+    } else if (m[4] !== undefined) {
       const b = yap("strong");
-      b.textContent = m[3];
-      hedef.append(b);
-    } else {
       const e = yap("em");
-      e.textContent = m[4];
-      hedef.append(e);
-    }
+      satirIciKur(m[4], e);
+      b.append(e);
+      hedef.append(b);
+    } else if (m[5] !== undefined) sar("strong", m[5]);
+    else if (m[6] !== undefined) sar("s", m[6]);
+    else if (m[7] !== undefined) sar(m[7], m[8]);
+    else sar("em", m[9]);
     son = m.index + m[0].length;
   }
   if (son < s.length) hedef.append(s.slice(son));
 }
 
+const GIRINTI = (g) => g.replace(/\t/g, "    ").length;
+
 export function markdownKur(md, hedef) {
   hedef.replaceChildren();
   let para = [];
-  let liste = null;
-  let listeTur = null;
-  let alinti = null;
+  let yigin = []; // iç içe listeler: {el, tur, girinti}
+  let alintiSatirlari = null;
+  let sonLi = null;
 
   const bosalt = () => {
     if (!para.length) return;
@@ -289,14 +327,37 @@ export function markdownKur(md, hedef) {
     hedef.append(p);
     para = [];
   };
+  const alintiBitir = () => {
+    if (!alintiSatirlari) return;
+    const parcalar = [[]];
+    for (const s of alintiSatirlari) {
+      if (!s.trim()) parcalar.push([]);
+      else parcalar[parcalar.length - 1].push(s);
+    }
+    const dolu = parcalar.filter((x) => x.length);
+    const q = yap("blockquote");
+    dolu.forEach((satirlar) => {
+      const kap = dolu.length > 1 ? yap("p") : q;
+      satirlar.forEach((x, k) => {
+        if (k) kap.append(yap("br"));
+        satirIciKur(x, kap);
+      });
+      if (kap !== q) q.append(kap);
+    });
+    hedef.append(q);
+    alintiSatirlari = null;
+  };
   const sifirla = () => {
-    liste = null;
-    alinti = null;
+    alintiBitir();
+    yigin = [];
+    sonLi = null;
   };
 
-  for (const satir of String(md || "").replace(/\r\n?/g, "\n").split("\n")) {
+  for (const ham of String(md || "").replace(/\r\n?/g, "\n").split("\n")) {
+    const satir = ham.replace(/\s+$/, "");
     let m;
     if (!satir.trim()) {
+      // alıntı içindeki boş satır paragraf ayracıdır ama alıntıyı bitirmez (">" satırı boş gelir)
       bosalt();
       sifirla();
     } else if ((m = satir.match(/^(#{1,6})\s+(.*)$/))) {
@@ -309,32 +370,57 @@ export function markdownKur(md, hedef) {
       bosalt();
       sifirla();
       hedef.append(yap("hr"));
-    } else if ((m = satir.match(/^\s*([-*+]|\d+[.)])\s+(.*)$/))) {
+    } else if ((m = satir.match(/^(\s*)([-*+]|\d+[.)])\s+(.*)$/))) {
       bosalt();
-      alinti = null;
-      const tur = /\d/.test(m[1]) ? "ol" : "ul";
-      if (!liste || listeTur !== tur) {
-        liste = yap(tur);
-        listeTur = tur;
+      alintiBitir();
+      const girinti = GIRINTI(m[1]);
+      const tur = /\d/.test(m[2]) ? "ol" : "ul";
+      while (yigin.length && girinti < yigin[yigin.length - 1].girinti) yigin.pop();
+      let ust = yigin[yigin.length - 1];
+      if (ust && girinti === ust.girinti && ust.tur !== tur) {
+        yigin.pop();
+        ust = yigin[yigin.length - 1];
+      }
+      if (!ust || girinti > ust.girinti) {
+        const liste = yap(tur);
+        (ust && sonLi ? sonLi : hedef).append(liste);
+        ust = { el: liste, tur, girinti };
+        yigin.push(ust);
+      } else if (ust.tur !== tur) {
+        const liste = yap(tur);
         hedef.append(liste);
+        ust = { el: liste, tur, girinti };
+        yigin[yigin.length - 1] = ust;
       }
       const li = yap("li");
-      satirIciKur(m[2], li);
-      liste.append(li);
+      let metin = m[3];
+      const g = metin.match(/^([☐☑])\s+(.*)$/);
+      if (g) {
+        ust.el.classList.add("nt-gorev");
+        if (g[1] === "☑") li.setAttribute("data-yapildi", "1");
+        metin = g[2];
+      }
+      satirIciKur(metin, li);
+      ust.el.append(li);
+      sonLi = li;
     } else if ((m = satir.match(/^>\s?(.*)$/))) {
       bosalt();
-      liste = null;
-      if (!alinti) {
-        alinti = yap("blockquote");
-        hedef.append(alinti);
-      } else alinti.append(yap("br"));
-      satirIciKur(m[1], alinti);
+      yigin = [];
+      sonLi = null;
+      (alintiSatirlari ||= []).push(m[1]);
+    } else if (sonLi && !alintiSatirlari) {
+      // liste maddesinin devamı (satır sonu boşluklu satır kırılması ya da girintili devam satırı)
+      sonLi.append(yap("br"));
+      satirIciKur(satir.trim(), sonLi);
+    } else if (alintiSatirlari) {
+      alintiSatirlari.push(satir); // tembel devam (aynı alıntı paragrafı)
     } else {
       sifirla();
-      para.push(satir);
+      para.push(satir.trimStart() === satir ? satir : satir.trim());
     }
   }
   bosalt();
+  sifirla();
 }
 
 /* ------------------------------------------------------------------ */
