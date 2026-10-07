@@ -284,6 +284,7 @@ export function rolEtiketi(rol) {
  */
 let _kvkkSurumSozu = null;
 export function guncelKvkkSurumu({ yenile = false } = {}) {
+  if (yenile) _onaySurumleriSozu = null;
   if (!_kvkkSurumSozu || yenile) {
     const sozu = (async () => {
       const { data, error } = await supabase
@@ -301,6 +302,32 @@ export function guncelKvkkSurumu({ yenile = false } = {}) {
     _kvkkSurumSozu = sozu;
   }
   return _kvkkSurumSozu;
+}
+
+/**
+ * Aydınlatma Metni (kvkk) VE yurt dışı açık rıza metni (riza) için yürürlükteki sürümler (migration 0064 + 0070).
+ * İki metin AYRI sürüm taşır: biri yükselince yalnızca onun onayı eski sayılır.
+ * 0070 henüz çalıştırılmadıysa riza, kvkk sürümüne düşer (eski davranış; kimse kilitlenmez/yanlış modal görmez).
+ * Sonuç: {kvkk, riza} ya da okunamazsa {kvkk:null, riza:null}. Sayfa başına tek istek; yenile:true önbelleği atlar.
+ */
+let _onaySurumleriSozu = null;
+export function guncelOnaySurumleri({ yenile = false } = {}) {
+  if (!_onaySurumleriSozu || yenile) {
+    const sozu = (async () => {
+      let { data, error } = await supabase.from("site_ayarlari").select("guncel_kvkk_surumu, guncel_riza_surumu").eq("id", 1).maybeSingle();
+      if (error && /guncel_riza_surumu|42703/i.test(error.message + (error.code || ""))) {
+        ({ data, error } = await supabase.from("site_ayarlari").select("guncel_kvkk_surumu").eq("id", 1).maybeSingle());
+      }
+      if (error || !data?.guncel_kvkk_surumu) {
+        console.error("Güncel onay sürümleri okunamadı:", error);
+        if (_onaySurumleriSozu === sozu) _onaySurumleriSozu = null;
+        return { kvkk: null, riza: null };
+      }
+      return { kvkk: data.guncel_kvkk_surumu, riza: data.guncel_riza_surumu || data.guncel_kvkk_surumu };
+    })();
+    _onaySurumleriSozu = sozu;
+  }
+  return _onaySurumleriSozu;
 }
 
 /*
