@@ -249,6 +249,7 @@ const IKONLAR = {
   "chevron-down": "M6 9l6 6 6-6",
   "chevron-right": "M9 6l6 6-6 6",
   download: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3",
+  upload: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12",
   more: "M12 12h.01M5 12h.01M19 12h.01",
   folder: "M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z",
   "folder-plus": "M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2zM12 10v6M9 13h6",
@@ -309,11 +310,18 @@ const yerelTarih = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth()
 /* 4) Model ⇄ şifreli zarf                                             */
 /* ------------------------------------------------------------------ */
 
+/** İçeri aktarılan notun özgün oluşturma zamanı (şifreli yükte saklanır; geçersizse null). */
+function kokenTarihi(v) {
+  const t = v ? Date.parse(v) : NaN;
+  return Number.isNaN(t) || t > Date.now() + 86400000 ? null : new Date(t).toISOString();
+}
+
 function modelOlustur(id, satir, yuk) {
   const m = {
     id,
     rev: satir?.rev ?? 0,
-    olusturma: satir?.created_at || new Date().toISOString(),
+    olusturma: kokenTarihi(yuk?.kokenOlusturma) || satir?.created_at || new Date().toISOString(),
+    kokenOlusturma: kokenTarihi(yuk?.kokenOlusturma),
     guncelleme: satir?.updated_at || new Date().toISOString(),
     silindiAt: satir?.silindi_at || null,
     tur: "not",
@@ -387,6 +395,7 @@ const yukuHazirla = (m) =>
         alintilar: m.alintilar,
         ekler: m.ekler,
         aktarildi: m.aktarildi,
+        kokenOlusturma: m.kokenOlusturma || undefined,
       };
 
 class CakismaHatasi extends Error {}
@@ -401,7 +410,7 @@ async function modeliKaydet(m, yeni) {
       .select("rev, created_at, updated_at")
       .single();
     if (error) throw error;
-    return { ...m, rev: data.rev, olusturma: data.created_at, guncelleme: data.updated_at };
+    return { ...m, rev: data.rev, olusturma: m.kokenOlusturma || data.created_at, guncelleme: data.updated_at };
   }
   const { data, error } = await supabase
     .from("notlar")
@@ -1268,6 +1277,7 @@ function yeniNotMenusu(bagla) {
 
 function dahaMenusu(bagla) {
   menuAc(bagla, [
+    { ad: "İçeri aktar…", islem: () => iceAktarAc().catch((h) => bildir("İçeri aktarma açılamadı: " + (h.message || h), "error")) },
     { ad: "Kasa ve yedek…", islem: () => $("nt-kasa-dlg").showModal() },
     { ad: "Notları yeniden yükle", islem: () => notlariYukle().catch((h) => bildir("Yenilenemedi: " + h.message, "error")) },
     { ad: "Kasayı kilitle", islem: () => kilitle("Kasa kilitlendi; bu cihazdaki anahtar silindi.") },
@@ -2669,7 +2679,10 @@ async function kurtarmaAnahtariniYenile() {
 /* 12b) Dışa aktarma (PDF · Word · Markdown · HTML · metin · ZIP)      */
 /* ------------------------------------------------------------------ */
 
-function kayitaCevir(m) {
+function kayitaCevir(kaynak) {
+  // Not editörde açıksa, kayıt kuyruğundaki/eski sürüm yerine EDİTÖRÜN O ANKİ içeriği dışa aktarılır:
+  // "künye var ama gövde boş" ya da son yazılanların eksik çıkması böylece imkânsız olur.
+  const m = S.duz && S.duz.id === kaynak.id ? { ...kaynak, ...structuredClone(formuOku()) } : kaynak;
   const yol = yolDizisi(notKlasoru(m));
   let html = m.html || "";
   let govde = m.govde || "";
@@ -2700,6 +2713,8 @@ const klasorKaydi = (k) => ({ yol: yolDizisi(k.id).map((x) => x.ad), guncelleme:
 
 /** baslangic: "bu" | "secili" | "klasor" | "gorunen" | "tum"; oge: not ya da klasör. */
 async function disaAktarAc(baslangic = "tum", oge = null) {
+  // Devam eden bir kayıt varsa bitmesini bekle (en çok 10 sn), sonra bekleyen değişikliği kaydet.
+  for (let i = 0; i < 100 && S.kaydediliyor; i++) await new Promise((r) => setTimeout(r, 100));
   if (S.kirli) await kaydet({ sessiz: true });
   const Aktar = await import("./disa-aktar/disa-aktar.js");
 
@@ -2711,7 +2726,7 @@ async function disaAktarAc(baslangic = "tum", oge = null) {
     kapsamlar.push({ id, ad, sayi: n.length, ekVar: n.some((m) => m.ekler.length), kayitlar: () => sirali(notlarFn()).map(kayitaCevir), klasorler: klasorlerFn, paketAdi });
   };
 
-  if (oge && oge.tur !== "klasor") ekle("bu", `Bu not: ${oge.baslik || "Başlıksız not"}`, () => [S.notlar.get(oge.id) || oge], null, oge.baslik);
+  if (oge && oge.tur !== "klasor") ekle("bu", `Bu not: ${oge.baslik || "Başlıksız not"}`, () => [S.notlar.get(oge.id) || (S.duz?.id === oge.id ? S.duz : oge)], null, oge.baslik);
   if (S.secim.size) ekle("secili", "Seçili notlar", () => secilenNotlar(), null, "Seçili notlar");
   const klasor = oge?.tur === "klasor" ? oge : S.gorunum === "klasor" ? S.klasorler.get(S.konum) : null;
   if (klasor) {
@@ -2737,6 +2752,106 @@ async function disaAktarAc(baslangic = "tum", oge = null) {
     },
   };
   await Aktar.disaAktarDiyalogu({ kapsamlar, ctx, baslangic: { kapsam: secilen.id, bicimler: ["pdf"] }, kok: $("notlar"), bildir });
+}
+
+
+/* ------------------------------------------------------------------ */
+/* 12c) İçeri aktarma (Markdown · metin · JSON · HTML · Word · ZIP)    */
+/* ------------------------------------------------------------------ */
+
+const katlaAd = (a) => katla(String(a || "").trim());
+
+/** Aynı başlık + aynı düz metin zaten (çöpte olmayan) bir notta varsa true: kopya yaratmayı önler. */
+function mukerrerMi(t) {
+  const baslik = katlaAd(t.baslik);
+  const metin = katlaAd(Bicim.duzMetinHtml(t.html));
+  for (const m of S.notlar.values()) {
+    if (m.silindiAt) continue;
+    if (katlaAd(m.baslik) === baslik && katlaAd(m.html ? Bicim.duzMetinHtml(m.html) : duzMetin(m.govde)) === metin) return true;
+  }
+  return false;
+}
+
+function degerBul(sozluk, v) {
+  const a = katlaAd(v);
+  if (!a) return null;
+  for (const [anahtar, oge] of Object.entries(sozluk)) if (katlaAd(anahtar) === a || katlaAd(oge.ad) === a) return anahtar;
+  return null;
+}
+
+/** Hedef klasörün altında yolu (yoksa oluşturarak) çözer; her klasör şifreli yükle kaydedilir. */
+async function klasorYoluCoz(yol, kokId, onbellek) {
+  let ust = kokId || null;
+  for (const ad of yol) {
+    const anahtar = `${ust || ""}|${katlaAd(ad)}`;
+    let id = onbellek.get(anahtar);
+    if (!id) {
+      const var_ = altKlasorler(ust).find((k) => katlaAd(k.ad) === katlaAd(ad));
+      if (var_) id = var_.id;
+      else {
+        const km = klasorModeli(crypto.randomUUID(), null, { ad, ust });
+        haritayaIsle(await modeliKaydet(km, true));
+        id = km.id;
+      }
+      onbellek.set(anahtar, id);
+    }
+    ust = id;
+  }
+  return ust;
+}
+
+/** Taslakları MEVCUT E2EE hattından geçirir: modelOlustur → Kasa.notuSifrele → INSERT (modeliKaydet). */
+async function iceAktarimiYaz({ notlar, hedefKlasorId, klasorYapisi }, ilerleme) {
+  const onbellek = new Map();
+  const hata = [];
+  const basarisiz = [];
+  let eklenen = 0;
+  for (let i = 0; i < notlar.length; i++) {
+    const t = notlar[i];
+    ilerleme(i, notlar.length, t.baslik || "Başlıksız not");
+    try {
+      const klasor = klasorYapisi && t.klasorYolu.length ? await klasorYoluCoz(t.klasorYolu, hedefKlasorId, onbellek) : hedefKlasorId || null;
+      const m = modelOlustur(crypto.randomUUID(), null, {
+        baslik: t.baslik,
+        etiketler: t.etiketler,
+        durum: t.durum || "gelen",
+        kategori: t.kategori || "genel",
+        tarih: t.tarih || "",
+        klasor,
+        html: t.html,
+        govde: t.govde,
+        alintilar: t.alintilar.map((a) => ({ id: crypto.randomUUID(), ...a })),
+        ekler: [],
+        kokenOlusturma: t.olusturma,
+      });
+      haritayaIsle(await modeliKaydet(m, true));
+      eklenen++;
+    } catch (h) {
+      console.error(h);
+      hata.push(`${t.baslik || "Başlıksız not"}: ${h.message || h}`);
+      basarisiz.push(t);
+    }
+  }
+  ilerleme(notlar.length, notlar.length, "");
+  etiketFiltresiniDoldur();
+  listeyiCiz();
+  return { eklenen, hata, basarisiz };
+}
+
+async function iceAktarAc() {
+  if (S.kirli) await kaydet({ sessiz: true });
+  const Ice = await import("./ice-aktar/ice-aktar.js");
+  await Ice.iceAktarDiyalogu({
+    ctx: {
+      turBul: (v) => degerBul(TURLER, v),
+      durumBul: (v) => degerBul(DURUMLAR, v) || ESKI_DURUM[String(v).trim().toLowerCase()] || null,
+      klasorSecenekleriDoldur: (sec) => klasorSecenekleriDoldur(sec, { secili: S.gorunum === "klasor" ? S.konum : null }),
+      mukerrerMi,
+    },
+    kok: $("notlar"),
+    uygula: iceAktarimiYaz,
+    bildir,
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -2794,8 +2909,9 @@ function baglantilariKur() {
     if (S.menu && S.menuBagla === o.currentTarget) return menuKapat();
     yeniNotMenusu(o.currentTarget);
   });
+  $("nt-ice-btn")?.addEventListener("click", () => iceAktarAc().catch((h) => bildir("İçeri aktarma açılamadı: " + (h.message || h), "error")));
   $("nt-aktar-btn").addEventListener("click", () => {
-    const acik = S.duz ? S.notlar.get(S.duz.id) : null;
+    const acik = S.duz ? S.notlar.get(S.duz.id) || S.duz : null;
     if (acik) return disaAktarAc("bu", acik);
     disaAktarAc(S.secim.size ? "secili" : S.gorunum === "klasor" ? "klasor" : filtreAktifMi() || S.gorunum !== "tum" ? "gorunen" : "tum");
   });
