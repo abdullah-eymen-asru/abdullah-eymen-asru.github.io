@@ -9,7 +9,7 @@
  * genelindeki "Hakkımda" metninin sadece admin panelinden yönetilmesi
  * istendiği için). Ad Soyad hâlâ düzenlenebilir.
  */
-import { supabase, showMessage, showSpamNotice, escapeHtml, turkceOtpHatasi, guncelKvkkSurumu } from "./core/supabase-client.js";
+import { supabase, showMessage, showSpamNotice, escapeHtml, turkceOtpHatasi, guncelOnaySurumleri } from "./core/supabase-client.js";
 import { requireAuthOrShowError } from "./auth/auth-guard.js";
 // NOT (TAŞINDI): Mesajlaşma (wireUserChat) artık bu sayfada değil — bkz.
 // panel/mesajlar.md + assets/js/mesajlar.js. "Yöneticiyle Mesajlaş" linki
@@ -667,10 +667,11 @@ async function wireKvkk(profile) {
 
   // Güncel sürüm site_ayarlari'ndan (migration 0064). Okunamazsa (null) sürüm farkı
   // yüzünden yanlış "güncel değil" uyarısı göstermemek için sürüm eşleşmesi aranmaz.
-  const guncelSurum = await guncelKvkkSurumu();
-  const surumGuncelMi = (v) => !guncelSurum || v === guncelSurum;
-  const aydinlatmaGuncelMi = profile.kvkk_onay_verildi && surumGuncelMi(profile.kvkk_onay_versiyonu);
-  const yurtdisiGuncelMi = profile.yurtdisi_onay_verildi && surumGuncelMi(profile.yurtdisi_onay_versiyonu);
+  // İki metnin sürümü AYRI (migration 0070): aydınlatma -> kvkk, yurt dışı açık rıza -> riza.
+  const surumler = await guncelOnaySurumleri();
+  const guncelSurum = surumler.kvkk;
+  const aydinlatmaGuncelMi = profile.kvkk_onay_verildi && (!surumler.kvkk || profile.kvkk_onay_versiyonu === surumler.kvkk);
+  const yurtdisiGuncelMi = profile.yurtdisi_onay_verildi && (!surumler.riza || profile.yurtdisi_onay_versiyonu === surumler.riza);
 
   let html = "";
 
@@ -766,7 +767,7 @@ async function wireKvkk(profile) {
     const { error } = await supabase.rpc("kvkk_onayini_ver", {
       p_versiyon: null, // NULL = aydınlatma beyanına dokunma (0064); sürümü DB yazar
       p_yurtdisi_onay: true,
-      p_yurtdisi_versiyon: guncelSurum,
+      p_yurtdisi_versiyon: surumler.riza, // bilgi amaçlı; DB tetikleyicisi güncel açık rıza sürümünü yazar (0070)
     });
     yurtdisiBtn.disabled = false;
     if (error) {
