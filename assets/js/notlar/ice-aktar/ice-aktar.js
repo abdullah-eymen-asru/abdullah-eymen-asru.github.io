@@ -47,7 +47,7 @@ export function iceAktarDiyalogu({ ctx, kok = document.body, uygula, bildir = ()
       { class: "nt-ia-birak" },
       girdi,
       el("strong", { text: "Dosya seç ya da buraya bırak" }),
-      el("span", { class: "muted", text: "Markdown · Metin · JSON · Web sayfası (HTML) · Word (.docx) · ZIP paketi" })
+      el("span", { class: "muted", text: "Markdown · Metin · JSON · HTML · Word · PDF · ZIP paketi" })
     );
     const liste = el("div", { class: "nt-ia-liste", hidden: true });
     const uyari = el("div", { class: "nt-ia-uyari", hidden: true });
