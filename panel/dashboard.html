@@ -976,18 +976,12 @@ permalink: "/panel/dashboard.html"
       </section>
     </section>
 
-    <!-- Üye verisi dışa aktarma izinleri (assets/js/uye-disa-aktar/yetki-paneli.js; migration 0069). Sadece Site Sahibi. -->
+    <!-- Üye verisi indirme izinleri + geçmiş (assets/js/uye-disa-aktar/yetki-paneli.js; migration 0069 + 0071). Sadece Site Sahibi. -->
     <section class="dash-view" id="view-sys-uye-aktarim" hidden data-view="sys-uye-aktarim">
-      <h1>Üye Verisi İndirme Yetkisi</h1>
-      <section class="panel-section">
-        <p class="muted">
-          Üye Ayarları'ndaki <strong>"Üyeleri dışa aktar"</strong> (CSV / Excel / TXT / PDF) özelliğini hangi yöneticinin,
-          <strong>hangi üyelerin</strong> bilgisi için kullanabileceğini buradan belirlersin. Sen (Site Sahibi) her zaman tüm
-          üyeleri indirebilirsin; Site Sahibi'nin verisini başkası indiremez. Her indirme aşağıda kayda geçer.
-        </p>
-        <div id="uye-aktarim-kok"><p class="muted">Yükleniyor...</p></div>
-        <div id="uye-aktarim-mesaj" class="auth-message" hidden></div>
-      </section>
+      <h1>Üye Verisi İndirme</h1>
+      <p class="muted">Hangi yöneticinin üye bilgilerini (CSV, Excel, TXT, PDF) indirebileceğini belirle ve geçmişi izle.</p>
+      <div id="uye-aktarim-kok"><p class="muted">Yükleniyor...</p></div>
+      <div id="uye-aktarim-mesaj" class="auth-message" hidden></div>
     </section>
 
     <section class="dash-view" id="view-sys-hakkimda" hidden data-view="sys-hakkimda">
