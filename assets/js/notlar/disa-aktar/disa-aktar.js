@@ -232,6 +232,21 @@ async function kayitUret(k, bicim, ctx, { ekBayt, ekHedef, dahilEk }) {
   if (bicim === "pdf") {
     return pdfUret({
       ...ortak,
+      // İçeri aktarmada birebir geri kurulabilsin diye notun kendisi PDF'e gömülür (görünmez)
+      veri: JSON.stringify({
+        v: 1,
+        baslik: k.baslik,
+        html: ctx.temizHtml(k.html || ""),
+        govde: k.govde || "",
+        etiketler: k.etiketler,
+        klasor: k.klasorYolu,
+        kategori: k.kategori,
+        durum: k.durum,
+        tarih: k.tarih || "",
+        olusturma: k.olusturma,
+        guncelleme: k.guncelleme,
+        alintilar: k.alintilar.map((a) => ({ alinti: a.alinti, kaynak: a.kaynak, sayfa: a.sayfa, yorum: a.yorum })),
+      }),
       resimAl: async (id) => {
         const ek = ekBul(id);
         if (!ek) return null;
