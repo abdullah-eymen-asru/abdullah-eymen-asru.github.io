@@ -629,6 +629,9 @@ permalink: "/panel/dashboard.html"
               <option value="admin">Yönetici</option>
             </select>
           </div>
+          <!-- Yalnızca Site Sahibi'nin dışa aktarma izni verdiği yöneticilere (ve Site Sahibi'ne) görünür:
+               uye-ayarlari.js -> wireDisaAktar() (gerçek yetki: uye_verisi_disa_aktar RPC, migration 0069). -->
+          <button type="button" id="uya-disa-aktar-btn" class="btn-secondary csp-w-auto uya-disa-aktar-btn" hidden>⬇ Üyeleri dışa aktar</button>
           <div class="form-field uya-sayfa-boyutu-alani">
             <label for="uya-sayfa-boyutu">Sayfa başına</label>
             <select id="uya-sayfa-boyutu">
@@ -970,6 +973,20 @@ permalink: "/panel/dashboard.html"
         </p>
         <div id="kvkk-surum-kok"><p class="muted">Yükleniyor...</p></div>
         <div id="kvkk-surum-mesaj" class="auth-message" hidden></div>
+      </section>
+    </section>
+
+    <!-- Üye verisi dışa aktarma izinleri (assets/js/uye-disa-aktar/yetki-paneli.js; migration 0069). Sadece Site Sahibi. -->
+    <section class="dash-view" id="view-sys-uye-aktarim" hidden data-view="sys-uye-aktarim">
+      <h1>Üye Verisi İndirme Yetkisi</h1>
+      <section class="panel-section">
+        <p class="muted">
+          Üye Ayarları'ndaki <strong>"Üyeleri dışa aktar"</strong> (CSV / Excel / TXT / PDF) özelliğini hangi yöneticinin,
+          <strong>hangi üyelerin</strong> bilgisi için kullanabileceğini buradan belirlersin. Sen (Site Sahibi) her zaman tüm
+          üyeleri indirebilirsin; Site Sahibi'nin verisini başkası indiremez. Her indirme aşağıda kayda geçer.
+        </p>
+        <div id="uye-aktarim-kok"><p class="muted">Yükleniyor...</p></div>
+        <div id="uye-aktarim-mesaj" class="auth-message" hidden></div>
       </section>
     </section>
 
@@ -1677,6 +1694,7 @@ permalink: "/panel/dashboard.html"
           <button type="button" id="nt-hizli-btn" class="nt-btn nt-btn-birincil" title="Başlığı tarih-saatle açılır, doğrudan yazmaya başlarsın (N)"><span class="nt-ikon" data-ikon="zap"></span><span class="nt-btn-metin">Hızlı not</span></button>
           <button type="button" id="nt-yeni-menu-btn" class="nt-btn nt-btn-birincil nt-bolunmus-ok" aria-haspopup="menu" aria-label="Şablondan yeni not"><span class="nt-ikon" data-ikon="chevron-down"></span></button>
         </div>
+        <button type="button" id="nt-ice-btn" class="nt-btn" title="Markdown, metin, JSON, HTML, Word ya da ZIP dosyalarını notlara aktar"><span class="nt-ikon" data-ikon="upload"></span><span class="nt-btn-metin">İçeri aktar</span></button>
         <button type="button" id="nt-aktar-btn" class="nt-btn" title="Notları PDF, Word, Markdown, HTML ya da ZIP olarak indir"><span class="nt-ikon" data-ikon="download"></span><span class="nt-btn-metin">Dışa aktar</span></button>
         <span class="nt-mk"><button type="button" id="nt-daha-btn" class="nt-btn nt-btn-ikon" aria-haspopup="menu" aria-label="Kasa ve diğer işlemler"><span class="nt-ikon" data-ikon="more"></span></button></span>
       </div>
