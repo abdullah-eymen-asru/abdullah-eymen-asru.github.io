@@ -140,7 +140,7 @@ const NAV = [
       // role:"admin" + izin:"kvkk": owner her zaman görür; admin sadece owner "adminler KVKK
       // sürümünü değiştirebilsin" anahtarını açtıysa (bkz. gorunurMu / izinleriYukle).
       { id: "sys-kvkk", icon: "📜", label: "KVKK Sürümü", module: "kvkkSurum", role: "admin", izin: "kvkk" },
-      { id: "sys-uye-aktarim", icon: "📤", label: "Üye Verisi İndirme Yetkisi", module: "uyeAktarimYetki", role: "owner" },
+      { id: "sys-uye-aktarim", icon: "📤", label: "Üye Verisi İndirme", module: "uyeAktarimYetki", role: "owner" },
       { id: "sys-github", icon: "🔑", label: "GitHub / Worker Bağlantısı", module: "gy" },
       { id: "sys-hakkimda", icon: "🙋", label: "Hakkımda & Sosyal Linkler", module: "gy" },
       { id: "sys-hesabim", icon: "⚠️", label: "Hesabım (Tehlikeli Bölge)", module: "admin" },
