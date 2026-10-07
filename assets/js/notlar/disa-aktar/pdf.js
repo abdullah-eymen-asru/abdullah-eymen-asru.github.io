@@ -367,7 +367,21 @@ export class PdfBelge {
       );
       sayfaNolari.push(sayfaNo);
     }
-    nesneler[katalogNo - 1] = `<< /Type /Catalog /Pages ${sayfalarNo} 0 R /Lang (tr-TR) >>`;
+    // GERİ OKUNABİLİR VERİ: notun kendisi (başlık, künye, zengin metin) PDF içine gömülür. PDF'te metin dizilimi
+    // geri çözülemediği için "İçeri aktar" bu parçayı okur ve dosyayı, dışa aktarılan nottan birebir geri kurar.
+    // Görüntüleyicilerde görünmez; özel katalog anahtarı (/NotlarVeri) standart okuyucular tarafından yok sayılır.
+    let veriAnahtari = "";
+    if (this.veri) {
+      const yuk = kod.encode("NOTLAR-V1\n" + this.veri.replace(/endstream/g, "end\\u0073tream") + "\n");
+      const bas = kod.encode(`<< /Type /NotlarVeri /Length ${yuk.length} >>\nstream\n`);
+      const son = kod.encode("\nendstream");
+      const u = new Uint8Array(bas.length + yuk.length + son.length);
+      u.set(bas, 0);
+      u.set(yuk, bas.length);
+      u.set(son, bas.length + yuk.length);
+      veriAnahtari = ` /NotlarVeri ${ekle(u)} 0 R`;
+    }
+    nesneler[katalogNo - 1] = `<< /Type /Catalog /Pages ${sayfalarNo} 0 R /Lang (tr-TR)${veriAnahtari} >>`;
     nesneler[sayfalarNo - 1] = `<< /Type /Pages /Kids [${sayfaNolari.map((n) => `${n} 0 R`).join(" ")}] /Count ${sayfaNolari.length} >>`;
 
     const parcalar = [kod.encode("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n")];
@@ -400,8 +414,9 @@ export class PdfBelge {
 }
 
 /** Blok listesi + künye → PDF baytları. resimAl(ekId) → {jpeg:Uint8Array, g, y, ad} | null */
-export async function pdfUret({ baslik, kunye, bloklar, resimAl, alintilar, yazar, olusturma, guncelleme }) {
+export async function pdfUret({ baslik, kunye, bloklar, resimAl, alintilar, yazar, olusturma, guncelleme, veri = null }) {
   const belge = new PdfBelge({ baslik, yazar, olusturma: new Date(olusturma), degistirme: new Date(guncelleme) });
+  belge.veri = veri; // JSON metni (bkz. bayta)
 
   belge.paragraf([{ text: baslik || "Başlıksız not" }], { boyut: 22, kalin: true, satirAraligi: 1.25, sonrasi: 6, renk: "0.06 0.07 0.1" });
   for (const [e, d] of kunye) {
