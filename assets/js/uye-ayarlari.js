@@ -57,6 +57,7 @@ async function init() {
   wireRolFiltre();
   wireSayfaBoyutu();
   wireAdminEmailChange();
+  wireDisaAktar();
 
   // KARARLILIK: loadUsers() önceden try/catch'siz çağrılıyordu — beklenmedik
   // bir hata (ör. bir Supabase çağrısı istisna fırlatırsa) fırlarsa,
@@ -71,6 +72,36 @@ async function init() {
     if (liste) liste.innerHTML = '<p class="muted">Liste yüklenemedi. Sayfayı yenilemeyi dene.</p>';
   }
   wireRealtime();
+}
+
+/* ---------------------------------------------------------------------- */
+/* ÜYE BİLGİLERİNİ DIŞA AKTAR (CSV / Excel / TXT / PDF)                    */
+/* ---------------------------------------------------------------------- */
+// Buton yalnızca sunucu "yetkilisin" derse görünür (Site Sahibi her zaman; yönetici ise Site Sahibi'nin Yetki
+// Ayarları'ndan verdiği kapsam kadar). Gerçek sınır veritabanındadır: uye_verisi_disa_aktar() yetkisiz çağrıyı reddeder
+// ve yetkili olsa bile yalnızca kapsamındaki üyeleri döndürür (migration 0069).
+async function wireDisaAktar() {
+  const btn = document.getElementById("uya-disa-aktar-btn");
+  if (!btn || btn.dataset.hazir) return;
+  btn.dataset.hazir = "1";
+  let yetkili = false;
+  try {
+    const { data, error } = await supabase.rpc("uye_aktarim_yetkisi_var_mi");
+    yetkili = !error && data === true;
+  } catch {
+    yetkili = false;
+  }
+  if (!yetkili) return;
+  btn.hidden = false;
+  btn.addEventListener("click", async () => {
+    try {
+      const modul = await import("./uye-disa-aktar/uye-disa-aktar.js");
+      modul.uyeDisaAktarAc({ yazar: GIRIS_YAPAN_PROFIL?.full_name || "" });
+    } catch (hata) {
+      console.error("uye-ayarlari.js: dışa aktarma açılamadı:", hata);
+      window.alert("Dışa aktarma açılamadı: " + (hata.message || hata));
+    }
+  });
 }
 
 /* ---------------------------------------------------------------------- */
