@@ -18,7 +18,8 @@
  * -----------------------------------------------------------------------
  */
 import { ZipYazici } from "./zip.js";
-import { adTemizle, zamanDamgasi, yerelIso, insanTarih, dosyaAdi, htmlBloklari, bloklariMetneCevir, kunyeSatirlari } from "./ir.js";
+import { htmlMarkdown } from "../bicim.js";
+import { adTemizle, zamanDamgasi, yerelIso, insanTarih, dosyaAdi, htmlBloklari, bloklariGuvenceyleUret, bloklariMetneCevir, kunyeSatirlari } from "./ir.js";
 import { pdfUret } from "./pdf.js";
 import { docxUret } from "./docx.js";
 
@@ -115,7 +116,8 @@ function markdownUret(k, ctx, ekHedef) {
     "",
   ].filter((x) => x !== null);
 
-  let govde = (k.govde || "").replace(/\{\{alinti:\d+\}\}/g, "");
+  // gövde (Markdown) boşsa ama zengin metin (HTML) doluysa Markdown HTML'den türetilir: metin asla kaybolmaz
+  let govde = ((k.govde || "").trim() ? k.govde : htmlMarkdown(ctx.temizHtml(k.html || ""))).replace(/\{\{alinti:\d+\}\}/g, "");
   govde = govde.replace(/!\[([^\]]*)\]\(ek:([^)]*)\)/g, (_, alt, id) => {
     const ek = k.ekler.find((e) => e.id === id);
     const yol = ek && ekHedef ? ekHedef(ek) : null;
@@ -134,7 +136,7 @@ function markdownUret(k, ctx, ekHedef) {
 
 function metinUret(k, ctx) {
   const kunye = kunyeSatirlari(k, { turAdi: ctx.turAdi(k.kategori), durumAdi: ctx.durumAdi(k.durum) });
-  const bloklar = htmlBloklari(ctx.temizHtml(k.html || ""));
+  const bloklar = bloklariGuvenceyleUret(ctx.temizHtml(k.html || ""), k.govde);
   const baslik = k.baslik || "Başlıksız not";
   const p = [baslik, "=".repeat(Math.min(60, baslik.length)), ...kunye.map(([e, d]) => `${e}: ${d}`), "", bloklariMetneCevir(bloklar, (ek) => `[Görsel: ${k.ekler.find((x) => x.id === ek)?.ad || ek}]`)];
   if (k.alintilar.length) {
@@ -184,6 +186,16 @@ async function htmlUret(k, ctx, ekBayt) {
   for (const ul of belge.querySelectorAll("ul.nt-gorev")) {
     ul.className = "g";
   }
+  if (!belge.body.textContent.trim() && !belge.body.querySelector("img,hr") && (k.govde || "").trim()) {
+    for (const para of k.govde.replace(/\{\{alinti:\d+\}\}/g, "").trim().split(/\n{2,}/)) {
+      const p = belge.createElement("p");
+      para.split("\n").forEach((satir, i) => {
+        if (i) p.append(belge.createElement("br"));
+        p.append(satir);
+      });
+      belge.body.append(p);
+    }
+  }
   const e = (s) => String(s ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
   const kunye = kunyeSatirlari(k, { turAdi: ctx.turAdi(k.kategori), durumAdi: ctx.durumAdi(k.durum) });
   const alintilar = k.alintilar
@@ -214,7 +226,7 @@ async function kayitUret(k, bicim, ctx, { ekBayt, ekHedef, dahilEk }) {
   if (bicim === "txt") return metinUret(k, ctx);
   if (bicim === "html") return htmlUret(k, ctx, ekBayt);
 
-  const bloklar = htmlBloklari(ctx.temizHtml(k.html || ""));
+  const bloklar = bloklariGuvenceyleUret(ctx.temizHtml(k.html || ""), k.govde);
   const ortak = { baslik: k.baslik, kunye, bloklar, alintilar: k.alintilar, yazar: ctx.yazar, olusturma: k.olusturma, guncelleme: k.guncelleme };
 
   if (bicim === "pdf") {
@@ -418,7 +430,7 @@ export function disaAktarDiyalogu({ kapsamlar, ctx, baslangic = {}, kok = docume
     const d = el("dialog", { class: "nt-diyalog nt-da" });
     const secili = { kapsam: baslangic.kapsam || kapsamlar[0].id, bicimler: new Set(baslangic.bicimler || ["pdf"]), zip: null, ekler: true };
 
-    const kapsamKutusu = el("div", { class: "nt-da-secenekler", role: "radiogroup", "aria-label": "Kapsam" });
+    const kapsamKutusu = el("div", { class: "nt-da-secenekler nt-da-kapsamlar", role: "radiogroup", "aria-label": "Kapsam" });
     const bicimKutusu = el("div", { class: "nt-da-secenekler nt-da-bicimler" });
     const secenekKutusu = el("div", { class: "nt-da-secenekler" });
     const ozet = el("p", { class: "nt-da-ozet", "aria-live": "polite" });
@@ -482,6 +494,7 @@ export function disaAktarDiyalogu({ kapsamlar, ctx, baslangic = {}, kok = docume
         ekVar ? el("label", { class: "nt-da-secenek" }, ekKutu, el("span", { class: "nt-da-ad", text: "Ekleri dahil et" }), el("span", { class: "nt-da-ipucu", text: "Görseller ve PDF'ler bu cihazda çözülüp pakete konur" })) : null].filter(Boolean)
       );
 
+      ciz.paketOzet.textContent = `${zipDeger || zorunlu ? "ZIP" : "Tek dosya"} · ${ekVar ? (secili.ekler ? "ekler dahil" : "ekler hariç") : "ek yok"}`;
       const dosya = kayitSayisi * secili.bicimler.size;
       ozet.textContent = secili.bicimler.size
         ? zorunlu || secili.zip
@@ -497,18 +510,31 @@ export function disaAktarDiyalogu({ kapsamlar, ctx, baslangic = {}, kok = docume
     });
     vazgecBtn.addEventListener("click", () => d.close());
 
+    const paketOzet = el("span", { class: "nt-da-paket-ozet muted" });
+    const paketKutusu = el(
+      "details",
+      { class: "nt-da-grup nt-da-gelismis" },
+      el("summary", {}, el("span", { text: "Paket ve ekler" }), paketOzet),
+      secenekKutusu
+    );
+    ciz.paketOzet = paketOzet;
+
+    // Üst (sabit) · orta (KAYDIRILABİLİR) · alt (sabit) yapı: pencere hiçbir koşulda ekrandan taşmaz.
     const form = el(
       "form",
-      { class: "nt-diyalog-form", novalidate: true },
-      el("h3", { text: "Dışa aktar" }),
-      el("p", { class: "muted nt-da-aciklama", text: "Dosyalar bu cihazda oluşturulur; hiçbir şey sunucuya gönderilmez." }),
-      el("fieldset", { class: "nt-da-grup" }, el("legend", { text: "Ne indirilsin?" }), kapsamKutusu),
-      el("fieldset", { class: "nt-da-grup" }, el("legend", { text: "Hangi biçimde?" }), bicimKutusu),
-      el("fieldset", { class: "nt-da-grup" }, el("legend", { text: "Paket" }), secenekKutusu),
-      ozet,
-      ilerleme,
-      hata,
-      el("div", { class: "nt-diyalog-eylem" }, vazgecBtn, indirBtn)
+      { class: "nt-diyalog-form nt-da-form", novalidate: true },
+      el("div", { class: "nt-da-ust" }, el("h3", { text: "Dışa aktar" }), el("p", { class: "muted nt-da-aciklama", text: "Dosyalar bu cihazda oluşturulur; hiçbir şey sunucuya gönderilmez." })),
+      el(
+        "div",
+        { class: "nt-da-govde" },
+        el("fieldset", { class: "nt-da-grup" }, el("legend", { text: "Ne indirilsin?" }), kapsamKutusu),
+        el("fieldset", { class: "nt-da-grup" }, el("legend", { text: "Hangi biçimde?" }), bicimKutusu),
+        paketKutusu,
+        ozet,
+        ilerleme,
+        hata
+      ),
+      el("div", { class: "nt-diyalog-eylem nt-da-alt" }, vazgecBtn, indirBtn)
     );
 
     form.addEventListener("submit", async (o) => {
