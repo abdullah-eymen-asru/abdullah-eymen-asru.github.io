@@ -70,6 +70,8 @@ const MODULES = {
   // "Panelim" (eski /panel/panel.html) — giriş yapmış HERKESE açık:
   // sıradan üye de, owner da aynı sekmeyi görür.
   panelim: { src: "./panel.js", role: null },
+  // Üye verisi dışa aktarma izinleri (migration 0069) — SADECE Site Sahibi: hangi yönetici hangi üyelerin verisini indirebilir.
+  uyeAktarimYetki: { src: "./uye-disa-aktar/yetki-paneli.js", role: "owner" },
 };
 
 // Sidebar hiyerarşisi. Her leaf: { id, label, view (gösterilecek
@@ -138,6 +140,7 @@ const NAV = [
       // role:"admin" + izin:"kvkk": owner her zaman görür; admin sadece owner "adminler KVKK
       // sürümünü değiştirebilsin" anahtarını açtıysa (bkz. gorunurMu / izinleriYukle).
       { id: "sys-kvkk", icon: "📜", label: "KVKK Sürümü", module: "kvkkSurum", role: "admin", izin: "kvkk" },
+      { id: "sys-uye-aktarim", icon: "📤", label: "Üye Verisi İndirme Yetkisi", module: "uyeAktarimYetki", role: "owner" },
       { id: "sys-github", icon: "🔑", label: "GitHub / Worker Bağlantısı", module: "gy" },
       { id: "sys-hakkimda", icon: "🙋", label: "Hakkımda & Sosyal Linkler", module: "gy" },
       { id: "sys-hesabim", icon: "⚠️", label: "Hesabım (Tehlikeli Bölge)", module: "admin" },
