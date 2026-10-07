@@ -9,6 +9,7 @@ import {
   showMessage,
   showSpamNotice,
   guncelKvkkSurumu,
+  guncelOnaySurumleri,
   KAYITLAR_KAPALI_ISARETI,
   kayitlarAcikMi,
   turkceOtpHatasi,
@@ -841,7 +842,7 @@ function googleKayitDonusunuIsle(msg) {
       // Sürüm değerleri bilgi amaçlıdır; DB kendi güncel sürümünü yazar (0064).
       p_versiyon: (await guncelKvkkSurumu()) ?? "bilinmiyor", // dolu = damgala
       p_yurtdisi_onay: true,
-      p_yurtdisi_versiyon: await guncelKvkkSurumu(),
+      p_yurtdisi_versiyon: (await guncelOnaySurumleri()).riza, // bilgi amaçlı; DB açık rıza sürümünü kendisi yazar (0070)
     });
     if (error) {
       console.error("Google ile kayıtta onaylar kaydedilemedi:", error);
