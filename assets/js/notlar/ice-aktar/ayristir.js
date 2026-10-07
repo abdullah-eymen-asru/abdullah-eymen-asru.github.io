@@ -3,7 +3,7 @@
  * -----------------------------------------------------------------------
  * İçeri aktarma AYRIŞTIRICILARI: dosya → not taslağı. Ağ yok, kasa yok; yalnızca okur.
  * Desteklenen: Markdown (.md/.markdown, YAML başlık bilgisiyle), düz metin (.txt), JSON (.json),
- * Web sayfası (.html/.htm), Word (.docx), ZIP paketi (bu uygulamanın dışa aktardığı paket dahil).
+ * Web sayfası (.html/.htm), Word (.docx), PDF (.pdf; bu uygulamanın PDF'i birebir, diğerleri düz metin), ZIP paketi (bu uygulamanın dışa aktardığı paket dahil).
  *
  * Tüm içerik bicim.js'in BEYAZ LİSTESİNDEN geçirilir (ham HTML hiçbir zaman olduğu gibi alınmaz).
  * Dönen taslak: {baslik, html, govde, etiketler[], klasorYolu[], kategori, durum, tarih,
@@ -13,8 +13,8 @@
 import * as Bicim from "../bicim.js";
 import { zipOku } from "./zip-oku.js";
 
-const UZANTI = { md: "md", markdown: "md", mdown: "md", txt: "txt", text: "txt", json: "json", html: "html", htm: "html", docx: "docx", zip: "zip" };
-export const KABUL_EDILEN = ".md,.markdown,.txt,.json,.html,.htm,.docx,.zip";
+const UZANTI = { md: "md", markdown: "md", mdown: "md", txt: "txt", text: "txt", json: "json", html: "html", htm: "html", docx: "docx", pdf: "pdf", zip: "zip" };
+export const KABUL_EDILEN = ".md,.markdown,.mdown,.txt,.text,.json,.html,.htm,.docx,.pdf,.zip";
 const DOSYA_UST = 60 * 1024 * 1024;
 const NOT_UST = 3000;
 const BICIM_KLASORLERI = new Set(["markdown", "pdf", "word", "html", "metin"]);
@@ -167,27 +167,10 @@ function alintiBolumuAyir(govde) {
   return { govde: geri, alintilar };
 }
 
-/** ☐/☑ ile başlayan madde işaretli listeleri görev listesine çevirir (dışa aktarılan Markdown'la simetrik). */
-function gorevListeleriniKur(kap) {
-  for (const ul of kap.querySelectorAll("ul")) {
-    const lis = [...ul.children].filter((c) => c.localName === "li");
-    if (!lis.length || !lis.every((li) => /^[☐☑]\s/.test(li.textContent))) continue;
-    ul.className = "nt-gorev";
-    for (const li of lis) {
-      if (li.textContent.startsWith("☑")) li.setAttribute("data-yapildi", "1");
-      const t = document.createTreeWalker(li, NodeFilter.SHOW_TEXT).nextNode();
-      if (t) t.nodeValue = t.nodeValue.replace(/^[☐☑]\s/, "");
-    }
-  }
-}
-
+/** Markdown → beyaz listeden geçmiş HTML (bicim.js markdownKur: iç içe liste, görev listesi, kaçışlar, ~~, <u>, <mark>). */
 function markdownHtml(md) {
   const kap = document.createElement("div");
   Bicim.markdownKur(md, kap);
-  // Markdown ters eğik çizgi kaçışlarını çöz (dışa aktarma "SON_CUMLE"yi "SON\\_CUMLE" yazar)
-  const yur = document.createTreeWalker(kap, NodeFilter.SHOW_TEXT);
-  for (let t = yur.nextNode(); t; t = yur.nextNode()) t.nodeValue = t.nodeValue.replace(/\\([\\`*_{}\[\]()#+\-.!|<>~])/g, "$1");
-  gorevListeleriniKur(kap);
   return temizHtml(kap);
 }
 
@@ -210,58 +193,27 @@ function markdownCoz(ad, metin, ctx) {
 
 const KUNYE_ANAHTARLARI = new Set(["klasor", "tur", "durum", "konu_tarihi", "etiketler", "olusturma", "son_guncelleme"]);
 
+const MD_KACIS = (t) => t.replace(/\\/g, "\\\\").replace(/([*_`~])/g, "\\$1").replace(/</g, "&lt;");
+
+/**
+ * Düz metin → HTML. Bu uygulamanın düz metin dışa aktarımıyla simetriktir: "## / ###" başlık, "•", "1.", "[ ]/[x]"
+ * liste (4 boşluk = bir alt düzey), "  | " alıntı, "----" ayraç. Başka metinlerdeki *, _ gibi işaretler biçim sayılmaz.
+ */
 function metinHtml(metin) {
-  const kap = document.createElement("div");
-  let liste = null;
-  let alinti = null;
-  let para = [];
-  const bosalt = () => {
-    if (!para.length) return;
-    const p = document.createElement("p");
-    para.forEach((s, i) => {
-      if (i) p.append(document.createElement("br"));
-      p.append(s);
-    });
-    kap.append(p);
-    para = [];
-  };
-  for (const satir of metin.replace(/\r\n?/g, "\n").split("\n")) {
-    const gorev = /^\s*\[( |x|X)\]\s+(.*)$/.exec(satir);
-    const li = gorev ? null : /^\s*(?:([-*•])|(\d+)[.)])\s+(.*)$/.exec(satir);
-    const aq = /^\s*\|\s?(.*)$/.exec(satir);
-    if (!satir.trim()) {
-      bosalt();
-      liste = null;
-      alinti = null;
-    } else if (aq) {
-      bosalt();
-      liste = null;
-      if (!alinti) {
-        alinti = document.createElement("blockquote");
-        kap.append(alinti);
-      } else alinti.append(document.createElement("br"));
-      alinti.append(aq[1]);
-    } else if (gorev || li) {
-      bosalt();
-      alinti = null;
-      const tur = gorev ? "ul" : li[2] ? "ol" : "ul";
-      if (!liste || liste.localName !== tur || liste.classList.contains("nt-gorev") !== !!gorev) {
-        liste = document.createElement(tur);
-        if (gorev) liste.className = "nt-gorev";
-        kap.append(liste);
-      }
-      const e = document.createElement("li");
-      if (gorev && gorev[1] !== " ") e.setAttribute("data-yapildi", "1");
-      e.append(gorev ? gorev[2] : li[3]);
-      liste.append(e);
-    } else {
-      liste = null;
-      alinti = null;
-      para.push(satir.trimEnd());
-    }
+  const md = [];
+  for (const ham of metin.replace(/\r\n?/g, "\n").split("\n")) {
+    const satir = ham.replace(/\s+$/, "");
+    let m;
+    if (!satir.trim()) md.push("");
+    else if ((m = /^(\s*)\[( |x|X)\]\s+(.*)$/.exec(satir))) md.push(`${m[1]}- ${m[2] === " " ? "☐" : "☑"} ${MD_KACIS(m[3])}`);
+    else if ((m = /^(\s*)(?:•|[-*])\s+(.*)$/.exec(satir))) md.push(`${m[1]}- ${MD_KACIS(m[2])}`);
+    else if ((m = /^(\s*)(\d+)[.)]\s+(.*)$/.exec(satir))) md.push(`${m[1]}${m[2]}. ${MD_KACIS(m[3])}`);
+    else if ((m = /^\s*\|\s?(.*)$/.exec(satir))) md.push(`> ${MD_KACIS(m[1])}`);
+    else if ((m = /^(#{1,3})\s+(.*)$/.exec(satir))) md.push(`${m[1].length === 1 ? "##" : m[1]} ${MD_KACIS(m[2])}`);
+    else if (/^\s*-{3,}\s*$/.test(satir)) md.push("---");
+    else md.push(MD_KACIS(satir.trim()));
   }
-  bosalt();
-  return temizHtml(kap);
+  return markdownHtml(md.join("\n"));
 }
 
 function metinCoz(ad, metin, ctx) {
@@ -396,7 +348,7 @@ async function docxCoz(ad, bayt, ctx) {
   const kap = document.createElement("div");
   const meta = {};
   let baslik = "";
-  let liste = null;
+  const yigin = []; // iç içe listeler (düzey -> <ul|ol>)
   let alintiModu = false;
   const alintilar = [];
   let gorselSayisi = 0;
@@ -476,7 +428,8 @@ async function docxCoz(ad, bayt, ctx) {
       }
     }
     if (!metin && !p.getElementsByTagNameNS(W, "drawing").length) {
-      liste = null;
+      yigin.length = 0;
+      if (durum.kunyeBitti && p.getElementsByTagNameNS(W, "pBdr").length) kap.append(document.createElement("hr")); // ayraç çizgisi
       if (!durum.kunyeBitti) durum.kunyeBitti = true; // künyeyi kapatan ayraç satırı
       return;
     }
@@ -488,13 +441,13 @@ async function docxCoz(ad, bayt, ctx) {
     }
     const baslikMi = /^Heading([1-9])$/i.exec(stil.replace(/\s+/g, ""));
     if (baslikMi || stil === "Subtitle") {
-      liste = null;
+      yigin.length = 0;
       const h = document.createElement(baslikMi && +baslikMi[1] === 1 ? "h2" : "h3");
       satirIci(p, h);
       return void kap.append(h);
     }
     if (stil === "Quote") {
-      liste = null;
+      yigin.length = 0;
       const q = document.createElement("blockquote");
       satirIci(p, q);
       return void kap.append(q);
@@ -506,10 +459,27 @@ async function docxCoz(ad, bayt, ctx) {
       const gorev = isaret && /[☐☑]/.test(isaret[1]);
       const sirali = isaret ? /\d/.test(isaret[1]) : false;
       const tur = sirali ? "ol" : "ul";
-      if (!liste || liste.localName !== tur || liste.classList.contains("nt-gorev") !== !!gorev) {
-        liste = document.createElement(tur);
-        if (gorev) liste.className = "nt-gorev";
-        kap.append(liste);
+      // girinti düzeyi: Word listesinde w:ilvl, bu uygulamanın dışa aktardığı Word'de sol girinti (540 + 360×düzey)
+      const ilvl = parseInt(p.getElementsByTagNameNS(W, "ilvl")[0]?.getAttributeNS(W, "val") || "", 10);
+      const sol = parseInt(p.getElementsByTagNameNS(W, "ind")[0]?.getAttributeNS(W, "left") || "0", 10);
+      const derinlik = Number.isFinite(ilvl) ? Math.min(ilvl, 6) : Math.max(0, Math.min(6, Math.round((sol - 540) / 360)));
+      while (yigin.length > derinlik + 1) yigin.pop();
+      let ust = yigin[derinlik];
+      if (ust && (ust.localName !== tur || ust.classList.contains("nt-gorev") !== !!gorev)) {
+        yigin.length = derinlik;
+        ust = null;
+      }
+      const kapsayici = (l) => l.lastElementChild || l.appendChild(document.createElement("li"));
+      while (yigin.length < derinlik) {
+        const ara = document.createElement("ul");
+        (yigin.length ? kapsayici(yigin[yigin.length - 1]) : kap).append(ara);
+        yigin.push(ara);
+      }
+      if (!ust) {
+        ust = document.createElement(tur);
+        if (gorev) ust.className = "nt-gorev";
+        (derinlik ? kapsayici(yigin[derinlik - 1]) : kap).append(ust);
+        yigin[derinlik] = ust;
       }
       const li = document.createElement("li");
       if (isaret && isaret[1] === "☑") li.setAttribute("data-yapildi", "1");
@@ -517,9 +487,9 @@ async function docxCoz(ad, bayt, ctx) {
       satirIci(p, gecici);
       if (isaret) bastanKirp(gecici, isaret[0].length);
       li.append(...gecici.childNodes);
-      return void liste.append(li);
+      return void ust.append(li);
     }
-    liste = null;
+    yigin.length = 0;
     const pe = document.createElement("p");
     satirIci(p, pe);
     kap.append(pe);
@@ -528,7 +498,7 @@ async function docxCoz(ad, bayt, ctx) {
   for (const c of govde.children) {
     if (c.localName === "p") paragraf(c);
     else if (c.localName === "tbl") {
-      liste = null;
+      yigin.length = 0;
       for (const tr of c.getElementsByTagNameNS(W, "tr")) {
         const pe = document.createElement("p");
         pe.append([...tr.getElementsByTagNameNS(W, "tc")].map((tc) => [...tc.getElementsByTagNameNS(W, "p")].map(duzMetin).join(" ").trim()).join(" | "));
@@ -541,9 +511,145 @@ async function docxCoz(ad, bayt, ctx) {
   return taslak(ad, { ...m, html: temizHtml(kap), alintilar, uyarilar }, ctx);
 }
 
+/* ---------- PDF ---------- */
+
+const ARA = (u8, igne, bas = 0) => {
+  const ilk = igne[0];
+  for (let i = bas; i <= u8.length - igne.length; i++) {
+    if (u8[i] !== ilk) continue;
+    let k = 1;
+    while (k < igne.length && u8[i + k] === igne[k]) k++;
+    if (k === igne.length) return i;
+  }
+  return -1;
+};
+const bayt = (m) => new TextEncoder().encode(m);
+
+async function zlibAc(u8) {
+  const akis = new Blob([u8]).stream().pipeThrough(new DecompressionStream("deflate"));
+  return new Uint8Array(await new Response(akis).arrayBuffer());
+}
+
+/** PDF literal dizgisini ("(...)" içi) çöz: \n \( \) \\ \ddd kaçışları. */
+function pdfDizgisi(ham) {
+  const cikti = [];
+  for (let i = 0; i < ham.length; i++) {
+    const c = ham[i];
+    if (c !== "\\") {
+      cikti.push(c.charCodeAt(0) & 255);
+      continue;
+    }
+    const n = ham[++i];
+    if (n === "n") cikti.push(10);
+    else if (n === "r") cikti.push(13);
+    else if (n === "t") cikti.push(9);
+    else if (n >= "0" && n <= "7") {
+      let o = n;
+      while (o.length < 3 && ham[i + 1] >= "0" && ham[i + 1] <= "7") o += ham[++i];
+      cikti.push(parseInt(o, 8) & 255);
+    } else if (n !== undefined && n !== "\n") cikti.push(n.charCodeAt(0) & 255);
+  }
+  const TR = { 1: "Ğ", 2: "ğ", 3: "İ", 4: "ı", 5: "Ş", 6: "ş" }; // bu uygulamanın PDF kodlaması (Differences)
+  return new TextDecoder("windows-1252").decode(new Uint8Array(cikti)).replace(/[\u0001-\u0006]/g, (c) => TR[c.charCodeAt(0)]);
+}
+
+/** Bu uygulamanın PDF'ine gömülen not verisi (varsa): dışa aktarılan notu BİREBİR geri kurar. */
+function pdfGomuluVeri(u8) {
+  const i = ARA(u8, bayt("NOTLAR-V1\n"));
+  if (i < 0) return null;
+  const bas = i + 10;
+  const son = ARA(u8, bayt("\nendstream"), bas);
+  if (son < 0) return null;
+  try {
+    return JSON.parse(new TextDecoder("utf-8").decode(u8.subarray(bas, son)).trim());
+  } catch {
+    return null;
+  }
+}
+
+/** Başka kaynaktan PDF: içerik akışlarındaki Tj/TJ metinlerini sırayla toplar (en iyi çaba). */
+export async function pdfMetniCikar(u8) {
+  const latin = new TextDecoder("latin1").decode(u8);
+  const satirlar = [];
+  let sonY = null;
+  let simdiki = "";
+  const bitir = () => {
+    if (simdiki.trim()) satirlar.push(simdiki.replace(/\s+/g, " ").trim());
+    simdiki = "";
+  };
+  const re = /stream\r?\n/g;
+  let m;
+  while ((m = re.exec(latin))) {
+    const bas = m.index + m[0].length;
+    const son = latin.indexOf("endstream", bas);
+    if (son < 0) break;
+    const sozluk = latin.slice(Math.max(0, m.index - 300), m.index);
+    let veri = u8.subarray(bas, son);
+    try {
+      if (/FlateDecode/.test(sozluk.slice(sozluk.lastIndexOf("obj")))) {
+        // "endstream"den önceki satır sonu akışın parçası değildir (PDF 7.3.8); sıkıştırma artığı sayılıp reddedilmesin
+        const kesik = veri.subarray(0, veri.length - (veri[veri.length - 1] === 10 ? (veri[veri.length - 2] === 13 ? 2 : 1) : veri[veri.length - 1] === 13 ? 1 : 0));
+        veri = await zlibAc(kesik).catch(() => zlibAc(veri));
+      }
+    } catch {
+      continue;
+    }
+    const icerik = new TextDecoder("latin1").decode(veri);
+    if (!/\bBT\b/.test(icerik)) continue;
+    for (const bt of icerik.matchAll(/BT([\s\S]*?)ET/g)) {
+      const jeton = /\((?:\\[\s\S]|[^\\)])*\)|\[(?:\((?:\\[\s\S]|[^\\)])*\)|[^\]])*\]\s*TJ|-?[\d.]+\s+-?[\d.]+\s+T[dD]|T\*|-?[\d.]+\s+-?[\d.]+\s+-?[\d.]+\s+-?[\d.]+\s+-?[\d.]+\s+-?[\d.]+\s+Tm/g;
+      let j;
+      let ilkKonum = true; // BT içindeki İLK konum mutlaktır, sonrakiler göreli
+      while ((j = jeton.exec(bt[1]))) {
+        const t = j[0];
+        if (t.startsWith("(")) simdiki += pdfDizgisi(t.slice(1, -1));
+        else if (t.startsWith("[")) {
+          for (const p of t.matchAll(/\(((?:\\[\s\S]|[^\\)])*)\)|(-?[\d.]+)/g)) {
+            if (p[1] !== undefined) simdiki += pdfDizgisi(p[1]);
+            else if (parseFloat(p[2]) < -250) simdiki += " ";
+          }
+        } else if (t === "T*") bitir();
+        else {
+          const say = t.trim().split(/\s+/);
+          const y = parseFloat(t.endsWith("Tm") ? say[5] : say[1]);
+          if (ilkKonum) {
+            // aynı satırdaki parçalar (aynı y) boşlukla birleşir, y değişince satır biter
+            if (sonY !== null && Math.abs(y - sonY) > 1) bitir();
+            else if (simdiki) simdiki += " ";
+            sonY = y;
+            ilkKonum = false;
+          } else if (!t.endsWith("Tm") && Math.abs(y) > 0.5) bitir();
+        }
+      }
+    }
+    bitir();
+    sonY = null; // sayfa/akış değişti
+  }
+  return satirlar;
+}
+
+async function pdfCoz(ad, u8, ctx) {
+  const v = pdfGomuluVeri(u8);
+  if (v && typeof v === "object") {
+    const kap = document.createElement("div");
+    Bicim.htmlKur(String(v.html || ""), kap);
+    const m = metaDuzelt({ baslik: v.baslik, klasor: v.klasor, kategori: v.kategori, durum: v.durum, tarih: v.tarih, etiketler: v.etiketler, olusturma: v.olusturma }, ctx);
+    const alintilar = Array.isArray(v.alintilar)
+      ? v.alintilar.map((a) => ({ alinti: String(a?.alinti || ""), kaynak: String(a?.kaynak || ""), sayfa: String(a?.sayfa || ""), yorum: String(a?.yorum || "") })).filter((a) => a.alinti || a.yorum)
+      : [];
+    return taslak(ad, { ...m, html: temizHtml(kap), alintilar }, ctx);
+  }
+  const satirlar = await pdfMetniCikar(u8);
+  const metin = satirlar.join("\n");
+  if ((metin.match(/\p{L}/gu) || []).length < 20) throw new Error("Bu PDF'ten metin okunamadı (taranmış görüntü ya da özel kodlamalı olabilir). Word, Markdown veya HTML sürümünü kullan.");
+  // Başka kaynaktan PDF'te yapı bilgisi yoktur: satırlar paragraf olur
+  const md = satirlar.map((x) => MD_KACIS(x)).join("\n\n");
+  return taslak(ad, { html: markdownHtml(md), uyarilar: ["Başka kaynaktan PDF: yalnızca düz metin alındı; biçimlendirme ve görseller yok. Satır kırılmaları paragraf sayıldı."] }, ctx);
+}
+
 /* ---------- ZIP paketi ---------- */
 
-const TERCIH = { md: 0, html: 1, docx: 2, txt: 3, json: 4 };
+const TERCIH = { md: 0, html: 1, pdf: 2, docx: 3, txt: 4, json: 5 };
 
 async function zipCoz(ad, bayt, ctx, atlanan) {
   const z = await zipOku(bayt);
@@ -557,10 +663,7 @@ async function zipCoz(ad, bayt, ctx, atlanan) {
     if (parcalar.some((p, i) => i < parcalar.length - 1 && katla(p) === "ekler")) continue; // ek klasörü
     if (/^Dizin\.md$/i.test(dosya)) continue;
     const u = UZANTI[uzantiAl(dosya)];
-    if (!u || u === "zip") {
-      if (uzantiAl(dosya) === "pdf") atlanan.push(`${yol}: PDF içeri aktarılamaz (aynı notun Markdown/Word/HTML sürümü varsa o alınır).`);
-      continue;
-    }
+    if (!u || u === "zip") continue;
     adaylar.push({ g, yol, u, parcalar });
   }
   // Aynı not birden çok biçimde paketlenmişse (Markdown/ Word/ HTML/ Metin/) yalnızca en iyi biçimi al.
@@ -599,12 +702,13 @@ async function dosyaCoz(ad, bayt, ctx, atlanan, zipAcilsin = true) {
     case "txt": return [metinCoz(ad, metin(), ctx)];
     case "json": return jsonNotlari(ad, JSON.parse(metin()), ctx);
     case "html": return [htmlCoz(ad, metin(), ctx)];
+    case "pdf": return [await pdfCoz(ad, bayt, ctx)];
     case "docx": return [await docxCoz(ad, bayt.buffer.slice(bayt.byteOffset, bayt.byteOffset + bayt.byteLength), ctx)];
     case "zip":
       if (!zipAcilsin) return [];
       return zipCoz(ad, bayt.buffer.slice(bayt.byteOffset, bayt.byteOffset + bayt.byteLength), ctx, atlanan);
     default:
-      throw new Error(uzantiAl(ad) === "pdf" ? "PDF içeri aktarılamaz; Word, Markdown, HTML ya da metin sürümünü kullan." : "Desteklenmeyen dosya türü.");
+      throw new Error("Desteklenmeyen dosya türü (desteklenenler: Markdown, metin, JSON, HTML, Word, PDF, ZIP).");
   }
 }
 
