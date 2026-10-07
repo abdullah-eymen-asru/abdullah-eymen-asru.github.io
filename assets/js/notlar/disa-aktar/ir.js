@@ -204,3 +204,21 @@ export function kunyeSatirlari(k, { turAdi, durumAdi }) {
   s.push(["Son güncelleme", insanTarih(k.guncelleme)]);
   return s;
 }
+
+/**
+ * htmlBloklari() + EKSİKSİZLİK GÜVENCESİ: bloklardan hiçbiri görünür metin/görsel/ayraç içermiyor ama
+ * notun metni (HTML metni ya da Markdown gövdesi) doluysa, metin düz paragraflar olarak geri konur.
+ * Böylece "künye var ama gövde boş" türü bir dışa aktarma hiçbir koşulda üretilmez.
+ */
+export function bloklariGuvenceyleUret(temizHtml, govde = "") {
+  const bloklar = htmlBloklari(temizHtml);
+  const doluMu = bloklar.some((b) => b.t === "img" || b.t === "hr" || (b.runs || []).some((r) => r.br || String(r.text || "").trim()));
+  if (doluMu) return bloklar;
+  const belge = new DOMParser().parseFromString(String(temizHtml || ""), "text/html");
+  const duz = (String(govde || "").replace(YER_TUTUCU, "").trim() || (belge.body.textContent || "").trim());
+  if (!duz) return bloklar;
+  return duz.split(/\n{2,}/).map((para) => ({
+    t: "p",
+    runs: para.split("\n").flatMap((satir, i) => (i ? [{ br: true }, { text: satir }] : [{ text: satir }])),
+  }));
+}
