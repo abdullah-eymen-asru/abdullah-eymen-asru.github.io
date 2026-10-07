@@ -26,6 +26,34 @@ const W_B = [278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556
 const OZEL = { Ğ: 1, ğ: 2, İ: 3, ı: 4, Ş: 5, ş: 6, "‘": 145, "’": 146, "“": 147, "”": 148, "•": 149, "–": 150, "—": 151, "…": 133, "€": 128, "™": 153 };
 const TABAN_HARF = { Ğ: "G", ğ: "g", İ: "I", ı: "i", Ş: "S", ş: "s" };
 
+/* Helvetica'da olmayan sık karakterler için yakın karşılıklar ("?" yerine okunur metin). */
+const BENZER = {
+  "→": "->", "←": "<-", "↔": "<->", "⇒": "=>", "✓": "v", "✔": "v", "✗": "x", "✘": "x", "≥": ">=", "≤": "<=", "≠": "!=", "≈": "~",
+  "−": "-", "‐": "-", "‑": "-", "‒": "-", "′": "'", "″": '"', "‚": ",", "„": '"', "‹": "<", "›": ">", "\u2009": " ", "\u202f": " ",
+  "\u2002": " ", "\u2003": " ", "\u200b": "", "\ufeff": "", "☐": "[ ]", "☑": "[x]", "★": "*", "☆": "*", "◦": "-", "▪": "-", "●": "•",
+};
+const kodlanabilirMi = (ch) => OZEL[ch] !== undefined || (ch.codePointAt(0) >= 32 && ch.codePointAt(0) <= 126) || (ch.codePointAt(0) >= 160 && ch.codePointAt(0) <= 255);
+
+/** PDF yazı tipinde bulunmayan karakterleri yakın karşılığına çevirir; çevrilemeyenleri sayar. */
+export function pdfMetni(metin, sayac = null) {
+  let c = "";
+  for (const ch of String(metin ?? "")) {
+    if (ch === "\t" || ch === "\n" || ch === "\r") c += " ";
+    else if (kodlanabilirMi(ch)) c += ch;
+    else if (BENZER[ch] !== undefined) c += BENZER[ch];
+    else {
+      const taban = ch.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      if (taban && [...taban].every(kodlanabilirMi)) c += taban;
+      else if (/[\u0300-\u036f\u200c-\u200f\ufe0f]/.test(ch)) continue; // birleştirici işaret / görünmez
+      else {
+        c += "?";
+        if (sayac) sayac.kayip++;
+      }
+    }
+  }
+  return c;
+}
+
 function kodla(ch) {
   if (OZEL[ch] !== undefined) return OZEL[ch];
   const c = ch.codePointAt(0);
@@ -87,6 +115,7 @@ export class PdfBelge {
     this.sayfalar = [];
     this.resimler = []; // {bayt, g, y}
     this.y = 0;
+    this.kayip = 0; // yazı tipinde karşılığı olmayan, "?" ile gösterilen karakter sayısı
     this.yeniSayfa();
   }
 
@@ -113,7 +142,7 @@ export class PdfBelge {
         continue;
       }
       const stil = { b: r.b || kalinZorla, i: r.i, u: r.u, s: r.s, mark: r.mark };
-      for (const parca of r.text.split(/(\s+)/)) {
+      for (const parca of pdfMetni(r.text, this).split(/(\s+)/)) {
         if (!parca) continue;
         if (/^\s+$/.test(parca)) kelimeler.push({ bosluk: true, stil });
         else kelimeler.push({ text: parca, stil });
@@ -407,6 +436,9 @@ export async function pdfUret({ baslik, kunye, bloklar, resimAl, alintilar, yaza
       if (kunyeMetni) belge.paragraf([{ text: `— ${kunyeMetni}` }], { boyut: 9.5, x: 20, renk: "0.4 0.42 0.48", sonrasi: 3 });
       if (a.yorum.trim()) belge.paragraf([{ text: "Yorumum: ", b: true }, { text: a.yorum.trim() }], { boyut: 11, x: 20, sonrasi: 8 });
     }
+  }
+  if (belge.kayip > 0) {
+    belge.paragraf([{ text: `Not: ${belge.kayip} karakter (emoji ya da Latin dışı yazı) PDF yazı tipinde bulunmadığı için "?" olarak gösterildi. Metnin tamamı için Word, Markdown veya Web sayfası çıktısını kullanabilirsin.`, i: true }], { boyut: 8.5, renk: "0.45 0.47 0.52", oncesi: 12, sonrasi: 0 });
   }
   return belge.bayta(true);
 }
