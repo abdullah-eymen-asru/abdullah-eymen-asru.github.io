@@ -240,19 +240,52 @@
 .uya-dlg-not, .uya-dlg-durum { margin: 0; font-size: 0.8rem; }
 @media (max-width: 480px) { .uya-dlg-bicimler { grid-template-columns: 1fr; } }
 
-/* ---- Yetki paneli: üye verisi indirme izinleri ---- */
-.uya-yp-liste { display: grid; gap: 8px; }
-.uya-yp-kart { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); }
-.uya-yp-kart-metin { display: grid; gap: 2px; min-width: 0; font-size: 0.88rem; }
-.uya-yp-kart-eylem { display: flex; gap: 8px; }
-.uya-yp-grup { display: grid; gap: 6px; margin: 0 0 12px; padding: 0; border: 0; }
-.uya-yp-grup legend { padding: 0; margin-bottom: 4px; font-weight: 700; font-size: 0.9rem; }
-.uya-yp-secenek { display: inline-flex; align-items: center; gap: 8px; font-size: 0.88rem; cursor: pointer; }
-.uya-yp-roller { display: flex; flex-wrap: wrap; gap: 6px 16px; padding-left: 24px; }
+/* ---- Üye verisi indirme sekmesi (sade): yönetici satırları + geçmiş ---- */
+.uya-yp-kart { margin: 0 0 16px; padding: 18px 20px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; }
+.uya-yp-kart h3 { margin: 0 0 4px; font-size: 1.05rem; }
+.uya-yp-aciklama { margin: 0 0 14px; font-size: 0.88rem; }
+.uya-yp-liste { display: grid; gap: 10px; }
+.uya-yp-satir { border: 1px solid var(--border); border-radius: 12px; background: var(--bg); overflow: hidden; }
+.uya-yp-ust { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+.uya-yp-avatar { flex: none; display: grid; place-items: center; width: 38px; height: 38px; font-weight: 700; color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); border-radius: 50%; }
+.uya-yp-kimlik { flex: 1 1 auto; min-width: 0; display: grid; gap: 4px; justify-items: start; }
+.uya-yp-kimlik strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.uya-yp-rozet { display: inline-block; padding: 2px 10px; font-size: 0.78rem; font-weight: 600; border-radius: 999px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.uya-yp-rozet--yok { color: var(--muted); background: color-mix(in srgb, var(--muted) 14%, transparent); }
+.uya-yp-rozet--tum { color: #15803d; background: rgba(34, 197, 94, 0.16); }
+.uya-yp-rozet--rol { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.uya-yp-duzen-alani { border-top: 1px solid var(--border); }
+.uya-yp-duzen { display: grid; gap: 14px; padding: 14px; }
+.uya-yp-segmentler { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.uya-yp-seg { display: grid; gap: 2px; align-content: start; text-align: left; padding: 10px 12px; color: var(--text); background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; font: inherit; }
+.uya-yp-seg span { font-size: 0.76rem; color: var(--muted); line-height: 1.3; }
+.uya-yp-seg:hover { border-color: var(--accent); }
+.uya-yp-seg--secili { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; background: color-mix(in srgb, var(--accent) 8%, var(--card-bg)); }
+.uya-yp-roller { display: flex; flex-wrap: wrap; gap: 8px; }
+.uya-yp-pil { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; font-size: 0.86rem; border: 1px solid var(--border); border-radius: 999px; cursor: pointer; background: var(--card-bg); }
+.uya-yp-pil:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--card-bg)); }
+.uya-yp-pil input { accent-color: var(--accent); margin: 0; }
+.uya-yp-gelismis { border: 1px dashed var(--border); border-radius: 10px; padding: 8px 12px; }
+.uya-yp-gelismis > summary { cursor: pointer; font-size: 0.86rem; color: var(--muted); }
+.uya-yp-gelismis[open] > summary { margin-bottom: 10px; }
+.uya-yp-alan { display: grid; gap: 6px; margin-bottom: 10px; }
+.uya-yp-etiket { font-size: 0.82rem; font-weight: 600; }
 .uya-yp-secici { display: flex; flex-wrap: wrap; gap: 8px; }
-.uya-yp-secici input, .uya-yp-secici select { flex: 1 1 180px; min-width: 0; }
-.uya-yp-cipler { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.uya-yp-cip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 10px; font-size: 0.8rem; border: 1px solid var(--border); border-radius: 999px; background: var(--bg); }
+.uya-yp-secici input, .uya-yp-secici select { flex: 1 1 160px; min-width: 0; }
+.uya-yp-cipler { display: flex; flex-wrap: wrap; gap: 6px; }
+.uya-yp-cip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 10px; font-size: 0.8rem; border: 1px solid var(--border); border-radius: 999px; background: var(--card-bg); }
 .uya-yp-cip button { width: 20px; height: 20px; padding: 0; line-height: 1; color: var(--muted); background: transparent; border: 0; border-radius: 50%; cursor: pointer; }
 .uya-yp-cip button:hover { color: var(--text); background: var(--border); }
-.uya-yp-kayit { margin: 0; padding-left: 18px; font-size: 0.85rem; }
+.uya-yp-eylem { display: flex; justify-content: flex-end; gap: 10px; }
+
+.uya-yp-gecmis-ust { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.uya-yp-gecmis-eylem { display: flex; flex-wrap: wrap; gap: 8px; }
+.uya-yp-tablo { display: grid; max-height: 420px; overflow: auto; border: 1px solid var(--border); border-radius: 10px; }
+.uya-yp-tr { display: grid; grid-template-columns: 36px minmax(140px, 2fr) 70px 60px minmax(130px, 1.2fr); gap: 8px; align-items: center; padding: 8px 12px; font-size: 0.86rem; border-top: 1px solid var(--border); min-width: 520px; }
+.uya-yp-tr:first-child { border-top: 0; }
+.uya-yp-tr--baslik { position: sticky; top: 0; z-index: 1; font-size: 0.76rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); background: var(--card-bg); }
+.uya-yp-hucre-kutu { display: grid; place-items: center; cursor: pointer; }
+.uya-yp-hucre-kutu input { accent-color: var(--accent); }
+.uya-yp-kim { display: grid; gap: 1px; min-width: 0; }
+.uya-yp-kim strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 640px) { .uya-yp-segmentler { grid-template-columns: 1fr; } }
