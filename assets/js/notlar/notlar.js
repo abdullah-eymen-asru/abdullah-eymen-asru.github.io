@@ -2800,16 +2800,88 @@ async function klasorYoluCoz(yol, kokId, onbellek) {
   return ust;
 }
 
-/** Taslakları MEVCUT E2EE hattından geçirir: modelOlustur → Kasa.notuSifrele → INSERT (modeliKaydet). */
+/** Ham baytı (içeri aktarılan belgeden çıkan görsel) mevcut ek hattından geçirir: şifrele → R2 → kayıt. dosyalariEkle ile aynı adımlar. */
+async function ekBaytYukle(bayt, ad, tip) {
+  if (!IZINLI_EK_TIPLERI.has(tip)) throw new Error("desteklenmeyen görsel türü");
+  if (bayt.byteLength > EK_UST_SINIR) throw new Error(`${EK_UST_SINIR / 1048576} MB sınırını aşıyor`);
+  if (!tipiDogrula(bayt.subarray(0, 16), tip)) throw new Error("görsel içeriği türüyle uyuşmuyor");
+  const anahtar = `notlar/${Kasa.kullaniciKimligi()}/${crypto.randomUUID()}`;
+  const ham = bayt.buffer.slice(bayt.byteOffset, bayt.byteOffset + bayt.byteLength);
+  const sifreli = await Kasa.ekiSifrele(ham, anahtar);
+  await ekIstegi("PUT", anahtar, sifreli);
+  const { error } = await supabase.from("not_ek_kayitlari").insert({ r2_key: anahtar, boyut_bayt: sifreli.byteLength });
+  if (error) {
+    await ekIstegi("DELETE", anahtar).catch(() => {});
+    throw error;
+  }
+  return { id: crypto.randomUUID(), ad: ad.slice(0, 120), tip, boyut: bayt.byteLength, anahtar };
+}
+
+const GORSEL_UZANTI = { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp" };
+const NOT_YUK_UST = 470 * 1024; // sunucu: şifreli yük ≤ 700000 karakter ≈ 512 KB düz JSON (notlar_ciphertext_check)
+
+/**
+ * Gövdedeki geçici görsel kimliklerini (data-ek="ia-g-N") gerçek ek kimlikleriyle değiştirir;
+ * seçilmeyen/yüklenemeyen görselleri gövdeden kaldırır. Yalnızca görseli olan taslaklara uygulanır.
+ */
+function gorselleriBagla(html, eslesme) {
+  const kap = document.createElement("div");
+  Bicim.htmlKur(html, kap);
+  for (const im of [...kap.querySelectorAll("img[data-ek]")]) {
+    const gecici = im.getAttribute("data-ek");
+    if (!/^ia-g-\d+$/.test(gecici)) continue;
+    if (eslesme.has(gecici)) im.setAttribute("data-ek", eslesme.get(gecici));
+    else {
+      const ata = im.parentElement;
+      im.remove();
+      if (ata && ata !== kap && !ata.textContent.trim() && !ata.querySelector("img")) ata.remove();
+    }
+  }
+  const yeniHtml = kap.innerHTML;
+  return { html: yeniHtml, govde: Bicim.htmlMarkdown(yeniHtml) };
+}
+
+/** Taslakları MEVCUT E2EE hattından geçirir: [seçilen görseller → ek olarak şifrele+R2] → modelOlustur → Kasa.notuSifrele → INSERT (modeliKaydet). */
 async function iceAktarimiYaz({ notlar, hedefKlasorId, klasorYapisi }, ilerleme) {
   const onbellek = new Map();
   const hata = [];
   const basarisiz = [];
   let eklenen = 0;
+  let gorselEklenen = 0;
+  const gorselSorunlari = [];
   for (let i = 0; i < notlar.length; i++) {
     const t = notlar[i];
-    ilerleme(i, notlar.length, t.baslik || "Başlıksız not");
+    const ad = t.baslik || "Başlıksız not";
+    ilerleme(i, notlar.length, ad);
+    const yuklenenler = []; // not kaydı başarısız olursa geri alınacak ekler
     try {
+      let { html, govde } = t;
+      const ekler = [];
+      const gorseller = t.gorseller || [];
+      if (gorseller.length) {
+        const eslesme = new Map();
+        const secili = gorseller.filter((g) => g.secili !== false).slice(0, NOT_BASINA_EK);
+        if (gorseller.filter((g) => g.secili !== false).length > NOT_BASINA_EK) gorselSorunlari.push(`${ad}: en fazla ${NOT_BASINA_EK} görsel eklenebilir, fazlası alınmadı.`);
+        for (let k = 0; k < secili.length; k++) {
+          const g = secili[k];
+          ilerleme(i, notlar.length, `${ad} · görsel ${k + 1}/${secili.length}`);
+          try {
+            const ek = await ekBaytYukle(g.bayt, `gorsel-${g.id.replace("ia-g-", "")}.${GORSEL_UZANTI[g.tip] || "bin"}`, g.tip);
+            yuklenenler.push(ek);
+            ekler.push(ek);
+            eslesme.set(g.id, ek.id);
+          } catch (h) {
+            console.warn("görsel yüklenemedi:", h);
+            gorselSorunlari.push(`${ad} · ${g.id.replace("ia-g-", "Görsel ")}: ${h.message || h}`);
+          }
+        }
+        ({ html, govde } = gorselleriBagla(html, eslesme));
+      }
+      const alintilar = t.alintilar.map((a) => ({ id: crypto.randomUUID(), ...a }));
+      // Sunucu sınırını AŞMADAN önce anlaşılır hata ver (ham veritabanı hatası yerine)
+      const yukBayt = new TextEncoder().encode(JSON.stringify({ html, govde, alintilar })).length;
+      if (yukBayt > NOT_YUK_UST) throw new Error(`not çok büyük (${Math.round(yukBayt / 1024)} KB; üst sınır ≈ ${Math.round(NOT_YUK_UST / 1024)} KB). Dosyayı bölüp tekrar dene.`);
+
       const klasor = klasorYapisi && t.klasorYolu.length ? await klasorYoluCoz(t.klasorYolu, hedefKlasorId, onbellek) : hedefKlasorId || null;
       const m = modelOlustur(crypto.randomUUID(), null, {
         baslik: t.baslik,
@@ -2818,24 +2890,28 @@ async function iceAktarimiYaz({ notlar, hedefKlasorId, klasorYapisi }, ilerleme)
         kategori: t.kategori || "genel",
         tarih: t.tarih || "",
         klasor,
-        html: t.html,
-        govde: t.govde,
-        alintilar: t.alintilar.map((a) => ({ id: crypto.randomUUID(), ...a })),
-        ekler: [],
+        html,
+        govde,
+        alintilar,
+        ekler,
         kokenOlusturma: t.olusturma,
       });
       haritayaIsle(await modeliKaydet(m, true));
       eklenen++;
+      gorselEklenen += ekler.length;
     } catch (h) {
       console.error(h);
-      hata.push(`${t.baslik || "Başlıksız not"}: ${h.message || h}`);
+      // Not yazılamadıysa yüklenen ekler yetim kalmasın
+      for (const ek of yuklenenler) await ekiTamamenSil(ek.anahtar);
+      const ham = String(h.message || h);
+      hata.push(`${ad}: ${/notlar_ciphertext_check|ciphertext/.test(ham) ? "not çok büyük (şifreli yük sınırı aşıldı); dosyayı bölüp tekrar dene" : ham}`);
       basarisiz.push(t);
     }
   }
   ilerleme(notlar.length, notlar.length, "");
   etiketFiltresiniDoldur();
   listeyiCiz();
-  return { eklenen, hata, basarisiz };
+  return { eklenen, hata, basarisiz, gorselEklenen, gorselSorunlari };
 }
 
 async function iceAktarAc() {
