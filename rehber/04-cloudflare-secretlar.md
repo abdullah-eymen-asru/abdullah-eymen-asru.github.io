@@ -69,6 +69,7 @@ dosyasındaki adresi de güncellemen gerekir.
 | 4.7 | `admin_guvenlik_bildirim_worker` | `admin-guvenlik-bildirim-worker` | `TELEGRAM_CHAT_ID` | `GIZLI_YOL`, `WEBHOOK_SHARED_SECRET`, `TELEGRAM_BOT_TOKEN` *(+ isteğe bağlı `TWILIO_*`)* | — |
 | 4.8 | `substack_feed_proxy_worker` | `substack-feed-proxy-worker` | — | — | — *(hiçbir şey girilmez)* |
 | 4.9 | `akademik_kutuphane_worker` | `akademik-kutuphane-worker` | `SUPABASE_URL`, `SUPABASE_ANON_KEY` *(+ yalnızca çok büyük dosya imzası için: `ACCOUNT_ID`, `BUCKET_NAME`)* | — *(bilerek `service_role` yok)* *(+ yalnızca çok büyük dosya imzası için: `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`)* | `AKADEMIK_BUCKET` |
+| 4.10 | `sistem_yedek_worker` | `sistem-yedek-worker` | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `GITHUB_OWNER`, `GITHUB_REPO` *(+ isteğe bağlı `GITHUB_REF`, `MAX_TARAMA_SAYFA`)* | `GITHUB_PAT` *(yalnızca repo **özel** ise; bilerek `service_role` yok)* | `AKADEMIK_BUCKET`, `ARSIV_BUCKET`, `NOT_EK_BUCKET` *(üçü de isteğe bağlı; bağlamadığın kaynak pakete girmez)* |
 
 > 💡 **"Variable mı Secret mı?" tablodaki sütunlar bir öneridir.** Kod ikisini de
 > aynı şekilde okur (`env.ADI`). Önemli olan, gizli değerlerin **Secret**
@@ -160,6 +161,8 @@ beklendiğinden onu mutlaka `openssl rand -base64 32` ile üret.
 | `GK_COOKIE_DAKIKA` | Pages projesi (Kasa uç katmanı) | `15` | Yetkili-geçiş cookie ömrü, dakika (1–120) |
 | `GK_AYAR_TTL_SN` | Pages projesi (Kasa uç katmanı) | `30` | `site_ayarlari` önbellek süresi, saniye (5–300) |
 | `GK_HATA_KILIT` | Pages projesi (Kasa uç katmanı) | boş (açık kal) | `1` ise: ayarlar okunamazsa **ve** bilinen son ayar yoksa siteyi kilitle |
+| `GITHUB_REF` | `sistem-yedek-worker` | `main` | Yedeklenecek dal adı |
+| `MAX_TARAMA_SAYFA` | `sistem-yedek-worker` | `40` | Depolama taramasında kova başına en çok kaç sayfa (1000 nesne/sayfa) listelensin |
 
 Hepsi **Variable (Text)**, değer sadece rakam (nokta/virgül/birim yok). `GK_*` değişkenleri Worker'a değil **Cloudflare Pages projesine** girilir (Bölüm 5.2-B).
 
@@ -187,7 +190,7 @@ Hepsi **Variable (Text)**, değer sadece rakam (nokta/virgül/birim yok). `GK_*`
 
 1. Worker → **Settings → Bindings** → **+ Add**.
 2. Tür olarak **R2 bucket** seç.
-3. **Variable name:** bölümüne binding adını yaz (Worker'a göre `MY_R2_BUCKET`, `NOT_EK_BUCKET` **veya** `AKADEMIK_BUCKET` — Bölüm 1 tablosunda hangisi olduğu yazıyor; harfi harfine).
+3. **Variable name:** bölümüne binding adını yaz (Worker'a göre `MY_R2_BUCKET`, `NOT_EK_BUCKET`, `AKADEMIK_BUCKET` **veya** `ARSIV_BUCKET` — Bölüm 1 tablosunda hangisi olduğu yazıyor; harfi harfine).
 4. **R2 bucket:** listesinden kovanı seç.
 5. **Deploy**.
 
@@ -453,6 +456,56 @@ listeleri) değiştirmeyi unutursan, tarayıcı Worker'a erişirken **CORS /
 
 ---
 
+### 4.10 `sistem-yedek-worker` — Sistem Yedekleme & Depolama Yönetimi (R2 dosyaları + GitHub zip akışı)
+
+**Ne yapar?** Panelde **Sistem & Güvenlik → 📦 Sistem Yedekleme** sekmesinden alınan tek ZIP paketinin (`site-yedek-YYYY-MM-DD.zip`) **büyük parçalarını** yetkiyi doğrulayarak tarayıcıya akıtır (Supabase **migration 0074** ile birlikte kurulur):
+
+- `GET /r2/liste?e=<oturum>` — pakete girecek R2 dosyalarının listesi (yönetici yalnızca **kendi** dosyaları; owner "tüm sistem" kapsamında hepsi).
+- `GET /r2/dosya?e=<oturum>&b=<kaynak>&k=<anahtar>` — tek dosyanın baytları (akış). Her istekte anahtar, oturumun kapsamındaki listede mi diye veritabanından yeniden doğrulanır.
+- `GET /github/zip?e=<oturum>&b=github|icerik_md` — site deposunun `zipball`'ı (akış). `.md` içerik bileşeni de bu zip'ten tarayıcıda ayıklanır.
+- `GET /depolama` — **yalnızca owner**: R2 kovalarının gerçek tarama özeti (veritabanında izi olmayan artık dosyalar dahil).
+- `GET /saglik` — hangi binding'lerin bağlı olduğunu gösterir.
+
+**Mimari notu:** Worker **ZIP üretmez, veritabanı satırı taşımaz.** ZIP tarayıcıda (akışlı, ZIP64) kurulur; veritabanı tabloları doğrudan Supabase RPC'lerinden gelir. Böylece Worker'da CPU/bellek sınırı sorunu yoktur (Free planda da çalışır) ve yeni bir R2 CORS kuralı gerekmez.
+
+| Tip | Ad | Değer | Nereden? |
+|---|---|---|---|
+| Variable | `SUPABASE_URL` | `https://<proje-ref>.supabase.co` | Bölüm 2.2 |
+| Variable | `SUPABASE_ANON_KEY` | `anon public` anahtarı | Bölüm 2.2 |
+| Variable | `GITHUB_OWNER` | GitHub kullanıcı adın | Bölüm 2.3 |
+| Variable | `GITHUB_REPO` | Site reposunun adı | Bölüm 2.3 |
+| **Secret** *(yalnızca repo özelse)* | `GITHUB_PAT` | Fine-grained token: **Contents: Read-only**, sadece site reposu | Bölüm 2.3 — `github-icerik-yonetim`'deki (yazma yetkili) token'ı **kullanma**; bu Worker için ayrı, salt okunur bir token üret |
+| Variable *(isteğe bağlı)* | `GITHUB_REF` | Dal adı (varsayılan `main`) | — |
+| Variable *(isteğe bağlı)* | `MAX_TARAMA_SAYFA` | Sadece rakam (varsayılan `40`) | Bölüm 2.6 |
+
+- **Binding'ler (hepsi isteğe bağlı):** Her biri, ilgili Worker'ın kullandığı kovanın **aynısına** bağlanır. Bağlamadığın kaynak pakete girmez (pakette `MANIFEST.json`'a "binding yok" notu düşer), hata vermez.
+
+  | Binding adı | Hangi kova? |
+  |---|---|
+  | `AKADEMIK_BUCKET` | `akademik-kutuphane-worker`'daki (4.9) kova |
+  | `ARSIV_BUCKET` | `r2-arsiv-worker`'da `MY_R2_BUCKET`'a bağlı (4.5) kova |
+  | `NOT_EK_BUCKET` | `r2-not-ek-worker`'daki (4.6) kova |
+
+- **`service_role` YOK** (bilinçli): Worker kullanıcının **kendi JWT'siyle** Supabase RPC çağırır; yetki kararı veritabanındadır. Buraya `SUPABASE_SERVICE_ROLE_KEY` **ekleme**.
+- **GitHub repon herkese açıksa `GITHUB_PAT` hiç gerekmez.** Özel repoda token olmadan GitHub `404` döner ve pakette hata notu görürsün.
+- **Kod içinde değiştirilecekler:** `IZINLI_ORIGINLER` listesi (worker.js) ve `SISTEM_YEDEK_WORKER_URL` (`assets/js/sistem-yedek/ortak.js`).
+
+**Kurulum adımları (sırayla):**
+
+1. **Supabase:** `supabase/migrations/0074_sistem_yedekleme_ve_depolama.sql` dosyasını SQL Editor'de **tek seferde** çalıştır. (Önceki 0001–0073 uygulanmış olmalı.)
+2. **Worker:** Bölüm 4'teki ortak başlangıçla `sistem-yedek-worker` oluştur, `cloudflare worker/sistem_yedek_worker/worker.js` içeriğini yapıştır, **Deploy**.
+3. **Variables:** Yukarıdaki tablodan `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `GITHUB_OWNER`, `GITHUB_REPO`'yu gir (repo özelse `GITHUB_PAT`'ı **Secret** olarak ekle). **Deploy.**
+4. **Binding'ler:** Worker → **Settings → Bindings → + Add → R2 bucket** ile yukarıdaki üç binding'i (kullanacaklarını) ekle → **Deploy**.
+5. **Adresi istemciye yaz:** Worker adresini `assets/js/sistem-yedek/ortak.js` → `SISTEM_YEDEK_WORKER_URL` sabitine yaz (varsayılan değer `aeymena` hesabına göredir), commit'le.
+6. **Yetkiyi aç (isteğe bağlı):** Panel → **Yetki Ayarları → 📦 Sistem Yedekleme** sekmesinde, yönetici / içerik sorumlusu / yazar rolleri için `can_export_system` anahtarını açarsın. **Varsayılan: hepsi kapalı; yalnızca owner erişir.**
+7. **Doğrula:** `https://sistem-yedek-worker.<hesap>.workers.dev/saglik` → `{"ok":true,"kaynaklar":{"akademik":true,"arsiv":true,"notek":true},"github":true}` görmelisin (bağlamadığın kaynak `false` görünür).
+
+**Veri izolasyonu (özet):** `can_export_system` açık bir yönetici bile yalnızca **kendi** notlarını, kaynaklarını, kendi R2 dosyalarını ve `.md`/kod bileşenlerini alır; başka kullanıcının verisini indirmek veritabanı tarafında engellenir. "Tüm sistem" (felaket yedeği) kapsamı yalnızca owner içindir. Notlar ve şifreli dosyalar pakette **şifreli halleriyle** durur (uçtan uca şifreleme korunur). Parolalar, 2FA yedek kodları ve servis anahtarları pakete hiçbir zaman girmez.
+
+**Kota göstergeleri:** Veritabanı boyutu `pg_database_size()` ile, R2 kullanımı veritabanı kayıtlarından hesaplanır (referans: Supabase ücretsiz 500 MB, R2 ücretsiz 10 GB; sabitler `sistem_depolama_durumu()` içindedir). Owner "R2'yi gerçekten tara" düğmesiyle Worker üzerinden kovanın kendisini sayabilir. %80'de **Uyarı**, %90'da **Kritik** rozeti çıkar.
+
+---
+
 ## 5. Cloudflare Pages ayarları
 
 Siteyi Cloudflare Pages'e bağladığında (**Workers & Pages → Create → Pages → Connect to Git**) ayarlar iki yerde durur: **Build** ve **Variables and secrets**. Pages ayarlarına sonradan:
@@ -598,6 +651,7 @@ Kurulumdan sonra tek tek işaretle:
 - [ ] Parola/token/key niteliğindeki her değer **Secret** (panelde `Value encrypted`). Özellikle: `TELEGRAM_BOT_TOKEN`, `WEBHOOK_SHARED_SECRET`, `GIZLI_YOL`, `GITHUB_*`, `R2_*`, `SUPABASE_SERVICE_ROLE_KEY`, `E2EE_KASA_SECRET`, `TWILIO_AUTH_TOKEN`, `GK_COOKIE_SECRET` (Pages).
 - [ ] `SUPABASE_SERVICE_ROLE_KEY` hiçbir `.js`/`.md`/`.yml` dosyasında ve hiçbir commit'te yok.
 - [ ] `r2-not-ek-worker`'da `service_role` yok.
+- [ ] `sistem-yedek-worker`'da `service_role` yok; varsa `GITHUB_PAT` **salt okunur** (Contents: Read-only) ve içerik yönetimi token'ından ayrı; `can_export_system` yalnızca gerçekten ihtiyacı olan rollerde açık.
 - [ ] `akademik-kutuphane-worker`'da `service_role` yok; `AKADEMIK_BUCKET` ayrı bir kovaya bağlı; (büyük dosya imzası kullanıyorsan) R2 token'ı yalnızca ilgili kovalara izinli ve kovada `PUT`'a izinli CORS kuralı var.
 - [ ] Kasa uç katmanını kurduysan: Pages'te `SUPABASE_ANON_KEY` olarak **anon public** var (`service_role` değil) ve `GK_COOKIE_SECRET` en az 32 karakterli bir **Secret**; değişkenler hem Production hem Preview'a girildi.
 - [ ] İki `GITHUB_TOKEN` (okuma/yazma) **farklı** token'lar; okuma olan yazma yetkisi taşımıyor.
@@ -634,6 +688,10 @@ Kurulumdan sonra tek tek işaretle:
 | Kaydederken "imza yapılandırılmamış" (501) | PDF 90 MB'ın üstünde ve büyük dosya imzası secret'ları girilmemiş | Bölüm 4.9: `ACCOUNT_ID`, `BUCKET_NAME`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` + kova CORS'u |
 | Kaydederken 409 "PDF başka bir sekmede güncellenmiş" | Aynı PDF iki yerde düzenlenip biri kaydedildi | Okuyucuyu kapatıp yeniden aç, değişikliklerini tekrar uygula |
 | Zamanlanmış yazı yayına çıkmıyor | `CLOUDFLARE_DEPLOY_HOOK_URL` GitHub'da yok ya da hook silinmiş | Bölüm 5.3 |
+| Sistem Yedekleme sekmesi görünmüyor | Migration 0074 uygulanmadı ya da owner bu rol için `can_export_system`'i açmadı (varsayılan kapalı) | 0074'ü çalıştır; Yetki Ayarları → 📦 Sistem Yedekleme'den rolü aç |
+| Yedekte R2 dosyaları yok / MANIFEST'te "binding yok" | `sistem-yedek-worker`'da `AKADEMIK_BUCKET` / `ARSIV_BUCKET` / `NOT_EK_BUCKET` bağlı değil | Bölüm 4.10 adım 4; `/saglik` çıktısında ilgili kaynak `true` olmalı |
+| GitHub zip alınamadı (404 / 502) | Repo özel ve `GITHUB_PAT` yok ya da `GITHUB_OWNER` / `GITHUB_REPO` yanlış | Bölüm 4.10: salt okunur `GITHUB_PAT` ekle, ad değerlerini kontrol et |
+| Dışa aktarma "Geçerli bir dışa aktarma oturumu yok" diyor | Oturum 6 saatten eski ya da yetki işlem sırasında kapatıldı | İşlemi yeniden başlat |
 
 ---
 
