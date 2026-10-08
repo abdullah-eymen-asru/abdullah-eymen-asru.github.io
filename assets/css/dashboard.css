@@ -706,3 +706,15 @@ body.dash-nav-acik {
 @media (max-width: 480px) {
   .ya-altsekme { padding: 9px 12px; font-size: 0.88rem; }
 }
+
+/* ---- KVKK paneli: hukuki paket eşgüdüm göstergesi (migration 0073) ---- */
+.kvkk-esgudum { margin: 8px 0 0; padding: 8px 12px; font-size: 0.86rem; border-radius: 10px; border: 1px solid var(--border); }
+.kvkk-esgudum--tamam { color: #1e6b3a; background: #eaf7ee; border-color: #b7e3c4; }
+.kvkk-esgudum--uyari { color: #7a5b06; background: #fff8e6; border-color: #f0dfa3; }
+[data-theme="dark"] .kvkk-esgudum--tamam { color: #8fe0a8; background: #16301f; border-color: #25513a; }
+[data-theme="dark"] .kvkk-esgudum--uyari { color: #f0d27a; background: #3a2f0f; border-color: #5a4a1a; }
+.kvkk-paket-secenek { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; font-size: 0.88rem; cursor: pointer; }
+.kvkk-paket-secenek input { margin-top: 3px; accent-color: var(--accent); }
+.kvkk-gelismis { border: 1px dashed var(--border); border-radius: 10px; padding: 8px 12px; }
+.kvkk-gelismis > summary { cursor: pointer; font-size: 0.88rem; color: var(--muted); }
+.kvkk-gelismis[open] > summary { margin-bottom: 8px; }
