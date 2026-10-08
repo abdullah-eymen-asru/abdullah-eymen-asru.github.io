@@ -289,3 +289,11 @@
 .uya-yp-kim { display: grid; gap: 1px; min-width: 0; }
 .uya-yp-kim strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 640px) { .uya-yp-segmentler { grid-template-columns: 1fr; } }
+
+/* ---- Taşma düzeltmesi: yönetici listesi (max yükseklik + iç kaydırma + yapışkan başlık) ---- */
+.uya-yp-kaydirma { max-height: min(55vh, 440px); overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; border: 1px solid var(--border); border-radius: 12px; }
+.uya-yp-liste-baslik { position: sticky; top: 0; z-index: 2; padding: 8px 14px; font-size: 0.76rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); background: var(--card-bg); border-bottom: 1px solid var(--border); }
+.uya-yp-kaydirma > .uya-yp-liste { padding: 10px; }
+.uya-yp-ust > button { flex: none; width: auto; min-width: 96px; }
+.uya-yp-gecmis--mesgul { opacity: 0.6; pointer-events: none; }
+@media (max-width: 480px) { .uya-yp-kaydirma { max-height: 60vh; } .uya-yp-ust { flex-wrap: wrap; } }
