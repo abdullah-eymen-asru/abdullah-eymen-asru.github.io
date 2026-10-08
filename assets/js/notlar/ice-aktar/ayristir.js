@@ -7,11 +7,15 @@
  *
  * Tüm içerik bicim.js'in BEYAZ LİSTESİNDEN geçirilir (ham HTML hiçbir zaman olduğu gibi alınmaz).
  * Dönen taslak: {baslik, html, govde, etiketler[], klasorYolu[], kategori, durum, tarih,
- *                olusturma, alintilar[], kaynak, uyarilar[]}
+ *                olusturma, alintilar[], kaynak, uyarilar[], gorseller[]}
+ *   gorseller[]: {id, tip, bayt(Uint8Array), pxG, pxY, sayfa} — belgeden çıkarılan GÖMÜLÜ görseller. Not gövdesinde
+ *   <img data-ek="ia-g-N"> (geçici kimlik) olarak durur; hangilerinin ek olarak yükleneceğini kullanıcı onay
+ *   ekranında seçer, notlar.js yükler ve kimlikleri gerçek ek kimlikleriyle değiştirir.
  * -----------------------------------------------------------------------
  */
 import * as Bicim from "../bicim.js";
 import { zipOku } from "./zip-oku.js";
+import { pdfCikar, PdfSifreliHatasi } from "./pdf-oku.js";
 
 const UZANTI = { md: "md", markdown: "md", mdown: "md", txt: "txt", text: "txt", json: "json", html: "html", htm: "html", docx: "docx", pdf: "pdf", zip: "zip" };
 export const KABUL_EDILEN = ".md,.markdown,.mdown,.txt,.text,.json,.html,.htm,.docx,.pdf,.zip";
@@ -97,7 +101,7 @@ const temizHtml = (dugum) => Bicim.duzenleyiciHtml(dugum);
 function taslak(ad, parca, ctx) {
   const t = {
     baslik: "", html: "", govde: "", etiketler: [], klasorYolu: [], kategori: null, durum: null, tarih: "", olusturma: null,
-    alintilar: [], kaynak: ad, uyarilar: [], ...parca,
+    alintilar: [], kaynak: ad, uyarilar: [], gorseller: [], ...parca,
   };
   if (!t.govde && t.html) t.govde = Bicim.htmlMarkdown(t.html);
   if (!t.baslik) t.baslik = dosyaGovdesi(ad).slice(0, 200);
@@ -336,6 +340,29 @@ function htmlCoz(ad, metin, ctx) {
 /* ---------- Word (.docx) ---------- */
 
 const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+const A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main";
+const R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+const VML_NS = "urn:schemas-microsoft-com:vml";
+const GORSEL_TIPI = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp" };
+const GORSEL_UST = 15 * 1024 * 1024;
+const GORSEL_ADET_UST = 40;
+
+/** PNG/JPEG/GIF başlığından piksel boyutu (yalnızca önizleme/bilgi için; hatada 0). */
+function gorselBoyutu(b, tip) {
+  try {
+    if (tip === "image/png") return { g: ((b[16] << 24) | (b[17] << 16) | (b[18] << 8) | b[19]) >>> 0, y: ((b[20] << 24) | (b[21] << 16) | (b[22] << 8) | b[23]) >>> 0 };
+    if (tip === "image/gif") return { g: b[6] | (b[7] << 8), y: b[8] | (b[9] << 8) };
+    if (tip === "image/jpeg") {
+      for (let i = 2; i < b.length - 9;) {
+        if (b[i] !== 0xff) { i++; continue; }
+        const m = b[i + 1];
+        if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return { g: (b[i + 7] << 8) | b[i + 8], y: (b[i + 5] << 8) | b[i + 6] };
+        i += 2 + ((b[i + 2] << 8) | b[i + 3]);
+      }
+    }
+  } catch { /* yoksay */ }
+  return { g: 0, y: 0 };
+}
 
 async function docxCoz(ad, bayt, ctx) {
   const z = await zipOku(bayt);
@@ -344,6 +371,42 @@ async function docxCoz(ad, bayt, ctx) {
   const xml = new DOMParser().parseFromString(await z.metin(g), "application/xml");
   const govde = xml.getElementsByTagNameNS(W, "body")[0];
   if (!govde) throw new Error("Word belgesi boş görünüyor.");
+
+  // Gömülü görseller (word/media/*): ilişki kimliği → geçici ek kimliği. Desteklenmeyenler (emf/wmf/tiff…) sayılır.
+  const gorseller = [];
+  const medya = new Map();
+  let desteklenmeyenGorsel = 0;
+  let toplamGorselBayt = 0;
+  try {
+    const rg = z.girisler.find((e) => e.ad === "word/_rels/document.xml.rels");
+    if (rg) {
+      const rx = new DOMParser().parseFromString(await z.metin(rg), "application/xml");
+      const yolId = new Map();
+      for (const r of rx.getElementsByTagName("Relationship")) {
+        if (!/\/image$/.test(r.getAttribute("Type") || "")) continue;
+        if (r.getAttribute("TargetMode") === "External") continue;
+        const hedef = r.getAttribute("Target") || "";
+        const yol = hedef.startsWith("/") ? hedef.slice(1) : new URL(hedef, "http://x/word/").pathname.slice(1);
+        const tip = GORSEL_TIPI[(/\.([a-z0-9]+)$/i.exec(yol) || [])[1]?.toLowerCase()];
+        if (!tip) { desteklenmeyenGorsel++; continue; }
+        let id = yolId.get(yol);
+        if (!id) {
+          if (gorseller.length >= GORSEL_ADET_UST) continue;
+          const g = z.girisler.find((e) => e.ad === yol);
+          if (!g) continue;
+          const bayt = await z.oku(g);
+          const d = gorselBoyutu(bayt, tip);
+          const kucuk = d.g && d.y ? d.g < 48 || d.y < 48 : bayt.length < 1500; // simge/madde imi/süs
+          if (kucuk || bayt.length > GORSEL_UST || toplamGorselBayt + bayt.length > 100 * 1024 * 1024) continue;
+          toplamGorselBayt += bayt.length;
+          id = `ia-g-${gorseller.length + 1}`;
+          gorseller.push({ id, tip, bayt, pxG: d.g, pxY: d.y, sayfa: 0 });
+          yolId.set(yol, id);
+        }
+        medya.set(r.getAttribute("Id"), id);
+      }
+    }
+  } catch { /* görseller alınamazsa metin yine alınır */ }
 
   const kap = document.createElement("div");
   const meta = {};
@@ -382,7 +445,24 @@ async function docxCoz(ad, bayt, ctx) {
         else if (c.localName === "br") {
           bosalt();
           hedef.append(document.createElement("br"));
-        } else if (c.localName === "drawing" || c.localName === "pict") gorselSayisi++;
+        } else if (c.localName === "drawing" || c.localName === "pict") {
+          bosalt();
+          let bulundu = 0;
+          const kimlikler = [
+            ...[...c.getElementsByTagNameNS(A_NS, "blip")].map((b) => b.getAttributeNS(R_NS, "embed") || b.getAttributeNS(R_NS, "link")),
+            ...[...c.getElementsByTagNameNS(VML_NS, "imagedata")].map((b) => b.getAttributeNS(R_NS, "id")),
+          ];
+          for (const rid of kimlikler) {
+            const id = rid && medya.get(rid);
+            if (!id) continue;
+            const im = document.createElement("img");
+            im.setAttribute("data-ek", id);
+            im.setAttribute("alt", "Görsel " + id.replace("ia-g-", ""));
+            hedef.append(im);
+            bulundu++;
+          }
+          if (!bulundu) gorselSayisi++;
+        }
       }
       bosalt();
     }
@@ -495,20 +575,28 @@ async function docxCoz(ad, bayt, ctx) {
     kap.append(pe);
   };
 
-  for (const c of govde.children) {
-    if (c.localName === "p") paragraf(c);
-    else if (c.localName === "tbl") {
-      yigin.length = 0;
-      for (const tr of c.getElementsByTagNameNS(W, "tr")) {
-        const pe = document.createElement("p");
-        pe.append([...tr.getElementsByTagNameNS(W, "tc")].map((tc) => [...tc.getElementsByTagNameNS(W, "p")].map(duzMetin).join(" ").trim()).join(" | "));
-        kap.append(pe);
-      }
+  const KAPSAYICI = new Set(["sdt", "sdtContent", "customXml", "ins", "moveTo", "smartTag", "txbxContent"]);
+  const gez = (dugum) => {
+    for (const c of dugum.children) {
+      try {
+        if (c.localName === "p") paragraf(c);
+        else if (c.localName === "tbl") {
+          yigin.length = 0;
+          for (const tr of c.getElementsByTagNameNS(W, "tr")) {
+            const pe = document.createElement("p");
+            const hucreler = [...tr.getElementsByTagNameNS(W, "tc")].map((tc) => [...tc.getElementsByTagNameNS(W, "p")].map(duzMetin).join(" ").trim());
+            pe.append(hucreler.join(" | "));
+            if (pe.textContent.replace(/[|\s]/g, "")) kap.append(pe);
+          }
+        } else if (KAPSAYICI.has(c.localName)) gez(c);
+      } catch { /* tek paragrafın hatası belgenin kalanını engellemesin */ }
     }
-  }
+  };
+  gez(govde);
   const m = metaDuzelt({ ...meta, ...(baslik ? { baslik } : {}) }, ctx);
-  const uyarilar = gorselSayisi ? [`${gorselSayisi} görsel alınmadı (ekler şifreli depoya taşınmaz).`] : [];
-  return taslak(ad, { ...m, html: temizHtml(kap), alintilar, uyarilar }, ctx);
+  const uyarilar = [];
+  if (gorselSayisi + desteklenmeyenGorsel) uyarilar.push(`${gorselSayisi + desteklenmeyenGorsel} görsel alınamadı (desteklenmeyen biçim: EMF/WMF/TIFF, çizim nesnesi ya da çok büyük/çok küçük).`);
+  return taslak(ad, { ...m, html: temizHtml(kap), alintilar, uyarilar, gorseller: gorseller.filter((g) => kap.querySelector(`img[data-ek="${g.id}"]`)) }, ctx);
 }
 
 /* ---------- PDF ---------- */
@@ -628,6 +716,37 @@ export async function pdfMetniCikar(u8) {
   return satirlar;
 }
 
+/** Metnin okunabilir olup olmadığı: çöp (özel kodlamalı) çıktıyı notlara yazmamak için. */
+function metinOkunur(metin) {
+  const bos = metin.replace(/\s/g, "");
+  if (bos.length < 20) return false;
+  const harf = (bos.match(/\p{L}/gu) || []).length;
+  const bozuk = (bos.match(/[\p{Co}\p{Cc}\p{Cn}\uFFFD]/gu) || []).length;
+  return harf / bos.length >= 0.5 && bozuk / bos.length < 0.03;
+}
+
+/** pdf-oku.js blokları → Markdown (yalnızca bu uygulamanın biçim alt kümesi). */
+function bloklarMarkdown(bloklar, gorseller) {
+  const sira = new Map(gorseller.map((g, i) => [g.id, i + 1]));
+  const kullanilan = new Set();
+  const parcalar = [];
+  let oncekiMadde = false;
+  for (const b of bloklar) {
+    let satir = "";
+    let madde = false;
+    if (b.t === "h") satir = `${b.level === 2 ? "##" : "###"} ${MD_KACIS(b.text)}`;
+    else if (b.t === "li") { satir = `- ${MD_KACIS(b.text)}`; madde = true; }
+    else if (b.t === "img") { if (!sira.has(b.id)) continue; kullanilan.add(b.id); satir = `![Görsel ${sira.get(b.id)}](ek:${b.id})`; }
+    else satir = MD_KACIS(b.text);
+    if (!satir.trim()) continue;
+    parcalar.push(madde && oncekiMadde ? "\n" + satir : (parcalar.length ? "\n\n" : "") + satir);
+    oncekiMadde = madde;
+  }
+  // Metin akışında yeri bulunamayan görseller sona eklenir (kullanıcı onay ekranında yine seçebilir)
+  for (const g of gorseller) if (!kullanilan.has(g.id)) parcalar.push(`${parcalar.length ? "\n\n" : ""}![Görsel ${sira.get(g.id)}](ek:${g.id})`);
+  return parcalar.join("");
+}
+
 async function pdfCoz(ad, u8, ctx) {
   const v = pdfGomuluVeri(u8);
   if (v && typeof v === "object") {
@@ -639,12 +758,45 @@ async function pdfCoz(ad, u8, ctx) {
       : [];
     return taslak(ad, { ...m, html: temizHtml(kap), alintilar }, ctx);
   }
-  const satirlar = await pdfMetniCikar(u8);
-  const metin = satirlar.join("\n");
-  if ((metin.match(/\p{L}/gu) || []).length < 20) throw new Error("Bu PDF'ten metin okunamadı (taranmış görüntü ya da özel kodlamalı olabilir). Word, Markdown veya HTML sürümünü kullan.");
-  // Başka kaynaktan PDF'te yapı bilgisi yoktur: satırlar paragraf olur
-  const md = satirlar.map((x) => MD_KACIS(x)).join("\n\n");
-  return taslak(ad, { html: markdownHtml(md), uyarilar: ["Başka kaynaktan PDF: yalnızca düz metin alındı; biçimlendirme ve görseller yok. Satır kırılmaları paragraf sayıldı."] }, ctx);
+
+  // Başka kaynaktan PDF: yapı çözümleyici → (başarısızsa) eski düz metin çıkarıcı → (o da çöpse) yalnızca görseller.
+  let r = null;
+  let hata = null;
+  try {
+    r = await pdfCikar(u8);
+  } catch (h) {
+    if (h instanceof PdfSifreliHatasi) throw h;
+    hata = h;
+    console.warn("[ice-aktar] pdf-oku başarısız:", h);
+  }
+  const uyarilar = [];
+  const gorseller = r ? r.gorseller : [];
+  let md = "";
+  let baslik = "";
+
+  const yapisal = r && r.harfSayisi >= 20 ? bloklarMarkdown(r.bloklar, gorseller) : "";
+  if (yapisal && metinOkunur(r.bloklar.map((b) => b.text || "").join(" "))) {
+    md = yapisal;
+    baslik = r.baslik || "";
+    uyarilar.push(...r.uyarilar);
+    uyarilar.push(`PDF'ten metin ${r.sayfaSayisi} sayfadan başlık/paragraf/madde yapısıyla alındı; renk ve yazı tipi biçimi taşınmaz.`);
+  } else {
+    let satirlar = [];
+    try { satirlar = await pdfMetniCikar(u8); } catch { /* yedek de başarısız olabilir */ }
+    const duz = satirlar.join("\n");
+    if (metinOkunur(duz)) {
+      md = satirlar.map((x) => MD_KACIS(x)).join("\n\n");
+      uyarilar.push("PDF yapısı çözümlenemedi; ham metin kurtarıldı (başlık/sütun düzeni yok, satır kırılmaları paragraf sayıldı).");
+      if (gorseller.length) md += "\n\n" + gorseller.map((g, i) => `![Görsel ${i + 1}](ek:${g.id})`).join("\n\n");
+    } else if (gorseller.length) {
+      md = "*Bu PDF'ten metin okunamadı (taranmış görüntü ya da özel kodlamalı olabilir). Sayfa görselleri aşağıda; seçtiklerin ek olarak kaydedilir.*\n\n" + gorseller.map((g, i) => `![Görsel ${i + 1}](ek:${g.id})`).join("\n\n");
+      uyarilar.push("Metin okunamadı; yalnızca görseller alındı.");
+    } else {
+      throw new Error("Bu PDF'ten metin okunamadı (taranmış görüntü, bozuk dosya ya da özel kodlamalı olabilir)" + (hata ? ` — ${String(hata.message || hata).replace(/[.\s]+$/, "")}` : "") + ". Word, Markdown veya HTML sürümünü kullan.");
+    }
+  }
+  const html = markdownHtml(md);
+  return taslak(ad, { ...(baslik ? { baslik } : {}), html, uyarilar, gorseller: gorseller.filter((g) => md.includes(`(ek:${g.id})`)) }, ctx);
 }
 
 /* ---------- ZIP paketi ---------- */
@@ -712,6 +864,60 @@ async function dosyaCoz(ad, bayt, ctx, atlanan, zipAcilsin = true) {
   }
 }
 
+/* ---------- Büyük notu parçalara bölme ----------
+ * Sunucu şifreli yükü ~700 KB'a (≈512 KB düz metin) sınırlar (notlar_ciphertext_check). Yük = html + govde (+alıntılar);
+ * bu sınırı aşan not eskiden veritabanı hatasıyla tümden reddediliyordu. Burada üst düzey bloklara göre
+ * "Başlık (1/3)" parçalarına bölünür; bölünemeyecek kadar büyük tek paragraf düz metin parçalarına ayrılır. */
+const PARCA_UST = 380 * 1024; // düz metin JSON baytı; sınırın altında bol pay (şifreleme dolgusu + base64 hesabı dahil)
+const enc = new TextEncoder();
+const yukBoyutu = (html, govde, alintilar) => enc.encode(JSON.stringify({ h: html, g: govde, a: alintilar })).length;
+
+function buyukTaslagiBol(t) {
+  if (yukBoyutu(t.html, t.govde, t.alintilar) <= PARCA_UST) return [t];
+  const kok = document.createElement("div");
+  Bicim.htmlKur(t.html, kok);
+  const parcalar = [];
+  let guncel = document.createElement("div");
+  let maliyet = 0;
+  const yeniParca = () => { if (guncel.childNodes.length) parcalar.push(guncel); guncel = document.createElement("div"); maliyet = 0; };
+  const BUTCE = PARCA_UST / 2.3; // html + govde ≈ 2× + JSON kaçışları
+  const bayt = (n) => enc.encode(n.outerHTML ?? n.textContent ?? "").length;
+  for (const c of [...kok.children]) {
+    const m = bayt(c);
+    if (m > BUTCE) {
+      // tek başına sığmayan blok: metnini ~60 KB'lık paragraflara böl
+      const metin = c.textContent || "";
+      yeniParca();
+      for (let i = 0; i < metin.length; i += 20000) {
+        const p = document.createElement("p");
+        p.textContent = metin.slice(i, i + 20000);
+        if (maliyet + 20000 * 3 > BUTCE) yeniParca();
+        guncel.append(p);
+        maliyet += 20000 * 3;
+      }
+      continue;
+    }
+    if (maliyet + m > BUTCE) yeniParca();
+    guncel.append(c.cloneNode(true));
+    maliyet += m;
+  }
+  yeniParca();
+  if (parcalar.length <= 1) return [t];
+  return parcalar.map((kap, i) => {
+    const html = temizHtml(kap);
+    const kullanilan = new Set([...kap.querySelectorAll("img[data-ek]")].map((x) => x.getAttribute("data-ek")));
+    return {
+      ...t,
+      baslik: `${t.baslik} (${i + 1}/${parcalar.length})`.slice(0, 200),
+      html,
+      govde: Bicim.htmlMarkdown(html),
+      alintilar: i === 0 ? t.alintilar : [],
+      gorseller: t.gorseller.filter((g) => kullanilan.has(g.id)),
+      uyarilar: i === 0 ? [...t.uyarilar, `Not çok büyük olduğu için ${parcalar.length} parçaya bölündü (şifreli kasa tek notta ~500 KB metin sınırı taşır).`] : [`“${t.baslik}” notunun ${i + 1}. parçası.`],
+    };
+  });
+}
+
 /** File[] → {notlar:[taslak], atlanan:[metin]} */
 export async function dosyalariCoz(dosyalar, ctx) {
   const notlar = [];
@@ -728,6 +934,15 @@ export async function dosyalariCoz(dosyalar, ctx) {
       atlanan.push(`Bir seferde en fazla ${NOT_UST} not alınır; fazlası bırakıldı.`);
       notlar.length = NOT_UST;
       break;
+    }
+  }
+  // Çok büyük notları sunucu sınırına göre parçala (hata vermeden)
+  for (let i = notlar.length - 1; i >= 0; i--) {
+    try {
+      const parcalar = buyukTaslagiBol(notlar[i]);
+      if (parcalar.length > 1) notlar.splice(i, 1, ...parcalar);
+    } catch (h) {
+      console.warn("[ice-aktar] not bölünemedi:", h);
     }
   }
   const dolu = notlar.filter((n) => {
