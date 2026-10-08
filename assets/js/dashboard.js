@@ -76,6 +76,11 @@ const MODULES = {
   panelim: { src: "./panel.js", role: null },
   // Üye verisi dışa aktarma izinleri (migration 0069) — SADECE Site Sahibi: hangi yönetici hangi üyelerin verisini indirebilir.
   uyeAktarimYetki: { src: "./uye-disa-aktar/yetki-paneli.js", role: "owner" },
+  // Sistem Yedekleme & Depolama Yönetimi (migration 0074). Sekme görünürlüğü role DEĞİL, can_export_system
+  // anahtarına bağlı (NAV'daki izin:"sistemyedek" + izinleriYukle). Gerçek yetki: RPC'ler + sistem-yedek-worker.
+  sistemYedek: { src: "./sistem-yedek/sistem-yedek.js", role: null },
+  // Yetki Ayarları > "📦 Sistem Yedekleme": rol bazlı can_export_system anahtarı (yalnızca owner).
+  sistemYedekYetki: { src: "./sistem-yedek/yetki-paneli.js", role: "owner" },
 };
 
 // Sidebar hiyerarşisi. Her leaf: { id, label, view (gösterilecek
@@ -154,6 +159,8 @@ const NAV = [
       // sürümünü değiştirebilsin" anahtarını açtıysa (bkz. gorunurMu / izinleriYukle).
       { id: "sys-kvkk", icon: "📜", label: "KVKK Sürümü", module: "kvkkSurum", role: "admin", izin: "kvkk" },
       { id: "sys-uye-aktarim", icon: "📤", label: "Üye Verisi İndirme", module: "uyeAktarimYetki", role: "owner" },
+      // role:null + izin:"sistemyedek": owner her zaman görür; diğer roller yalnızca owner can_export_system'i açtıysa.
+      { id: "sys-yedek", icon: "📦", label: "Sistem Yedekleme", module: "sistemYedek", role: null, izin: "sistemyedek", defaultAcilis: false },
       { id: "sys-github", icon: "🔑", label: "GitHub / Worker Bağlantısı", module: "gy" },
       { id: "sys-hakkimda", icon: "🙋", label: "Hakkımda & Sosyal Linkler", module: "gy" },
       { id: "sys-hesabim", icon: "⚠️", label: "Hesabım (Tehlikeli Bölge)", module: "admin" },
@@ -191,6 +198,9 @@ function gorunurMu(item, profile) {
   if (item.ozellik && profile.role !== "owner" && profile.izinler?.ozellikler?.[item.ozellik] === false) {
     return false;
   }
+  if (item.izin === "sistemyedek") {
+    return profile.role === "owner" || !!profile.izinler?.sistemYedek;
+  }
   if (item.izin === "kvkk") {
     return profile.role === "owner" || !!profile.izinler?.kvkk;
   }
@@ -209,16 +219,19 @@ async function izinleriYukle(rol) {
       .rpc("ozellik_erisimi_var_mi", { p_ozellik: anahtar, p_rol: rol })
       .then((r) => (r.error ? true : r.data !== false))
       .catch(() => true);
-  const [arsiv, kvkk, ozelIcerik, dosyaPaylasimi, akademikKutuphane] = await Promise.all([
+  const [arsiv, kvkk, ozelIcerik, dosyaPaylasimi, akademikKutuphane, sistemYedek] = await Promise.all([
     supabase.rpc("r2_arsiv_yetkilerim").then((r) => (r.error ? undefined : r.data)).catch(() => undefined),
     supabase.rpc("kvkk_surum_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
     ozellikSor("ozel_icerik_yonetimi"),
     ozellikSor("dosya_paylasimi_yonetimi"),
     ozellikSor("akademik_kutuphane"),
+    // can_export_system: varsayılan KAPALI → hata/ağ sorununda da false (kvkk ile aynı güvenli yön).
+    supabase.rpc("sistem_export_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
   ]);
   return {
     arsiv,
     kvkk,
+    sistemYedek,
     ozellikler: { ozel_icerik_yonetimi: ozelIcerik, dosya_paylasimi_yonetimi: dosyaPaylasimi, akademik_kutuphane: akademikKutuphane },
   };
 }
@@ -487,6 +500,7 @@ async function showView(viewId, moduleKey) {
   // Yetki Ayarları: owner için "R2 Erişim İzni" bölümü (ayrı modül; gy modülüne dokunmaz)
   if (viewId === "sys-yetki") await ensureModuleLoaded("arsivIzin");
   if (viewId === "sys-yetki") await ensureModuleLoaded("kalkan");
+  if (viewId === "sys-yetki") await ensureModuleLoaded("sistemYedekYetki");
 }
 
 function firstAvailableView(profile) {
