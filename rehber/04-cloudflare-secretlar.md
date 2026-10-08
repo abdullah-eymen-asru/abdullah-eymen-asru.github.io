@@ -68,6 +68,7 @@ dosyasındaki adresi de güncellemen gerekir.
 | 4.6 | `r2_not_ek_worker` | `r2-not-ek-worker` | `SUPABASE_URL`, `SUPABASE_ANON_KEY` *(+ isteğe bağlı `KOTA_BAYT`)* | — *(bilerek yok)* | `NOT_EK_BUCKET` |
 | 4.7 | `admin_guvenlik_bildirim_worker` | `admin-guvenlik-bildirim-worker` | `TELEGRAM_CHAT_ID` | `GIZLI_YOL`, `WEBHOOK_SHARED_SECRET`, `TELEGRAM_BOT_TOKEN` *(+ isteğe bağlı `TWILIO_*`)* | — |
 | 4.8 | `substack_feed_proxy_worker` | `substack-feed-proxy-worker` | — | — | — *(hiçbir şey girilmez)* |
+| 4.9 | `akademik_kutuphane_worker` | `akademik-kutuphane-worker` | `SUPABASE_URL`, `SUPABASE_ANON_KEY` *(+ yalnızca çok büyük dosya imzası için: `ACCOUNT_ID`, `BUCKET_NAME`)* | — *(bilerek `service_role` yok)* *(+ yalnızca çok büyük dosya imzası için: `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`)* | `AKADEMIK_BUCKET` |
 
 > 💡 **"Variable mı Secret mı?" tablodaki sütunlar bir öneridir.** Kod ikisini de
 > aynı şekilde okur (`env.ADI`). Önemli olan, gizli değerlerin **Secret**
@@ -186,7 +187,7 @@ Hepsi **Variable (Text)**, değer sadece rakam (nokta/virgül/birim yok). `GK_*`
 
 1. Worker → **Settings → Bindings** → **+ Add**.
 2. Tür olarak **R2 bucket** seç.
-3. **Variable name:** bölümüne binding adını yaz (Worker'a göre `MY_R2_BUCKET` **veya** `NOT_EK_BUCKET` — Bölüm 1 tablosunda hangisi olduğu yazıyor; harfi harfine).
+3. **Variable name:** bölümüne binding adını yaz (Worker'a göre `MY_R2_BUCKET`, `NOT_EK_BUCKET` **veya** `AKADEMIK_BUCKET` — Bölüm 1 tablosunda hangisi olduğu yazıyor; harfi harfine).
 4. **R2 bucket:** listesinden kovanı seç.
 5. **Deploy**.
 
@@ -389,6 +390,69 @@ listeleri) değiştirmeyi unutursan, tarayıcı Worker'a erişirken **CORS /
 
 ---
 
+### 4.9 `akademik-kutuphane-worker` — Akademik Kütüphane (PDF okuma / açıklamalı PDF'i R2'ye geri yazma)
+
+**Ne yapar?** Akademik Kütüphane'deki PDF'lerin R2'deki güvenli kapısıdır (Supabase **migration 0072** ile birlikte kurulur):
+
+- `GET /pdf/<kaynak_id>` — PDF'i okur (**Range** destekli: büyük PDF'ler parça parça açılır).
+- `PUT /pdf/<kaynak_id>` — ilk yükleme **ve** vurgu/not eklenmiş PDF'in R2'deki dosyanın **üzerine yazılması**. Üzerine yazmadan önce bir önceki sürüm otomatik yedeklenir (okuyucudaki ↶ düğmesi geri yükler).
+- `DELETE /pdf/<kaynak_id>`, `POST /pdf/<kaynak_id>/onceki-surum`, `POST …/yukleme-imzasi`, `POST …/yukleme-tamam` (çok büyük dosya yolu).
+- `GET /meta?url=…` — makale bağlantısından künye önerisi (sunucuda `citation_*` meta etiketlerini okur; tarayıcı başka sitelerin HTML'ini CORS yüzünden okuyamaz).
+
+**Dosya yolu:** `akademik-kutuphane/users/<user_id>/<dosya_adi>.pdf` (ön ek sabittir, kova adı serbest). **Boyut ya da kullanıcı kotası sınırı uygulanmaz** (bilinçli istek).
+
+| Tip | Ad | Değer | Nereden? |
+|---|---|---|---|
+| Variable | `SUPABASE_URL` | `https://<proje-ref>.supabase.co` | Bölüm 2.2 |
+| Variable | `SUPABASE_ANON_KEY` | `anon public` anahtarı | Bölüm 2.2 |
+| Variable *(isteğe bağlı — çok büyük dosyalar)* | `ACCOUNT_ID` | Cloudflare hesap ID | Bölüm 2.1 |
+| Variable *(isteğe bağlı — çok büyük dosyalar)* | `BUCKET_NAME` | `AKADEMIK_BUCKET`'ın bağlı olduğu kovanın **gerçek adı** | Bölüm 2.1 |
+| **Secret** *(isteğe bağlı — çok büyük dosyalar)* | `R2_ACCESS_KEY_ID` | R2 Access Key ID | Bölüm 2.1 |
+| **Secret** *(isteğe bağlı — çok büyük dosyalar)* | `R2_SECRET_ACCESS_KEY` | R2 Secret Access Key | Bölüm 2.1 |
+
+**Kurulum adımları (sırayla):**
+
+1. **Supabase:** `supabase/migrations/0072_akademik_kutuphane.sql` dosyasını SQL Editor'de **tek seferde** çalıştır. (Önceki 0001–0071 uygulanmış olmalı.)
+2. **R2 kovası:** Cloudflare → **R2 object storage** → **Create bucket** → ad: `akademik-kutuphane` (öneri; **ayrı bir kova** kullan ki arşiv/not dosyalarıyla karışmasın). Kovaya kota ya da boyut sınırı **koyma**.
+3. **Worker:** Bölüm 4'teki ortak başlangıçla `akademik-kutuphane-worker` oluştur, `cloudflare worker/akademik_kutuphane_worker/worker.js` içeriğini yapıştır, **Deploy**.
+4. **Variables:** yukarıdaki tablodan `SUPABASE_URL` ve `SUPABASE_ANON_KEY`'i gir. **Deploy.**
+5. **Binding:** Worker → **Settings → Bindings → + Add → R2 bucket** → *Variable name:* `AKADEMIK_BUCKET` (harfi harfine) → kova: `akademik-kutuphane` → **Deploy**.
+6. **Adresi istemciye yaz:** Worker adresini (`https://akademik-kutuphane-worker.<hesap>.workers.dev`) `assets/js/akademik/ortak.js` → `AKADEMIK_WORKER_URL` sabitine yaz (varsayılan değer `aeymena` hesabına göredir), commit'le.
+7. **Panelde aç/kapat:** Panel → **Yetki Ayarları** → matristeki **Akademik Kütüphane** satırı. Hangi rollerin (Üye, Özel Üye, Yazar, İçerik Sorumlusu, Yönetici) kütüphaneyi görebileceğini buradan belirlersin; **owner her zaman erişir**. (Yeni bir kalkan/izin sistemi yoktur; mevcut `ozellik_erisimleri` matrisi kullanılır.)
+8. **Doğrula:** tarayıcıda `https://akademik-kutuphane-worker.<hesap>.workers.dev/saglik` → `{"ok":true,"buyuk_dosya_imzasi":false}` görmelisin (imza secret'larını girdiysen `true`).
+
+**Neden `service_role` YOK?** `r2-not-ek-worker` ile aynı tasarım: Worker kullanıcının **kendi JWT'si** ve `anon` anahtarla Supabase'e sorar; böylece satır görünürlüğünü (sahibi / `ekip` / `herkese_acik` / owner incelemesi) **RLS** belirler. Worker ele geçirilse bile veritabanının tamamı açılmaz. Buraya `SUPABASE_SERVICE_ROLE_KEY` **ekleme**.
+
+**Boyut sınırı hakkında (önemli, dürüst not):** Kodda hiçbir boyut/kota sınırı yoktur. Tek fiziksel sınır Cloudflare'in Worker'a **istek gövdesi** üst sınırıdır (Free/Pro ≈ 100 MB, Business ≈ 200 MB, Enterprise ≈ 500 MB). İstemci, **90 MB'ın üstündeki** PDF'leri otomatik olarak `…/yukleme-imzasi` yoluna yönlendirir: Worker JWT'yi doğrular ve **süreli (1 saat) imzalı R2 adresi** verir, tarayıcı dosyayı **doğrudan R2'ye** yazar (sınır yok). Bu yol için tablodaki **isteğe bağlı** dört değişken/secret'ı gir **ve** R2 kovasına CORS ekle (aşağıda). Girmezsen 90 MB'a kadar her şey çalışır; daha büyük dosyada okuyucu "imza yapılandırılmamış" hatası verir. Bu yolda önceki-sürüm yedeği alınmaz.
+
+**R2 kovasında CORS (yalnızca büyük dosya imzası kullanacaksan):** kovayı seç → **Settings → CORS Policy → Add CORS policy → JSON**:
+
+```json
+[
+  {
+    "AllowedOrigins": [
+      "https://abdullah-eymen-asru.github.io",
+      "https://abdullah-eymen-asru.pages.dev"
+    ],
+    "AllowedMethods": ["PUT"],
+    "AllowedHeaders": ["Content-Type"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+(Normal okuma/yazma Worker üzerinden olduğu için `GET` gerekmez. R2 API token'ının izni **bu kovayı** da kapsamalı: *Object Read & Write*.)
+
+**Okuyucu motoru (PDF.js) için ek ayar yok — ama bilmen gerekenler:**
+
+- PDF.js ve pdf-lib koda gömülmez; resmi paketler **jsDelivr** (yedek: unpkg) üzerinden **sürüm sabitli** yüklenir. Sürümü panelde **Akademik Kütüphane → Tüm Kullanıcıların Kaynakları → ⚙️ Okuyucu motoru** kartından (yalnızca owner) **Dene → Sabitle** veya **Okuyucu Motorunu Güncelle (en yeni)** ile değiştirirsin; sürüm Supabase'teki `akademik_okuyucu_ayarlari` tablosunda durur ve tüm kullanıcılara birden uygulanır.
+- **CSP:** Pages/Cloudflare tarafında yeni secret gerekmez ama sitenin CSP'sine `worker-src 'self' blob:` eklendi (`_layouts/default.html` **ve** `_headers`). Bu olmadan PDF.js çalışır ama ana iş parçacığında (yavaş) çalışır. Özel bir CSP yazdıysan o satırı kendi politikana da ekle; jsDelivr/unpkg zaten `https:` kapsamında.
+- **R2 kota/sınır koyma:** Cloudflare panelinde kovaya ayrıca bir boyut/kota kuralı tanımlama; sınırsız tasarım bunu varsayar.
+
+- **Kod içinde değiştirilecekler:** `IZINLI_ORIGINLER` listesi (worker.js) ve `AKADEMIK_WORKER_URL` (`assets/js/akademik/ortak.js`).
+
+---
+
 ## 5. Cloudflare Pages ayarları
 
 Siteyi Cloudflare Pages'e bağladığında (**Workers & Pages → Create → Pages → Connect to Git**) ayarlar iki yerde durur: **Build** ve **Variables and secrets**. Pages ayarlarına sonradan:
@@ -534,6 +598,7 @@ Kurulumdan sonra tek tek işaretle:
 - [ ] Parola/token/key niteliğindeki her değer **Secret** (panelde `Value encrypted`). Özellikle: `TELEGRAM_BOT_TOKEN`, `WEBHOOK_SHARED_SECRET`, `GIZLI_YOL`, `GITHUB_*`, `R2_*`, `SUPABASE_SERVICE_ROLE_KEY`, `E2EE_KASA_SECRET`, `TWILIO_AUTH_TOKEN`, `GK_COOKIE_SECRET` (Pages).
 - [ ] `SUPABASE_SERVICE_ROLE_KEY` hiçbir `.js`/`.md`/`.yml` dosyasında ve hiçbir commit'te yok.
 - [ ] `r2-not-ek-worker`'da `service_role` yok.
+- [ ] `akademik-kutuphane-worker`'da `service_role` yok; `AKADEMIK_BUCKET` ayrı bir kovaya bağlı; (büyük dosya imzası kullanıyorsan) R2 token'ı yalnızca ilgili kovalara izinli ve kovada `PUT`'a izinli CORS kuralı var.
 - [ ] Kasa uç katmanını kurduysan: Pages'te `SUPABASE_ANON_KEY` olarak **anon public** var (`service_role` değil) ve `GK_COOKIE_SECRET` en az 32 karakterli bir **Secret**; değişkenler hem Production hem Preview'a girildi.
 - [ ] İki `GITHUB_TOKEN` (okuma/yazma) **farklı** token'lar; okuma olan yazma yetkisi taşımıyor.
 - [ ] R2 API token'ı **sadece kendi kovalarına** izinli.
@@ -561,6 +626,13 @@ Kurulumdan sonra tek tek işaretle:
 | Build komutu değişikliği etkisiz | Build cache eski | Settings → Build → Build cache → **Clear Cache**, sonra yeniden deploy |
 | Kasa kuruldu ama yetkili kullanıcılar (owner/admin) da kilit ekranında kalıyor | `GK_COOKIE_SECRET` eksik ya da 32 karakterden kısa; `SUPABASE_URL` / `SUPABASE_ANON_KEY` o ortama (Production/Preview) girilmemiş | Bölüm 5.2-B tablosunu kontrol et, hem Production hem Preview'a gir, yeniden deploy et |
 | Alan adı kilitliyken `/feed.xml`, `/rss.xml`, CV ve görseller `403` dönüyor | Beklenen davranış: rotaya bağlı varlıklar kilitli rotayla birlikte kapanır | Açmak istediğin dosya için `_middleware.js` içindeki `VARLIK_ROTALARI` / `ACIK_VARLIK_*` sabitlerini düzenle (Bölüm 5.2-B) |
+| Akademik Kütüphane sekmesi hiç görünmüyor | Migration 0072 uygulanmadı ya da owner Yetki Ayarları'nda rolün için **Akademik Kütüphane**'yi kapattı | 0072'yi çalıştır; Yetki Ayarları matrisinde ilgili rolü aç |
+| PDF açılmıyor: "Worker yapılandırması eksik (… AKADEMIK_BUCKET)" | R2 binding adı farklı yazılmış ya da eklenmemiş | Bölüm 4.9 adım 5: binding adı **`AKADEMIK_BUCKET`** olmalı, Deploy |
+| PDF açılmıyor, konsolda CORS hatası | `IZINLI_ORIGINLER`'de site adresin yok ya da `AKADEMIK_WORKER_URL` yanlış | `worker.js` listesini ve `ortak.js` adresini düzelt |
+| PDF açılıyor ama sayfalar çok yavaş yükleniyor | CSP'de `worker-src 'self' blob:` yok → PDF.js ana iş parçacığında çalışıyor | `_layouts/default.html` ve `_headers` CSP'sine `worker-src 'self' blob:;` ekle |
+| "Okuyucu motoru yüklenemedi" | jsDelivr/unpkg engelli ya da seçilen PDF.js sürümü bozuk | Owner: ⚙️ Okuyucu motoru kartından bilinen iyi bir sürümü (varsayılan 5.6.205) sabitle |
+| Kaydederken "imza yapılandırılmamış" (501) | PDF 90 MB'ın üstünde ve büyük dosya imzası secret'ları girilmemiş | Bölüm 4.9: `ACCOUNT_ID`, `BUCKET_NAME`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` + kova CORS'u |
+| Kaydederken 409 "PDF başka bir sekmede güncellenmiş" | Aynı PDF iki yerde düzenlenip biri kaydedildi | Okuyucuyu kapatıp yeniden aç, değişikliklerini tekrar uygula |
 | Zamanlanmış yazı yayına çıkmıyor | `CLOUDFLARE_DEPLOY_HOOK_URL` GitHub'da yok ya da hook silinmiş | Bölüm 5.3 |
 
 ---
