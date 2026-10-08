@@ -9,6 +9,11 @@
  *   - anahtar (kvkk_surum_admin_degistirebilir) için UPDATE yalnızca owner (RLS + kolon GRANT).
  * Bu dosya yalnızca arayüzdür.
  *
+ * HUKUKİ PAKET (migration 0073): Gizlilik Politikası + KVKK Aydınlatma + Açık Rıza tek pakettir.
+ * "Yeni Sürümü Yayınla" varsayılan olarak hukuki_paket_surumu_yayinla() RPC'siyle Aydınlatma VE Açık Rıza
+ * etiketini AYNI değere ve TEK işlemde (atomik) yükseltir; iki etiket ayrışırsa panel uyarı gösterir.
+ * Açık rızayı tek başına yükseltmek "gelişmiş" bölümde kalır (açık rıza metni tek başına değiştiğinde).
+ *
  * innerHTML YOK; inline style YOK (CSP). Görünüm mevcut .ya-* / .gk-p-* / .form-field
  * sınıflarından gelir.
  */
@@ -38,11 +43,12 @@ function sonrakiOneri(surum) {
  * "Açık Rıza Sürümü" bölümü (migration 0070): yurt dışı açık rıza metninin AYRI sürümü. Yükseltince, daha önce
  * rıza vermiş üyelere bir sonraki girişte (kutusu işaretsiz) rızayı yeniden soran modal düşer.
  */
-function rizaBolumu(satir, mesaj) {
+function rizaBolumu(satir, mesaj, surumDegisti) {
   if (satir.riza_surumu === undefined || satir.riza_surumu === null) {
     return el("p", { class: "muted csp-mt-18", text: "Açık rıza için ayrı sürüm (0070 numaralı migration) henüz çalıştırılmamış görünüyor." });
   }
   let mevcut = satir.riza_surumu;
+  surumDegisti?.({ riza: mevcut }, true);
   const verenler = Number(satir.riza_verenler);
   const eski = Number(satir.riza_eski);
   const mevcutMetin = el("strong", { text: mevcut });
@@ -69,6 +75,7 @@ function rizaBolumu(satir, mesaj) {
       mevcutMetin.textContent = mevcut;
       girdi.value = "";
       girdi.placeholder = sonrakiOneri(mevcut);
+      surumDegisti?.({ riza: mevcut });
       showMessage(mesaj, `Kaydedildi: yürürlükteki açık rıza sürümü ${mevcut}. Deploy gerekmez.`, "success");
     } catch (hata) {
       showMessage(mesaj, `Kaydedilemedi: ${hata.message || hata}`, "error");
@@ -77,9 +84,9 @@ function rizaBolumu(satir, mesaj) {
     }
   });
   return el(
-    "div",
-    { class: "csp-mt-18" },
-    el("h3", { text: "Açık Rıza Sürümü" }),
+    "details",
+    { class: "csp-mt-18 kvkk-gelismis" },
+    el("summary", { text: "Gelişmiş: yalnızca Açık Rıza sürümünü değiştir" }),
     el("p", {}, "Yürürlükteki açık rıza sürümü: ", mevcutMetin),
     ozet,
     el("div", { class: "form-field csp-mt-16" }, el("label", { for: "riza-surum-girdi", text: "Yeni açık rıza sürüm etiketi" }), girdi),
@@ -118,6 +125,38 @@ async function kur() {
   const toplam = Number(satir.toplam);
   const eski = Number(satir.eski);
 
+  // Eşgüdüm göstergesi: Aydınlatma ve Açık Rıza etiketleri aynı olmalı (hukuki paket).
+  let rizaMevcut = satir.riza_surumu ?? null;
+  const esgudum = el("p", { class: "kvkk-esgudum", role: "status" });
+  const esgudumuCiz = () => {
+    if (rizaMevcut === null) {
+      esgudum.hidden = true;
+      return;
+    }
+    esgudum.hidden = false;
+    const esit = rizaMevcut === mevcut;
+    esgudum.className = "kvkk-esgudum " + (esit ? "kvkk-esgudum--tamam" : "kvkk-esgudum--uyari");
+    esgudum.textContent = esit
+      ? `✓ Hukuki paket eşgüdümlü: Aydınlatma ve Açık Rıza ${mevcut}.`
+      : `⚠ Sürümler ayrışmış: Aydınlatma ${mevcut}, Açık Rıza ${rizaMevcut}. Eşitlemek için aşağıdan yeni bir sürüm yayınla (açık rıza kutusu işaretli kalsın).`;
+  };
+  const sürümDegisti = (k, ilk) => {
+    if (k?.riza) rizaMevcut = k.riza;
+    if (!ilk) esgudumuCiz();
+  };
+  esgudumuCiz();
+
+  const rizaKutu = el("input", { type: "checkbox", id: "kvkk-paket-riza" });
+  rizaKutu.checked = true;
+  const rizaSatiri = rizaMevcut === null
+    ? null
+    : el(
+        "label",
+        { class: "kvkk-paket-secenek", for: "kvkk-paket-riza" },
+        rizaKutu,
+        el("span", { text: "Açık Rıza sürümünü de aynı etikete yükselt (önerilir: Gizlilik Politikası + Aydınlatma + Açık Rıza tek paket)" })
+      );
+
   const mevcutMetin = el("strong", { text: mevcut });
   const ozetMetin = el("p", {
     class: "muted",
@@ -146,28 +185,37 @@ async function kur() {
       showMessage(mesaj, "Bu zaten yürürlükteki sürüm.", "error");
       return;
     }
+    const rizaDa = rizaMevcut !== null && rizaKutu.checked;
     const onay = window.confirm(
-      `Sürüm ${mevcut} -> ${yeni} olarak değişecek.\n\n` +
+      `Sürüm ${mevcut} -> ${yeni} olarak değişecek` + (rizaDa ? " (Aydınlatma + Açık Rıza)." : " (yalnızca Aydınlatma).") + "\n\n" +
         `Onayı ${yeni} ile eşleşmeyen tüm üyeler bir sonraki girişlerinde ekranı kilitleyen ` +
         `"Rıza Yenileme" modalını görecek (şu an ${toplam} üye).\n\n` +
-        `Gizlilik politikası metnini ÖNCE yayınladığından emin ol. Devam edilsin mi?`
+        `Gizlilik politikası ve açık rıza metnini ÖNCE yayınladığından emin ol. Devam edilsin mi?`
     );
     if (!onay) return;
 
     yayinlaBtn.disabled = true;
     try {
-      // Tek yazma yolu RPC: yetkiyi (owner / anahtarı açık admin) sunucu denetler.
-      const { data, error: hata } = await supabase.rpc("kvkk_surumunu_degistir", { p_surum: yeni });
-      if (hata) throw hata;
-      if (!data) throw new Error("Sürüm güncellenmedi.");
+      // Tek yazma yolu RPC: yetkiyi (owner / anahtarı açık admin) sunucu denetler; iki sürüm TEK işlemde yazılır.
+      const { data, error: hata } = await supabase.rpc("hukuki_paket_surumu_yayinla", { p_surum: yeni, p_riza_da: rizaDa });
+      if (hata) {
+        if (/does not exist|42883|PGRST202|schema cache/i.test(`${hata.code || ""} ${hata.message || ""}`)) {
+          throw new Error("0073 numaralı migration henüz çalıştırılmamış: dosyayı SQL Editor'de çalıştır.");
+        }
+        throw hata;
+      }
+      const yeniSatir = Array.isArray(data) ? data[0] : data;
+      if (!yeniSatir?.kvkk_surumu) throw new Error("Sürüm güncellenmedi.");
 
-      mevcut = data;
-      await guncelKvkkSurumu({ yenile: true }); // bu sekmenin önbelleğini tazele
+      mevcut = yeniSatir.kvkk_surumu;
+      rizaMevcut = yeniSatir.riza_surumu ?? rizaMevcut;
+      await Promise.all([guncelKvkkSurumu({ yenile: true }), guncelOnaySurumleri({ yenile: true })]);
       mevcutMetin.textContent = mevcut;
       girdi.value = "";
       girdi.placeholder = sonrakiOneri(mevcut);
+      esgudumuCiz();
       ozetMetin.textContent = `Yeni sürüm ${mevcut} yürürlükte. Üyeler bir sonraki sayfa yüklemelerinde modalı görür.`;
-      showMessage(mesaj, `Kaydedildi: yürürlükteki sürüm ${mevcut}. Deploy gerekmez.`, "success");
+      showMessage(mesaj, `Kaydedildi: Aydınlatma ${mevcut}` + (rizaDa ? ` · Açık Rıza ${rizaMevcut}` : "") + ". Deploy gerekmez.", "success");
     } catch (hata) {
       showMessage(mesaj, `Kaydedilemedi: ${hata.message || hata}`, "error");
     } finally {
@@ -233,9 +281,11 @@ async function kur() {
   }
 
   kok.replaceChildren(
-    el("p", {}, "Yürürlükteki sürüm: ", mevcutMetin),
+    el("p", {}, "Yürürlükteki Aydınlatma sürümü: ", mevcutMetin),
+    esgudum,
     ozetMetin,
     el("div", { class: "form-field csp-mt-16" }, el("label", { for: "kvkk-surum-girdi", text: "Yeni sürüm etiketi" }), girdi),
+    rizaSatiri,
     el("div", { class: "csp-flex-gap10-wrap csp-mt-12" }, yayinlaBtn),
     el("p", {
       class: "gy-yardim-metni",
@@ -244,7 +294,7 @@ async function kur() {
         "Sadece yazım düzeltmesi için sürümü değiştirme; her değişiklik tüm üyelere yeniden onay ekranı gösterir. " +
         "Onay damgasını tarayıcı değil veritabanı yazar; sürüm okunamazsa kimse kilitlenmez.",
     }),
-    rizaBolumu(satir, mesaj),
+    rizaBolumu(satir, mesaj, sürümDegisti),
     yetkiBolumu
   );
 }
