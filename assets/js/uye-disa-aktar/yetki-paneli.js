@@ -77,6 +77,8 @@ async function kur() {
 
   /* ---------------- 1) Yöneticiler ---------------- */
   const liste = el("div", { class: "uya-yp-liste" });
+  const listeBaslik = el("div", { class: "uya-yp-liste-baslik" });
+  const listeKutu = el("div", { class: "uya-yp-kaydirma" }, listeBaslik, liste);
   const yenile = async () => {
     const { data, error } = await supabase.rpc("owner_uye_aktarim_yoneticileri");
     if (error) return showMessage(mesaj, "Liste yenilenemedi: " + hataMetni(error), "error");
@@ -129,6 +131,8 @@ async function kur() {
   };
 
   const listeCiz = () => {
+    listeBaslik.textContent = yoneticiler.length ? `${yoneticiler.length} yönetici` : "";
+    listeBaslik.hidden = !yoneticiler.length;
     liste.replaceChildren(
       ...(yoneticiler.length
         ? yoneticiler.map((y) => {
@@ -156,6 +160,12 @@ async function kur() {
   const gecmisKutu = el("div", { class: "uya-yp-gecmis" });
   let kayitlar = [];
   const secili = new Set();
+  let silmeSuruyor = false;
+  // Uzun listelerde mesaj sayfanın en altında kalıp görünmüyordu: göster + görünür alana kaydır.
+  const mesajGoster = (metin, tur) => {
+    showMessage(mesaj, metin, tur);
+    mesaj.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+  };
   const gecmisCiz = () => {
     const secimSayisi = secili.size;
     const hepsi = el("input", { type: "checkbox", "aria-label": "Tümünü seç" });
@@ -167,12 +177,24 @@ async function kur() {
     });
     const sil = async (ids, hepsiMi) => {
       const n = hepsiMi ? kayitlar.length : ids.length;
+      if (!n) return;
       if (!window.confirm(hepsiMi ? `Tüm indirme geçmişi (${n} kayıt) kalıcı olarak silinecek. Devam edilsin mi?` : `${n} kayıt kalıcı olarak silinecek. Devam edilsin mi?`)) return;
-      const { error } = await supabase.rpc("owner_uye_aktarim_kayitlari_sil", { p_ids: hepsiMi ? null : ids, p_hepsi: hepsiMi });
-      if (error) return showMessage(mesaj, "Silinemedi: " + hataMetni(error), "error");
-      showMessage(mesaj, `${n} kayıt silindi.`, "success");
-      secili.clear();
-      await gecmisYukle();
+      if (silmeSuruyor) return;
+      silmeSuruyor = true;
+      gecmisKutu.classList.add("uya-yp-gecmis--mesgul");
+      try {
+        const { data, error } = await supabase.rpc("owner_uye_aktarim_kayitlari_sil", { p_ids: hepsiMi ? null : ids, p_hepsi: hepsiMi });
+        if (error) return mesajGoster("Silinemedi: " + hataMetni(error), "error");
+        const silinen = Number.isFinite(Number(data)) ? Number(data) : n; // sunucunun gerçek sayısı
+        mesajGoster(silinen ? `${silinen} kayıt silindi.` : "Silinecek kayıt bulunamadı (zaten silinmiş olabilir).", silinen ? "success" : "warning");
+        secili.clear();
+        await gecmisYukle();
+      } catch (h) {
+        mesajGoster("Silinemedi: " + hataMetni(h), "error");
+      } finally {
+        silmeSuruyor = false;
+        gecmisKutu.classList.remove("uya-yp-gecmis--mesgul");
+      }
     };
     gecmisKutu.replaceChildren(
       el("div", { class: "uya-yp-gecmis-ust" },
@@ -213,7 +235,7 @@ async function kur() {
   };
 
   kok.replaceChildren(
-    el("section", { class: "uya-yp-kart" }, el("h3", { text: "Yöneticiler" }), el("p", { class: "muted uya-yp-aciklama", text: "Bir yöneticinin üye bilgilerini indirmesine izin ver. Sen her zaman tüm üyeleri indirebilirsin; Site Sahibi'nin verisini kimse indiremez." }), liste),
+    el("section", { class: "uya-yp-kart" }, el("h3", { text: "Yöneticiler" }), el("p", { class: "muted uya-yp-aciklama", text: "Bir yöneticinin üye bilgilerini indirmesine izin ver. Sen her zaman tüm üyeleri indirebilirsin; Site Sahibi'nin verisini kimse indiremez." }), listeKutu),
     el("section", { class: "uya-yp-kart" }, gecmisKutu)
   );
   await gecmisYukle();
