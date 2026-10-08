@@ -345,6 +345,16 @@ const OZELLIK_KATALOGU = [
     aciklama: "Uçtan uca şifreli not modülü: not yazma/okuma ve ek yükleme/indirme. Kapatılan rolün notları SİLİNMEZ, yeniden açılınca aynen döner. Tek tek kişiye kapatmak için matrisin altındaki bölümü kullan.",
     rolSutunlari: ["editor", "manager", "admin"],
   },
+  {
+    // bkz. migration 0072 — Akademik Kütüphane (kaynak/PDF kütüphanesi + PDF açıklama motoru).
+    // Rol bazlı kapatma BU matristen (yeni bir kalkan sistemi YOK). Kapalıyken: sekme menüden kalkar;
+    // RLS (akademik_kutuphane_yetkili) ve akademik-kutuphane-worker da reddeder. Veri SİLİNMEZ,
+    // yeniden açılınca aynen döner. owner her zaman erişir. Üye (user/special_user) rolleri de dahildir.
+    anahtar: "akademik_kutuphane",
+    baslik: "Akademik Kütüphane",
+    aciklama: "Kaynak/PDF kütüphanesi, PDF vurgulama-açıklama okuyucusu, DOI/ISBN künyesi, atıf ve BibTeX/RIS aktarımı. Herkes yalnızca KENDİ kaynaklarını görür; site sahibi hepsini inceleyebilir. Kapatılan rolün verisi SİLİNMEZ.",
+    rolSutunlari: ["user", "special_user", "editor", "manager", "admin"],
+  },
 ];
 
 /** Sıradan bir kullanıcının (owner OLMAYAN) kendi rolü için bir özelliğe
@@ -5590,6 +5600,8 @@ async function cvKaldir() {
 /* hesaplar.                                                              */
 /* ---------------------------------------------------------------------- */
 const YA_ROL_ETIKETLERI = {
+  user: "Üye (User)",
+  special_user: "Özel Üye (Special User)",
   editor: "Yazar (Editor)",
   admin: "Yönetici (Admin)",
   manager: "İçerik Sorumlusu (Manager)",
