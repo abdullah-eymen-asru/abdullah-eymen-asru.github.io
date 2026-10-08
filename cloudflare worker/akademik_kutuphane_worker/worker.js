@@ -231,7 +231,7 @@ async function urlKunyesi(env, istek, cors) {
 
   // Gövdenin yalnızca başını oku (</head>'e ya da 1 MB'a kadar).
   const okuyucu = yanit.body.getReader();
-  const dec = new TextDecoder("utf-8", { fatal: false });
+  const dec = new TextDecoder() /* varsayılan: utf-8, hatalı baytlarda fırlatmaz */;
   let html = "";
   let okunan = 0;
   for (;;) {
@@ -525,12 +525,12 @@ export default {
     };
 
     if (istek.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
-    if (!izinli) return json({ error: "Erişim reddedildi: yetkisiz Origin." }, 403, cors);
-
     const url = new URL(istek.url);
+    // /saglik gizli bilgi içermez; tarayıcı adres çubuğundan ya da Cloudflare'in test aracından (Origin başlığı olmadan) açılabilsin.
     if (istek.method === "GET" && url.pathname === "/saglik") {
       return json({ ok: true, buyuk_dosya_imzasi: imzaYapilandirildiMi(env) }, 200, cors);
     }
+    if (!izinli) return json({ error: "Erişim reddedildi: yetkisiz Origin." }, 403, cors);
 
     if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY || !env.AKADEMIK_BUCKET) {
       return json({ error: "Worker yapılandırması eksik (SUPABASE_URL, SUPABASE_ANON_KEY, AKADEMIK_BUCKET)." }, 500, cors);
