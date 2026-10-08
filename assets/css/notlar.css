@@ -395,14 +395,14 @@
 .nt-ia-birak { display: grid; justify-items: center; gap: 4px; padding: 18px 14px; text-align: center; background: var(--bg); border: 2px dashed var(--nt-cizgi); border-radius: 12px; cursor: pointer; }
 .nt-ia-birak:hover, .nt-ia-birak.nt-ia-ustte, .nt-ia-birak:focus-within { border-color: var(--accent); background: var(--nt-vurgu-zemin-2); }
 .nt-ia-birak .muted { font-size: 0.78rem; }
-.nt-ia-liste { display: grid; gap: 4px; max-height: 240px; overflow-y: auto; padding-right: 2px; overscroll-behavior: contain; }
+.nt-ia-liste { display: grid; gap: 4px; max-height: min(46vh, 380px); overflow-y: auto; padding-right: 2px; overscroll-behavior: contain; }
 .nt-ia-oge { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 1px 10px; align-items: start; padding: 7px 10px; background: var(--bg); border: 1px solid var(--nt-cizgi); border-radius: 10px; cursor: pointer; }
 .nt-ia-oge input { grid-row: 1 / span 3; width: 16px; height: 16px; margin: 2px 0 0; accent-color: var(--accent); }
 .nt-ia-oge:has(input:checked) { background: var(--nt-vurgu-zemin-2); border-color: color-mix(in srgb, var(--accent) 45%, var(--nt-cizgi)); }
 .nt-ia-mukerrer { opacity: 0.8; }
 .nt-ia-ad { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.9rem; font-weight: 600; }
 .nt-ia-ozet, .nt-ia-meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.76rem; }
-.nt-ia-ikaz { color: var(--nt-tehlike); }
+.nt-ia-ikaz { color: var(--nt-tehlike); white-space: normal; overflow: visible; text-overflow: clip; }
 .nt-ia-uyari { padding: 8px 12px; font-size: 0.82rem; background: color-mix(in srgb, var(--nt-tehlike) 8%, var(--bg)); border-radius: 10px; max-height: 140px; overflow-y: auto; }
 .nt-ia-uyari ul { margin: 4px 0 0; padding-left: 18px; }
 
@@ -567,3 +567,17 @@
   .nt-ya-durum { grid-column: 1; justify-self: start; }
 }
 
+
+/* ---- İçeri aktar: bulunan görseller (önizleme + seç/çıkar) ---- */
+.nt-ia-satir { display: grid; gap: 4px; }
+.nt-ia-gorseller { margin: 0 2px 2px; padding: 6px 10px; background: var(--bg); border: 1px dashed var(--nt-cizgi); border-radius: 10px; }
+.nt-ia-gorsel-ozet { cursor: pointer; font-size: 0.82rem; font-weight: 600; }
+.nt-ia-gorsel-not { margin: 6px 0; font-size: 0.76rem; }
+.nt-ia-gorsel-arac { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.nt-ia-kucukbtn { padding: 3px 10px; font-size: 0.76rem; }
+.nt-ia-gorsel-izgara { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; padding: 2px; }
+.nt-ia-gorsel { position: relative; display: grid; gap: 4px; padding: 6px; border: 1px solid var(--nt-cizgi); border-radius: 10px; cursor: pointer; background: var(--card-bg, var(--bg)); }
+.nt-ia-gorsel:has(input:checked) { border-color: color-mix(in srgb, var(--accent) 55%, var(--nt-cizgi)); background: var(--nt-vurgu-zemin-2); }
+.nt-ia-gorsel input { position: absolute; top: 8px; left: 8px; width: 16px; height: 16px; accent-color: var(--accent); z-index: 1; }
+.nt-ia-kucuk { width: 100%; height: 76px; object-fit: cover; border-radius: 6px; background: var(--nt-cizgi); }
+.nt-ia-gorsel-bilgi { font-size: 0.7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
