@@ -153,6 +153,7 @@
     img-src 'self' data: https: blob:;
     font-src 'self' data: https:;
     frame-src 'self' https:;
+    worker-src 'self' blob:;
     object-src 'none';
 ">
   <title>{{ page.title | default: site.title }}{% unless page.url == '/' or page.url == '/index.html' %} · {{ site.title }}{% endunless %}</title>
