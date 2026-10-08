@@ -13,6 +13,7 @@ permalink: "/panel/dashboard.html"
 <link rel="stylesheet" href="{{ '/assets/css/dashboard.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/notlar.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/r2-arsiv.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/css/akademik.css' | relative_url }}">
 
 <div class="loading-overlay" id="loading">Yükleniyor...</div>
 
@@ -387,6 +388,16 @@ permalink: "/panel/dashboard.html"
         yüklenen dosyalar tarayıcında şifrelenir ve yalnızca seçtiğin kişiler açabilir.
       </p>
       <div id="slot-arsiv"></div>
+    </section>
+
+    <!-- ===== Akademik Kütüphane (migration 0072; assets/js/akademik/kutuphane.js) ===== -->
+    <section class="dash-view" id="view-lib-kutuphane" hidden data-view="lib-kutuphane">
+      <div id="ak-kok"></div>
+    </section>
+
+    <section class="dash-view" id="view-lib-tum" hidden data-view="lib-tum">
+      <p class="muted">Bu sekme <strong>sadece Site Sahibi (owner)</strong> içindir: üyelerin kaynaklarını, yükledikleri/düzenledikleri PDF'leri ve notlarını <strong>salt okunur</strong> inceleyebilirsin.</p>
+      <div id="ak-owner-kok"></div>
     </section>
 
     <section class="dash-view" id="view-media-izleme" hidden data-view="media-izleme">
