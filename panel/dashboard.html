@@ -14,6 +14,7 @@ permalink: "/panel/dashboard.html"
 <link rel="stylesheet" href="{{ '/assets/css/notlar.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/r2-arsiv.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/akademik.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/css/sistem-yedek.css' | relative_url }}">
 
 <div class="loading-overlay" id="loading">Yükleniyor...</div>
 
@@ -902,6 +903,7 @@ permalink: "/panel/dashboard.html"
         <button type="button" role="tab" class="ya-altsekme" id="ya-tab-r2" data-ya-pane="ra-izin-bolumu" aria-controls="ra-izin-bolumu" aria-selected="false" tabindex="-1">🗄️ Dosya Yöneticisi</button>
         <button type="button" role="tab" class="ya-altsekme" id="ya-tab-kalkan" data-ya-pane="gk-kalkan-bolumu" aria-controls="gk-kalkan-bolumu" aria-selected="false" tabindex="-1">🛡️ Erişim Kalkanı</button>
         <button type="button" role="tab" class="ya-altsekme" id="ya-tab-kilit-izin" data-ya-pane="gk-izin-bolumu" aria-controls="gk-izin-bolumu" aria-selected="false" tabindex="-1">🔑 Kilit İzinleri</button>
+        <button type="button" role="tab" class="ya-altsekme" id="ya-tab-sistem-yedek" data-ya-pane="sy-izin-bolumu" aria-controls="sy-izin-bolumu" aria-selected="false" tabindex="-1">📦 Sistem Yedekleme</button>
       </div>
 
       <!-- 1) Özellik matrisi. id="yetki-ayarlari" ve içindeki id'ler AYNEN korundu:
@@ -970,6 +972,18 @@ permalink: "/panel/dashboard.html"
         <div id="gk-izin-kok"><p class="muted">Yükleniyor...</p></div>
         <div id="gk-izin-mesaj" class="auth-message" hidden></div>
       </section>
+
+      <!-- 6) Sistem yedekleme / dışa aktarma izni: can_export_system (assets/js/sistem-yedek/yetki-paneli.js; migration 0074) -->
+      <section id="sy-izin-bolumu" class="panel-section ya-pane" role="tabpanel" aria-labelledby="ya-tab-sistem-yedek" hidden>
+        <h2>Sistem Yedekleme İzni</h2>
+        <p class="muted">
+          "Sistem Yedekleme" varsayılan olarak yalnızca Site Sahibi'ne açıktır. Buradan yönetici ve diğer üst roller için
+          <code>can_export_system</code> anahtarını açıp kapatabilirsin. Yetkili bir rol yalnızca <strong>kendi</strong> verilerini
+          indirebilir; kontrol sunucuda (RLS + Cloudflare Worker) yapılır.
+        </p>
+        <div id="sy-izin-kok"><p class="muted">Yükleniyor...</p></div>
+        <div id="sy-izin-mesaj" class="auth-message" hidden></div>
+      </section>
     </section>
 
     <!-- KVKK metin sürümü (assets/js/kvkk/kvkk-surum-paneli.js; tablo site_ayarlari, migration 0064/0065).
@@ -993,6 +1007,14 @@ permalink: "/panel/dashboard.html"
       <p class="muted">Hangi yöneticinin üye bilgilerini (CSV, Excel, TXT, PDF) indirebileceğini belirle ve geçmişi izle.</p>
       <div id="uye-aktarim-kok"><p class="muted">Yükleniyor...</p></div>
       <div id="uye-aktarim-mesaj" class="auth-message" hidden></div>
+    </section>
+
+    <!-- Sistem Yedekleme & Depolama Yönetimi (assets/js/sistem-yedek/sistem-yedek.js; migration 0074 + sistem-yedek-worker).
+         Owner her zaman; diğer roller yalnızca can_export_system açıksa. -->
+    <section class="dash-view" id="view-sys-yedek" hidden data-view="sys-yedek">
+      <h1>Sistem Yedekleme &amp; Depolama Yönetimi</h1>
+      <div id="sy-kok"><p class="muted">Yükleniyor...</p></div>
+      <div id="sy-mesaj" class="auth-message" hidden></div>
     </section>
 
     <section class="dash-view" id="view-sys-hakkimda" hidden data-view="sys-hakkimda">
