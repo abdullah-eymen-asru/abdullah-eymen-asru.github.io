@@ -60,6 +60,10 @@ const MODULES = {
   // (bkz. NAV'daki izin:"arsiv" ve gorunurMu()). Gerçek yetki: RLS + r2_arsiv_worker.
   arsiv: { src: "./r2-arsiv/r2-arsiv.js", role: null },
   arsivIzin: { src: "./r2-arsiv/izin-paneli.js", role: "owner" },
+  // Akademik Kütüphane: sekme görünürlüğü Yetki Ayarları matrisindeki "akademik_kutuphane" özelliğine bağlı
+  // (NAV'daki ozellik alanı + izinleriYukle). role:null -> tüm roller; gerçek yetki: RLS (0072) + worker.
+  // İki sekme aynı modülü paylaşır (assets/js/akademik/kutuphane.js); modül #ak-kok / #ak-owner-kok'u kurar.
+  kutuphane: { src: "./akademik/kutuphane.js", role: null },
   // Yetki Ayarları > "Alan Adı & Sayfa Erişim Kalkanı" (gatekeeper; migration 0061).
   // Gerçek yetki: site_ayarlari UPDATE politikası + owner RPC'leri is_owner() ister.
   kalkan: { src: "./gatekeeper/kalkan-paneli.js", role: "owner" },
@@ -115,6 +119,15 @@ const NAV = [
       { id: "media-arsiv", icon: "🗄️", label: "Dosya Yöneticisi", module: "arsiv", role: null, izin: "arsiv", defaultAcilis: false },
       { id: "media-izleme", icon: "🎬", label: "İzleme ve Okuma Yönetimi", module: "izleme" },
       { id: "media-cv", icon: "📄", label: "Özgeçmiş (CV) & Profil Görseli", module: "gy" },
+    ],
+  },
+  {
+    group: "Akademik Kütüphane",
+    icon: "📚",
+    items: [
+      { id: "lib-kutuphane", icon: "📖", label: "Kütüphanem", module: "kutuphane", role: null, ozellik: "akademik_kutuphane", defaultAcilis: false },
+      // Site sahibi merkezi denetimi: tüm üyelerin kaynakları, PDF'leri ve notları (salt okuma) + okuyucu motoru sürümü.
+      { id: "lib-tum", icon: "🛡️", label: "Tüm Kullanıcıların Kaynakları", module: "kutuphane", role: "owner", defaultAcilis: false },
     ],
   },
   {
@@ -196,16 +209,17 @@ async function izinleriYukle(rol) {
       .rpc("ozellik_erisimi_var_mi", { p_ozellik: anahtar, p_rol: rol })
       .then((r) => (r.error ? true : r.data !== false))
       .catch(() => true);
-  const [arsiv, kvkk, ozelIcerik, dosyaPaylasimi] = await Promise.all([
+  const [arsiv, kvkk, ozelIcerik, dosyaPaylasimi, akademikKutuphane] = await Promise.all([
     supabase.rpc("r2_arsiv_yetkilerim").then((r) => (r.error ? undefined : r.data)).catch(() => undefined),
     supabase.rpc("kvkk_surum_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
     ozellikSor("ozel_icerik_yonetimi"),
     ozellikSor("dosya_paylasimi_yonetimi"),
+    ozellikSor("akademik_kutuphane"),
   ]);
   return {
     arsiv,
     kvkk,
-    ozellikler: { ozel_icerik_yonetimi: ozelIcerik, dosya_paylasimi_yonetimi: dosyaPaylasimi },
+    ozellikler: { ozel_icerik_yonetimi: ozelIcerik, dosya_paylasimi_yonetimi: dosyaPaylasimi, akademik_kutuphane: akademikKutuphane },
   };
 }
 
