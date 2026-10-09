@@ -1,103 +1,167 @@
 /*
- * assets/js/kvkk/kvkk-surum-paneli.js — "KVKK Sürümü" sekmesi (sys-kvkk)
+ * assets/js/kvkk/kvkk-surum-paneli.js — "Hukuki Metinler" sekmesi (sys-kvkk)
  * -----------------------------------------------------------------------------
- * dashboard.js, sekme açılınca bu modülü import() eder (MODULES.kvkkSurum). Sekmeyi owner
- * her zaman, admin ise yalnızca owner "adminler değiştirebilsin" anahtarını açtıysa görür.
- * Asıl sınır veritabanında (migration 0064/0065):
- *   - sürümü yalnızca kvkk_surumunu_degistir() yazar (owner; admin ise anahtar açıkken),
- *   - özeti kvkk_onay_ozeti() verir (aynı yetki),
- *   - anahtar (kvkk_surum_admin_degistirebilir) için UPDATE yalnızca owner (RLS + kolon GRANT).
- * Bu dosya yalnızca arayüzdür.
- *
- * HUKUKİ PAKET (migration 0073): Gizlilik Politikası + KVKK Aydınlatma + Açık Rıza tek pakettir.
- * "Yeni Sürümü Yayınla" varsayılan olarak hukuki_paket_surumu_yayinla() RPC'siyle Aydınlatma VE Açık Rıza
- * etiketini AYNI değere ve TEK işlemde (atomik) yükseltir; iki etiket ayrışırsa panel uyarı gösterir.
- * Açık rızayı tek başına yükseltmek "gelişmiş" bölümde kalır (açık rıza metni tek başına değiştiğinde).
- *
- * innerHTML YOK; inline style YOK (CSP). Görünüm mevcut .ya-* / .gk-p-* / .form-field
- * sınıflarından gelir.
+ * Üç AYRI metin vardır ve birbirinden bağımsız yönetilir:
+ *   • Gizlilik Politikası      — genel bilgilendirme; üyeden onay istenmez (sürüm etiketi yok).
+ *   • KVKK Aydınlatma Metni    — site_ayarlari.guncel_kvkk_surumu  (kvkk_surumunu_degistir)
+ *   • Açık Rıza Metni          — site_ayarlari.guncel_riza_surumu  (riza_surumunu_degistir)
+ * Eski "paket" onay kutusu ve "Gelişmiş" bölümü kaldırıldı: her kartın kendi sürüm kutusu ve kendi düğmesi vardır.
+ * Yetki (migration 0076): owner her zaman; admin için iki AYRI anahtar (aydınlatma / açık rıza), yalnızca owner açar.
+ * Ayrıca her üyenin hangi sürümü ne zaman onayladığı (onay_gecmisi) arama + filtreyle izlenir.
+ * Gerçek sınır veritabanındadır; bu dosya yalnızca arayüzdür. innerHTML YOK, inline stil YOK (CSP).
  */
 import { supabase, showMessage, guncelKvkkSurumu, guncelOnaySurumleri } from "../core/supabase-client.js";
+import { el, dugme, ikon, onayIste, tarihMetni } from "../sistem-yedek/ortak.js";
 
-const BICIM = /^v[0-9]{1,3}\.[0-9]{1,3}$/; // DB check kısıtıyla aynı
+const BICIM = /^v[0-9]{1,3}\.[0-9]{1,3}$/;
+const ROLLER = { owner: "Site Sahibi", admin: "Yönetici", manager: "İçerik Sorumlusu", editor: "Editör", special_user: "Özel Üye", user: "Üye" };
+const TUR_AD = { aydinlatma: "KVKK Aydınlatma", acik_riza: "Açık Rıza" };
 
-function el(etiket, ozellikler = {}, ...cocuklar) {
-  const d = document.createElement(etiket);
-  for (const [k, v] of Object.entries(ozellikler)) {
-    if (v == null || v === false) continue;
-    if (k === "class") d.className = v;
-    else if (k === "text") d.textContent = v;
-    else if (k.startsWith("on")) d.addEventListener(k.slice(2), v);
-    else d.setAttribute(k, v === true ? "" : v);
-  }
-  for (const c of cocuklar.flat()) if (c != null) d.append(c);
-  return d;
-}
+const sonrakiOneri = (s) => { const m = /^v(\d+)\.(\d+)$/.exec(s || ""); return m ? `v${m[1]}.${Number(m[2]) + 1}` : "v1.0"; };
+const yokMu = (e) => /does not exist|42883|PGRST202|42703|schema cache/i.test(`${e?.code || ""} ${e?.message || ""}`);
 
-function sonrakiOneri(surum) {
-  const m = /^v(\d+)\.(\d+)$/.exec(surum || "");
-  return m ? `v${m[1]}.${Number(m[2]) + 1}` : "v1.0";
-}
+/** Tek metin kartı: yürürlükteki sürüm, istatistik, yeni sürüm kutusu ve kendi yayın düğmesi. */
+function metinKarti({ baslik, link, surum, ozet, yetkili, yetkiNotu, onayMetni, yayinla, mesaj }) {
+  let mevcut = surum;
+  const surumMetni = el("p", { class: "hk-surum", text: mevcut });
+  const ozetMetni = el("p", { class: "muted", text: ozet });
+  const girdi = el("input", { type: "text", class: "sy-girdi", maxlength: "8", autocomplete: "off", spellcheck: "false", placeholder: sonrakiOneri(mevcut), "aria-label": `${baslik} yeni sürüm etiketi`, disabled: !yetkili });
+  const dugmeYayin = dugme({ metin: "Yeni sürümü yayınla", ikonAdi: "tik", tur: "birincil", disabled: !yetkili });
 
-/**
- * "Açık Rıza Sürümü" bölümü (migration 0070): yurt dışı açık rıza metninin AYRI sürümü. Yükseltince, daha önce
- * rıza vermiş üyelere bir sonraki girişte (kutusu işaretsiz) rızayı yeniden soran modal düşer.
- */
-function rizaBolumu(satir, mesaj, surumDegisti) {
-  if (satir.riza_surumu === undefined || satir.riza_surumu === null) {
-    return el("p", { class: "muted csp-mt-18", text: "Açık rıza için ayrı sürüm (0070 numaralı migration) henüz çalıştırılmamış görünüyor." });
-  }
-  let mevcut = satir.riza_surumu;
-  surumDegisti?.({ riza: mevcut }, true);
-  const verenler = Number(satir.riza_verenler);
-  const eski = Number(satir.riza_eski);
-  const mevcutMetin = el("strong", { text: mevcut });
-  const ozet = el("p", {
-    class: "muted",
-    text:
-      `${verenler} üye açık rıza vermiş; ${verenler - eski}'i bu sürümü onaylamış` +
-      (eski > 0 ? `, ${eski}'ine bir sonraki girişte rızayı yenileme modalı çıkacak.` : "."),
-  });
-  const girdi = el("input", { type: "text", id: "riza-surum-girdi", maxlength: "8", autocomplete: "off", spellcheck: "false", placeholder: sonrakiOneri(mevcut), "aria-label": "Yeni açık rıza sürüm etiketi" });
-  const btn = el("button", { type: "button", id: "riza-surum-kaydet", class: "btn-primary csp-w-auto", text: "Açık Rıza Sürümünü Yayınla" });
-  btn.addEventListener("click", async () => {
+  dugmeYayin.addEventListener("click", async () => {
     const yeni = girdi.value.trim();
     if (!BICIM.test(yeni)) return showMessage(mesaj, 'Sürüm "v1.2" biçiminde olmalı (v + sayı + nokta + sayı).', "error");
-    if (yeni === mevcut) return showMessage(mesaj, "Bu zaten yürürlükteki açık rıza sürümü.", "error");
-    if (!window.confirm(`Açık rıza sürümü ${mevcut} -> ${yeni} olacak.\n\nŞu an rıza vermiş ${verenler} üyenin hepsi bir sonraki girişte rızayı yeniden verme/geri çekme ekranını görecek. Açık rıza metnini ÖNCE yayınladığından emin ol. Devam edilsin mi?`)) return;
-    btn.disabled = true;
+    if (yeni === mevcut) return showMessage(mesaj, "Bu zaten yürürlükteki sürüm.", "error");
+    const tamam = await onayIste({ baslik: `${baslik}: ${mevcut} → ${yeni}`, metin: [onayMetni, "Metni ÖNCE yayınladığından (deploy) emin ol. Yalnızca yazım düzeltmesi için sürüm yükseltme."], tamam: "Yayınla", tehlike: true });
+    if (!tamam) return;
+    dugmeYayin.disabled = true;
     try {
-      const { data, error } = await supabase.rpc("riza_surumunu_degistir", { p_surum: yeni });
-      if (error) throw error;
-      if (!data) throw new Error("Sürüm güncellenmedi.");
-      mevcut = data;
-      await guncelOnaySurumleri({ yenile: true });
-      mevcutMetin.textContent = mevcut;
+      mevcut = await yayinla(yeni);
+      surumMetni.textContent = mevcut;
       girdi.value = "";
       girdi.placeholder = sonrakiOneri(mevcut);
-      surumDegisti?.({ riza: mevcut });
-      showMessage(mesaj, `Kaydedildi: yürürlükteki açık rıza sürümü ${mevcut}. Deploy gerekmez.`, "success");
-    } catch (hata) {
-      showMessage(mesaj, `Kaydedilemedi: ${hata.message || hata}`, "error");
+      showMessage(mesaj, `Kaydedildi: ${baslik} ${mevcut} yürürlükte. Deploy gerekmez.`, "success");
+    } catch (h) {
+      showMessage(mesaj, `Kaydedilemedi: ${h.message || h}`, "error");
     } finally {
-      btn.disabled = false;
+      dugmeYayin.disabled = !yetkili;
     }
   });
-  return el(
-    "details",
-    { class: "csp-mt-18 kvkk-gelismis" },
-    el("summary", { text: "Gelişmiş: yalnızca Açık Rıza sürümünü değiştir" }),
-    el("p", {}, "Yürürlükteki açık rıza sürümü: ", mevcutMetin),
-    ozet,
-    el("div", { class: "form-field csp-mt-16" }, el("label", { for: "riza-surum-girdi", text: "Yeni açık rıza sürüm etiketi" }), girdi),
-    el("div", { class: "csp-flex-gap10-wrap csp-mt-12" }, btn),
-    el("p", {
-      class: "gy-yardim-metni",
-      text:
-        "Aydınlatma sürümünden BAĞIMSIZDIR: yalnızca açık rıza metni değiştiğinde bunu yükselt. Rıza, üyelik şartı değildir; " +
-        "modalda kutu işaretsiz gelir, işaretlemeden devam eden üyenin rızası geri çekilmiş sayılır.",
-    })
+
+  return el("article", { class: "sy-kart hk-kart" },
+    el("h3", { text: baslik }),
+    surumMetni,
+    ozetMetni,
+    el("a", { href: link, target: "_blank", rel: "noopener noreferrer", text: "Sayfayı aç ↗" }),
+    yetkili
+      ? el("div", { class: "hk-form" }, el("label", { text: "Yeni sürüm etiketi" }), girdi, dugmeYayin)
+      : el("p", { class: "sy-bilgi sy-bilgi--uyari" }, ikon("kalkan"), el("span", { text: yetkiNotu }))
   );
+}
+
+/** Admin yetki anahtarları (yalnızca owner görür): iki ayrı, açık etiketli anahtar. */
+function yetkiBolumu(satir, mesaj) {
+  const anahtar = (id, baslik, aciklama, ilkDeger, kolon) => {
+    const kutu = el("input", { type: "checkbox", id, role: "switch" });
+    kutu.checked = !!ilkDeger;
+    kutu.addEventListener("change", async () => {
+      const istenen = kutu.checked;
+      kutu.disabled = true;
+      try {
+        // .select() ŞART: RLS yetkisiz UPDATE'i hata vermeden 0 satıra çevirir.
+        const { data, error } = await supabase.from("site_ayarlari").update({ [kolon]: istenen }).eq("id", 1).select(kolon).maybeSingle();
+        if (error) throw error;
+        if (!data) throw new Error("Kayıt güncellenmedi (yetkin yok ya da satır bulunamadı).");
+        kutu.checked = !!data[kolon];
+        showMessage(mesaj, `${baslik}: ${kutu.checked ? "açıldı (menü, adminin bir sonraki panel yüklemesinde görünür)" : "kapatıldı, yalnızca sen değiştirebilirsin"}.`, "success");
+      } catch (h) {
+        kutu.checked = !istenen;
+        showMessage(mesaj, yokMu(h) ? "0076 numaralı migration henüz çalıştırılmamış." : `Kaydedilemedi: ${h.message || h}`, "error");
+      } finally {
+        kutu.disabled = false;
+      }
+    });
+    return el("div", { class: "hk-anahtar" }, el("label", { for: id }, el("strong", { text: baslik }), el("p", { text: aciklama })), kutu);
+  };
+  return el("section", { class: "sy-kart hk-kart" },
+    el("h3", { text: "Adminlere yetki ver" }),
+    el("p", { class: "muted", text: "Sürüm yükseltmek tüm üyelere yeniden onay ekranı gösterdiği için ikisi de varsayılan KAPALIDIR. İki yetki birbirinden bağımsızdır." }),
+    anahtar("hk-yetki-kvkk", "Adminler KVKK Aydınlatma sürümünü değiştirebilsin", "Kapalıyken yalnızca Site Sahibi yükseltir.", satir.admin_degistirebilir, "kvkk_surum_admin_degistirebilir"),
+    anahtar("hk-yetki-riza", "Adminler Açık Rıza sürümünü değiştirebilsin", "Kapalıyken yalnızca Site Sahibi yükseltir.", satir.riza_admin_degistirebilir, "riza_surum_admin_degistirebilir")
+  );
+}
+
+/** Üye onay kayıtları: arama + filtre + her üyenin zaman damgalı geçmişi. */
+function uyeKayitlari() {
+  const SAYFA = 20;
+  let q = "";
+  let filtre = "hepsi";
+  let ofset = 0;
+  let zamanlayici = null;
+  const girdi = el("input", { type: "search", class: "sy-girdi", placeholder: "Üye adıyla ara…", "aria-label": "Üye ara", autocomplete: "off" });
+  const cipler = el("div", { class: "sy-cipler", role: "group", "aria-label": "Onay durumu filtresi" });
+  const liste = el("div", { class: "hk-liste", "aria-live": "polite" });
+  const sayfalama = el("div", { class: "sy-sayfalama" });
+  const FILTRELER = [["hepsi", "Hepsi"], ["eski", "Güncel olmayan onay"], ["rizasiz", "Açık rızası yok"], ["onaysiz", "Aydınlatma onayı yok"]];
+
+  const cipCiz = () => cipler.replaceChildren(...FILTRELER.map(([k, ad]) => {
+    const b = el("button", { type: "button", class: "sy-sec", "aria-pressed": String(filtre === k), text: ad });
+    b.addEventListener("click", () => { filtre = k; ofset = 0; cipCiz(); yukle(); });
+    return b;
+  }));
+
+  const rozet = (verildi, guncel, surum, tarih, ad) => {
+    if (!verildi) return el("span", { class: "sy-rozet sy-rozet--d-basarisiz", text: `${ad}: yok` });
+    return el("span", { class: `sy-rozet ${guncel ? "sy-rozet--iyi" : "sy-rozet--uyari"}`, text: `${ad}: ${surum || "?"} · ${tarih ? tarihMetni(tarih) : "tarih yok"}${guncel ? "" : " (eski)"}` });
+  };
+
+  const gecmisAc = async (u, kutu, btn) => {
+    if (!kutu.hidden) { kutu.hidden = true; btn.querySelector("span").textContent = "Geçmiş"; return; }
+    kutu.hidden = false;
+    btn.querySelector("span").textContent = "Gizle";
+    kutu.replaceChildren(el("p", { class: "muted", text: "Yükleniyor…" }));
+    const { data, error } = await supabase.rpc("uye_onay_gecmisi", { p_uye: u.id });
+    if (error) return kutu.replaceChildren(el("p", { class: "auth-message error", text: error.message }));
+    kutu.replaceChildren(!data?.length
+      ? el("p", { class: "muted", text: "Bu üye için kayıt yok." })
+      : el("ul", { class: "hk-zaman" }, data.map((g) => el("li", {},
+          el("strong", { text: `${TUR_AD[g.tur] || g.tur} · ${g.islem === "onay" ? "onayladı" : "geri çekti"}` }),
+          ` ${g.surum || ""} — ${tarihMetni(g.olusturma_tarihi)}`,
+          g.kaynak === "geri_doldurma" ? el("span", { class: "muted", text: " (mevcut durumdan aktarıldı; önceki sürümler bilinmiyor)" }) : null))));
+  };
+
+  async function yukle() {
+    liste.replaceChildren(el("p", { class: "muted", text: "Yükleniyor…" }));
+    const { data, error } = await supabase.rpc("uye_onay_durumlari", { p_q: q, p_filtre: filtre, p_limit: SAYFA, p_ofset: ofset });
+    if (error) {
+      liste.replaceChildren(el("p", { class: "auth-message error", text: yokMu(error) ? "0076 numaralı migration henüz çalıştırılmamış." : error.message }));
+      return;
+    }
+    const satirlar = data || [];
+    const toplam = satirlar[0] ? Number(satirlar[0].toplam) : 0;
+    liste.replaceChildren(...(satirlar.length ? satirlar.map((u) => {
+      const gecmis = el("div", { hidden: true });
+      const btn = dugme({ metin: "Geçmiş", ikonAdi: "ara", tur: "ikincil", kucuk: true });
+      btn.addEventListener("click", () => gecmisAc(u, gecmis, btn));
+      return el("article", { class: "hk-satir" },
+        el("div", { class: "hk-satir-ust" }, el("strong", { text: `${u.ad} · ${ROLLER[u.rol] || u.rol}` }), btn),
+        u.eposta ? el("small", { class: "muted", text: u.eposta }) : null,
+        el("div", { class: "hk-satir-durum" }, rozet(u.kvkk_verildi, u.kvkk_guncel, u.kvkk_surum, u.kvkk_tarih, "Aydınlatma"), rozet(u.riza_verildi, u.riza_guncel, u.riza_surum, u.riza_tarih, "Açık rıza")),
+        gecmis);
+    }) : [el("p", { class: "muted", text: "Bu filtreyle eşleşen üye yok." })]));
+    sayfalama.replaceChildren(
+      dugme({ metin: "Önceki", tur: "ikincil", kucuk: true, disabled: ofset === 0, onclick: () => { ofset = Math.max(0, ofset - SAYFA); yukle(); } }),
+      el("span", { class: "muted", text: toplam ? `${ofset + 1}–${Math.min(ofset + SAYFA, toplam)} / ${toplam}` : "" }),
+      dugme({ metin: "Sonraki", tur: "ikincil", kucuk: true, disabled: ofset + SAYFA >= toplam, onclick: () => { ofset += SAYFA; yukle(); } })
+    );
+  }
+  girdi.addEventListener("input", () => { clearTimeout(zamanlayici); zamanlayici = setTimeout(() => { q = girdi.value.trim(); ofset = 0; yukle(); }, 300); });
+  cipCiz();
+  yukle();
+  return el("section", { class: "sy-bolum" },
+    el("h2", { text: "Üye onay kayıtları" }),
+    el("p", { class: "muted", text: "Her üyenin hangi aydınlatma ve açık rıza sürümünü ne zaman onayladığı (veya geri çektiği) otomatik kaydedilir." }),
+    el("div", { class: "sy-arama" }, ikon("ara"), girdi), cipler, liste, sayfalama);
 }
 
 async function kur() {
@@ -108,199 +172,50 @@ async function kur() {
 
   const { data: ozet, error } = await supabase.rpc("kvkk_onay_ozeti");
   const satir = Array.isArray(ozet) ? ozet[0] : ozet;
-  if (error || !satir) {
-    const yok = /does not exist|42883|PGRST202|42703|schema cache/i.test(error?.message || error?.code || "");
-    kok.replaceChildren(
-      el("p", {
-        class: "muted",
-        text: yok || (!error && !satir)
-          ? "0064, 0065 ve 0070 numaralı KVKK migration'ları henüz çalıştırılmamış görünüyor: dosyaları SQL Editor'de çalıştır."
-          : `Yüklenemedi: ${error.message}`,
-      })
-    );
+  if (error || !satir || satir.kvkk_yetkim === undefined) {
+    kok.replaceChildren(el("p", { class: "muted", text: yokMu(error) || (!error && (!satir || satir.kvkk_yetkim === undefined))
+      ? "0064, 0065, 0070, 0073 ve 0076 numaralı migration'lar tam çalıştırılmamış görünüyor: dosyaları SQL Editor'de sırayla çalıştır."
+      : `Yüklenemedi: ${error.message}` }));
     return;
   }
 
-  let mevcut = satir.guncel_surum;
   const toplam = Number(satir.toplam);
-  const eski = Number(satir.eski);
-
-  // Eşgüdüm göstergesi: Aydınlatma ve Açık Rıza etiketleri aynı olmalı (hukuki paket).
-  let rizaMevcut = satir.riza_surumu ?? null;
-  const esgudum = el("p", { class: "kvkk-esgudum", role: "status" });
-  const esgudumuCiz = () => {
-    if (rizaMevcut === null) {
-      esgudum.hidden = true;
-      return;
-    }
-    esgudum.hidden = false;
-    const esit = rizaMevcut === mevcut;
-    esgudum.className = "kvkk-esgudum " + (esit ? "kvkk-esgudum--tamam" : "kvkk-esgudum--uyari");
-    esgudum.textContent = esit
-      ? `✓ Hukuki paket eşgüdümlü: Aydınlatma ve Açık Rıza ${mevcut}.`
-      : `⚠ Sürümler ayrışmış: Aydınlatma ${mevcut}, Açık Rıza ${rizaMevcut}. Eşitlemek için aşağıdan yeni bir sürüm yayınla (açık rıza kutusu işaretli kalsın).`;
-  };
-  const sürümDegisti = (k, ilk) => {
-    if (k?.riza) rizaMevcut = k.riza;
-    if (!ilk) esgudumuCiz();
-  };
-  esgudumuCiz();
-
-  const rizaKutu = el("input", { type: "checkbox", id: "kvkk-paket-riza" });
-  rizaKutu.checked = true;
-  const rizaSatiri = rizaMevcut === null
-    ? null
-    : el(
-        "label",
-        { class: "kvkk-paket-secenek", for: "kvkk-paket-riza" },
-        rizaKutu,
-        el("span", { text: "Açık Rıza sürümünü de aynı etikete yükselt (önerilir: Gizlilik Politikası + Aydınlatma + Açık Rıza tek paket)" })
-      );
-
-  const mevcutMetin = el("strong", { text: mevcut });
-  const ozetMetin = el("p", {
-    class: "muted",
-    text:
-      `${toplam} üyeden ${toplam - eski}'i bu sürümü onaylamış` +
-      (eski > 0 ? `, ${eski}'inin onayı eski (giriş yapınca modal görecek).` : "."),
+  const kvkkKart = metinKarti({
+    baslik: "KVKK Aydınlatma Metni", link: "/kurumsal/kvkk-aydinlatma-metni.html", surum: satir.guncel_surum, mesaj,
+    ozet: `${toplam} üyeden ${satir.guncel}'i bu sürümü onaylamış` + (Number(satir.eski) > 0 ? `; ${satir.eski} üyeye giriş yapınca onay ekranı çıkacak.` : ".") + (Number(satir.onaysiz) > 0 ? ` ${satir.onaysiz} üye henüz onay vermemiş.` : ""),
+    yetkili: !!satir.kvkk_yetkim, yetkiNotu: "Bu sürümü değiştirme yetkin yok. Site Sahibi bu yetkiyi senin için açabilir.",
+    onayMetni: `Onayı eşleşmeyen üyelere (şu an ${satir.eski}) bir sonraki girişte ekranı kilitleyen yeniden onay penceresi gösterilir.`,
+    yayinla: async (yeni) => {
+      const { data, error: e } = await supabase.rpc("kvkk_surumunu_degistir", { p_surum: yeni });
+      if (e) throw e;
+      await guncelKvkkSurumu({ yenile: true });
+      return data;
+    },
   });
-  const girdi = el("input", {
-    type: "text",
-    id: "kvkk-surum-girdi",
-    maxlength: "8",
-    autocomplete: "off",
-    spellcheck: "false",
-    placeholder: sonrakiOneri(mevcut),
-    "aria-label": "Yeni KVKK sürüm etiketi",
-  });
-  const yayinlaBtn = el("button", { type: "button", id: "kvkk-surum-kaydet", class: "btn-primary csp-w-auto", text: "Yeni Sürümü Yayınla" });
-
-  yayinlaBtn.addEventListener("click", async () => {
-    const yeni = girdi.value.trim();
-    if (!BICIM.test(yeni)) {
-      showMessage(mesaj, 'Sürüm "v1.2" biçiminde olmalı (v + sayı + nokta + sayı).', "error");
-      return;
-    }
-    if (yeni === mevcut) {
-      showMessage(mesaj, "Bu zaten yürürlükteki sürüm.", "error");
-      return;
-    }
-    const rizaDa = rizaMevcut !== null && rizaKutu.checked;
-    const onay = window.confirm(
-      `Sürüm ${mevcut} -> ${yeni} olarak değişecek` + (rizaDa ? " (Aydınlatma + Açık Rıza)." : " (yalnızca Aydınlatma).") + "\n\n" +
-        `Onayı ${yeni} ile eşleşmeyen tüm üyeler bir sonraki girişlerinde ekranı kilitleyen ` +
-        `"Rıza Yenileme" modalını görecek (şu an ${toplam} üye).\n\n` +
-        `Gizlilik politikası ve açık rıza metnini ÖNCE yayınladığından emin ol. Devam edilsin mi?`
-    );
-    if (!onay) return;
-
-    yayinlaBtn.disabled = true;
-    try {
-      // Tek yazma yolu RPC: yetkiyi (owner / anahtarı açık admin) sunucu denetler; iki sürüm TEK işlemde yazılır.
-      const { data, error: hata } = await supabase.rpc("hukuki_paket_surumu_yayinla", { p_surum: yeni, p_riza_da: rizaDa });
-      if (hata) {
-        if (/does not exist|42883|PGRST202|schema cache/i.test(`${hata.code || ""} ${hata.message || ""}`)) {
-          throw new Error("0073 numaralı migration henüz çalıştırılmamış: dosyayı SQL Editor'de çalıştır.");
-        }
-        throw hata;
-      }
-      const yeniSatir = Array.isArray(data) ? data[0] : data;
-      if (!yeniSatir?.kvkk_surumu) throw new Error("Sürüm güncellenmedi.");
-
-      mevcut = yeniSatir.kvkk_surumu;
-      rizaMevcut = yeniSatir.riza_surumu ?? rizaMevcut;
-      await Promise.all([guncelKvkkSurumu({ yenile: true }), guncelOnaySurumleri({ yenile: true })]);
-      mevcutMetin.textContent = mevcut;
-      girdi.value = "";
-      girdi.placeholder = sonrakiOneri(mevcut);
-      esgudumuCiz();
-      ozetMetin.textContent = `Yeni sürüm ${mevcut} yürürlükte. Üyeler bir sonraki sayfa yüklemelerinde modalı görür.`;
-      showMessage(mesaj, `Kaydedildi: Aydınlatma ${mevcut}` + (rizaDa ? ` · Açık Rıza ${rizaMevcut}` : "") + ". Deploy gerekmez.", "success");
-    } catch (hata) {
-      showMessage(mesaj, `Kaydedilemedi: ${hata.message || hata}`, "error");
-    } finally {
-      yayinlaBtn.disabled = false;
-    }
+  const rizaKart = metinKarti({
+    baslik: "Açık Rıza Metni", link: "/kurumsal/acik-riza-metni.html", surum: satir.riza_surumu, mesaj,
+    ozet: `${satir.riza_verenler} üye açık rıza vermiş; ${satir.riza_guncel}'i bu sürümü onaylamış` + (Number(satir.riza_eski) > 0 ? `, ${satir.riza_eski}'ine giriş yapınca rızayı yenileme ekranı çıkacak.` : "."),
+    yetkili: !!satir.riza_yetkim, yetkiNotu: "Açık rıza sürümünü değiştirme yetkin yok. Site Sahibi bu yetkiyi senin için açabilir.",
+    onayMetni: `Rıza vermiş ${satir.riza_verenler} üye bir sonraki girişte rızayı yeniden verme / geri çekme ekranını görür.`,
+    yayinla: async (yeni) => {
+      const { data, error: e } = await supabase.rpc("riza_surumunu_degistir", { p_surum: yeni });
+      if (e) throw e;
+      await guncelOnaySurumleri({ yenile: true });
+      return data;
+    },
   });
 
-  // Yetki anahtarı: YALNIZCA owner görür ve değiştirir (admin bu bölümü hiç görmez).
-  let yetkiBolumu = null;
-  if (satir.sahip_mi) {
-    const kutu = el("input", { type: "checkbox", id: "kvkk-admin-anahtar" });
-    kutu.checked = !!satir.admin_degistirebilir;
-    kutu.addEventListener("change", async () => {
-      const istenen = kutu.checked;
-      kutu.disabled = true;
-      try {
-        // .select() ŞART: RLS yetkisiz UPDATE'i hata vermeden 0 satıra çevirir.
-        const { data, error: hata } = await supabase
-          .from("site_ayarlari")
-          .update({ kvkk_surum_admin_degistirebilir: istenen })
-          .eq("id", 1)
-          .select("kvkk_surum_admin_degistirebilir")
-          .maybeSingle();
-        if (hata) throw hata;
-        if (!data) throw new Error("Kayıt güncellenmedi (yetkin yok ya da satır bulunamadı).");
-        kutu.checked = !!data.kvkk_surum_admin_degistirebilir;
-        showMessage(
-          mesaj,
-          kutu.checked
-            ? "Adminler artık KVKK sürümünü değiştirebilir (menüleri bir sonraki panel yüklemesinde görünür)."
-            : "Admin yetkisi kapatıldı: sürümü yalnızca sen değiştirebilirsin (yetki sunucuda anında kalkar).",
-          "success"
-        );
-      } catch (hata) {
-        kutu.checked = !istenen; // başarısız: eski haline dön
-        showMessage(mesaj, `Kaydedilemedi: ${hata.message || hata}`, "error");
-      } finally {
-        kutu.disabled = false;
-      }
-    });
-    yetkiBolumu = el(
-      "div",
-      { class: "csp-mt-18" },
-      el("h3", { text: "Yetki" }),
-      el(
-        "div",
-        { class: "gk-p-anahtar" },
-        el(
-          "label",
-          { class: "ya-mini-toggle", for: "kvkk-admin-anahtar" },
-          kutu,
-          el("span", { class: "ya-mini-track" }, el("span", { class: "ya-mini-thumb" }))
-        ),
-        el("label", { for: "kvkk-admin-anahtar", text: "Adminler de KVKK sürümünü değiştirebilsin" })
-      ),
-      el("p", {
-        class: "gy-yardim-metni",
-        text:
-          "Kapalıyken yalnızca Site Sahibi (owner) değiştirir. Sürüm yükseltmek tüm üyelere yeniden onay ekranı " +
-          "gösterdiği için varsayılan KAPALIDIR.",
-      })
-    );
-  }
-
+  kok.classList.add("sy-kok");
   kok.replaceChildren(
-    el("p", {}, "Yürürlükteki Aydınlatma sürümü: ", mevcutMetin),
-    esgudum,
-    ozetMetin,
-    el("div", { class: "form-field csp-mt-16" }, el("label", { for: "kvkk-surum-girdi", text: "Yeni sürüm etiketi" }), girdi),
-    rizaSatiri,
-    el("div", { class: "csp-flex-gap10-wrap csp-mt-12" }, yayinlaBtn),
-    el("p", {
-      class: "gy-yardim-metni",
-      text:
-        "Sıra: (1) kurumsal/gizlilik-politikasi.md değişikliğini deploy et, (2) burada sürümü yükselt. " +
-        "Sadece yazım düzeltmesi için sürümü değiştirme; her değişiklik tüm üyelere yeniden onay ekranı gösterir. " +
-        "Onay damgasını tarayıcı değil veritabanı yazar; sürüm okunamazsa kimse kilitlenmez.",
-    }),
-    rizaBolumu(satir, mesaj, sürümDegisti),
-    yetkiBolumu
+    el("div", { class: "hk-kartlar" }, kvkkKart, rizaKart),
+    el("p", { class: "sy-bilgi" }, ikon("uyari"), el("span", { text: "Sıra: (1) ilgili metin sayfasını değiştirip deploy et, (2) burada sürümü yükselt. Gizlilik Politikası genel bilgilendirmedir; üyeden onay istenmediği için sürümü burada yönetilmez." })),
+    satir.sahip_mi ? yetkiBolumu(satir, mesaj) : null,
+    uyeKayitlari()
   );
 }
 
 kur().catch((hata) => {
   console.error("kvkk-surum-paneli.js:", hata);
   const mesaj = document.getElementById("kvkk-surum-mesaj");
-  if (mesaj) showMessage(mesaj, `KVKK sürüm paneli yüklenemedi: ${hata.message || hata}`, "error");
+  if (mesaj) showMessage(mesaj, `Panel yüklenemedi: ${hata.message || hata}`, "error");
 });
