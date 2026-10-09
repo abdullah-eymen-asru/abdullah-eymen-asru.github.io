@@ -195,13 +195,13 @@ export function dosyaAdi() {
 }
 
 /**
- * @param {object} p { bilesenler:Set<string>, kapsam:'kendi'|'tum', hassas:boolean, bicimler:{json,sql}, alici, ilerleme(fn), sinyal }
+ * @param {object} p { bilesenler:Set<string>, kapsam:'kendi'|'secili'|'tum', hedefler:string[] (kapsam='secili' iken üye id'leri), hedefAdlari:string[], hassas:boolean, bicimler:{json,sql}, alici, ilerleme(fn), sinyal }
  * @returns {Promise<{boyut:number, blob:Blob|null, ozet:object}>}
  */
-export async function yedekAl({ bilesenler, kapsam, hassas, bicimler, alici, ilerleme, sinyal }) {
+export async function yedekAl({ bilesenler, kapsam, hedefler = [], hedefAdlari = [], hassas, bicimler, alici, ilerleme, sinyal }) {
   const secili = new Set(bilesenler);
   const { data: oturum, error } = await supabase.rpc("sistem_export_baslat", {
-    p_bilesenler: [...secili], p_kapsam: kapsam, p_hassas: !!hassas,
+    p_bilesenler: [...secili], p_kapsam: kapsam, p_hassas: !!hassas, p_hedefler: kapsam === "secili" ? hedefler : [],
   });
   if (error) {
     await alici.iptal();
@@ -210,7 +210,7 @@ export async function yedekAl({ bilesenler, kapsam, hassas, bicimler, alici, ile
 
   const zip = new AkisliZip(alici);
   const ozet = {
-    surum: 1, olusturma: new Date().toISOString(), kapsam, bilesenler: [...secili],
+    surum: 2, olusturma: new Date().toISOString(), kapsam, hedefUyeler: kapsam === "secili" ? hedefAdlari : [], bilesenler: [...secili],
     tablolar: {}, r2: { adet: 0, bayt: 0 }, github: { bayt: 0 }, icerik: { adet: 0 }, hatalar: [],
   };
 
@@ -246,7 +246,7 @@ function okubeni(o) {
   return [
     "SİTE SİSTEM YEDEĞİ",
     `Oluşturma: ${o.olusturma}`,
-    `Kapsam   : ${o.kapsam === "tum" ? "TÜM SİSTEM (felaket yedeği, yalnızca Site Sahibi)" : "Yalnızca oturumu açan kullanıcının kendi verileri"}`,
+    `Kapsam   : ${o.kapsam === "tum" ? "TÜM SİSTEM (felaket yedeği, yalnızca Site Sahibi)" : o.kapsam === "secili" ? `SEÇİLİ ÜYELER (${(o.hedefUyeler || []).join(", ")}) — yalnızca Site Sahibi` : "Yalnızca oturumu açan kullanıcının kendi verileri"}`,
     `Bileşenler: ${o.bilesenler.join(", ")}`,
     "",
     "KLASÖRLER",
@@ -258,6 +258,7 @@ function okubeni(o) {
     "  github/                        Kaynak kod zip'i",
     "",
     "ÖNEMLİ",
+    "  * Kişisel Notlar bileşeni her zaman yalnızca paketi alan kişinin kendi notlarını içerir.",
     "  * Notlar ve .sifreli uzantılı dosyalar UÇTAN UCA ŞİFRELİDİR; bu pakette şifreli halleriyle durur.",
     "    Açabilmek için kullanıcının parolası/kurtarma anahtarı gerekir (not_kasasi tablosundaki sarılı anahtarlar da pakettedir).",
     "  * Parolalar, 2FA yedek kodları ve servis anahtarları pakete HİÇBİR ZAMAN girmez.",
