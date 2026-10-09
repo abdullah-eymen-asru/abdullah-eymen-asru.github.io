@@ -157,7 +157,7 @@ const NAV = [
       { id: "sys-yetki", icon: "🔐", label: "Yetki Ayarları", module: "gy", role: "owner" },
       // role:"admin" + izin:"kvkk": owner her zaman görür; admin sadece owner "adminler KVKK
       // sürümünü değiştirebilsin" anahtarını açtıysa (bkz. gorunurMu / izinleriYukle).
-      { id: "sys-kvkk", icon: "📜", label: "KVKK Sürümü", module: "kvkkSurum", role: "admin", izin: "kvkk" },
+      { id: "sys-kvkk", icon: "📜", label: "Hukuki Metinler", module: "kvkkSurum", role: "admin", izin: "kvkk" },
       { id: "sys-uye-aktarim", icon: "📤", label: "Üye Verisi İndirme", module: "uyeAktarimYetki", role: "owner" },
       // role:null + izin:"sistemyedek": owner her zaman görür; diğer roller yalnızca owner can_export_system'i açtıysa.
       { id: "sys-yedek", icon: "📦", label: "Sistem Yedekleme", module: "sistemYedek", role: null, izin: "sistemyedek", defaultAcilis: false },
@@ -221,7 +221,7 @@ async function izinleriYukle(rol) {
       .catch(() => true);
   const [arsiv, kvkk, ozelIcerik, dosyaPaylasimi, akademikKutuphane, sistemYedek] = await Promise.all([
     supabase.rpc("r2_arsiv_yetkilerim").then((r) => (r.error ? undefined : r.data)).catch(() => undefined),
-    supabase.rpc("kvkk_surum_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
+    supabase.rpc("hukuki_metin_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
     ozellikSor("ozel_icerik_yonetimi"),
     ozellikSor("dosya_paylasimi_yonetimi"),
     ozellikSor("akademik_kutuphane"),
