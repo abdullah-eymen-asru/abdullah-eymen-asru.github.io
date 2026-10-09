@@ -989,12 +989,12 @@ permalink: "/panel/dashboard.html"
     <!-- KVKK metin sürümü (assets/js/kvkk/kvkk-surum-paneli.js; tablo site_ayarlari, migration 0064/0065).
          Owner her zaman görür; adminler yalnızca owner anahtarı açıksa. -->
     <section class="dash-view" id="view-sys-kvkk" hidden data-view="sys-kvkk">
-      <h1>KVKK Metin Sürümü</h1>
+      <h1>Hukuki Metinler</h1>
       <section class="panel-section">
         <p class="muted">
-          Gizlilik Politikası / Aydınlatma Metni'nin yürürlükteki sürüm etiketi. Yükselttiğinde onayı eşleşmeyen
-          üyeler bir sonraki girişlerinde yeniden onay verir. <strong>Kod değiştirmeden ve deploy etmeden</strong>
-          değişir.
+          KVKK Aydınlatma Metni ve Açık Rıza Metni <strong>ayrı belgelerdir</strong>; her birinin kendi sürüm etiketi vardır.
+          Yükselttiğinde onayı eşleşmeyen üyeler bir sonraki girişlerinde yeniden onay verir. Kod değiştirmeden ve deploy etmeden değişir.
+          Gizlilik Politikası genel bilgilendirmedir, üyeden onay istenmez.
         </p>
         <div id="kvkk-surum-kok"><p class="muted">Yükleniyor...</p></div>
         <div id="kvkk-surum-mesaj" class="auth-message" hidden></div>
@@ -1013,7 +1013,7 @@ permalink: "/panel/dashboard.html"
          Owner her zaman; diğer roller yalnızca can_export_system açıksa. -->
     <section class="dash-view" id="view-sys-yedek" hidden data-view="sys-yedek">
       <h1>Sistem Yedekleme &amp; Depolama Yönetimi</h1>
-      <div id="sy-kok"><p class="muted">Yükleniyor...</p></div>
+      <div id="sy-kok" class="sy-kok"><p class="muted">Yükleniyor...</p></div>
       <div id="sy-mesaj" class="auth-message" hidden></div>
     </section>
 
@@ -1758,14 +1758,16 @@ permalink: "/panel/dashboard.html"
             <button type="button" id="nt-sec-btn" class="nt-btn nt-btn-kucuk" aria-pressed="false" title="Birden çok not seç">Seç</button>
           </div>
           <div id="nt-secim-cubugu" class="nt-secim-cubugu" hidden>
-            <span id="nt-secim-sayi" class="nt-secim-sayi" aria-live="polite"></span>
-            <span class="nt-secim-eylem">
-              <button type="button" id="nt-secim-hepsi" class="nt-btn nt-btn-kucuk">Tümünü seç</button>
-              <button type="button" id="nt-secim-aktar" class="nt-btn nt-btn-kucuk">Dışa aktar</button>
-              <button type="button" id="nt-secim-tasi" class="nt-btn nt-btn-kucuk">Taşı</button>
-              <span class="nt-mk"><button type="button" id="nt-secim-durum" class="nt-btn nt-btn-kucuk" aria-haspopup="menu">Durum</button></span>
-              <button type="button" id="nt-secim-cop" class="nt-btn nt-btn-kucuk nt-btn-tehlike">Çöpe at</button>
-            </span>
+            <div class="nt-secim-ust">
+              <span id="nt-secim-sayi" class="nt-secim-sayi" aria-live="polite"></span>
+              <button type="button" id="nt-secim-hepsi" class="nt-btn nt-secim-hepsi">Tümünü seç</button>
+            </div>
+            <div class="nt-secim-eylem" role="group" aria-label="Seçili notlar için işlemler">
+              <button type="button" id="nt-secim-aktar" class="nt-btn nt-secim-btn">Dışa aktar</button>
+              <button type="button" id="nt-secim-tasi" class="nt-btn nt-secim-btn">Taşı</button>
+              <span class="nt-mk"><button type="button" id="nt-secim-durum" class="nt-btn nt-secim-btn" aria-haspopup="menu">Durum</button></span>
+              <button type="button" id="nt-secim-cop" class="nt-btn nt-secim-btn nt-btn-tehlike">Çöpe at</button>
+            </div>
           </div>
         </div>
         <div class="nt-liste-kaydirma">
