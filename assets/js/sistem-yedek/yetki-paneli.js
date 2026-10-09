@@ -1,7 +1,7 @@
 /*
  * assets/js/sistem-yedek/yetki-paneli.js — Yetki Ayarları > "📦 Sistem Yedekleme" sekmesi (SADECE owner).
  * can_export_system anahtarı: owner her zaman yetkilidir; admin / manager / editor için buradan açılır/kapanır.
- * VARSAYILAN KAPALI. Gerçek sınır veritabanındadır (migration 0074); bu dosya yalnızca arayüzdür.
+ * VARSAYILAN KAPALI. Gerçek sınır veritabanındadır (migration 0074 / 0075); bu dosya yalnızca arayüzdür.
  * innerHTML YOK, inline stil YOK (CSP).
  * -----------------------------------------------------------------------
  */
@@ -54,7 +54,7 @@ async function kur() {
           );
         })
       ),
-      el("p", { class: "muted sy-not", text: "Yetki açık olsa bile veri izolasyonu veritabanında zorlanır: hiçbir yönetici başka kullanıcının notlarını, kaynaklarını veya özel verilerini indiremez. 'Tüm sistem' yedeği her koşulda yalnızca Site Sahibi'ne aittir." })
+      el("p", { class: "muted sy-not", text: "Yetki açık olsa bile veri izolasyonu veritabanında zorlanır: yönetici yalnızca KENDİ verilerini alabilir. Başka üyelerin verisini (seçili üyeler ya da 'Tüm sistem' yedeği) her koşulda yalnızca Site Sahibi alabilir; hiç kimse başkasının notlarını indiremez." })
     );
   };
   await yukle();
