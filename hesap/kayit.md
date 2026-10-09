@@ -47,7 +47,7 @@ permalink: "/hesap/kayit.html"
           aşağıdaki forma bağlı kaldığı için normal kayıt gönderiminde de
           değeri okunur. -->
   <p id="kvkk-aydinlatma-bilgi">
-    Kayıt olarak <a href="{{ '/kurumsal/gizlilik-politikasi.html' | relative_url }}" target="_blank" rel="noopener noreferrer">Aydınlatma Metni</a>'ni okuduğunuzu beyan edersiniz.
+    Kayıt olarak <a href="{{ '/kurumsal/kvkk-aydinlatma-metni.html' | relative_url }}" target="_blank" rel="noopener noreferrer">KVKK Aydınlatma Metni</a>'ni okuduğunuzu beyan edersiniz. Genel bilgi için <a href="{{ '/kurumsal/gizlilik-politikasi.html' | relative_url }}" target="_blank" rel="noopener noreferrer">Gizlilik Politikası</a>.
   </p>
 
   <div class="form-checkbox">
