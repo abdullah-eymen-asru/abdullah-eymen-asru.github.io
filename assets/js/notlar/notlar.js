@@ -1134,7 +1134,7 @@ function secimiDegistir(id) {
     if (k) k.checked = secimde;
     satir.querySelector(".nt-satir-ana")?.setAttribute("aria-pressed", String(secimde));
   }
-  secimCubuguGuncelle();
+  secimCubuguGuncelle(filtrelenmisNotlar().liste);
 }
 
 function secimModuAyarla(ac) {
@@ -1152,7 +1152,13 @@ function secimCubuguGuncelle(liste) {
   const n = S.secim.size;
   $("nt-secim-sayi").textContent = n ? `${n} not seçildi` : "Not seçmek için satırlara dokun";
   for (const id of ["nt-secim-aktar", "nt-secim-tasi", "nt-secim-durum", "nt-secim-cop"]) $(id).disabled = !n;
-  if (liste) $("nt-secim-hepsi").dataset.toplam = String(liste.length);
+  if (liste) {
+    $("nt-secim-hepsi").dataset.toplam = String(liste.length);
+    // Etiket durumu yansıtsın: hepsi seçiliyse "Seçimi kaldır"; liste boşsa düğme pasif.
+    const hepsi = liste.length > 0 && liste.every((m) => S.secim.has(m.id));
+    $("nt-secim-hepsi").textContent = hepsi ? "Seçimi kaldır" : `Tümünü seç (${liste.length})`;
+    $("nt-secim-hepsi").disabled = liste.length === 0;
+  }
 }
 
 function gorunenleriSec() {
@@ -1189,7 +1195,12 @@ async function topluDurum(d) {
 async function topluCope() {
   const notlar = secilenNotlar();
   if (!notlar.length) return;
-  if (!window.confirm(`${notlar.length} not çöp kutusuna taşınsın mı?\n\nÇöptekiler sen silene kadar durur; istediğin an geri alabilirsin.`)) return;
+  const onay = await diyalog({
+    baslik: `${notlar.length} not çöp kutusuna taşınsın mı?`,
+    tamam: "Çöpe taşı",
+    govde: el("p", { class: "muted", text: "Çöptekiler sen silene kadar durur; istediğin an geri alabilirsin." }),
+  });
+  if (!onay) return;
   if (S.duz && S.secim.has(S.duz.id)) {
     S.kirli = false;
     await duzenleyiciKapat();
