@@ -233,3 +233,16 @@
 .hk-anahtar:last-child { border-bottom: 0; }
 .hk-anahtar input { width: 26px; height: 26px; flex: none; accent-color: var(--accent); }
 .hk-anahtar p { margin: 2px 0 0; font-size: .84rem; color: var(--muted); }
+
+/* Üye onay kayıtları: liste kendi içinde kayar; üye sayısı ne olursa olsun sayfa uzamaz. Arama, filtre ve sayfalama görünür kalır. */
+.hk-liste {
+  display: grid; gap: 10px; align-content: start;
+  max-height: min(62vh, 560px);
+  overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  padding: 2px 4px 2px 0; margin: 12px 0 4px;
+  scrollbar-width: thin;
+}
+.hk-satir { min-width: 0; }
+.hk-satir-ust strong { overflow-wrap: anywhere; min-width: 0; }
+.hk-satir small { overflow-wrap: anywhere; }
+@media (max-width: 640px) { .hk-liste { max-height: 58vh; } }
