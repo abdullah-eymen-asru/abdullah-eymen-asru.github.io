@@ -334,18 +334,23 @@ function onayYenilemeModaliniGosterVeBekle(profile, surumler, durum) {
 
     const baslik = document.createElement("h2");
     baslik.id = "kvkk-modal-baslik";
-    baslik.textContent = iki ? "Gizlilik Metinlerimiz Güncellendi" : aydinlatmaEski ? "Gizlilik Politikamız Güncellendi" : "Açık Rıza Metnimiz Güncellendi";
+    baslik.textContent = iki ? "Gizlilik Metinlerimiz Güncellendi" : aydinlatmaEski ? "Aydınlatma Metnimiz Güncellendi" : "Açık Rıza Metnimiz Güncellendi";
     modal.append(baslik);
 
     const link = document.createElement("a");
-    link.href = "/kurumsal/gizlilik-politikasi.html";
+    link.href = "/kurumsal/kvkk-aydinlatma-metni.html";
     link.target = "_blank";
     link.rel = "noopener noreferrer";
     link.textContent = "Aydınlatma Metni";
+    const rizaLink = document.createElement("a");
+    rizaLink.href = "/kurumsal/acik-riza-metni.html";
+    rizaLink.target = "_blank";
+    rizaLink.rel = "noopener noreferrer";
+    rizaLink.textContent = "Açık Rıza Metni";
 
     if (aydinlatmaEski) {
       const metin = document.createElement("p");
-      metin.append("Gizlilik Politikası ve Yurt Dışı Aktarım Şartlarımız güncellendi. İncelemek için ", link.cloneNode(true), "'ni okuyabilirsin.");
+      metin.append("KVKK Aydınlatma Metnimiz güncellendi. İncelemek için ", link.cloneNode(true), "'ni okuyabilirsin.");
       const altYazi = document.createElement("p");
       altYazi.className = "kvkk-modal-altyazi";
       altYazi.textContent = "Devam etmek için güncel metni okuduğunu onaylaman gerekiyor. Onaylamak istemiyorsan hesabından çıkış yapabilirsin.";
@@ -357,7 +362,7 @@ function onayYenilemeModaliniGosterVeBekle(profile, surumler, durum) {
       const bolum = document.createElement("div");
       bolum.className = "kvkk-modal-riza";
       const ust = document.createElement("p");
-      ust.append("Yurt dışına aktarım ", document.createElement("strong"), " metni güncellendi. Daha önce verdiğin açık rıza güncel metni kapsamadığı için yeniden soruyoruz. Detaylar: ", link.cloneNode(true), ".");
+      ust.append("Yurt dışına aktarım ", document.createElement("strong"), " metni güncellendi. Daha önce verdiğin açık rıza güncel metni kapsamadığı için yeniden soruyoruz. Detaylar: ", rizaLink.cloneNode(true), ".");
       ust.querySelector("strong").textContent = "açık rıza";
       rizaKutusu = document.createElement("input");
       rizaKutusu.type = "checkbox";
