@@ -209,10 +209,19 @@
 .nt-suzgec select { flex: 1 1 28%; min-width: 0; max-width: 100%; height: 30px; padding: 0 8px; font: inherit; font-size: 0.8rem; color: var(--text); background: var(--nt-yuzey); border: 1px solid var(--nt-cizgi); border-radius: 8px; }
 #nt-sirala { flex: 1 1 60%; }
 .nt-suzgec .nt-btn { flex: none; }
-.nt-secim-cubugu { display: flex; flex-wrap: nowrap; align-items: center; justify-content: space-between; gap: 6px 10px; min-width: 0; padding: 8px 10px; background: var(--nt-vurgu-zemin); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--nt-cizgi)); border-radius: 10px; }
-.nt-secim-sayi { flex: none; white-space: nowrap; font-size: 0.82rem; font-weight: 600; }
-.nt-secim-eylem { display: flex; flex-wrap: nowrap; gap: 6px; min-width: 0; overflow-x: auto; scrollbar-width: thin; padding-bottom: 2px; }
-.nt-secim-eylem .nt-btn, .nt-secim-eylem .nt-mk { flex: none; white-space: nowrap; }
+/* Toplu seçim çubuğu: iki satır (sayı + tümünü seç / eylem ızgarası). Yatay kaydırma ve kırpılma YOK; dokunma hedefleri ≥44px. */
+.nt-secim-cubugu { display: grid; gap: 10px; min-width: 0; padding: 10px; background: var(--nt-vurgu-zemin); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--nt-cizgi)); border-radius: 12px; }
+.nt-secim-ust { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
+.nt-secim-sayi { min-width: 0; font-size: 0.92rem; font-weight: 700; overflow-wrap: anywhere; }
+.nt-secim-hepsi { flex: none; height: 40px; padding: 0 14px; }
+.nt-secim-eylem { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.nt-secim-eylem .nt-mk { display: flex; min-width: 0; }
+.nt-secim-eylem .nt-mk .nt-btn { flex: 1 1 auto; }
+.nt-secim-btn { width: 100%; min-width: 0; height: 44px; padding: 0 8px; font-size: 0.9rem; font-weight: 650; white-space: normal; line-height: 1.15; touch-action: manipulation; }
+.nt-secim-btn.nt-btn-tehlike { color: var(--nt-tehlike); background: color-mix(in srgb, var(--nt-tehlike) 10%, var(--bg)); border-color: color-mix(in srgb, var(--nt-tehlike) 55%, var(--nt-cizgi)); }
+@media (max-width: 560px) { .nt-secim-eylem { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* Seçim modunda satır dokunma alanı geniş ve işaret kutusu büyük */
+.nt-satir-kutu { width: 22px; height: 22px; accent-color: var(--accent); }
 .nt-liste-kaydirma { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 8px; overscroll-behavior: contain; }
 .nt-liste { display: grid; gap: 2px; }
 .nt-klasor-satirlari { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 2px 10px; }
