@@ -686,12 +686,12 @@ async function wireKvkk(profile) {
       <p class="auth-message auth-message--error">
         ${
           profile.kvkk_onay_verildi
-            ? "Gizlilik politikası/KVKK Aydınlatma Metni güncellendi, lütfen tekrar okuduğunu beyan et."
+            ? "KVKK Aydınlatma Metni güncellendi, lütfen tekrar okuduğunu beyan et."
             : "Henüz KVKK Aydınlatma Metni'ni okuduğuna dair bir beyanın yok."
         }
       </p>
       <p>
-        <a href="/kurumsal/gizlilik-politikasi.html" target="_blank" rel="noopener noreferrer">KVKK Aydınlatma Metni ve Gizlilik Politikası</a>'nı
+        <a href="/kurumsal/kvkk-aydinlatma-metni.html" target="_blank" rel="noopener noreferrer">KVKK Aydınlatma Metni</a>'ni
         okudun mu?
       </p>
       <button id="kvkk-aydinlatma-onayla-btn" type="button" class="btn-primary">Okudum</button>`;
@@ -721,12 +721,14 @@ async function wireKvkk(profile) {
           Kişisel verilerimin üyelik işlemlerinin yürütülmesi amacıyla yurt
           dışında (Almanya/Frankfurt) bulunan güvenli Supabase sunucularına
           aktarılmasına açık rıza veriyorum.
+          (<a href="/kurumsal/acik-riza-metni.html" target="_blank" rel="noopener noreferrer">Açık Rıza Metni</a>)
         </span>
       </label>
       <button id="yurtdisi-onayla-btn" type="button" class="btn-primary">Onayla</button>`;
   }
 
   box.innerHTML = html;
+  onayGecmisiniEkle(box);
 
   const aydinlatmaBtn = document.getElementById("kvkk-aydinlatma-onayla-btn");
   aydinlatmaBtn?.addEventListener("click", async () => {
@@ -1299,3 +1301,27 @@ function wireLogout() {
 }
 
 init(); // sayfa modülü yüklenince otomatik çalışır; #app'i requireAuth() gösterir
+
+/* ---------------------------------------------------------------------- */
+/** Üyenin kendi onay geçmişi (hangi sürüm, ne zaman) — migration 0076 kendi_onay_gecmisim(). Yoksa sessizce atlanır. */
+async function onayGecmisiniEkle(box) {
+  try {
+    const { data, error } = await supabase.rpc("kendi_onay_gecmisim");
+    if (error || !data?.length) return;
+    const ad = { aydinlatma: "KVKK Aydınlatma", acik_riza: "Açık Rıza" };
+    const detay = document.createElement("details");
+    detay.className = "ya-detay";
+    const baslik = document.createElement("summary");
+    baslik.textContent = "Onay geçmişim";
+    const liste = document.createElement("ul");
+    for (const g of data) {
+      const li = document.createElement("li");
+      li.textContent = `${ad[g.tur] || g.tur} — ${g.islem === "onay" ? "onayladın" : "geri çektin"} ${g.surum || ""} · ${new Date(g.olusturma_tarihi).toLocaleString("tr-TR", { dateStyle: "medium", timeStyle: "short" })}`;
+      liste.append(li);
+    }
+    detay.append(baslik, liste);
+    box.append(detay);
+  } catch (e) {
+    console.warn("Onay geçmişi okunamadı:", e);
+  }
+}
