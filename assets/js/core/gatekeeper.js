@@ -74,7 +74,7 @@
   // Alan adı komple kapalı olsa BİLE açık kalanlar. /hesap: yönetici kapıdan girebilsin
   // (kilitli sitede giriş sayfası da kilitli olsaydı kimse kendi sitesine giremezdi).
   // /panel: kendi auth-guard'ı var. Gizlilik politikası: KVKK/yasal metin erişilebilir kalmalı.
-  var DAIMA_ACIK = ["/hesap", "/panel", "/kurumsal/gizlilik-politikasi"];
+  var DAIMA_ACIK = ["/hesap", "/panel", "/kurumsal/gizlilik-politikasi", "/kurumsal/kvkk-aydinlatma-metni", "/kurumsal/acik-riza-metni"];
 
   function altinda(norm, kok) {
     return norm === kok || norm.indexOf(kok + "/") === 0;
