@@ -31,20 +31,20 @@ export const KUTUPHANELER = {
   },
   mammoth: {
     paket: "mammoth", surum: "1.8.0", dosya: "mammoth.browser.min.js", global: "mammoth", lisans: "BSD-2-Clause",
-    sri: null, amac: "Word (.docx) → HTML",
+    sri: "sha384-/cXAMbzovUIKbBERjPmR3SnPTh8siWr5lsvFYj1Uq4XP0yaJUZJmsh0YXyGv5P0y", amac: "Word (.docx) → HTML",
   },
   dompurify: {
     paket: "dompurify", surum: "3.2.6", dosya: "dist/purify.min.js", global: "DOMPurify", lisans: "Apache-2.0 veya MPL-2.0",
-    sri: null, amac: "HTML temizleme (XSS koruması); yüklenemezse yerleşik katı temizleyici kullanılır",
+    sri: "sha384-JEyTNhjM6R1ElGoJns4U2Ln4ofPcqzSsynQkmEc/KGy6336qAZl70tDLufbkla+3", amac: "HTML temizleme (XSS koruması); yüklenemezse yerleşik katı temizleyici kullanılır",
   },
   pdfmake: {
     paket: "pdfmake", surum: "0.2.20", dosya: "build/pdfmake.min.js", global: "pdfMake", lisans: "MIT",
-    sri: null, amac: "PDF üretimi (Roboto gömülü: Türkçe/Latin-Ext/Kiril/Yunanca)",
+    sri: "sha384-G23ofMOEI98f9UnroUBjDi6Ll55Y5E6bOX4VAMJo0nIbuQRIxzn0g4athUOb58zs", amac: "PDF üretimi (Roboto gömülü: Türkçe/Latin-Ext/Kiril/Yunanca)",
     ek: ["build/vfs_fonts.js"],
   },
   heic2any: {
     paket: "heic2any", surum: "0.0.4", dosya: "dist/heic2any.min.js", global: "heic2any", lisans: "MIT",
-    sri: null, amac: "HEIC/HEIF (iPhone) görsellerini çözme — WebAssembly gerektirir ('wasm-unsafe-eval')",
+    sri: "sha384-OTofQ0MEeiSgh62havBcemCIK0gqj809wX6UA0uPISNMRnR6NZyCdGzX3SbLrgwL", amac: "HEIC/HEIF (iPhone) görsellerini çözme — WebAssembly gerektirir ('wasm-unsafe-eval')",
   },
 };
 
