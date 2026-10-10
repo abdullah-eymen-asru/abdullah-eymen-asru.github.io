@@ -15,6 +15,7 @@ permalink: "/panel/dashboard.html"
 <link rel="stylesheet" href="{{ '/assets/css/r2-arsiv.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/akademik.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/sistem-yedek.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/css/donusturucu.css' | relative_url }}">
 
 <div class="loading-overlay" id="loading">Yükleniyor...</div>
 
@@ -904,6 +905,7 @@ permalink: "/panel/dashboard.html"
         <button type="button" role="tab" class="ya-altsekme" id="ya-tab-kalkan" data-ya-pane="gk-kalkan-bolumu" aria-controls="gk-kalkan-bolumu" aria-selected="false" tabindex="-1">🛡️ Erişim Kalkanı</button>
         <button type="button" role="tab" class="ya-altsekme" id="ya-tab-kilit-izin" data-ya-pane="gk-izin-bolumu" aria-controls="gk-izin-bolumu" aria-selected="false" tabindex="-1">🔑 Kilit İzinleri</button>
         <button type="button" role="tab" class="ya-altsekme" id="ya-tab-sistem-yedek" data-ya-pane="sy-izin-bolumu" aria-controls="sy-izin-bolumu" aria-selected="false" tabindex="-1">📦 Sistem Yedekleme</button>
+        <button type="button" role="tab" class="ya-altsekme" id="ya-tab-donusturucu" data-ya-pane="dn-izin-bolumu" aria-controls="dn-izin-bolumu" aria-selected="false" tabindex="-1">🔄 Dönüştürücü</button>
       </div>
 
       <!-- 1) Özellik matrisi. id="yetki-ayarlari" ve içindeki id'ler AYNEN korundu:
@@ -984,6 +986,18 @@ permalink: "/panel/dashboard.html"
         <div id="sy-izin-kok"><p class="muted">Yükleniyor...</p></div>
         <div id="sy-izin-mesaj" class="auth-message" hidden></div>
       </section>
+
+      <!-- 7) Evrensel Dönüştürücü izni: can_use_converter (assets/js/donusturucu/yetki-paneli.js; migration 0077) -->
+      <section id="dn-izin-bolumu" class="panel-section ya-pane" role="tabpanel" aria-labelledby="ya-tab-donusturucu" hidden>
+        <h2>Dönüştürücü &amp; Belge Düzenleyici İzni</h2>
+        <p class="muted">
+          "Dönüştürücü &amp; Editör" aracı varsayılan olarak yalnızca Site Sahibi'ne açıktır. Buradan her rol için
+          <code>can_use_converter</code> anahtarını tek tıkla açıp kapatabilirsin. Araç tamamen tarayıcıda çalışır; dosyalar
+          sunucuya gitmez. Yetkisi olmayan roller menüde aracı görmez, adresi bilseler de Guard'a takılır.
+        </p>
+        <div id="dn-izin-kok"><p class="muted">Yükleniyor...</p></div>
+        <div id="dn-izin-mesaj" class="auth-message" hidden></div>
+      </section>
     </section>
 
     <!-- KVKK metin sürümü (assets/js/kvkk/kvkk-surum-paneli.js; tablo site_ayarlari, migration 0064/0065).
@@ -1015,6 +1029,14 @@ permalink: "/panel/dashboard.html"
       <h1>Sistem Yedekleme &amp; Depolama Yönetimi</h1>
       <div id="sy-kok" class="sy-kok"><p class="muted">Yükleniyor...</p></div>
       <div id="sy-mesaj" class="auth-message" hidden></div>
+    </section>
+
+    <!-- Evrensel Dosya Dönüştürücü & Tarayıcı İçi Belge Düzenleyici (assets/js/donusturucu/donusturucu.js; migration 0077).
+         %100 istemci tarafı. Owner her zaman; diğer roller yalnızca can_use_converter açıksa. -->
+    <section class="dash-view" id="view-tool-donusturucu" hidden data-view="tool-donusturucu">
+      <h1>Dönüştürücü &amp; Belge Düzenleyici</h1>
+      <div id="dn-kok" class="dn-kok"><p class="muted">Yükleniyor...</p></div>
+      <div id="dn-mesaj" class="auth-message" hidden role="status"></div>
     </section>
 
     <section class="dash-view" id="view-sys-hakkimda" hidden data-view="sys-hakkimda">
