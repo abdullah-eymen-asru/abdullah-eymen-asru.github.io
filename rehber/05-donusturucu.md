@@ -47,11 +47,38 @@ katı izin listesi (her zaman). Uzak görseller kaldırılır (render sırasınd
 
 Editörler (zengin metin, metin/kod, PDF) ve CSV/JSON/XML, BMP/ICO, SVG sarmalama **bağımlılıksızdır** (kendi kodumuz).
 
-### SRI (boş olanlar için)
+### SRI (boş olanlar için) — İSTEĞE BAĞLI
+Bu adım **zorunlu değil**: `sri: null` ile her şey çalışır. Hash, CDN ele geçirilip dosya değiştirilirse tarayıcının o dosyayı
+çalıştırmasını engelleyen ek bir koruma katmanıdır.
+
+**Nasıl yapılır (macOS: Terminal; Spotlight için `Cmd + Boşluk` → "Terminal"):**
+1. Aşağıdaki komutlardan ilgili olanı yapıştırıp Enter'a bas. Ekrana tek satırlık uzun bir metin (hash) çıkar.
+2. `assets/js/donusturucu/cdn.js` içinde ilgili kütüphanenin `sri: null` kısmını `sri: "sha384-ÇIKAN_DEĞER"` olarak değiştir
+   (başına `sha384-` ekle, metni olduğu gibi, boşluksuz kopyala).
+3. İlgili özelliği bir kez dene. Çalışmazsa `sri`'yi tekrar `null` yap.
+
 ```bash
+# mammoth 1.8.0 (Word → HTML)
 curl -s https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js | openssl dgst -sha384 -binary | openssl base64 -A
+
+# dompurify 3.2.6 (HTML temizleme)
+curl -s https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js | openssl dgst -sha384 -binary | openssl base64 -A
+
+# pdfmake 0.2.20 (PDF üretimi) — yalnızca ana dosya; build/vfs_fonts.js hash'siz kalır
+curl -s https://cdn.jsdelivr.net/npm/pdfmake@0.2.20/build/pdfmake.min.js | openssl dgst -sha384 -binary | openssl base64 -A
+
+# heic2any 0.0.4 (iPhone HEIC)
+curl -s https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js | openssl dgst -sha384 -binary | openssl base64 -A
 ```
-Çıkan değeri `assets/js/donusturucu/cdn.js` içinde ilgili kütüphanenin `sri` alanına `"sha384-…"` olarak yaz.
+
+Örnek yerleştirme:
+```js
+mammoth: {
+  paket: "mammoth", surum: "1.8.0", dosya: "mammoth.browser.min.js", global: "mammoth", lisans: "BSD-2-Clause",
+  sri: "sha384-ÇIKAN_DEĞER", amac: "Word (.docx) → HTML",
+},
+```
+Uyarı: komut hata verip boş çıktı üretirse (internet yok vb.) `sri`'ya yazma, `null` kalsın; yanlış hash o kütüphanenin hiç yüklenmemesine yol açar.
 
 ## CSP değişikliği (tek token)
 `_layouts/default.html` ve `_headers` içine `script-src 'self' https: 'wasm-unsafe-eval'` eklendi (önceden `default-src 'self' https:`
