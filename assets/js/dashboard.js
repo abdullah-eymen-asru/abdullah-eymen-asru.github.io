@@ -81,6 +81,11 @@ const MODULES = {
   sistemYedek: { src: "./sistem-yedek/sistem-yedek.js", role: null },
   // Yetki Ayarları > "📦 Sistem Yedekleme": rol bazlı can_export_system anahtarı (yalnızca owner).
   sistemYedekYetki: { src: "./sistem-yedek/yetki-paneli.js", role: "owner" },
+  // Evrensel Dosya Dönüştürücü & Belge Düzenleyici (migration 0077). %100 istemci tarafı; sekme görünürlüğü role DEĞİL,
+  // can_use_converter anahtarına bağlı (NAV'daki izin:"donusturucu" + izinleriYukle). Modül kendi içinde RPC ile tekrar doğrular (Guard).
+  donusturucu: { src: "./donusturucu/donusturucu.js", role: null },
+  // Yetki Ayarları > "🔄 Dönüştürücü": rol bazlı can_use_converter anahtarı (owner; admin yönetimi owner'ın izniyle araç içinden).
+  donusturucuYetki: { src: "./donusturucu/yetki-paneli.js", role: "owner" },
 };
 
 // Sidebar hiyerarşisi. Her leaf: { id, label, view (gösterilecek
@@ -144,6 +149,15 @@ const NAV = [
     ],
   },
   {
+    group: "Araçlar",
+    icon: "🧰",
+    items: [
+      // role:null + izin:"donusturucu": owner her zaman görür; diğer roller yalnızca can_use_converter açıksa.
+      // Menüde görünmeyen rol, #tool-donusturucu adresine gitse bile hash Guard'ına (gorunurMu) takılır.
+      { id: "tool-donusturucu", icon: "🔄", label: "Dönüştürücü & Editör", module: "donusturucu", role: null, izin: "donusturucu", defaultAcilis: false },
+    ],
+  },
+  {
     group: "Sistem & Güvenlik",
     icon: "⚙️",
     items: [
@@ -201,6 +215,9 @@ function gorunurMu(item, profile) {
   if (item.izin === "sistemyedek") {
     return profile.role === "owner" || !!profile.izinler?.sistemYedek;
   }
+  if (item.izin === "donusturucu") {
+    return profile.role === "owner" || !!profile.izinler?.donusturucu;
+  }
   if (item.izin === "kvkk") {
     return profile.role === "owner" || !!profile.izinler?.kvkk;
   }
@@ -219,7 +236,7 @@ async function izinleriYukle(rol) {
       .rpc("ozellik_erisimi_var_mi", { p_ozellik: anahtar, p_rol: rol })
       .then((r) => (r.error ? true : r.data !== false))
       .catch(() => true);
-  const [arsiv, kvkk, ozelIcerik, dosyaPaylasimi, akademikKutuphane, sistemYedek] = await Promise.all([
+  const [arsiv, kvkk, ozelIcerik, dosyaPaylasimi, akademikKutuphane, sistemYedek, donusturucu] = await Promise.all([
     supabase.rpc("r2_arsiv_yetkilerim").then((r) => (r.error ? undefined : r.data)).catch(() => undefined),
     supabase.rpc("hukuki_metin_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
     ozellikSor("ozel_icerik_yonetimi"),
@@ -227,11 +244,14 @@ async function izinleriYukle(rol) {
     ozellikSor("akademik_kutuphane"),
     // can_export_system: varsayılan KAPALI → hata/ağ sorununda da false (kvkk ile aynı güvenli yön).
     supabase.rpc("sistem_export_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
+    // can_use_converter: varsayılan KAPALI → hata/ağ sorununda da false (güvenli yön).
+    supabase.rpc("donusturucu_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
   ]);
   return {
     arsiv,
     kvkk,
     sistemYedek,
+    donusturucu,
     ozellikler: { ozel_icerik_yonetimi: ozelIcerik, dosya_paylasimi_yonetimi: dosyaPaylasimi, akademik_kutuphane: akademikKutuphane },
   };
 }
@@ -501,6 +521,7 @@ async function showView(viewId, moduleKey) {
   if (viewId === "sys-yetki") await ensureModuleLoaded("arsivIzin");
   if (viewId === "sys-yetki") await ensureModuleLoaded("kalkan");
   if (viewId === "sys-yetki") await ensureModuleLoaded("sistemYedekYetki");
+  if (viewId === "sys-yetki") await ensureModuleLoaded("donusturucuYetki");
 }
 
 function firstAvailableView(profile) {
