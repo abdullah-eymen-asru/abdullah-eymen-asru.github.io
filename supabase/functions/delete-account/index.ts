@@ -26,7 +26,9 @@
 //   * Site sahibi BAŞKASINI silerse (hedef_kullanici_id) de VARSAYILAN olarak veriler hemen silinmez: hesap kapatılır ve talep
 //     kuyruğa (tur: owner) düşer; hangi verilerin indirileceği/silineceği "Silinen Hesap Verileri" sekmesinde seçilir.
 //     Kalıcı silme yalnızca açıkça mod:"kalici" ile istenir (o sekme gönderir).
-//     Gövde: { hedef_kullanici_id, mod?: "talep" | "kalici", secimler?: { arsiv: bool, icerik: bool } }
+//   * GERİ ALMA: owner, bekleyen bir talebi mod:"geri_al" ile iptal eder → giriş yasağı kalkar, üye eski erişimine döner
+//     (yeniden giriş yapması gerekir). Veriler zaten silinmediği için hiçbir şey kaybolmaz.
+//     Gövde: { hedef_kullanici_id, mod?: "talep" | "kalici" | "geri_al", secimler?: { arsiv: bool, icerik: bool } }
 //   * R2 nesneleri sistem-yedek-worker'ın /uye-temizle ucuyla silinir (Secret: SISTEM_YEDEK_WORKER_URL, ör.
 //     https://sistem-yedek-worker.<hesap>.workers.dev). Worker tanımlı değilse ve silinecek R2 verisi varsa İŞLEM DURDURULUR
 //     (veri kaybı/iz kalması yerine açık hata).
@@ -102,9 +104,11 @@ Deno.serve(async (req) => {
   let hedefKullaniciId: string | null = null;
   let secimler: { arsiv: boolean; icerik: boolean } = { arsiv: true, icerik: true };
   let kaliciIstendi = false;
+  let geriAlIstendi = false;
   try {
     const body = await req.json();
     kaliciIstendi = body?.mod === "kalici";
+    geriAlIstendi = body?.mod === "geri_al";
     if (body && typeof body.secimler === "object" && body.secimler) {
       secimler = { arsiv: body.secimler.arsiv !== false, icerik: body.secimler.icerik !== false };
     }
@@ -166,6 +170,17 @@ Deno.serve(async (req) => {
     const { data: hedefProfil } = await adminClient.from("profiles").select("*").eq("id", targetId).maybeSingle();
     const hedefOwner = hedefProfil?.role === "owner";
     const bosHesap = hedefProfil?.kvkk_onay_verildi === false; // hiç kayıt/onay olmamış (ör. Google ile gelip vazgeçen)
+
+    // GERİ ALMA: yalnızca owner (hedef başkası olduğu için yukarıda owner doğrulandı); kendi kendine geri alma yok (banlı).
+    if (geriAlIstendi) {
+      if (kendiHesabi) return json({ error: "Silme talebini yalnızca Site Sahibi geri alabilir." }, 403);
+      const { data: iptal, error: iptalErr } = await adminClient.rpc("hesap_silme_talebi_iptal", { p_user: targetId });
+      if (iptalErr) throw iptalErr;
+      if (!iptal) return json({ error: "Bu üye için bekleyen silme talebi yok." }, 404);
+      const { error: banKaldirErr } = await adminClient.auth.admin.updateUserById(targetId, { ban_duration: "none" });
+      if (banKaldirErr) throw banKaldirErr;
+      return json({ success: true, geri_alindi: true, kullanici_id: targetId });
+    }
 
     // KUYRUK: sıradan üye kendi hesabını siliyor → kapat + talep aç. (owner / boş hesap / owner'ın silmesi: anında kalıcı.)
     if (hedefProfil && !hedefOwner && !bosHesap && (kendiHesabi || !kaliciIstendi)) {
