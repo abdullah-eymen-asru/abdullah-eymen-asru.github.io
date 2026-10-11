@@ -355,6 +355,24 @@ const OZELLIK_KATALOGU = [
     aciklama: "Kaynak/PDF kütüphanesi, PDF vurgulama-açıklama okuyucusu, DOI/ISBN künyesi, atıf ve BibTeX/RIS aktarımı. Herkes yalnızca KENDİ kaynaklarını görür; site sahibi hepsini inceleyebilir. Kapatılan rolün verisi SİLİNMEZ.",
     rolSutunlari: ["user", "special_user", "editor", "manager", "admin"],
   },
+  {
+    // bkz. migration 0077 — Dönüştürücü & Belge Düzenleyici. Önceki ayrı "Dönüştürücü" sekmesi buraya taşındı.
+    // VARSAYILAN KAPALI (diğer satırların tersi): anahtar açılana kadar yalnızca owner kullanır. Kaynak: donusturucu_yetkileri.
+    anahtar: "donusturucu",
+    baslik: "Dönüştürücü & Belge Düzenleyici",
+    aciklama: "Dosya biçimi dönüştürme + tarayıcı içi PDF/Word/metin düzenleme. Varsayılan KAPALI; dosyalar tarayıcıdan çıkmaz. Kapalı rol menüde aracı görmez.",
+    rolSutunlari: ["admin", "manager", "editor", "special_user", "user"],
+    kaynak: "donusturucu",
+  },
+  {
+    // bkz. migration 0078 — silinen hesapların artık verisini inceleme/önerme. VARSAYILAN KAPALI.
+    // Kalıcı silme (son onay) bu anahtardan BAĞIMSIZ olarak yalnızca Site Sahibi'ndedir.
+    anahtar: "hesap_silme_onayi",
+    baslik: "Silinen Hesapların Artık Verisi (İnceleme)",
+    aciklama: "Hesabını silen üyelerin geride kalan verisini görme ve silme ÖNERİSİ gönderme. Varsayılan KAPALI. Kalıcı silmenin son onayı her zaman Site Sahibi'ndedir.",
+    rolSutunlari: ["admin"],
+    kaynak: "kapali",
+  },
 ];
 
 /** Sıradan bir kullanıcının (owner OLMAYAN) kendi rolü için bir özelliğe
@@ -419,7 +437,7 @@ async function init() {
   // sormaya gerek yok — bkz. migration 0048 ozellik_erisimi_var_mi kısayolu).
   if (GIRIS_YAPAN_PROFIL?.role && GIRIS_YAPAN_PROFIL.role !== "owner") {
     await Promise.all(
-      OZELLIK_KATALOGU.map(async ({ anahtar }) => {
+      OZELLIK_KATALOGU.filter((o) => !o.kaynak).map(async ({ anahtar }) => {
         try {
           const { data, error } = await supabase.rpc("ozellik_erisimi_var_mi", { p_ozellik: anahtar });
           KENDI_OZELLIK_ERISIMI[anahtar] = error ? true : data !== false;
@@ -5644,6 +5662,23 @@ async function yetkiAyarlariTablosunuYukle() {
       kisitHaritasi[`${satir.ozellik_anahtari}::${satir.rol}`] = satir.izinli;
     }
 
+    // Varsayılan KAPALI özellikler (kaynak: donusturucu | kapali): açık olanlar ayrı RPC'lerden gelir.
+    const acikHaritasi = {};
+    let adminYonetebilir = false;
+    try {
+      const { data: dn, error: dnErr } = await supabase.rpc("donusturucu_yetkilerini_getir");
+      if (!dnErr) {
+        for (const r of dn || []) acikHaritasi[`donusturucu::${r.rol}`] = !!r.can_use_converter;
+        adminYonetebilir = dn?.[0]?.admin_yonetebilir === true;
+      }
+    } catch (_e) { /* migration 0077 yoksa satır kapalı görünür */ }
+    try {
+      const { data: kp, error: kpErr } = await supabase.rpc("kapali_ozellikleri_getir");
+      if (!kpErr) for (const r of kp || []) acikHaritasi[`${r.ozellik_anahtari}::${r.rol}`] = !!r.acik;
+    } catch (_e) { /* migration 0078 yoksa satır kapalı görünür */ }
+    const yaIzinli = (ozellik, rol) =>
+      ozellik.kaynak ? acikHaritasi[`${ozellik.anahtar}::${rol}`] === true : kisitHaritasi[`${ozellik.anahtar}::${rol}`] !== false;
+
     // Tüm özelliklerin rolSutunlari'nın BİRLEŞİMİ — sütun başlıklarını
     // oluşturur (ilk görülme sırasına göre, katalog sırasını takip eder).
     const tumRoller = [];
@@ -5668,8 +5703,7 @@ async function yetkiAyarlariTablosunuYukle() {
         if (!ozellikRolleri.includes(rol)) {
           return `<td class="ya-hucre-yok" aria-hidden="true" role="presentation">—</td>`;
         }
-        const anahtar = `${ozellik.anahtar}::${rol}`;
-        const izinli = kisitHaritasi[anahtar] !== false; // yoksa varsayılan: izinli
+        const izinli = yaIzinli(ozellik, rol); // normal özellikler: yoksa varsayılan izinli; kaynaklılar: yoksa kapalı
         const rolEtiketi = YA_ROL_ETIKETLERI[rol] || rol;
         return `
           <td role="cell" data-label="${escapeHtml(rolEtiketi)}">
@@ -5679,7 +5713,7 @@ async function yetkiAyarlariTablosunuYukle() {
             </label>
           </td>`;
       }).join("");
-      const hepsiIzinli = ozellikRolleri.every((r) => kisitHaritasi[`${ozellik.anahtar}::${r}`] !== false);
+      const hepsiIzinli = ozellikRolleri.every((r) => yaIzinli(ozellik, r));
       const masterHucre =
         ozellikRolleri.length > 1
           ? `<td role="cell" data-label="Tüm roller">
@@ -5690,7 +5724,7 @@ async function yetkiAyarlariTablosunuYukle() {
           </td>`
           : `<td class="ya-hucre-yok" aria-hidden="true" role="presentation">—</td>`;
       return `
-        <tr role="row">
+        <tr role="row" data-ya-ara="${escapeHtml(`${ozellik.baslik} ${ozellik.aciklama} ${ozellik.anahtar} ${ozellikRolleri.map((r) => YA_ROL_ETIKETLERI[r] || r).join(" ")}`.toLocaleLowerCase("tr"))}">
           <td role="rowheader" class="ya-ozellik-hucre">
             <span class="ya-ozellik-adi">${escapeHtml(ozellik.baslik)}</span>
             <span class="ya-ozellik-aciklama">${escapeHtml(ozellik.aciklama)}</span>
@@ -5708,7 +5742,27 @@ async function yetkiAyarlariTablosunuYukle() {
           <thead role="rowgroup"><tr role="row"><th scope="col">Özellik</th>${basliklar}</tr></thead>
           <tbody role="rowgroup">${satirlarHtml}</tbody>
         </table>
+      </div>
+      <p id="ya-arama-bos" class="muted" hidden>Aramayla eşleşen özellik yok.</p>
+      <div class="ya-ek-ayar" id="ya-ek-ayar">
+        <label class="ya-mini-toggle">
+          <input type="checkbox" id="ya-dn-admin-yonet" ${adminYonetebilir ? "checked" : ""}>
+          <span class="ya-mini-track"><span class="ya-mini-thumb"></span></span>
+        </label>
+        <label for="ya-dn-admin-yonet" class="ya-ek-ayar-metin">
+          <strong>Dönüştürücü: adminler de diğer rollerin erişimini yönetebilsin</strong>
+          <span class="muted">Açıkken yöneticiler, admin dışındaki roller için Dönüştürücü'yü açıp kapatabilir. Admin rolünün kendi anahtarını yalnızca sen değiştirirsin.</span>
+        </label>
       </div>`;
+
+    document.getElementById("ya-dn-admin-yonet")?.addEventListener("change", async (e) => {
+      const k = e.target; k.disabled = true;
+      const { error } = await supabase.rpc("owner_donusturucu_admin_yonetimi_ayarla", { p_acik: k.checked });
+      k.disabled = false;
+      if (error) { k.checked = !k.checked; showMessage(msgEl, `Kaydedilemedi: ${error.message}`, "error"); return; }
+      showMessage(msgEl, `Adminlerin Dönüştürücü erişimini yönetmesi: ${k.checked ? "AÇIK" : "kapalı"}.`, "success");
+    });
+    yaAramaUygula();
 
     alan.querySelectorAll('input[data-ya-ozellik]').forEach((input) => {
       input.addEventListener("change", async () => {
@@ -5724,6 +5778,32 @@ async function yetkiAyarlariTablosunuYukle() {
     showMessage(msgEl, `Yetki ayarları yüklenemedi: ${err.message}`, "error");
   }
 }
+
+// Özelliğin kaynağına göre doğru RPC: normal = kısıt tablosu (varsayılan açık); donusturucu/kapali = açık listesi (varsayılan kapalı).
+function yaOzellikYaz(ozellik, rol, deger) {
+  const kaynak = OZELLIK_KATALOGU.find((o) => o.anahtar === ozellik)?.kaynak;
+  if (kaynak === "donusturucu") return supabase.rpc("donusturucu_yetkisi_ayarla", { p_rol: rol, p_izinli: deger });
+  if (kaynak === "kapali") return supabase.rpc("owner_kapali_ozellik_ayarla", { p_ozellik: ozellik, p_rol: rol, p_acik: deger });
+  return supabase.rpc("owner_ozellik_erisimi_ayarla", { p_ozellik: ozellik, p_rol: rol, p_izinli: deger });
+}
+
+// Özellikler sekmesindeki arama kutusu: başlık, açıklama, anahtar ve rol adlarında arar (Türkçe büyük/küçük harf duyarlı değil).
+function yaAramaUygula() {
+  const girdi = document.getElementById("ya-arama-girdi");
+  const sonuc = document.getElementById("ya-arama-sonuc");
+  const bos = document.getElementById("ya-arama-bos");
+  const satirlar = [...document.querySelectorAll("#ya-tablo-alani tr[data-ya-ara]")];
+  const kelimeler = (girdi?.value || "").toLocaleLowerCase("tr").split(/\s+/).filter(Boolean);
+  let gorunen = 0;
+  for (const tr of satirlar) {
+    const uygun = kelimeler.every((k) => tr.dataset.yaAra.includes(k));
+    tr.hidden = !uygun;
+    if (uygun) gorunen += 1;
+  }
+  if (bos) bos.hidden = !(satirlar.length && gorunen === 0);
+  if (sonuc) sonuc.textContent = kelimeler.length ? `${gorunen} / ${satirlar.length} özellik gösteriliyor.` : "";
+}
+document.addEventListener("input", (e) => { if (e.target?.id === "ya-arama-girdi") yaAramaUygula(); });
 
 // Satırdaki rol anahtarlarının hepsi açıksa "Tüm roller" anahtarı da açık görünsün.
 function yaMasterSenkronla(alan, ozellik) {
@@ -5744,11 +5824,7 @@ async function yetkiAyariniTopluKaydet(master, alan) {
   roller.forEach((r) => (r.disabled = true));
   try {
     for (const r of roller) {
-      const { error } = await supabase.rpc("owner_ozellik_erisimi_ayarla", {
-        p_ozellik: ozellik,
-        p_rol: r.dataset.yaRol,
-        p_izinli: yeniDeger,
-      });
+      const { error } = await yaOzellikYaz(ozellik, r.dataset.yaRol, yeniDeger);
       if (error) throw error;
       r.checked = yeniDeger;
     }
@@ -5779,11 +5855,7 @@ async function yetkiAyariniKaydet(input) {
 
   input.disabled = true;
   try {
-    const { error } = await supabase.rpc("owner_ozellik_erisimi_ayarla", {
-      p_ozellik: ozellik,
-      p_rol: rol,
-      p_izinli: yeniDeger,
-    });
+    const { error } = await yaOzellikYaz(ozellik, rol, yeniDeger);
     if (error) throw error;
 
     const ozellikBaslik = OZELLIK_KATALOGU.find((o) => o.anahtar === ozellik)?.baslik || ozellik;
