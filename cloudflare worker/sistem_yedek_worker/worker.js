@@ -21,6 +21,9 @@
  *   GET /r2/dosya?e=<oturum>&b=<kaynak>&k=<anahtar> → dosya baytları (akış)
  *   GET /github/zip?e=<oturum>&b=github|icerik_md → deponun zipball'ı (akış)
  *   GET /depolama                                 → R2 kovalarının GERÇEK tarama özeti (owner)
+ *   POST /uye-temizle {hedef, arsiv_anahtarlari}  → (yalnızca owner; delete-account Edge Function çağırır) silinen üyenin
+ *                                                   R2 nesnelerini siler: Dosya Yöneticisi anahtarları + notlar/<id>/ + akademik-kutuphane/users/<id>/
+ *                                                   Yanıt: {ok, silinen:{arsiv,notek,akademik}, bagsiz:[bağlı olmayan kovalar]}
  *
  * Ortam değişkenleri (Worker > Settings > Variables and Secrets):
  *   SUPABASE_URL        https://<proje-ref>.supabase.co          (Text)
@@ -54,7 +57,7 @@ function corsBasliklari(istek) {
   const izinli = IZINLI_ORIGINLER.includes(origin);
   return {
     "Access-Control-Allow-Origin": izinli ? origin : IZINLI_ORIGINLER[0],
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Authorization, Content-Type",
     "Access-Control-Expose-Headers": "Content-Length, X-Dosya-Boyut",
     "Access-Control-Max-Age": "3600",
@@ -184,6 +187,49 @@ async function depolamaTara(env, kimlik, cors) {
   return json({ kaynaklar: sonuc }, 200, cors);
 }
 
+/** Owner: silinen üyenin R2 nesnelerini kalıcı siler (hesap silme onayı sonrası; bkz. migration 0078). */
+async function uyeTemizle(env, kimlik, istek, cors) {
+  let govde;
+  try { govde = await istek.json(); } catch { return json({ error: "Geçersiz gövde." }, 400, cors); }
+  const hedef = String(govde?.hedef || "");
+  if (!UUID_DESENI.test(hedef)) return json({ error: "Geçersiz hedef." }, 400, cors);
+  const s = await rpc(env, kimlik, "is_owner", {});
+  if (s.hata || s.veri !== true) return json({ error: "Yalnızca Site Sahibi." }, 403, cors);
+
+  const silinen = { arsiv: 0, notek: 0, akademik: 0 };
+  const bagsiz = [];
+
+  // Dosya Yöneticisi: yalnızca r2_key biçimine uyan anahtarlar (arsiv/<uuid>)
+  const anahtarlar = (Array.isArray(govde?.arsiv_anahtarlari) ? govde.arsiv_anahtarlari : [])
+    .filter((k) => typeof k === "string" && /^arsiv\/[0-9a-f-]{36}$/i.test(k));
+  if (anahtarlar.length) {
+    if (!env.ARSIV_BUCKET) bagsiz.push("arsiv");
+    else {
+      for (let i = 0; i < anahtarlar.length; i += 1000) await env.ARSIV_BUCKET.delete(anahtarlar.slice(i, i + 1000));
+      silinen.arsiv = anahtarlar.length;
+    }
+  }
+
+  // Not ekleri ve Akademik PDF'ler: üyeye ait önek altındaki HER ŞEY (DB satırı olmasa da yetim kalmasın)
+  const onekler = [
+    ["notek", "NOT_EK_BUCKET", `notlar/${hedef}/`],
+    ["akademik", "AKADEMIK_BUCKET", `akademik-kutuphane/users/${hedef}/`],
+  ];
+  for (const [ad, bagAdi, onek] of onekler) {
+    const kova = env[bagAdi];
+    if (!kova) { bagsiz.push(ad); continue; }
+    let imlec;
+    for (;;) {
+      const l = await kova.list({ prefix: onek, limit: 1000, cursor: imlec });
+      const keys = l.objects.map((o) => o.key);
+      if (keys.length) { await kova.delete(keys); silinen[ad] += keys.length; }
+      if (!l.truncated) break;
+      imlec = l.cursor;
+    }
+  }
+  return json({ ok: true, silinen, bagsiz }, 200, cors);
+}
+
 /* -------------------------------- giriş -------------------------------- */
 
 export default {
@@ -201,6 +247,12 @@ export default {
       }, 200, cors);
     }
 
+    if (istek.method === "POST" && yol === "/uye-temizle") {
+      if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return json({ error: "Worker yapılandırması eksik (SUPABASE_URL, SUPABASE_ANON_KEY)." }, 500, cors);
+      const k = istek.headers.get("Authorization") || "";
+      if (!k.startsWith("Bearer ")) return json({ error: "Oturum gerekli." }, 401, cors);
+      try { return await uyeTemizle(env, k, istek, cors); } catch (hata) { return json({ error: "Beklenmeyen hata: " + (hata?.message || hata) }, 500, cors); }
+    }
     if (istek.method !== "GET") return json({ error: "Yöntem desteklenmiyor." }, 405, cors);
     if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
       return json({ error: "Worker yapılandırması eksik (SUPABASE_URL, SUPABASE_ANON_KEY)." }, 500, cors);
