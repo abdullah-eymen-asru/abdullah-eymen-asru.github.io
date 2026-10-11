@@ -18,7 +18,7 @@ export function durumSeviyesi(oran) {
 
 /* -------- tablo açıklamaları + kategoriler (bilinmeyen tablo için şema/ad tabanlı genel açıklama) -------- */
 
-const KATEGORILER = [
+export const KATEGORILER = [
   { id: "hepsi", ad: "Hepsi" },
   { id: "uye", ad: "Üyeler & onaylar" },
   { id: "icerik", ad: "İçerik & dosyalar" },
@@ -87,7 +87,7 @@ const SEMA_BILGI = {
   supabase_migrations: "Uygulanan migration kayıtları (Supabase CLI).",
 };
 
-function tabloBilgisi(t) {
+export function tabloBilgisi(t) {
   if (t.sema === "public") {
     const b = TABLO_BILGI[t.tablo];
     return b ? { kategori: b[0], aciklama: b[1] } : { kategori: "ayar", aciklama: "Açıklama tanımlı değil (yeni eklenmiş tablo olabilir)." };
