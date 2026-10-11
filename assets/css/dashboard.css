@@ -766,7 +766,10 @@ body.dash-nav-acik {
 .ya-arama-sonuc { margin: 0; min-height: 1.2em; font-size: 0.85rem; }
 .ya-tablo tr[hidden] { display: none !important; }
 .ya-ek-ayar { display: flex; align-items: flex-start; gap: 12px; margin-top: 16px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); min-width: 0; }
-.ya-ek-ayar-metin { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; cursor: pointer; }
+.ya-ek-ayar-metin { display: grid; gap: 4px; flex: 1 1 0; min-width: 0; max-width: 100%; overflow-wrap: anywhere; cursor: pointer; }
+/* Anahtar, uzun açıklama yüzünden daralıp daireye dönmesin (flex-shrink) */
+.ya-ek-ayar .ya-mini-toggle { flex: none; margin-top: 2px; }
+.ya-ek-ayar { box-sizing: border-box; max-width: 100%; }
 .gk-alt-bolum { margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--border); min-width: 0; max-width: 100%; }
 .gk-alt-baslik { margin: 0 0 6px; font-size: 1.1rem; }
 .gk-alt-bolum > * { min-width: 0; max-width: 100%; }
