@@ -612,7 +612,7 @@ async function kendiYetkimiDusur(btn) {
 /* ÜYE SİLME                                                               */
 /* ---------------------------------------------------------------------- */
 async function uyeyiSil(userId, email) {
-  if (!confirm(`${email} adlı üyeyi ve TÜM verilerini kalıcı olarak silmek istediğine emin misin? Bu işlem geri alınamaz.`)) {
+  if (!confirm(`${email} adlı üyenin hesabı kapatılacak. Verileri HEMEN silinmez: hangi verilerin indirileceğini/silineceğini sonraki adımda (Silinen Hesap Verileri) sen seçeceksin. Devam edilsin mi?`)) {
     return;
   }
 
@@ -627,7 +627,7 @@ async function uyeyiSil(userId, email) {
         Authorization: `Bearer ${session.access_token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ hedef_kullanici_id: userId }),
+      body: JSON.stringify({ hedef_kullanici_id: userId, mod: "talep" }),
     });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || "Bilinmeyen hata");
@@ -635,6 +635,9 @@ async function uyeyiSil(userId, email) {
     TUM_KULLANICILAR = TUM_KULLANICILAR.filter((u) => u.id !== userId);
     renderStats(TUM_KULLANICILAR);
     renderListe();
+    if (body.bekliyor && confirm("Hesap kapatıldı. Verileri seçip indirmek/silmek için “Silinen Hesap Verileri” sayfası şimdi açılsın mı?")) {
+      window.location.href = "/panel/dashboard.html#sys-silme-onayi";
+    }
   } catch (err) {
     alert("Üye silinemedi: " + err.message);
   }
