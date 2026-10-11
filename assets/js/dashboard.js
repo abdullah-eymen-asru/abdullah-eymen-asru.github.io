@@ -37,6 +37,8 @@
 
 import { requireAuthOrShowError } from "./auth/auth-guard.js";
 import { supabase } from "./core/supabase-client.js";
+import { ayrilmayaIzinVarMi } from "./core/gezinme-kilidi.js";
+import { hubCiz, sonKullanilanKaydet } from "./hub/hub.js";
 
 /* ------------------------------------------------------------------ */
 /* 1) Modül tanımları                                                  */
@@ -47,6 +49,8 @@ import { supabase } from "./core/supabase-client.js";
 // UI/gezinme amaçlı tekrarlanıyor (gerçek güvenlik yine RLS + her
 // modülün kendi requireAuthOrShowError çağrısında).
 const MODULES = {
+  // Ana Ekran (Hub): yerleşik görünüm, ayrı script yok (bkz. hub/hub.js). Görünürlük: giriş yapmış herkes.
+  hub: { yerlesik: true, role: null },
   gy: { src: "./github-yonetim/github-yonetim.js", role: ["editor", "manager"] },
   admin: { src: "./admin.js", role: ["admin", "manager"] },
   uye: { src: "./uye-ayarlari.js", role: "admin" },
@@ -100,6 +104,8 @@ const NAV = [
       // varsayılan olarak "Panelim" DEĞİL, ilk yetkili iş sekmesi açılır;
       // başka hiçbir sekmeye yetkisi olmayan üye içinse zaten tek seçenek
       // budur (bkz. firstAvailableView).
+      // Ana Ekran: rol/yetkiye göre erişilebilen TÜM modüller tek ekranda (kartlar + arama). Varsayılan açılış.
+      { id: "me-hub", icon: "🧭", label: "Ana Ekran", module: "hub", role: null },
       { id: "me-panel", icon: "🙍", label: "Panelim", module: "panelim", role: null, defaultAcilis: false },
     ],
   },
@@ -384,6 +390,7 @@ function ensureContentSlots(viewId, moduleKey) {
 const loadedModules = new Set();
 
 async function ensureModuleLoaded(key) {
+  if (!MODULES[key]?.src) return; // yerleşik görünüm (hub): yüklenecek script yok
   if (loadedModules.has(key)) return;
   loadedModules.add(key);
   try {
@@ -503,9 +510,23 @@ function aktifGrubuAc(viewId) {
   if (baslik) acGrup(baslik);
 }
 
+let gecisSuruyor = false;
+let hubNesnesi = null;
+let hubVerisi = null; // { gruplar, profil }
+
 async function showView(viewId, moduleKey) {
   const target = document.getElementById(`view-${viewId}`);
   if (!target) return;
+
+  // AYRILMA KALKANI: açık/kaydedilmemiş belge tutan modül (ör. Dönüştürücü) sekmeden çıkarken sorar.
+  // Modal açıkken gelen ikinci geçiş isteği (çift tıklama, geri tuşu) yok sayılır; vazgeçilirse adres çubuğu eski sekmeye döner.
+  if (activeViewId && activeViewId !== viewId) {
+    if (gecisSuruyor) { history.replaceState(null, "", `#${activeViewId}`); return; }
+    gecisSuruyor = true;
+    let izin = true;
+    try { izin = await ayrilmayaIzinVarMi(activeViewId, viewId); } finally { gecisSuruyor = false; }
+    if (!izin) { history.replaceState(null, "", `#${activeViewId}`); return; }
+  }
 
   ensureContentSlots(viewId, moduleKey);
 
@@ -528,12 +549,24 @@ async function showView(viewId, moduleKey) {
 
   activeViewId = viewId;
   history.replaceState(null, "", `#${viewId}`);
+  if (viewId !== "me-hub") sonKullanilanKaydet(viewId);
+  if (viewId === "me-hub") hubuCiz();
 
   await ensureModuleLoaded(moduleKey);
   // Yetki Ayarları: owner için "R2 Erişim İzni" bölümü (ayrı modül; gy modülüne dokunmaz)
   // Bu iki modül yalnızca Site Sahibi'nin sekmelerini doldurur (yetkili admin yalnızca Özellikler'i görür).
   if (viewId === "sys-yetki" && GIRIS_PROFIL_ROLU === "owner") await ensureModuleLoaded("arsivIzin");
   if (viewId === "sys-yetki" && GIRIS_PROFIL_ROLU === "owner") await ensureModuleLoaded("kalkan");
+}
+
+function hubuCiz() {
+  const kok = document.getElementById("hub-kok");
+  if (!kok || !hubVerisi) return;
+  hubNesnesi?.yokEt?.();
+  hubNesnesi = hubCiz(kok, hubVerisi.gruplar, (id) => {
+    const item = NAV.flatMap((g) => g.items).find((it) => it.id === id);
+    if (item) showView(item.id, item.module);
+  }, { ad: hubVerisi.ad });
 }
 
 function firstAvailableView(profile) {
@@ -818,6 +851,11 @@ async function init() {
   import("./r2-arsiv/e2ee.js").then((m) => m.anahtarlariHazirla()).catch(() => {});
 
   buildSidebar(profile);
+  // Hub: sidebar ile AYNI görünürlük kuralı (gorunurMu); Ana Ekran kartı kendisi için çizilmez.
+  hubVerisi = {
+    ad: profile.first_name || profile.full_name || "",
+    gruplar: NAV.map((g) => ({ group: g.group, icon: g.icon, items: g.items.filter((it) => it.id !== "me-hub" && gorunurMu(it, profile)).map((it) => ({ id: it.id, icon: it.icon, label: it.label })) })).filter((g) => g.items.length),
+  };
   wireMobileNav();
   wireDashIciLinkler();
   wireYetkiAltSekmeler();
