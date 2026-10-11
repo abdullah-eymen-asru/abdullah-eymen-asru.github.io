@@ -46,7 +46,7 @@ async function kaliciSil(t) {
   const res = await fetch(DELETE_ACCOUNT_FUNCTION_URL, {
     method: "POST",
     headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ hedef_kullanici_id: t.user_id, secimler: secimAl(t) }),
+    body: JSON.stringify({ hedef_kullanici_id: t.user_id, mod: "kalici", secimler: secimAl(t) }),
   });
   const govde = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(govde.error || `Silinemedi (${res.status})`);
