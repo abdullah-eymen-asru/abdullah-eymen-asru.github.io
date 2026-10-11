@@ -158,6 +158,7 @@ export async function pdfDuzenleyiciKur(kap, { dosyalar, onDegisim, mesaj = () =
   let renk = RENKLER[0];
   let kalinlik = 2.5;
   let zoom = 1;
+  let otoSigdir = true; // kullanıcı elle yakınlaştırana dek pencereye/genişliğe otomatik sığdır
   let sigDurum = "sigdir"; // sigdir | serbest
   let secili = null; // anot id
   let imza = null; // son çizilen imza {url,w,h}
@@ -466,6 +467,10 @@ export async function pdfDuzenleyiciKur(kap, { dosyalar, onDegisim, mesaj = () =
   const kisitZ = (z) => Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
   async function sigdir() {
     if (!sf()) return;
+    // DÜZELTME (%30 hatası): düzenleyici DOM'a eklenmeden/gizliyken clientWidth = 0 → eski kod zoom'u 0,3'e kıstırıyordu
+    // ve sonradan yeniden sığdırmıyordu. Genişlik bilinmiyorsa HESAPLAMA; görünür olunca ResizeObserver / dışarıdan sigdir() çağrılır.
+    if (!sahne.clientWidth) return;
+    otoSigdir = true;
     const o = await olcu(sf());
     zoom = Math.max(0.3, Math.min(4, (sahne.clientWidth - 24) / o.W));
     await sayfaGoster();
@@ -480,6 +485,7 @@ export async function pdfDuzenleyiciKur(kap, { dosyalar, onDegisim, mesaj = () =
     kutu.style.transform = "";
     kutu.style.transformOrigin = "";
     if (Math.abs(z1 - zoom) < 0.002) return;
+    otoSigdir = false;
     zoom = z1;
     await sayfaGoster();
     const r1 = kutu.getBoundingClientRect();
@@ -1054,7 +1060,7 @@ export async function pdfDuzenleyiciKur(kap, { dosyalar, onDegisim, mesaj = () =
   aracSec("sec");
   const baslangicBoyut = async () => { await sayfaGoster(); await sigdir(); };
   await baslangicBoyut();
-  const yenidenBoyut = () => { if (sahne.clientWidth && anaOlcu && anaOlcu.W * zoom > sahne.clientWidth + 2) sigdir(); };
+  const yenidenBoyut = () => { if (!yokEdildi && sahne.clientWidth && anaOlcu && (otoSigdir || anaOlcu.W * zoom > sahne.clientWidth + 2)) sigdir().catch(() => {}); };
   const ro = typeof ResizeObserver === "function" ? new ResizeObserver(yenidenBoyut) : null;
   ro?.observe(sahne);
 
@@ -1063,6 +1069,7 @@ export async function pdfDuzenleyiciKur(kap, { dosyalar, onDegisim, mesaj = () =
     ad: () => adsizAl(kaynaklar.values().next().value?.ad || "belge"),
     pdfAl: pdfOlustur,
     kirli: () => kirli,
+    sigdir: () => sigdir(),
     yokEt() {
       yokEdildi = true;
       ro?.disconnect();
@@ -1071,7 +1078,7 @@ export async function pdfDuzenleyiciKur(kap, { dosyalar, onDegisim, mesaj = () =
       for (const k of kaynaklar.values()) { pdfBirak(k.gorev, k.pdf); k.bayt = null; }
       kaynaklar.clear();
       sayfalar = []; gecmis = [];
-      tuval.width = 0; katman.width = 0;
+      for (const c of [tuval, katman]) { try { c.getContext("2d")?.clearRect(0, 0, c.width, c.height); } catch { /* yok say */ } c.width = 0; c.height = 0; }
       bos(kap);
     },
   };
