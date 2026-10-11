@@ -23,8 +23,10 @@
 //     "hesap_silme_talepleri" kuyruğuna alınır; veriler yerinde kalır ki site sahibi inceleyip indirebilsin.
 //     Site sahibi (veya yetkili admin önerisiyle owner) onaylayınca kalıcı silme yapılır: R2 + Storage + satırlar + auth.
 //     İstisnalar (anında kalıcı silme): site sahibi hesabı, KVKK onayı hiç verilmemiş boş hesaplar.
-//   * Site sahibi BAŞKASINI silerse (hedef_kullanici_id) onay zaten kendisinden geldiği için doğrudan kalıcı silinir.
-//     Gövde: { hedef_kullanici_id, secimler?: { arsiv: bool, icerik: bool } }  (varsayılan ikisi de true)
+//   * Site sahibi BAŞKASINI silerse (hedef_kullanici_id) de VARSAYILAN olarak veriler hemen silinmez: hesap kapatılır ve talep
+//     kuyruğa (tur: owner) düşer; hangi verilerin indirileceği/silineceği "Silinen Hesap Verileri" sekmesinde seçilir.
+//     Kalıcı silme yalnızca açıkça mod:"kalici" ile istenir (o sekme gönderir).
+//     Gövde: { hedef_kullanici_id, mod?: "talep" | "kalici", secimler?: { arsiv: bool, icerik: bool } }
 //   * R2 nesneleri sistem-yedek-worker'ın /uye-temizle ucuyla silinir (Secret: SISTEM_YEDEK_WORKER_URL, ör.
 //     https://sistem-yedek-worker.<hesap>.workers.dev). Worker tanımlı değilse ve silinecek R2 verisi varsa İŞLEM DURDURULUR
 //     (veri kaybı/iz kalması yerine açık hata).
@@ -99,8 +101,10 @@ Deno.serve(async (req) => {
   // gövde de kabul edilir (eski istemciler hiç gövde göndermiyordu).
   let hedefKullaniciId: string | null = null;
   let secimler: { arsiv: boolean; icerik: boolean } = { arsiv: true, icerik: true };
+  let kaliciIstendi = false;
   try {
     const body = await req.json();
+    kaliciIstendi = body?.mod === "kalici";
     if (body && typeof body.secimler === "object" && body.secimler) {
       secimler = { arsiv: body.secimler.arsiv !== false, icerik: body.secimler.icerik !== false };
     }
@@ -164,13 +168,15 @@ Deno.serve(async (req) => {
     const bosHesap = hedefProfil?.kvkk_onay_verildi === false; // hiç kayıt/onay olmamış (ör. Google ile gelip vazgeçen)
 
     // KUYRUK: sıradan üye kendi hesabını siliyor → kapat + talep aç. (owner / boş hesap / owner'ın silmesi: anında kalıcı.)
-    if (kendiHesabi && !hedefOwner && !bosHesap && hedefProfil) {
-      const { error: talepErr } = await adminClient.rpc("hesap_silme_talebi_olustur", { p_user: targetId, p_tur: "kendisi" });
+    if (hedefProfil && !hedefOwner && !bosHesap && (kendiHesabi || !kaliciIstendi)) {
+      const { error: talepErr } = await adminClient.rpc("hesap_silme_talebi_olustur", { p_user: targetId, p_tur: kendiHesabi ? "kendisi" : "owner" });
       if (talepErr) throw talepErr;
       // Giriş yasağı (≈100 yıl) + tüm oturumları sonlandır.
       const { error: banErr } = await adminClient.auth.admin.updateUserById(targetId, { ban_duration: "876000h" });
       if (banErr) throw banErr;
-      try { await adminClient.auth.admin.signOut(accessToken, "global"); } catch (e) { console.warn("signOut uyarısı:", e); }
+      if (kendiHesabi) {
+        try { await adminClient.auth.admin.signOut(accessToken, "global"); } catch (e) { console.warn("signOut uyarısı:", e); }
+      }
       return json({ success: true, bekliyor: true, silinen_id: targetId });
     }
 
