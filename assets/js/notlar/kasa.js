@@ -38,6 +38,13 @@
  *     .fill(0) ile gerçekten sıfırlıyoruz; string referanslarını da null'a
  *     çekiyoruz. Girdi kutusundaki değer ise giriş formunun kendisine ait.
  *
+ * İKİ TÜR KASA PAROLASI (migration 0082, not_kasasi.parola_tur)
+ *   'giris' → zarf GİRİŞ parolasından türetilir (e-posta/şifre kullanıcıları; ikinci parola yok).
+ *   'kasa'  → zarf kullanıcının ayrıca belirlediği KASA PAROLASI'ndan türetilir (Google/OAuth
+ *             kullanıcılarının veritabanında giriş parolası yoktur). Giriş parolası değişse de
+ *             bu zarfa dokunulmaz. Her iki durumda parola YEREL olarak PBKDF2 ile CryptoKey'e
+ *             çevrilir; sunucuya yalnızca SARILMIŞ DEK + tuz gider.
+ *
  * NE KORUR / NE KORUMAZ?
  *   + Supabase çalışanı, yedekler, SQL enjeksiyonu, sızan service_role →
  *     hiçbiri notu okuyamaz (sadece ciphertext var).
@@ -54,6 +61,7 @@ const enc = new TextEncoder();
 const dec = new TextDecoder();
 
 export const KDF_TUR = 600000; // OWASP 2023: PBKDF2-HMAC-SHA256 için asgari 600.000
+export const KASA_PAROLASI_MIN = 10; // bağımsız Kasa Parolası için asgari uzunluk (karakter)
 const SEMA = "v1";
 const PAD_BLOK = 512; // düz metin boyutunu 512 bayt basamaklarına yuvarla (uzunluk sızıntısını azaltır)
 const BEKLEYEN_OMRU_MS = 15 * 60 * 1000; // girişte yakalanan parola malzemesi 15 dk geçerli (2FA süresi dahil)
@@ -219,21 +227,44 @@ export async function parolaMalzemesiOlustur(parola) {
   }
 }
 
-/** Giriş kancası: parola malzemesini (ham parolayı DEĞİL) kısa ömürlü olarak saklar. */
-export async function bekleyenParolaMalzemesiKaydet(eposta, baz) {
-  await depoYaz(BEKLEYEN_ANAHTARI, { baz, eposta: eposta.trim().toLowerCase(), zaman: Date.now() });
+/**
+ * Giriş kancası: parola malzemesini (ham parolayı DEĞİL) kısa ömürlü olarak saklar.
+ * `dogrulanmis`: parolanın GERÇEKTEN hesabın parolası olduğu sunucuca onaylandıysa true
+ * (şifre sıfırlama sayfasında updateUser başarılı olduktan sonra). Giriş formunda submit
+ * anında henüz bilinmediği için false kalır; o durumda oturumun son giriş zamanı denetlenir.
+ */
+export async function bekleyenParolaMalzemesiKaydet(eposta, baz, dogrulanmis = false) {
+  await depoYaz(BEKLEYEN_ANAHTARI, { baz, eposta: eposta.trim().toLowerCase(), zaman: Date.now(), dogrulanmis: !!dogrulanmis });
 }
 
-async function bekleyenParolaMalzemesiAl(eposta) {
+/**
+ * Bekleyen parola malzemesini GÜVENLE döndürür ya da null.
+ * Reddedilme nedenleri: süresi dolmuş, başka hesaba ait, ya da (doğrulanmamışsa) bu oturum
+ * kayıttan ÖNCE açılmış — yani giriş denemesi başarısız olmuş (yanlış parola yazılmış) ve
+ * eldeki malzeme hesabın gerçek parolası olmayabilir.
+ */
+async function bekleyenKayitAl(session) {
   const kayit = await depoOku(BEKLEYEN_ANAHTARI);
   if (!kayit) return null;
+  const eposta = (session?.user?.email || "").trim().toLowerCase();
   const taze = Date.now() - kayit.zaman < BEKLEYEN_OMRU_MS;
-  const ayniHesap = !eposta || kayit.eposta === eposta.trim().toLowerCase();
-  if (!taze || !ayniHesap) {
+  const ayniHesap = !eposta || kayit.eposta === eposta;
+  let oturumKayittanSonra = true;
+  if (!kayit.dogrulanmis) {
+    const t = Date.parse(session?.user?.last_sign_in_at || "");
+    // 90 sn: istemci/sunucu saat farkı payı. last_sign_in_at yoksa eski davranışa düş.
+    if (Number.isFinite(t) && t < kayit.zaman - 90_000) oturumKayittanSonra = false;
+  }
+  if (!taze || !ayniHesap || !oturumKayittanSonra) {
     await depoSil(BEKLEYEN_ANAHTARI);
     return null;
   }
-  return kayit.baz;
+  return kayit;
+}
+
+/** UI için: girişte yakalanmış, geçerli bir parola malzemesi var mı? (kurtarmada parola tekrar sorulmasın) */
+export async function bekleyenParolaVarMi(session) {
+  return !!(await bekleyenKayitAl(session));
 }
 
 export const bekleyenParolaMalzemesiniSil = () => depoSil(BEKLEYEN_ANAHTARI);
@@ -287,6 +318,20 @@ let oturum = null; // { uid, eposta, dek, kek, satir }
 
 export const kasaAcikMi = () => !!oturum?.dek;
 
+/** Kasa açıkken: zarf bağımsız Kasa Parolası ile mi sarılı? (kapalıyken false) */
+export const bagimsizKasaMi = () => oturum?.satir?.parola_tur === "kasa";
+/** Kasa açıkken: kurtarma anahtarı oluşturulmuş mu? */
+export const kurtarmaAnahtariVarMi = () => !!oturum?.satir?.dek_kurtarma;
+
+/**
+ * Oturum SADECE sosyal giriş (Google vb.) ile mi açıldı? Bu kullanıcının giriş parolası yoktur;
+ * kasa için bağımsız Kasa Parolası kullanılır.
+ */
+export function oauthMu(session) {
+  const kimlikler = session?.user?.identities || [];
+  return kimlikler.length > 0 && !kimlikler.some((k) => k.provider === "email");
+}
+
 function sekmeIsaretiniKoy(uid) {
   try {
     sessionStorage.setItem(SEKME_ISARETI, uid);
@@ -327,30 +372,46 @@ async function kasaSatiriniGetir(uid) {
 /* 6) Kasa kurma / açma                                                */
 /* ------------------------------------------------------------------ */
 
-async function yeniKasaKur(uid, baz) {
+async function yeniKasaKur(uid, baz, { parolaTur = "giris", kurtarma = true } = {}) {
   // DEK: SADECE burada, sarılana kadar geçici olarak extractable:true.
   const dekGecici = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
   const tuz = rastgele(16);
   const kek = await kekTuret(baz, tuz, KDF_TUR);
 
-  const kurtarmaBaytlari = rastgele(32);
-  const kurtarmaMetni = kurtarmaMetniYap(kurtarmaBaytlari);
-  const kurtarmaKek = await kurtarmaKekiOlustur(kurtarmaBaytlari);
-  kurtarmaBaytlari.fill(0);
+  let kurtarmaMetni = null;
+  let dekKurtarma = null;
+  if (kurtarma) {
+    const kurtarmaBaytlari = rastgele(32);
+    kurtarmaMetni = kurtarmaMetniYap(kurtarmaBaytlari);
+    const kurtarmaKek = await kurtarmaKekiOlustur(kurtarmaBaytlari);
+    kurtarmaBaytlari.fill(0);
+    dekKurtarma = await dekSar(dekGecici, kurtarmaKek, uid, "dek-kurtarma");
+  }
 
   const satir = {
     user_id: uid,
     kdf_iter: KDF_TUR,
     kdf_salt: b64Kodla(tuz),
     dek_parola: await dekSar(dekGecici, kek, uid, "dek-parola"),
-    dek_kurtarma: await dekSar(dekGecici, kurtarmaKek, uid, "dek-kurtarma"),
+    dek_kurtarma: dekKurtarma,
   };
+  // 'giris' türünde sütunu hiç göndermiyoruz: 0082 çalıştırılmamış veritabanında da klasik akış bozulmasın.
+  if (parolaTur !== "giris") satir.parola_tur = parolaTur;
 
   const { data, error } = await supabase.from("not_kasasi").insert(satir).select("*").single();
-  if (error) throw error;
+  if (error) throw hataCevir(error);
 
   const dek = await dekAc(data.dek_parola, kek, uid, "dek-parola", false);
   return { dek, kek, satir: data, kurtarmaMetni };
+}
+
+/** 0082 migration'ı eksikse anlaşılır bir mesaj ver (sessiz çökme yerine). */
+function hataCevir(hata) {
+  const m = hata?.message || "";
+  if (/parola_tur|dek_kurtarma|23502|42703/.test(`${hata?.code || ""} ${m}`)) {
+    return new Error("Bağımsız Kasa Parolası için 0082_not_kasasi_bagimsiz_kasa_parolasi.sql migration'ı Supabase'de çalıştırılmalı.");
+  }
+  return hata;
 }
 
 async function kekIleDekAc(satir, kek, uid) {
@@ -363,16 +424,23 @@ async function kekIleDekAc(satir, kek, uid) {
 
 /**
  * Not sekmesi açıldığında çağrılır.
- * Dönüş: { durum: "acik" | "kilitli" | "kurtarma-gerekli" | "yeni-kasa", kurtarmaMetni? }
- *   acik             → anahtar bu cihazda hazır (önbellek ya da girişte yakalanan parola)
- *   kilitli          → bu cihazda anahtar yok; kullanıcı AYNI giriş parolasını bir kez yazmalı
- *   kurtarma-gerekli → girişteki parola kasayı açmıyor (parola dışarıdan değişmiş); kurtarma anahtarı lazım
- *   yeni-kasa        → ilk kez kuruldu; kurtarma anahtarı kullanıcıya GÖSTERİLMELİ
+ * Dönüş: { durum: "acik" | "kilitli" | "kurtarma-gerekli" | "yeni-kasa" | "kasa-parolasi-belirle", ... }
+ *   acik                  → anahtar bu cihazda hazır (önbellek ya da girişte yakalanan parola)
+ *   kilitli               → bu cihazda anahtar yok; { kasaVar, bagimsiz, kurtarmaVar } ile kullanıcıdan parola istenir
+ *   kurtarma-gerekli      → girişteki parola kasayı açmıyor (parola dışarıdan değişmiş); kurtarma anahtarı lazım
+ *   yeni-kasa             → ilk kez kuruldu; kurtarmaMetni varsa kullanıcıya GÖSTERİLMELİ
+ *   kasa-parolasi-belirle → Google (OAuth) kullanıcısının henüz kasası yok: bağımsız Kasa Parolası belirletilmeli
  */
 export async function kasaBaslat(session) {
   const uid = session.user.id;
   const eposta = session.user.email || "";
   const satir = await kasaSatiriniGetir(uid);
+  const bagimsiz = satir?.parola_tur === "kasa";
+  const oauth = oauthMu(session);
+
+  // Bağımsız kasada (ve kasası olmayan OAuth kullanıcısında) giriş parolası malzemesi ANLAMSIZDIR;
+  // eski bir e-posta girişinden kalmış malzemenin yanlışlıkla kullanılmasını da engelle.
+  const bekleyenKullan = !bagimsiz && !(oauth && !satir);
 
   // 1) Bu cihazda kalıcı (dışa aktarılamaz) KEK var mı?
   if (satir) {
@@ -381,23 +449,58 @@ export async function kasaBaslat(session) {
       const dek = await kekIleDekAc(satir, kekOnbellek, uid);
       if (dek) {
         oturum = { uid, eposta, dek, kek: kekOnbellek, satir };
+        // Parola dışarıdan (ör. "şifremi unuttum") değişmiş ve kullanıcı bu cihazda YENİ parolayla
+        // girmişse: önbellekteki anahtar hâlâ geçerli → zarfı yeni parolaya taşı, kurtarma anahtarı gerekmesin.
+        if (bekleyenKullan) await girisParolasiniUyumla(session, uid, satir, kekOnbellek);
         return { durum: "acik" };
       }
       await depoSil(KEK_ANAHTARI(uid)); // eski/geçersiz → at
     }
   }
 
-  // 2) Girişte yakalanan parola malzemesi var mı?
-  const baz = await bekleyenParolaMalzemesiAl(eposta);
-  if (baz) {
-    const sonuc = await bazIleBaslat(uid, eposta, satir, baz);
-    // "kurtarma-gerekli"de malzeme SİLİNMEZ: kullanıcı kurtarma anahtarını girince zarfı bu
-    // (girişte yakalanan) parolayla yeniden kurmamız gerekecek. 15 dk TTL zaten sınırlıyor.
-    if (sonuc.durum === "acik" || sonuc.durum === "yeni-kasa") await bekleyenParolaMalzemesiniSil();
-    return sonuc;
+  // 2) Girişte yakalanan parola malzemesi var mı? (yalnızca 'giris' türü)
+  if (bekleyenKullan) {
+    const kayit = await bekleyenKayitAl(session);
+    if (kayit) {
+      const sonuc = await bazIleBaslat(uid, eposta, satir, kayit.baz);
+      // "kurtarma-gerekli"de malzeme SİLİNMEZ: kullanıcı kurtarma anahtarını girince zarfı bu
+      // (girişte yakalanan) parolayla yeniden kurmamız gerekecek. 15 dk TTL zaten sınırlıyor.
+      if (sonuc.durum === "acik" || sonuc.durum === "yeni-kasa") await bekleyenParolaMalzemesiniSil();
+      return sonuc;
+    }
   }
 
-  return { durum: "kilitli", kasaVar: !!satir };
+  // 3) Google (OAuth) kullanıcısı + kasa yok → bağımsız Kasa Parolası belirletilecek.
+  if (!satir && oauth) return { durum: "kasa-parolasi-belirle" };
+
+  return { durum: "kilitli", kasaVar: !!satir, bagimsiz, kurtarmaVar: !!satir?.dek_kurtarma };
+}
+
+/**
+ * Girişte (ya da şifre sıfırlamada) yakalanan YENİ parola zarfı açmıyor ama bu cihazın önbellekteki
+ * anahtarı açıyorsa, parola başka yerden değişmiş demektir: zarf yeni parolayla yeniden sarılır.
+ * Hata olursa sessizce geçilir (kasa zaten açık; en kötü ihtimalle kurtarma anahtarı yolu kalır).
+ */
+async function girisParolasiniUyumla(session, uid, satir, kekOnbellek) {
+  try {
+    const kayit = await bekleyenKayitAl(session);
+    if (!kayit) return;
+    const yeniKek = await kekTuret(kayit.baz, b64Coz(satir.kdf_salt), satir.kdf_iter);
+    if (await kekIleDekAc(satir, yeniKek, uid)) {
+      await bekleyenParolaMalzemesiniSil(); // zaten uyumlu
+      return;
+    }
+    const dekGecici = await dekAc(satir.dek_parola, kekOnbellek, uid, "dek-parola", true);
+    await zarfiYenile(uid, satir, dekGecici, kayit.baz);
+    const taze = await kasaSatiriniGetir(uid);
+    const kek = await kekTuret(kayit.baz, b64Coz(taze.kdf_salt), taze.kdf_iter);
+    const dek = await dekAc(taze.dek_parola, kek, uid, "dek-parola", false);
+    oturum = { uid, eposta: oturum?.eposta || "", dek, kek, satir: taze };
+    await kekiOnbellegeAl(uid, kek);
+    await bekleyenParolaMalzemesiniSil();
+  } catch (hata) {
+    console.warn("Not Kasası: zarf yeni parolaya taşınamadı (kasa açık, kurtarma anahtarı yolu geçerli):", hata);
+  }
 }
 
 async function bazIleBaslat(uid, eposta, satir, baz) {
@@ -415,6 +518,64 @@ async function bazIleBaslat(uid, eposta, satir, baz) {
   return { durum: "acik" };
 }
 
+/**
+ * Google (OAuth) kullanıcısı için BAĞIMSIZ Kasa Parolası ile ilk kurulum.
+ * Parola yerelde PBKDF2 ile türetilir; sunucuya yalnızca sarılmış DEK + tuz gider.
+ * `kurtarmaIste`: true ise tek seferlik kurtarma anahtarı da üretilir (dönen kurtarmaMetni BİR KEZ gösterilmeli).
+ */
+export async function kasaParolasiIleKur(session, parola, kurtarmaIste) {
+  const uid = session.user.id;
+  const eposta = session.user.email || "";
+  if (typeof parola !== "string" || parola.length < KASA_PAROLASI_MIN) {
+    throw new Error(`Kasa Parolası en az ${KASA_PAROLASI_MIN} karakter olmalı.`);
+  }
+  if (await kasaSatiriniGetir(uid)) throw new Error("Bu hesapta zaten bir Not Kasası var; parolanla aç.");
+  let p = parola;
+  const baz = await parolaMalzemesiOlustur(p);
+  p = null;
+  const k = await yeniKasaKur(uid, baz, { parolaTur: "kasa", kurtarma: !!kurtarmaIste });
+  oturum = { uid, eposta, dek: k.dek, kek: k.kek, satir: k.satir };
+  await kekiOnbellegeAl(uid, k.kek);
+  return { durum: k.kurtarmaMetni ? "yeni-kasa" : "acik", kurtarmaMetni: k.kurtarmaMetni };
+}
+
+/**
+ * Kasa açıkken Kasa Parolasını değiştirir (ya da Google kullanıcısının giriş-parolasına bağlı eski
+ * kasasını bağımsız Kasa Parolası'na geçirir). Mevcut parola yerelde doğrulanır: AES-GCM açılmazsa hata.
+ * Notlar yeniden şifrelenmez; yalnızca küçük dek_parola zarfı yenilenir.
+ */
+export async function kasaParolasiniDegistir(mevcutParola, yeniParola) {
+  const { uid } = oturumGerekli();
+  if (typeof yeniParola !== "string" || yeniParola.length < KASA_PAROLASI_MIN) {
+    throw new Error(`Yeni Kasa Parolası en az ${KASA_PAROLASI_MIN} karakter olmalı.`);
+  }
+  const satir = await kasaSatiriniGetir(uid);
+  if (!satir) throw new Error("Bu hesapta henüz bir Not Kasası yok.");
+
+  let m = mevcutParola;
+  const eskiBaz = await parolaMalzemesiOlustur(m);
+  m = null;
+  const eskiKek = await kekTuret(eskiBaz, b64Coz(satir.kdf_salt), satir.kdf_iter);
+  let dekGecici;
+  try {
+    dekGecici = await dekAc(satir.dek_parola, eskiKek, uid, "dek-parola", true);
+  } catch {
+    throw new Error("Mevcut parola hatalı.");
+  }
+
+  let y = yeniParola;
+  const yeniBaz = await parolaMalzemesiOlustur(y);
+  y = null;
+  await zarfiYenile(uid, satir, dekGecici, yeniBaz, { parola_tur: "kasa" });
+
+  const taze = await kasaSatiriniGetir(uid);
+  const kek = await kekTuret(yeniBaz, b64Coz(taze.kdf_salt), taze.kdf_iter);
+  const dek = await dekAc(taze.dek_parola, kek, uid, "dek-parola", false);
+  oturum = { ...oturum, dek, kek, satir: taze };
+  await kekiOnbellegeAl(uid, kek);
+  return { durum: "acik" };
+}
+
 /** Kilit kartındaki form: kullanıcı GİRİŞ parolasını yazar (ikinci bir parola DEĞİL). */
 export async function parolaIleAc(session, parola) {
   const uid = session.user.id;
@@ -422,7 +583,12 @@ export async function parolaIleAc(session, parola) {
   const baz = await parolaMalzemesiOlustur(p);
   p = null; // ham parola referansı anında bırakılır
   const satir = await kasaSatiriniGetir(uid);
-  return bazIleBaslat(uid, session.user.email || "", satir, baz);
+  const sonuc = await bazIleBaslat(uid, session.user.email || "", satir, baz);
+  if (sonuc.durum === "kurtarma-gerekli") {
+    // Hatalı parola ile bu durum ayırt edilemez (AES-GCM doğrulaması başarısız); UI "Hatalı parola" der.
+    return { ...sonuc, bagimsiz: satir?.parola_tur === "kasa", kurtarmaVar: !!satir?.dek_kurtarma };
+  }
+  return sonuc;
 }
 
 /**
@@ -435,18 +601,32 @@ export async function kurtarmaIleAc(session, kurtarmaMetni, parola) {
   const eposta = session.user.email || "";
   const satir = await kasaSatiriniGetir(uid);
   if (!satir) throw new Error("Bu hesapta henüz bir Not Kasası yok.");
+  if (!satir.dek_kurtarma) {
+    throw new Error("Bu kasa için kurtarma anahtarı oluşturulmamış; yalnızca Kasa Parolasıyla açılabilir.");
+  }
+  const bagimsiz = satir.parola_tur === "kasa";
 
   let baz = null;
   if (parola) {
+    if (bagimsiz && parola.length < KASA_PAROLASI_MIN) {
+      throw new Error(`Yeni Kasa Parolası en az ${KASA_PAROLASI_MIN} karakter olmalı.`);
+    }
     let p = parola;
     baz = await parolaMalzemesiOlustur(p);
     p = null;
-  } else {
-    baz = await bekleyenParolaMalzemesiAl(eposta);
+  } else if (!bagimsiz) {
+    baz = (await bekleyenKayitAl(session))?.baz || null;
   }
-  if (!baz) throw new Error("Zarfı yeniden kurmak için giriş parolanı da yazmalısın.");
+  if (!baz) {
+    throw new Error(bagimsiz ? "Kasa için yeni bir Kasa Parolası yazmalısın." : "Zarfı yeniden kurmak için giriş parolanı da yazmalısın.");
+  }
 
-  const kurtarmaBaytlari = base32Coz(kurtarmaMetni);
+  let kurtarmaBaytlari;
+  try {
+    kurtarmaBaytlari = base32Coz(kurtarmaMetni || "");
+  } catch (h) {
+    throw new Error(h.message);
+  }
   if (kurtarmaBaytlari.length !== 32) throw new Error("Kurtarma anahtarı eksik ya da fazla karakter içeriyor.");
   const kurtarmaKek = await kurtarmaKekiOlustur(kurtarmaBaytlari);
   kurtarmaBaytlari.fill(0);
@@ -455,7 +635,7 @@ export async function kurtarmaIleAc(session, kurtarmaMetni, parola) {
   try {
     dekGecici = await dekAc(satir.dek_kurtarma, kurtarmaKek, uid, "dek-kurtarma", true); // geçici: yeniden sarılacak
   } catch {
-    throw new Error("Kurtarma anahtarı yanlış.");
+    throw new Error("Hatalı kurtarma anahtarı.");
   }
 
   await zarfiYenile(uid, satir, dekGecici, baz);
@@ -469,7 +649,7 @@ export async function kurtarmaIleAc(session, kurtarmaMetni, parola) {
 }
 
 /** dek_parola zarfını YENİ bir tuz + yeni KEK ile baştan yazar (iyimser kilitli). */
-async function zarfiYenile(uid, satir, dekGecici, yeniBaz) {
+async function zarfiYenile(uid, satir, dekGecici, yeniBaz, ekAlanlar = {}) {
   const tuz = rastgele(16);
   const yeniKek = await kekTuret(yeniBaz, tuz, KDF_TUR);
   const { data, error } = await supabase
@@ -478,11 +658,12 @@ async function zarfiYenile(uid, satir, dekGecici, yeniBaz) {
       kdf_iter: KDF_TUR,
       kdf_salt: b64Kodla(tuz),
       dek_parola: await dekSar(dekGecici, yeniKek, uid, "dek-parola"),
+      ...ekAlanlar,
     })
     .eq("user_id", uid)
     .eq("rev", satir.rev)
     .select("rev");
-  if (error) throw error;
+  if (error) throw hataCevir(error);
   if (!data?.length) throw new Error("Kasa başka bir cihazda değişti; sayfayı yenileyip tekrar dene.");
 }
 
@@ -493,6 +674,8 @@ async function zarfiYenile(uid, satir, dekGecici, yeniBaz) {
 export async function parolaDegisimindeZarfiYenile(uid, yeniBaz) {
   const satir = await kasaSatiriniGetir(uid);
   if (!satir) return { yapildi: false, sebep: "kasa-yok" };
+  // Bağımsız Kasa Parolası giriş parolasından BAĞIMSIZDIR: giriş parolası değişince zarfa dokunma.
+  if (satir.parola_tur === "kasa") return { yapildi: false, sebep: "bagimsiz-parola" };
   const eskiKek = oturum?.uid === uid ? oturum.kek : await onbellekliKekiAl(uid);
   if (!eskiKek) return { yapildi: false, sebep: "kilitli" };
 
@@ -512,7 +695,7 @@ export async function parolaDegisimindeZarfiYenile(uid, yeniBaz) {
   return { yapildi: true };
 }
 
-/** Yeni kurtarma anahtarı üretir (eskisi geçersiz olur). Kasa açıkken çağrılır. */
+/** Yeni kurtarma anahtarı üretir (varsa eskisi geçersiz olur; yoksa İLK kez oluşturur). Kasa açıkken çağrılır. */
 export async function kurtarmaAnahtariniYenile() {
   if (!oturum) throw new Error("Kasa kilitli.");
   const { uid, kek } = oturum;
@@ -530,7 +713,7 @@ export async function kurtarmaAnahtariniYenile() {
     .eq("user_id", uid)
     .eq("rev", satir.rev)
     .select("*");
-  if (error) throw error;
+  if (error) throw hataCevir(error);
   if (!data?.length) throw new Error("Kasa başka bir cihazda değişti; sayfayı yenileyip tekrar dene.");
   oturum.satir = data[0];
   return metin;
