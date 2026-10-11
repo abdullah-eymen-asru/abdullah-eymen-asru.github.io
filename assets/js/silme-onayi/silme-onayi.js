@@ -136,33 +136,62 @@ function kart(t) {
     eylem.append(oner, el("span", { class: "muted", text: "Kalıcı silmenin son onayı Site Sahibi'ndedir." }));
   }
 
-  return el("article", { class: "so-kart" },
-    el("header", { class: "so-baslik" },
-      hesapK,
-      el("div", { class: "so-kimlik" },
-        el("strong", { text: ad }),
-        el("span", { class: "muted", text: [owner && t.eposta ? t.eposta : null, t.rol, t.talep_turu === "owner" ? "site sahibi talebi" : "üye kendisi sildi"].filter(Boolean).join(" · ") }),
-        el("span", { class: "muted", text: `Talep: ${tarih(t.created_at)}` })),
-      el("span", { class: `so-rozet ${t.durum === "onerildi" ? "so-rozet-oneri" : ""}`, text: t.durum === "onerildi" ? `Admin önerisi (${tarih(t.oneri_at)})` : "İnceleme bekliyor" })),
-    el("div", { class: "so-secimler" },
-      satirKutu("Dosya Yöneticisi dosyaları", `${sayi(o.arsiv_dosya)} dosya, ${sayi(o.arsiv_klasor)} klasör (R2 dahil kalıcı silinir)`, arsivK),
-      satirKutu("Yazdığı taslak ve özel içerikler", `${sayi(o.taslak)} taslak, ${sayi(o.ozel_icerik)} özel içerik (+ ekli dosyaları)`, icerikK),
-      satirKutu("Not ekleri ve notlar", `${sayi(o.not_ek)} ek, ${sayi(o.notlar)} şifreli not — hesapla birlikte silinir`, sabit()),
-      satirKutu("Akademik Kütüphane", `${sayi(o.akademik)} kaynak, ${sayi(o.akademik_pdf)} PDF — hesapla birlikte silinir`, sabit()),
-      satirKutu("Mesajlar, erişim atamaları, onay geçmişi, indirme kayıtları", `${sayi(o.mesaj)} mesaj, ${sayi(o.erisim)} erişim, ${sayi(o.indirme_logu)} kayıt — hesapla birlikte silinir`, sabit())),
-    eylem, mesajKart);
+  const ozetSatiri = el("summary", { class: "so-ozet" },
+    hesapK,
+    el("span", { class: "so-kimlik" },
+      el("strong", { text: ad }),
+      el("span", { class: "muted", text: [owner && t.eposta ? t.eposta : null, t.rol].filter(Boolean).join(" · ") })),
+    el("span", { class: "so-tarih muted", text: tarih(t.created_at) }),
+    el("span", { class: `so-rozet ${t.durum === "onerildi" ? "so-rozet-oneri" : ""}`, text: t.durum === "onerildi" ? "Admin önerisi" : "İnceleme bekliyor" }));
+  if (hesapK) hesapK.addEventListener("click", (e) => e.stopPropagation());
+
+  const kart = el("details", { class: "so-kart" },
+    ozetSatiri,
+    el("div", { class: "so-detay" },
+      el("dl", { class: "so-bilgi" },
+        el("div", {}, el("dt", { text: "Üye" }), el("dd", { text: ad })),
+        owner && t.eposta ? el("div", {}, el("dt", { text: "E-posta" }), el("dd", { text: t.eposta })) : null,
+        el("div", {}, el("dt", { text: "Rol" }), el("dd", { text: t.rol || "—" })),
+        el("div", {}, el("dt", { text: "Silme talebi" }), el("dd", { text: `${tarih(t.created_at)} · ${t.talep_turu === "owner" ? "Site sahibi sildi" : "üye kendisi sildi"}` })),
+        t.durum === "onerildi" ? el("div", {}, el("dt", { text: "Admin önerisi" }), el("dd", { text: tarih(t.oneri_at) })) : null),
+      el("div", { class: "so-secimler" },
+        satirKutu("Dosya Yöneticisi dosyaları", `${sayi(o.arsiv_dosya)} dosya, ${sayi(o.arsiv_klasor)} klasör (R2 dahil kalıcı silinir)`, arsivK),
+        satirKutu("Yazdığı taslak ve özel içerikler", `${sayi(o.taslak)} taslak, ${sayi(o.ozel_icerik)} özel içerik (+ ekli dosyaları)`, icerikK),
+        satirKutu("Not ekleri ve notlar", `${sayi(o.not_ek)} ek, ${sayi(o.notlar)} şifreli not — hesapla birlikte silinir`, sabit()),
+        satirKutu("Akademik Kütüphane", `${sayi(o.akademik)} kaynak, ${sayi(o.akademik_pdf)} PDF — hesapla birlikte silinir`, sabit()),
+        satirKutu("Mesajlar, erişim atamaları, onay geçmişi, indirme kayıtları", `${sayi(o.mesaj)} mesaj, ${sayi(o.erisim)} erişim, ${sayi(o.indirme_logu)} kayıt — hesapla birlikte silinir`, sabit())),
+      eylem, mesajKart));
+  kart.open = acikKartlar.has(t.user_id);
+  kart.addEventListener("toggle", () => { if (kart.open) acikKartlar.add(t.user_id); else acikKartlar.delete(t.user_id); });
+  return kart;
+}
+
+const acikKartlar = new Set();
+const aramaGirdi = el("input", { type: "search", class: "so-arama", placeholder: "Ad veya e-posta ile ara…", "aria-label": "Silinen hesaplarda ad veya e-posta ara", autocomplete: "off", enterkeyhint: "search" });
+const sayac = el("p", { class: "muted so-sayac", role: "status", "aria-live": "polite" });
+const ustKab = el("div", { class: "so-ust" });
+const listeKab = el("div", { class: "so-liste" });
+aramaGirdi.addEventListener("input", () => ciz());
+
+/** Aramaya uyan talepler (ad + e-posta; e-posta yalnızca owner'a gelir). */
+function gorunenler() {
+  const k = aramaGirdi.value.toLocaleLowerCase("tr").split(/\s+/).filter(Boolean);
+  if (!k.length) return talepler;
+  return talepler.filter((t) => { const h = `${t.ad || ""} ${t.eposta || ""}`.toLocaleLowerCase("tr"); return k.every((x) => h.includes(x)); });
 }
 
 function ciz() {
   const sahip = talepler[0]?.owner_mi === true;
-  const ust = el("div", { class: "so-ust" });
-  if (sahip && talepler.length) {
+  const liste = gorunenler();
+  sayac.textContent = talepler.length ? `${liste.length} / ${talepler.length} hesap gösteriliyor.` : "";
+  ustKab.replaceChildren();
+  if (sahip && liste.length) {
     const hepsi = el("input", { type: "checkbox", id: "so-hepsi" });
-    hepsi.checked = talepler.every((t) => hesapSecili.has(t.user_id));
-    hepsi.addEventListener("change", () => { talepler.forEach((t) => (hepsi.checked ? hesapSecili.add(t.user_id) : hesapSecili.delete(t.user_id))); ciz(); });
+    hepsi.checked = liste.every((t) => hesapSecili.has(t.user_id));
+    hepsi.addEventListener("change", () => { liste.forEach((t) => (hepsi.checked ? hesapSecili.add(t.user_id) : hesapSecili.delete(t.user_id))); ciz(); });
     const toplu = el("button", { type: "button", class: "so-btn so-btn-tehlike", text: "Seçili hesapların verilerini kalıcı sil" });
     toplu.addEventListener("click", async () => {
-      const secilen = talepler.filter((t) => hesapSecili.has(t.user_id));
+      const secilen = liste.filter((t) => hesapSecili.has(t.user_id));
       if (!secilen.length) { bildir("Önce en az bir hesap seç.", "error"); return; }
       if (!onayYaz(`${secilen.length} hesabın seçili TÜM verileri kalıcı silinecek ve geri alınamaz.`)) return;
       toplu.disabled = true;
@@ -173,17 +202,17 @@ function ciz() {
       if (tamam) bildir(`${tamam} hesabın verileri kalıcı silindi.`, "success");
       await yukle();
     });
-    ust.append(el("label", { class: "so-hepsi" }, hepsi, el("span", { text: "Tümünü seç" })), toplu);
+    ustKab.append(el("label", { class: "so-hepsi" }, hepsi, el("span", { text: "Görünenleri seç" })), toplu);
   }
-  kok.replaceChildren(
-    ust,
-    ...(talepler.length ? talepler.map(kart) : [el("p", { class: "muted", text: "Bekleyen silme talebi yok. Hesabını silen üyelerin verileri burada site sahibinin onayını bekler." })]));
+  listeKab.replaceChildren(...(liste.length
+    ? liste.map(kart)
+    : [el("p", { class: "muted", text: talepler.length ? "Aramayla eşleşen hesap yok." : "Bekleyen silme talebi yok. Hesabını silen üyelerin verileri burada site sahibinin onayını bekler." })]));
 }
 
 async function yukle() {
   const { data, error } = await supabase.rpc("hesap_silme_talepleri_getir");
   if (error) {
-    kok.replaceChildren(el("p", { class: "auth-message error", text: /does not exist|PGRST202|schema cache/i.test(error.message) ? "Gerekli migration (0078) henüz çalıştırılmamış." : error.message }));
+    listeKab.replaceChildren(el("p", { class: "auth-message error", text: /does not exist|PGRST202|schema cache/i.test(error.message) ? "Gerekli migration (0078) henüz çalıştırılmamış." : error.message }));
     return;
   }
   talepler = data || [];
@@ -191,4 +220,5 @@ async function yukle() {
   ciz();
 }
 
+if (kok) kok.replaceChildren(aramaGirdi, sayac, ustKab, listeKab);
 if (kok) yukle().catch((h) => { console.error("silme-onayi:", h); kok.replaceChildren(el("p", { class: "auth-message error", text: hata(h) })); });
