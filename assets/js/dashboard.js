@@ -79,8 +79,6 @@ const MODULES = {
   // Sistem Yedekleme & Depolama Yönetimi (migration 0074). Sekme görünürlüğü role DEĞİL, can_export_system
   // anahtarına bağlı (NAV'daki izin:"sistemyedek" + izinleriYukle). Gerçek yetki: RPC'ler + sistem-yedek-worker.
   sistemYedek: { src: "./sistem-yedek/sistem-yedek.js", role: null },
-  // Yetki Ayarları > "📦 Sistem Yedekleme": rol bazlı can_export_system anahtarı (yalnızca owner).
-  sistemYedekYetki: { src: "./sistem-yedek/yetki-paneli.js", role: "owner" },
   // Evrensel Dosya Dönüştürücü & Belge Düzenleyici (migration 0077). %100 istemci tarafı; sekme görünürlüğü role DEĞİL,
   // can_use_converter anahtarına bağlı (NAV'daki izin:"donusturucu" + izinleriYukle). Modül kendi içinde RPC ile tekrar doğrular (Guard).
   donusturucu: { src: "./donusturucu/donusturucu.js", role: null },
@@ -528,7 +526,6 @@ async function showView(viewId, moduleKey) {
   // Yetki Ayarları: owner için "R2 Erişim İzni" bölümü (ayrı modül; gy modülüne dokunmaz)
   if (viewId === "sys-yetki") await ensureModuleLoaded("arsivIzin");
   if (viewId === "sys-yetki") await ensureModuleLoaded("kalkan");
-  if (viewId === "sys-yetki") await ensureModuleLoaded("sistemYedekYetki");
 }
 
 function firstAvailableView(profile) {
