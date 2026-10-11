@@ -225,3 +225,7 @@
 .dn-pdf-metin br::selection { background: transparent; }
 
 .dn-kok [hidden], .dn-dialog [hidden], #dn-izin-kok [hidden] { display: none !important; }
+
+/* Bellek güvenliği (Oturumu Sıfırla) */
+.dn-guvenli-serit { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 12px; }
+.dn-sifirla { min-height: 44px; }
