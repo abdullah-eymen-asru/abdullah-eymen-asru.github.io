@@ -225,6 +225,7 @@ let PROFIL_SHA = null;
 // Girişi yapan kullanıcının profili (id, full_name, email, role). Yazar
 // alanının otomatik doldurulması/açılır listesi bu bilgiye göre kurulur
 // (bkz. wireYazarAlani).
+let YETKI_AYARLARI_ERISIMI = false; // owner dışı: owner'ın açtığı "adminler Yetki Ayarları'na erişebilsin" anahtarı
 let GIRIS_YAPAN_PROFIL = null;
 
 /*
@@ -421,7 +422,7 @@ function rolBazliArayuzuUygula() {
     // açılmaz; ekranda "görünüp kaybolma" sorununun en görünür örneği
     // buydu, çünkü admin için bu her zaman true'ydu ama BİR ANLIĞINA
     // görünüyordu).
-    { section: "yetki-ayarlari", gizle: () => rol !== "owner" },
+    { section: "yetki-ayarlari", gizle: () => rol !== "owner" && !(rol === "admin" && YETKI_AYARLARI_ERISIMI) },
   ];
 
   for (const { section, gizle } of kurallar) {
@@ -474,6 +475,12 @@ async function init() {
   // — element zaten yoksa .remove() çağrısı sorunsuz no-op) ama görsel
   // olarak artık hiçbir an için yanlış sekmeler DOM'da görünür durumda
   // OLMUYOR.
+  if (GIRIS_YAPAN_PROFIL?.role === "admin") {
+    try {
+      const { data } = await supabase.rpc("yetki_ayarlari_yonetim_yetkisi_var_mi");
+      YETKI_AYARLARI_ERISIMI = data === true;
+    } catch (_e) { YETKI_AYARLARI_ERISIMI = false; }
+  }
   rolBazliArayuzuUygula();
 
   document.getElementById("loading")?.setAttribute("hidden", "");
@@ -5642,13 +5649,21 @@ function wireYetkiAyarlari() {
   // SADECE owner — bkz. migration 0048 owner_ozellik_erisimi_ayarla/
   // ozellik_erisimlerini_getir (ikisi de is_owner() zorunlu kılıyor,
   // burası SADECE görünürlük kolaylığı, asıl sınır veritabanında).
-  if (GIRIS_YAPAN_PROFIL?.role !== "owner") {
+  const sahip = GIRIS_YAPAN_PROFIL?.role === "owner";
+  if (!sahip && !(GIRIS_YAPAN_PROFIL?.role === "admin" && YETKI_AYARLARI_ERISIMI)) {
     navLink?.remove();
     bolum?.remove();
     return;
   }
 
   yetkiAyarlariTablosunuYukle();
+
+  if (!sahip) {
+    // Yetkili admin YALNIZCA Özellikler sekmesini görür: diğer izin sekmeleri (Tezgâh, Dosya Yöneticisi, Erişim Kalkanı +
+    // Kilit İzinleri) güvenlik açısından Site Sahibi'ne özeldir; sekme şeridi paneli olmayan sekmeyi kendisi kaldırır.
+    ["ya-pane-tezgah", "ra-izin-bolumu", "gk-kalkan-bolumu"].forEach((id) => document.getElementById(id)?.remove());
+    return;
+  }
 
   // Kullanıcı bazlı bölüm (Fikir & Araştırma Tezgâhı) — ayrı dosya, hata olsa matris etkilenmez.
   import("../notlar/yetki-paneli.js")
@@ -5659,6 +5674,7 @@ function wireYetkiAyarlari() {
 async function yetkiAyarlariTablosunuYukle() {
   const alan = document.getElementById("ya-tablo-alani");
   const msgEl = document.getElementById("ya-message");
+  const sahipMi = GIRIS_YAPAN_PROFIL?.role === "owner";
   try {
     const { data, error } = await supabase.rpc("ozellik_erisimlerini_getir");
     if (error) throw error;
@@ -5674,12 +5690,11 @@ async function yetkiAyarlariTablosunuYukle() {
 
     // Varsayılan KAPALI özellikler (kaynak: donusturucu | sistem_yedek | kapali): açık olanlar ayrı RPC'lerden gelir.
     const acikHaritasi = {};
-    let adminYonetebilir = false;
+    let adminErisimi = false;
     try {
       const { data: dn, error: dnErr } = await supabase.rpc("donusturucu_yetkilerini_getir");
       if (!dnErr) {
         for (const r of dn || []) acikHaritasi[`donusturucu::${r.rol}`] = !!r.can_use_converter;
-        adminYonetebilir = dn?.[0]?.admin_yonetebilir === true;
       }
     } catch (_e) { /* migration 0077 yoksa satır kapalı görünür */ }
     try {
@@ -5687,17 +5702,22 @@ async function yetkiAyarlariTablosunuYukle() {
       if (!syErr) for (const r of sy || []) acikHaritasi[`sistem_yedek::${r.rol}`] = !!r.can_export_system;
     } catch (_e) { /* migration 0074 yoksa satır kapalı görünür */ }
     try {
-      const { data: kp, error: kpErr } = await supabase.rpc("kapali_ozellikleri_getir");
-      if (!kpErr) for (const r of kp || []) acikHaritasi[`${r.ozellik_anahtari}::${r.rol}`] = !!r.acik;
+      const { data: kp, error: kpErr } = sahipMi ? await supabase.rpc("kapali_ozellikleri_getir") : { data: [] };
+      if (!kpErr) for (const r of kp || []) {
+        acikHaritasi[`${r.ozellik_anahtari}::${r.rol}`] = !!r.acik;
+        if (r.ozellik_anahtari === "yetki_ayarlari" && r.rol === "admin") adminErisimi = !!r.acik;
+      }
     } catch (_e) { /* migration 0078 yoksa satır kapalı görünür */ }
     const yaIzinli = (ozellik, rol) =>
       ozellik.kaynak ? acikHaritasi[`${ozellik.anahtar}::${rol}`] === true : kisitHaritasi[`${ozellik.anahtar}::${rol}`] !== false;
 
     // Tüm özelliklerin rolSutunlari'nın BİRLEŞİMİ — sütun başlıklarını
     // oluşturur (ilk görülme sırasına göre, katalog sırasını takip eder).
+    // Yetkili admin, admin rolünün anahtarlarını göremez/değiştiremez (kendi yetkisini genişletemez).
+    const yaRoller = (o) => (o.rolSutunlari || ["admin"]).filter((r) => sahipMi || (r !== "admin" && r !== "owner"));
     const tumRoller = [];
     OZELLIK_KATALOGU.forEach((o) => {
-      (o.rolSutunlari || ["admin"]).forEach((r) => {
+      yaRoller(o).forEach((r) => {
         if (!tumRoller.includes(r)) tumRoller.push(r);
       });
     });
@@ -5709,7 +5729,8 @@ async function yetkiAyarlariTablosunuYukle() {
       '<th scope="col">Tüm roller</th>';
 
     const satirlarHtml = OZELLIK_KATALOGU.map((ozellik) => {
-      const ozellikRolleri = ozellik.rolSutunlari || ["admin"];
+      const ozellikRolleri = yaRoller(ozellik);
+      if (!ozellikRolleri.length) return "";
       const hucreler = tumRoller.map((rol) => {
         // Bu özellik bu rol için hiç tanımlı değilse (ör. "CV Yönetimi"
         // satırında "manager" sütunu) — manager zaten bu özelliğe sabit
@@ -5758,23 +5779,23 @@ async function yetkiAyarlariTablosunuYukle() {
         </table>
       </div>
       <p id="ya-arama-bos" class="muted" hidden>Aramayla eşleşen özellik yok.</p>
-      <div class="ya-ek-ayar" id="ya-ek-ayar">
+      ${sahipMi ? `<div class="ya-ek-ayar" id="ya-ek-ayar">
         <label class="ya-mini-toggle">
-          <input type="checkbox" id="ya-dn-admin-yonet" ${adminYonetebilir ? "checked" : ""}>
+          <input type="checkbox" id="ya-admin-erisim" ${adminErisimi ? "checked" : ""}>
           <span class="ya-mini-track"><span class="ya-mini-thumb"></span></span>
         </label>
-        <label for="ya-dn-admin-yonet" class="ya-ek-ayar-metin">
-          <strong>Dönüştürücü: adminler de diğer rollerin erişimini yönetebilsin</strong>
-          <span class="muted">Açıkken yöneticiler, admin dışındaki roller için Dönüştürücü'yü açıp kapatabilir. Admin rolünün kendi anahtarını yalnızca sen değiştirirsin.</span>
+        <label for="ya-admin-erisim" class="ya-ek-ayar-metin">
+          <strong>Adminler Yetki Ayarları'na erişebilsin</strong>
+          <span class="muted">Açıkken tüm yöneticiler bu Özellikler tablosunu görür ve admin DIŞI roller (içerik sorumlusu, yazar, özel üye, üye) için özellikleri açıp kapatabilir. Admin rolünün kendi anahtarlarını ve diğer izin sekmelerini (Erişim Kalkanı, Kilit İzinleri, Dosya Yöneticisi, Tezgâh) yalnızca sen yönetirsin.</span>
         </label>
-      </div>`;
+      </div>` : ""}`;
 
-    document.getElementById("ya-dn-admin-yonet")?.addEventListener("change", async (e) => {
+    document.getElementById("ya-admin-erisim")?.addEventListener("change", async (e) => {
       const k = e.target; k.disabled = true;
-      const { error } = await supabase.rpc("owner_donusturucu_admin_yonetimi_ayarla", { p_acik: k.checked });
+      const { error } = await supabase.rpc("owner_kapali_ozellik_ayarla", { p_ozellik: "yetki_ayarlari", p_rol: "admin", p_acik: k.checked });
       k.disabled = false;
       if (error) { k.checked = !k.checked; showMessage(msgEl, `Kaydedilemedi: ${error.message}`, "error"); return; }
-      showMessage(msgEl, `Adminlerin Dönüştürücü erişimini yönetmesi: ${k.checked ? "AÇIK" : "kapalı"}.`, "success");
+      showMessage(msgEl, `Adminlerin Yetki Ayarları'na erişimi: ${k.checked ? "AÇIK" : "kapalı"}.`, "success");
     });
     yaAramaUygula();
 
