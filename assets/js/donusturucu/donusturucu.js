@@ -17,6 +17,8 @@ import { belgeHtmlAl } from "./belge-oku.js";
 import { veriDonustur } from "./motor-veri.js";
 import { kutuphaneListesi } from "./cdn.js";
 import { yetkiPaneliniKur } from "./yetki-ortak.js";
+import { sifirla as bellekSifirla, kaydet as bellekKaydet, dugumKaydet } from "./bellek.js";
+import { ayrilmaKancasiKaydet } from "../core/gezinme-kilidi.js";
 
 const MAKS_TEK = 250 * 1024 * 1024;
 const MAKS_TOPLAM = 500 * 1024 * 1024;
@@ -120,7 +122,11 @@ async function hedefSecenekleri(turler) {
   return sonuc;
 }
 
+let kontrolTur = 0;
 async function kontrolCiz() {
+  // YARIŞ DÜZELTMESİ: hedefSecenekleri() await ettiği için art arda çağrılar (hızlı tıklama, dosya ekleme) aynı kontrolAlani'na
+  // iki kez çizim yapıp arayüzü çoğaltıyordu. Yalnızca EN SON çağrı çizer; eskiler await sonrası sessizce çıkar.
+  const tur = ++kontrolTur;
   bos(kontrolAlani);
   if (!dosyalar.length) return;
   const turler = dosyalar.map((d) => d.tur);
@@ -148,6 +154,7 @@ async function kontrolCiz() {
   if (!hedefListesi.length) { kontrolAlani.append(el("div", { class: "dn-uyari", text: "Bu dosya için dönüştürme hedefi yok." })); return; }
 
   const suzulmus = await hedefSecenekleri(hedefListesi.filter((h) => h !== "pdf-birlestir"));
+  if (tur !== kontrolTur) return; // daha yeni bir çizim başladı
   const tumHedefler = hedefListesi.includes("pdf-birlestir") ? ["pdf-birlestir", ...suzulmus] : suzulmus;
   if (!tumHedefler.includes(hedef)) hedef = null;
 
@@ -315,6 +322,7 @@ async function duzenleyiciAc() {
         : [[d0.tur === "md" ? "md" : "txt", d0.tur === "md" ? "Markdown (kaydet)" : `Metin (.${d0.uzanti || "txt"}) (kaydet)`], ...DISA_BELGE.filter((h) => h !== (d0.tur === "md" ? "md" : "txt")).map((h) => [h, FORMATLAR[h].ad])];
     }
     duzenleyici = { tur: edTur, nesne, dosyaAdi, kaynak: d0 };
+    bellekKaydet(nesne, (n) => n.yokEt?.());
     kirliBekciKur();
 
     const secici = el("select", { class: "dn-select", "aria-label": "Kayıt biçimi" }, ...hedefListesi.map(([d, e]) => el("option", { value: d, text: e })));
@@ -337,11 +345,12 @@ async function duzenleyiciAc() {
         el("div", { class: "dn-ust-eylem" },
           el("label", { class: "dn-alan-etiket" }, "Dosya adı", adGirdi),
           el("label", { class: "dn-alan-etiket" }, "Kayıt biçimi", secici),
-          el("div", { class: "dn-eylemler" }, kaydetBtn, kapat))),
+          el("div", { class: "dn-eylemler" }, kaydetBtn, kapat, sifirlaDugmesi()))),
       durum.el, kap);
     ana.hidden = true;
     calismaAlani.hidden = false;
     ilerleme.gizle();
+    nesne.sigdir?.()?.catch?.(() => {}); // gizliyken ölçülemeyen genişlik: artık görünür → sığdır (%30 hatası)
     nesne.odak?.();
     calismaAlani.scrollIntoView?.({ block: "start" });
   } catch (h) {
@@ -392,7 +401,11 @@ async function ciz() {
   const temizle = dugme({ metin: "Hepsini temizle", kucuk: true, tur: "hayalet", hidden: !dosyalar.length });
   temizle.addEventListener("click", dosyalariTemizle);
   bos(ana);
-  ana.append(dropzone(), dosyalar.length ? el("div", { class: "dn-kart" }, el("div", { class: "dn-editor-ust" }, el("h2", { text: `Seçilen dosyalar (${dosyalar.length})` }), temizle), liste) : null, kontrolAlani);
+  // DÜZELTME ("null" yazısı): yerel Node.append(null) ekrana "null" METNİ basar; boş değerler dışarıda bırakılır.
+  const parcalar = [dropzone()];
+  if (dosyalar.length) parcalar.push(el("div", { class: "dn-kart" }, el("div", { class: "dn-editor-ust" }, el("h2", { text: `Seçilen dosyalar (${dosyalar.length})` }), temizle), liste));
+  parcalar.push(kontrolAlani);
+  ana.append(...parcalar);
   await kontrolCiz();
 }
 
@@ -420,6 +433,66 @@ async function yonetimKarti() {
   return d;
 }
 
+/* ------------------------------ bellek güvenliği ------------------------------ */
+
+const bellekteVeriVar = () => dosyalar.length > 0 || !!duzenleyici || !!calisiyor;
+
+/** Hiçbir soru sormadan: çalışan işi iptal et, düzenleyiciyi yok et, dosya referanslarını bırak, tuvalleri/URL'leri temizle. */
+function oturumuSifirla() {
+  try { calisiyor?.iptal(); } catch { /* yok say */ }
+  if (duzenleyici) {
+    try { duzenleyici.nesne.yokEt(); } catch { /* yok say */ }
+    if (kirliBekci) { window.removeEventListener("beforeunload", kirliBekci); kirliBekci = null; }
+    duzenleyici = null;
+  }
+  dosyalar = [];
+  hedef = null;
+  try { girdi.value = ""; } catch { /* yok say */ }
+  for (const k of Object.keys(SECENEK)) delete SECENEK[k];
+  bellekSifirla({ ekstraDugumler: [dugumKaydet(calismaAlani), dugumKaydet(kontrolAlani), dugumKaydet(liste)] });
+  ilerleme.gizle();
+  calismaAlani.hidden = true;
+  ana.hidden = false;
+}
+
+function sifirlaDugmesi() {
+  const b = dugme({ metin: "Oturumu Sıfırla / Dosyayı Güvenli Sil", ikon: "🧹", class: "dn-sifirla", title: "Açık dosyaları, düzenleyiciyi ve önizlemeleri bellekten siler" });
+  b.addEventListener("click", async () => {
+    if (!bellekteVeriVar()) { bildir("Bellekte silinecek belge yok.", "info"); return; }
+    const kirli = duzenleyici?.nesne?.kirli?.();
+    const ok = await onayIste({ baslik: "Oturum sıfırlansın mı?", metin: kirli ? "Kaydedilmemiş değişiklikler VAR ve kaybolacak. Açık belgeler bellekten silinecek (sunucuda zaten hiçbir kopya yok)." : "Açık belgeler, düzenleyici ve önizlemeler bellekten silinecek.", tamam: "Sıfırla ve sil", tehlike: true });
+    if (!ok) return;
+    oturumuSifirla();
+    await ciz();
+    bildir("Oturum sıfırlandı: belgeler bellekten silindi.", "success");
+  });
+  return b;
+}
+
+/** Sekmeden ayrılırken: "Açık belgeniz bellekten silinsin mi?" — Sil ve ayrıl | Sakla ve ayrıl | Vazgeç. */
+function ayrilirkenSor() {
+  if (!bellekteVeriVar()) return Promise.resolve(true);
+  return new Promise((coz) => {
+    const d = el("dialog", { class: "dn-dialog" });
+    const sil = dugme({ metin: "Sil ve ayrıl", tur: "birincil" });
+    const sakla = dugme({ metin: "Sakla ve ayrıl" });
+    const kal = dugme({ metin: "Vazgeç (burada kal)" });
+    const kirli = duzenleyici?.nesne?.kirli?.();
+    d.append(el("form", { method: "dialog", class: "dn-dialog-govde" },
+      el("h3", { text: "Açık belgeniz bellekten silinsin mi?" }),
+      el("p", { class: "dn-muted", text: kirli ? "Kaydedilmemiş değişiklikler var. “Sakla” dersen belge bu sekmenin belleğinde kalır (ortak cihazda önerilmez); “Sil” dersen değişiklikler kaybolur." : "Belge yalnızca bu sekmenin belleğinde duruyor. Ortak cihazdaysan silmeni öneririz." }),
+      el("div", { class: "dn-eylemler" }, kal, sakla, sil)));
+    let sonuc = false;
+    sil.addEventListener("click", (e) => { e.preventDefault(); oturumuSifirla(); ciz(); sonuc = true; d.close(); });
+    sakla.addEventListener("click", (e) => { e.preventDefault(); sonuc = true; d.close(); });
+    kal.addEventListener("click", (e) => { e.preventDefault(); sonuc = false; d.close(); });
+    d.addEventListener("cancel", () => { sonuc = false; });
+    d.addEventListener("close", () => { d.remove(); coz(sonuc); });
+    document.body.append(d);
+    if (typeof d.showModal === "function") d.showModal(); else { d.remove(); coz(window.confirm("Açık belgeniz bellekten silinsin mi? (Tamam = sil ve ayrıl)") ? (oturumuSifirla(), true) : false); }
+  });
+}
+
 async function kur() {
   if (!kok) return;
   // GUARD (derinlemesine savunma): yetki yoksa hiçbir arayüz/kütüphane yüklenmez.
@@ -431,9 +504,11 @@ async function kur() {
   }
   kok.classList.add("dn-kok");
   const yonetim = await yonetimKarti();
-  kok.replaceChildren(gizlilikRozeti(), ana, calismaAlani, girdi, ...(yonetim ? [yonetim] : []), kutuphaneKarti());
+  kok.replaceChildren(gizlilikRozeti(), el("div", { class: "dn-guvenli-serit" }, sifirlaDugmesi(), el("span", { class: "dn-muted", text: "Ortak cihazdaysan işin bitince belleği temizle." })), ana, calismaAlani, girdi, ...(yonetim ? [yonetim] : []), kutuphaneKarti());
   await ciz();
-  window.addEventListener("pagehide", () => { try { duzenleyici?.nesne?.yokEt?.(); } catch { /* yok say */ } tumUrlleriSerbestBirak(); });
+  window.addEventListener("pagehide", () => { try { oturumuSifirla(); } catch { /* yok say */ } });
+  // Panel sekmesinden ayrılma kalkanı (dashboard.js showView → gezinme-kilidi)
+  ayrilmaKancasiKaydet("tool-donusturucu", ayrilirkenSor);
 }
 
 kur().catch((h) => {
