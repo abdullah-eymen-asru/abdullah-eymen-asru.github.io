@@ -1686,14 +1686,11 @@ permalink: "/panel/dashboard.html"
   <div id="nt-kilit" class="nt-kilit" hidden>
     <h2>🔐 Not Kasası</h2>
     <p id="nt-kilit-aciklama" class="muted"></p>
-    <p id="nt-google-ipucu" class="muted" hidden>
-      Google ile giriş yapıyorsan henüz bir parolan olmayabilir. Önce
-      <a href="#me-panel" data-dash-git="me-panel">Panelim → Şifre Değiştir</a>
-      bölümünden bir parola belirle; bu parola Google girişini bozmaz.
-    </p>
+    <p id="nt-kilit-uyari" class="muted" hidden></p>
+    <button type="button" id="nt-kp-ac-btn" class="btn-primary csp-w-auto" hidden>Kasa Parolası belirle</button>
     <form id="nt-kilit-form" novalidate>
-      <div class="form-field">
-        <label for="nt-kilit-parola">Giriş parolan</label>
+      <div id="nt-kilit-parola-alan" class="form-field">
+        <label id="nt-kilit-parola-etiket" for="nt-kilit-parola">Giriş parolan</label>
         <input id="nt-kilit-parola" type="password" autocomplete="current-password">
       </div>
       <div id="nt-kurtarma-alan" hidden>
@@ -1713,8 +1710,8 @@ permalink: "/panel/dashboard.html"
   <div id="nt-kurtarma-goster" class="nt-kurtarma" hidden>
     <h2>🗝️ Kurtarma anahtarını sakla</h2>
     <p class="muted">
-      Notların cihazında şifrelenir; sunucu içeriği okuyamaz. Bunun bedeli: parolanı unutur ya da
-      “şifremi unuttum” ile sıfırlarsan, <strong>bu anahtar olmadan notların kalıcı olarak açılamaz</strong>.
+      Notların cihazında şifrelenir; sunucu içeriği okuyamaz. Bunun bedeli: parolanı unutur (ya da giriş parolan
+      “şifremi unuttum” ile sıfırlanırsa), <strong>bu anahtar olmadan notların kalıcı olarak açılamaz</strong>.
       Bir parola yöneticisine ya da çıktıya kaydet; bir daha gösterilmeyecek.
     </p>
     <code id="nt-kurtarma-metin" class="nt-kurtarma-metin"></code>
@@ -1911,8 +1908,42 @@ permalink: "/panel/dashboard.html"
           <button type="button" id="nt-yedek-sifreli-btn" class="nt-btn">Şifreli yedek (.json)</button>
           <button type="button" id="nt-kurtarma-yenile-btn" class="nt-btn">Kurtarma anahtarını yenile</button>
         </div>
+        <div class="nt-guvenlik-satir">
+          <button type="button" id="nt-kasa-parola-btn" class="nt-btn" hidden>Kasa Parolasını değiştir</button>
+        </div>
         <div class="nt-diyalog-eylem"><button type="button" id="nt-kasa-kapat" class="nt-btn nt-btn-birincil">Tamam</button></div>
       </div>
+    </dialog>
+
+    <!-- KASA PAROLASI: Google (OAuth) kullanıcısı için ilk kurulum VE parola değiştirme.
+         Parola sunucuya GİTMEZ; tarayıcıda PBKDF2 ile anahtara çevrilir. -->
+    <dialog id="nt-kp-dlg" class="nt-diyalog">
+      <form id="nt-kp-form" class="nt-diyalog-form" novalidate>
+        <h3 id="nt-kp-baslik">Kasa Parolası belirle</h3>
+        <p id="nt-kp-aciklama" class="muted"></p>
+        <div id="nt-kp-eski-alan" class="form-field" hidden>
+          <label for="nt-kp-eski">Mevcut parola</label>
+          <input id="nt-kp-eski" type="password" autocomplete="current-password">
+        </div>
+        <div class="form-field">
+          <label id="nt-kp-yeni-etiket" for="nt-kp-yeni">Kasa Parolası</label>
+          <input id="nt-kp-yeni" type="password" autocomplete="new-password" minlength="10">
+        </div>
+        <div class="form-field">
+          <label for="nt-kp-tekrar">Kasa Parolası (tekrar)</label>
+          <input id="nt-kp-tekrar" type="password" autocomplete="new-password" minlength="10">
+        </div>
+        <label id="nt-kp-kurtarma-alan" class="nt-onay" for="nt-kp-kurtarma">
+          <input id="nt-kp-kurtarma" type="checkbox" checked>
+          <span>Tek seferlik <strong>kurtarma anahtarı</strong> da oluştur (önerilir). Parolanı unutursan notlarını
+            yalnızca bu anahtarla açabilirsin; işaretlemezsen unutulan parola KURTARILAMAZ.</span>
+        </label>
+        <p id="nt-kp-hata" class="auth-message auth-message--error" role="alert" hidden></p>
+        <div class="nt-diyalog-eylem">
+          <button type="button" id="nt-kp-iptal" class="nt-btn">Şimdi değil</button>
+          <button type="submit" id="nt-kp-btn" class="nt-btn nt-btn-birincil">Kasa Parolasını belirle</button>
+        </div>
+      </form>
     </dialog>
   </div>
 </section>
