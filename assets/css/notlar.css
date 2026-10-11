@@ -141,6 +141,7 @@
 /* ---------- Çalışma alanı: üç panel ---------- */
 .nt-duzen {
   position: relative;
+  isolation: isolate; /* iç çekmece (z-index 50) site menüsünün (40) üstüne taşmasın */
   display: grid;
   grid-template-columns: 232px minmax(300px, 360px) minmax(0, 1fr);
   height: calc(100vh - var(--dash-header-h, 72px) - 120px);
