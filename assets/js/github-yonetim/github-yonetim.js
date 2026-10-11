@@ -365,6 +365,16 @@ const OZELLIK_KATALOGU = [
     kaynak: "donusturucu",
   },
   {
+    // bkz. migration 0074 — Sistem Yedekleme (can_export_system). Önceki ayrı "Sistem Yedekleme" sekmesi buraya taşındı.
+    // VARSAYILAN KAPALI. Açık olsa bile yönetici yalnızca KENDİ verisini alabilir (RLS + Worker); başkalarının verisini ve
+    // "Tüm sistem" yedeğini her koşulda yalnızca Site Sahibi alır.
+    anahtar: "sistem_yedek",
+    baslik: "Sistem Yedekleme (dışa aktarma)",
+    aciklama: "Verilerini ve içerik/kod bileşenlerini yedek olarak indirme. Varsayılan KAPALI. Yetkili rol yalnızca KENDİ verisini alabilir; başkalarının verisi ve tüm sistem yedeği her zaman yalnızca Site Sahibi'nindir.",
+    rolSutunlari: ["admin", "manager", "editor"],
+    kaynak: "sistem_yedek",
+  },
+  {
     // bkz. migration 0078 — silinen hesapların artık verisini inceleme/önerme. VARSAYILAN KAPALI.
     // Kalıcı silme (son onay) bu anahtardan BAĞIMSIZ olarak yalnızca Site Sahibi'ndedir.
     anahtar: "hesap_silme_onayi",
@@ -5662,7 +5672,7 @@ async function yetkiAyarlariTablosunuYukle() {
       kisitHaritasi[`${satir.ozellik_anahtari}::${satir.rol}`] = satir.izinli;
     }
 
-    // Varsayılan KAPALI özellikler (kaynak: donusturucu | kapali): açık olanlar ayrı RPC'lerden gelir.
+    // Varsayılan KAPALI özellikler (kaynak: donusturucu | sistem_yedek | kapali): açık olanlar ayrı RPC'lerden gelir.
     const acikHaritasi = {};
     let adminYonetebilir = false;
     try {
@@ -5672,6 +5682,10 @@ async function yetkiAyarlariTablosunuYukle() {
         adminYonetebilir = dn?.[0]?.admin_yonetebilir === true;
       }
     } catch (_e) { /* migration 0077 yoksa satır kapalı görünür */ }
+    try {
+      const { data: sy, error: syErr } = await supabase.rpc("owner_sistem_export_yetkilerini_getir");
+      if (!syErr) for (const r of sy || []) acikHaritasi[`sistem_yedek::${r.rol}`] = !!r.can_export_system;
+    } catch (_e) { /* migration 0074 yoksa satır kapalı görünür */ }
     try {
       const { data: kp, error: kpErr } = await supabase.rpc("kapali_ozellikleri_getir");
       if (!kpErr) for (const r of kp || []) acikHaritasi[`${r.ozellik_anahtari}::${r.rol}`] = !!r.acik;
@@ -5779,10 +5793,11 @@ async function yetkiAyarlariTablosunuYukle() {
   }
 }
 
-// Özelliğin kaynağına göre doğru RPC: normal = kısıt tablosu (varsayılan açık); donusturucu/kapali = açık listesi (varsayılan kapalı).
+// Özelliğin kaynağına göre doğru RPC: normal = kısıt tablosu (varsayılan açık); donusturucu/sistem_yedek/kapali = açık listesi (varsayılan kapalı).
 function yaOzellikYaz(ozellik, rol, deger) {
   const kaynak = OZELLIK_KATALOGU.find((o) => o.anahtar === ozellik)?.kaynak;
   if (kaynak === "donusturucu") return supabase.rpc("donusturucu_yetkisi_ayarla", { p_rol: rol, p_izinli: deger });
+  if (kaynak === "sistem_yedek") return supabase.rpc("owner_sistem_export_yetkisi_ayarla", { p_rol: rol, p_izinli: deger });
   if (kaynak === "kapali") return supabase.rpc("owner_kapali_ozellik_ayarla", { p_ozellik: ozellik, p_rol: rol, p_acik: deger });
   return supabase.rpc("owner_ozellik_erisimi_ayarla", { p_ozellik: ozellik, p_rol: rol, p_izinli: deger });
 }
