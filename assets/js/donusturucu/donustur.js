@@ -13,7 +13,7 @@ import { htmlDenEpub } from "./belge-epub.js";
 import { gorselDonustur, gorsellerdenPdf, sayfaGorseliMime } from "./motor-gorsel.js";
 import { veriDonustur } from "./motor-veri.js";
 import { kutuphaneYukle } from "./cdn.js";
-import { pdfjsAl, pdfLibAl } from "./pdf-yukle.js";
+import { pdfjsAl, pdfLibAl, pdfBirak } from "./pdf-yukle.js";
 import { temizHtml } from "./temizle.js";
 
 const HTML_SABLON_CSS = "body{font-family:system-ui,Segoe UI,Roboto,sans-serif;line-height:1.6;max-width:800px;margin:2rem auto;padding:0 1rem;color:#222}img{max-width:100%;height:auto}table{border-collapse:collapse;width:100%}td,th{border:1px solid #bbb;padding:.35rem .5rem}th{background:#f1f3f5}pre{background:#f4f5f7;padding:.8rem;overflow:auto}code{font-family:ui-monospace,Consolas,monospace}blockquote{margin-left:0;padding-left:1rem;border-left:3px solid #aab}[align=center]{text-align:center}[align=right]{text-align:right}[align=justify]{text-align:justify}";
@@ -63,7 +63,7 @@ export async function pdfSayfaGorselleri(dosya, hedef, { olcek = 2, ilerle, ipta
   const pdfjs = await pdfjsAl();
   const bayt = new Uint8Array(await baytlariOku(dosya));
   const gorev = pdfjs.getDocument({ data: bayt });
-  gorev.onPassword = async (cevapVer, neden) => { const p = parola ? await parola(neden === 2) : null; if (p == null) { gorev.destroy(); return; } cevapVer(p); };
+  gorev.onPassword = async (cevapVer, neden) => { const p = parola ? await parola(neden === 2) : null; if (p == null) { pdfBirak(gorev); return; } cevapVer(p); };
   const pdf = await gorev.promise;
   const cikti = [];
   const kok = adsizAl(dosya.name);
@@ -81,7 +81,7 @@ export async function pdfSayfaGorselleri(dosya, hedef, { olcek = 2, ilerle, ipta
       c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
       const ctx2 = c.getContext("2d");
       ctx2.fillStyle = "#fff"; ctx2.fillRect(0, 0, c.width, c.height);
-      await sayfa.render({ canvasContext: ctx2, viewport: vp }).promise;
+      await sayfa.render({ canvasContext: ctx2, canvas: c, viewport: vp }).promise;
       const blob = await sayfaGorseliMime(c, hedef);
       c.width = 0; c.height = 0; // belleği hemen bırak
       cikti.push({ blob, ad: `${dosyaAdiTemizle(kok)}-sayfa-${String(n).padStart(3, "0")}.${uz}` });
@@ -89,7 +89,7 @@ export async function pdfSayfaGorselleri(dosya, hedef, { olcek = 2, ilerle, ipta
       ilerle?.(n / pdf.numPages, `Sayfa ${n}/${pdf.numPages} görsele çevriliyor…`);
       await nefes();
     }
-  } finally { pdf.destroy(); }
+  } finally { pdfBirak(gorev, pdf); }
   return cikti;
 }
 
