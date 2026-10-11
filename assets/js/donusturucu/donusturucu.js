@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------
  */
 import { supabase, showMessage } from "../core/supabase-client.js";
-import { el, bos, dugme, ilerlemeCubugu, bayt, indir, tumUrlleriSerbestBirak, onayIste, formIste, hataMetni, adsizAl, dosyaAdiTemizle, metinOku, isBaglami, IptalHatasi } from "./ortak.js";
+import { el, bos, dugme, ilerlemeCubugu, bayt, indir, tumUrlleriSerbestBirak, onayIste, formIste, hataMetni, adsizAl, uzantiAl, dosyaAdiTemizle, metinOku, isBaglami, IptalHatasi } from "./ortak.js";
 import { FORMATLAR, turBul, hedefler, cokluDegerlendir, duzenleyiciTuru, vurguDili } from "./tur-matrisi.js";
 import { donustur, zipPaketle, pdfBirlestir, htmldenCikti, pdfSayfaGorselleri } from "./donustur.js";
 import { cikisDestekleniyor } from "./motor-gorsel.js";
@@ -96,7 +96,16 @@ function dosyaListesiCiz() {
   dosyalar.forEach((d, i) => {
     const sil = dugme({ ikon: "✕", kucuk: true, tur: "hayalet", "aria-label": `${d.file.name} dosyasını kaldır`, title: "Kaldır" });
     sil.addEventListener("click", () => { dosyalar.splice(i, 1); hedef = null; ciz(); });
-    liste.append(el("li", { class: "dn-dosya" }, el("span", { class: "dn-rozet", text: FORMATLAR[d.tur].ad }), el("span", { class: "dn-dosya-ad", title: d.file.name, text: d.file.name }), el("span", { class: "dn-dosya-meta", text: bayt(d.file.size) }), sil));
+    const adDegis = dugme({ ikon: "✎", kucuk: true, tur: "hayalet", "aria-label": `${d.file.name} dosyasının adını değiştir`, title: "Adı değiştir" });
+    adDegis.addEventListener("click", async () => {
+      const v = await formIste({ baslik: "Dosya adını değiştir", aciklama: `Uzantı (.${uzantiAl(d.file.name) || d.uzanti || ""}) korunur.`, alanlar: [{ ad: "ad", etiket: "Yeni ad", tur: "text", deger: adsizAl(d.file.name) }], tamam: "Kaydet" });
+      if (!v) return;
+      const taban = dosyaAdiTemizle(v.ad, adsizAl(d.file.name));
+      const uz = uzantiAl(d.file.name);
+      d.file = new File([d.file], uz ? `${taban}.${uz}` : taban, { type: d.file.type, lastModified: d.file.lastModified });
+      ciz();
+    });
+    liste.append(el("li", { class: "dn-dosya" }, el("span", { class: "dn-rozet", text: FORMATLAR[d.tur].ad }), el("span", { class: "dn-dosya-ad", title: d.file.name, text: d.file.name }), el("span", { class: "dn-dosya-meta", text: bayt(d.file.size) }), adDegis, sil));
   });
 }
 
@@ -309,6 +318,9 @@ async function duzenleyiciAc() {
     kirliBekciKur();
 
     const secici = el("select", { class: "dn-select", "aria-label": "Kayıt biçimi" }, ...hedefListesi.map(([d, e]) => el("option", { value: d, text: e })));
+    const adGirdi = el("input", { type: "text", class: "dn-ad-girdi", value: `${dosyaAdi}-duzenlendi`, maxlength: "120", "aria-label": "Kaydedilecek dosya adı (uzantısız)", autocomplete: "off" });
+    adGirdi.addEventListener("input", () => { if (duzenleyici) duzenleyici.dosyaAdi = dosyaAdiTemizle(adGirdi.value, dosyaAdi); });
+    if (duzenleyici) duzenleyici.dosyaAdi = dosyaAdiTemizle(adGirdi.value, dosyaAdi);
     const kaydetBtn = dugme({ metin: "Kaydet / indir", ikon: "⬇", tur: "birincil" });
     const kapat = dugme({ metin: "Kapat", ikon: "✕" });
     const durum = ilerlemeCubugu();
@@ -322,7 +334,10 @@ async function duzenleyiciAc() {
     bos(calismaAlani);
     calismaAlani.append(
       el("div", { class: "dn-editor-ust" }, el("h2", { text: `✏️ ${d0.file.name}${dosyalar.length > 1 ? ` (+${dosyalar.length - 1})` : ""}` }),
-        el("div", { class: "dn-eylemler" }, el("label", { class: "dn-muted" }, "Kayıt biçimi ", secici), kaydetBtn, kapat)),
+        el("div", { class: "dn-ust-eylem" },
+          el("label", { class: "dn-alan-etiket" }, "Dosya adı", adGirdi),
+          el("label", { class: "dn-alan-etiket" }, "Kayıt biçimi", secici),
+          el("div", { class: "dn-eylemler" }, kaydetBtn, kapat))),
       durum.el, kap);
     ana.hidden = true;
     calismaAlani.hidden = false;
@@ -342,8 +357,8 @@ async function duzenleyiciKaydet(hedefTur, durum) {
   let ciktilar;
   if (ed.tur === "pdf") {
     const blob = await ed.nesne.pdfAl((o, m) => durum.ayarla(o * 0.8, m));
-    const duzenlenmis = new File([blob], `${ad}-duzenlendi.pdf`, { type: "application/pdf" });
-    if (hedefTur === "pdf") ciktilar = [{ blob, ad: `${ad}-duzenlendi.pdf` }];
+    const duzenlenmis = new File([blob], `${ad}.pdf`, { type: "application/pdf" });
+    if (hedefTur === "pdf") ciktilar = [{ blob, ad: `${ad}.pdf` }];
     else if (hedefTur === "png-zip") ciktilar = await pdfSayfaGorselleri(duzenlenmis, "png", ctx);
     else ciktilar = await donustur(duzenlenmis, "pdf", hedefTur, ctx);
   } else if (ed.tur === "zengin") {
