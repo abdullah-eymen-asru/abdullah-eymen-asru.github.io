@@ -53,3 +53,8 @@ permalink: "/hesap/sifre-guncelle.html"
   import { initSifreGuncellePage } from "{{ '/assets/js/auth/auth-pages.js' | relative_url }}";
   initSifreGuncellePage();
 </script>
+
+<!-- Not Kasası: "şifremi unuttum" sonrası yeni parolayı (ham parolayı DEĞİL, dışa aktarılamaz anahtar malzemesini)
+     sunucuda parola gerçekten değişince saklar; aynı cihazda Notlar kurtarma anahtarı istemeden açılır.
+     auth-pages.js'e dokunmaz. Yüklenemezse şifre sıfırlama etkilenmez. -->
+<script type="module" src="{{ '/assets/js/notlar/kasa-kancalari.js' | relative_url }}"></script>
