@@ -52,6 +52,18 @@ export function pdfjsAl() {
   return sozPdfjs;
 }
 
+/**
+ * PDF.js belgesini güvenle serbest bırakır. Sürümler arasında "pdf.destroy()" (PDFDocumentProxy) her yerde
+ * bulunmaz (5.x'te kaldırıldı/yeniden adlandırıldı → "pdf.destroy is not a function"); kalıcı olan yol
+ * yükleme görevinin destroy()'udur. Burada ikisi de, hata fırlatmadan denenir.
+ */
+export function pdfBirak(gorev, pdf) {
+  const sessiz = (f) => { try { const s = f(); if (s && typeof s.catch === "function") s.catch(() => {}); } catch { /* yok say */ } };
+  if (gorev && typeof gorev.destroy === "function") sessiz(() => gorev.destroy());
+  else if (pdf && typeof pdf.destroy === "function") sessiz(() => pdf.destroy());
+  else if (pdf && typeof pdf.cleanup === "function") sessiz(() => pdf.cleanup());
+}
+
 export function pdfLibAl() {
   if (globalThis.__DN_PDF__?.PDFLib) return Promise.resolve(globalThis.__DN_PDF__.PDFLib);
   if (globalThis.PDFLib?.PDFDocument) return Promise.resolve(globalThis.PDFLib);
