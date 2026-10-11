@@ -721,11 +721,14 @@ function panelGoster(p) {
 }
 
 function navAc(ac) {
+  // Site (dashboard) menüsü açıksa önce o kapansın; ikisi aynı anda açık kalıp üst üste binmesin.
+  if (ac) window.dispatchEvent(new CustomEvent("nt:nav-acildi"));
   $("nt-duzen").classList.toggle("nt-nav-acik", ac);
   $("nt-nav-perde").hidden = !ac;
   $("nt-nav-btn").setAttribute("aria-expanded", String(ac));
 }
 const navKapat = () => navAc(false);
+window.addEventListener("dash:sidebar-acildi", () => { if (document.getElementById("nt-duzen")?.classList.contains("nt-nav-acik")) navAc(false); });
 
 function odakAcKapa(ac = !S.odak) {
   S.odak = ac && !$("nt-editor").hidden;
