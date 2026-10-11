@@ -6,6 +6,7 @@
  * Kalıcı silme: delete-account Edge Function (R2 + Storage + satırlar + auth hesabı). innerHTML YOK, inline stil YOK (CSP).
  */
 import { supabase, showMessage } from "../core/supabase-client.js";
+import { dosyaPaneliKur } from "./dosyalar.js";
 
 const DELETE_ACCOUNT_FUNCTION_URL = "https://eahvcirspmvntffzphye.supabase.co/functions/v1/delete-account";
 
@@ -100,6 +101,8 @@ function kart(t) {
   if (hesapK) { hesapK.checked = hesapSecili.has(t.user_id); hesapK.addEventListener("change", () => { if (hesapK.checked) hesapSecili.add(t.user_id); else hesapSecili.delete(t.user_id); }); }
 
   const eylem = el("div", { class: "so-eylem" });
+  const dosyaKutu = el("div", { class: "so-dosya-kok" });
+  let dosyaPanel = null;
   const mesajKart = el("p", { class: "muted so-kart-mesaj", role: "status" });
   const calistir = async (dugme, f) => {
     dugme.disabled = true;
@@ -108,7 +111,7 @@ function kart(t) {
 
   if (owner) {
     const indir = el("button", { type: "button", class: "so-btn", text: "⬇ Veri dökümü (JSON)" });
-    indir.addEventListener("click", () => calistir(indir, async () => { await jsonIndir(t); indir.disabled = false; mesajKart.textContent = "Döküm indirildi. Dosyaların kendisi için: Sistem & Güvenlik › Sistem Yedekleme › “Seçili üyeler”."; }));
+    indir.addEventListener("click", () => calistir(indir, async () => { await jsonIndir(t); indir.disabled = false; mesajKart.textContent = "Döküm indirildi. Dosyalar için “Dosyaları incele / indir” düğmesini kullan."; }));
     const sil = el("button", { type: "button", class: "so-btn so-btn-tehlike", text: t.durum === "onerildi" ? "Öneriyi onayla ve kalıcı sil" : "Kalıcı sil (son onay)" });
     sil.addEventListener("click", () => {
       if (!onayYaz(`${ad} hesabının seçili TÜM verileri kalıcı silinecek ve geri alınamaz.`)) return;
@@ -119,7 +122,14 @@ function kart(t) {
       if (!window.confirm(`${ad} hesabının silinmesi iptal edilecek ve üye eski erişimine geri dönecek (yeniden giriş yapması gerekir). Devam edilsin mi?`)) return;
       calistir(geriAl, async () => { await silmeyiGeriAl(t); bildir(`${ad}: silme iptal edildi, hesap eski erişimine döndü.`, "success"); await yukle(); });
     });
-    eylem.append(geriAl, indir, sil);
+    // Fiziksel dosyalar (R2): listele / önizle / ZIP olarak indir (migration 0081)
+    const dosyaBtn = el("button", { type: "button", class: "so-btn", text: "📁 Dosyaları incele / indir" });
+    dosyaBtn.addEventListener("click", () => {
+      if (dosyaPanel) { dosyaPanel.temizle(); dosyaPanel = null; dosyaKutu.replaceChildren(); dosyaBtn.textContent = "📁 Dosyaları incele / indir"; return; }
+      dosyaPanel = dosyaPaneliKur(dosyaKutu, t.user_id, (m, tur = "error") => { mesajKart.textContent = m; mesajKart.dataset.tur = tur; });
+      dosyaBtn.textContent = "📁 Dosya panelini kapat";
+    });
+    eylem.append(geriAl, dosyaBtn, indir, sil);
     if (t.durum === "onerildi") {
       const sifirla = el("button", { type: "button", class: "so-btn", text: "Öneriyi reddet" });
       sifirla.addEventListener("click", () => calistir(sifirla, async () => { const { error } = await supabase.rpc("hesap_silme_oneri_sifirla", { p_user: t.user_id }); if (error) throw error; await yukle(); }));
@@ -160,7 +170,7 @@ function kart(t) {
         satirKutu("Not ekleri ve notlar", `${sayi(o.not_ek)} ek, ${sayi(o.notlar)} şifreli not — hesapla birlikte silinir`, sabit()),
         satirKutu("Akademik Kütüphane", `${sayi(o.akademik)} kaynak, ${sayi(o.akademik_pdf)} PDF — hesapla birlikte silinir`, sabit()),
         satirKutu("Mesajlar, erişim atamaları, onay geçmişi, indirme kayıtları", `${sayi(o.mesaj)} mesaj, ${sayi(o.erisim)} erişim, ${sayi(o.indirme_logu)} kayıt — hesapla birlikte silinir`, sabit())),
-      eylem, mesajKart));
+      eylem, mesajKart, dosyaKutu));
   kart.open = acikKartlar.has(t.user_id);
   kart.addEventListener("toggle", () => { if (kart.open) acikKartlar.add(t.user_id); else acikKartlar.delete(t.user_id); });
   return kart;
