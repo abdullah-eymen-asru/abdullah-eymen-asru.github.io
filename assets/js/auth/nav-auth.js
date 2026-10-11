@@ -188,7 +188,7 @@ function renderHesapMenusu(container, role) {
   // yönlendiriyor, böylece kullanıcı sekmeler arasında sayfa yenilemeden
   // dolaşıyor.
   const DASH = "/panel/dashboard.html";
-  const linkler = [{ href: `${DASH}#me-panel`, etiket: "Panelim" }];
+  const linkler = [{ href: `${DASH}#me-hub`, etiket: "Panelim" }];
   // Sohbet/Mesajlar artık ayrı, ortak bir sayfa (bkz. panel/mesajlar.md) —
   // giriş yapmış HERKES görür: admin için o sayfa gelen kutusunu, diğer
   // herkes için kendi yöneticiyle sohbet ekranını açar (karar
