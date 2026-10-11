@@ -12,6 +12,10 @@
  *                                olursa (USER_UPDATED), kasa zarfı yeni parolayla
  *                                yeniden sarılır → notlar kaybolmaz.
  *  3) cikisTemizligiKur()        SIGNED_OUT: cihazdaki tüm anahtar malzemesi silinir.
+ *  4) sifirlamaKancasiKur()      hesap/sifre-guncelle.html ("şifremi unuttum" sonrası yeni parola):
+ *                                updateUser BAŞARILI olunca yeni parola malzemesi "doğrulanmış"
+ *                                olarak saklanır; aynı cihazda Notlar açılınca zarf yeni parolaya
+ *                                taşınır, kurtarma anahtarı gerekmez (kasa-js girisParolasiniUyumla).
  *
  * NEDEN GİRİŞ SAYFASINDA YAKALIYORUZ?
  *   Giriş başarılı olunca auth-pages.js hemen başka sayfaya yönlendiriyor; yani
@@ -21,9 +25,10 @@
  *   bitmeden tamamlanır. Tuz sunucuda olduğundan ve oturum henüz yokken
  *   okunamadığından, ağır PBKDF2 türetmesi dashboard'da (oturum varken) yapılır.
  *
- * GOOGLE İLE GİRİŞ: parola yok → kanca hiçbir şey yakalamaz. Not sekmesi ilk
- *   açılışta AYNI giriş parolasını bir kez ister (Google hesabına parola
- *   belirlenmemişse önce Panelim > Şifre Değiştir). Bunu notlar.js anlatır.
+ * GOOGLE İLE GİRİŞ: giriş parolası yok → kanca hiçbir şey yakalamaz. Google kullanıcısı
+ *   Notlar'ı ilk açtığında BAĞIMSIZ bir "Kasa Parolası" belirler (migration 0082,
+ *   parola_tur='kasa'); bu parola giriş parolasından tamamen ayrıdır, Şifre Değiştir
+ *   kancası bu zarfa DOKUNMAZ. Akışı notlar.js + kasa.js anlatır.
  * -----------------------------------------------------------------------
  */
 import { supabase } from "../core/supabase-client.js";
@@ -147,6 +152,59 @@ function bildir(metin, tur) {
 }
 
 /* ------------------------------------------------------------------ */
+/* 2b) Şifre sıfırlama sayfası ("şifremi unuttum" → yeni parola)       */
+/* ------------------------------------------------------------------ */
+
+let sifirlamaKancasiKuruldu = false;
+
+export function sifirlamaKancasiKur() {
+  if (sifirlamaKancasiKuruldu) return;
+  sifirlamaKancasiKuruldu = true;
+
+  let bekleyenBaz = null; // dışa aktarılamaz CryptoKey (ham parola DEĞİL)
+  let zamanAsimi = null;
+
+  document.addEventListener(
+    "submit",
+    (olay) => {
+      const form = olay.target;
+      if (!(form instanceof HTMLFormElement) || form.id !== "sifre-guncelle-form") return;
+
+      let yeni = form.elements.password?.value || "";
+      let tekrar = form.elements.password_again?.value || "";
+      // auth-pages.js aynı doğrulamaları yapar; geçersizse updateUser çağrılmaz, USER_UPDATED gelmez.
+      if (yeni.length < 8 || yeni !== tekrar) {
+        yeni = tekrar = null;
+        return;
+      }
+      parolaMalzemesiOlustur(yeni)
+        .then((baz) => {
+          bekleyenBaz = baz;
+          clearTimeout(zamanAsimi);
+          zamanAsimi = setTimeout(() => (bekleyenBaz = null), 60_000);
+        })
+        .catch((hata) => console.warn("Not Kasası: yeni parola malzemesi üretilemedi (sıfırlama etkilenmedi):", hata));
+      yeni = tekrar = null;
+    },
+    true
+  );
+
+  // Parola SUNUCUDA gerçekten değişince (USER_UPDATED) malzeme "doğrulanmış" olarak saklanır.
+  // Sayfa hemen yönlendirildiği için ağır PBKDF2 burada değil, Notlar açılırken yapılır.
+  supabase.auth.onAuthStateChange((olay, oturum) => {
+    if (olay !== "USER_UPDATED" || !bekleyenBaz || !oturum?.user?.email) return;
+    const baz = bekleyenBaz;
+    bekleyenBaz = null;
+    clearTimeout(zamanAsimi);
+    setTimeout(() => {
+      bekleyenParolaMalzemesiKaydet(oturum.user.email, baz, true).catch((hata) =>
+        console.warn("Not Kasası: sıfırlama sonrası parola malzemesi saklanamadı:", hata)
+      );
+    }, 0);
+  });
+}
+
+/* ------------------------------------------------------------------ */
 /* 3) Çıkış temizliği                                                  */
 /* ------------------------------------------------------------------ */
 
@@ -174,6 +232,8 @@ export function dashboardKancalariniKur() {
 // bir SIGNED_OUT, az önce yakaladığımız parola malzemesini yanlışlıkla silebilirdi. Onun
 // yerine: sayfa AÇILIRKEN oturum yoksa (başka bir sayfadan çıkış yapılmıştır) eski anahtarlar
 // silinir. Bu, submit'ten ÖNCE olduğundan yeni yakalanan malzemeyle yarışmaz.
+if (document.getElementById("sifre-guncelle-form")) sifirlamaKancasiKur();
+
 if (document.getElementById("giris-form")) {
   girisKancasiKur();
   supabase.auth
