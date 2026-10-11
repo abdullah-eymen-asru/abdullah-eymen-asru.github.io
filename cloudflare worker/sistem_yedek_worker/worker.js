@@ -24,6 +24,17 @@
  *   POST /uye-temizle {hedef, arsiv_anahtarlari}  → (yalnızca owner; delete-account Edge Function çağırır) silinen üyenin
  *                                                   R2 nesnelerini siler: Dosya Yöneticisi anahtarları + notlar/<id>/ + akademik-kutuphane/users/<id>/
  *                                                   Yanıt: {ok, silinen:{arsiv,notek,akademik}, bagsiz:[bağlı olmayan kovalar]}
+ *                                                   İşlem bütçesi aşılırsa 409 (kısmi silme) → Edge Function DB satırlarına DOKUNMAZ; tekrar çalıştırmak güvenlidir.
+ *
+ * v2 (migration 0081) — YENİ uç noktalar (hepsi YALNIZCA owner; yetki is_owner() RPC'siyle doğrulanır):
+ *   GET  /r2/gezgin?b=<kaynak>&o=<önek>&c=<imleç>  → klasörler + nesneler (sayfa başına 200) + veritabanı kayıt durumu
+ *   GET  /r2/boyut?b=<kaynak>&o=<önek>             → önek altındaki toplam adet/bayt (sınırlı tarama)
+ *   POST /r2/sil {kaynak, anahtarlar[], islem}     → ÖNCE DB indeks satırı + silme kuyruğu (atomik RPC), SONRA R2 silme.
+ *                                                    Anahtar deseni bilinen biçimlerden biriyle eşleşmezse (korumalı) 400.
+ *                                                    Kova (bucket) silme uç noktası YOKTUR: kovalar bu Worker'dan silinemez.
+ *   POST /r2/kuyruk-isle                           → silme kuyruğunda kalmış (yarım) işlemleri tamamlar
+ *   PUT  /r2/yukle?b=&k=&m=eksikleri|uzerine       → geri yükleme: tek R2 nesnesi yazar (gövde = dosya baytları)
+ *   GET  /uye/dosya?u=<üye>&b=&k=                  → silme kuyruğundaki üyenin dosyasını akıtır (önizleme/indirme)
  *
  * Ortam değişkenleri (Worker > Settings > Variables and Secrets):
  *   SUPABASE_URL        https://<proje-ref>.supabase.co          (Text)
@@ -32,7 +43,10 @@
  *   GITHUB_REPO         site reposunun adı                        (Text)  — GitHub zip için
  *   GITHUB_PAT          Contents: Read-only fine-grained token    (Secret, YALNIZCA repo özelse gerekir)
  *   GITHUB_REF          (isteğe bağlı) dal adı, varsayılan main   (Text)
- *   MAX_TARAMA_SAYFA    (isteğe bağlı) /depolama sayfa üst sınırı, varsayılan 40 (Text)
+ *   MAX_TARAMA_SAYFA    (isteğe bağlı) /depolama + /r2/boyut TOPLAM sayfa (list çağrısı) bütçesi, varsayılan 40 (Text).
+ *                       Cloudflare Workers Free planda istek başına 50 alt-istek sınırı vardır; bütçe TÜM kovalar için ORTAKTIR.
+ *   MAX_YUKLEME_MB     (isteğe bağlı) /r2/yukle tek dosya üst sınırı, varsayılan 95 (Text). Workers istek gövdesi sınırı
+ *                       Free/Pro planda 100 MB'dır; daha büyük dosyalar geri yüklenemez ve raporda "atlandı" görünür.
  * R2 Binding'leri (hepsi isteğe bağlı; bağlamadığın kaynak pakete girmez, hata vermez):
  *   AKADEMIK_BUCKET → Akademik Kütüphane kovası   (akademik_kutuphane_worker ile AYNI kova)
  *   ARSIV_BUCKET    → Dosya Yöneticisi kovası      (r2_arsiv_worker'daki MY_R2_BUCKET ile AYNI kova)
@@ -50,6 +64,16 @@ const IZINLI_ORIGINLER = [
 const UUID_DESENI = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const KAYNAKLAR = { akademik: "AKADEMIK_BUCKET", arsiv: "ARSIV_BUCKET", notek: "NOT_EK_BUCKET" };
 
+// Silinebilir / geri yüklenebilir R2 anahtarlarının BİLİNEN biçimleri. Bunlara uymayan her anahtar KORUMALIDIR
+// (silinemez, üzerine yazılamaz). Biçimler veritabanı CHECK kısıtlarıyla birebir aynıdır (0057, 0056, 0072).
+const ANAHTAR_DESENLERI = {
+  arsiv: /^arsiv\/[0-9a-f-]{36}$/i,
+  notek: /^notlar\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/i,
+  akademik: /^akademik-kutuphane\/users\/[0-9a-f-]{36}\/[^\\]{1,400}$/i,
+};
+const anahtarSilinebilirMi = (kaynak, k) => !!ANAHTAR_DESENLERI[kaynak] && anahtarGuvenliMi(k) && ANAHTAR_DESENLERI[kaynak].test(k);
+const ONIZLEME_TURLERI = new Set(["application/pdf", "image/png", "image/jpeg", "image/webp", "image/gif"]);
+
 /* ----------------------------- yardımcılar ----------------------------- */
 
 function corsBasliklari(istek) {
@@ -57,7 +81,7 @@ function corsBasliklari(istek) {
   const izinli = IZINLI_ORIGINLER.includes(origin);
   return {
     "Access-Control-Allow-Origin": izinli ? origin : IZINLI_ORIGINLER[0],
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
     "Access-Control-Allow-Headers": "Authorization, Content-Type",
     "Access-Control-Expose-Headers": "Content-Length, X-Dosya-Boyut",
     "Access-Control-Max-Age": "3600",
@@ -163,49 +187,58 @@ async function githubZip(env, kimlik, url, cors) {
   });
 }
 
-/** Owner: R2 kovalarının gerçek (DB'den bağımsız) taraması. Sayfa sayısı sınırlı → "kismi" bayrağı. */
+/** Owner: R2 kovalarının gerçek (DB'den bağımsız) taraması. Sayfa bütçesi TÜM kovalar için ORTAKTIR (alt-istek sınırı). */
 async function depolamaTara(env, kimlik, cors) {
-  const s = await rpc(env, kimlik, "is_owner", {});
-  if (s.hata || s.veri !== true) return json({ error: "Yalnızca Site Sahibi." }, 403, cors);
+  if (!(await ownerMi(env, kimlik))) return json({ error: "Yalnızca Site Sahibi." }, 403, cors);
 
-  const ust = Math.max(1, Math.min(parseInt(env.MAX_TARAMA_SAYFA || "40", 10) || 40, 200));
+  let butce = Math.max(3, Math.min(parseInt(env.MAX_TARAMA_SAYFA || "40", 10) || 40, 200));
   const sonuc = {};
+  const bagli = Object.entries(KAYNAKLAR).filter(([, b]) => env[b]);
   for (const [kaynak, bagAdi] of Object.entries(KAYNAKLAR)) {
     const kova = env[bagAdi];
     if (!kova) { sonuc[kaynak] = { bagli: false }; continue; }
+    // Kalan bütçeyi kalan kovalara eşit paylaştır (ilk kova tüm bütçeyi yutmasın).
+    const kalanKova = bagli.findIndex(([k]) => k === kaynak);
+    const pay = Math.max(1, Math.floor(butce / Math.max(1, bagli.length - kalanKova)));
     let adet = 0, bayt = 0, imlec, sayfa = 0, kismi = false;
     for (;;) {
       const l = await kova.list({ limit: 1000, cursor: imlec });
       for (const o of l.objects) { adet += 1; bayt += o.size; }
       sayfa += 1;
       if (!l.truncated) break;
-      if (sayfa >= ust) { kismi = true; break; }
+      if (sayfa >= pay) { kismi = true; break; }
       imlec = l.cursor;
     }
+    butce -= sayfa;
     sonuc[kaynak] = { bagli: true, adet, bayt, kismi };
   }
   return json({ kaynaklar: sonuc }, 200, cors);
 }
 
-/** Owner: silinen üyenin R2 nesnelerini kalıcı siler (hesap silme onayı sonrası; bkz. migration 0078). */
+/** Owner: silinen üyenin R2 nesnelerini kalıcı siler (hesap silme onayı sonrası; bkz. migration 0078).
+ *  İşlem bütçesi (alt-istek sınırı) aşılırsa 409 döner: kısmi silme OLDUĞU için çağıran DB satırlarına dokunmamalı,
+ *  aynı isteği tekrarlamalıdır (silme idempotent; kalan nesneler sonraki turda gider). */
 async function uyeTemizle(env, kimlik, istek, cors) {
   let govde;
   try { govde = await istek.json(); } catch { return json({ error: "Geçersiz gövde." }, 400, cors); }
   const hedef = String(govde?.hedef || "");
   if (!UUID_DESENI.test(hedef)) return json({ error: "Geçersiz hedef." }, 400, cors);
-  const s = await rpc(env, kimlik, "is_owner", {});
-  if (s.hata || s.veri !== true) return json({ error: "Yalnızca Site Sahibi." }, 403, cors);
+  if (!(await ownerMi(env, kimlik))) return json({ error: "Yalnızca Site Sahibi." }, 403, cors);
 
   const silinen = { arsiv: 0, notek: 0, akademik: 0 };
   const bagsiz = [];
+  let butce = 40; // 50 alt-istek sınırının altında kal (is_owner RPC'si + pay)
 
   // Dosya Yöneticisi: yalnızca r2_key biçimine uyan anahtarlar (arsiv/<uuid>)
   const anahtarlar = (Array.isArray(govde?.arsiv_anahtarlari) ? govde.arsiv_anahtarlari : [])
-    .filter((k) => typeof k === "string" && /^arsiv\/[0-9a-f-]{36}$/i.test(k));
+    .filter((k) => anahtarSilinebilirMi("arsiv", k));
   if (anahtarlar.length) {
     if (!env.ARSIV_BUCKET) bagsiz.push("arsiv");
     else {
-      for (let i = 0; i < anahtarlar.length; i += 1000) await env.ARSIV_BUCKET.delete(anahtarlar.slice(i, i + 1000));
+      for (let i = 0; i < anahtarlar.length; i += 1000) {
+        if (butce-- <= 0) return json({ error: "Çok fazla nesne: işlem bütçesi doldu (kısmi silme). Aynı işlemi tekrar çalıştır." }, 409, cors);
+        await env.ARSIV_BUCKET.delete(anahtarlar.slice(i, i + 1000));
+      }
       silinen.arsiv = anahtarlar.length;
     }
   }
@@ -220,14 +253,194 @@ async function uyeTemizle(env, kimlik, istek, cors) {
     if (!kova) { bagsiz.push(ad); continue; }
     let imlec;
     for (;;) {
+      if (butce-- <= 0) return json({ error: "Çok fazla nesne: işlem bütçesi doldu (kısmi silme). Aynı işlemi tekrar çalıştır." }, 409, cors);
       const l = await kova.list({ prefix: onek, limit: 1000, cursor: imlec });
       const keys = l.objects.map((o) => o.key);
-      if (keys.length) { await kova.delete(keys); silinen[ad] += keys.length; }
+      if (keys.length) {
+        if (butce-- <= 0) return json({ error: "Çok fazla nesne: işlem bütçesi doldu (kısmi silme). Aynı işlemi tekrar çalıştır." }, 409, cors);
+        await kova.delete(keys);
+        silinen[ad] += keys.length;
+      }
       if (!l.truncated) break;
       imlec = l.cursor;
     }
   }
   return json({ ok: true, silinen, bagsiz }, 200, cors);
+}
+
+/* ------------------------- v2: owner uç noktaları (migration 0081) ------------------------- */
+
+async function ownerMi(env, kimlik) {
+  const s = await rpc(env, kimlik, "is_owner", {});
+  return !s.hata && s.veri === true;
+}
+
+function kaynakKovasi(env, kaynak, cors) {
+  if (!KAYNAKLAR[kaynak]) return { hata: json({ error: "Geçersiz kaynak." }, 400, cors) };
+  const kova = env[KAYNAKLAR[kaynak]];
+  if (!kova) return { hata: json({ error: `${KAYNAKLAR[kaynak]} binding'i bağlı değil.` }, 501, cors) };
+  return { kova };
+}
+
+function onekGuvenliMi(o) {
+  return o === "" || (typeof o === "string" && o.length <= 600 && o.endsWith("/") && !o.includes("..") && !o.includes("\\") && !o.startsWith("/"));
+}
+
+async function r2Gezgin(env, kimlik, url, cors) {
+  if (!(await ownerMi(env, kimlik))) return json({ error: "Yalnızca Site Sahibi." }, 403, cors);
+  const kaynak = url.searchParams.get("b") || "";
+  const onek = url.searchParams.get("o") || "";
+  const imlec = url.searchParams.get("c") || undefined;
+  if (!onekGuvenliMi(onek)) return json({ error: "Geçersiz önek." }, 400, cors);
+  const { kova, hata } = kaynakKovasi(env, kaynak, cors);
+  if (hata) return hata;
+
+  const l = await kova.list({ prefix: onek, delimiter: "/", limit: 200, cursor: imlec });
+  const anahtarlar = l.objects.map((o) => o.key);
+  let durum = {};
+  if (anahtarlar.length) {
+    const s = await rpc(env, kimlik, "sistem_r2_kayit_durumu", { p_kaynak: kaynak, p_anahtarlar: anahtarlar });
+    if (!s.hata) durum = s.veri || {};
+  }
+  return json({
+    kaynak,
+    onek,
+    klasorler: (l.delimitedPrefixes || []).map((p) => ({ onek: p, ad: p.slice(onek.length).replace(/\/$/, "") })),
+    nesneler: l.objects.map((o) => ({
+      anahtar: o.key,
+      ad: o.key.slice(onek.length),
+      boyut: o.size,
+      yuklenme: o.uploaded ? new Date(o.uploaded).toISOString() : null,
+      kayitli: !!durum[o.key]?.kayitli,
+      sahip: durum[o.key]?.sahip || null,
+      etiket: durum[o.key]?.ad || null,
+      sifreli: !!durum[o.key]?.sifreli,
+      silinebilir: anahtarSilinebilirMi(kaynak, o.key),
+    })),
+    imlec: l.truncated ? l.cursor : null,
+  }, 200, cors);
+}
+
+async function r2Boyut(env, kimlik, url, cors) {
+  if (!(await ownerMi(env, kimlik))) return json({ error: "Yalnızca Site Sahibi." }, 403, cors);
+  const kaynak = url.searchParams.get("b") || "";
+  const onek = url.searchParams.get("o") || "";
+  if (!onekGuvenliMi(onek)) return json({ error: "Geçersiz önek." }, 400, cors);
+  const { kova, hata } = kaynakKovasi(env, kaynak, cors);
+  if (hata) return hata;
+  const ust = Math.max(1, Math.min(parseInt(env.MAX_TARAMA_SAYFA || "40", 10) || 40, 200) - 3);
+  let adet = 0, bayt = 0, imlec, sayfa = 0, kismi = false;
+  for (;;) {
+    const l = await kova.list({ prefix: onek, limit: 1000, cursor: imlec });
+    for (const o of l.objects) { adet += 1; bayt += o.size; }
+    sayfa += 1;
+    if (!l.truncated) break;
+    if (sayfa >= ust) { kismi = true; break; }
+    imlec = l.cursor;
+  }
+  return json({ adet, bayt, kismi }, 200, cors);
+}
+
+/** Silme: ÖNCE veritabanı (indeks satırı kaldır + kuyruğa yaz; atomik RPC), SONRA R2. Ağ/zaman aşımı olsa bile
+ *  anahtarlar kuyrukta kalır → /r2/kuyruk-isle ile tamamlanır; "DB'de kayıt yok ama dosya duruyor" kalıcı olmaz. */
+async function r2Sil(env, kimlik, istek, cors) {
+  let g;
+  try { g = await istek.json(); } catch { return json({ error: "Geçersiz gövde." }, 400, cors); }
+  const kaynak = String(g?.kaynak || "");
+  const liste = Array.isArray(g?.anahtarlar) ? [...new Set(g.anahtarlar)] : [];
+  const islem = UUID_DESENI.test(String(g?.islem || "")) ? g.islem : null;
+  if (!liste.length || liste.length > 500) return json({ error: "1–500 anahtar gerekli." }, 400, cors);
+  if (!(await ownerMi(env, kimlik))) return json({ error: "Yalnızca Site Sahibi." }, 403, cors);
+  const { kova, hata } = kaynakKovasi(env, kaynak, cors);
+  if (hata) return hata;
+  const reddedilen = liste.filter((k) => !anahtarSilinebilirMi(kaynak, k));
+  if (reddedilen.length) {
+    return json({ error: `${reddedilen.length} anahtar korumalı/bilinmeyen biçimde; hiçbir şey silinmedi.`, korumali: reddedilen.slice(0, 20) }, 400, cors);
+  }
+
+  const h = await rpc(env, kimlik, "sistem_r2_silme_hazirla", { p_kaynak: kaynak, p_anahtarlar: liste, p_islem: islem });
+  if (h.hata) return json({ error: h.hata }, yetkisizMi(h.durum) ? 403 : 502, cors);
+
+  try {
+    await kova.delete(liste);
+  } catch (e) {
+    await rpc(env, kimlik, "sistem_r2_kuyruk_tamamla", { p_kaynak: kaynak, p_silinen: [], p_hatali: liste, p_hata: String(e?.message || e) });
+    return json({ error: "R2 silme yarım kaldı; anahtarlar kuyrukta bekliyor (Depolama Gezgini › Bekleyen silmeler › Tekrar dene).", kuyrukta: liste.length }, 502, cors);
+  }
+  await rpc(env, kimlik, "sistem_r2_kuyruk_tamamla", { p_kaynak: kaynak, p_silinen: liste, p_hatali: [], p_hata: null });
+  return json({ ok: true, silinen: liste.length, indeks: h.veri }, 200, cors);
+}
+
+async function r2KuyrukIsle(env, kimlik, cors) {
+  if (!(await ownerMi(env, kimlik))) return json({ error: "Yalnızca Site Sahibi." }, 403, cors);
+  const k = await rpc(env, kimlik, "sistem_r2_kuyruk_listesi", { p_limit: 500 });
+  if (k.hata) return json({ error: k.hata }, 502, cors);
+  const gruplar = {};
+  for (const o of k.veri?.ogeler || []) {
+    if (anahtarSilinebilirMi(o.kaynak, o.anahtar)) (gruplar[o.kaynak] ||= []).push(o.anahtar);
+  }
+  let silinen = 0, kalan = 0;
+  for (const [kaynak, anahtarlar] of Object.entries(gruplar)) {
+    const kova = env[KAYNAKLAR[kaynak]];
+    if (!kova) { kalan += anahtarlar.length; continue; }
+    try {
+      await kova.delete(anahtarlar);
+      await rpc(env, kimlik, "sistem_r2_kuyruk_tamamla", { p_kaynak: kaynak, p_silinen: anahtarlar, p_hatali: [], p_hata: null });
+      silinen += anahtarlar.length;
+    } catch (e) {
+      await rpc(env, kimlik, "sistem_r2_kuyruk_tamamla", { p_kaynak: kaynak, p_silinen: [], p_hatali: anahtarlar, p_hata: String(e?.message || e) });
+      kalan += anahtarlar.length;
+    }
+  }
+  return json({ ok: true, silinen, kalan, toplam_kuyruk: Number(k.veri?.adet) || 0 }, 200, cors);
+}
+
+/** Geri yükleme: tek R2 nesnesi. Gövde dosya baytlarıdır; Content-Length ZORUNLU (akış boyutu belli olmalı). */
+async function r2Yukle(env, kimlik, istek, url, cors) {
+  const kaynak = url.searchParams.get("b") || "";
+  const anahtar = url.searchParams.get("k") || "";
+  const mod = url.searchParams.get("m") === "uzerine" ? "uzerine" : "eksikleri";
+  if (!anahtarSilinebilirMi(kaynak, anahtar)) return json({ error: "Anahtar bilinen biçimlerden biriyle eşleşmiyor (korumalı)." }, 400, cors);
+  const boy = parseInt(istek.headers.get("Content-Length") || "", 10);
+  if (!Number.isFinite(boy) || boy < 0) return json({ error: "Content-Length gerekli." }, 411, cors);
+  const ust = (parseInt(env.MAX_YUKLEME_MB || "95", 10) || 95) * 1024 * 1024;
+  if (boy > ust) return json({ error: `Dosya ${Math.round(boy / 1048576)} MB; Worker yükleme sınırı ${Math.round(ust / 1048576)} MB.` }, 413, cors);
+  if (!(await ownerMi(env, kimlik))) return json({ error: "Yalnızca Site Sahibi." }, 403, cors);
+  const { kova, hata } = kaynakKovasi(env, kaynak, cors);
+  if (hata) return hata;
+  if (mod === "eksikleri" && (await kova.head(anahtar))) return json({ ok: true, durum: "atlandi" }, 200, cors);
+  const tur = kaynak === "akademik" ? "application/pdf" : "application/octet-stream";
+  await kova.put(anahtar, istek.body, { httpMetadata: { contentType: tur }, customMetadata: { geriyukleme: "1" } });
+  return json({ ok: true, durum: "yazildi", boyut: boy }, 200, cors);
+}
+
+/** Silme kuyruğundaki üyenin dosyası: yalnızca hesap_silme_dosya_izinli_mi() onaylarsa akıtılır.
+ *  Önizleme güvenliği: yalnızca izinli türler (PDF/PNG/JPEG/WebP/GIF) "inline" sayılır; SVG/HTML asla. */
+async function uyeDosya(env, kimlik, url, cors) {
+  const uye = url.searchParams.get("u") || "";
+  const kaynak = url.searchParams.get("b") || "";
+  const anahtar = url.searchParams.get("k") || "";
+  if (!UUID_DESENI.test(uye) || !anahtarSilinebilirMi(kaynak, anahtar)) return json({ error: "Geçersiz istek." }, 400, cors);
+  const { kova, hata } = kaynakKovasi(env, kaynak, cors);
+  if (hata) return hata;
+  const s = await rpc(env, kimlik, "hesap_silme_dosya_izinli_mi", { p_user: uye, p_kaynak: kaynak, p_anahtar: anahtar });
+  if (s.hata) return json({ error: s.hata }, yetkisizMi(s.durum) ? 403 : 502, cors);
+  if (s.veri !== true) return json({ error: "Bu dosya bu üyenin silme kuyruğundaki verisi değil." }, 403, cors);
+  const nesne = await kova.get(anahtar);
+  if (!nesne) return json({ error: "Dosya R2'de bulunamadı." }, 404, cors);
+  const tur = (nesne.httpMetadata?.contentType || "").toLowerCase().split(";")[0].trim();
+  return new Response(nesne.body, {
+    status: 200,
+    headers: {
+      ...cors,
+      "Content-Type": ONIZLEME_TURLERI.has(tur) ? tur : "application/octet-stream",
+      "Content-Length": String(nesne.size),
+      "X-Dosya-Boyut": String(nesne.size),
+      "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy": "sandbox; default-src 'none'",
+      "Cache-Control": "no-store",
+    },
+  });
 }
 
 /* -------------------------------- giriş -------------------------------- */
@@ -253,6 +466,17 @@ export default {
       if (!k.startsWith("Bearer ")) return json({ error: "Oturum gerekli." }, 401, cors);
       try { return await uyeTemizle(env, k, istek, cors); } catch (hata) { return json({ error: "Beklenmeyen hata: " + (hata?.message || hata) }, 500, cors); }
     }
+    if (istek.method === "POST" || istek.method === "PUT") {
+      if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return json({ error: "Worker yapılandırması eksik (SUPABASE_URL, SUPABASE_ANON_KEY)." }, 500, cors);
+      const k = istek.headers.get("Authorization") || "";
+      if (!k.startsWith("Bearer ")) return json({ error: "Oturum gerekli." }, 401, cors);
+      try {
+        if (istek.method === "POST" && yol === "/r2/sil") return await r2Sil(env, k, istek, cors);
+        if (istek.method === "POST" && yol === "/r2/kuyruk-isle") return await r2KuyrukIsle(env, k, cors);
+        if (istek.method === "PUT" && yol === "/r2/yukle") return await r2Yukle(env, k, istek, url, cors);
+      } catch (hata) { return json({ error: "Beklenmeyen hata: " + (hata?.message || hata) }, 500, cors); }
+      return json({ error: "Bulunamadı." }, 404, cors);
+    }
     if (istek.method !== "GET") return json({ error: "Yöntem desteklenmiyor." }, 405, cors);
     if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
       return json({ error: "Worker yapılandırması eksik (SUPABASE_URL, SUPABASE_ANON_KEY)." }, 500, cors);
@@ -269,6 +493,9 @@ export default {
       if (yol === "/r2/dosya") return await r2Dosya(env, kimlik, url, cors);
       if (yol === "/github/zip") return await githubZip(env, kimlik, url, cors);
       if (yol === "/depolama") return await depolamaTara(env, kimlik, cors);
+      if (yol === "/r2/gezgin") return await r2Gezgin(env, kimlik, url, cors);
+      if (yol === "/r2/boyut") return await r2Boyut(env, kimlik, url, cors);
+      if (yol === "/uye/dosya") return await uyeDosya(env, kimlik, url, cors);
     } catch (hata) {
       return json({ error: "Beklenmeyen hata: " + (hata?.message || hata) }, 500, cors);
     }
