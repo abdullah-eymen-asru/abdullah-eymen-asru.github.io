@@ -2514,32 +2514,97 @@ function ekranGoster(hangisi) {
   $("nt-ana").hidden = hangisi !== "ana";
 }
 
-function googleMiYalnizca(session) {
-  const kimlikler = session.user.identities || [];
-  return kimlikler.length > 0 && !kimlikler.some((k) => k.provider === "email");
-}
-
-function kilitKartiniHazirla({ kasaVar, kurtarmaGerekli }) {
+/**
+ * Kilit kartını durumuna göre kurar. Dört durum:
+ *   - kasa YOK + Google kullanıcısı  → "Kasa Parolası belirle" düğmesi (form gizli; diyalog normalde kendiliğinden açılır)
+ *   - kasa VAR + bağımsız parola     → "Kasa Parolası" sorulur (Google: "Google ile oturum açtınız…")
+ *   - kasa VAR + giriş parolası      → "Giriş parolan" sorulur (e-posta kullanıcıları)
+ *   - kurtarmaGerekli                → kurtarma anahtarı (+ yeni parola) istenir
+ */
+async function kilitKartiniHazirla({ kasaVar, kurtarmaGerekli = false, bagimsiz = false, kurtarmaVar = true } = {}) {
   ekranGoster("kilit");
-  const aciklama = $("nt-kilit-aciklama");
-  const oturumGoogle = googleMiYalnizca(S.session);
+  const oauth = Kasa.oauthMu(S.session);
+  // Girişte yakalanmış (hâlâ geçerli) parola varsa kurtarmada parola TEKRAR sorulmaz.
+  const bekleyenVar = !!(kurtarmaGerekli && !bagimsiz && (await Kasa.bekleyenParolaVarMi(S.session)));
+  S.kilit = { kasaVar, kurtarmaGerekli, bagimsiz, kurtarmaVar, bekleyenVar };
 
-  if (kurtarmaGerekli) {
+  const aciklama = $("nt-kilit-aciklama");
+  const uyari = $("nt-kilit-uyari");
+  const form = $("nt-kilit-form");
+  const kpAc = $("nt-kp-ac-btn");
+  const toggle = $("nt-kurtarma-toggle");
+  const kasaParolasiBelirlenecek = !kasaVar && oauth;
+
+  form.hidden = kasaParolasiBelirlenecek;
+  kpAc.hidden = !kasaParolasiBelirlenecek;
+  uyari.hidden = true;
+  toggle.hidden = false;
+
+  if (kasaParolasiBelirlenecek) {
     aciklama.textContent =
-      "Giriş parolan bu kasanın zarfını açmıyor. Parolan başka bir yerden değişmiş olabilir (ör. “şifremi unuttum”). " +
-      "Kurtarma anahtarını ve şu anki giriş parolanı yaz; kasa yeni parolana göre yeniden kurulur, notların korunur.";
-    $("nt-kurtarma-alan").hidden = false;
+      "Google ile oturum açtınız. Şifreli notlarınızı kullanmak için önce bir Kasa Parolası belirleyin. " +
+      "Bu parola yalnızca bu tarayıcıda anahtara çevrilir; sunucuya asla gönderilmez.";
+  } else if (kurtarmaGerekli) {
+    aciklama.textContent = bagimsiz
+      ? "Kasa Parolası açılmadı. Kurtarma anahtarını ve kasan için YENİ bir Kasa Parolası yaz; notların korunur."
+      : bekleyenVar
+        ? "Giriş parolan bu kasanın zarfını açmıyor (parolan başka bir yerden değişmiş olabilir, ör. “şifremi unuttum”). " +
+          "Kurtarma anahtarını yaz; kasa şu anki giriş parolanla yeniden kurulur, notların korunur."
+        : "Giriş parolan bu kasanın zarfını açmıyor. Parolan başka bir yerden değişmiş olabilir (ör. “şifremi unuttum”). " +
+          "Kurtarma anahtarını ve şu anki giriş parolanı yaz; kasa yeni parolana göre yeniden kurulur, notların korunur.";
   } else if (!kasaVar) {
     aciklama.textContent =
       "İlk kurulum: Notların bu cihazda, giriş parolandan türetilen bir anahtarla şifrelenecek. " +
       "Yeni bir parola belirlemene gerek yok — mevcut giriş parolanı yaz. Seni bir kez doğrularız.";
+  } else if (bagimsiz) {
+    aciklama.textContent = oauth
+      ? "Google ile oturum açtınız. Şifreli kasanızın kilidini açmak için belirlediğiniz Kasa Parolasını girin."
+      : "Şifreli kasanın kilidini açmak için belirlediğin Kasa Parolasını gir.";
+    if (!kurtarmaVar) {
+      uyari.textContent =
+        "Bu kasa için kurtarma anahtarı oluşturulmamış: Kasa Parolasını unutursan notlar açılamaz. " +
+        "Kasayı açtıktan sonra “Kasa ve yedek” bölümünden bir kurtarma anahtarı oluşturabilirsin.";
+      uyari.hidden = false;
+      toggle.hidden = true;
+    }
+  } else if (oauth) {
+    aciklama.textContent =
+      "Google ile oturum açtınız. Bu kasa, daha önce giriş parolanıza bağlı kurulmuş: giriş parolanızı yazın. " +
+      "Açtıktan sonra “Kasa ve yedek → Kasa Parolasını değiştir” ile giriş parolasından bağımsız bir Kasa Parolasına geçebilirsiniz.";
   } else {
     aciklama.textContent =
-      "Bu cihazda anahtar yok (Google ile giriş yaptın, oturumun başka yerden devam ediyor ya da kasayı kilitledin). " +
+      "Bu cihazda anahtar yok (yeni cihaz, gizli sekme, tarayıcı oturumu temizlendi ya da kasayı kilitledin). " +
       "Giriş parolanı bir kez yaz; yeni bir parola istemiyoruz.";
   }
-  $("nt-google-ipucu").hidden = !oturumGoogle;
-  $("nt-kilit-parola").focus();
+
+  if (!kasaParolasiBelirlenecek) {
+    kurtarmaModunuAyarla(kurtarmaGerekli);
+    if (!$("nt-kilit-parola-alan").hidden) $("nt-kilit-parola").focus();
+    else $("nt-kilit-kurtarma").focus();
+  }
+}
+
+/** Normal açma ↔ kurtarma anahtarıyla açma görünümü (etiketler, alanlar, düğme metinleri). */
+function kurtarmaModunuAyarla(acik) {
+  const k = S.kilit || {};
+  const etiket = $("nt-kilit-parola-etiket");
+  const girdi = $("nt-kilit-parola");
+  $("nt-kurtarma-alan").hidden = !acik;
+  if (acik) {
+    etiket.textContent = k.bagimsiz ? "Yeni Kasa Parolası" : "Güncel giriş parolan";
+    girdi.autocomplete = k.bagimsiz ? "new-password" : "current-password";
+    $("nt-kilit-parola-alan").hidden = !k.bagimsiz && !!k.bekleyenVar;
+  } else {
+    etiket.textContent = k.bagimsiz ? "Kasa Parolası" : "Giriş parolan";
+    girdi.autocomplete = k.bagimsiz ? "off" : "current-password";
+    $("nt-kilit-parola-alan").hidden = false;
+  }
+  $("nt-kilit-btn").textContent = acik ? "Kurtarma anahtarıyla aç" : "Kasayı aç";
+  $("nt-kurtarma-toggle").textContent = acik
+    ? "Vazgeç"
+    : k.bagimsiz
+      ? "Kasa Parolamı unuttum, kurtarma anahtarı kullan"
+      : "Parolam değişti, kurtarma anahtarı kullan";
 }
 
 function kurtarmaKartiniGoster(metin, sonra) {
@@ -2555,23 +2620,34 @@ async function kasaSonucunuUygula(sonuc) {
     case "acik":
       return anaEkraniAc();
     case "yeni-kasa":
-      return kurtarmaKartiniGoster(sonuc.kurtarmaMetni, anaEkraniAc);
+      // Kurtarma anahtarı istenmemişse (bağımsız Kasa Parolası) gösterilecek bir şey yok.
+      return sonuc.kurtarmaMetni ? kurtarmaKartiniGoster(sonuc.kurtarmaMetni, anaEkraniAc) : anaEkraniAc();
+    case "kasa-parolasi-belirle":
+      return kasaParolaDiyaloguAc("belirle");
     case "kurtarma-gerekli":
-      return kilitKartiniHazirla({ kasaVar: true, kurtarmaGerekli: true });
+      return kilitKartiniHazirla({ kasaVar: true, kurtarmaGerekli: true, bagimsiz: !!sonuc.bagimsiz, kurtarmaVar: sonuc.kurtarmaVar !== false });
     default:
-      return kilitKartiniHazirla({ kasaVar: !!sonuc.kasaVar, kurtarmaGerekli: false });
+      return kilitKartiniHazirla({ kasaVar: !!sonuc.kasaVar, bagimsiz: !!sonuc.bagimsiz, kurtarmaVar: sonuc.kurtarmaVar !== false });
   }
 }
 
 async function anaEkraniAc() {
   ekranGoster("ana");
   otoKilidiKur();
+  kasaPenceresiniGuncelle();
   try {
     await notlariYukle();
   } catch (h) {
     console.error(h);
     bildir("Notlar yüklenemedi: " + (h.message || h), "error", 0);
   }
+}
+
+/** "Kasa ve yedek" penceresindeki düğmeleri kasanın türüne göre ayarlar. */
+function kasaPenceresiniGuncelle() {
+  // Giriş parolası olmayan (Google) kullanıcı ya da zaten bağımsız parolası olan: Kasa Parolası değiştirilebilir.
+  $("nt-kasa-parola-btn").hidden = !(Kasa.bagimsizKasaMi() || Kasa.oauthMu(S.session));
+  $("nt-kurtarma-yenile-btn").textContent = Kasa.kurtarmaAnahtariVarMi() ? "Kurtarma anahtarını yenile" : "Kurtarma anahtarı oluştur";
 }
 
 /**
@@ -2588,21 +2664,42 @@ async function girisParolasiniDogrula(parola) {
   return !error;
 }
 
+const YANLIS_DENEME_SINIRI = 5; // art arda bu kadar hatadan sonra kısa bir bekleme (PBKDF2 zaten yavaş; kaba kuvvete ek engel)
+const YANLIS_DENEME_BEKLEME_MS = 30_000;
+
 async function kilitFormuGonderildi(olay) {
   olay.preventDefault();
   const btn = $("nt-kilit-btn");
   const girdi = $("nt-kilit-parola");
+  const k = S.kilit || {};
+  const kurtarmaModu = !$("nt-kurtarma-alan").hidden;
+  const parolaAlaniGizli = $("nt-kilit-parola-alan").hidden; // girişte yakalanan parola varsa kurtarmada sorulmaz
+
+  const kalan = Math.ceil(((S.kilitBekleme || 0) - Date.now()) / 1000);
+  if (kalan > 0) return bildir(`Art arda çok hatalı deneme yapıldı. ${kalan} sn sonra tekrar dene.`, "warning");
+
   let parola = girdi.value;
   girdi.value = "";
-  if (!parola) return bildir("Giriş parolanı yaz.", "warning");
+  if (!parola && !(kurtarmaModu && parolaAlaniGizli)) {
+    return bildir(k.bagimsiz ? "Kasa Parolanı yaz." : "Giriş parolanı yaz.", "warning");
+  }
 
   btn.disabled = true;
+  btn.textContent = "Açılıyor…"; // PBKDF2 (600.000 tur) birkaç yüz ms sürebilir: kullanıcı donma sanmasın
   try {
-    const kurtarmaModu = !$("nt-kurtarma-alan").hidden;
     let sonuc;
     if (kurtarmaModu) {
-      const k = $("nt-kilit-kurtarma").value;
-      sonuc = await Kasa.kurtarmaIleAc(S.session, k, parola);
+      const kurtarma = $("nt-kilit-kurtarma").value.trim();
+      if (!kurtarma) return bildir("Kurtarma anahtarını yaz.", "warning");
+      if (k.bagimsiz && parola.length < Kasa.KASA_PAROLASI_MIN) {
+        return bildir(`Yeni Kasa Parolası en az ${Kasa.KASA_PAROLASI_MIN} karakter olmalı.`, "warning");
+      }
+      // Yanlış yazılmış bir giriş parolasıyla zarfı yeniden kurmak kullanıcıyı yine kilitlerdi: önce doğrula.
+      if (!k.bagimsiz && parola && !(await girisParolasiniDogrula(parola))) {
+        parola = null;
+        return bildir("Hatalı giriş parolası: şu anki (güncel) giriş parolanı yaz.", "error");
+      }
+      sonuc = await Kasa.kurtarmaIleAc(S.session, kurtarma, parola || null);
       $("nt-kilit-kurtarma").value = "";
     } else {
       const { kasaVar } = await kasaVarMi();
@@ -2615,9 +2712,20 @@ async function kilitFormuGonderildi(olay) {
     parola = null;
 
     if (sonuc.durum === "kurtarma-gerekli") {
-      kilitKartiniHazirla({ kasaVar: true, kurtarmaGerekli: true });
-      return bildir("Bu parola kasayı açmadı. Yanlış yazmış olabilirsin; ya da parolan değişmişse kurtarma anahtarını kullan.", "error");
+      // AES-GCM doğrulaması başarısız = parola/anahtar hatalı. Sessizce başka ekrana atmak yerine açıkça söyle.
+      S.yanlisSayac = (S.yanlisSayac || 0) + 1;
+      if (S.yanlisSayac >= YANLIS_DENEME_SINIRI) {
+        S.kilitBekleme = Date.now() + YANLIS_DENEME_BEKLEME_MS;
+        S.yanlisSayac = 0;
+      }
+      return bildir(
+        k.bagimsiz
+          ? "Hatalı Kasa Parolası. Kontrol edip tekrar dene." + (k.kurtarmaVar === false ? "" : " Unuttuysan kurtarma anahtarını kullanabilirsin.")
+          : "Hatalı giriş parolası. Parolanı yakın zamanda sıfırladıysan “Parolam değişti, kurtarma anahtarı kullan” seçeneğine geç.",
+        "error"
+      );
     }
+    S.yanlisSayac = 0;
     await kasaSonucunuUygula(sonuc);
   } catch (h) {
     console.error(h);
@@ -2625,6 +2733,7 @@ async function kilitFormuGonderildi(olay) {
   } finally {
     parola = null;
     btn.disabled = false;
+    btn.textContent = !$("nt-kurtarma-alan").hidden ? "Kurtarma anahtarıyla aç" : "Kasayı aç";
   }
 }
 
@@ -2636,9 +2745,11 @@ async function kasaVarMi() {
 /** Bellekteki her şeyi bırakır, anahtarı cihazdan siler, kilit kartını gösterir. */
 async function kilitle(sebep) {
   if (S.kirli) await kaydet({ sessiz: true }).catch(() => {});
+  const bagimsiz = Kasa.bagimsizKasaMi(); // kilitlemeden ÖNCE oku (oturum bırakılınca bilgi gider)
+  const kurtarmaVar = Kasa.kurtarmaAnahtariVarMi();
   await Kasa.kilitle();
   arayuzuSifirla();
-  kilitKartiniHazirla({ kasaVar: true, kurtarmaGerekli: false });
+  kilitKartiniHazirla({ kasaVar: true, kurtarmaGerekli: false, bagimsiz, kurtarmaVar });
   if (sebep) bildir(sebep, "success");
 }
 
@@ -2681,11 +2792,91 @@ async function sifreliYedekIndir() {
 }
 
 async function kurtarmaAnahtariniYenile() {
-  if (!window.confirm("Yeni bir kurtarma anahtarı üretilecek; ESKİSİ GEÇERSİZ olacak. Devam edilsin mi?")) return;
+  const varMi = Kasa.kurtarmaAnahtariVarMi();
+  if (varMi && !window.confirm("Yeni bir kurtarma anahtarı üretilecek; ESKİSİ GEÇERSİZ olacak. Devam edilsin mi?")) return;
   try {
-    kurtarmaKartiniGoster(await Kasa.kurtarmaAnahtariniYenile(), () => ekranGoster("ana"));
+    kurtarmaKartiniGoster(await Kasa.kurtarmaAnahtariniYenile(), () => {
+      ekranGoster("ana");
+      kasaPenceresiniGuncelle();
+    });
   } catch (h) {
     bildir(h.message || "Kurtarma anahtarı yenilenemedi.", "error");
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* 11b) Kasa Parolası (Google/OAuth): ilk kurulum ve değiştirme        */
+/* ------------------------------------------------------------------ */
+
+/** mod: "belirle" (kasa yok → ilk kurulum) | "degistir" (kasa açık). Parola sunucuya gitmez. */
+function kasaParolaDiyaloguAc(mod) {
+  S.kpMod = mod;
+  S.kpTamam = false;
+  const belirle = mod === "belirle";
+  if (belirle) kilitKartiniHazirla({ kasaVar: false }); // diyalog kapatılırsa arkada "Kasa Parolası belirle" düğmesi kalsın
+
+  $("nt-kp-baslik").textContent = belirle ? "Kasa Parolası belirle" : "Kasa Parolasını değiştir";
+  $("nt-kp-aciklama").textContent = belirle
+    ? "Google ile oturum açtınız; hesabınızda bir giriş parolası olmadığı için şifreli kasanız için ayrı bir Kasa Parolası belirleyin. " +
+      "Bu parola yalnızca bu tarayıcıda anahtara çevrilir, sunucuya ASLA gönderilmez. Başka bir cihazdan ya da gizli sekmeden girdiğinizde " +
+      "kasanızı bu parolayla açarsınız."
+    : Kasa.bagimsizKasaMi()
+      ? "Notların yeniden şifrelenmez; yalnızca anahtar zarfı yeni parolayla yenilenir."
+      : "Bu kasa şu an giriş parolana bağlı: “Mevcut parola” alanına O parolayı yaz. Sonrasında kasa, giriş parolandan bağımsız bir Kasa Parolası kullanır.";
+  $("nt-kp-eski-alan").hidden = belirle;
+  $("nt-kp-kurtarma-alan").hidden = !belirle;
+  $("nt-kp-kurtarma").checked = true;
+  $("nt-kp-yeni-etiket").textContent = belirle ? "Kasa Parolası" : "Yeni Kasa Parolası";
+  $("nt-kp-iptal").textContent = belirle ? "Şimdi değil" : "Vazgeç";
+  $("nt-kp-btn").textContent = belirle ? "Kasa Parolasını belirle" : "Parolayı değiştir";
+  for (const id of ["nt-kp-eski", "nt-kp-yeni", "nt-kp-tekrar"]) $(id).value = "";
+  $("nt-kp-hata").hidden = true;
+
+  const d = $("nt-kp-dlg");
+  if (!d.open) d.showModal();
+  (belirle ? $("nt-kp-yeni") : $("nt-kp-eski")).focus();
+}
+
+async function kasaParolaFormuGonderildi(olay) {
+  olay.preventDefault();
+  const hata = $("nt-kp-hata");
+  const goster = (m) => {
+    hata.textContent = m;
+    hata.hidden = false;
+  };
+  hata.hidden = true;
+
+  const yeni = $("nt-kp-yeni").value;
+  const tekrar = $("nt-kp-tekrar").value;
+  if (yeni.length < Kasa.KASA_PAROLASI_MIN) return goster(`Kasa Parolası en az ${Kasa.KASA_PAROLASI_MIN} karakter olmalı.`);
+  if (yeni !== tekrar) return goster("Parolalar eşleşmiyor.");
+
+  const btn = $("nt-kp-btn");
+  const eskiMetin = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Hazırlanıyor…";
+  try {
+    if (S.kpMod === "belirle") {
+      const sonuc = await Kasa.kasaParolasiIleKur(S.session, yeni, $("nt-kp-kurtarma").checked);
+      S.kpTamam = true;
+      $("nt-kp-dlg").close();
+      await kasaSonucunuUygula(sonuc);
+    } else {
+      const eski = $("nt-kp-eski").value;
+      if (!eski) return goster("Mevcut parolanı yaz.");
+      await Kasa.kasaParolasiniDegistir(eski, yeni);
+      S.kpTamam = true;
+      $("nt-kp-dlg").close();
+      kasaPenceresiniGuncelle();
+      bildir("Kasa Parolası değiştirildi. Notların yeniden şifrelenmedi; etkilenmedi.");
+    }
+    for (const id of ["nt-kp-eski", "nt-kp-yeni", "nt-kp-tekrar"]) $(id).value = "";
+  } catch (h) {
+    console.error(h);
+    goster(h.message || "Kasa Parolası ayarlanamadı.");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = eskiMetin;
   }
 }
 
@@ -3131,9 +3322,21 @@ function baglantilariKur() {
   // Kilit / kurtarma
   $("nt-kilit-form").addEventListener("submit", kilitFormuGonderildi);
   $("nt-kurtarma-toggle").addEventListener("click", () => {
-    const alan = $("nt-kurtarma-alan");
-    alan.hidden = !alan.hidden;
-    if (!alan.hidden) $("nt-kilit-kurtarma").focus();
+    const acilacak = $("nt-kurtarma-alan").hidden;
+    kurtarmaModunuAyarla(acilacak);
+    (acilacak ? $("nt-kilit-kurtarma") : $("nt-kilit-parola")).focus();
+  });
+  // Kasa Parolası (Google/OAuth)
+  $("nt-kp-ac-btn").addEventListener("click", () => kasaParolaDiyaloguAc("belirle"));
+  $("nt-kasa-parola-btn").addEventListener("click", () => {
+    $("nt-kasa-dlg").close();
+    kasaParolaDiyaloguAc("degistir");
+  });
+  $("nt-kp-form").addEventListener("submit", kasaParolaFormuGonderildi);
+  $("nt-kp-iptal").addEventListener("click", () => $("nt-kp-dlg").close());
+  $("nt-kp-dlg").addEventListener("close", () => {
+    for (const id of ["nt-kp-eski", "nt-kp-yeni", "nt-kp-tekrar"]) $(id).value = ""; // parola alanları DOM'da kalmasın
+    if (S.kpMod === "belirle" && !S.kpTamam) kilitKartiniHazirla({ kasaVar: false });
   });
   $("nt-kurtarma-onay").addEventListener("change", (o) => ($("nt-kurtarma-devam").disabled = !o.target.checked));
   $("nt-kurtarma-kopyala").addEventListener("click", async () => {
