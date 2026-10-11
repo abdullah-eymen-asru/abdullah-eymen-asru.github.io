@@ -18,6 +18,17 @@
 //      bir admin başka birini, hatta owner'ı bile silebiliyordu; bu artık
 //      KAPATILDI). Admin panelindeki "Üyeyi Sil" butonu bunu kullanır.
 //
+// MİGRATION 0078 İLE DEĞİŞTİ — "arkada iz kalmasın":
+//   * Üye KENDİ hesabını silerse hesap hemen KAPATILIR (giriş yasak + oturumlar sonlanır) ve verileri silinmek üzere
+//     "hesap_silme_talepleri" kuyruğuna alınır; veriler yerinde kalır ki site sahibi inceleyip indirebilsin.
+//     Site sahibi (veya yetkili admin önerisiyle owner) onaylayınca kalıcı silme yapılır: R2 + Storage + satırlar + auth.
+//     İstisnalar (anında kalıcı silme): site sahibi hesabı, KVKK onayı hiç verilmemiş boş hesaplar.
+//   * Site sahibi BAŞKASINI silerse (hedef_kullanici_id) onay zaten kendisinden geldiği için doğrudan kalıcı silinir.
+//     Gövde: { hedef_kullanici_id, secimler?: { arsiv: bool, icerik: bool } }  (varsayılan ikisi de true)
+//   * R2 nesneleri sistem-yedek-worker'ın /uye-temizle ucuyla silinir (Secret: SISTEM_YEDEK_WORKER_URL, ör.
+//     https://sistem-yedek-worker.<hesap>.workers.dev). Worker tanımlı değilse ve silinecek R2 verisi varsa İŞLEM DURDURULUR
+//     (veri kaybı/iz kalması yerine açık hata).
+//
 // Deploy:  supabase functions deploy delete-account
 // Secrets: SUPABASE_URL ve SUPABASE_SERVICE_ROLE_KEY, Supabase projelerinde
 //          Edge Function ortamına otomatik enjekte edilir, elle eklemene
@@ -28,6 +39,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const WORKER_URL = (Deno.env.get("SISTEM_YEDEK_WORKER_URL") ?? "").replace(/\/+$/, "");
 
 // CORS: sadece kendi sitenin domainlerinden çağrılabilsin.
 // admin-change-email/index.ts ile AYNI listeyi kullan — domain
@@ -86,8 +98,12 @@ Deno.serve(async (req) => {
   // İsteğe bağlı gövde: { "hedef_kullanici_id": "uuid" }. Boş/geçersiz JSON
   // gövde de kabul edilir (eski istemciler hiç gövde göndermiyordu).
   let hedefKullaniciId: string | null = null;
+  let secimler: { arsiv: boolean; icerik: boolean } = { arsiv: true, icerik: true };
   try {
     const body = await req.json();
+    if (body && typeof body.secimler === "object" && body.secimler) {
+      secimler = { arsiv: body.secimler.arsiv !== false, icerik: body.secimler.icerik !== false };
+    }
     if (body && typeof body.hedef_kullanici_id === "string" && body.hedef_kullanici_id.trim()) {
       hedefKullaniciId = body.hedef_kullanici_id.trim();
     }
@@ -137,39 +153,76 @@ Deno.serve(async (req) => {
     targetId = hedefKullaniciId;
   }
 
+  const json = (govde: unknown, status = 200) => new Response(JSON.stringify(govde), { status, headers });
+
   try {
-    // 3) Önce ilişkili verileri (özel içerik erişim atamaları, profil vb.)
-    //    temizle. auth.users satırı zaten ON DELETE CASCADE ile bunları
-    //    otomatik temizleyecek olsa da, admin_delete_user_data() ile
-    //    açıkça de çağırıyoruz (idempotent, zarar vermez, ve auth.users
-    //    silme adımı herhangi bir sebeple başarısız olursa bile veri
-    //    tutarlılığını erken sağlar).
+    const kendiHesabi = targetId === callerId;
+
+    // Hedefin rolü + KVKK durumu (service_role ile okunur; istemci beyanına güvenilmez).
+    const { data: hedefProfil } = await adminClient.from("profiles").select("*").eq("id", targetId).maybeSingle();
+    const hedefOwner = hedefProfil?.role === "owner";
+    const bosHesap = hedefProfil?.kvkk_onay_verildi === false; // hiç kayıt/onay olmamış (ör. Google ile gelip vazgeçen)
+
+    // KUYRUK: sıradan üye kendi hesabını siliyor → kapat + talep aç. (owner / boş hesap / owner'ın silmesi: anında kalıcı.)
+    if (kendiHesabi && !hedefOwner && !bosHesap && hedefProfil) {
+      const { error: talepErr } = await adminClient.rpc("hesap_silme_talebi_olustur", { p_user: targetId, p_tur: "kendisi" });
+      if (talepErr) throw talepErr;
+      // Giriş yasağı (≈100 yıl) + tüm oturumları sonlandır.
+      const { error: banErr } = await adminClient.auth.admin.updateUserById(targetId, { ban_duration: "876000h" });
+      if (banErr) throw banErr;
+      try { await adminClient.auth.admin.signOut(accessToken, "global"); } catch (e) { console.warn("signOut uyarısı:", e); }
+      return json({ success: true, bekliyor: true, silinen_id: targetId });
+    }
+
+    // ---- KALICI SİLME ----
+    // 3) Depolama envanteri + R2 temizliği (DB satırları silinmeden ÖNCE: anahtarlar buradan okunur).
+    const { data: yollar, error: yolErr } = await adminClient.rpc("hesap_silme_depolama_yollari", { p_user: targetId });
+    if (yolErr) throw yolErr;
+    const ozet = yollar?.ozet ?? {};
+    const arsivAnahtarlari: string[] = secimler.arsiv ? (yollar?.arsiv_anahtarlari ?? []) : [];
+    const ozelDosyalar: string[] = secimler.icerik ? (yollar?.ozel_dosya_yollari ?? []) : [];
+    const r2Beklenen = arsivAnahtarlari.length + Number(ozet.not_ek ?? 0) + Number(ozet.akademik_pdf ?? 0);
+
+    if (r2Beklenen > 0) {
+      if (!WORKER_URL) {
+        return json({ error: "Bu üyenin R2 dosyaları var ama SISTEM_YEDEK_WORKER_URL tanımlı değil; hiçbir şey silinmedi. Edge Function Secret'ını ekleyip tekrar dene." }, 500);
+      }
+      const wr = await fetch(`${WORKER_URL}/uye-temizle`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ hedef: targetId, arsiv_anahtarlari: arsivAnahtarlari }),
+      });
+      const wj = await wr.json().catch(() => ({}));
+      if (!wr.ok) return json({ error: `R2 temizliği başarısız (${wr.status}): ${wj?.error ?? "bilinmeyen"}. Hiçbir veri satırı silinmedi.` }, 502);
+      const bagsiz: string[] = wj?.bagsiz ?? [];
+      if ((bagsiz.includes("notek") && Number(ozet.not_ek ?? 0) > 0) || (bagsiz.includes("akademik") && Number(ozet.akademik_pdf ?? 0) > 0) || (bagsiz.includes("arsiv") && arsivAnahtarlari.length > 0)) {
+        return json({ error: `Worker'da şu R2 kovası bağlı değil: ${bagsiz.join(", ")}. Hiçbir veri satırı silinmedi.` }, 501);
+      }
+    }
+
+    // 4) Supabase Storage ('ozel-dosyalar') — özel içeriğe eklenmiş dosyalar.
+    if (ozelDosyalar.length) {
+      const { error: stErr } = await adminClient.storage.from("ozel-dosyalar").remove(ozelDosyalar);
+      if (stErr) console.warn("Storage temizliği uyarısı:", stErr);
+    }
+
+    // 5) Hesapla birlikte gitmeyen satırlar + talep kaydı.
+    const { data: temizlik, error: temErr } = await adminClient.rpc("hesap_silme_kalici_temizle", { p_user: targetId, p_secimler: secimler });
+    if (temErr) throw temErr;
+
+    // 6) İlişkili verileri temizle (idempotent) ve asıl Auth hesabını sil — FK cascade kalan her şeyi götürür.
     try {
       const { error: rpcErr } = await adminClient.rpc("admin_delete_user_data", { p_user_id: targetId });
-      if (rpcErr) {
-        console.warn("admin_delete_user_data RPC uyarısı (cascade zaten halledecek):", rpcErr);
-      }
+      if (rpcErr) console.warn("admin_delete_user_data RPC uyarısı (cascade zaten halledecek):", rpcErr);
     } catch (e) {
       console.warn("admin_delete_user_data RPC uyarısı (cascade zaten halledecek):", e);
     }
-
-    // 4) Asıl Auth hesabını sil. profiles, content_access, messages vb.
-    //    FK'lerdeki ON DELETE CASCADE sayesinde ilişkili TÜM veriler
-    //    otomatik gider. (Eski "avatarlar" bucket'ı ve temizlik adımı
-    //    kaldırıldı — profil fotoğrafı özelliği ve bucket'ın kendisi artık
-    //    hiç kullanılmıyor, bkz. migration 0004.)
     const { error: delErr } = await adminClient.auth.admin.deleteUser(targetId);
     if (delErr) throw delErr;
 
-    return new Response(JSON.stringify({ success: true, silinen_id: targetId }), {
-      status: 200,
-      headers,
-    });
+    return json({ success: true, bekliyor: false, silinen_id: targetId, temizlik });
   } catch (err: any) {
     console.error("delete-account error:", err);
-    return new Response(
-      JSON.stringify({ error: "Hesap silinirken bir hata oluştu: " + (err?.message ?? String(err)) }),
-      { status: 500, headers }
-    );
+    return json({ error: "Hesap silinirken bir hata oluştu: " + (err?.message ?? String(err)) }, 500);
   }
 });
