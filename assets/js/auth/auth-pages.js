@@ -18,7 +18,7 @@ import {
 
 // PANEL BİRLEŞTİRİLDİ: giriş sonrası varış noktası birleşik panelin
 // "Panelim" sekmesi (eski /panel/panel.html artık sadece yönlendirme).
-const REDIRECT_AFTER_LOGIN = "/panel/dashboard.html#me-panel";
+const REDIRECT_AFTER_LOGIN = "/panel/dashboard.html#me-hub";
 // Google OAuth ve "şifre sıfırlama" e-postası kullanıcıyı bu sayfaya
 // geri döndürür; Supabase SDK URL'deki token'ı otomatik yakalar.
 const SITE_ORIGIN = window.location.origin;
