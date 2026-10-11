@@ -813,3 +813,20 @@ body.dash-nav-acik {
 .so-bilgi dt { font-size: 0.78rem; color: var(--muted); }
 .so-bilgi dd { margin: 0; overflow-wrap: anywhere; font-weight: 600; }
 @media (max-width: 600px) { .so-ozet .so-tarih { flex: 1 0 100%; padding-left: 32px; } }
+
+/* ===== Ana Ekran (Hub) ===== */
+.hub-kok { display: grid; gap: 16px; min-width: 0; }
+.hub-selam { margin: 0; }
+.hub-arama { width: 100%; box-sizing: border-box; min-height: 48px; padding: 10px 14px; font: inherit; color: var(--text); background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; }
+.hub-arama:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.hub-cipler { display: flex; gap: 8px; flex-wrap: wrap; }
+.hub-cip { min-height: 40px; padding: 6px 12px; font: inherit; color: var(--text); background: transparent; border: 1px solid var(--border); border-radius: 999px; cursor: pointer; }
+.hub-cip[aria-pressed="true"] { color: #fff; background: var(--accent); border-color: var(--accent); }
+.hub-icerik { display: grid; gap: 22px; min-width: 0; }
+.hub-bolum h2 { margin: 0 0 10px; font-size: 1rem; }
+.hub-izgara { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.hub-kart { display: flex; align-items: flex-start; gap: 12px; min-height: 64px; padding: 12px 14px; color: var(--text); text-decoration: none; background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; min-width: 0; }
+.hub-kart:hover, .hub-kart:focus-visible { border-color: var(--accent); outline: none; }
+.hub-kart-ikon { font-size: 1.5rem; line-height: 1.2; flex: none; }
+.hub-kart-govde { display: grid; gap: 2px; min-width: 0; }
+.hub-kart-govde small { color: var(--muted); overflow-wrap: anywhere; }
