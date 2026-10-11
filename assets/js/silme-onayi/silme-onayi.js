@@ -53,6 +53,17 @@ async function kaliciSil(t) {
   return govde;
 }
 
+async function silmeyiGeriAl(t) {
+  const { data: { session } } = await supabase.auth.getSession();
+  const res = await fetch(DELETE_ACCOUNT_FUNCTION_URL, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ hedef_kullanici_id: t.user_id, mod: "geri_al" }),
+  });
+  const govde = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(govde.error || `Geri alınamadı (${res.status})`);
+}
+
 function onayYaz(metin) {
   const c = window.prompt(`${metin}\n\nDevam etmek için büyük harflerle SİL yaz:`);
   return (c || "").trim().toLocaleUpperCase("tr") === "SİL";
@@ -103,7 +114,12 @@ function kart(t) {
       if (!onayYaz(`${ad} hesabının seçili TÜM verileri kalıcı silinecek ve geri alınamaz.`)) return;
       calistir(sil, async () => { await kaliciSil(t); bildir(`${ad}: veriler kalıcı silindi.`, "success"); await yukle(); });
     });
-    eylem.append(indir, sil);
+    const geriAl = el("button", { type: "button", class: "so-btn so-btn-birincil", text: "↩ Silmeyi iptal et, erişimi geri ver" });
+    geriAl.addEventListener("click", () => {
+      if (!window.confirm(`${ad} hesabının silinmesi iptal edilecek ve üye eski erişimine geri dönecek (yeniden giriş yapması gerekir). Devam edilsin mi?`)) return;
+      calistir(geriAl, async () => { await silmeyiGeriAl(t); bildir(`${ad}: silme iptal edildi, hesap eski erişimine döndü.`, "success"); await yukle(); });
+    });
+    eylem.append(geriAl, indir, sil);
     if (t.durum === "onerildi") {
       const sifirla = el("button", { type: "button", class: "so-btn", text: "Öneriyi reddet" });
       sifirla.addEventListener("click", () => calistir(sifirla, async () => { const { error } = await supabase.rpc("hesap_silme_oneri_sifirla", { p_user: t.user_id }); if (error) throw error; await yukle(); }));
