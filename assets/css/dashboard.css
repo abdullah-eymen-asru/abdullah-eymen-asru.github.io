@@ -757,3 +757,37 @@ body.dash-nav-acik {
   #dash-nav a { min-height: 44px; }
   .dash-nav-group { min-height: 44px; }
 }
+
+/* Yetki Ayarları › Özellikler: arama kutusu + ek ayar; Erişim Kalkanı altındaki Kilit İzinleri bölümü */
+.ya-arama { display: grid; gap: 6px; margin: 0 0 16px; max-width: 100%; }
+.ya-arama-etiket { font-size: 0.85rem; font-weight: 600; }
+.ya-arama-girdi { width: 100%; max-width: 520px; box-sizing: border-box; min-height: 46px; padding: 8px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); color: var(--text); font: inherit; }
+.ya-arama-girdi:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ya-arama-sonuc { margin: 0; min-height: 1.2em; font-size: 0.85rem; }
+.ya-tablo tr[hidden] { display: none !important; }
+.ya-ek-ayar { display: flex; align-items: flex-start; gap: 12px; margin-top: 16px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); min-width: 0; }
+.ya-ek-ayar-metin { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; cursor: pointer; }
+.gk-alt-bolum { margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--border); min-width: 0; max-width: 100%; }
+.gk-alt-baslik { margin: 0 0 6px; font-size: 1.1rem; }
+.gk-alt-bolum > * { min-width: 0; max-width: 100%; }
+#gk-kalkan-bolumu, #gk-izin-kok { overflow-wrap: anywhere; }
+
+/* Silinen Hesap Verileri (migration 0078) */
+.so-ust { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 14px; }
+.so-hepsi { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-weight: 600; }
+.so-kart { display: grid; gap: 12px; margin-bottom: 16px; padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--card-bg); min-width: 0; }
+.so-baslik { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 14px; min-width: 0; }
+.so-kimlik { display: grid; gap: 2px; flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; }
+.so-rozet { padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px; font-size: 0.8rem; background: var(--bg); }
+.so-rozet-oneri { border-color: var(--accent); color: var(--accent); }
+.so-secimler { display: grid; gap: 8px; }
+.so-secim { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); min-width: 0; }
+.so-secim input { margin-top: 4px; flex: none; width: 20px; height: 20px; }
+.so-secim span { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.so-eylem { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.so-btn { min-height: 44px; padding: 8px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
+.so-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.so-btn-birincil { background: var(--accent); border-color: var(--accent); color: #fff; }
+.so-btn-tehlike { border-color: #c62828; color: #c62828; }
+.so-kart-mesaj { margin: 0; min-height: 1.2em; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .so-btn { flex: 1 1 100%; } }
