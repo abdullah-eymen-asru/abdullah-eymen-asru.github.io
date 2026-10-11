@@ -1189,7 +1189,7 @@ function wireDeleteAccount(session, profile) {
         ? "\n\nDİKKAT: Bu hesap bir YÖNETİCİ hesabıdır. Silersen ve başka bir admin yoksa siteyi yönetecek kimse kalmaz."
         : "";
     const sure = window.confirm(
-      "Bu işlem GERİ ALINAMAZ. Hesabın ve tüm verilerin kalıcı olarak silinecek. Emin misin?" + ekstraUyari
+      "Bu işlem GERİ ALINAMAZ. Hesabın hemen kapatılır; verilerin Site Sahibi'nin onayıyla kalıcı olarak silinir. Emin misin?" + ekstraUyari
     );
     if (!sure) return;
 
@@ -1222,7 +1222,7 @@ function wireDeleteAccount(session, profile) {
       } catch (signOutErr) {
         console.error("Hesap silindi ama signOut() hata verdi (önemli değil):", signOutErr);
       }
-      alert("Hesabın silindi. Anasayfaya yönlendiriliyorsun.");
+      alert(body.bekliyor ? "Hesabın kapatıldı. Verilerin Site Sahibi'nin onayıyla kalıcı olarak silinecek. Anasayfaya yönlendiriliyorsun." : "Hesabın silindi. Anasayfaya yönlendiriliyorsun.");
       window.location.href = "/";
     } catch (err) {
       showMessage(msg, "Hesap silinemedi: " + err.message);
