@@ -794,3 +794,22 @@ body.dash-nav-acik {
 .so-btn-tehlike { border-color: #c62828; color: #c62828; }
 .so-kart-mesaj { margin: 0; min-height: 1.2em; overflow-wrap: anywhere; }
 @media (max-width: 600px) { .so-btn { flex: 1 1 100%; } }
+
+/* Silinen Hesap Verileri: sıkışık, açılır satırlar + arama (çok üyede sayfa uzamasın) */
+.so-arama { width: 100%; max-width: 520px; box-sizing: border-box; min-height: 46px; margin: 0 0 6px; padding: 8px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); color: var(--text); font: inherit; }
+.so-arama:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.so-sayac { margin: 0 0 10px; min-height: 1.2em; font-size: 0.85rem; }
+.so-liste { display: grid; gap: 8px; }
+.so-kart { display: block; margin: 0; padding: 0; overflow: hidden; }
+.so-ozet { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 10px 14px; min-height: 48px; cursor: pointer; list-style: none; }
+.so-ozet::-webkit-details-marker { display: none; }
+.so-ozet::before { content: "▸"; flex: none; color: var(--muted); transition: transform 0.15s ease; }
+.so-kart[open] > .so-ozet::before { transform: rotate(90deg); }
+.so-ozet .so-kimlik { flex: 1 1 180px; }
+.so-ozet input[type="checkbox"] { flex: none; width: 20px; height: 20px; }
+.so-tarih { font-size: 0.8rem; white-space: nowrap; }
+.so-detay { display: grid; gap: 12px; padding: 4px 14px 14px; border-top: 1px solid var(--border); }
+.so-bilgi { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px 16px; margin: 10px 0 0; }
+.so-bilgi dt { font-size: 0.78rem; color: var(--muted); }
+.so-bilgi dd { margin: 0; overflow-wrap: anywhere; font-weight: 600; }
+@media (max-width: 600px) { .so-ozet .so-tarih { flex: 1 0 100%; padding-left: 32px; } }
