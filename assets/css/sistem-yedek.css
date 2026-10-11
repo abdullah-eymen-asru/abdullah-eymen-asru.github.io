@@ -246,3 +246,47 @@
 .hk-satir-ust strong { overflow-wrap: anywhere; min-width: 0; }
 .hk-satir small { overflow-wrap: anywhere; }
 @media (max-width: 640px) { .hk-liste { max-height: 58vh; } }
+
+/* ===== v2 (migration 0081): alt sekmeler, Depolama Gezgini, İçe Aktar, silme onayı, silinen üye dosyaları ===== */
+.sy-altsekmeler { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 16px; padding: 4px; border: 1px solid var(--sy-cizgi); border-radius: 12px; background: var(--sy-yuzey); }
+.sy-altsekme { min-height: 44px; padding: 8px 14px; font: inherit; font-weight: 600; color: var(--text); background: transparent; border: 0; border-radius: 9px; cursor: pointer; }
+.sy-altsekme[aria-selected="true"] { color: var(--sy-on-vurgu); background: var(--accent); }
+.sy-sekme-panel { display: grid; gap: 16px; min-width: 0; }
+.sy-gz-pane, .sy-gz-govde, .sy-gz-r2 { display: grid; gap: 12px; min-width: 0; }
+.sy-gz-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.sy-gz-satir--kilitli { opacity: .78; }
+.sy-gz-etiket { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; cursor: pointer; }
+.sy-gz-etiket input { width: 20px; height: 20px; }
+.sy-gz-kilit { display: inline-flex; align-items: center; justify-content: center; width: 20px; color: var(--sy-uyari); }
+.sy-gz-zincir { color: var(--sy-uyari); }
+.sy-gz-sadece { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+.sy-gz-cubuk { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--sy-cizgi); border-radius: 12px; background: var(--sy-yuzey); }
+.sy-gz-cubuk[hidden] { display: none; }
+.sy-gz-cubuk-metin { flex: 1 1 200px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.sy-gz-r2-ust { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sy-gz-kirinti { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.sy-gz-kirinti-btn, .sy-gz-klasor-btn { min-height: 44px; padding: 4px 8px; font: inherit; color: var(--accent); background: transparent; border: 0; cursor: pointer; text-align: left; overflow-wrap: anywhere; }
+.sy-gz-kirinti-btn[aria-current="page"] { color: var(--text); font-weight: 700; cursor: default; }
+.sy-gz-klasor-btn { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+.sy-gz-nesne { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 10px; border: 1px solid var(--sy-cizgi); border-radius: 10px; background: var(--sy-yuzey); min-width: 0; }
+.sy-gz-nesne input[type="checkbox"] { width: 20px; height: 20px; flex: none; }
+.sy-gz-nesne-ad { display: inline-flex; align-items: center; gap: 6px; flex: 1 1 180px; min-width: 0; overflow-wrap: anywhere; }
+.sy-gz-nesne-meta { font-size: .85rem; }
+.sy-gz-kuyruk:empty { display: none; }
+.sy-dialog-asama { margin: 0; font-size: .85rem; color: var(--muted); }
+.sy-dialog-ozet { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.sy-ia-birak { display: grid; justify-items: center; gap: 6px; padding: 28px 16px; text-align: center; border: 2px dashed var(--sy-cizgi); border-radius: 14px; cursor: pointer; background: var(--sy-yuzey); }
+.sy-ia-birak--ustte, .sy-ia-birak:focus-visible { border-color: var(--accent); outline: none; }
+.sy-ia-plan, .sy-ia-sonuc { display: grid; gap: 12px; min-width: 0; }
+.sy-ia-liste, .sy-ia-notlar { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.sy-ia-notlar { list-style: disc; padding-left: 18px; }
+.sy-ia-satir { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 10px; border: 1px solid var(--sy-cizgi); border-radius: 10px; min-width: 0; overflow-wrap: anywhere; }
+.sy-ia-satir input[type="checkbox"] { width: 20px; height: 20px; flex: none; }
+.sy-ia-ad { flex: 1 1 160px; min-width: 0; }
+/* Silinen hesap: dosya inceleme */
+.so-dosya-kok { display: grid; gap: 10px; margin-top: 10px; min-width: 0; }
+.so-dosya-izgara { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.so-dosya-kart { display: grid; gap: 6px; padding: 10px; border: 1px solid var(--border); border-radius: 12px; min-width: 0; }
+.so-dosya-kart img, .so-dosya-kart canvas { display: block; width: 100%; max-height: 180px; object-fit: contain; border-radius: 8px; background: rgba(127, 127, 127, .12); }
+.so-dosya-ad { font-weight: 600; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .sy-altsekme { flex: 1 1 100%; } }
