@@ -84,8 +84,9 @@ const MODULES = {
   // Evrensel Dosya Dönüştürücü & Belge Düzenleyici (migration 0077). %100 istemci tarafı; sekme görünürlüğü role DEĞİL,
   // can_use_converter anahtarına bağlı (NAV'daki izin:"donusturucu" + izinleriYukle). Modül kendi içinde RPC ile tekrar doğrular (Guard).
   donusturucu: { src: "./donusturucu/donusturucu.js", role: null },
-  // Yetki Ayarları > "🔄 Dönüştürücü": rol bazlı can_use_converter anahtarı (owner; admin yönetimi owner'ın izniyle araç içinden).
-  donusturucuYetki: { src: "./donusturucu/yetki-paneli.js", role: "owner" },
+  // Silinen hesapların artık verisi (migration 0078). Görünürlük: owner her zaman; admin yalnızca owner anahtarı açıksa
+  // (NAV'daki izin:"silmeonayi"). Gerçek yetki RPC'lerde; kalıcı silme yalnızca owner (Edge Function).
+  silmeOnayi: { src: "./silme-onayi/silme-onayi.js", role: null },
 };
 
 // Sidebar hiyerarşisi. Her leaf: { id, label, view (gösterilecek
@@ -174,6 +175,7 @@ const NAV = [
       { id: "sys-kvkk", icon: "📜", label: "Hukuki Metinler", module: "kvkkSurum", role: "admin", izin: "kvkk" },
       { id: "sys-uye-aktarim", icon: "📤", label: "Üye Verisi İndirme", module: "uyeAktarimYetki", role: "owner" },
       // role:null + izin:"sistemyedek": owner her zaman görür; diğer roller yalnızca owner can_export_system'i açtıysa.
+      { id: "sys-silme-onayi", icon: "🧹", label: "Silinen Hesap Verileri", module: "silmeOnayi", role: null, izin: "silmeonayi", defaultAcilis: false },
       { id: "sys-yedek", icon: "📦", label: "Sistem Yedekleme", module: "sistemYedek", role: null, izin: "sistemyedek", defaultAcilis: false },
       { id: "sys-github", icon: "🔑", label: "GitHub / Worker Bağlantısı", module: "gy" },
       { id: "sys-hakkimda", icon: "🙋", label: "Hakkımda & Sosyal Linkler", module: "gy" },
@@ -215,6 +217,9 @@ function gorunurMu(item, profile) {
   if (item.izin === "sistemyedek") {
     return profile.role === "owner" || !!profile.izinler?.sistemYedek;
   }
+  if (item.izin === "silmeonayi") {
+    return profile.role === "owner" || (profile.role === "admin" && !!profile.izinler?.silmeOnayi);
+  }
   if (item.izin === "donusturucu") {
     return profile.role === "owner" || !!profile.izinler?.donusturucu;
   }
@@ -236,7 +241,7 @@ async function izinleriYukle(rol) {
       .rpc("ozellik_erisimi_var_mi", { p_ozellik: anahtar, p_rol: rol })
       .then((r) => (r.error ? true : r.data !== false))
       .catch(() => true);
-  const [arsiv, kvkk, ozelIcerik, dosyaPaylasimi, akademikKutuphane, sistemYedek, donusturucu] = await Promise.all([
+  const [arsiv, kvkk, ozelIcerik, dosyaPaylasimi, akademikKutuphane, sistemYedek, donusturucu, silmeOnayi] = await Promise.all([
     supabase.rpc("r2_arsiv_yetkilerim").then((r) => (r.error ? undefined : r.data)).catch(() => undefined),
     supabase.rpc("hukuki_metin_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
     ozellikSor("ozel_icerik_yonetimi"),
@@ -246,12 +251,15 @@ async function izinleriYukle(rol) {
     supabase.rpc("sistem_export_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
     // can_use_converter: varsayılan KAPALI → hata/ağ sorununda da false (güvenli yön).
     supabase.rpc("donusturucu_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
+    // hesap_silme_onayi: varsayılan KAPALI → hata/ağ sorununda false.
+    supabase.rpc("hesap_silme_inceleme_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
   ]);
   return {
     arsiv,
     kvkk,
     sistemYedek,
     donusturucu,
+    silmeOnayi,
     ozellikler: { ozel_icerik_yonetimi: ozelIcerik, dosya_paylasimi_yonetimi: dosyaPaylasimi, akademik_kutuphane: akademikKutuphane },
   };
 }
@@ -521,7 +529,6 @@ async function showView(viewId, moduleKey) {
   if (viewId === "sys-yetki") await ensureModuleLoaded("arsivIzin");
   if (viewId === "sys-yetki") await ensureModuleLoaded("kalkan");
   if (viewId === "sys-yetki") await ensureModuleLoaded("sistemYedekYetki");
-  if (viewId === "sys-yetki") await ensureModuleLoaded("donusturucuYetki");
 }
 
 function firstAvailableView(profile) {
@@ -575,6 +582,8 @@ function openMobileSidebar() {
   const overlay = document.getElementById("dash-overlay");
   const toggle = document.getElementById("dash-nav-toggle");
   if (!sidebar) return;
+  // Notlarım'ın kendi klasör menüsü açıksa kapansın: iki çekmece üst üste binmesin.
+  window.dispatchEvent(new CustomEvent("dash:sidebar-acildi"));
   sidebar.classList.add("open");
   if (overlay) overlay.hidden = false;
   toggle?.setAttribute("aria-expanded", "true");
@@ -626,6 +635,8 @@ function wireMobileNav() {
     else openMobileSidebar();
   });
   overlay.addEventListener("click", closeMobileSidebar);
+  // Notlarım menüsü açılırken site menüsü kapanır (karşılıklı dışlama).
+  window.addEventListener("nt:nav-acildi", () => { if (sidebar.classList.contains("open")) closeMobileSidebar(); });
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && sidebar.classList.contains("open")) closeMobileSidebar();
