@@ -19,6 +19,8 @@ import { depolamaCiz } from "./depolama.js";
 import { gunlukCiz } from "./gunluk.js";
 import { yedekAl, dosyaAdi } from "./disa-aktar.js";
 import { aliciOlustur } from "./zip-yazici.js";
+import { gezginCiz } from "./gezgin.js";
+import { icAktarCiz } from "./ice-aktar.js";
 
 const ROLLER = { owner: "Site Sahibi", admin: "Yönetici", manager: "İçerik Sorumlusu", editor: "Editör", special_user: "Özel Üye", user: "Üye" };
 
@@ -293,7 +295,7 @@ async function kur() {
   const gunlukYukle = () => gunlukCiz(gunlukKok, mesaj);
 
   let no = 0;
-  kok.replaceChildren(
+  const disaAktarBolumleri = [
     el("section", { class: "sy-bolum" },
       el("div", { class: "sy-bolum-ust" }, el("h2", { text: "Depolama Durumu" }), yenile),
       depolamaKok
@@ -311,8 +313,36 @@ async function kur() {
       el("div", { class: "sy-eylemler" }, indir, iptalDugme),
       ilerleme
     ),
-    ownerMi ? el("section", { class: "sy-bolum" }, el("h2", { text: "Dışa Aktarma Denetim Günlüğü" }), gunlukKok) : null
-  );
+    ownerMi ? el("section", { class: "sy-bolum" }, el("h2", { text: "Dışa Aktarma Denetim Günlüğü" }), gunlukKok) : null,
+  ];
+
+  // "Sayfa içinde sayfa": yalnızca owner'da İçe Aktar ve Depolama Gezgini sekmeleri vardır.
+  // Paneller DOM'dan sökülmez (hidden), böylece devam eden bir dışa aktarma/geri yükleme sekme değişince bozulmaz.
+  const sekmeTanimlari = [{ id: "disa", ad: "📤 Dışa aktar & durum", panel: el("div", { class: "sy-sekme-panel" }, ...disaAktarBolumleri) }];
+  if (ownerMi) {
+    const icKok = el("div", { class: "sy-sekme-panel", hidden: true });
+    const gzKok = el("div", { class: "sy-sekme-panel", hidden: true });
+    sekmeTanimlari.push({ id: "ice", ad: "📥 İçe aktar (geri yükle)", panel: icKok, kur: () => icAktarCiz(icKok, mesaj) });
+    sekmeTanimlari.push({ id: "gezgin", ad: "🗂️ Depolama gezgini", panel: gzKok, kur: () => gezginCiz(gzKok, mesaj) });
+  }
+  const serit = el("div", { class: "sy-altsekmeler", role: "tablist", "aria-label": "Sistem yedekleme bölümleri" });
+  const kuruldu = new Set(["disa"]);
+  const sekmeSec = (id) => {
+    for (const t of sekmeTanimlari) {
+      t.panel.hidden = t.id !== id;
+      t.dugme.setAttribute("aria-selected", String(t.id === id));
+      t.dugme.tabIndex = t.id === id ? 0 : -1;
+    }
+    const t = sekmeTanimlari.find((x) => x.id === id);
+    if (t.kur && !kuruldu.has(id)) { kuruldu.add(id); Promise.resolve(t.kur()).catch((h) => mesaj(hataMetni(h))); }
+  };
+  for (const t of sekmeTanimlari) {
+    t.dugme = el("button", { type: "button", role: "tab", class: "sy-altsekme", text: t.ad, "aria-selected": "false" });
+    t.dugme.addEventListener("click", () => sekmeSec(t.id));
+    serit.append(t.dugme);
+  }
+  kok.replaceChildren(...(sekmeTanimlari.length > 1 ? [serit] : []), ...sekmeTanimlari.map((t) => t.panel));
+  sekmeSec("disa");
 
   durumGuncelle();
   await depolamaCiz(depolamaKok);
