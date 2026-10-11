@@ -903,9 +903,7 @@ permalink: "/panel/dashboard.html"
         <button type="button" role="tab" class="ya-altsekme" id="ya-tab-tezgah" data-ya-pane="ya-pane-tezgah" aria-controls="ya-pane-tezgah" aria-selected="false" tabindex="-1">🌱 Tezgâh (kişi bazlı)</button>
         <button type="button" role="tab" class="ya-altsekme" id="ya-tab-r2" data-ya-pane="ra-izin-bolumu" aria-controls="ra-izin-bolumu" aria-selected="false" tabindex="-1">🗄️ Dosya Yöneticisi</button>
         <button type="button" role="tab" class="ya-altsekme" id="ya-tab-kalkan" data-ya-pane="gk-kalkan-bolumu" aria-controls="gk-kalkan-bolumu" aria-selected="false" tabindex="-1">🛡️ Erişim Kalkanı</button>
-        <button type="button" role="tab" class="ya-altsekme" id="ya-tab-kilit-izin" data-ya-pane="gk-izin-bolumu" aria-controls="gk-izin-bolumu" aria-selected="false" tabindex="-1">🔑 Kilit İzinleri</button>
         <button type="button" role="tab" class="ya-altsekme" id="ya-tab-sistem-yedek" data-ya-pane="sy-izin-bolumu" aria-controls="sy-izin-bolumu" aria-selected="false" tabindex="-1">📦 Sistem Yedekleme</button>
-        <button type="button" role="tab" class="ya-altsekme" id="ya-tab-donusturucu" data-ya-pane="dn-izin-bolumu" aria-controls="dn-izin-bolumu" aria-selected="false" tabindex="-1">🔄 Dönüştürücü</button>
       </div>
 
       <!-- 1) Özellik matrisi. id="yetki-ayarlari" ve içindeki id'ler AYNEN korundu:
@@ -930,6 +928,12 @@ permalink: "/panel/dashboard.html"
             (owner) yönetebilirsin.
           </p>
         </details>
+
+        <div class="ya-arama">
+          <label for="ya-arama-girdi" class="ya-arama-etiket">Özellik ara</label>
+          <input type="search" id="ya-arama-girdi" class="ya-arama-girdi" placeholder="Örn. dönüştürücü, CV, notlar, yazı…" autocomplete="off" enterkeyhint="search">
+          <p id="ya-arama-sonuc" class="muted ya-arama-sonuc" role="status" aria-live="polite"></p>
+        </div>
 
         <div id="ya-tablo-alani">
           <p class="muted">Yükleniyor...</p>
@@ -967,12 +971,15 @@ permalink: "/panel/dashboard.html"
         </p>
         <div id="gk-kok"><p class="muted">Yükleniyor...</p></div>
         <div id="gk-mesaj" class="auth-message" hidden></div>
-      </section>
 
-      <!-- 5) Kilitli siteyi yine de görebilecek üyeler (aynı modül, ayrı kök) -->
-      <section id="gk-izin-bolumu" class="panel-section ya-pane" role="tabpanel" aria-labelledby="ya-tab-kilit-izin" hidden>
-        <div id="gk-izin-kok"><p class="muted">Yükleniyor...</p></div>
-        <div id="gk-izin-mesaj" class="auth-message" hidden></div>
+        <!-- Kilitli siteyi yine de görebilecek üyeler (Kilit İzinleri): Erişim Kalkanı'nın alt bölümü.
+             Aynı modül (kalkan-paneli.js) doldurur; id'ler korundu. -->
+        <div id="gk-izin-bolumu" class="gk-alt-bolum">
+          <h3 class="gk-alt-baslik">🔑 Kilit İzinleri</h3>
+          <p class="muted">Site kilitliyken yine de içeri girebilecek üyeler. Kalkanın kendisiyle aynı yerde yönetilir.</p>
+          <div id="gk-izin-kok"><p class="muted">Yükleniyor...</p></div>
+          <div id="gk-izin-mesaj" class="auth-message" hidden></div>
+        </div>
       </section>
 
       <!-- 6) Sistem yedekleme / dışa aktarma izni: can_export_system (assets/js/sistem-yedek/yetki-paneli.js; migration 0074) -->
@@ -985,18 +992,6 @@ permalink: "/panel/dashboard.html"
         </p>
         <div id="sy-izin-kok"><p class="muted">Yükleniyor...</p></div>
         <div id="sy-izin-mesaj" class="auth-message" hidden></div>
-      </section>
-
-      <!-- 7) Evrensel Dönüştürücü izni: can_use_converter (assets/js/donusturucu/yetki-paneli.js; migration 0077) -->
-      <section id="dn-izin-bolumu" class="panel-section ya-pane" role="tabpanel" aria-labelledby="ya-tab-donusturucu" hidden>
-        <h2>Dönüştürücü &amp; Belge Düzenleyici İzni</h2>
-        <p class="muted">
-          "Dönüştürücü &amp; Editör" aracı varsayılan olarak yalnızca Site Sahibi'ne açıktır. Buradan her rol için
-          <code>can_use_converter</code> anahtarını tek tıkla açıp kapatabilirsin. Araç tamamen tarayıcıda çalışır; dosyalar
-          sunucuya gitmez. Yetkisi olmayan roller menüde aracı görmez, adresi bilseler de Guard'a takılır.
-        </p>
-        <div id="dn-izin-kok"><p class="muted">Yükleniyor...</p></div>
-        <div id="dn-izin-mesaj" class="auth-message" hidden></div>
       </section>
     </section>
 
@@ -1021,6 +1016,19 @@ permalink: "/panel/dashboard.html"
       <p class="muted">Hangi yöneticinin üye bilgilerini (CSV, Excel, TXT, PDF) indirebileceğini belirle ve geçmişi izle.</p>
       <div id="uye-aktarim-kok"><p class="muted">Yükleniyor...</p></div>
       <div id="uye-aktarim-mesaj" class="auth-message" hidden></div>
+    </section>
+
+    <!-- Silinen hesapların artık verisi (assets/js/silme-onayi/silme-onayi.js; migration 0078). Owner her zaman; admin yalnızca
+         Yetki Ayarları › Özellikler'den "Silinen Hesapların Artık Verisi" açıksa (yalnızca öneri gönderebilir). -->
+    <section class="dash-view" id="view-sys-silme-onayi" hidden data-view="sys-silme-onayi">
+      <h1>Silinen Hesap Verileri</h1>
+      <p class="muted">
+        Hesabını silen üyelerin hesabı hemen kapanır; verileri burada <strong>Site Sahibi'nin onayını</strong> bekler.
+        Onaydan önce dökümü indirebilir, hangi veri gruplarının silineceğini seçebilirsin. Onaylanınca üyeye ait her şey
+        (R2 dosyaları, Storage, kayıtlar, hesap) kalıcı silinir ve talep kaydı da kalkar. Güvenlik/denetim günlükleri bu işlemin dışındadır.
+      </p>
+      <div id="so-kok"><p class="muted">Yükleniyor...</p></div>
+      <div id="so-mesaj" class="auth-message" hidden></div>
     </section>
 
     <!-- Sistem Yedekleme & Depolama Yönetimi (assets/js/sistem-yedek/sistem-yedek.js; migration 0074 + sistem-yedek-worker).
