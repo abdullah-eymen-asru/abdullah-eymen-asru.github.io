@@ -316,7 +316,7 @@ function wireCurrentAdminSelfDelete(session) {
       } catch (signOutErr) {
         console.error("Hesap silindi ama signOut() hata verdi (önemli değil):", signOutErr);
       }
-      alert("Hesabın silindi. Anasayfaya yönlendiriliyorsun.");
+      alert(body.bekliyor ? "Hesabın kapatıldı. Verilerin Site Sahibi'nin onayıyla kalıcı olarak silinecek. Anasayfaya yönlendiriliyorsun." : "Hesabın silindi. Anasayfaya yönlendiriliyorsun.");
       window.location.href = "/";
     } catch (err) {
       showMessage(msg, "Hesap silinemedi: " + err.message);
