@@ -167,7 +167,7 @@ const NAV = [
       // aynı, ama görünürlüğü owner'a sabitlenmiş durumda: github-yonetim.js
       // -> wireYetkiAyarlari() zaten owner değilse bölümü DOM'dan siliyor,
       // burada da sidebar linkini hiç çizmiyoruz (item.role override'ı).
-      { id: "sys-yetki", icon: "🔐", label: "Yetki Ayarları", module: "gy", role: "owner" },
+      { id: "sys-yetki", icon: "🔐", label: "Yetki Ayarları", module: "gy", role: "admin", izin: "yetkiayarlari", defaultAcilis: false },
       // role:"admin" + izin:"kvkk": owner her zaman görür; admin sadece owner "adminler KVKK
       // sürümünü değiştirebilsin" anahtarını açtıysa (bkz. gorunurMu / izinleriYukle).
       { id: "sys-kvkk", icon: "📜", label: "Hukuki Metinler", module: "kvkkSurum", role: "admin", izin: "kvkk" },
@@ -215,6 +215,9 @@ function gorunurMu(item, profile) {
   if (item.izin === "sistemyedek") {
     return profile.role === "owner" || !!profile.izinler?.sistemYedek;
   }
+  if (item.izin === "yetkiayarlari") {
+    return profile.role === "owner" || (profile.role === "admin" && !!profile.izinler?.yetkiAyarlari);
+  }
   if (item.izin === "silmeonayi") {
     return profile.role === "owner" || (profile.role === "admin" && !!profile.izinler?.silmeOnayi);
   }
@@ -239,7 +242,7 @@ async function izinleriYukle(rol) {
       .rpc("ozellik_erisimi_var_mi", { p_ozellik: anahtar, p_rol: rol })
       .then((r) => (r.error ? true : r.data !== false))
       .catch(() => true);
-  const [arsiv, kvkk, ozelIcerik, dosyaPaylasimi, akademikKutuphane, sistemYedek, donusturucu, silmeOnayi] = await Promise.all([
+  const [arsiv, kvkk, ozelIcerik, dosyaPaylasimi, akademikKutuphane, sistemYedek, donusturucu, silmeOnayi, yetkiAyarlari] = await Promise.all([
     supabase.rpc("r2_arsiv_yetkilerim").then((r) => (r.error ? undefined : r.data)).catch(() => undefined),
     supabase.rpc("hukuki_metin_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
     ozellikSor("ozel_icerik_yonetimi"),
@@ -251,6 +254,8 @@ async function izinleriYukle(rol) {
     supabase.rpc("donusturucu_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
     // hesap_silme_onayi: varsayılan KAPALI → hata/ağ sorununda false.
     supabase.rpc("hesap_silme_inceleme_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
+    // adminler Yetki Ayarları'na erişebilsin (migration 0079): varsayılan KAPALI.
+    supabase.rpc("yetki_ayarlari_yonetim_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
   ]);
   return {
     arsiv,
@@ -258,6 +263,7 @@ async function izinleriYukle(rol) {
     sistemYedek,
     donusturucu,
     silmeOnayi,
+    yetkiAyarlari,
     ozellikler: { ozel_icerik_yonetimi: ozelIcerik, dosya_paylasimi_yonetimi: dosyaPaylasimi, akademik_kutuphane: akademikKutuphane },
   };
 }
@@ -393,6 +399,7 @@ async function ensureModuleLoaded(key) {
 /* ------------------------------------------------------------------ */
 
 let activeViewId = null;
+let GIRIS_PROFIL_ROLU = null;
 
 function buildSidebar(profile) {
   const nav = document.getElementById("dash-nav");
@@ -524,8 +531,9 @@ async function showView(viewId, moduleKey) {
 
   await ensureModuleLoaded(moduleKey);
   // Yetki Ayarları: owner için "R2 Erişim İzni" bölümü (ayrı modül; gy modülüne dokunmaz)
-  if (viewId === "sys-yetki") await ensureModuleLoaded("arsivIzin");
-  if (viewId === "sys-yetki") await ensureModuleLoaded("kalkan");
+  // Bu iki modül yalnızca Site Sahibi'nin sekmelerini doldurur (yetkili admin yalnızca Özellikler'i görür).
+  if (viewId === "sys-yetki" && GIRIS_PROFIL_ROLU === "owner") await ensureModuleLoaded("arsivIzin");
+  if (viewId === "sys-yetki" && GIRIS_PROFIL_ROLU === "owner") await ensureModuleLoaded("kalkan");
 }
 
 function firstAvailableView(profile) {
@@ -776,6 +784,7 @@ async function init() {
     profile.full_name || [profile.first_name, profile.last_name].filter(Boolean).join(" ") || profile.email || "";
   document.getElementById("dash-rol").textContent = `Rol: ${profile.role}`;
 
+  GIRIS_PROFIL_ROLU = profile.role;
   profile.izinler = await izinleriYukle(profile.role);
 
   // Notlarım: erişimi owner belirler (migration 0059/0060, Yetki Ayarları).
