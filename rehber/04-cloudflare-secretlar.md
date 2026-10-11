@@ -700,3 +700,22 @@ Kurulumdan sonra tek tek işaretle:
 [📖 Site Rehberi](./01-site-rehberi.md) · [🔐 Supabase Sistemi](./02-supabase-sistemi.md) · [🍴 Fork Kurulumu](./03-fork-kurulumu.md) · **☁️ Cloudflare Secret & Ayarlar**
 
 ---
+
+---
+
+## 4.10b — sistem-yedek-worker v2 (migration 0081): Depolama Gezgini, İçe Aktar, silinen üye dosyaları
+
+**Yeni secret / binding GEREKMEZ.** Mevcut `AKADEMIK_BUCKET`, `ARSIV_BUCKET`, `NOT_EK_BUCKET` binding'leri ve `SUPABASE_URL` / `SUPABASE_ANON_KEY` yeterlidir. Worker kodunu (`cloudflare worker/sistem_yedek_worker/worker.js`) yeniden deploy et.
+
+İsteğe bağlı değişkenler (Text):
+
+| Değişken | Varsayılan | Anlamı |
+|---|---|---|
+| `MAX_TARAMA_SAYFA` | `40` | `/depolama` ve `/r2/boyut` için TOPLAM `list` çağrısı bütçesi. Artık TÜM kovalar arasında paylaşılır. Workers **Free** planda istek başına 50 alt-istek sınırı vardır; 40'ın üstüne çıkma. |
+| `MAX_YUKLEME_MB` | `95` | Geri yüklemede (`PUT /r2/yukle`) tek dosya üst sınırı. Workers istek gövdesi sınırı Free/Pro'da 100 MB'dır; daha büyük dosyalar raporda "hata" görünür (diğerleri sürer). |
+
+Yeni uç noktalar (hepsi yalnızca Site Sahibi, kullanıcının KENDİ JWT'siyle `is_owner()` doğrulanır; `service_role` yok):
+`GET /r2/gezgin`, `GET /r2/boyut`, `POST /r2/sil`, `POST /r2/kuyruk-isle`, `PUT /r2/yukle`, `GET /uye/dosya`.
+CORS `Allow-Methods` artık `PUT` içerir. Kovaları (bucket) silen hiçbir uç nokta yoktur.
+
+**Edge Function:** `delete-account` değişmedi; fakat `/uye-temizle` artık işlem bütçesi aşılırsa HTTP 409 döner → Edge Function zaten `!wr.ok` durumunda DB satırlarına dokunmadan hata verir; aynı işlemi tekrar çalıştırmak güvenlidir.
