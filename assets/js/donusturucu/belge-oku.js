@@ -7,7 +7,7 @@ import { temizHtml, metinDenHtml } from "./temizle.js";
 import { baytlariOku, metinOku, adsizAl } from "./ortak.js";
 import { epubOku } from "./belge-epub.js";
 import { pdfDenHtml } from "./pdf-metin.js";
-import { pdfjsAl } from "./pdf-yukle.js";
+import { pdfjsAl, pdfBirak } from "./pdf-yukle.js";
 
 const STIL_HARITASI = [
   "p[style-name='Title'] => h1:fresh",
@@ -69,14 +69,14 @@ export async function belgeHtmlAl(dosya, tur, ctx = {}) {
       const gorev = pdfjs.getDocument({ data: bayt });
       gorev.onPassword = async (cevapVer, neden) => {
         const p = ctx.parola ? await ctx.parola(neden === 2) : null;
-        if (p == null) { gorev.destroy(); return; }
+        if (p == null) { pdfBirak(gorev); return; }
         cevapVer(p);
       };
       const pdf = await gorev.promise;
       try {
         const s = await pdfDenHtml(pdf, ctx);
         return { html: await temizHtml(s.html), baslik: ad, taranmis: s.taranmis, sayfaSayisi: s.sayfaSayisi };
-      } finally { pdf.destroy(); }
+      } finally { pdfBirak(gorev, pdf); }
     }
     default: throw new Error(`Okunamayan belge türü: ${tur}`);
   }
