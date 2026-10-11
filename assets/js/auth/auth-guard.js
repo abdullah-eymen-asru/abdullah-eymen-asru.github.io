@@ -195,7 +195,7 @@ export async function requireAuth({ role = null, redirectTo = "/hesap/giris.html
     // PANEL BİRLEŞTİRİLDİ: yetkisiz kullanıcı artık birleşik panelin
     // "Panelim" sekmesine düşüyor (eski /panel/panel.html sadece bir
     // yönlendirme sayfası — oraya atmak gereksiz bir ikinci hop olurdu).
-    window.location.replace("/panel/dashboard.html?hata=yetkisiz#me-panel");
+    window.location.replace("/panel/dashboard.html?hata=yetkisiz#me-hub");
     return new Promise(() => {});
   }
 
