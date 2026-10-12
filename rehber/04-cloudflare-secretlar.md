@@ -543,6 +543,10 @@ Yedekleme gezgini, içe aktarma ve üye yedekleme için **yeni secret/binding ge
 
 Ekledikten sonra **Deploy**'a bas. Panelde: Yedekleme & Verilerim → Depolama Durumu → "⚡ Worker İstekleri (bugün)". Sayı Cloudflare'den gelir ve yaklaşık 1 dakika gecikmeli olabilir.
 
+**Neden Cloudflare panelindeki "Requests today" ile aynı?** Ücretsiz 100.000/gün kotası **Workers + Pages Functions** isteklerini birlikte sayar. Panel sayacı ikisini de okur ve ayrı gösterir (`Workers: … · Pages Functions: …`); Pages Functions kısmı `functions/_middleware.js` (Gatekeeper) çalıştıkça artar. Aynı token izni (Account Analytics › Read) ikisine de yeter. Cloudflare'deki tek tek Worker kartları **son 24 saati**, panel ise **UTC gününü** (03:00 TR'den başlar) gösterir; bu yüzden o kartlarla birebir eşleşmesi beklenmez, ama "Requests today" ile (≈1 dk gecikmeyle) eşleşmelidir.
+
+**`_routes.json`:** kökteki bu dosya Gatekeeper Function'ını CSS/JS/yazı tipi isteklerinde çalıştırmaz (yalnızca sayfa istekleri sayılır). Dosyayı silersen Function her varlık isteğinde de çalışır ve kota daha hızlı dolar.
+
 **Yeni uç noktalar** (hepsi yalnızca Site Sahibi; üye geri yükleme hariç): `/r2/gezgin`, `/r2/boyut`, `/r2/sil`, `/r2/kuyruk-isle`, `/r2/yukle`, `/uye/dosya`, `/kota`; üyeler için `PUT /uye/yukle` (yalnızca kendi kaydının işaret ettiği dosyaya yazar). CORS `PUT`'u da kabul eder. Kovaları silen hiçbir uç nokta yoktur.
 
 **`delete-account` Edge Function** değişmedi. `/uye-temizle` artık çok büyük hesaplarda işlem bütçesi dolarsa HTTP 409 döner; Edge Function bu durumda veritabanına dokunmadan hata verir, aynı işlemi tekrar çalıştırmak güvenlidir.
