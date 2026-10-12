@@ -56,6 +56,7 @@
  * -----------------------------------------------------------------------
  */
 import { supabase } from "../core/supabase-client.js";
+import { demoModuAktifMi, DEMO_UID, DEMO_EPOSTA } from "../demo/demo-durum.js";
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -432,6 +433,7 @@ async function kekIleDekAc(satir, kek, uid) {
  *   kasa-parolasi-belirle → Google (OAuth) kullanıcısının henüz kasası yok: bağımsız Kasa Parolası belirletilmeli
  */
 export async function kasaBaslat(session) {
+  if (demoModuAktifMi()) return demoKasaHazirla(); // demo: sahte bellek içi kasa (Supabase'e istek yok)
   const uid = session.user.id;
   const eposta = session.user.email || "";
   const satir = await kasaSatiriniGetir(uid);
@@ -578,6 +580,7 @@ export async function kasaParolasiniDegistir(mevcutParola, yeniParola) {
 
 /** Kilit kartındaki form: kullanıcı GİRİŞ parolasını yazar (ikinci bir parola DEĞİL). */
 export async function parolaIleAc(session, parola) {
+  if (demoModuAktifMi()) return demoKasaHazirla(); // demo: her parola kabul (anahtar zaten bellekte)
   const uid = session.user.id;
   let p = parola;
   const baz = await parolaMalzemesiOlustur(p);
@@ -597,6 +600,7 @@ export async function parolaIleAc(session, parola) {
  * `parola`: şu anki giriş parolası (kullanıcı yazar) — null ise girişte yakalanan malzeme kullanılır.
  */
 export async function kurtarmaIleAc(session, kurtarmaMetni, parola) {
+  if (demoModuAktifMi()) return demoKasaHazirla();
   const uid = session.user.id;
   const eposta = session.user.email || "";
   const satir = await kasaSatiriniGetir(uid);
@@ -752,6 +756,21 @@ export async function tumAnahtarlariTemizle() {
   } catch {
     /* önemsiz */
   }
+}
+
+
+/* ------------------------------------------------------------------ */
+/* DEMO / VİTRİN MODU: bellek içi, tek kullanımlık, SAHTE kasa           */
+/* ------------------------------------------------------------------ */
+// Demo ziyaretçisinin gerçek bir kasası yoktur (Supabase'e hiç istek atılmaz). Sayfa ömrü boyunca tek bir rastgele
+// AES-GCM anahtarı (extractable:false) üretilir; sahte notlar bununla şifrelenir (demo-mock-veri.js) ve arayüz
+// bunları HİÇ DEĞİŞMEMİŞ şifre çözme koduyla açar. Parola sorulursa her parola kabul edilir (anahtar zaten bellekte).
+let demoDek = null;
+export async function demoKasaHazirla() {
+  if (!demoModuAktifMi()) throw new Error("Demo kasası yalnızca demo modunda kullanılabilir.");
+  demoDek ||= await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  oturum = { uid: DEMO_UID, eposta: DEMO_EPOSTA, dek: demoDek, kek: null, satir: { parola_tur: "kasa", dek_kurtarma: null } };
+  return { durum: "acik" };
 }
 
 /* ------------------------------------------------------------------ */
