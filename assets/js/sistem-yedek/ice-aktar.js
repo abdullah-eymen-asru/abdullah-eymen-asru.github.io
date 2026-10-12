@@ -10,7 +10,10 @@
  *  ÇAKIŞMA: "Yalnızca eksikleri tamamla" (varsayılan) | "Üzerine yaz". Korumalı tablolarda üzerine yazma YOKTUR
  *   (veritabanı bunu zorlar). SQL dökümleri tarayıcıdan çalıştırılmaz (güvenlik): JSON kullanılır.
  *  SIRA: önce tablolar (bağımlılık sırası; FK hatası alanlar sonraki turda yeniden denenir), sonra R2 dosyaları.
- *  Denetim: işlem başlamadan günlüğe yazılır. innerHTML yok, inline stil yok (CSP).
+ *  Denetim: (Site Sahibi) işlem başlamadan günlüğe yazılır. innerHTML yok, inline stil yok (CSP).
+ *  ÜYE MODU (opts.uye = true; migration 0084): her üye YALNIZCA KENDİ yedeğini kendi hesabına geri yükler — hesabı silinip yeniden
+ *   açılmış olsa bile. Beyaz listeli tablolar (notlar, not_kasasi, not_ek_kayitlari, akademik_*, r2_arsiv); kullanıcı kimliği sunucuda
+ *   oturumdan ZORLANIR; R2 anahtarlarındaki eski üye kimliği yenisiyle değiştirilir; dosya yalnızca kendi kaydının işaret ettiği anahtara yazılır.
  * -----------------------------------------------------------------------
  */
 import { supabase } from "../core/supabase-client.js";
@@ -23,6 +26,14 @@ const MAKS_JSON = 150 * 1024 * 1024;
 const siraNo = (t) => { const i = SIRA.indexOf(t); return i < 0 ? 999 : i; };
 
 /* ------------------------------ tablo tespiti ------------------------------ */
+
+/** Üye modunda R2 anahtarındaki ESKİ üye kimliğini mevcut kimlikle değiştirir (hesap silinip yeniden açıldıysa kimlik değişir). */
+function yeniAnahtar(kaynak, k, ctx) {
+  if (!ctx?.uye) return k;
+  if (kaynak === "notek") return k.replace(/^notlar\/[0-9a-f-]{36}\//i, `notlar/${ctx.uid}/`);
+  if (kaynak === "akademik") return k.replace(/^akademik-kutuphane\/users\/[0-9a-f-]{36}\//i, `akademik-kutuphane/users/${ctx.uid}/`);
+  return k;
+}
 
 function tabloTespit(ad, satirlar, sema) {
   const kok = ad.split("/").pop().replace(/\.json$/i, "");
@@ -54,7 +65,7 @@ async function jsonSatirlari(blob) {
 
 /* ------------------------------ analiz ------------------------------ */
 
-async function analizEt(dosyalar, sema, ilerleme) {
+async function analizEt(dosyalar, sema, ilerleme, ctx = {}) {
   const tablolar = new Map(); // tablo -> {tablo, parcalar:[satirlar], kaynaklar:[], yontem, korumali}
   const r2 = [];              // {kaynak, anahtar, ad, boyut, al: ()=>Promise<Blob>, secenekler?}
   const notlar = [];
@@ -95,7 +106,7 @@ async function analizEt(dosyalar, sema, ilerleme) {
             manifestYollari.add(e.yol);
             if (!g) { notlar.push(`MANIFEST: ${e.yol} pakette yok.`); continue; }
             if (!r2AnahtarGecerli(e.kaynak, e.anahtar)) { notlar.push(`MANIFEST: ${e.anahtar} bilinen anahtar biçimi değil (korumalı) — atlanacak.`); continue; }
-            r2.push({ kaynak: e.kaynak, anahtar: e.anahtar, ad: e.anahtar.split("/").pop(), boyut: g.usize, al: () => z.oku(g) });
+            r2.push({ kaynak: e.kaynak, anahtar: yeniAnahtar(e.kaynak, e.anahtar, ctx), ad: e.anahtar.split("/").pop(), boyut: g.usize, al: () => z.oku(g) });
           }
         } catch (h) { notlar.push(`r2/MANIFEST.json okunamadı: ${h.message}`); }
       }
@@ -127,7 +138,7 @@ async function analizEt(dosyalar, sema, ilerleme) {
     ilerleme("Tekil dosyalar kayıtlarla eşleştiriliyor…");
     for (let i = 0; i < gevsek.length; i += 100) {
       const parca = gevsek.slice(i, i + 100);
-      const { data, error } = await supabase.rpc("sistem_r2_dosya_esle", { p_dosyalar: parca.map((g) => ({ ad: g.ad, boyut: g.boyut })) });
+      const { data, error } = await supabase.rpc(ctx.uye ? "uye_r2_dosya_esle" : "sistem_r2_dosya_esle", { p_dosyalar: parca.map((g) => ({ ad: g.ad, boyut: g.boyut })) });
       if (error) throw new Error(hataMetni(error));
       parca.forEach((g, j) => {
         const adaylar = (data?.[j]?.adaylar || []).filter((a) => r2AnahtarGecerli(a.kaynak, a.anahtar));
@@ -142,8 +153,15 @@ async function analizEt(dosyalar, sema, ilerleme) {
 
 /* ------------------------------ arayüz ------------------------------ */
 
-export async function icAktarCiz(kok, mesaj) {
-  const { data: sema, error: se } = await supabase.rpc("sistem_geri_yukleme_tablolari");
+export async function icAktarCiz(kok, mesaj, { uye = false } = {}) {
+  let uid = null;
+  if (uye) {
+    const { data: o } = await supabase.auth.getUser();
+    uid = o?.user?.id || null;
+    if (!uid) { kok.replaceChildren(el("p", { class: "auth-message error", text: "Oturum bulunamadı." })); return; }
+  }
+  const ctx = { uye, uid };
+  const { data: sema, error: se } = await supabase.rpc(uye ? "uye_geri_yukleme_tablolari" : "sistem_geri_yukleme_tablolari");
   if (se) { kok.replaceChildren(el("p", { class: "auth-message error", text: hataMetni(se) })); return; }
 
   let plan = null;
@@ -169,7 +187,7 @@ export async function icAktarCiz(kok, mesaj) {
     planKutu.replaceChildren();
     if (!liste.length) return;
     try {
-      plan = await analizEt(liste, sema, (m) => { durum.textContent = m; });
+      plan = await analizEt(liste, sema, (m) => { durum.textContent = m; }, ctx);
       durum.textContent = "";
       planCiz();
     } catch (h) { durum.textContent = ""; mesaj(`Analiz başarısız: ${hataMetni(h)}`); }
@@ -236,9 +254,11 @@ export async function icAktarCiz(kok, mesaj) {
     const rapor = { tablolar: {}, dosyalar: { yazildi: 0, atlandi: 0, hata: [] }, mod };
     let islem = null;
     try {
-      const b = await supabase.rpc("sistem_islem_baslat", { p_tur: "geri_yukleme", p_ayrinti: { mod, tablolar: tSec.map((t) => t.tablo), dosya: rSec.length } });
-      if (b.error) throw b.error;
-      islem = b.data;
+      if (!uye) { // denetim günlüğü yalnızca Site Sahibi işlemleri için (üyenin kendi geri yüklemesi kendi verisidir)
+        const b = await supabase.rpc("sistem_islem_baslat", { p_tur: "geri_yukleme", p_ayrinti: { mod, tablolar: tSec.map((t) => t.tablo), dosya: rSec.length } });
+        if (b.error) throw b.error;
+        islem = b.data;
+      }
       const iptalKontrol = () => { if (denetci.signal.aborted) throw new DOMException("İptal edildi", "AbortError"); };
 
       // 1) tablolar — en çok 3 tur; FK hatası alan tablolar sonraki turda "eksikleri" kipiyle tekrar denenir
@@ -252,7 +272,7 @@ export async function icAktarCiz(kok, mesaj) {
           for (let i = 0; i < t.satirlar.length; i += SAYFA) {
             iptalKontrol();
             asama.textContent = `Tablo ${t.tablo} (tur ${tur}) — ${Math.min(i + SAYFA, t.satirlar.length)}/${t.satirlar.length}`;
-            const { data, error } = await supabase.rpc("sistem_geri_yukle_tablo", { p_tablo: t.tablo, p_satirlar: t.satirlar.slice(i, i + SAYFA), p_mod: m });
+            const { data, error } = await supabase.rpc(uye ? "uye_geri_yukle_tablo" : "sistem_geri_yukle_tablo", { p_tablo: t.tablo, p_satirlar: t.satirlar.slice(i, i + SAYFA), p_mod: m });
             if (error) throw new Error(`${t.tablo}: ${hataMetni(error)}`);
             top.eklenen += data.eklenen; top.guncellenen += data.guncellenen; hataliBu += data.hatali;
             if (tur === 1) top.atlanan += data.atlanan;
@@ -273,7 +293,7 @@ export async function icAktarCiz(kok, mesaj) {
         asama.textContent = `R2 dosyası ${n}/${rSec.length}: ${r.ad}`;
         try {
           const blob = await r.al();
-          const res = await workerFetch(`/r2/yukle?b=${r.kaynak}&k=${encodeURIComponent(r.anahtar)}&m=${mod}`, { yontem: "PUT", govde: blob, sinyal: denetci.signal });
+          const res = await workerFetch(`${uye ? "/uye/yukle" : "/r2/yukle"}?b=${r.kaynak}&k=${encodeURIComponent(r.anahtar)}&m=${mod}`, { yontem: "PUT", govde: blob, sinyal: denetci.signal });
           const g = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(g.error || `HTTP ${res.status}`);
           if (g.durum === "atlandi") rapor.dosyalar.atlandi += 1; else rapor.dosyalar.yazildi += 1;
@@ -283,7 +303,7 @@ export async function icAktarCiz(kok, mesaj) {
         }
       }
       const hatali = Object.values(rapor.tablolar).reduce((x, t) => x + t.hatali, 0) + rapor.dosyalar.hata.length;
-      await supabase.rpc("sistem_islem_bitir", { p_id: islem, p_basarili: true, p_ozet: { tablolar: rapor.tablolar, dosyalar: { yazildi: rapor.dosyalar.yazildi, atlandi: rapor.dosyalar.atlandi, hata: rapor.dosyalar.hata.length } } });
+      if (islem) await supabase.rpc("sistem_islem_bitir", { p_id: islem, p_basarili: true, p_ozet: { tablolar: rapor.tablolar, dosyalar: { yazildi: rapor.dosyalar.yazildi, atlandi: rapor.dosyalar.atlandi, hata: rapor.dosyalar.hata.length } } });
       raporCiz(rapor);
       mesaj(hatali ? `Geri yükleme bitti; ${hatali} kayıt/dosya aktarılamadı (raporda).` : "Geri yükleme tamamlandı.", hatali ? "error" : "success");
     } catch (h) {
@@ -329,7 +349,7 @@ export async function icAktarCiz(kok, mesaj) {
   girdi.addEventListener("change", () => { const l = [...girdi.files]; girdi.value = ""; dosyaAl(l); });
 
   kok.replaceChildren(
-    el("p", { class: "sy-bilgi" }, ikon("kalkan"), el("span", { text: "Yalnızca Site Sahibi. Tablolar veritabanında, dosyalar Worker üzerinden R2'ye yazılır; her işlem günlüğe kaydedilir. Auth hesapları (giriş bilgileri) yedekten geri yüklenemez." })),
+    el("p", { class: "sy-bilgi" }, ikon("kalkan"), el("span", { text: uye ? "Kendi yedeğini (indirdiğin ZIP ya da tek tek dosyalar) kendi hesabına geri yükle. Hesabını silip yeniden açtıysan da çalışır: kayıtlar yeni hesabına bağlanır. Yalnızca notlar, kaynaklar ve dosyalar geri yüklenir; hesap/rol/yetki bilgileri yüklenmez." : "Yalnızca Site Sahibi. Tablolar veritabanında, dosyalar Worker üzerinden R2'ye yazılır; her işlem günlüğe kaydedilir. Auth hesapları (giriş bilgileri) yedekten geri yüklenemez." })),
     surukle, girdi, durum, planKutu, sonucKutu
   );
 }
