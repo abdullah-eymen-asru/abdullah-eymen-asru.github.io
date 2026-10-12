@@ -73,7 +73,7 @@ begin
     from pg_class c
     join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind in ('r', 'p') and c.relrowsecurity
-      and c.relname <> 'profiles' -- profiles'in izolasyonu 0086'da (demo YALNIZCA kendi satırını okur; yoksa giriş sayfasına döner)
+      and c.relname not in ('profiles', 'site_ayarlari') -- 0086 (profiles: demo yalnızca kendi satırını okur) ve 0087 (site_ayarlari: demo yalnızca okur)
   loop
     execute format('drop policy if exists %I on public.%I', 'demo_izolasyon_' || t.relname, t.relname);
     execute format(
