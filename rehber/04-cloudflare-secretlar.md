@@ -162,7 +162,10 @@ beklendiğinden onu mutlaka `openssl rand -base64 32` ile üret.
 | `GK_AYAR_TTL_SN` | Pages projesi (Kasa uç katmanı) | `30` | `site_ayarlari` önbellek süresi, saniye (5–300) |
 | `GK_HATA_KILIT` | Pages projesi (Kasa uç katmanı) | boş (açık kal) | `1` ise: ayarlar okunamazsa **ve** bilinen son ayar yoksa siteyi kilitle |
 | `GITHUB_REF` | `sistem-yedek-worker` | `main` | Yedeklenecek dal adı |
-| `MAX_TARAMA_SAYFA` | `sistem-yedek-worker` | `40` | Depolama taramasında kova başına en çok kaç sayfa (1000 nesne/sayfa) listelensin |
+| `MAX_TARAMA_SAYFA` | `sistem-yedek-worker` | `40` | Depolama taramasında TÜM kovalar için toplam en çok kaç sayfa (1000 nesne/sayfa) listelensin (Free planda 50 alt-istek sınırı var, 40'ın üstüne çıkma) |
+| `MAX_YUKLEME_MB` | `sistem-yedek-worker` | `95` | Geri yüklemede tek dosya üst sınırı, MB (Workers istek gövdesi sınırı 100 MB) |
+| `GUNLUK_ISTEK_LIMITI` | `sistem-yedek-worker` | `100000` | Canlı kota sayacındaki günlük üst sınır |
+| `CACHE_SURUM` | `izleme-okuma-api` | `1` | Önbelleği anında sıfırlamak için numarayı değiştir (bkz. 4.1) |
 
 Hepsi **Variable (Text)**, değer sadece rakam (nokta/virgül/birim yok). `GK_*` değişkenleri Worker'a değil **Cloudflare Pages projesine** girilir (Bölüm 5.2-B).
 
@@ -228,6 +231,26 @@ listeleri) değiştirmeyi unutursan, tarayıcı Worker'a erişirken **CORS /
 - **Adres nereye yazılır?** `_config.yml` → `cloudflare_worker_url:`
 - **Kod içinde değiştirilecekler:** `GITHUB_LOGIN` (kendi kullanıcı adın), `PROJECTS` içindeki proje numaraları (`number: 2` / `3` — kendi panolarının numarası).
 - **Test:** Adresin sonuna `?project=izleme` ekleyip tarayıcıda aç; JSON gelmeli.
+
+**Önbellek (hız için; tamamen isteğe bağlı):**
+
+Bu Worker her istekte GitHub'a gitmek yerine yanıtı kısa süre saklar, böylece sayfa daha hızlı açılır ve GitHub'a daha az istek gider. Üç durum vardır:
+
+| Kayıt ne kadar eski? | Ne olur? |
+|---|---|
+| 60 saniyeden yeni | Saklanan yanıt hemen verilir, GitHub'a gidilmez. |
+| 60 saniye – 1 saat arası | Ziyaretçiye yine saklanan (biraz eski) yanıt **hemen** verilir; yeni veri arka planda çekilip saklanır. Kimse beklemez. |
+| 1 saatten eski | Yanıt GitHub'dan taze çekilir. |
+
+Yani panoya yeni bir kayıt eklersen, sitede görünmesi **en geç ~1 dakika** (nadiren bir sonraki ziyarete kadar) sürer. Bunu beklemeden görmek istiyorsan önbelleği sıfırla:
+
+1. Cloudflare → **Workers & Pages** → `izleme-okuma-api` → **Settings → Variables and secrets** → **Add**.
+2. Tip: **Text**, Ad: `CACHE_SURUM`, Değer: `1` yaz. Daha önce eklediysen değeri bir artır (`1` → `2`).
+3. **Deploy**'a bas.
+
+Değer değişince Worker eski kayıtların hiçbirini kullanmaz; hepsi yeniden çekilir. İlk kez eklerken `1` yazman yeterli, sıfırlamak için her seferinde değeri değiştirmen gerekir. Hiç eklemezsen önbellek yine çalışır, sadece "anında sıfırlama" olmaz.
+
+*Neden "sil" yerine numara değiştiriyoruz?* Cloudflare önbelleği her veri merkezinde ayrı tutar ve bir yerden silmek diğerlerine ulaşmaz. Numara değişince hepsi birden geçersiz olur.
 
 ---
 
@@ -506,6 +529,26 @@ listeleri) değiştirmeyi unutursan, tarayıcı Worker'a erişirken **CORS /
 
 ---
 
+#### 4.10 devamı — yeni özellikler için ek ayarlar (hepsi isteğe bağlı)
+
+Yedekleme gezgini, içe aktarma ve üye yedekleme için **yeni secret/binding gerekmez**; yalnızca Worker kodunu yeniden deploy et.
+
+**Canlı Worker istek sayacı** (panelde `1.450 / 100.000` gibi görünür). İstemiyorsan hiçbirini ekleme; kart "yapılandırılmadı" der, başka bir şey bozulmaz.
+
+| Tip | Ad | Değer | Nereden? |
+|---|---|---|---|
+| Text | `CF_ACCOUNT_ID` | Hesap kimliği | Workers & Pages ana sayfası → sağdaki **Account ID** |
+| **Secret** | `CF_API_TOKEN` | API token | My Profile → **API Tokens → Create Token → Create Custom Token**: izin **Account → Account Analytics → Read**, Account Resources: kendi hesabın, IP filtresi boş |
+| Text (ops.) | `GUNLUK_ISTEK_LIMITI` | `100000` | Free plan günlük sınırı |
+
+Ekledikten sonra **Deploy**'a bas. Panelde: Yedekleme & Verilerim → Depolama Durumu → "⚡ Worker İstekleri (bugün)". Sayı Cloudflare'den gelir ve yaklaşık 1 dakika gecikmeli olabilir.
+
+**Yeni uç noktalar** (hepsi yalnızca Site Sahibi; üye geri yükleme hariç): `/r2/gezgin`, `/r2/boyut`, `/r2/sil`, `/r2/kuyruk-isle`, `/r2/yukle`, `/uye/dosya`, `/kota`; üyeler için `PUT /uye/yukle` (yalnızca kendi kaydının işaret ettiği dosyaya yazar). CORS `PUT`'u da kabul eder. Kovaları silen hiçbir uç nokta yoktur.
+
+**`delete-account` Edge Function** değişmedi. `/uye-temizle` artık çok büyük hesaplarda işlem bütçesi dolarsa HTTP 409 döner; Edge Function bu durumda veritabanına dokunmadan hata verir, aynı işlemi tekrar çalıştırmak güvenlidir.
+
+---
+
 ## 5. Cloudflare Pages ayarları
 
 Siteyi Cloudflare Pages'e bağladığında (**Workers & Pages → Create → Pages → Connect to Git**) ayarlar iki yerde durur: **Build** ve **Variables and secrets**. Pages ayarlarına sonradan:
@@ -700,35 +743,3 @@ Kurulumdan sonra tek tek işaretle:
 [📖 Site Rehberi](./01-site-rehberi.md) · [🔐 Supabase Sistemi](./02-supabase-sistemi.md) · [🍴 Fork Kurulumu](./03-fork-kurulumu.md) · **☁️ Cloudflare Secret & Ayarlar**
 
 ---
-
----
-
-## 4.10b — sistem-yedek-worker v2 (migration 0081): Depolama Gezgini, İçe Aktar, silinen üye dosyaları
-
-**Yeni secret / binding GEREKMEZ.** Mevcut `AKADEMIK_BUCKET`, `ARSIV_BUCKET`, `NOT_EK_BUCKET` binding'leri ve `SUPABASE_URL` / `SUPABASE_ANON_KEY` yeterlidir. Worker kodunu (`cloudflare worker/sistem_yedek_worker/worker.js`) yeniden deploy et.
-
-İsteğe bağlı değişkenler (Text):
-
-| Değişken | Varsayılan | Anlamı |
-|---|---|---|
-| `MAX_TARAMA_SAYFA` | `40` | `/depolama` ve `/r2/boyut` için TOPLAM `list` çağrısı bütçesi. Artık TÜM kovalar arasında paylaşılır. Workers **Free** planda istek başına 50 alt-istek sınırı vardır; 40'ın üstüne çıkma. |
-| `MAX_YUKLEME_MB` | `95` | Geri yüklemede (`PUT /r2/yukle`) tek dosya üst sınırı. Workers istek gövdesi sınırı Free/Pro'da 100 MB'dır; daha büyük dosyalar raporda "hata" görünür (diğerleri sürer). |
-
-Yeni uç noktalar (hepsi yalnızca Site Sahibi, kullanıcının KENDİ JWT'siyle `is_owner()` doğrulanır; `service_role` yok):
-`GET /r2/gezgin`, `GET /r2/boyut`, `POST /r2/sil`, `POST /r2/kuyruk-isle`, `PUT /r2/yukle`, `GET /uye/dosya`.
-CORS `Allow-Methods` artık `PUT` içerir. Kovaları (bucket) silen hiçbir uç nokta yoktur.
-
-**Edge Function:** `delete-account` değişmedi; fakat `/uye-temizle` artık işlem bütçesi aşılırsa HTTP 409 döner → Edge Function zaten `!wr.ok` durumunda DB satırlarına dokunmadan hata verir; aynı işlemi tekrar çalıştırmak güvenlidir.
-
-## 4.10c — Canlı kota sayacı ve kenar önbelleği (migration 0084 turu)
-
-**sistem-yedek-worker › Settings › Variables and Secrets**
-| Ad | Tür | Değer |
-|---|---|---|
-| `CF_ACCOUNT_ID` | Text | Cloudflare hesap kimliği (Workers & Pages sağ kenar çubuğu) |
-| `CF_API_TOKEN` | **Secret** | My Profile › API Tokens › Create: izin **Account › Account Analytics › Read** (başka izin verme) |
-| `GUNLUK_ISTEK_LIMITI` | Text (ops.) | Varsayılan `100000` |
-
-Yapılandırılmazsa panel sayacı "yapılandırılmadı" der; başka hiçbir şey bozulmaz. Panel: Yedekleme & Verilerim › Depolama Durumu › "⚡ Worker İstekleri (bugün)" (60 sn önbellekli, UTC günü).
-
-**izleme-okuma-worker:** stale-while-revalidate eklendi (taze 60 sn, bayat 1 saat anında + arka planda yenileme). **Önbelleği anında sıfırlamak için** `CACHE_SURUM` (Text) değerini değiştir (ör. `1` → `2`) ve Deploy et; tüm veri merkezlerinde eski kopyalar geçersiz olur. (Cache API'de `cache.delete` yalnızca çalıştığı veri merkezini temizler; küresel garanti için sürümleme kullanılır.)
