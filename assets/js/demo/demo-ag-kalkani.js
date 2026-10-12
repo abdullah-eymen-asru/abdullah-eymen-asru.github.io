@@ -16,7 +16,7 @@
  *
  * Okuma isteklerinden BİRKAÇI sahte yanıtla karşılanır (örnek PDF'in açılabilmesi için): bkz. sahteYanit().
  */
-import { demoBildir, demoModuAktifMi, DEMO_MESAJI } from "./demo-durum.js";
+import { demoBildir, demoModuAktifMi, demoUyeMi, DEMO_MESAJI } from "./demo-durum.js";
 
 /** Demo'da sunulan, herkese açık ÖRNEK dosyalar (statik, repoda; R2'de değil). id → {url, ad, mime} */
 export const DEMO_DOSYALARI = Object.freeze({
@@ -95,9 +95,14 @@ async function sahteYanit(url, init) {
   return null;
 }
 
+/** Demo ÜYESİ (gerçek 'demo' rollü hesap) kendi hesabını silebilir: yalnızca bu tek Edge Function ucu kalkandan geçer. */
+function uyeHesapSilmeUcuMu(url) {
+  return !!url && demoUyeMi() && /(^|\.)supabase\.co$/i.test(url.hostname) && url.pathname === "/functions/v1/delete-account";
+}
+
 async function demoFetch(girdi, init) {
   const url = urlCoz(girdi);
-  if (!istekEngelliMi(url)) return asilFetch(girdi, init);
+  if (!istekEngelliMi(url) || uyeHesapSilmeUcuMu(url)) return asilFetch(girdi, init);
   const sahte = await sahteYanit(url, init || (girdi instanceof Request ? { method: girdi.method } : undefined));
   if (sahte) return sahte;
   demoBildir();
