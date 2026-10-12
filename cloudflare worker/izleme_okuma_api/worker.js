@@ -216,7 +216,7 @@ async function fetchAllItems(token, projectNumber, manuelSutunSirasi) {
 }
 
 // Cloudflare Worker'ın giriş noktası — her HTTP isteğinde bu çalışır.
-export default {
+const ASIL_ISLEYICI = {
   async fetch(request, env, ctx) {
     // CORS: GitHub Pages'teki sitenden bu Worker'a istek atılabilmesi için
     // gerekli izin başlıkları. "*" herkese izin verir — bu Worker sadece
@@ -243,8 +243,12 @@ export default {
     const url = new URL(request.url);
     const projectKey = url.searchParams.get("project"); // "izleme" ya da "okuma"
 
-    const projectConfig = PROJECTS[projectKey];
-    if (!projectConfig) {
+    // TEK İSTEK (kota): ?project=hepsi -> izleme + okuma TEK yanıtta ({ izleme:{...}, okuma:{...} }). Listelerim'deki iki sekme
+    // (İzlediklerim / Okuduklarım) aynı veriyi paylaşır; istemci bunu bir kez çeker ve sekmeler arası geçiş Worker'a hiç
+    // istek atmaz. Eski ?project=izleme|okuma uçları geriye dönük uyumluluk için aynen çalışır.
+    const tumu = projectKey === "hepsi";
+    const projectConfig = tumu ? {} : PROJECTS[projectKey];
+    if (!tumu && !projectConfig) {
       // Parametre hiç verilmemiş ya da yanlışsa: çıplak bir JSON hatası yerine,
       // bu adrese doğrudan girenler için (örn. tarayıcıdan test ederken) daha
       // anlaşılır, HTML bir bilgi sayfası döndürüyoruz. Site zaten her zaman
@@ -272,6 +276,7 @@ export default {
   <ul>
     <li><code>${url.origin}?project=izleme</code></li>
     <li><code>${url.origin}?project=okuma</code></li>
+    <li><code>${url.origin}?project=hepsi</code> (ikisi tek yanıtta)</li>
   </ul>
   <p><a href="https://abdullah-eymen-asru.github.io">← Portfolyo sitesine dön</a></p>
 </body>
@@ -315,8 +320,16 @@ export default {
     const cacheKey = new Request(anahtarUrl.toString());
 
     const uret = async () => {
-      const { projectTitle, items, fieldOrder } = await fetchAllItems(env.GITHUB_TOKEN, projectConfig.number, projectConfig.sutunSirasi);
-      const govde = JSON.stringify({ generatedAt: new Date().toISOString(), projectTitle, count: items.length, fieldOrder, items });
+      let govde;
+      if (tumu) {
+        // İki GitHub GraphQL çağrısı paralel; Worker isteği yine TEK sayılır.
+        const [iz, ok] = await Promise.all(["izleme", "okuma"].map((k) => fetchAllItems(env.GITHUB_TOKEN, PROJECTS[k].number, PROJECTS[k].sutunSirasi)));
+        const paket = ({ projectTitle, items, fieldOrder }) => ({ projectTitle, count: items.length, fieldOrder, items });
+        govde = JSON.stringify({ generatedAt: new Date().toISOString(), izleme: paket(iz), okuma: paket(ok) });
+      } else {
+        const { projectTitle, items, fieldOrder } = await fetchAllItems(env.GITHUB_TOKEN, projectConfig.number, projectConfig.sutunSirasi);
+        govde = JSON.stringify({ generatedAt: new Date().toISOString(), projectTitle, count: items.length, fieldOrder, items });
+      }
       ctx.waitUntil(cache.put(cacheKey, new Response(govde, { headers: { "Content-Type": "application/json", "Cache-Control": `public, max-age=${STALE}`, "X-Cached-At": String(Date.now()) } })));
       return govde;
     };
@@ -345,5 +358,58 @@ export default {
         { status: 502, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
+  },
+};
+
+/* ============================================================================
+ * KOTA KORUMASI (migration 0088 · public.worker_anahtarlari) — Site Sahibi/yetkili yönetici bu servisi panelden
+ * (Yedekleme & Verilerim › Worker anahtarları) KAPATTIYSA istek, asıl kod çalışmadan 503 ile reddedilir.
+ * Durum Worker örneğinde 30 sn bellekte tutulur (en çok 30 sn'de bir 1 Supabase isteği). Okunamazsa servis AÇIK kabul
+ * edilir (fail-open): bu koruma kendi başına bir kesinti sebebi olmamalı. Değerler herkese açıktır (anon anahtar gizli değildir).
+ * DÜRÜST NOT: reddedilen istek de Cloudflare'de 1 istek sayılır; kazanç CPU/alt-istektir. İstekleri kaynağında kesen
+ * katman istemci kapısıdır (assets/js/core/worker-kapi.js); workers.dev'i tamamen kapatmak isteğe bağlı "sert kapatma"dır.
+ * ========================================================================== */
+const WK_AD = "izleme-okuma-api";
+const WK_SB_URL = "https://eahvcirspmvntffzphye.supabase.co";
+const WK_SB_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVhaHZjaXJzcG12bnRmZnpwaHllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxOTgxODMsImV4cCI6MjEwMTc3NDE4M30._f-GKSsffxFo66w3g0NJfmOWEhlsjU4Y6mlcTlcPJ2E";
+const WK_TTL_MS = 30000;
+let wkDurum = { t: 0, kapali: false };
+async function wkKapaliMi() {
+  if (Date.now() - wkDurum.t < WK_TTL_MS) return wkDurum.kapali;
+  try {
+    const kontrol = new AbortController();
+    const zamanAsimi = setTimeout(() => kontrol.abort(), 1500);
+    const r = await fetch(`${WK_SB_URL}/rest/v1/worker_anahtarlari?ad=eq.${WK_AD}&select=acik`, {
+      headers: { apikey: WK_SB_ANON, Authorization: `Bearer ${WK_SB_ANON}` },
+      signal: kontrol.signal,
+    });
+    clearTimeout(zamanAsimi);
+    if (r.ok) {
+      const satirlar = await r.json();
+      wkDurum = { t: Date.now(), kapali: Array.isArray(satirlar) && satirlar.length === 1 && satirlar[0].acik === false };
+    } else {
+      wkDurum = { t: Date.now() - WK_TTL_MS + 5000, kapali: wkDurum.kapali }; // hata: bilinen son durumla 5 sn daha dayan
+    }
+  } catch {
+    wkDurum = { t: Date.now() - WK_TTL_MS + 5000, kapali: wkDurum.kapali };
+  }
+  return wkDurum.kapali;
+}
+const WK_IZINLI_ORIGIN = /^(https:\/\/(abdullah-eymen-asru\.(github\.io|pages\.dev))|http:\/\/localhost(:\d+)?)$/;
+export default {
+  async fetch(istek, env, ctx) {
+    if (istek.method !== "OPTIONS" && (await wkKapaliMi())) {
+      const origin = istek.headers.get("Origin") || "";
+      return new Response(JSON.stringify({ error: "Bu servis geçici olarak kapatıldı.", kapali: true }), {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "Retry-After": "300",
+          "Cache-Control": "no-store",
+          ...(WK_IZINLI_ORIGIN.test(origin) ? { "Access-Control-Allow-Origin": origin, Vary: "Origin" } : {}),
+        },
+      });
+    }
+    return ASIL_ISLEYICI.fetch(istek, env, ctx);
   },
 };
