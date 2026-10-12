@@ -36,9 +36,10 @@ permalink: "/hesap/giris.html"
   <div id="demo-giris-kutu" hidden>
   <div class="auth-divider">veya</div>
   <button id="demo-giris-btn" type="button" class="btn-demo">🎭 Canlı Demo / Vitrin Modu</button>
-  <p class="muted demo-giris-not">Hesap gerekmez. Örnek verilerle, salt-okunur olarak platformu dene; gerçek verilere erişilmez.</p>
+  <p class="muted demo-giris-not">Hesap gerekmez. Örnek verilerle, salt-okunur olarak platformu dene; gerçek verilere erişilmez. Sana özel bir demo hesabı verildiyse yukarıdaki formla da girebilirsin; seni otomatik olarak aynı vitrin moduna alırız.</p>
   </div>
-  <p id="demo-kapali-not" class="muted" hidden>Herkese açık demo şu an kapalı. Demo hesabı verildiyse e-posta ve şifrenle giriş yapabilirsin.</p>
+  <p id="demo-kapali-not" class="muted demo-giris-not" hidden>Hesapsız (herkese açık) demo şu an kapalı. Sana bir demo hesabı verildiyse yukarıdaki forma e-posta ve şifrenle giriş yap; seni otomatik olarak salt-okunur vitrin moduna alırız.</p>
+  <p id="demo-depo-not" class="auth-message auth-message--error" hidden>Tarayıcın oturum depolamasına izin vermediği için demo hesabın açılamadı. Gizli sekmeyi/çerez kısıtını kapatıp tekrar dene.</p>
 
   <div class="auth-links">
     <a href="{{ '/hesap/kayit.html' | relative_url }}">Hesabın yok mu? Kayıt ol</a>
