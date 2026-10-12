@@ -196,6 +196,42 @@ async function ayarlar(env) {
   return ayarUcusta;
 }
 
+/* ===================== Gatekeeper Function anahtarı (kota koruması, migration 0088) =====================
+ * Panelden (Yedekleme & Verilerim › Worker anahtarları) "gatekeeper-function" KAPATILIRSA bu Function istekleri hiç
+ * işlemeden doğrudan statik içeriğe geçirir (next()): Supabase isteği yok, kilit kararı yok, cookie/imza işi yok → kilit sayfası ve
+ * /_gk/* uçları da devre dışı kalır. SUNUCU TARAFI KİLİT BU SÜRE BOYUNCA YOKTUR (tarayıcıdaki gatekeeper.js perdesi sürer, ama
+ * o güvenlik sınırı değildir). DÜRÜST NOT: Cloudflare, Function'ı çalıştırdığı her isteği kotaya sayar — kapalıyken de
+ * istek sayısı düşmez; kazanç CPU/alt-istek ve (anahtar kapalıyken) hızlı geçiştir. İstek sayısını asıl düşüren: _routes.json
+ * (CSS/JS/yazı tipi Function'a hiç girmez). Okunamazsa anahtar AÇIK kabul edilir (fail-open: bu koruma kesinti sebebi olmasın).
+ */
+let fnAnahtar = { v: true, t: 0 };
+let fnAnahtarUcusta = null;
+async function gatekeeperFonksiyonuAcikMi(env) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return true;
+  const ttl = sinirla(env.GK_AYAR_TTL_SN, 30, 5, 300) * 1000;
+  if (Date.now() - fnAnahtar.t < ttl) return fnAnahtar.v;
+  if (!fnAnahtarUcusta) {
+    fnAnahtarUcusta = supabaseFetch(
+      env,
+      "/rest/v1/worker_anahtarlari?ad=eq.gatekeeper-function&select=acik",
+      { headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}` } },
+      1500,
+    )
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`worker_anahtarlari ${r.status}`);
+        const satirlar = await r.json();
+        fnAnahtar = { v: !(Array.isArray(satirlar) && satirlar.length === 1 && satirlar[0].acik === false), t: Date.now() };
+        return fnAnahtar.v;
+      })
+      .catch(() => {
+        fnAnahtar = { v: fnAnahtar.v, t: Date.now() - ttl + 5000 }; // bilinen son durumla 5 sn daha dayan
+        return fnAnahtar.v;
+      })
+      .finally(() => { fnAnahtarUcusta = null; });
+  }
+  return fnAnahtarUcusta;
+}
+
 /* ================================ cookie (HMAC) ================================ */
 const anahtarOnbellek = new Map();
 async function hmacAnahtari(secret) {
@@ -422,6 +458,9 @@ export async function onRequest(context) {
 
   // pages.dev dışı (github.io zaten buraya gelmez; özel alan adı, localhost, wrangler dev): dokunma.
   if (GK.hostTuru(url.hostname) !== "pages.dev") return next();
+
+  // Kota koruması: Function panelden kapatıldıysa her şeyi olduğu gibi geçir (bkz. gatekeeperFonksiyonuAcikMi).
+  if (!(await gatekeeperFonksiyonuAcikMi(env))) return next();
 
   if (url.pathname.startsWith("/_gk/")) return gkUcNoktasi(request, env, url);
   if (request.method === "OPTIONS") return next();
