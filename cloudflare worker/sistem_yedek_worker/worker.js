@@ -544,6 +544,49 @@ async function uyeDosya(env, kimlik, url, cors) {
 
 /* -------------------------------- giriş -------------------------------- */
 
+/**
+ * SERT KAPATMA (isteğe bağlı, kota koruması): bir Worker'ın workers.dev adresini Cloudflare API ile KAPATIR/AÇAR. Kapalıyken o
+ * adrese gelen istekler Worker çalışmadan reddedilir → Cloudflare kotasına SAYILMAZ (yumuşak anahtar yalnızca erken 503 döner ve
+ * yine sayılır). Gereken secret'lar: CF_ACCOUNT_ID (zaten /kota için var) + CF_WORKERS_TOKEN (izin: Workers Scripts › Edit —
+ * Account Analytics token'ından AYRI, daha geniş yetkili; yoksa bu uç 501 döner, hiçbir şey bozulmaz).
+ * Yetki: Site Sahibi ya da sistem yedekleme yetkisi olan roller (sistem_export_yetkisi_var_mi). Yalnızca worker_anahtarlari'nda
+ * kayıtlı, tur='worker' ve korumali=false servisler (sistem-yedek-worker kendini kapatamaz).
+ */
+async function workerSert(env, kimlik, istek, cors) {
+  const yetki = await rpc(env, kimlik, "sistem_export_yetkisi_var_mi", {});
+  if (yetki.hata || yetki.veri !== true) return json({ error: "Yetkisiz işlem." }, 403, cors);
+  if (!env.CF_ACCOUNT_ID || !env.CF_WORKERS_TOKEN) {
+    return json({ error: "Sert kapatma yapılandırılmamış (CF_WORKERS_TOKEN: Workers Scripts › Edit).", yapilandirilmadi: true }, 501, cors);
+  }
+  let g;
+  try { g = await istek.json(); } catch { return json({ error: "Geçersiz istek." }, 400, cors); }
+  const ad = String(g?.ad || "");
+  if (!/^[a-z0-9-]{3,64}$/.test(ad) || typeof g?.acik !== "boolean") return json({ error: "Geçersiz istek." }, 400, cors);
+
+  const kayit = await fetch(`${env.SUPABASE_URL}/rest/v1/worker_anahtarlari?ad=eq.${encodeURIComponent(ad)}&select=tur,korumali`, {
+    headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}` },
+  });
+  const satirlar = kayit.ok ? await kayit.json().catch(() => []) : [];
+  if (!Array.isArray(satirlar) || satirlar.length !== 1) return json({ error: "Bilinmeyen servis." }, 404, cors);
+  if (satirlar[0].tur !== "worker" || satirlar[0].korumali) return json({ error: "Bu servis için sert kapatma yapılamaz." }, 403, cors);
+
+  const adres = `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/workers/scripts/${encodeURIComponent(ad)}/subdomain`;
+  let r, j = {};
+  for (const yontem of ["POST", "PUT"]) { // API sürümüne göre yöntem farkı olabilir: 404/405'te diğerini dene
+    r = await fetch(adres, {
+      method: yontem,
+      headers: { Authorization: `Bearer ${env.CF_WORKERS_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: g.acik }),
+    });
+    j = await r.json().catch(() => ({}));
+    if (r.status !== 404 && r.status !== 405) break;
+  }
+  if (!r.ok || j.success === false) {
+    return json({ error: `Cloudflare reddetti: ${j?.errors?.[0]?.message || "HTTP " + r.status}` }, 502, cors);
+  }
+  return json({ ok: true, ad, workersDev: g.acik }, 200, cors);
+}
+
 export default {
   async fetch(istek, env) {
     const cors = corsBasliklari(istek);
@@ -570,6 +613,7 @@ export default {
       const k = istek.headers.get("Authorization") || "";
       if (!k.startsWith("Bearer ")) return json({ error: "Oturum gerekli." }, 401, cors);
       try {
+        if (istek.method === "POST" && yol === "/worker-sert") return await workerSert(env, k, istek, cors);
         if (istek.method === "POST" && yol === "/r2/sil") return await r2Sil(env, k, istek, cors);
         if (istek.method === "POST" && yol === "/r2/kuyruk-isle") return await r2KuyrukIsle(env, k, cors);
         if (istek.method === "PUT" && yol === "/r2/yukle") return await r2Yukle(env, k, istek, url, cors);
@@ -594,6 +638,7 @@ export default {
       if (yol === "/github/zip") return await githubZip(env, kimlik, url, cors);
       if (yol === "/depolama") return await depolamaTara(env, kimlik, cors);
       if (yol === "/kota") return await kotaGetir(env, kimlik, cors);
+      if (yol === "/worker-sert/durum") return json({ yapilandirildi: !!(env.CF_ACCOUNT_ID && env.CF_WORKERS_TOKEN) }, 200, cors);
       if (yol === "/r2/gezgin") return await r2Gezgin(env, kimlik, url, cors);
       if (yol === "/r2/boyut") return await r2Boyut(env, kimlik, url, cors);
       if (yol === "/uye/dosya") return await uyeDosya(env, kimlik, url, cors);
