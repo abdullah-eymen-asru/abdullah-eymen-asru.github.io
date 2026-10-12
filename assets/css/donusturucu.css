@@ -229,3 +229,22 @@
 /* Bellek güvenliği (Oturumu Sıfırla) */
 .dn-guvenli-serit { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 12px; }
 .dn-sifirla { min-height: 44px; }
+
+/* ===== Mobil düzeltmeleri: dengeli düğmeler, büyük PDF önizleme, tam ekran ===== */
+.dn-sifirla .dn-btn-metin, .dn-eylemler--editor .dn-btn-metin { white-space: nowrap; }
+@media (max-width: 720px) {
+  .dn-eylemler--editor { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+  .dn-eylemler--editor .dn-btn { width: 100%; min-width: 0; }
+  .dn-eylemler--editor .dn-btn--birincil { grid-column: 1 / -1; }
+  .dn-eylemler--editor .dn-btn-metin { white-space: normal; }
+  /* Toolbar ekranı yemesin: editör sayfa akışında uzar, ÖNİZLEME alanı bağımsız ve yüksek olur */
+  .dn-editor.dn-pdf { height: auto; overflow: visible; }
+  .dn-pdf-alan { height: clamp(460px, 78dvh, 1000px); min-height: 460px; }
+  .dn-pdf-sahne { padding: 4px; }
+  .dn-guvenli-serit { display: grid; grid-template-columns: 1fr; }
+  .dn-guvenli-serit .dn-btn { width: 100%; }
+}
+.dn-editor.dn-tam { position: fixed; inset: 0; z-index: 2000; height: 100dvh !important; max-width: none; border-radius: 0; margin: 0; overflow: auto; background: var(--bg, #111); }
+.dn-editor.dn-tam .dn-pdf-alan { height: calc(100dvh - 190px); min-height: 300px; }
+.dn-tam-ekran-acik { overflow: hidden; }
+.dn-tam-cik { position: sticky; top: 0; z-index: 5; margin: 6px; align-self: flex-end; }
