@@ -1,0 +1,52 @@
+/* assets/css/belge-tarayici.css — Belge Tarayıcı (dn- tasarım belirteçlerini donusturucu.css'ten devralır).
+ * Inline stil YOK (CSP): yalnızca sınıflar; pin konumları JS'te CSSOM ile verilir. Sıfır taşma: min-width:0, wrap, iç kaydırma. */
+.bt-kok { gap: 14px; }
+.bt-seritler { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.bt-sayac { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.bt-bellek { font-variant-numeric: tabular-nums; }
+.bt-dropzone { min-height: 120px; }
+
+/* Küçük resim ızgarası */
+.bt-izgara { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 168px), 1fr)); min-width: 0; }
+.bt-kart { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid var(--dn-cizgi); border-radius: 12px; background: var(--dn-yuzey); min-width: 0; cursor: grab; }
+.bt-kart.bt-surukleniyor { opacity: .45; }
+.bt-kart.bt-hedef { outline: 3px dashed var(--accent, #2563eb); outline-offset: 2px; }
+.bt-sira { position: absolute; top: 6px; left: 6px; z-index: 1; min-width: 26px; padding: 2px 7px; border-radius: 999px; background: var(--accent, #2563eb); color: var(--dn-on-vurgu); font-size: .8rem; font-weight: 700; text-align: center; }
+.bt-kucuk { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: contain; border-radius: 8px; background: repeating-conic-gradient(#e5e7eb 0% 25%, #fff 0% 50%) 0 0 / 14px 14px; }
+.bt-kucuk--bos { display: grid; place-items: center; color: var(--muted); }
+.bt-ad { font-size: .88rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bt-meta { font-size: .78rem; }
+.bt-oge-mod { min-height: 34px; font-size: .85rem; width: 100%; }
+.bt-kart-eylem { display: flex; flex-wrap: wrap; gap: 2px; justify-content: space-between; }
+.bt-kart-eylem .dn-btn { min-width: 38px; padding: 4px 6px; }
+
+/* Ayarlar */
+.bt-profiller { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); }
+.bt-profil { flex-direction: column; gap: 2px; }
+.bt-profil[aria-pressed="true"] { background: var(--accent, #2563eb); border-color: var(--accent, #2563eb); color: var(--dn-on-vurgu); }
+.bt-profil[aria-pressed="true"] small { color: inherit; }
+.bt-alan { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.bt-alan--aralik { flex-direction: row; align-items: center; flex-wrap: wrap; gap: 10px; }
+.bt-alan--aralik label { flex: 0 0 120px; font-weight: 600; }
+.bt-alan--aralik input[type="range"] { flex: 1 1 160px; min-width: 0; accent-color: var(--accent, #2563eb); }
+.bt-alan--aralik output { flex: 0 0 64px; text-align: right; font-variant-numeric: tabular-nums; }
+.bt-ayar-izgara { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
+.bt-alan label { font-weight: 600; font-size: .92rem; }
+.bt-tahmin-kutu { padding: 10px 12px; border-radius: 10px; background: var(--dn-zemin2); border: 1px solid var(--dn-cizgi); overflow-wrap: anywhere; }
+.bt-tahmin { font-variant-numeric: tabular-nums; }
+.bt-eylemler { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Perspektif penceresi */
+.bt-koseler-dialog { width: min(96vw, 760px); max-height: 94dvh; }
+.bt-koseler-govde { max-height: 90dvh; overflow: auto; }
+.bt-sahne { position: relative; width: 100%; max-height: 62dvh; line-height: 0; touch-action: none; user-select: none; border-radius: 10px; margin: 18px; width: calc(100% - 36px); background: #111; }
+.bt-sahne-taban, .bt-sahne-ust { border-radius: 10px; display: block; width: 100%; height: auto; max-height: 62dvh; object-fit: contain; }
+.bt-sahne-ust { position: absolute; inset: 0; pointer-events: none; }
+.bt-pin { position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px; padding: 0; border-radius: 50%; border: 3px solid #fff; background: #22c55e; color: #052e16; font: 700 .85rem/1 system-ui, sans-serif; box-shadow: 0 0 0 2px #15803d, 0 2px 8px rgba(0,0,0,.5); cursor: grab; touch-action: none; }
+.bt-pin--aktif, .bt-pin:focus-visible { background: #facc15; outline: 3px solid var(--accent, #2563eb); outline-offset: 2px; }
+.bt-lup { position: absolute; top: 8px; left: 8px; width: 128px; height: 128px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 2px 10px rgba(0,0,0,.6); background: #fff; pointer-events: none; z-index: 5; }
+.bt-lup--sag { left: auto; right: 8px; }
+.bt-lup--alt { top: auto; bottom: 8px; }
+.bt-koseler-eylem { flex-wrap: wrap; }
+@media (max-width: 480px) { .bt-izgara { grid-template-columns: repeat(2, minmax(0, 1fr)); } .bt-alan--aralik label { flex-basis: 100%; } }
+@media (prefers-reduced-motion: no-preference) { .bt-kart { transition: outline-color .15s, opacity .15s; } }
