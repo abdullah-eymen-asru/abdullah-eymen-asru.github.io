@@ -10,8 +10,8 @@
  */
 
 // ---- BURAYI DOLDUR (Supabase Dashboard > Project Settings > API) ----
-const SUPABASE_URL = "https://eahvcirspmvntffzphye.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVhaHZjaXJzcG12bnRmZnpwaHllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxOTgxODMsImV4cCI6MjEwMTc3NDE4M30._f-GKSsffxFo66w3g0NJfmOWEhlsjU4Y6mlcTlcPJ2E"; // "anon public" anahtarı
+export const SUPABASE_URL = "https://eahvcirspmvntffzphye.supabase.co";
+export const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVhaHZjaXJzcG12bnRmZnpwaHllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxOTgxODMsImV4cCI6MjEwMTc3NDE4M30._f-GKSsffxFo66w3g0NJfmOWEhlsjU4Y6mlcTlcPJ2E"; // "anon public" anahtarı
 // -----------------------------------------------------------------------
 
 // DEMO / VİTRİN MODU: isDemoMode iken aşağıdaki `supabase` export'u GERÇEK istemci DEĞİL, sahte (mock) istemcidir
