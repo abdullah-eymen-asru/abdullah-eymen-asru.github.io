@@ -16,6 +16,7 @@ permalink: "/panel/dashboard.html"
 <link rel="stylesheet" href="{{ '/assets/css/akademik.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/sistem-yedek.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/donusturucu.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/css/belge-tarayici.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/demo.css' | relative_url }}">
 
 <div class="loading-overlay" id="loading">Yükleniyor...</div>
@@ -1052,6 +1053,14 @@ permalink: "/panel/dashboard.html"
       <h1>Dönüştürücü &amp; Belge Düzenleyici</h1>
       <div id="dn-kok" class="dn-kok"><p class="muted">Yükleniyor...</p></div>
       <div id="dn-mesaj" class="auth-message" hidden role="status"></div>
+    </section>
+
+    <!-- Belge Tarayıcı, Kümülatif Çoklu Birleştirici, Evrensel Sıkıştırma & Bellek Korumalı Dönüştürücü
+         (assets/js/belge-tarayici/belge-tarayici.js). %100 istemci: sıfır sunucu/Worker isteği. Yetki: Dönüştürücü ile aynı (can_use_converter). -->
+    <section class="dash-view" id="view-tool-belge-tarayici" hidden data-view="tool-belge-tarayici">
+      <h1>Belge Tarayıcı &amp; Birleştirici</h1>
+      <div id="bt-kok" class="bt-kok"><p class="muted">Yükleniyor...</p></div>
+      <div id="bt-mesaj" class="auth-message" hidden role="status"></div>
     </section>
 
     <section class="dash-view" id="view-sys-hakkimda" hidden data-view="sys-hakkimda">
