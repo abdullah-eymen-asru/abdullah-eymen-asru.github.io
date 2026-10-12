@@ -3,6 +3,8 @@
  * -----------------------------------------------------------------------
  *  • EN ÜSTTE global anahtar: "Adminler bu demo yetkilerini değiştirebilsin mi?" — YALNIZCA Site Sahibi (owner) değiştirir
  *    (RPC: owner_demo_admin_izni_ayarla). Kapalıyken adminler matrisi yalnızca OKUR.
+ *  • "Herkese açık demo girişi" (migration 0085): VARSAYILAN KAPALI. Kapalıyken giriş sayfasında demo düğmesi görünmez ve hesapsız ziyaretçi
+ *    demoya giremez; yalnızca 'demo' rollü gerçek üyeler girer. YALNIZCA Site Sahibi açar/kapatır (RPC: owner_demo_herkese_acik_ayarla).
  *  • Granüler matris: Hub kartları, PDF (sayfa + araç çubuğu), Arşiv (sayfa + ZIP inceleme), Notlar (sayfa + filtre çipleri),
  *    Sistem/Metrik. Üst sayfa kapalıysa alt özellikler pasif görünür.
  *  • Depolama: Supabase `demo_config` (tek satır). Okuma demo_config_getir(), yazma demo_config_kaydet() — yetki kararı
@@ -56,21 +58,22 @@ async function baslat() {
   const mesaj = el("div", { class: "auth-message", hidden: true });
 
   let cfg = configBirlestir(VARSAYILAN_CONFIG, null);
-  let durum = { is_owner: profile.role === "owner", can_edit: profile.role === "owner", admin_degistirebilir: false };
+  let durum = { is_owner: profile.role === "owner", can_edit: profile.role === "owner", admin_degistirebilir: false, herkese_acik: false };
   let kirli = false;
 
   async function yukle() {
     const [c, d] = await Promise.all([supabase.rpc("demo_config_getir"), supabase.rpc("demo_config_yonetim_durumu")]);
     if (c.error) return showMessage(mesaj, "Yapılandırma okunamadı: " + c.error.message + " (0083 migration'ı çalıştırıldı mı?)");
     cfg = configBirlestir(VARSAYILAN_CONFIG, c.data);
-    if (d.data) durum = d.data;
+    if (d.data) durum = { herkese_acik: false, ...d.data };
+    durum.herkese_acik = c.data?.herkeseAcik === true;
     kirli = false;
     ciz();
   }
 
   async function kaydet() {
     kaydetBtn.disabled = true;
-    const { adminlerDegistirebilir, ...govde } = cfg; // global anahtar ayrı RPC ile yönetilir
+    const { adminlerDegistirebilir, herkeseAcik, ...govde } = cfg; // global anahtarlar ayrı RPC'lerle yönetilir
     const { error } = await supabase.rpc("demo_config_kaydet", { p_config: govde });
     if (error) showMessage(mesaj, "Kaydedilemedi: " + error.message);
     else {
@@ -89,6 +92,18 @@ async function baslat() {
     durum.admin_degistirebilir = acik;
     cfg.adminlerDegistirebilir = acik;
     showMessage(mesaj, acik ? "Adminler artık demo yetkilerini değiştirebilir." : "Yalnızca Site Sahibi demo yetkilerini değiştirebilir.", "success");
+    ciz();
+  }
+
+  async function herkeseAcikDegis(acik) {
+    if (acik && !window.confirm("Demo girişi HERKESE açılacak: giriş sayfasında düğme görünür ve hesapsız herkes vitrin (örnek veri, salt-okunur) modunu açabilir. Gerçek verilere erişilmez. Açılsın mı?")) return ciz();
+    const { error } = await supabase.rpc("owner_demo_herkese_acik_ayarla", { p_acik: acik });
+    if (error) {
+      showMessage(mesaj, "Değiştirilemedi: " + error.message + " (0085 migration'ı çalıştırıldı mı?)");
+      return ciz();
+    }
+    durum.herkese_acik = acik;
+    showMessage(mesaj, acik ? "Demo girişi artık HERKESE açık." : "Demo girişi kapatıldı: yalnızca 'demo' rollü üyeler girebilir. Açık demo oturumları bir sonraki yenilemede sonlanır.", "success");
     ciz();
   }
 
@@ -116,6 +131,10 @@ async function baslat() {
       el("h2", { text: "Yetki Kontrolü" }),
       anahtar("Adminler Bu Demo Yetkilerini Değiştirebilsin mi?", durum.admin_degistirebilir, !durum.is_owner, globalDegis,
         durum.is_owner ? "Kapalıyken yalnızca Site Sahibi değiştirir; adminler sadece okur." : "Bu anahtarı yalnızca Site Sahibi değiştirebilir."),
+      anahtar("Herkese açık demo girişi (hesapsız ziyaretçiler)", durum.herkese_acik, !durum.is_owner, herkeseAcikDegis,
+        durum.is_owner
+          ? (durum.herkese_acik ? "AÇIK: giriş sayfasında “Canlı Demo” düğmesi görünür; herkes girebilir." : "KAPALI (önerilen): düğme görünmez; yalnızca Üye Ayarları'nda rolü “Demo (vitrin)” yapılan üyeler demoya girer.")
+          : "Bu anahtarı yalnızca Site Sahibi değiştirebilir."),
       !duzenle ? el("p", { class: "auth-message auth-message--warning", text: "Salt-okunur: bu ayarları değiştirme yetkin yok (Site Sahibi adminlere izin vermemiş)." }) : null);
 
     const matris = BOLUMLER.map((b) => {
