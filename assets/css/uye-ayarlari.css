@@ -125,10 +125,14 @@
   font-size: 0.85rem;
 }
 .uya-email {
-  font-size: 0.78rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 0.85rem;
+  /* E-posta ASLA kısaltılmaz (…): uzun adresler (ör. ad+etiket@gmail.com) kartın genişliğinde alt satıra bölünür. */
+  flex: 1 1 100%;
+  min-width: 0;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  line-height: 1.35;
 }
 .uya-rol-etiket {
   flex-shrink: 0;
