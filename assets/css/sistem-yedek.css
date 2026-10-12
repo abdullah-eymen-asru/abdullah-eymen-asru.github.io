@@ -290,3 +290,23 @@
 .so-dosya-kart img, .so-dosya-kart canvas { display: block; width: 100%; max-height: 180px; object-fit: contain; border-radius: 8px; background: rgba(127, 127, 127, .12); }
 .so-dosya-ad { font-weight: 600; overflow-wrap: anywhere; }
 @media (max-width: 600px) { .sy-altsekme { flex: 1 1 100%; } }
+
+/* ===== v3: sayfalama, içerik gezgini, geniş pencere, kota listesi ===== */
+.sy-sayfalayici { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; padding: 8px 0; }
+.sy-sayfa-bilgi { font-weight: 600; }
+.sy-sayfalayici select { min-height: 40px; }
+.sy-dialog--genis { width: min(960px, 96vw); max-height: 92dvh; padding: 0; }
+.sy-dialog-govde--genis { max-height: calc(92dvh - 64px); overflow: auto; padding: 12px 16px 16px; display: grid; gap: 12px; }
+.sy-dialog-ust { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; background: var(--sy-yuzey, var(--card-bg)); border-bottom: 1px solid var(--sy-cizgi, var(--border)); }
+.sy-sat-liste { display: grid; gap: 8px; min-width: 0; }
+.sy-sat { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--sy-cizgi, var(--border)); border-radius: 10px; min-width: 0; }
+.sy-sat > input[type="checkbox"] { width: 20px; height: 20px; flex: none; margin-top: 4px; }
+.sy-sat-onizleme { display: grid; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.sy-sat-alan { display: flex; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.sy-sat-k { color: var(--muted); font-size: .85rem; min-width: 110px; }
+.sy-sat-v { overflow-wrap: anywhere; flex: 1 1 160px; min-width: 0; }
+.sy-analiz-blok { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--sy-cizgi, var(--border)); border-radius: 12px; }
+.sy-analiz-ust { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: space-between; }
+.sy-kota-liste { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
+.sy-kota-liste li { display: flex; justify-content: space-between; gap: 8px; }
+.sy-btn--tehlike-hafif { background: transparent; color: var(--sy-tehlike, #c0392b); border-color: var(--sy-tehlike, #c0392b); }
