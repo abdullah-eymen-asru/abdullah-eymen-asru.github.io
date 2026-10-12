@@ -455,7 +455,7 @@ mutation($issueId: ID!, $title: String, $body: String) {
 }
 `;
 
-export default {
+const ASIL_ISLEYICI = {
   async fetch(request, env, ctx) {
     const origin = request.headers.get("Origin") || "";
     const { headers: corsHeaders, isAllowed } = corsHeadersOlustur(origin);
@@ -743,5 +743,58 @@ export default {
     }
 
     return jsonYanit({ message: "Bilinmeyen uç nokta." }, 404, corsHeaders);
+  },
+};
+
+/* ============================================================================
+ * KOTA KORUMASI (migration 0088 · public.worker_anahtarlari) — Site Sahibi/yetkili yönetici bu servisi panelden
+ * (Yedekleme & Verilerim › Worker anahtarları) KAPATTIYSA istek, asıl kod çalışmadan 503 ile reddedilir.
+ * Durum Worker örneğinde 30 sn bellekte tutulur (en çok 30 sn'de bir 1 Supabase isteği). Okunamazsa servis AÇIK kabul
+ * edilir (fail-open): bu koruma kendi başına bir kesinti sebebi olmamalı. Değerler herkese açıktır (anon anahtar gizli değildir).
+ * DÜRÜST NOT: reddedilen istek de Cloudflare'de 1 istek sayılır; kazanç CPU/alt-istektir. İstekleri kaynağında kesen
+ * katman istemci kapısıdır (assets/js/core/worker-kapi.js); workers.dev'i tamamen kapatmak isteğe bağlı "sert kapatma"dır.
+ * ========================================================================== */
+const WK_AD = "izleme-okuma-yonetim-worker";
+const WK_SB_URL = "https://eahvcirspmvntffzphye.supabase.co";
+const WK_SB_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVhaHZjaXJzcG12bnRmZnpwaHllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxOTgxODMsImV4cCI6MjEwMTc3NDE4M30._f-GKSsffxFo66w3g0NJfmOWEhlsjU4Y6mlcTlcPJ2E";
+const WK_TTL_MS = 30000;
+let wkDurum = { t: 0, kapali: false };
+async function wkKapaliMi() {
+  if (Date.now() - wkDurum.t < WK_TTL_MS) return wkDurum.kapali;
+  try {
+    const kontrol = new AbortController();
+    const zamanAsimi = setTimeout(() => kontrol.abort(), 1500);
+    const r = await fetch(`${WK_SB_URL}/rest/v1/worker_anahtarlari?ad=eq.${WK_AD}&select=acik`, {
+      headers: { apikey: WK_SB_ANON, Authorization: `Bearer ${WK_SB_ANON}` },
+      signal: kontrol.signal,
+    });
+    clearTimeout(zamanAsimi);
+    if (r.ok) {
+      const satirlar = await r.json();
+      wkDurum = { t: Date.now(), kapali: Array.isArray(satirlar) && satirlar.length === 1 && satirlar[0].acik === false };
+    } else {
+      wkDurum = { t: Date.now() - WK_TTL_MS + 5000, kapali: wkDurum.kapali }; // hata: bilinen son durumla 5 sn daha dayan
+    }
+  } catch {
+    wkDurum = { t: Date.now() - WK_TTL_MS + 5000, kapali: wkDurum.kapali };
+  }
+  return wkDurum.kapali;
+}
+const WK_IZINLI_ORIGIN = /^(https:\/\/(abdullah-eymen-asru\.(github\.io|pages\.dev))|http:\/\/localhost(:\d+)?)$/;
+export default {
+  async fetch(istek, env, ctx) {
+    if (istek.method !== "OPTIONS" && (await wkKapaliMi())) {
+      const origin = istek.headers.get("Origin") || "";
+      return new Response(JSON.stringify({ error: "Bu servis geçici olarak kapatıldı.", kapali: true }), {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "Retry-After": "300",
+          "Cache-Control": "no-store",
+          ...(WK_IZINLI_ORIGIN.test(origin) ? { "Access-Control-Allow-Origin": origin, Vary: "Origin" } : {}),
+        },
+      });
+    }
+    return ASIL_ISLEYICI.fetch(istek, env, ctx);
   },
 };
