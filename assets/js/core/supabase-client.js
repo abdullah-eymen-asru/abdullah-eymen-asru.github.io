@@ -14,6 +14,12 @@ const SUPABASE_URL = "https://eahvcirspmvntffzphye.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVhaHZjaXJzcG12bnRmZnpwaHllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxOTgxODMsImV4cCI6MjEwMTc3NDE4M30._f-GKSsffxFo66w3g0NJfmOWEhlsjU4Y6mlcTlcPJ2E"; // "anon public" anahtarı
 // -----------------------------------------------------------------------
 
+// DEMO / VİTRİN MODU: isDemoMode iken aşağıdaki `supabase` export'u GERÇEK istemci DEĞİL, sahte (mock) istemcidir
+// (assets/js/demo/demo-supabase.js): hiçbir Supabase/Worker/R2 isteği atılmaz, sahte veriyle çalışır. Ağ kalkanı
+// (demo-ag-kalkani.js) fetch/XHR'i de ayrıca engeller. Demo değilse bu import'lar hiçbir şeyi değiştirmez.
+import { isDemoMode, configiBaslat } from "../demo/demo-durum.js";
+import { demoSupabase } from "../demo/demo-supabase.js";
+
 // Supabase JS SDK — artık CDN'den (esm.sh) ESM import DEĞİL, YEREL vendor
 // dosyasından (assets/js/vendor/supabase.js, Supabase'in resmi UMD build'i)
 // alınıyor. Bu build build sistemi gerektirmez, GitHub Pages / Cloudflare
@@ -35,14 +41,14 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // yükleniyor (defer'lı klasik scriptler ile modül scriptleri, spec gereği
 // belge sırasına göre ve DOMContentLoaded'dan önce çalışır) — yani
 // aşağıdaki window.supabase, bu satır çalıştığında HER ZAMAN hazırdır.
-if (!window.supabase || typeof window.supabase.createClient !== "function") {
+if (!isDemoMode && (!window.supabase || typeof window.supabase.createClient !== "function")) {
   throw new Error(
     "Supabase JS bulunamadı: assets/js/vendor/supabase.js eksik ya da " +
       "_layouts/default.html'deki <script defer> etiketinden sonra " +
       "çalıştırılmış olabilir."
   );
 }
-const { createClient } = window.supabase;
+const createClient = isDemoMode ? null : window.supabase.createClient;
 
 /*
  * "OTURUMUMU HATIRLA" (bkz. hesap/giris.md + assets/js/auth/auth-pages.js)
@@ -108,14 +114,19 @@ const dinamikOturumDeposu = {
   },
 };
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true, // OAuth / e-posta linki dönüşünde token'ı otomatik yakalar
-    storage: dinamikOturumDeposu,
-  },
-});
+export const supabase = isDemoMode
+  ? demoSupabase
+  : createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true, // OAuth / e-posta linki dönüşünde token'ı otomatik yakalar
+        storage: dinamikOturumDeposu,
+      },
+    });
+
+// Demo görünürlük yapılandırması (demo_config_getir RPC'si; demo modunda Supabase'e giden TEK istek). Demo değilse no-op.
+if (isDemoMode) configiBaslat(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /**
  * Giriş sayfasındaki "Oturumumu hatırla" checkbox'ının durumunu kaydeder.
