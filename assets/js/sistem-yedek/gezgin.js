@@ -25,6 +25,44 @@ const KILIT_METNI = {
   sistem_semasi: "Sistem şeması — silinemez",
 };
 
+/* ------------------------------ ortak parçalar ------------------------------ */
+
+/** Büyük, kaydırılabilir bilgi/işlem penceresi. kur(govde, kapat) içeriği doldurur. Kapanınca düğümü söker. */
+function pencereAc(baslik, kur) {
+  const d = el("dialog", { class: "sy-dialog sy-dialog--genis" });
+  const govde = el("div", { class: "sy-dialog-govde sy-dialog-govde--genis" });
+  const kapat = dugme({ metin: "Kapat", ikonAdi: "kapat", tur: "ikincil", kucuk: true });
+  kapat.addEventListener("click", () => d.close());
+  d.append(el("div", { class: "sy-dialog-ust" }, el("h3", { class: "sy-dialog-baslik", text: baslik }), kapat), govde);
+  d.addEventListener("close", () => d.remove());
+  document.body.append(d);
+  if (typeof d.showModal === "function") d.showModal(); else d.setAttribute("open", "");
+  kur(govde, () => d.close());
+  return d;
+}
+
+/** Bir tablo satırını okunur kısa bir blok olarak gösterir (ilk alanlar açık, kalanı "tümü" içinde). */
+function satirOnizleme(veri) {
+  const girisler = Object.entries(veri || {}).filter(([, v]) => v !== null && v !== "");
+  const ilk = girisler.slice(0, 4);
+  const geri = girisler.slice(4);
+  const satir = ([k, v]) => el("div", { class: "sy-sat-alan" }, el("span", { class: "sy-sat-k", text: k }), el("span", { class: "sy-sat-v", text: String(v) }));
+  return el("div", { class: "sy-sat-onizleme" }, ...ilk.map(satir),
+    geri.length ? el("details", {}, el("summary", { text: `+${geri.length} alan daha` }), ...geri.map(satir)) : null);
+}
+
+function sayfalayici(toplam, sayfa, boyut, git, boyutSec) {
+  const sayfaSayisi = Math.max(1, Math.ceil(toplam / boyut));
+  const geri = dugme({ metin: "Önceki", tur: "ikincil", kucuk: true, disabled: sayfa <= 0, "aria-label": "Önceki sayfa" });
+  const ileri = dugme({ metin: "Sonraki", tur: "ikincil", kucuk: true, disabled: sayfa >= sayfaSayisi - 1, "aria-label": "Sonraki sayfa" });
+  geri.addEventListener("click", () => git(sayfa - 1));
+  ileri.addEventListener("click", () => git(sayfa + 1));
+  const s = boyutSec ? el("select", { "aria-label": "Sayfa başına öğe" }, [10, 20, 50].map((n) => el("option", { value: String(n), text: `${n} / sayfa`, selected: n === boyut ? "" : null }))) : null;
+  s?.addEventListener("change", () => boyutSec(Number(s.value)));
+  return el("nav", { class: "sy-sayfalayici", "aria-label": "Sayfalama" }, geri,
+    el("span", { class: "sy-sayfa-bilgi", text: `Sayfa ${sayfa + 1} / ${sayfaSayisi} · ${sayi(toplam)} öğe` }), ileri, s);
+}
+
 /* ====================================================================== */
 /* A) VERİTABANI                                                            */
 /* ====================================================================== */
@@ -38,6 +76,9 @@ function veritabaniPaneli(mesaj) {
   let sadeceSilinebilir = false;
   let sira = "boyut";
   let calisiyor = false;
+  let sayfa = 0;
+  let sayfaBoyu = 15;
+  let sonGorunen = [];
 
   const anahtar = (t) => `${t.sema}.${t.tablo}`;
   const SIRALAR = {
@@ -51,9 +92,12 @@ function veritabaniPaneli(mesaj) {
   const sadeceK = el("input", { type: "checkbox", id: "sy-gz-sadece" });
   const cipler = el("div", { class: "sy-cipler", role: "group", "aria-label": "Kategori filtresi" });
   const liste = el("ul", { class: "sy-gz-liste" });
+  const sayfalamaKutu = el("div", { class: "sy-gz-sayfalama" });
   const cubuk = el("div", { class: "sy-gz-cubuk", role: "status", "aria-live": "polite" });
   const ozetMetin = el("span", { class: "sy-gz-cubuk-metin" });
-  const analizBtn = dugme({ metin: "Seçimi analiz et", ikonAdi: "ara", tur: "ikincil", kucuk: true });
+  const analizBtn = dugme({ metin: "Seçimi analiz et / içeriği gör", ikonAdi: "ara", tur: "ikincil", kucuk: true });
+  const silinebilirBtn = dugme({ metin: "Neler silinebilir?", ikonAdi: "ara", tur: "ikincil", kucuk: true });
+  const sayfaSecBtn = dugme({ metin: "Bu sayfadakileri seç", tur: "ikincil", kucuk: true });
   const silBtn = dugme({ metin: "Seçilenleri sil…", ikonAdi: "cop", tur: "tehlike", kucuk: true });
   const temizleBtn = dugme({ metin: "Seçimi temizle", ikonAdi: "kapat", tur: "hayalet", kucuk: true });
   cubuk.append(ozetMetin, analizBtn, silBtn, temizleBtn);
@@ -75,7 +119,7 @@ function veritabaniPaneli(mesaj) {
     cipler.replaceChildren(...KATEGORILER.map((k) => {
       const n = k.id === "hepsi" ? tablolar.length : tablolar.filter((t) => t.kategori === k.id).length;
       const b = el("button", { type: "button", class: "sy-sec", "aria-pressed": String(kategori === k.id), text: `${k.ad} (${n})` });
-      b.addEventListener("click", () => { kategori = k.id; cipleriCiz(); ciz(); });
+      b.addEventListener("click", () => { kategori = k.id; sayfa = 0; cipleriCiz(); ciz(); });
       return b;
     }));
   }
@@ -99,6 +143,7 @@ function veritabaniPaneli(mesaj) {
         el("span", { class: "sy-tablo-boyut", text: bayt(t.toplam) })),
       el("progress", { class: "sy-cubuk sy-cubuk--ince", max: "100", value: String(Math.max(1, Math.round((Number(t.toplam) / enBuyuk) * 100))), "aria-label": `${t.tablo} göreli boyut` }),
       el("p", { class: "sy-tablo-acik", text: kilitli ? (KILIT_METNI[t.kilit] || "") : t.aciklama }),
+      el("div", { class: "sy-eylemler" }, icerikBtn(t)),
       el("p", { class: "sy-tablo-meta" },
         el("span", { text: `${t.satir_kesin ? "" : "≈ "}${sayi(t.satir)} satır` }),
         el("span", { text: `Veri ${bayt(t.veri)}` }),
@@ -113,25 +158,118 @@ function veritabaniPaneli(mesaj) {
       .filter((t) => !sadeceSilinebilir || t.silinebilir)
       .filter((t) => !q || `${anahtar(t)} ${t.aciklama}`.toLocaleLowerCase("tr").includes(q))
       .sort(SIRALAR[sira][1]);
+    sayfa = Math.min(sayfa, Math.max(0, Math.ceil(gorunen.length / sayfaBoyu) - 1));
+    const dilim = gorunen.slice(sayfa * sayfaBoyu, (sayfa + 1) * sayfaBoyu);
+    sonGorunen = dilim;
     const enBuyuk = Math.max(1, ...gorunen.map((t) => Number(t.toplam)));
-    liste.replaceChildren(...(gorunen.length ? gorunen.map((t) => satirCiz(t, enBuyuk)) : [el("li", { class: "muted", text: "Bu filtreyle eşleşen tablo yok." })]));
+    liste.replaceChildren(...(dilim.length ? dilim.map((t) => satirCiz(t, enBuyuk)) : [el("li", { class: "muted", text: "Bu filtreyle eşleşen tablo yok." })]));
+    sayfalamaKutu.replaceChildren(gorunen.length > 10 ? sayfalayici(gorunen.length, sayfa, sayfaBoyu, (n) => { sayfa = n; ciz(); liste.scrollIntoView({ block: "start" }); }, (b) => { sayfaBoyu = b; sayfa = 0; ciz(); }) : "");
     ozetGuncelle();
   }
 
-  async function analiz() {
-    const s = secilenler();
-    if (!s.length) return;
-    const adlar = new Set(s.map((t) => t.tablo));
-    const zincirEk = [...new Set(s.flatMap((t) => t.cascade || []))].map((x) => x.replace(/^public\./, "")).filter((x) => !adlar.has(x));
-    const satir = s.reduce((n, t) => n + Number(t.satir), 0);
-    const boyut = s.reduce((n, t) => n + Number(t.toplam), 0);
-    const buyukler = [...s].sort((a, b) => b.toplam - a.toplam).slice(0, 5).map((t) => `${t.tablo} (${bayt(t.toplam)})`);
-    mesaj([
-      `Analiz: ${s.length} tablo, ${sayi(satir)} satır, ${bayt(boyut)} (tablo + indeks + TOAST).`,
-      `En büyükler: ${buyukler.join(", ")}.`,
-      zincirEk.length ? `Zincirleme etkilenecek (seçili olmayan) tablolar: ${zincirEk.join(", ")}.` : "Zincirleme etkilenen başka tablo yok.",
-      "Bu yalnızca analizdir; hiçbir şey silinmedi.",
-    ].join("\n"), "success");
+  function icerikBtn(t) {
+    const b = dugme({ metin: "İçeriği gör", ikonAdi: "goz", tur: "hayalet", kucuk: true, disabled: t.sema !== "public" });
+    b.addEventListener("click", () => satirGezgini(t));
+    return b;
+  }
+
+  /** Satır gezgini: tablonun kayıtlarını sayfalı gösterir; işaretlenen satırlar silinir (kilitli tabloda yalnızca okuma). */
+  function satirGezgini(t) {
+    pencereAc(`${t.tablo} — içerik`, (govde, kapat) => {
+      const adet = 20;
+      let ofset = 0, veri = null, yukleniyor = false;
+      const secilen = new Map();
+      const durum = el("p", { class: "muted", role: "status" });
+      const icerik = el("div", { class: "sy-sat-liste" });
+      const sayfaYeri = el("div");
+      const silB = dugme({ metin: "Seçilenleri sil…", ikonAdi: "cop", tur: "tehlike", kucuk: true, disabled: true });
+      const tumTablo = dugme({ metin: "Tüm tabloyu temizle…", tur: "tehlike-hafif", kucuk: true, disabled: !t.silinebilir });
+      const sayfaSec = dugme({ metin: "Bu sayfayı seç", tur: "ikincil", kucuk: true });
+      const cubuk2 = el("div", { class: "sy-gz-cubuk" }, el("span", { class: "sy-gz-cubuk-metin", text: `${sayi(t.satir)} satır · ${bayt(t.toplam)}` }), sayfaSec, silB, tumTablo);
+      const guncelle = () => {
+        silB.disabled = !secilen.size || !t.silinebilir;
+        const m = silB.querySelector(".dn-btn-metin, .sy-dugme-metin, span:last-child");
+        if (m) m.textContent = secilen.size ? `${secilen.size} satırı sil…` : "Seçilenleri sil…";
+      };
+      async function yukle() {
+        if (yukleniyor) return;
+        yukleniyor = true; durum.textContent = "Yükleniyor…";
+        const { data, error } = await supabase.rpc("sistem_tablo_satirlari", { p_tablo: t.tablo, p_ofset: ofset, p_adet: adet });
+        yukleniyor = false;
+        if (error) { durum.textContent = hataMetni(error); return; }
+        durum.textContent = "";
+        veri = data;
+        icerik.replaceChildren(...(veri.satirlar.length ? veri.satirlar.map((r) => {
+          const k = JSON.stringify(r.pk);
+          const silinebilirSatir = t.silinebilir && veri.pk.length > 0;
+          const kutu = el("input", { type: "checkbox", disabled: silinebilirSatir ? null : "", "aria-label": "Satırı seç" });
+          kutu.checked = secilen.has(k);
+          kutu.addEventListener("change", () => { if (kutu.checked) secilen.set(k, r.pk); else secilen.delete(k); guncelle(); });
+          r._kutu = kutu; r._k = k;
+          return el("div", { class: "sy-sat" }, silinebilirSatir ? kutu : el("span", { class: "sy-gz-kilit" }, ikon("kilit")), satirOnizleme(r.veri));
+        }) : [el("p", { class: "muted", text: "Bu tabloda kayıt yok." })]));
+        sayfaYeri.replaceChildren(sayfalayici(veri.toplam, Math.floor(ofset / adet), adet, (n) => { ofset = n * adet; yukle(); }));
+        guncelle();
+      }
+      sayfaSec.addEventListener("click", () => { for (const r of veri?.satirlar || []) if (r._kutu && !r._kutu.disabled) { r._kutu.checked = true; secilen.set(r._k, r.pk); } guncelle(); });
+      silB.addEventListener("click", async () => {
+        const pkler = [...secilen.values()];
+        const ok = await silOnayiIste({ baslik: `${t.tablo}: seçili satırlar silinsin mi?`, ozet: [`${pkler.length} satır silinecek`, `Tablo: ${t.tablo}`],
+          uyari: [...(t.cascade?.length ? [`Zincirleme etkilenen tablolar: ${t.cascade.map((x) => x.replace(/^public\./, "")).join(", ")}.`] : []), "Geri alınamaz."] });
+        if (!ok) return;
+        let islem = null;
+        try {
+          const b = await supabase.rpc("sistem_islem_baslat", { p_tur: "satir_sil", p_ayrinti: { tablo: t.tablo, satir: pkler.length } });
+          if (b.error) throw b.error;
+          islem = b.data;
+          for (let i = 0; i < pkler.length; i += 500) {
+            const r = await supabase.rpc("sistem_satir_sil", { p_tablo: t.tablo, p_pkler: pkler.slice(i, i + 500), p_onay: "SİL", p_islem: i + 500 >= pkler.length ? islem : null });
+            if (r.error) throw r.error;
+          }
+          mesaj(`${pkler.length} satır silindi (${t.tablo}).`, "success");
+          secilen.clear(); ofset = 0;
+          await yukle();
+          yukleTablolarSessiz();
+        } catch (h) {
+          if (islem) { try { await supabase.rpc("sistem_islem_bitir", { p_id: islem, p_basarili: false, p_ozet: { hata: String(h?.message || h).slice(0, 200) } }); } catch { /* best-effort */ } }
+          durum.textContent = `Silinemedi: ${hataMetni(h)}`;
+        }
+      });
+      tumTablo.addEventListener("click", () => { kapat(); secili.clear(); secili.add(anahtar(t)); tumSil(); });
+      govde.append(el("p", { class: "sy-bilgi" }, ikon(t.silinebilir ? "kalkan" : "kilit"), el("span", { text: t.silinebilir ? "Silmek istediğin kayıtları işaretle; yalnızca işaretlenenler silinir. Gizli alanlar (parola, anahtar, jeton…) maskelenir." : `${KILIT_METNI[t.kilit] || "Kilitli"}: içerik yalnızca okunabilir.` })),
+        cubuk2, durum, icerik, sayfaYeri);
+      yukle();
+    });
+  }
+
+  async function yukleTablolarSessiz() { try { await yukle(true); } catch { /* yok say */ } }
+  const tumSil = () => sil();
+
+  async function analiz(tum = false) {
+    const s = tum ? tablolar.filter((t) => t.silinebilir && t.satir > 0) : secilenler();
+    if (!s.length) { mesaj(tum ? "Silinebilir ve dolu tablo yok." : "Önce analiz edilecek tabloları seç.", "info"); return; }
+    pencereAc(tum ? "Neler silinebilir? (dolu, kilitsiz tablolar)" : "Seçim analizi", (govde) => {
+      const adlar = new Set(s.map((t) => t.tablo));
+      const zincirEk = [...new Set(s.flatMap((t) => t.cascade || []))].map((x) => x.replace(/^public\./, "")).filter((x) => !adlar.has(x));
+      const satir = s.reduce((n, t) => n + Number(t.satir), 0);
+      const boyut = s.reduce((n, t) => n + Number(t.toplam), 0);
+      govde.append(
+        el("p", { class: "sy-bilgi" }, ikon("kalkan"), el("span", { text: `${s.length} tablo · ${sayi(satir)} satır · ${bayt(boyut)}. Bu yalnızca analizdir; hiçbir şey silinmedi.` })),
+        zincirEk.length ? el("p", { class: "sy-bilgi sy-bilgi--uyari" }, ikon("uyari"), el("span", { text: `Zincirleme (CASCADE) etkilenecek seçili olmayan tablolar: ${zincirEk.join(", ")}.` })) : null);
+      for (const t of s) {
+        const blok = el("section", { class: "sy-analiz-blok" });
+        const gor = dugme({ metin: "Tüm içeriği gör / seç", ikonAdi: "goz", tur: "ikincil", kucuk: true });
+        gor.addEventListener("click", () => satirGezgini(t));
+        const ornek = el("div", { class: "sy-sat-liste" }, el("p", { class: "muted", text: "Örnek kayıtlar yükleniyor…" }));
+        blok.append(el("div", { class: "sy-analiz-ust" }, el("code", { text: t.tablo }), el("span", { class: "muted", text: `${sayi(t.satir)} satır · ${bayt(t.toplam)}` }), gor), ornek);
+        govde.append(blok);
+        supabase.rpc("sistem_tablo_satirlari", { p_tablo: t.tablo, p_ofset: 0, p_adet: 3 }).then(({ data, error }) => {
+          if (error) { ornek.replaceChildren(el("p", { class: "auth-message error", text: hataMetni(error) })); return; }
+          ornek.replaceChildren(...(data.satirlar.length ? data.satirlar.map((r) => el("div", { class: "sy-sat" }, satirOnizleme(r.veri))) : [el("p", { class: "muted", text: "Kayıt yok." })]),
+            ...(data.toplam > 3 ? [el("p", { class: "muted", text: `… ve ${sayi(data.toplam - 3)} kayıt daha.` })] : []));
+        });
+      }
+    });
   }
 
   async function sil() {
@@ -178,8 +316,8 @@ function veritabaniPaneli(mesaj) {
     await yukle();
   }
 
-  async function yukle() {
-    liste.replaceChildren(el("li", { class: "muted", text: "Tablolar taranıyor (gerçek satır sayıları sayılıyor)…" }));
+  async function yukle(sessiz = false) {
+    if (!sessiz) liste.replaceChildren(el("li", { class: "muted", text: "Tablolar taranıyor (gerçek satır sayıları sayılıyor)…" }));
     const { data, error } = await supabase.rpc("sistem_depolama_gezgini");
     if (error) { liste.replaceChildren(el("li", { class: "auth-message error", text: hataMetni(error) })); return; }
     tablolar = (data || []).map((t) => ({ ...t, ...tabloBilgisi(t), toplam: Number(t.toplam), satir: Number(t.satir), veri: Number(t.veri), indeks: Number(t.indeks) }));
@@ -188,10 +326,12 @@ function veritabaniPaneli(mesaj) {
     ciz();
   }
 
-  girdi.addEventListener("input", () => { arama = girdi.value; ciz(); });
-  siraSec.addEventListener("change", () => { sira = siraSec.value; ciz(); });
-  sadeceK.addEventListener("change", () => { sadeceSilinebilir = sadeceK.checked; ciz(); });
-  analizBtn.addEventListener("click", analiz);
+  girdi.addEventListener("input", () => { arama = girdi.value; sayfa = 0; ciz(); });
+  siraSec.addEventListener("change", () => { sira = siraSec.value; sayfa = 0; ciz(); });
+  sadeceK.addEventListener("change", () => { sadeceSilinebilir = sadeceK.checked; sayfa = 0; ciz(); });
+  analizBtn.addEventListener("click", () => analiz(false));
+  silinebilirBtn.addEventListener("click", () => analiz(true));
+  sayfaSecBtn.addEventListener("click", () => { for (const t of sonGorunen) if (t.silinebilir) secili.add(anahtar(t)); ciz(); });
   silBtn.addEventListener("click", sil);
   temizleBtn.addEventListener("click", () => { secili.clear(); ciz(); });
   yenileBtn.addEventListener("click", yukle);
@@ -199,8 +339,9 @@ function veritabaniPaneli(mesaj) {
   kok.append(
     el("p", { class: "sy-bilgi" }, ikon("kalkan"), el("span", { text: "🔒 kilitli tablolar (kimlik, roller, yetkiler, site ayarları, şifreleme anahtarları, denetim kayıtları, tüm sistem şemaları) hiçbir koşulda silinemez; kilit veritabanında ve Worker'da da uygulanır." })),
     el("div", { class: "sy-filtre" }, el("div", { class: "sy-arama" }, ikon("ara"), girdi), siraSec, yenileBtn),
+    el("div", { class: "sy-eylemler" }, silinebilirBtn, sayfaSecBtn),
     el("label", { class: "sy-gz-sadece", for: "sy-gz-sadece" }, sadeceK, el("span", { text: "Yalnızca silinebilir olanları göster" })),
-    cipler, cubuk, liste
+    cipler, cubuk, liste, sayfalamaKutu
   );
   yukle();
   return kok;
@@ -382,6 +523,21 @@ function r2Paneli(mesaj) {
     temizle.addEventListener("click", () => { d.secili.clear(); gezginCiz(); });
     const silBtn = dugme({ metin: "Seçilenleri sil…", ikonAdi: "cop", tur: "tehlike", kucuk: true, disabled: !o.adet || d.calisiyor });
     silBtn.addEventListener("click", sil);
+    const analizB = dugme({ metin: "Seçimi analiz et", ikonAdi: "ara", tur: "ikincil", kucuk: true, disabled: !o.adet });
+    analizB.addEventListener("click", () => {
+      const v = [...d.secili.values()];
+      pencereAc("R2 seçim analizi", (govde) => {
+        const kayitli = v.filter((x) => x.kayitli);
+        govde.append(
+          el("p", { class: "sy-bilgi" }, ikon("kalkan"), el("span", { text: `${sayi(v.length)} nesne · ${bayt(o.bayt)} — ${sayi(kayitli.length)} kayıtlı, ${sayi(v.length - kayitli.length)} yetim. Bu yalnızca analizdir; hiçbir şey silinmedi.` })),
+          el("ul", { class: "sy-gz-liste" }, v.slice(0, 200).map((x) => el("li", { class: "sy-gz-nesne" },
+            el("span", { class: "sy-gz-nesne-ad", title: x.anahtar }, ikon("dosya"), el("span", { text: x.etiket || x.ad })),
+            el("span", { class: `sy-rozet ${x.kayitli ? "sy-rozet--iyi" : "sy-rozet--uyari"}`, text: x.kayitli ? "Kayıtlı" : "Yetim" }),
+            x.sahip ? el("span", { class: "muted", text: `Üye: ${String(x.sahip).slice(0, 8)}…` }) : null,
+            el("span", { class: "muted", text: `${bayt(x.boyut)} · ${tarihMetni(x.yuklenme)}` })))),
+          v.length > 200 ? el("p", { class: "muted", text: `… ve ${sayi(v.length - 200)} nesne daha.` }) : null);
+      });
+    });
     const dahaFazla = d.imlec ? dugme({ metin: "Daha fazla yükle", tur: "ikincil", kucuk: true, disabled: d.yukleniyor }) : null;
     dahaFazla?.addEventListener("click", () => sayfaYukle(true));
 
@@ -389,7 +545,7 @@ function r2Paneli(mesaj) {
       el("div", { class: "sy-gz-r2-ust" }, kirinti, kapat),
       el("div", { class: "sy-gz-cubuk", role: "status", "aria-live": "polite" },
         el("span", { class: "sy-gz-cubuk-metin", text: o.adet ? `${sayi(o.adet)} nesne seçili · ${bayt(o.bayt)} (${sayi(o.kayitli)} kayıtlı, ${sayi(o.yetim)} yetim)` : "Silmek için dosya seç; kilitli (korumalı) öğeler seçilemez." }),
-        yetimSec, temizle, silBtn),
+        yetimSec, analizB, temizle, silBtn),
       d.yukleniyor && !d.nesneler.length && !d.klasorler.length ? el("p", { class: "muted", text: "Yükleniyor…" }) : null,
       el("ul", { class: "sy-gz-liste sy-gz-liste--r2" }, [...klasorSatirlari, ...nesneSatirlari].length
         ? [...klasorSatirlari, ...nesneSatirlari]
