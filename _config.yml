@@ -121,6 +121,7 @@ include:
   - .well-known
   - llms.txt
   - _redirects   # Cloudflare Pages yönlendirmeleri (başında "_" olduğu için Jekyll varsayılanda atlar)
+  - _routes.json # Cloudflare Pages: Gatekeeper Function'ı yalnızca sayfa isteklerinde çalıştırır (CSS/JS/yazı tipi Function kotasını yemez)
 
 # GÜVENLİK: "supabase/" (veritabanı migration'ları + Edge Function kaynak
 # kodu, ör. admin-change-email/index.ts) ve "cloudflare worker/" (Cloudflare
