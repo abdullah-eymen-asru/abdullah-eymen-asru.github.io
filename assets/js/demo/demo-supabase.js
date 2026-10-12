@@ -10,7 +10,7 @@
  *              → "salt-okunur" toast'ı + { data:null, error } (modül kendi hata akışını çalıştırır). Hiçbir şey kaydedilmez.
  *   • AUTH   : sahte oturum (demo@sistem.local, role 'demo'); signIn/updateUser/… engellenir.
  */
-import { DEMO_PROFIL, DEMO_UID, DEMO_EPOSTA, demoBildir, demoHatasi, demoCikisYap } from "./demo-durum.js";
+import { DEMO_PROFIL, DEMO_UID, DEMO_EPOSTA, demoBildir, demoHatasi, demoCikisYap, demoBitir } from "./demo-durum.js";
 import "./demo-ag-kalkani.js"; // yan etki: demo ise ağ kalkanını hemen kurar
 
 let mock = null;
@@ -219,3 +219,106 @@ export const demoSupabase = {
   removeChannel: async () => "ok",
   removeAllChannels: async () => [],
 };
+
+/* ============================================================================================================
+ * DEMO ÜYESİ (GERÇEK 'demo' rollü hesap) — HİBRİT istemci
+ * ------------------------------------------------------------------------------------------------------------
+ * "Tamamen saf demo olmasın": demo üyesi KENDİ hesabını gerçekten yönetebilir (ad-soyad, e-posta, şifre, 2FA, oturumlar,
+ * KVKK, hesabı silme). Bu yüzden hesap ile ilgili çağrılar GERÇEK istemciye gider; veri sekmeleri (notlar, arşiv,
+ * kütüphane, metrikler…) hâlâ sahte veriyle çalışır ve veritabanı tarafı (0083 restrictive RLS) bu hesaba başka hiçbir
+ * satır vermez. Ağ kalkanı (demo-ag-kalkani.js) açık kalır: gerçek istemci kendi (kalkan öncesi yakalanmış) fetch'ini
+ * kullanır, bu yüzden yalnızca Supabase Auth/PostgREST'e gider; Worker/R2'ye hiçbir istek çıkmaz.
+ *   • auth.*                 → GERÇEK (signOut: gerçek oturumu kapatır + demo bayrağını siler)
+ *   • from("profiles")       → select GERÇEK (yalnızca kendi satırı: 0086); update → dar RPC demo_profil_ad_guncelle (0087)
+ *   • from("site_ayarlari")  → select GERÇEK (herkese açık veri; KVKK sürüm kontrolü için); yazma engelli
+ *   • rpc(<hesap RPC'leri>)  → GERÇEK (aşağıdaki liste); diğer her rpc → sahte/engelli
+ *   • geri kalan her şey     → sahte (Sorgu / mock) — salt-okunur
+ * ============================================================================================================ */
+const UYE_GERCEK_RPC = new Set([
+  "is_demo",
+  "demo_profil_ad_guncelle",
+  "kvkk_onayini_ver",
+  "kendi_onay_gecmisim",
+  "yedek_kod_durumu",
+  "yedek_kodlar_olustur",
+  "yedek_kodlar_temizle",
+  "oturumlarimi_listele",
+  "oturum_sonlandir",
+  "kullanici_email_identity_ekle",
+]);
+
+const engelliSonuc = () => {
+  demoBildir();
+  return { data: null, error: demoHatasi(), count: null, status: 403, statusText: "DEMO_READONLY" };
+};
+
+/** profiles.update({first_name,last_name}).eq("id", …).select().single() → RPC demo_profil_ad_guncelle (başka kolon yok). */
+class UyeProfilGuncelle {
+  constructor(gercek, yuk) {
+    this.gercek = gercek;
+    this.yuk = yuk || {};
+    this.tek = false;
+  }
+  eq() { return this; }
+  select() { return this; }
+  single() { this.tek = true; return this; }
+  maybeSingle() { this.tek = true; return this; }
+  then(coz, red) { return this.calistir().then(coz, red); }
+  catch(red) { return this.calistir().catch(red); }
+  async calistir() {
+    const anahtarlar = Object.keys(this.yuk);
+    if (!anahtarlar.length || anahtarlar.some((k) => k !== "first_name" && k !== "last_name")) return engelliSonuc();
+    const { data, error } = await this.gercek.rpc("demo_profil_ad_guncelle", {
+      p_first_name: this.yuk.first_name ?? null,
+      p_last_name: this.yuk.last_name ?? null,
+    });
+    if (error) return { data: null, error, count: null, status: 400 };
+    return { data: this.tek ? data : [data], error: null, count: null, status: 200 };
+  }
+}
+
+export function demoUyeSupabaseKur(gercek) {
+  const engelliYazma = (tablo) => ({
+    insert: () => new Sorgu(tablo).insert(),
+    upsert: () => new Sorgu(tablo).upsert(),
+    update: () => new Sorgu(tablo).update(),
+    delete: () => new Sorgu(tablo).delete(),
+  });
+
+  const auth = new Proxy(gercek.auth, {
+    get(hedef, ad) {
+      if (ad === "signOut") {
+        return async () => {
+          let sonuc = { error: null };
+          try { sonuc = await hedef.signOut({ scope: "local" }); } catch { /* ağ yok: yerel temizlik aşağıda */ }
+          demoBitir();
+          try { localStorage.removeItem("aea_auth_hint"); } catch { /* yok say */ }
+          return { error: sonuc?.error && /session/i.test(sonuc.error.message || "") ? null : sonuc?.error ?? null };
+        };
+      }
+      const v = hedef[ad];
+      return typeof v === "function" ? v.bind(hedef) : v;
+    },
+  });
+
+  return {
+    ...demoSupabase,
+    supabaseUrl: gercek.supabaseUrl,
+    supabaseKey: gercek.supabaseKey,
+    auth,
+    from(tablo) {
+      if (tablo === "profiles") {
+        const { insert, upsert, delete: sil } = engelliYazma("profiles");
+        return { select: (...a) => gercek.from("profiles").select(...a), update: (yuk) => new UyeProfilGuncelle(gercek, yuk), insert, upsert, delete: sil };
+      }
+      if (tablo === "site_ayarlari") {
+        const { insert, upsert, update, delete: sil } = engelliYazma("site_ayarlari");
+        return { select: (...a) => gercek.from("site_ayarlari").select(...a), insert, upsert, update, delete: sil };
+      }
+      return new Sorgu(tablo);
+    },
+    rpc(ad, args) {
+      return UYE_GERCEK_RPC.has(ad) ? gercek.rpc(ad, args) : demoSupabase.rpc(ad, args);
+    },
+  };
+}
