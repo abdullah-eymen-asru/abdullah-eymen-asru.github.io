@@ -33,9 +33,12 @@ permalink: "/hesap/giris.html"
     <button type="submit" class="btn-primary">Giriş Yap</button>
   </form>
 
+  <div id="demo-giris-kutu" hidden>
   <div class="auth-divider">veya</div>
   <button id="demo-giris-btn" type="button" class="btn-demo">🎭 Canlı Demo / Vitrin Modu</button>
   <p class="muted demo-giris-not">Hesap gerekmez. Örnek verilerle, salt-okunur olarak platformu dene; gerçek verilere erişilmez.</p>
+  </div>
+  <p id="demo-kapali-not" class="muted" hidden>Herkese açık demo şu an kapalı. Demo hesabı verildiyse e-posta ve şifrenle giriş yapabilirsin.</p>
 
   <div class="auth-links">
     <a href="{{ '/hesap/kayit.html' | relative_url }}">Hesabın yok mu? Kayıt ol</a>
