@@ -9,7 +9,7 @@
  *    dosya seçici açılmadan ve istek hazırlanmadan toast gösterilir. (Ağ kalkanı yine ikinci emniyet olarak durur.)
  *  • innerHTML yok (CSP + XSS); metinler textContent.
  */
-import { demoBildir, demoCikisYap, ozellikAcikMi } from "./demo-durum.js";
+import { demoBildir, demoCikisYap, demoUyeMi, ozellikAcikMi } from "./demo-durum.js";
 
 const KRITIK = [
   "#ra-yukle-dosya", "#ra-yukle-klasor", "#ra-klasor-yeni", "#ra-secim-sil",
@@ -42,7 +42,9 @@ function bandKur() {
   main.prepend(
     el("div", { id: "demo-bandi", class: "demo-bandi", role: "note" },
       el("span", { class: "demo-bandi-ikon", "aria-hidden": "true", text: "🎭" }),
-      el("span", { class: "demo-bandi-metin", text: "Vitrin modu: örnek verilerle salt-okunur deneyim. Hiçbir değişiklik kaydedilmez ve gerçek sunucuya iletilmez." }),
+      el("span", { class: "demo-bandi-metin", text: demoUyeMi()
+        ? "Demo hesabı: içerik sekmeleri örnek verilerle salt-okunurdur. Yalnızca Panelim'deki hesap ayarların (ad, e-posta, şifre, 2FA, hesabı silme) gerçektir."
+        : "Vitrin modu: örnek verilerle salt-okunur deneyim. Hiçbir değişiklik kaydedilmez ve gerçek sunucuya iletilmez." }),
       cikis)
   );
 }
