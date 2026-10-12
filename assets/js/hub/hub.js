@@ -32,6 +32,8 @@ const ACIKLAMA = {
   "sys-github": "GitHub / Worker bağlantı durumu.",
   "sys-hakkimda": "Hakkımda ve sosyal bağlantılar.",
   "sys-hesabim": "Hesap silme ve tehlikeli işlemler.",
+  "sys-demo": "Demo/vitrin modunda hangi sayfa ve özelliklerin görüneceğini yönet.",
+  "sys-metrik": "Depolama ve istek kullanımı (vitrin için örnek metrikler).",
 };
 const SON_ANAHTAR = "aea_hub_son";
 
