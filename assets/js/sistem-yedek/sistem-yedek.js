@@ -116,16 +116,24 @@ async function kur() {
   const mesajKutu = document.getElementById("sy-mesaj");
   if (!kok) return;
   kok.classList.add("sy-kok");
-  const mesaj = (m, tur = "error") => mesajKutu && showMessage(mesajKutu, m, tur);
+  const mesaj = (m, tur = "error") => {
+    if (!mesajKutu) return;
+    showMessage(mesajKutu, m, tur);
+    // Mesaj sayfanın altından/ortasından tetiklense bile görünür olsun (aksi hâlde kullanıcı sonucu hiç görmüyordu)
+    try { mesajKutu.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch { /* eski tarayıcı */ }
+  };
 
-  const { data: yetkili, error: ye } = await supabase.rpc("sistem_export_yetkisi_var_mi");
+  const { data: yetkili, error: ye } = await supabase.rpc("sistem_export_uye_yetkisi_var_mi");
   if (ye) { kok.replaceChildren(el("p", { class: "auth-message error", text: hataMetni(ye) })); return; }
   if (!yetkili) {
-    kok.replaceChildren(el("p", { class: "auth-message error", text: "Bu bölüm için sistem dışa aktarma yetkin yok. Site Sahibi, Yetki Ayarları > Sistem Yedekleme sekmesinden açabilir." }));
+    kok.replaceChildren(el("p", { class: "auth-message error", text: "Bu bölüm için oturumun geçerli değil ya da hesabın askıda." }));
     return;
   }
   const { data: owner } = await supabase.rpc("is_owner");
   const ownerMi = owner === true;
+  // "İzinli rol" (site içeriği + GitHub bileşenleri + depolama durumu): Site Sahibi ya da Yetki Ayarları'nda açılmış roller.
+  const { data: tamYetki } = await supabase.rpc("sistem_export_yetkisi_var_mi");
+  const tamMi = tamYetki === true;
   const { data: oturum } = await supabase.auth.getSession();
   const benimId = oturum?.session?.user?.id || null;
 
@@ -155,7 +163,7 @@ async function kur() {
 
   // Bileşenler
   const kutular = new Map();
-  const bilesenKartlari = BILESENLER.map((b) => {
+  const bilesenKartlari = BILESENLER.filter((b) => tamMi || !["icerik_md", "github"].includes(b.id)).map((b) => {
     const k = secenekKarti({ id: `sy-b-${b.id}`, baslik: `${b.ikon} ${b.ad}`, aciklama: b.aciklama });
     kutular.set(b.id, k);
     return k.etiket;
@@ -273,7 +281,7 @@ async function kur() {
       }
       const uyari = sonuc.ozet.hatalar.length ? ` ${sonuc.ozet.hatalar.length} dosya alınamadı (ayrıntı pakettedeki OKUBENI.txt'de).` : "";
       mesaj(`Yedek hazır: ${dosyaAdi()} (${bayt(sonuc.boyut)}).${uyari}`, sonuc.ozet.hatalar.length ? "error" : "success");
-      depolamaCiz(depolamaKok);
+      if (tamMi) depolamaCiz(depolamaKok);
       if (ownerMi) gunlukYukle();
     } catch (h) {
       if (h?.name === "AbortError") mesaj("Dışa aktarma iptal edildi.");
@@ -296,10 +304,11 @@ async function kur() {
 
   let no = 0;
   const disaAktarBolumleri = [
-    el("section", { class: "sy-bolum" },
+    tamMi ? el("section", { class: "sy-bolum" },
       el("div", { class: "sy-bolum-ust" }, el("h2", { text: "Depolama Durumu" }), yenile),
       depolamaKok
-    ),
+    ) : null,
+    !ownerMi ? el("p", { class: "sy-bilgi" }, ikon("kalkan"), el("span", { text: "Bu bölümde yalnızca KENDİ verilerini (veritabanı kayıtların, dosyaların, notların) indirip yedekleyebilirsin. Hesabını silsen bile bu yedeği “İçe aktar” sekmesiyle yeni hesabına geri yükleyebilirsin; tek bir dosyayı ya da tüm ZIP'i yükleyebilirsin." })) : null,
     el("section", { class: "sy-bolum" },
       el("h2", { text: "Dışa Aktar" }),
       el("p", { class: "muted", text: "Seçtiğin bileşenler tek, tarih damgalı bir ZIP paketinde indirilir. Her işlem denetim günlüğüne kaydedilir." }),
@@ -319,10 +328,12 @@ async function kur() {
   // "Sayfa içinde sayfa": yalnızca owner'da İçe Aktar ve Depolama Gezgini sekmeleri vardır.
   // Paneller DOM'dan sökülmez (hidden), böylece devam eden bir dışa aktarma/geri yükleme sekme değişince bozulmaz.
   const sekmeTanimlari = [{ id: "disa", ad: "📤 Dışa aktar & durum", panel: el("div", { class: "sy-sekme-panel" }, ...disaAktarBolumleri) }];
-  if (ownerMi) {
+  {
     const icKok = el("div", { class: "sy-sekme-panel", hidden: true });
+    sekmeTanimlari.push({ id: "ice", ad: ownerMi ? "📥 İçe aktar (geri yükle)" : "📥 Yedeğimi geri yükle", panel: icKok, kur: () => icAktarCiz(icKok, mesaj, { uye: !ownerMi }) });
+  }
+  if (ownerMi) {
     const gzKok = el("div", { class: "sy-sekme-panel", hidden: true });
-    sekmeTanimlari.push({ id: "ice", ad: "📥 İçe aktar (geri yükle)", panel: icKok, kur: () => icAktarCiz(icKok, mesaj) });
     sekmeTanimlari.push({ id: "gezgin", ad: "🗂️ Depolama gezgini", panel: gzKok, kur: () => gezginCiz(gzKok, mesaj) });
   }
   const serit = el("div", { class: "sy-altsekmeler", role: "tablist", "aria-label": "Sistem yedekleme bölümleri" });
@@ -345,7 +356,7 @@ async function kur() {
   sekmeSec("disa");
 
   durumGuncelle();
-  await depolamaCiz(depolamaKok);
+  if (tamMi) await depolamaCiz(depolamaKok);
   if (ownerMi) await gunlukYukle();
 }
 
