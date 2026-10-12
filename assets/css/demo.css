@@ -1,0 +1,85 @@
+/* assets/css/demo.css — Demo / Vitrin Modu (satır içi stil yok: CSP). Değişkenler: --bg --text --muted --accent --border --card-bg */
+
+/* Giriş sayfası düğmesi */
+.btn-demo { width: 100%; font: inherit; font-weight: 600; padding: .7rem 1rem; border-radius: 10px; cursor: pointer;
+  color: var(--accent); background: var(--bg); border: 2px dashed var(--accent); }
+.btn-demo:hover, .btn-demo:focus-visible { background: var(--tag-bg); outline: none; }
+.demo-giris-not { font-size: .85rem; margin: .5rem 0 1rem; text-align: center; }
+
+/* Vitrin bandı */
+.demo-bandi { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; padding: .55rem .8rem; margin: 0 0 1rem;
+  border: 1px solid var(--lang-notice-border, #f0dca0); background: var(--lang-notice-bg, #fff8e6); color: var(--lang-notice-text, #6b5a1e);
+  border-radius: 10px; font-size: .9rem; }
+.demo-bandi-metin { flex: 1 1 16rem; }
+.demo-bandi-btn, .demo-btn { font: inherit; cursor: pointer; padding: .35rem .8rem; border-radius: 8px; border: 1px solid var(--accent);
+  background: var(--accent); color: #fff; }
+.demo-bandi-btn { background: transparent; color: inherit; border-color: currentColor; }
+.demo-btn:disabled { opacity: .6; cursor: progress; }
+.demo-link { font: inherit; background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; }
+
+/* Toast */
+.demo-toast-kutu { position: fixed; left: 50%; bottom: 1.2rem; transform: translateX(-50%); display: grid; gap: .5rem;
+  z-index: 100001; width: min(30rem, 92vw); pointer-events: none; }
+.demo-toast { display: flex; gap: .6rem; align-items: flex-start; pointer-events: auto; padding: .75rem 1rem; border-radius: 12px;
+  background: var(--text); color: var(--bg); box-shadow: 0 8px 28px rgba(0,0,0,.28); font-size: .92rem; line-height: 1.4;
+  animation: demo-toast-gir .25s ease-out; transition: opacity .3s, transform .3s; }
+.demo-toast--kapaniyor { opacity: 0; transform: translateY(8px); }
+.demo-toast-ikon { font-size: 1.1rem; }
+@keyframes demo-toast-gir { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .demo-toast { animation: none; transition: none; } }
+
+/* Alt özellik gizleme (demo_config → <html data-demo-gizle="pdf-arac zip not-cip">) */
+[data-demo-gizle~="pdf-arac"] .ak-ok-araclar,
+[data-demo-gizle~="pdf-arac"] .ak-ok-renkler { display: none !important; }
+[data-demo-gizle~="zip"] #demo-zip-karti { display: none !important; }
+[data-demo-gizle~="not-cip"] #nt-durum-filtre,
+[data-demo-gizle~="not-cip"] #nt-tur-filtre,
+[data-demo-gizle~="not-cip"] #nt-etiket-filtre { display: none !important; }
+
+/* ZIP kartı */
+.demo-zip-karti { margin-top: 1.2rem; }
+.demo-zip-liste { margin: .4rem 0; padding-left: 1.1rem; }
+.demo-zip-onizleme { max-height: 14rem; overflow: auto; padding: .6rem; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--card-bg); white-space: pre-wrap; font-size: .82rem; }
+
+/* Yetki paneli: anahtarlar */
+.demo-anahtar { display: flex; align-items: center; gap: .6rem; padding: .35rem 0; cursor: pointer; flex-wrap: wrap; }
+.demo-anahtar input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.demo-anahtar-iz { position: relative; flex: none; width: 2.4rem; height: 1.35rem; border-radius: 999px; background: var(--border); transition: background .2s; }
+.demo-anahtar-iz::after { content: ""; position: absolute; top: .15rem; left: .15rem; width: 1.05rem; height: 1.05rem; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .2s; }
+.demo-anahtar input:checked + .demo-anahtar-iz { background: var(--accent); }
+.demo-anahtar input:checked + .demo-anahtar-iz::after { transform: translateX(1.05rem); }
+.demo-anahtar input:focus-visible + .demo-anahtar-iz { outline: 2px solid var(--accent); outline-offset: 2px; }
+.demo-anahtar--pasif { opacity: .55; cursor: not-allowed; }
+.demo-global { border-left: 4px solid var(--accent); }
+.demo-alt { margin-left: 1rem; padding-left: .8rem; border-left: 2px solid var(--border); }
+
+/* Metrik sayfası */
+.demo-olcer-deger { font-size: 1.35rem; font-weight: 700; margin: .2rem 0 .5rem; }
+.demo-cubuk { height: .8rem; border-radius: 999px; background: var(--border); overflow: hidden; }
+.demo-cubuk-dolu { height: 100%; border-radius: 999px; background: var(--accent); min-width: 2px; }
+.demo-seri { display: flex; align-items: flex-end; gap: .35rem; height: 9rem; padding: .3rem 0; }
+.demo-seri-kol { flex: 1; height: 100%; display: flex; align-items: flex-end; }
+.demo-seri-cubuk { width: 100%; background: var(--accent); border-radius: 4px 4px 0 0; min-height: 2px; }
+.demo-cubuk-dolu.demo-w-0{width:0%} .demo-seri-cubuk.demo-w-0{height:0%}
+.demo-cubuk-dolu.demo-w-5{width:5%} .demo-seri-cubuk.demo-w-5{height:5%}
+.demo-cubuk-dolu.demo-w-10{width:10%} .demo-seri-cubuk.demo-w-10{height:10%}
+.demo-cubuk-dolu.demo-w-15{width:15%} .demo-seri-cubuk.demo-w-15{height:15%}
+.demo-cubuk-dolu.demo-w-20{width:20%} .demo-seri-cubuk.demo-w-20{height:20%}
+.demo-cubuk-dolu.demo-w-25{width:25%} .demo-seri-cubuk.demo-w-25{height:25%}
+.demo-cubuk-dolu.demo-w-30{width:30%} .demo-seri-cubuk.demo-w-30{height:30%}
+.demo-cubuk-dolu.demo-w-35{width:35%} .demo-seri-cubuk.demo-w-35{height:35%}
+.demo-cubuk-dolu.demo-w-40{width:40%} .demo-seri-cubuk.demo-w-40{height:40%}
+.demo-cubuk-dolu.demo-w-45{width:45%} .demo-seri-cubuk.demo-w-45{height:45%}
+.demo-cubuk-dolu.demo-w-50{width:50%} .demo-seri-cubuk.demo-w-50{height:50%}
+.demo-cubuk-dolu.demo-w-55{width:55%} .demo-seri-cubuk.demo-w-55{height:55%}
+.demo-cubuk-dolu.demo-w-60{width:60%} .demo-seri-cubuk.demo-w-60{height:60%}
+.demo-cubuk-dolu.demo-w-65{width:65%} .demo-seri-cubuk.demo-w-65{height:65%}
+.demo-cubuk-dolu.demo-w-70{width:70%} .demo-seri-cubuk.demo-w-70{height:70%}
+.demo-cubuk-dolu.demo-w-75{width:75%} .demo-seri-cubuk.demo-w-75{height:75%}
+.demo-cubuk-dolu.demo-w-80{width:80%} .demo-seri-cubuk.demo-w-80{height:80%}
+.demo-cubuk-dolu.demo-w-85{width:85%} .demo-seri-cubuk.demo-w-85{height:85%}
+.demo-cubuk-dolu.demo-w-90{width:90%} .demo-seri-cubuk.demo-w-90{height:90%}
+.demo-cubuk-dolu.demo-w-95{width:95%} .demo-seri-cubuk.demo-w-95{height:95%}
+.demo-cubuk-dolu.demo-w-100{width:100%} .demo-seri-cubuk.demo-w-100{height:100%}
