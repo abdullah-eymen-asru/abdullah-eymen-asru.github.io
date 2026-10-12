@@ -2733,3 +2733,13 @@ html.gk-kilitli body > :not(.gk-govde) { visibility: hidden; }
   .gk-govde { padding: 16px; }
   .gk-kart { padding: 28px 20px 22px; }
 }
+
+
+/* HESAP MENÜSÜ — "Hesabım" = Ana Ekran'a giden bağlantı + ayrı "▾" menü düğmesi (bkz. assets/js/auth/nav-auth.js).
+   Toplam genişlik eski tek "Hesabım ▾" düğmesine yakın tutulur (yedek iskeletle yan taraftaki öğeleri itmesin). */
+.auth-nav-dropdown { display: inline-flex; align-items: center; }
+a.auth-nav-btn { display: inline-block; padding-right: 4px; text-decoration: none; }
+.auth-nav-btn.auth-nav-ok { margin-left: 0; padding: 7px 8px 7px 4px; }
+.auth-nav--mobile .auth-nav-dropdown { display: flex; }
+.auth-nav--mobile a.auth-nav-btn { flex: 1 1 auto; width: auto; padding: 14px 4px 14px 12px; }
+.auth-nav--mobile .auth-nav-btn.auth-nav-ok { flex: 0 0 auto; width: auto; padding: 14px 16px; text-align: center; }
