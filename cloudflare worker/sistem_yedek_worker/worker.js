@@ -443,42 +443,70 @@ async function uyeYukle(env, kimlik, istek, url, cors) {
   return json({ ok: true, durum: "yazildi", boyut: boy }, 200, cors);
 }
 
-/** Owner: bugünkü (UTC) Worker istek sayısı — Cloudflare ücretsiz GraphQL Analytics API. 60 sn edge cache. */
+/**
+ * Owner: bugünkü (UTC) istek sayısı — Cloudflare ücretsiz GraphQL Analytics API. 60 sn edge cache.
+ *
+ * BUG FİX (panel sayacı Cloudflare'in "Requests today" değerinden çok küçük çıkıyordu — örn. 34 vs 84):
+ * Cloudflare'in 100.000/gün ücretsiz kotası Workers VE Pages Functions isteklerini BİRLİKTE sayar. Eski kod yalnızca
+ * `workersInvocationsAdaptive` (Workers betikleri) okuyordu; Pages Functions (functions/_middleware.js — Gatekeeper "kasa"
+ * katmanı, pages.dev'e gelen HER sayfa isteğinde çalışır) ayrı bir veri kümesinde (`pagesFunctionsInvocationsAdaptiveGroups`)
+ * durduğu için sayıya hiç girmiyordu. Artık iki küme AYRI sorgularla okunur ve toplanır (biri başarısız olsa diğeri
+ * görünür kalır). Yanıt: istek = workers + pages (kotaya sayılan toplam), workers, pages (null = okunamadı).
+ * Not: Cloudflare panelindeki Worker kartlarındaki sayılar SON 24 SAAT'tir; burası UTC günüdür (gün başı 03:00 TR).
+ */
 async function kotaGetir(env, kimlik, cors) {
   if (!(await ownerMi(env, kimlik))) return json({ error: "Yalnızca Site Sahibi." }, 403, cors);
   const limit = parseInt(env.GUNLUK_ISTEK_LIMITI || "100000", 10) || 100000;
   if (!env.CF_ACCOUNT_ID || !env.CF_API_TOKEN) return json({ yapilandirilmadi: true, limit }, 200, cors);
-  const anahtar = new Request(`https://kota.invalid/${env.CF_ACCOUNT_ID}`);
+  const anahtar = new Request(`https://kota.invalid/v2/${env.CF_ACCOUNT_ID}`);
   const onbellek = caches.default;
   const var_ = await onbellek.match(anahtar);
   if (var_) return new Response(var_.body, { status: 200, headers: { ...cors, "Content-Type": "application/json", "X-Onbellek": "hit" } });
 
   const simdi = new Date();
   const gun = new Date(Date.UTC(simdi.getUTCFullYear(), simdi.getUTCMonth(), simdi.getUTCDate())).toISOString();
-  const sorgu = `query($acc:String!,$from:Time!,$to:Time!){viewer{accounts(filter:{accountTag:$acc}){workersInvocationsAdaptive(limit:1000,filter:{datetime_geq:$from,datetime_leq:$to}){sum{requests errors subrequests}dimensions{scriptName}}}}}`;
-  let r;
-  try {
-    r = await fetch("https://api.cloudflare.com/client/v4/graphql", {
+  const graphql = async (sorgu) => {
+    const r = await fetch("https://api.cloudflare.com/client/v4/graphql", {
       method: "POST",
       headers: { Authorization: `Bearer ${env.CF_API_TOKEN}`, "Content-Type": "application/json" },
       body: JSON.stringify({ query: sorgu, variables: { acc: env.CF_ACCOUNT_ID, from: gun, to: simdi.toISOString() } }),
     });
+    const g = await r.json().catch(() => ({}));
+    return { ok: r.ok && !(Array.isArray(g.errors) && g.errors.length), g };
+  };
+
+  const workersSorgu = `query($acc:String!,$from:Time!,$to:Time!){viewer{accounts(filter:{accountTag:$acc}){workersInvocationsAdaptive(limit:1000,filter:{datetime_geq:$from,datetime_leq:$to}){sum{requests errors subrequests}dimensions{scriptName}}}}}`;
+  const pagesSorgu = `query($acc:String!,$from:Time!,$to:Time!){viewer{accounts(filter:{accountTag:$acc}){pagesFunctionsInvocationsAdaptiveGroups(limit:1000,filter:{datetime_geq:$from,datetime_leq:$to}){sum{requests}}}}}`;
+
+  let w, p;
+  try {
+    [w, p] = await Promise.all([graphql(workersSorgu), graphql(pagesSorgu).catch(() => ({ ok: false, g: {} }))]);
   } catch (e) { return json({ error: "Cloudflare Analytics'e ulaşılamadı.", limit }, 502, cors); }
-  const g = await r.json().catch(() => ({}));
-  const satirlar = g?.data?.viewer?.accounts?.[0]?.workersInvocationsAdaptive;
-  if (!r.ok || !Array.isArray(satirlar)) {
+
+  const satirlar = w.g?.data?.viewer?.accounts?.[0]?.workersInvocationsAdaptive;
+  if (!w.ok || !Array.isArray(satirlar)) {
     return json({ error: "Analytics yanıtı alınamadı (token izni: Account Analytics › Read olmalı).", limit }, 502, cors);
   }
   const perScript = {};
-  let istek = 0, hataSayisi = 0, alt = 0;
+  let workers = 0, hataSayisi = 0, alt = 0;
   for (const s of satirlar) {
     const n = Number(s.sum?.requests) || 0;
-    istek += n; hataSayisi += Number(s.sum?.errors) || 0; alt += Number(s.sum?.subrequests) || 0;
+    workers += n; hataSayisi += Number(s.sum?.errors) || 0; alt += Number(s.sum?.subrequests) || 0;
     const ad = s.dimensions?.scriptName || "?";
     perScript[ad] = (perScript[ad] || 0) + n;
   }
+
+  // Pages Functions: okunamazsa null (kullanıcıya "dahil değil" denir; Workers sayısı yine de gösterilir).
+  const pagesSatirlari = p.g?.data?.viewer?.accounts?.[0]?.pagesFunctionsInvocationsAdaptiveGroups;
+  let pages = null;
+  if (p.ok && Array.isArray(pagesSatirlari)) {
+    pages = pagesSatirlari.reduce((t, x) => t + (Number(x.sum?.requests) || 0), 0);
+    if (pages > 0) perScript["Pages Functions (Gatekeeper)"] = pages;
+  }
+
+  const istek = workers + (pages || 0);
   const govde = JSON.stringify({
-    istek, hata: hataSayisi, subistek: alt, limit, gun: gun.slice(0, 10), guncelleme: simdi.toISOString(),
+    istek, workers, pages, hata: hataSayisi, subistek: alt, limit, gun: gun.slice(0, 10), guncelleme: simdi.toISOString(),
     scriptler: Object.entries(perScript).map(([ad, n]) => ({ ad, istek: n })).sort((a, b) => b.istek - a.istek).slice(0, 12),
   });
   await onbellek.put(anahtar, new Response(govde, { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=60" } }));
