@@ -108,6 +108,67 @@ export function demoBitir() {
   }
 }
 
+/**
+ * Demo bayrağı GERÇEKTEN sekme deposuna yazılabildi mi? (WebView/gizli sekmede sessionStorage kapalı olabilir.)
+ * auth-guard.js, 'demo' rollü hesabı demoya alıp sayfayı yeniden yüklemeden önce bunu sorar: depo yazılamıyorsa
+ * bayrak yeniden yüklemede kaybolur ve sayfa SONSUZ yeniden yükleme döngüsüne girerdi.
+ */
+export function demoBayrakKaliciMi() {
+  try {
+    return sessionStorage.getItem(BAYRAK) === "1";
+  } catch {
+    return false;
+  }
+}
+
+const GERCEK_OTURUM_ANAHTARI = /^sb-[a-z0-9]+-auth-token(-code-verifier)?$/i;
+
+/**
+ * Demodan ÇIKIŞ. Anonim ziyaretçide yalnızca bayrağı siler. 'demo' rollü GERÇEK hesapta ayrıca o hesabın gerçek
+ * Supabase oturumunu da kapatır (yoksa kullanıcı "çıkış" yaptıktan sonra bile oturum açık kalır, panele her girişte
+ * yeniden demoya düşer ve başka hesapla giriş yapamazdı). Sunucu çıkışı en iyi gayretle denenir (4 sn); olmasa da
+ * yerel jeton silinir. Tek giden istek /auth/v1/logout'tur ve yalnızca demo ÜYESİ içindir.
+ */
+export async function demoCikisYap(supabaseUrl, anonAnahtar) {
+  const uyeydi = demoUyeMi();
+  demoBitir();
+  if (!uyeydi) return;
+  let jeton = null;
+  const silinecek = [];
+  try {
+    for (const depo of [localStorage, sessionStorage]) {
+      for (let i = 0; i < depo.length; i++) {
+        const k = depo.key(i);
+        if (!k || !GERCEK_OTURUM_ANAHTARI.test(k)) continue;
+        silinecek.push([depo, k]);
+        if (!jeton && !k.endsWith("code-verifier")) {
+          try { jeton = JSON.parse(depo.getItem(k) || "null")?.access_token || null; } catch { /* yok say */ }
+        }
+      }
+    }
+  } catch {
+    /* depo kapalı */
+  }
+  if (jeton && supabaseUrl && anonAnahtar) {
+    try {
+      const ctrl = new AbortController();
+      const zamanAsimi = setTimeout(() => ctrl.abort(), 4000);
+      await gercekFetch(`${supabaseUrl}/auth/v1/logout?scope=local`, {
+        method: "POST",
+        headers: { apikey: anonAnahtar, Authorization: `Bearer ${jeton}` },
+        signal: ctrl.signal,
+      });
+      clearTimeout(zamanAsimi);
+    } catch {
+      /* ağ yok / zaman aşımı: yerel jeton yine de silinir */
+    }
+  }
+  for (const [depo, k] of silinecek) {
+    try { depo.removeItem(k); } catch { /* yok say */ }
+  }
+  try { localStorage.removeItem("aea_auth_hint"); } catch { /* yok say */ }
+}
+
 /* --------------------------- yapılandırma --------------------------- */
 function birlestir(taban, gelen) {
   const cikti = JSON.parse(JSON.stringify(taban));
