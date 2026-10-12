@@ -113,6 +113,8 @@ const NAV = [
       // budur (bkz. firstAvailableView).
       // Ana Ekran: rol/yetkiye göre erişilebilen TÜM modüller tek ekranda (kartlar + arama). Varsayılan açılış.
       { id: "me-hub", icon: "🧭", label: "Ana Ekran", module: "hub", role: null },
+      // Her üye kendi verisini yedekler/geri yükler (KVKK taşınabilirlik); Site Sahibi aynı ekranda tam sistem araçlarını da görür.
+      { id: "sys-yedek", icon: "📦", label: "Yedekleme & Verilerim", module: "sistemYedek", role: null, izin: "sistemyedek", defaultAcilis: false },
       { id: "me-panel", icon: "🙍", label: "Panelim", module: "panelim", role: null, defaultAcilis: false },
     ],
   },
@@ -187,7 +189,6 @@ const NAV = [
       { id: "sys-uye-aktarim", icon: "📤", label: "Üye Verisi İndirme", module: "uyeAktarimYetki", role: "owner" },
       // role:null + izin:"sistemyedek": owner her zaman görür; diğer roller yalnızca owner can_export_system'i açtıysa.
       { id: "sys-silme-onayi", icon: "🧹", label: "Silinen Hesap Verileri", module: "silmeOnayi", role: null, izin: "silmeonayi", defaultAcilis: false },
-      { id: "sys-yedek", icon: "📦", label: "Sistem Yedekleme", module: "sistemYedek", role: null, izin: "sistemyedek", defaultAcilis: false },
       // Demo Yetki & Görünürlük Paneli: owner her zaman; admin (rol:"admin" kapısı) salt-okunur görür, yazma DB'de.
       { id: "sys-demo", icon: "🎭", label: "Demo Yetki & Görünürlük", module: "demoYetki", role: "admin", defaultAcilis: false },
       // Demo modunda görünen statik "Sistem / Metrikler" sayfası (gerçek R2/Supabase metriği DEĞİL).
@@ -233,7 +234,7 @@ function gorunurMu(item, profile) {
     return false;
   }
   if (item.izin === "sistemyedek") {
-    return profile.role === "owner" || !!profile.izinler?.sistemYedek;
+    return true; // artık herkes: kendi verisini yedekleme / geri yükleme (migration 0084). Tam sistem araçları arayüzde ve RPC'de ayrıca kapılı. (Demo modunda yukarıdaki demoSekmeAcikMi erken döner.)
   }
   if (item.izin === "yetkiayarlari") {
     return profile.role === "owner" || (profile.role === "admin" && !!profile.izinler?.yetkiAyarlari);
