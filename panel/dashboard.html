@@ -16,6 +16,7 @@ permalink: "/panel/dashboard.html"
 <link rel="stylesheet" href="{{ '/assets/css/akademik.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/sistem-yedek.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/donusturucu.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/css/demo.css' | relative_url }}">
 
 <div class="loading-overlay" id="loading">Yükleniyor...</div>
 
@@ -1026,6 +1027,18 @@ permalink: "/panel/dashboard.html"
 
     <!-- Sistem Yedekleme & Depolama Yönetimi (assets/js/sistem-yedek/sistem-yedek.js; migration 0074 + sistem-yedek-worker).
          Owner her zaman; diğer roller yalnızca can_export_system açıksa. -->
+    <!-- Demo Yetki & Görünürlük Paneli (assets/js/demo/demo-yetki-paneli.js; migration 0083). Owner yazar; admin yalnızca izin verilirse. -->
+    <section class="dash-view" id="view-sys-demo" hidden data-view="sys-demo">
+      <h1>Demo Yetki &amp; Görünürlük</h1>
+      <div id="demo-yetki-kok"><p class="muted">Yükleniyor...</p></div>
+    </section>
+
+    <!-- Demo "Sistem / Metrikler" (yalnızca demo modunda; statik vitrin rakamları — assets/js/demo/demo-metrik.js) -->
+    <section class="dash-view" id="view-sys-metrik" hidden data-view="sys-metrik">
+      <h1>Sistem / Metrikler</h1>
+      <div id="demo-metrik-kok"><p class="muted">Yükleniyor...</p></div>
+    </section>
+
     <section class="dash-view" id="view-sys-yedek" hidden data-view="sys-yedek">
       <h1>Sistem Yedekleme &amp; Depolama Yönetimi</h1>
       <div id="sy-kok" class="sy-kok"><p class="muted">Yükleniyor...</p></div>
