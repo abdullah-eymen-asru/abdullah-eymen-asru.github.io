@@ -18,7 +18,7 @@
  *     </script>
  */
 import { supabase, guncelOnaySurumleri } from "../core/supabase-client.js";
-import { demoModuAktifMi, demoBaslat } from "../demo/demo-durum.js";
+import { demoModuAktifMi, demoBaslat, demoBayrakKaliciMi } from "../demo/demo-durum.js";
 
 /**
  * @param {Object} opts
@@ -102,7 +102,7 @@ export async function requireAuth({ role = null, redirectTo = "/hesap/giris.html
   // Veritabanı tarafı zaten is_admin() içinde bunu kapatıyor (RLS/RPC
   // seviyesinde GERÇEK güvenlik orada), ama burada da kontrol ediyoruz ki
   // askıdaki bir admin panel sayfasını en azından GÖRMESİN (aşağıya bak).
-  const { data: profile, error } = await supabase
+  let { data: profile, error } = await supabase
     .from("profiles")
     .select(
       "id, email, first_name, last_name, full_name, role, is_suspended, kvkk_onay_verildi, kvkk_onay_versiyonu, kvkk_onay_tarihi, yurtdisi_onay_verildi, yurtdisi_onay_versiyonu, yurtdisi_onay_tarihi"
@@ -110,7 +110,16 @@ export async function requireAuth({ role = null, redirectTo = "/hesap/giris.html
     .eq("id", session.user.id)
     .single();
 
+  // BUG FİX (demo hesabı girişte "giriş yapmamış" gibi giriş sayfasına düşüyordu): migration 0083, 'demo' rolüne
+  // profiles dahil HİÇBİR tablodan satır okutmuyordu — kendi profil satırı da dahil. Bu yüzden yukarıdaki sorgu demo
+  // hesabı için hep boş/hatalı dönüyor, "Profil okunamadı" dalı kullanıcıyı giriş sayfasına geri atıyordu (oturum
+  // açık olduğu halde). Düzeltme (iki katman): (1) migration 0086 demo'ya YALNIZCA kendi profil satırını okutur;
+  // (2) 0086 henüz uygulanmamış olsa bile profil okunamazsa is_demo() RPC'si (migration 0083, SECURITY DEFINER —
+  // RLS'ten etkilenmez) sorulur ve hesap demo ise aşağıdaki demo akışına girilir.
   if (error || !profile) {
+    if (await gercekHesapDemoMu()) {
+      return demoyaGec(redirectTo);
+    }
     console.error("Profil okunamadı:", error);
     redirectWithReturnUrl(redirectTo);
     return new Promise(() => {});
@@ -120,9 +129,7 @@ export async function requireAuth({ role = null, redirectTo = "/hesap/giris.html
   // yüklenir; yeniden yüklemeden sonra `supabase` sahte istemcidir (hiçbir gerçek istek atılmaz, veritabanı
   // tarafı zaten restrictive RLS ile bu hesaba tek satır bile vermez). Demo bayrağı sekmeye özeldir.
   if (profile.role === "demo" && !demoModuAktifMi()) {
-    demoBaslat({ uye: true }); // gerçek 'demo' rollü hesap: herkese açık anahtarı kapalıyken de girebilir
-    window.location.reload();
-    return new Promise(() => {});
+    return demoyaGec(redirectTo);
   }
 
   // SÖZLEŞME VERSİYON TAKİBİ + ESKİ KULLANICILAR İÇİN RIZA YENİLEME MODALI
@@ -252,6 +259,31 @@ export async function requireAuthOrShowError(opts) {
     // çalışmak sadece konsolu ek TypeError'larla kirletirdi.
     return new Promise(() => {});
   }
+}
+
+/** Oturumdaki GERÇEK hesap 'demo' rolünde mi? (is_demo(): SECURITY DEFINER, demo'nun RLS kısıtından etkilenmez.) */
+async function gercekHesapDemoMu() {
+  try {
+    const { data, error } = await supabase.rpc("is_demo");
+    return !error && data === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Gerçek 'demo' rollü hesabı demo moduna alır ve sayfayı yeniden yükler. Bayrak sekme deposuna yazılamıyorsa
+ * (WebView/gizli sekme) yeniden yükleme bayrağı kaybettirip SONSUZ yeniden yükleme döngüsüne yol açardı; bu durumda
+ * döngüye girmeden giriş sayfasına açıklayıcı bir uyarıyla dönülür.
+ */
+function demoyaGec(redirectTo) {
+  demoBaslat({ uye: true }); // gerçek 'demo' rollü hesap: herkese açık anahtarı kapalıyken de girebilir
+  if (!demoBayrakKaliciMi()) {
+    redirectWithReturnUrl(redirectTo + (redirectTo.includes("?") ? "&" : "?") + "demo=depo");
+  } else {
+    window.location.reload();
+  }
+  return new Promise(() => {});
 }
 
 function redirectWithReturnUrl(target) {
