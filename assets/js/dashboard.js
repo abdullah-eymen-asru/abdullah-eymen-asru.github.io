@@ -89,6 +89,9 @@ const MODULES = {
   // Evrensel Dosya Dönüştürücü & Belge Düzenleyici (migration 0077). %100 istemci tarafı; sekme görünürlüğü role DEĞİL,
   // can_use_converter anahtarına bağlı (NAV'daki izin:"donusturucu" + izinleriYukle). Modül kendi içinde RPC ile tekrar doğrular (Guard).
   donusturucu: { src: "./donusturucu/donusturucu.js", role: null },
+  // Belge Tarayıcı & Çoklu Birleştirici (assets/js/belge-tarayici/): %100 istemci, sıfır sunucu isteği. Yetki Dönüştürücü ile AYNI
+  // (can_use_converter → NAV'daki izin:"donusturucu"); modül kendi içinde donusturucu_yetkisi_var_mi() ile tekrar doğrular (Guard).
+  belgeTarayici: { src: "./belge-tarayici/belge-tarayici.js", role: null },
   // Silinen hesapların artık verisi (migration 0078). Görünürlük: owner her zaman; admin yalnızca owner anahtarı açıksa
   // (NAV'daki izin:"silmeonayi"). Gerçek yetki RPC'lerde; kalıcı silme yalnızca owner (Edge Function).
   silmeOnayi: { src: "./silme-onayi/silme-onayi.js", role: null },
@@ -169,6 +172,7 @@ const NAV = [
       // role:null + izin:"donusturucu": owner her zaman görür; diğer roller yalnızca can_use_converter açıksa.
       // Menüde görünmeyen rol, #tool-donusturucu adresine gitse bile hash Guard'ına (gorunurMu) takılır.
       { id: "tool-donusturucu", icon: "🔄", label: "Dönüştürücü & Editör", module: "donusturucu", role: null, izin: "donusturucu", defaultAcilis: false },
+      { id: "tool-belge-tarayici", icon: "📑", label: "Belge Tarayıcı & Birleştirici", module: "belgeTarayici", role: null, izin: "donusturucu", defaultAcilis: false },
     ],
   },
   {
