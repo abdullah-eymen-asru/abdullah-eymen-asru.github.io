@@ -17,8 +17,9 @@ export const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // DEMO / VİTRİN MODU: isDemoMode iken aşağıdaki `supabase` export'u GERÇEK istemci DEĞİL, sahte (mock) istemcidir
 // (assets/js/demo/demo-supabase.js): hiçbir Supabase/Worker/R2 isteği atılmaz, sahte veriyle çalışır. Ağ kalkanı
 // (demo-ag-kalkani.js) fetch/XHR'i de ayrıca engeller. Demo değilse bu import'lar hiçbir şeyi değiştirmez.
-import { isDemoMode, configiBaslat } from "../demo/demo-durum.js";
-import { demoSupabase } from "../demo/demo-supabase.js";
+import { isDemoMode, configiBaslat, demoUyeMi, gercekAgFetch } from "../demo/demo-durum.js";
+import { demoSupabase, demoUyeSupabaseKur } from "../demo/demo-supabase.js";
+import { workerKapisiKur } from "./worker-kapi.js";
 
 // Supabase JS SDK — artık CDN'den (esm.sh) ESM import DEĞİL, YEREL vendor
 // dosyasından (assets/js/vendor/supabase.js, Supabase'in resmi UMD build'i)
@@ -48,7 +49,9 @@ if (!isDemoMode && (!window.supabase || typeof window.supabase.createClient !== 
       "çalıştırılmış olabilir."
   );
 }
-const createClient = isDemoMode ? null : window.supabase.createClient;
+// Demo ÜYESİ (gerçek 'demo' rollü hesap) da gerçek bir istemci gerektirir (hesap ayarları için): bkz. demoUyeSupabaseKur.
+const demoUyesi = isDemoMode && demoUyeMi();
+const createClient = !isDemoMode || demoUyesi ? window.supabase?.createClient : null;
 
 /*
  * "OTURUMUMU HATIRLA" (bkz. hesap/giris.md + assets/js/auth/auth-pages.js)
@@ -114,16 +117,24 @@ const dinamikOturumDeposu = {
   },
 };
 
-export const supabase = isDemoMode
-  ? demoSupabase
-  : createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true, // OAuth / e-posta linki dönüşünde token'ı otomatik yakalar
-        storage: dinamikOturumDeposu,
-      },
-    });
+const gercekIstemciSecenekleri = {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true, // OAuth / e-posta linki dönüşünde token'ı otomatik yakalar
+    storage: dinamikOturumDeposu,
+  },
+};
+
+export const supabase = !isDemoMode
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, gercekIstemciSecenekleri)
+  : demoUyesi && typeof createClient === "function"
+    // global.fetch: ağ kalkanından ÖNCE yakalanmış gerçek fetch — yalnızca Supabase'e (Auth/PostgREST) gider.
+    ? demoUyeSupabaseKur(createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { ...gercekIstemciSecenekleri, global: { fetch: gercekAgFetch } }))
+    : demoSupabase;
+
+// KOTA KORUMASI: panelden kapatılan Worker'lara tarayıcıdan hiç istek gitmesin (bkz. worker-kapi.js). Demo'da kalkan zaten engelliyor.
+if (!isDemoMode) workerKapisiKur(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Demo görünürlük yapılandırması (demo_config_getir RPC'si; demo modunda Supabase'e giden TEK istek). Demo değilse no-op.
 if (isDemoMode) configiBaslat(SUPABASE_URL, SUPABASE_ANON_KEY);
