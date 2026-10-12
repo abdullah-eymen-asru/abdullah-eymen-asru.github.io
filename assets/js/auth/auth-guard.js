@@ -18,6 +18,7 @@
  *     </script>
  */
 import { supabase, guncelOnaySurumleri } from "../core/supabase-client.js";
+import { demoModuAktifMi, demoBaslat } from "../demo/demo-durum.js";
 
 /**
  * @param {Object} opts
@@ -112,6 +113,15 @@ export async function requireAuth({ role = null, redirectTo = "/hesap/giris.html
   if (error || !profile) {
     console.error("Profil okunamadı:", error);
     redirectWithReturnUrl(redirectTo);
+    return new Promise(() => {});
+  }
+
+  // DEMO ROLÜ (migration 0083): GERÇEK bir hesabın rolü 'demo' ise, istemci demo moduna alınır ve sayfa yeniden
+  // yüklenir; yeniden yüklemeden sonra `supabase` sahte istemcidir (hiçbir gerçek istek atılmaz, veritabanı
+  // tarafı zaten restrictive RLS ile bu hesaba tek satır bile vermez). Demo bayrağı sekmeye özeldir.
+  if (profile.role === "demo" && !demoModuAktifMi()) {
+    demoBaslat();
+    window.location.reload();
     return new Promise(() => {});
   }
 
