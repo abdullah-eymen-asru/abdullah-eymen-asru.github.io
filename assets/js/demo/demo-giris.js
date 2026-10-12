@@ -11,12 +11,17 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../core/supabase-client.js";
 
 const kutu = document.getElementById("demo-giris-kutu");
 const kapaliNot = document.getElementById("demo-kapali-not");
+const depoNot = document.getElementById("demo-depo-not");
 const buton = document.getElementById("demo-giris-btn");
+
+// Bilgilendirme HER İKİ durumda da görünür (kullanıcı kararı): açıkken "hesapsız dene" düğmesinin yanında, kapalıyken
+// (ya da durum okunamadıysa) "hesapsız demo kapalı, demo hesabın varsa forma gir" notu. Böylece demo hesabı olan biri
+// anahtarın durumundan bağımsız olarak nasıl gireceğini bilir. Ek olarak ?demo=depo (tarayıcı depolaması kapalı) uyarısı.
+if (depoNot) depoNot.hidden = new URLSearchParams(location.search).get("demo") !== "depo";
 
 function goster(acik) {
   if (kutu) kutu.hidden = !acik;
-  // Kapalıyken yalnızca ziyaretçi demoyu aramışsa (yönlendirmeyle ?demo=kapali) bilgi notu göster; normal girişte sessiz kal.
-  if (kapaliNot) kapaliNot.hidden = acik || new URLSearchParams(location.search).get("demo") !== "kapali";
+  if (kapaliNot) kapaliNot.hidden = acik;
 }
 
 demoHerkeseAcikMi(SUPABASE_URL, SUPABASE_ANON_KEY).then(goster);
@@ -26,7 +31,7 @@ buton?.addEventListener("click", async () => {
   const acik = await demoHerkeseAcikMi(SUPABASE_URL, SUPABASE_ANON_KEY); // tıklama anında yeniden doğrula
   if (!acik) {
     goster(false);
-    if (kapaliNot) kapaliNot.hidden = false;
+    buton.disabled = false; // anahtar sonradan açılırsa (sayfa yenilenmeden) düğme kilitli kalmasın
     return;
   }
   demoBaslat();
