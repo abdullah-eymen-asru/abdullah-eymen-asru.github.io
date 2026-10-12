@@ -34,6 +34,8 @@ const ROL_ETIKETLERI = {
   // BUG FİX: 'owner' (Site Sahibi, migration 0021) bu haritada yoktu —
   // üye listesinde owner'ın rolü ham "owner" metniyle görünüyordu.
   owner: "Site Sahibi",
+  // Migration 0083: salt-okunur vitrin hesabı (yalnızca Site Sahibi atar; hiçbir veriyi okuyamaz/yazamaz).
+  demo: "Demo (vitrin)",
 };
 
 let TUM_KULLANICILAR = [];
@@ -393,7 +395,8 @@ function epostaDegistirButonuHtml(u) {
 function rolSecimHtml(u) {
   const benOwnerMi = GIRIS_YAPAN_PROFIL?.role === "owner";
   const hedefZatenAdminMi = u.role === "admin";
-  const devreDisi = hedefZatenAdminMi && !benOwnerMi;
+  const hedefDemoMu = u.role === "demo";
+  const devreDisi = (hedefZatenAdminMi || hedefDemoMu) && !benOwnerMi;
 
   const secenekler = [
     { rol: "user", etiket: "Üye" },
@@ -403,6 +406,8 @@ function rolSecimHtml(u) {
     // "Yönetici" seçeneği sadece owner'a (ya da hedef zaten admin ise —
     // değeri korumak için) gösterilir.
     ...(benOwnerMi || hedefZatenAdminMi ? [{ rol: "admin", etiket: "Yönetici" }] : []),
+    // "Demo" seçeneği yalnızca owner'a (ya da hedef zaten demo ise değeri korumak için) gösterilir.
+    ...(benOwnerMi || hedefDemoMu ? [{ rol: "demo", etiket: "Demo (vitrin, salt-okunur)" }] : []),
   ];
 
   return `
@@ -458,10 +463,19 @@ function wireKartOlaylari(liste) {
       const yeniRol = select.value;
       const durum = liste.querySelector(`.rol-durum[data-id="${userId}"]`);
 
-      const { error } = await supabase.rpc("admin_set_user_role", {
-        p_user_id: userId,
-        p_new_role: yeniRol,
-      });
+      // Demo rolü ayrı, yalnızca-owner RPC'siyle atanır/geri alınır (admin_set_user_role 'demo' vermez; migration 0083).
+      const eskiRol = TUM_KULLANICILAR.find((u) => u.id === userId)?.role;
+      let error = null;
+      if (yeniRol === "demo") {
+        ({ error } = await supabase.rpc("owner_demo_rolu_ata", { p_user_id: userId, p_demo: true }));
+      } else {
+        if (eskiRol === "demo") {
+          ({ error } = await supabase.rpc("owner_demo_rolu_ata", { p_user_id: userId, p_demo: false })); // demo → user
+        }
+        if (!error && !(eskiRol === "demo" && yeniRol === "user")) {
+          ({ error } = await supabase.rpc("admin_set_user_role", { p_user_id: userId, p_new_role: yeniRol }));
+        }
+      }
 
       if (durum) {
         durum.textContent = error ? "Hata!" : "Kaydedildi ✓";
