@@ -300,36 +300,37 @@ export default {
     // de rate-limit tüketme saldırılarına karşı gerçek bir koruma sağlar
     // (önceden sadece tarayıcıya öneri niteliğinde bir Cache-Control
     // header'ı gönderiliyordu, edge'de fiilen önbelleğe alınmıyordu).
+    // AKILLI KENAR ÖNBELLEĞİ (stale-while-revalidate):
+    //  • TAZE (< FRESH sn): önbellekten döner; GitHub'a gidilmez.
+    //  • BAYAT (FRESH..STALE sn): ziyaretçiye ANINDA bayat kopya verilir, yenileme arka planda (ctx.waitUntil) yapılır
+    //    → kimse GitHub yanıtını beklemez.
+    //  • Sürümleme: CACHE_SURUM değişkeni (Text) değiştirilirse anahtar değişir ve TÜM veri merkezlerindeki eski kopyalar
+    //    anında "yok" sayılır (cache.delete yalnızca o veri merkezini temizler; sürümleme küresel ve garantilidir).
+    // DÜRÜST NOT: Cache API ile bile bu Worker çalışır ve 1 istek sayılır; kazanç GitHub API çağrısı/gecikmedir. Worker'ı HİÇ
+    // çalıştırmamak için yanıtı Worker önünde CDN'de önbellekleyen bir Cache Rule gerekir.
+    const FRESH = 60, STALE = 3600;
     const cache = caches.default;
-    const cacheKey = new Request(url.toString(), request);
-    const cachedResponse = await cache.match(cacheKey);
-    if (cachedResponse) {
-      return cachedResponse;
-    }
+    const anahtarUrl = new URL(url.toString());
+    anahtarUrl.search = `?project=${encodeURIComponent(projectKey)}&_v=${encodeURIComponent(env.CACHE_SURUM || "1")}`;
+    const cacheKey = new Request(anahtarUrl.toString());
+
+    const uret = async () => {
+      const { projectTitle, items, fieldOrder } = await fetchAllItems(env.GITHUB_TOKEN, projectConfig.number, projectConfig.sutunSirasi);
+      const govde = JSON.stringify({ generatedAt: new Date().toISOString(), projectTitle, count: items.length, fieldOrder, items });
+      ctx.waitUntil(cache.put(cacheKey, new Response(govde, { headers: { "Content-Type": "application/json", "Cache-Control": `public, max-age=${STALE}`, "X-Cached-At": String(Date.now()) } })));
+      return govde;
+    };
+    const yanit = (govde, durum) => new Response(govde, { headers: { "Content-Type": "application/json", "Cache-Control": `public, max-age=${FRESH}, stale-while-revalidate=300`, "X-Cache": durum, ...corsHeaders } });
 
     try {
-      const { projectTitle, items, fieldOrder } = await fetchAllItems(env.GITHUB_TOKEN, projectConfig.number, projectConfig.sutunSirasi);
-
-      const payload = {
-        generatedAt: new Date().toISOString(),
-        projectTitle,
-        count: items.length,
-        fieldOrder,
-        items,
-      };
-
-      const response = new Response(JSON.stringify(payload), {
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "public, max-age=60",
-          ...corsHeaders,
-        },
-      });
-
-      // Cevabı edge cache'e yaz (arka planda, isteği yavaşlatmadan).
-      ctx.waitUntil(cache.put(cacheKey, response.clone()));
-
-      return response;
+      const onbellekte = await cache.match(cacheKey);
+      if (onbellekte) {
+        const yas = (Date.now() - Number(onbellekte.headers.get("X-Cached-At") || 0)) / 1000;
+        const metin = await onbellekte.text();
+        if (yas >= FRESH) ctx.waitUntil(uret().catch((e) => console.error("arka plan yenileme:", e)));
+        return yanit(metin, yas < FRESH ? "HIT" : "STALE");
+      }
+      return yanit(await uret(), "MISS");
     } catch (err) {
       // GÜVENLİK: GitHub API'sinden veya GraphQL'den gelen ham hata mesajını
       // (err.message) DOĞRUDAN ziyaretçiye döndürmüyoruz. Bu mesaj bazen
