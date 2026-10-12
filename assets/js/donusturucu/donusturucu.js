@@ -345,7 +345,7 @@ async function duzenleyiciAc() {
         el("div", { class: "dn-ust-eylem" },
           el("label", { class: "dn-alan-etiket" }, "Dosya adı", adGirdi),
           el("label", { class: "dn-alan-etiket" }, "Kayıt biçimi", secici),
-          el("div", { class: "dn-eylemler" }, kaydetBtn, kapat, sifirlaDugmesi()))),
+          el("div", { class: "dn-eylemler dn-eylemler--editor" }, kaydetBtn, kapat, sifirlaDugmesi(), tamEkranDugmesi()))),
       durum.el, kap);
     ana.hidden = true;
     calismaAlani.hidden = false;
@@ -453,10 +453,34 @@ function oturumuSifirla() {
   ilerleme.gizle();
   calismaAlani.hidden = true;
   ana.hidden = false;
+  document.documentElement.classList.remove("dn-tam-ekran-acik");
+}
+
+/** Mobilde önizleme küçük kalmasın: editörü tüm ekrana yayar (Esc / aynı düğme ile geri). */
+function tamEkranDugmesi() {
+  const b = dugme({ metin: "Tam ekran", ikon: "⛶", "aria-pressed": "false" });
+  const ac = (v) => {
+    const e = calismaAlani.querySelector(".dn-editor");
+    if (!e) return;
+    e.classList.toggle("dn-tam", v);
+    e.querySelector(".dn-tam-cik")?.remove();
+    if (v) {
+      const cik = dugme({ metin: "Tam ekrandan çık", ikon: "✕", class: "dn-tam-cik" });
+      cik.addEventListener("click", () => ac(false));
+      e.prepend(cik);
+    }
+    document.documentElement.classList.toggle("dn-tam-ekran-acik", v);
+    b.setAttribute("aria-pressed", String(v));
+    b.querySelector(".dn-btn-metin").textContent = v ? "Tam ekrandan çık" : "Tam ekran";
+    duzenleyici?.nesne?.sigdir?.()?.catch?.(() => {});
+  };
+  b.addEventListener("click", () => ac(b.getAttribute("aria-pressed") !== "true"));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && b.getAttribute("aria-pressed") === "true") ac(false); });
+  return b;
 }
 
 function sifirlaDugmesi() {
-  const b = dugme({ metin: "Oturumu Sıfırla / Dosyayı Güvenli Sil", ikon: "🧹", class: "dn-sifirla", title: "Açık dosyaları, düzenleyiciyi ve önizlemeleri bellekten siler" });
+  const b = dugme({ metin: "Oturumu Sıfırla", ikon: "🧹", class: "dn-sifirla", title: "Dosyayı Güvenli Sil: açık dosyaları, düzenleyiciyi ve önizlemeleri bellekten siler", "aria-label": "Oturumu sıfırla, dosyayı güvenli sil" });
   b.addEventListener("click", async () => {
     if (!bellekteVeriVar()) { bildir("Bellekte silinecek belge yok.", "info"); return; }
     const kirli = duzenleyici?.nesne?.kirli?.();
