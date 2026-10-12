@@ -15,8 +15,8 @@ permalink: "/icerik/okuduklarim.html"
   Okuduğum kitapları
   <a href="{{ site.okuma_projects_url }}" target="_blank" rel="noopener noreferrer">GitHub Projects panosunda</a>
   kayıt altına alıyorum. Bu tablo, panoya her yeni kayıt eklendiğinde
-  <strong>anlık olarak</strong> güncellenir — sayfayı her açtığında en güncel
-  veriyi görürsün.
+  <strong>anlık olarak</strong> güncellenir — veri en geç birkaç dakika içinde
+  sayfaya yansır (İzlediklerim ve Okuduklarım aynı veriyi paylaşır, sekmeler arası geçiş anlıktır).
 </p>
 
 <p class="format-hint">
@@ -64,6 +64,8 @@ permalink: "/icerik/okuduklarim.html"
 <script>
   koleksiyonTablosuOlustur({
     jsonUrl: "{{ site.cloudflare_worker_url }}?project=okuma",
+    tumuUrl: "{{ site.cloudflare_worker_url }}?project=hepsi",   // izleme + okuma TEK Worker isteğinde; iki sekme arasında geçiş istek atmaz
+    bolum: "okuma",
     containerId: "okunanlar-tablo",
     searchInputId: "okuma-search",
     turSelectId: "tur-filtresi",
