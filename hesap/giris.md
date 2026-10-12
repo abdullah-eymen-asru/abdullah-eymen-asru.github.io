@@ -33,6 +33,10 @@ permalink: "/hesap/giris.html"
     <button type="submit" class="btn-primary">Giriş Yap</button>
   </form>
 
+  <div class="auth-divider">veya</div>
+  <button id="demo-giris-btn" type="button" class="btn-demo">🎭 Canlı Demo / Vitrin Modu</button>
+  <p class="muted demo-giris-not">Hesap gerekmez. Örnek verilerle, salt-okunur olarak platformu dene; gerçek verilere erişilmez.</p>
+
   <div class="auth-links">
     <a href="{{ '/hesap/kayit.html' | relative_url }}">Hesabın yok mu? Kayıt ol</a>
     <a href="{{ '/hesap/sifremi-unuttum.html' | relative_url }}">Şifremi unuttum</a>
@@ -42,6 +46,9 @@ permalink: "/hesap/giris.html"
     <span></span>
   </div>
 </div>
+
+<link rel="stylesheet" href="{{ '/assets/css/demo.css' | relative_url }}">
+<script type="module" src="{{ '/assets/js/demo/demo-giris.js' | relative_url }}"></script>
 
 <script type="module">
   import { initGirisPage } from "{{ '/assets/js/auth/auth-pages.js' | relative_url }}";
