@@ -9,7 +9,7 @@
  *    dosya seçici açılmadan ve istek hazırlanmadan toast gösterilir. (Ağ kalkanı yine ikinci emniyet olarak durur.)
  *  • innerHTML yok (CSP + XSS); metinler textContent.
  */
-import { demoBildir, demoBitir, ozellikAcikMi } from "./demo-durum.js";
+import { demoBildir, demoCikisYap, ozellikAcikMi } from "./demo-durum.js";
 
 const KRITIK = [
   "#ra-yukle-dosya", "#ra-yukle-klasor", "#ra-klasor-yeni", "#ra-secim-sil",
@@ -33,8 +33,10 @@ function bandKur() {
   const main = document.getElementById("dash-main");
   if (!main || document.getElementById("demo-bandi")) return;
   const cikis = el("button", { type: "button", class: "demo-bandi-btn", text: "Demodan çık" });
-  cikis.addEventListener("click", () => {
-    demoBitir();
+  cikis.addEventListener("click", async () => {
+    cikis.disabled = true;
+    const { SUPABASE_URL, SUPABASE_ANON_KEY } = await import("../core/supabase-client.js");
+    await demoCikisYap(SUPABASE_URL, SUPABASE_ANON_KEY); // anonimde yalnızca bayrak; demo üyesinde gerçek oturum da kapanır
     window.location.href = "/hesap/giris.html";
   });
   main.prepend(
