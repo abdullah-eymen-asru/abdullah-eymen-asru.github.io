@@ -310,3 +310,13 @@
 .sy-kota-liste { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
 .sy-kota-liste li { display: flex; justify-content: space-between; gap: 8px; }
 .sy-btn--tehlike-hafif { background: transparent; color: var(--sy-tehlike, #c0392b); border-color: var(--sy-tehlike, #c0392b); }
+
+/* Worker anahtarları (kota koruması) kartı — assets/js/sistem-yedek/worker-anahtarlari.js */
+.sy-wk-kart { grid-column: 1 / -1; }
+.sy-wk-liste { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+.sy-wk-satir { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px dashed var(--border); }
+.sy-wk-ad { flex: 1 1 220px; display: grid; gap: 2px; min-width: 0; }
+.sy-wk-ad code { overflow-wrap: anywhere; font-size: 0.8rem; }
+.sy-wk-sert { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; font-size: 0.9rem; }
+.sy-wk-gunluk { margin-top: 10px; }
+.sy-wk-gunluk summary { cursor: pointer; font-weight: 600; }
