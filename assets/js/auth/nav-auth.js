@@ -188,61 +188,9 @@ function renderHesapMenusu(container, role) {
   // yönlendiriyor, böylece kullanıcı sekmeler arasında sayfa yenilemeden
   // dolaşıyor.
   const DASH = "/panel/dashboard.html";
-  const linkler = [{ href: `${DASH}#me-hub`, etiket: "Panelim" }];
-  // Sohbet/Mesajlar artık ayrı, ortak bir sayfa (bkz. panel/mesajlar.md) —
-  // giriş yapmış HERKES görür: admin için o sayfa gelen kutusunu, diğer
-  // herkes için kendi yöneticiyle sohbet ekranını açar (karar
-  // assets/js/mesajlar.js içinde, role'e göre çalışma zamanında verilir).
-  linkler.push({ href: `${DASH}#users-mesajlar`, etiket: "Sohbet / Mesajlar" });
-  // Üye Ayarları (eski "Kullanıcılar & Roller") artık ayrı bir sayfa (bkz.
-  // panel/uye-ayarlari.md) ve SADECE admin'e açık — manager (İçerik
-  // Sorumlusu) bu linki hiç görmez, doğrudan URL'yi yazsa bile o sayfanın
-  // kendi requireAuth({role:'admin'}) kontrolü onu geri gönderir.
-  // owner (Site Sahibi), admin'in tüm menü linklerini görmeli — bkz.
-  // migration 0021 ve auth-guard.js'teki "owner her zaman geçer" kuralı.
-  const adminGibi = role === "admin" || role === "owner";
-  if (adminGibi) {
-    linkler.push({ href: `${DASH}#users-uye`, etiket: "Üye Ayarları" });
-  }
-  // 'manager' (panelde "İçerik Sorumlusu") de admin paneline girebiliyor —
-  // ama SADECE "Özel İçerik Ekle/Düzenle", "Mevcut Özel İçerikler" ve
-  // "R2 Dosya Paylaşımı" sekmelerine (bkz. admin.js, panel/admin.md).
-  // Linkin kendisi admin ile aynı, hangi sekmelerin görüneceğine admin.js
-  // içeri girdikten sonra karar veriyor.
-  if (adminGibi || role === "manager") {
-    linkler.push({ href: `${DASH}#content-private`, etiket: "Admin Paneli" });
-  }
-  // Admin Güvenliği (karşılıklı denetim / askıya alma / owner kararı) —
-  // sadece admin/owner girebilir (bkz. admin-guvenlik.js).
-  if (adminGibi) {
-    linkler.push({ href: `${DASH}#sys-guvenlik`, etiket: "🛡️ Admin Güvenliği" });
-  }
-  // GitHub Pages'in kendi statik içeriğini (blog/proje yazıları, profil
-  // fotoğrafı) yönetmek için ayrı, bağımsız bir sayfa — bkz.
-  // panel/github-yonetim.md / assets/js/github-yonetim/github-yonetim.js. O sayfa
-  // requireAuth({role:['editor','manager']}) kullanır, yani editor, manager
-  // VEYA admin girebilir (auth-guard.js'te "admin her zaman geçer" kuralı
-  // zaten var).
-  //
-  // BUG FİX: bu link öncesinde SADECE role==='admin' iken ekleniyordu —
-  // editor rolündeki kullanıcılar panele erişebildikleri hâlde (RLS ve
-  // requireAuth doğru kurulmuştu) menüde linki HİÇ görmüyorlardı, yani
-  // panele ulaşmanın tek yolu URL'yi elle yazmaktı. Şimdi editor, manager
-  // veya admin iken gösteriliyor.
-  if (adminGibi || role === "editor" || role === "manager") {
-    linkler.push({ href: `${DASH}#content-all`, etiket: "GitHub İçerik Yönetimi" });
-  }
-  // İzleme/Okuma Yönetimi — bkz. panel/izleme-okuma-yonetim.md /
-  // assets/js/izleme-okuma-yonetim/izleme-okuma-yonetim.js. Bu, GitHub
-  // İçerik Yönetimi'nin AKSİNE editor/manager/admin'e DEĞİL, SADECE
-  // 'owner' (Site Sahibi) rolüne açık — o pano site sahibinin kişisel
-  // izleme/okuma kaydı olduğu için (bir editöre devredilebilecek bir
-  // "site içeriği" değil). "admin her zaman geçer" kuralı BİLİNÇLİ
-  // OLARAK burada uygulanmıyor; requireAuth({role:'owner'}) da sayfanın
-  // kendisinde aynı şekilde SADECE owner'ı geçiriyor (bkz. o dosya).
-  if (role === "owner") {
-    linkler.push({ href: `${DASH}#media-izleme`, etiket: "🎬📚 İzleme/Okuma Yönetimi" });
-  }
+  // Eski panel kısayolları (Sohbet, Üye Ayarları, Admin Paneli, Admin Güvenliği, GitHub İçerik, İzleme/Okuma) menüden KALDIRILDI:
+  // hepsi artık Ana Ekran (Hub) içinde, rol/yetkiye göre kartlar olarak duruyor (assets/js/hub/hub.js). Sayfalar silinmedi.
+  const linkler = [{ href: `${DASH}#me-hub`, etiket: "🧭 Ana Ekran" }];
 
   linkler.forEach(({ href, etiket }) => {
     const a = document.createElement("a");
