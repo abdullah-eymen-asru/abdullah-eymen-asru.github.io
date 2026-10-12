@@ -39,6 +39,9 @@ import { requireAuthOrShowError } from "./auth/auth-guard.js";
 import { supabase } from "./core/supabase-client.js";
 import { ayrilmayaIzinVarMi } from "./core/gezinme-kilidi.js";
 import { hubCiz, sonKullanilanKaydet } from "./hub/hub.js";
+// DEMO / VİTRİN MODU (migration 0083): rol 'demo' + sahte veri katmanı. Görünürlük TEK yerden gelir: demoSekmeAcikMi()
+// (izinli sekme listesi + Site Sahibi'nin canlı yapılandırması). Ayrıntı: assets/js/demo/*.
+import { isDemoMode, configHazir, demoSekmeAcikMi, demoHubKartiAcikMi } from "./demo/demo-durum.js";
 
 /* ------------------------------------------------------------------ */
 /* 1) Modül tanımları                                                  */
@@ -89,6 +92,10 @@ const MODULES = {
   // Silinen hesapların artık verisi (migration 0078). Görünürlük: owner her zaman; admin yalnızca owner anahtarı açıksa
   // (NAV'daki izin:"silmeonayi"). Gerçek yetki RPC'lerde; kalıcı silme yalnızca owner (Edge Function).
   silmeOnayi: { src: "./silme-onayi/silme-onayi.js", role: null },
+  // Demo Yetki & Görünürlük Paneli: owner her zaman; admin salt-okunur görür, yazma yetkisini DB (demo_config_kaydet) verir.
+  demoYetki: { src: "./demo/demo-yetki-paneli.js", role: "admin" },
+  // Demo "Sistem / Metrikler" sekmesi: statik vitrin grafikleri (yalnızca demo modunda görünür; bkz. gorunurMu -> demoOnly).
+  demoMetrik: { src: "./demo/demo-metrik.js", role: null },
 };
 
 // Sidebar hiyerarşisi. Her leaf: { id, label, view (gösterilecek
@@ -181,6 +188,10 @@ const NAV = [
       // role:null + izin:"sistemyedek": owner her zaman görür; diğer roller yalnızca owner can_export_system'i açtıysa.
       { id: "sys-silme-onayi", icon: "🧹", label: "Silinen Hesap Verileri", module: "silmeOnayi", role: null, izin: "silmeonayi", defaultAcilis: false },
       { id: "sys-yedek", icon: "📦", label: "Sistem Yedekleme", module: "sistemYedek", role: null, izin: "sistemyedek", defaultAcilis: false },
+      // Demo Yetki & Görünürlük Paneli: owner her zaman; admin (rol:"admin" kapısı) salt-okunur görür, yazma DB'de.
+      { id: "sys-demo", icon: "🎭", label: "Demo Yetki & Görünürlük", module: "demoYetki", role: "admin", defaultAcilis: false },
+      // Demo modunda görünen statik "Sistem / Metrikler" sayfası (gerçek R2/Supabase metriği DEĞİL).
+      { id: "sys-metrik", icon: "📊", label: "Sistem / Metrikler", module: "demoMetrik", role: null, demoOnly: true, defaultAcilis: false },
       { id: "sys-github", icon: "🔑", label: "GitHub / Worker Bağlantısı", module: "gy" },
       { id: "sys-hakkimda", icon: "🙋", label: "Hakkımda & Sosyal Linkler", module: "gy" },
       { id: "sys-hesabim", icon: "⚠️", label: "Hesabım (Tehlikeli Bölge)", module: "admin" },
@@ -213,6 +224,9 @@ function roleAllowed(required, profile) {
 // Rol kuralı + (varsa) dinamik izin kuralı. izin:"arsiv" -> r2_arsiv_yetkilerim()
 // sonucundan en az biri true (ya da kendisine şifreli dosya paylaşılmış) olmalı.
 function gorunurMu(item, profile) {
+  // DEMO: yalnızca izinli demo sekmeleri ve yalnızca yapılandırmada açıksa; rol/izin RPC'leri hiç sorulmaz.
+  if (isDemoMode) return demoSekmeAcikMi(item.id);
+  if (item.demoOnly) return false; // demo'ya özel sekme, gerçek hesaplarda yok
   if (!roleAllowed(itemRole(item), profile)) return false;
   // Owner'ın Yetki Ayarları'ndan kapattığı özellik: sekme hiç görünmesin (owner etkilenmez).
   if (item.ozellik && profile.role !== "owner" && profile.izinler?.ozellikler?.[item.ozellik] === false) {
@@ -812,10 +826,12 @@ async function init() {
   // modülün kendi requireAuthOrShowError({role:...}) çağrısı YİNE de
   // (savunma derinliği olarak) çalışmaya devam eder.
   const { profile } = await requireAuthOrShowError({ role: null });
+  // Demo: görünürlük yapılandırması hazır olmadan menü çizilmez (en geç ~6 sn; başarısızsa varsayılan/önbellek).
+  if (isDemoMode) await configHazir();
 
   document.getElementById("dash-ad-soyad").textContent =
     profile.full_name || [profile.first_name, profile.last_name].filter(Boolean).join(" ") || profile.email || "";
-  document.getElementById("dash-rol").textContent = `Rol: ${profile.role}`;
+  document.getElementById("dash-rol").textContent = isDemoMode ? "Demo / Vitrin Modu" : `Rol: ${profile.role}`;
 
   GIRIS_PROFIL_ROLU = profile.role;
   profile.izinler = await izinleriYukle(profile.role);
@@ -848,13 +864,14 @@ async function init() {
   // E2EE anahtar çiftini HERKES için sessizce hazırla: bir kullanıcı, panele en az bir kez
   // girdiyse başkaları ona şifreli dosya gönderebilir (alıcının açık anahtarı gerekir).
   // Worker kapalıysa/yoksa sessizce atlanır; paneli asla bozmaz.
-  import("./r2-arsiv/e2ee.js").then((m) => m.anahtarlariHazirla()).catch(() => {});
+  // (Demo'da atlanır: Worker'a hiç istek gitmesin.)
+  if (!isDemoMode) import("./r2-arsiv/e2ee.js").then((m) => m.anahtarlariHazirla()).catch(() => {});
 
   buildSidebar(profile);
   // Hub: sidebar ile AYNI görünürlük kuralı (gorunurMu); Ana Ekran kartı kendisi için çizilmez.
   hubVerisi = {
     ad: profile.first_name || profile.full_name || "",
-    gruplar: NAV.map((g) => ({ group: g.group, icon: g.icon, items: g.items.filter((it) => it.id !== "me-hub" && gorunurMu(it, profile)).map((it) => ({ id: it.id, icon: it.icon, label: it.label })) })).filter((g) => g.items.length),
+    gruplar: NAV.map((g) => ({ group: g.group, icon: g.icon, items: g.items.filter((it) => it.id !== "me-hub" && gorunurMu(it, profile) && (!isDemoMode || demoHubKartiAcikMi(it.id))).map((it) => ({ id: it.id, icon: it.icon, label: it.label })) })).filter((g) => g.items.length),
   };
   wireMobileNav();
   wireDashIciLinkler();
@@ -893,8 +910,15 @@ async function init() {
       ? requested
       : firstAvailableView(profile);
 
+  if (isDemoMode) {
+    // Vitrin bandı, alt özellik gizleme (PDF araç çubuğu, ZIP inceleme, filtre çipleri) ve "Demodan çık".
+    import("./demo/demo-gorunum.js").then((m) => m.demoGorunumuKur()).catch((h) => console.warn("Demo görünümü kurulamadı:", h));
+  }
   if (target) {
     await showView(target.id, target.module);
+  } else if (isDemoMode) {
+    document.getElementById("dash-main").innerHTML =
+      '<p class="muted">Bu demoda şu an görüntülenecek bir bölüm açık değil. Site sahibi vitrin ayarlarını güncellemiş olabilir.</p>';
   } else {
     document.getElementById("dash-main").innerHTML =
       '<p class="muted">Bu panelde görüntüleyebileceğin bir bölüm bulunamadı.</p>';
