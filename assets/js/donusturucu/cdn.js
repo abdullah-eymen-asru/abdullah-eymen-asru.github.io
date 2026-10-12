@@ -42,6 +42,14 @@ export const KUTUPHANELER = {
     sri: "sha384-G23ofMOEI98f9UnroUBjDi6Ll55Y5E6bOX4VAMJo0nIbuQRIxzn0g4athUOb58zs", amac: "PDF üretimi (Roboto gömülü: Türkçe/Latin-Ext/Kiril/Yunanca)",
     ek: ["build/vfs_fonts.js"],
   },
+  utif: {
+    paket: "utif", surum: "3.1.0", dosya: "UTIF.js", global: "UTIF", lisans: "MIT",
+    sri: null, amac: "TIFF çözme (Chrome/Firefox çözemez; Safari yerel çözer) — Belge Tarayıcı",
+  },
+  pako: {
+    paket: "pako", surum: "2.1.0", dosya: "dist/pako.min.js", global: "pako", lisans: "MIT AND Zlib",
+    sri: null, amac: "Deflate sıkıştırmalı TIFF'ler için (UTIF'in isteğe bağlı bağımlılığı)",
+  },
   heic2any: {
     paket: "heic2any", surum: "0.0.4", dosya: "dist/heic2any.min.js", global: "heic2any", lisans: "MIT",
     sri: "sha384-OTofQ0MEeiSgh62havBcemCIK0gqj809wX6UA0uPISNMRnR6NZyCdGzX3SbLrgwL", amac: "HEIC/HEIF (iPhone) görsellerini çözme — WebAssembly gerektirir ('wasm-unsafe-eval')",
