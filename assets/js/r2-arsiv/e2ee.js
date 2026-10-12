@@ -95,6 +95,21 @@ export async function anahtarlariHazirla() {
   return anahtarOnbellek;
 }
 
+/**
+ * Panel AÇILIŞINDA çağrılır (dashboard.js): anahtar çifti yoksa oluşturur. KOTA: kaydı ÖNCE Supabase'ten kontrol eder; varsa
+ * kasa anahtarı için Worker'a HİÇ gidilmez (eskiden her panel açılışı 1 Worker isteğiydi). Kasa anahtarı yalnızca gerçekten
+ * gerektiğinde (dosya şifreleme/çözme → anahtarlariHazirla) Worker'dan alınır.
+ */
+export async function anahtarKaydiniSessizHazirla() {
+  const session = await jwt();
+  if (anahtarOnbellek?.uid === session.user.id) return true;
+  const { data, error } = await supabase.from("e2ee_kullanici_anahtarlari")
+    .select("kullanici_id").eq("kullanici_id", session.user.id).maybeSingle();
+  if (!error && data) return true; // kayıt var: Worker'a gerek yok
+  await anahtarlariHazirla();      // kayıt yok (ilk giriş) ya da okunamadı: tam hazırlık
+  return true;
+}
+
 export function anahtarOnbellegiTemizle() { anahtarOnbellek = null; }
 
 // Çıkış yapılınca bellekteki (çözülmüş) özel anahtar referansını bırak.
