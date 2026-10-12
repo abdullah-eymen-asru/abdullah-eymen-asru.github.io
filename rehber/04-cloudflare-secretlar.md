@@ -719,3 +719,16 @@ Yeni uç noktalar (hepsi yalnızca Site Sahibi, kullanıcının KENDİ JWT'siyle
 CORS `Allow-Methods` artık `PUT` içerir. Kovaları (bucket) silen hiçbir uç nokta yoktur.
 
 **Edge Function:** `delete-account` değişmedi; fakat `/uye-temizle` artık işlem bütçesi aşılırsa HTTP 409 döner → Edge Function zaten `!wr.ok` durumunda DB satırlarına dokunmadan hata verir; aynı işlemi tekrar çalıştırmak güvenlidir.
+
+## 4.10c — Canlı kota sayacı ve kenar önbelleği (migration 0084 turu)
+
+**sistem-yedek-worker › Settings › Variables and Secrets**
+| Ad | Tür | Değer |
+|---|---|---|
+| `CF_ACCOUNT_ID` | Text | Cloudflare hesap kimliği (Workers & Pages sağ kenar çubuğu) |
+| `CF_API_TOKEN` | **Secret** | My Profile › API Tokens › Create: izin **Account › Account Analytics › Read** (başka izin verme) |
+| `GUNLUK_ISTEK_LIMITI` | Text (ops.) | Varsayılan `100000` |
+
+Yapılandırılmazsa panel sayacı "yapılandırılmadı" der; başka hiçbir şey bozulmaz. Panel: Yedekleme & Verilerim › Depolama Durumu › "⚡ Worker İstekleri (bugün)" (60 sn önbellekli, UTC günü).
+
+**izleme-okuma-worker:** stale-while-revalidate eklendi (taze 60 sn, bayat 1 saat anında + arka planda yenileme). **Önbelleği anında sıfırlamak için** `CACHE_SURUM` (Text) değerini değiştir (ör. `1` → `2`) ve Deploy et; tüm veri merkezlerinde eski kopyalar geçersiz olur. (Cache API'de `cache.delete` yalnızca çalıştığı veri merkezini temizler; küresel garanti için sürümleme kullanılır.)
