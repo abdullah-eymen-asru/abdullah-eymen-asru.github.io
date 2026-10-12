@@ -15,6 +15,7 @@
  */
 
 const BAYRAK = "aea_demo_modu";
+const UYE_BAYRAK = "aea_demo_uye"; // GERÇEK, 'demo' rolündeki üye girişi (anonim ziyaretçi değil) — herkese açık anahtarından bağımsız girer
 const CFG_ONBELLEK = "aea_demo_cfg";
 const CFG_TTL_MS = 90 * 1000;
 
@@ -45,6 +46,7 @@ export const DEMO_PROFIL = Object.freeze({
 export const VARSAYILAN_CONFIG = Object.freeze({
   v: 1,
   adminlerDegistirebilir: false,
+  herkeseAcik: false, // anonim (hesapsız) demo girişi: VARSAYILAN KAPALI; yalnızca Site Sahibi açar (owner_demo_herkese_acik_ayarla)
   hub: { aktif: true, kartlar: { "content-notlar": true, "media-arsiv": true, "lib-kutuphane": true, "sys-metrik": true } },
   pdf: { aktif: true, duzenlemeAraclari: true },
   arsiv: { aktif: true, zipInceleme: true },
@@ -79,10 +81,17 @@ if (isDemoMode) {
   document.documentElement.dataset.demo = "1";
 }
 
-export function demoBaslat() {
+/** Gerçek hesabıyla demo rolünde giren üye mi? (Anonim ziyaretçi değil.) */
+export function demoUyeMi() {
+  try { return sessionStorage.getItem(UYE_BAYRAK) === "1"; } catch { return false; }
+}
+
+/** @param {{uye?: boolean}} opts uye=true → 'demo' rolündeki GERÇEK hesap (auth-guard). Anonim girişte uye=false. */
+export function demoBaslat({ uye = false } = {}) {
   bellekBayragi = true;
   try {
     sessionStorage.setItem(BAYRAK, "1");
+    if (uye) sessionStorage.setItem(UYE_BAYRAK, "1");
   } catch {
     /* depo kapalı: bellek bayrağı yetmez (sayfa değişince kaybolur) ama kritik değil */
   }
@@ -92,6 +101,7 @@ export function demoBitir() {
   bellekBayragi = false;
   try {
     sessionStorage.removeItem(BAYRAK);
+    sessionStorage.removeItem(UYE_BAYRAK);
     sessionStorage.removeItem(CFG_ONBELLEK);
   } catch {
     /* yok say */
@@ -116,6 +126,7 @@ function birlestir(taban, gelen) {
     }
   }
   cikti.adminlerDegistirebilir = gelen.adminlerDegistirebilir === true;
+  cikti.herkeseAcik = gelen.herkeseAcik === true; // alan yoksa/okunamazsa KAPALI (güvenli varsayılan)
   return cikti;
 }
 export const configBirlestir = birlestir;
@@ -166,9 +177,38 @@ export function configiBaslat(supabaseUrl, anonAnahtar) {
       console.warn("Demo yapılandırması okunamadı, önbellek/varsayılan kullanılıyor:", h?.message || h);
       aktifConfig = birlestir(VARSAYILAN_CONFIG, onb?.cfg || null);
     }
+    // GÜVENLİK ANAHTARI: anonim demo kapalıysa (varsayılan) ve bu bir 'demo' rollü gerçek üye değilse demo oturumu sonlandırılır.
+    // Bayrağı elle açmış/eski sekmede bırakmış ziyaretçiyi de yakalar. Okunamazsa (ağ/önbellek yok) KAPALI sayılır.
+    if (!aktifConfig.herkeseAcik && !demoUyeMi()) {
+      demoBitir();
+      window.location.replace("/hesap/giris.html?demo=kapali");
+      await new Promise(() => {}); // yönlendirme sürerken panelin çizilmesine izin verme
+    }
     return aktifConfig;
   })();
   return configSozu;
+}
+
+/**
+ * Giriş sayfası için: anonim demo şu an herkese açık mı? ÖNBELLEKSİZ taze okuma (düğme göstermeden/tıklamadan önce).
+ * Okunamazsa false (kapalı). Gönderilen tek istek: demo_config_getir() (anon; yalnızca görünürlük JSON'u döner).
+ */
+export async function demoHerkeseAcikMi(supabaseUrl, anonAnahtar) {
+  try {
+    const ctrl = new AbortController();
+    const zamanAsimi = setTimeout(() => ctrl.abort(), 6000);
+    const r = await gercekFetch(`${supabaseUrl}/rest/v1/rpc/demo_config_getir`, {
+      method: "POST",
+      headers: { apikey: anonAnahtar, Authorization: `Bearer ${anonAnahtar}`, "Content-Type": "application/json" },
+      body: "{}",
+      signal: ctrl.signal,
+    });
+    clearTimeout(zamanAsimi);
+    if (!r.ok) return false;
+    return (await r.json())?.herkeseAcik === true;
+  } catch {
+    return false;
+  }
 }
 
 /** Yapılandırma hazır olana dek bekler (kalıcı olarak asılı kalmaz: en geç ~6 sn). */
