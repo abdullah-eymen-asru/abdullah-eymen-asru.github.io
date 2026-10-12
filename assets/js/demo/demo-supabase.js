@@ -10,7 +10,7 @@
  *              → "salt-okunur" toast'ı + { data:null, error } (modül kendi hata akışını çalıştırır). Hiçbir şey kaydedilmez.
  *   • AUTH   : sahte oturum (demo@sistem.local, role 'demo'); signIn/updateUser/… engellenir.
  */
-import { DEMO_PROFIL, DEMO_UID, DEMO_EPOSTA, demoBildir, demoHatasi, demoBitir } from "./demo-durum.js";
+import { DEMO_PROFIL, DEMO_UID, DEMO_EPOSTA, demoBildir, demoHatasi, demoCikisYap } from "./demo-durum.js";
 import "./demo-ag-kalkani.js"; // yan etki: demo ise ağ kalkanını hemen kurar
 
 let mock = null;
@@ -163,8 +163,10 @@ const auth = {
     return { data: { subscription: { id: "demo", callback: cb, unsubscribe() { iptal = true; } } } };
   },
   async signOut() {
-    // "Demodan çık": bayrağı sil, giriş sayfasına dön. (Gerçek oturum kapatma yok.)
-    demoBitir();
+    // "Demodan çık": bayrağı sil; 'demo' rollü GERÇEK hesapsa onun gerçek oturumunu da kapat (bkz. demoCikisYap).
+    // supabase-client.js bu dosyayı import ettiği için sabitler burada tembel (dinamik) alınır — döngüsel import yok.
+    const { SUPABASE_URL, SUPABASE_ANON_KEY } = await import("../core/supabase-client.js");
+    await demoCikisYap(SUPABASE_URL, SUPABASE_ANON_KEY);
     return { error: null };
   },
   mfa: {
