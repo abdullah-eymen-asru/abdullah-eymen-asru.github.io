@@ -551,6 +551,22 @@ Ekledikten sonra **Deploy**'a bas. Panelde: Yedekleme & Verilerim → Depolama D
 
 **`delete-account` Edge Function** değişmedi. `/uye-temizle` artık çok büyük hesaplarda işlem bütçesi dolarsa HTTP 409 döner; Edge Function bu durumda veritabanına dokunmadan hata verir, aynı işlemi tekrar çalıştırmak güvenlidir.
 
+#### 4.10c Worker anahtarları (kota koruması) — migration 0088
+
+Panel: **Yedekleme & Verilerim → Depolama Durumu → 🔌 Worker anahtarları**. Site Sahibi ve sistem yedekleme yetkisi olan roller, Gatekeeper Function'ı ve her Worker'ı tek tek açıp kapatabilir (sistem-yedek-worker ve admin-guvenlik-bildirim-worker **korumalıdır**, kapatılamaz).
+
+**Yumuşak katman (her zaman, ek ayar yok):** durum `public.worker_anahtarlari` tablosundadır. Kapalı servise tarayıcılar istek göndermez (`assets/js/core/worker-kapi.js`), Worker'lar gelen isteği 503 ile hemen reddeder (her Worker'ın sonunda "KOTA KORUMASI" bloğu), Gatekeeper Function isteği işlemeden `next()` ile geçirir. **Bunun için 8 Worker'ı ve Pages'i yeniden deploy etmen gerekir.** Dürüst not: Worker'a yine de ulaşan (doğrudan adrese gelen) istek kapalıyken de Cloudflare'de 1 istek sayılır; siteden gelen istekler ise kaynağında kesilir.
+
+**Sert katman (isteğe bağlı):** Worker'ın `workers.dev` adresini Cloudflare API ile kapatır; istek Worker'a hiç ulaşmaz ve kotaya sayılmaz. `sistem-yedek-worker`'a ekle:
+
+| Tip | Ad | Değer |
+|---|---|---|
+| **Secret** | `CF_WORKERS_TOKEN` | Custom Token: **Account → Workers Scripts → Edit**, Account Resources: kendi hesabın. (Analytics token'ından AYRI ve daha geniş yetkilidir; yalnızca bu Worker'da tut.) |
+
+(`CF_ACCOUNT_ID` zaten var.) Token yoksa panelde sert kapatma seçeneği pasif görünür; hiçbir şey bozulmaz. Pages Function için sert kapatma yoktur (Cloudflare buna izin vermez); onun için `_routes.json` kullanılır.
+
+**Gatekeeper kapalıyken:** pages.dev'de sunucu tarafı kilit yoktur (kilitli rotalar herkese açık olur); tarayıcıdaki perde güvenlik sınırı değildir. Bu yüzden kapatmayı yalnızca geçici kota acillerinde kullan.
+
 ---
 
 ## 5. Cloudflare Pages ayarları
