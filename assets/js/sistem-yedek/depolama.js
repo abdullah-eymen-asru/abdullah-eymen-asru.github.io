@@ -241,7 +241,8 @@ function workerKotaKarti() {
       govde.replaceChildren(
         el("p", { class: "sy-kota-deger" }, el("strong", { text: sayiMetni(g.istek) }), ` / ${sayiMetni(g.limit)}`, el("span", { class: "muted", text: `  (%${(oran * 100).toLocaleString("tr-TR", { maximumFractionDigits: 1 })})` }), el("span", { class: `sy-rozet sy-rozet--${sev.sinif}`, text: sev.etiket })),
         el("progress", { class: `sy-cubuk sy-cubuk--${sev.sinif}`, max: "100", value: String(Math.round(oran * 1000) / 10), "aria-label": "Günlük Worker isteği doluluk" }),
-        el("p", { class: "muted sy-not", text: `Gün: ${g.gun} (UTC) · hata: ${sayiMetni(g.hata)} · alt-istek: ${sayiMetni(g.subistek)} · veri 1 dk gecikmeli olabilir.` }),
+        el("p", { class: "muted sy-not", text: `Workers: ${sayiMetni(g.workers ?? g.istek)} · Pages Functions: ${g.pages == null ? "okunamadı (dahil değil)" : sayiMetni(g.pages)} — Cloudflare'in günlük kotası ikisini birlikte sayar.` }),
+        el("p", { class: "muted sy-not", text: `Gün: ${g.gun} (UTC) · hata: ${sayiMetni(g.hata)} · alt-istek: ${sayiMetni(g.subistek)} · veri 1 dk gecikmeli olabilir. Cloudflare panelindeki Worker kartları son 24 saati gösterir; burası UTC gününü.` }),
         g.scriptler?.length ? el("ul", { class: "sy-kota-liste" }, g.scriptler.map((x) => el("li", {}, el("span", { text: x.ad }), el("span", { class: "muted", text: sayiMetni(x.istek) })))) : null);
     } catch (h) {
       govde.replaceChildren(el("p", { class: "auth-message error", text: `Kota okunamadı: ${h.message || h}` }));
