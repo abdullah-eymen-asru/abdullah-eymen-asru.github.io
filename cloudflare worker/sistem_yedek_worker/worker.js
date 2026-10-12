@@ -35,6 +35,12 @@
  *   POST /r2/kuyruk-isle                           → silme kuyruğunda kalmış (yarım) işlemleri tamamlar
  *   PUT  /r2/yukle?b=&k=&m=eksikleri|uzerine       → geri yükleme: tek R2 nesnesi yazar (gövde = dosya baytları)
  *   GET  /uye/dosya?u=<üye>&b=&k=                  → silme kuyruğundaki üyenin dosyasını akıtır (önizleme/indirme)
+ * v3 (migration 0084):
+ *   PUT  /uye/yukle?b=&k=&m=eksikleri|uzerine      → HER ÜYE: kendi yedeğini geri yüklerken R2'ye dosya yazar. Yalnızca üyenin KENDİ
+ *                                                    kaydının işaret ettiği anahtara izin verilir (uye_r2_yukleme_izinli_mi RPC).
+ *   GET  /kota                                     → (owner) Cloudflare ücretsiz GraphQL Analytics: bugünkü (UTC) Worker istek sayısı.
+ *                                                    Secret'lar: CF_ACCOUNT_ID, CF_API_TOKEN (izin: Account › Account Analytics › Read).
+ *                                                    Sonuç 60 sn edge cache'te tutulur (Analytics API'yi yormaz).
  *
  * Ortam değişkenleri (Worker > Settings > Variables and Secrets):
  *   SUPABASE_URL        https://<proje-ref>.supabase.co          (Text)
@@ -45,6 +51,8 @@
  *   GITHUB_REF          (isteğe bağlı) dal adı, varsayılan main   (Text)
  *   MAX_TARAMA_SAYFA    (isteğe bağlı) /depolama + /r2/boyut TOPLAM sayfa (list çağrısı) bütçesi, varsayılan 40 (Text).
  *                       Cloudflare Workers Free planda istek başına 50 alt-istek sınırı vardır; bütçe TÜM kovalar için ORTAKTIR.
+ *   CF_ACCOUNT_ID, CF_API_TOKEN  (isteğe bağlı) /kota için. Yoksa panel sayacı "yapılandırılmadı" der, başka hiçbir şey bozulmaz.
+ *   GUNLUK_ISTEK_LIMITI (isteğe bağlı, Text) varsayılan 100000 (Workers Free günlük istek sınırı).
  *   MAX_YUKLEME_MB     (isteğe bağlı) /r2/yukle tek dosya üst sınırı, varsayılan 95 (Text). Workers istek gövdesi sınırı
  *                       Free/Pro planda 100 MB'dır; daha büyük dosyalar geri yüklenemez ve raporda "atlandı" görünür.
  * R2 Binding'leri (hepsi isteğe bağlı; bağlamadığın kaynak pakete girmez, hata vermez):
@@ -414,6 +422,69 @@ async function r2Yukle(env, kimlik, istek, url, cors) {
   return json({ ok: true, durum: "yazildi", boyut: boy }, 200, cors);
 }
 
+/** HER ÜYE: kendi geri yüklemesi için R2 yazımı. Yetki, üyenin kendi DB kaydının işaret ettiği anahtarla sınırlıdır. */
+async function uyeYukle(env, kimlik, istek, url, cors) {
+  const kaynak = url.searchParams.get("b") || "";
+  const anahtar = url.searchParams.get("k") || "";
+  const mod = url.searchParams.get("m") === "uzerine" ? "uzerine" : "eksikleri";
+  if (!anahtarSilinebilirMi(kaynak, anahtar)) return json({ error: "Anahtar bilinen biçimlerden biriyle eşleşmiyor." }, 400, cors);
+  const boy = parseInt(istek.headers.get("Content-Length") || "", 10);
+  if (!Number.isFinite(boy) || boy < 0) return json({ error: "Content-Length gerekli." }, 411, cors);
+  const ust = (parseInt(env.MAX_YUKLEME_MB || "95", 10) || 95) * 1024 * 1024;
+  if (boy > ust) return json({ error: `Dosya ${Math.round(boy / 1048576)} MB; yükleme sınırı ${Math.round(ust / 1048576)} MB.` }, 413, cors);
+  const iz = await rpc(env, kimlik, "uye_r2_yukleme_izinli_mi", { p_kaynak: kaynak, p_anahtar: anahtar });
+  if (iz.hata) return json({ error: iz.hata }, yetkisizMi(iz.durum) ? 403 : 502, cors);
+  if (iz.veri !== true) return json({ error: "Bu dosya için kaydın yok: önce tablolar geri yüklenmeli (kayıt olmadan dosya yazılmaz)." }, 403, cors);
+  const { kova, hata } = kaynakKovasi(env, kaynak, cors);
+  if (hata) return hata;
+  if (mod === "eksikleri" && (await kova.head(anahtar))) return json({ ok: true, durum: "atlandi" }, 200, cors);
+  const tur = kaynak === "akademik" ? "application/pdf" : "application/octet-stream";
+  await kova.put(anahtar, istek.body, { httpMetadata: { contentType: tur }, customMetadata: { geriyukleme: "uye" } });
+  return json({ ok: true, durum: "yazildi", boyut: boy }, 200, cors);
+}
+
+/** Owner: bugünkü (UTC) Worker istek sayısı — Cloudflare ücretsiz GraphQL Analytics API. 60 sn edge cache. */
+async function kotaGetir(env, kimlik, cors) {
+  if (!(await ownerMi(env, kimlik))) return json({ error: "Yalnızca Site Sahibi." }, 403, cors);
+  const limit = parseInt(env.GUNLUK_ISTEK_LIMITI || "100000", 10) || 100000;
+  if (!env.CF_ACCOUNT_ID || !env.CF_API_TOKEN) return json({ yapilandirilmadi: true, limit }, 200, cors);
+  const anahtar = new Request(`https://kota.invalid/${env.CF_ACCOUNT_ID}`);
+  const onbellek = caches.default;
+  const var_ = await onbellek.match(anahtar);
+  if (var_) return new Response(var_.body, { status: 200, headers: { ...cors, "Content-Type": "application/json", "X-Onbellek": "hit" } });
+
+  const simdi = new Date();
+  const gun = new Date(Date.UTC(simdi.getUTCFullYear(), simdi.getUTCMonth(), simdi.getUTCDate())).toISOString();
+  const sorgu = `query($acc:String!,$from:Time!,$to:Time!){viewer{accounts(filter:{accountTag:$acc}){workersInvocationsAdaptive(limit:1000,filter:{datetime_geq:$from,datetime_leq:$to}){sum{requests errors subrequests}dimensions{scriptName}}}}}`;
+  let r;
+  try {
+    r = await fetch("https://api.cloudflare.com/client/v4/graphql", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${env.CF_API_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ query: sorgu, variables: { acc: env.CF_ACCOUNT_ID, from: gun, to: simdi.toISOString() } }),
+    });
+  } catch (e) { return json({ error: "Cloudflare Analytics'e ulaşılamadı.", limit }, 502, cors); }
+  const g = await r.json().catch(() => ({}));
+  const satirlar = g?.data?.viewer?.accounts?.[0]?.workersInvocationsAdaptive;
+  if (!r.ok || !Array.isArray(satirlar)) {
+    return json({ error: "Analytics yanıtı alınamadı (token izni: Account Analytics › Read olmalı).", limit }, 502, cors);
+  }
+  const perScript = {};
+  let istek = 0, hataSayisi = 0, alt = 0;
+  for (const s of satirlar) {
+    const n = Number(s.sum?.requests) || 0;
+    istek += n; hataSayisi += Number(s.sum?.errors) || 0; alt += Number(s.sum?.subrequests) || 0;
+    const ad = s.dimensions?.scriptName || "?";
+    perScript[ad] = (perScript[ad] || 0) + n;
+  }
+  const govde = JSON.stringify({
+    istek, hata: hataSayisi, subistek: alt, limit, gun: gun.slice(0, 10), guncelleme: simdi.toISOString(),
+    scriptler: Object.entries(perScript).map(([ad, n]) => ({ ad, istek: n })).sort((a, b) => b.istek - a.istek).slice(0, 12),
+  });
+  await onbellek.put(anahtar, new Response(govde, { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=60" } }));
+  return new Response(govde, { status: 200, headers: { ...cors, "Content-Type": "application/json" } });
+}
+
 /** Silme kuyruğundaki üyenin dosyası: yalnızca hesap_silme_dosya_izinli_mi() onaylarsa akıtılır.
  *  Önizleme güvenliği: yalnızca izinli türler (PDF/PNG/JPEG/WebP/GIF) "inline" sayılır; SVG/HTML asla. */
 async function uyeDosya(env, kimlik, url, cors) {
@@ -474,6 +545,7 @@ export default {
         if (istek.method === "POST" && yol === "/r2/sil") return await r2Sil(env, k, istek, cors);
         if (istek.method === "POST" && yol === "/r2/kuyruk-isle") return await r2KuyrukIsle(env, k, cors);
         if (istek.method === "PUT" && yol === "/r2/yukle") return await r2Yukle(env, k, istek, url, cors);
+        if (istek.method === "PUT" && yol === "/uye/yukle") return await uyeYukle(env, k, istek, url, cors);
       } catch (hata) { return json({ error: "Beklenmeyen hata: " + (hata?.message || hata) }, 500, cors); }
       return json({ error: "Bulunamadı." }, 404, cors);
     }
@@ -493,6 +565,7 @@ export default {
       if (yol === "/r2/dosya") return await r2Dosya(env, kimlik, url, cors);
       if (yol === "/github/zip") return await githubZip(env, kimlik, url, cors);
       if (yol === "/depolama") return await depolamaTara(env, kimlik, cors);
+      if (yol === "/kota") return await kotaGetir(env, kimlik, cors);
       if (yol === "/r2/gezgin") return await r2Gezgin(env, kimlik, url, cors);
       if (yol === "/r2/boyut") return await r2Boyut(env, kimlik, url, cors);
       if (yol === "/uye/dosya") return await uyeDosya(env, kimlik, url, cors);
