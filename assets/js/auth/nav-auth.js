@@ -169,12 +169,21 @@ function renderHesapMenusu(container, role) {
   const wrap = document.createElement("div");
   wrap.className = "auth-nav-dropdown";
 
+  // "Hesabım" = tıklanınca DOĞRUDAN Ana Ekran'a (panel) giden bağlantı; yanındaki ayrı "▾" düğmesi ise küçük menüyü
+  // (Ana Ekran / Çıkış Yap) açar — çıkış her sayfadan erişilebilir kalır. (Önceden tek düğme yalnızca menüyü açıyordu.)
+  const baglanti = document.createElement("a");
+  baglanti.className = "auth-nav-btn";
+  baglanti.href = relUrl("/panel/dashboard.html#me-hub");
+  baglanti.title = "Ana Ekran'a git";
+  baglanti.textContent = "Hesabım";
+
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "auth-nav-btn";
+  btn.className = "auth-nav-btn auth-nav-ok";
   btn.setAttribute("aria-haspopup", "true");
   btn.setAttribute("aria-expanded", "false");
-  btn.textContent = "Hesabım ▾";
+  btn.setAttribute("aria-label", "Hesap menüsünü aç/kapat");
+  btn.textContent = "▾";
 
   const menu = document.createElement("div");
   menu.className = "auth-nav-menu";
@@ -260,6 +269,7 @@ function renderHesapMenusu(container, role) {
   document.addEventListener("click", disariTiklamaDinleyici);
   document.addEventListener("keydown", escDinleyici);
 
+  wrap.appendChild(baglanti);
   wrap.appendChild(btn);
   wrap.appendChild(menu);
   container.appendChild(wrap);
