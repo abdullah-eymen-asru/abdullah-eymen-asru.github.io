@@ -196,6 +196,8 @@ let aktifConfig = birlestir(VARSAYILAN_CONFIG, null);
 let configSozu = null;
 // Ağ kalkanı kurulmadan ÖNCE yakalanan gerçek fetch: yalnızca demo_config_getir() için kullanılır.
 const gercekFetch = window.fetch.bind(window);
+/** Demo ÜYESİNİN (gerçek 'demo' rollü hesap) hesap ayarları için kullanılan gerçek ağ erişimi: Supabase istemcisi buna bağlanır. */
+export const gercekAgFetch = (...a) => gercekFetch(...a);
 
 function onbellekOku() {
   try {
@@ -291,6 +293,9 @@ export function ozellikAcikMi(yol, cfg = aktifConfig) {
 
 /** Sekme demoda görünür mü? (izinli sekme + bölüm anahtarı açık) */
 export function demoSekmeAcikMi(sekmeId, cfg = aktifConfig) {
+  // "Panelim" (hesap ayarları: ad, e-posta, şifre, 2FA, oturumlar, KVKK, hesabı silme) yalnızca GERÇEK 'demo' rollü
+  // hesapta açıktır; anonim "hesapsız demo" ziyaretçisinde yoktur (kendi hesabı olmadığı için anlamsız).
+  if (sekmeId === "me-panel") return demoUyeMi();
   const bolum = DEMO_SEKMELERI[sekmeId];
   return !!bolum && cfg[bolum]?.aktif === true;
 }
