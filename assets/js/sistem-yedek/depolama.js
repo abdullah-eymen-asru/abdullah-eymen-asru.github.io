@@ -6,7 +6,7 @@
  * -----------------------------------------------------------------------
  */
 import { supabase } from "../core/supabase-client.js";
-import { el, bayt, hataMetni, workerFetch, dugme, ikon, VARSAYILAN_DB_KOTA, VARSAYILAN_R2_KOTA } from "./ortak.js";
+import { el, bayt, hataMetni, workerFetch, workerJson, dugme, ikon, VARSAYILAN_DB_KOTA, VARSAYILAN_R2_KOTA } from "./ortak.js";
 
 const KAYNAK_ADLARI = { arsiv: "Dosya Yöneticisi", akademik: "Akademik Kütüphane", notek: "Not ekleri" };
 
@@ -219,6 +219,39 @@ function kota(baslik, ikonMetni, kullanilan, toplam, altSatirlar) {
   );
 }
 
+/**
+ * Canlı kota: bugünkü (UTC) gerçek Worker istek sayısı — Cloudflare ücretsiz GraphQL Analytics API, Worker'ın /kota ucundan
+ * (60 sn edge cache). CF_ACCOUNT_ID / CF_API_TOKEN tanımlı değilse kart nasıl yapılandırılacağını söyler; diğer hiçbir şey bozulmaz.
+ */
+function workerKotaKarti() {
+  const sayiMetni = (n) => Number(n || 0).toLocaleString("tr-TR");
+  const govde = el("div", {}, el("p", { class: "muted", text: "Cloudflare'den bugünkü kullanım okunuyor…" }));
+  const yenile = dugme({ metin: "Yenile", ikonAdi: "yenile", tur: "ikincil", kucuk: true });
+  const kart = el("article", { class: "sy-kart sy-kota" }, el("div", { class: "sy-kota-ust" }, el("h3", { text: "⚡ Worker İstekleri (bugün)" })), govde, el("div", { class: "sy-eylemler" }, yenile));
+  async function yukle() {
+    yenile.disabled = true;
+    try {
+      const g = await workerJson("/kota");
+      if (g.yapilandirilmadi) {
+        govde.replaceChildren(el("p", { class: "muted sy-not", text: "Canlı sayaç için sistem-yedek-worker'a CF_ACCOUNT_ID ve CF_API_TOKEN (izin: Account Analytics › Read) ekle. Adımlar: rehber/04-cloudflare-secretlar.md § 4.10b." }));
+        return;
+      }
+      const oran = g.limit > 0 ? Math.min(g.istek / g.limit, 1) : 0;
+      const sev = durumSeviyesi(oran);
+      govde.replaceChildren(
+        el("p", { class: "sy-kota-deger" }, el("strong", { text: sayiMetni(g.istek) }), ` / ${sayiMetni(g.limit)}`, el("span", { class: "muted", text: `  (%${(oran * 100).toLocaleString("tr-TR", { maximumFractionDigits: 1 })})` }), el("span", { class: `sy-rozet sy-rozet--${sev.sinif}`, text: sev.etiket })),
+        el("progress", { class: `sy-cubuk sy-cubuk--${sev.sinif}`, max: "100", value: String(Math.round(oran * 1000) / 10), "aria-label": "Günlük Worker isteği doluluk" }),
+        el("p", { class: "muted sy-not", text: `Gün: ${g.gun} (UTC) · hata: ${sayiMetni(g.hata)} · alt-istek: ${sayiMetni(g.subistek)} · veri 1 dk gecikmeli olabilir.` }),
+        g.scriptler?.length ? el("ul", { class: "sy-kota-liste" }, g.scriptler.map((x) => el("li", {}, el("span", { text: x.ad }), el("span", { class: "muted", text: sayiMetni(x.istek) })))) : null);
+    } catch (h) {
+      govde.replaceChildren(el("p", { class: "auth-message error", text: `Kota okunamadı: ${h.message || h}` }));
+    } finally { yenile.disabled = false; }
+  }
+  yenile.addEventListener("click", yukle);
+  yukle();
+  return kart;
+}
+
 export async function depolamaCiz(kok) {
   kok.replaceChildren(el("p", { class: "muted", text: "Depolama durumu yükleniyor…" }));
   const { data: d, error } = await supabase.rpc("sistem_depolama_durumu");
@@ -273,7 +306,8 @@ export async function depolamaCiz(kok) {
   kok.replaceChildren(
     el("div", { class: "sy-izgara" },
       kota("Supabase Veritabanı", "🗄️", Number(d.db_bayt) || 0, dbKota, dbAlt),
-      kota("Cloudflare R2 Depolama", "☁️", r2Bayt, r2Kota, r2Alt)
+      kota("Cloudflare R2 Depolama", "☁️", r2Bayt, r2Kota, r2Alt),
+      workerKotaKarti()
     )
   );
 }
