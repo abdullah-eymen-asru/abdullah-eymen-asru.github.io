@@ -120,7 +120,7 @@ export async function requireAuth({ role = null, redirectTo = "/hesap/giris.html
   // yüklenir; yeniden yüklemeden sonra `supabase` sahte istemcidir (hiçbir gerçek istek atılmaz, veritabanı
   // tarafı zaten restrictive RLS ile bu hesaba tek satır bile vermez). Demo bayrağı sekmeye özeldir.
   if (profile.role === "demo" && !demoModuAktifMi()) {
-    demoBaslat();
+    demoBaslat({ uye: true }); // gerçek 'demo' rollü hesap: herkese açık anahtarı kapalıyken de girebilir
     window.location.reload();
     return new Promise(() => {});
   }
