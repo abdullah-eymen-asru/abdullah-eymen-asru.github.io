@@ -866,7 +866,7 @@ async function init() {
   // girdiyse başkaları ona şifreli dosya gönderebilir (alıcının açık anahtarı gerekir).
   // Worker kapalıysa/yoksa sessizce atlanır; paneli asla bozmaz.
   // (Demo'da atlanır: Worker'a hiç istek gitmesin.)
-  if (!isDemoMode) import("./r2-arsiv/e2ee.js").then((m) => m.anahtarlariHazirla()).catch(() => {});
+  if (!isDemoMode) import("./r2-arsiv/e2ee.js").then((m) => m.anahtarKaydiniSessizHazirla()).catch(() => {}); // kayıt varsa Worker'a istek ATILMAZ (kota)
 
   buildSidebar(profile);
   // Hub: sidebar ile AYNI görünürlük kuralı (gorunurMu); Ana Ekran kartı kendisi için çizilmez.
