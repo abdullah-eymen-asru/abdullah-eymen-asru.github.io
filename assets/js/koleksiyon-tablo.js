@@ -196,6 +196,56 @@ function istatistikGosterimiOlustur(items, config) {
 }
 
 /**
+ * KOTA KORUMASI — TEK WORKER İSTEĞİ: İzlediklerim ve Okuduklarım sayfaları aynı Worker'dan veri çeker. Her ikisi
+ * config.tumuUrl (…?project=hepsi) ile TEK yanıtta ({ izleme, okuma }) gelir; sonuç sessionStorage'da 5 dk paylaşılır.
+ * Böylece iki sekme arasında geçmek (tam sayfa gezintisi) Worker'a hiç istek atmaz; aynı sayfada eşzamanlı çağrılar da
+ * tek isteği paylaşır. Önbellek yoksa/okunamazsa ya da Worker henüz güncellenmemişse eski tekil uç (config.jsonUrl) kullanılır.
+ */
+var KOLEKSIYON_ONBELLEK_ANAHTARI = "aea_listeler_v1";
+var KOLEKSIYON_ONBELLEK_OMRU_MS = 5 * 60 * 1000;
+var koleksiyonUcusta = null;
+
+function koleksiyonOnbellekOku() {
+  try {
+    var ham = sessionStorage.getItem(KOLEKSIYON_ONBELLEK_ANAHTARI);
+    var k = ham ? JSON.parse(ham) : null;
+    if (k && k.v && Date.now() - k.t < KOLEKSIYON_ONBELLEK_OMRU_MS) return k.v;
+  } catch (e) { /* depo kapalı / bozuk: yok say */ }
+  return null;
+}
+
+async function koleksiyonVerisiGetir(config, sinyal) {
+  async function tekil() {
+    var res = await fetch(config.jsonUrl, { cache: "no-store", signal: sinyal });
+    if (!res.ok) {
+      var gov = null;
+      try { gov = await res.json(); } catch (e) { /* yok say */ }
+      var hata = new Error(gov && gov.kapali ? "Bu servis geçici olarak kapatıldı." : "JSON yüklenemedi: " + res.status);
+      throw hata;
+    }
+    return res.json();
+  }
+  if (!config.tumuUrl || !config.bolum) return tekil();
+
+  var paket = koleksiyonOnbellekOku();
+  if (!paket) {
+    if (!koleksiyonUcusta) {
+      koleksiyonUcusta = fetch(config.tumuUrl, { cache: "no-store", signal: sinyal })
+        .then(function (r) { if (!r.ok) throw new Error("hepsi " + r.status); return r.json(); })
+        .then(function (v) {
+          if (!v || !v.izleme || !v.okuma) throw new Error("hepsi biçimi tanınmadı");
+          try { sessionStorage.setItem(KOLEKSIYON_ONBELLEK_ANAHTARI, JSON.stringify({ t: Date.now(), v: v })); } catch (e) { /* yok say */ }
+          return v;
+        })
+        .finally(function () { koleksiyonUcusta = null; });
+    }
+    try { paket = await koleksiyonUcusta; } catch (e) { paket = null; }
+  }
+  if (paket && paket[config.bolum]) return paket[config.bolum];
+  return tekil(); // geri dönüş: eski tekil uç
+}
+
+/**
  * @param {Object} config
  * @param {string} config.jsonUrl - JSON dosyasının yolu (örn. "/assets/data/izlenenler.json")
  * @param {string} config.containerId - Tablonun basılacağı <div> id'si
@@ -292,9 +342,7 @@ async function koleksiyonTablosuOlustur(config) {
     // karşılamaz, her sayfa yenilemesinde gerçekten taze veri ister.
     // Worker tarafında zaten kısa süreli (60sn) bir Cloudflare önbelleği
     // var, o yeterli hız/güvenlik dengesini sağlıyor.
-    const res = await fetch(config.jsonUrl, { cache: "no-store", signal: controller.signal });
-    if (!res.ok) throw new Error("JSON yüklenemedi: " + res.status);
-    const data = await res.json();
+    const data = await koleksiyonVerisiGetir(config, controller.signal);
     const items = Array.isArray(data.items) ? data.items : [];
 
     // İstatistik şeridi arama/filtrelemeden bağımsızdır — TÜM kayıtlar
