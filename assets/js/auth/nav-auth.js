@@ -11,9 +11,8 @@
  *
  *   - Çıkış yapmışken:  "Giriş Yap"  -> doğrudan /hesap/giris.html (kayıt ol
  *                        linki o sayfanın içinde zaten var, bkz. hesap/giris.md)
- *   - Giriş yapmışken:  "Hesabım ▾" -> tıklanınca küçük bir menü açılır:
- *                        Panelim, (adminse) Admin Paneli, (adminse) GitHub
- *                        İçerik Yönetimi, Çıkış Yap
+ *   - Giriş yapmışken:  "Hesabım"   -> doğrudan panelin Ana Ekranı'na (açılır menü YOK;
+ *                        Çıkış Yap panelin içinde)
  *
  * _layouts/default.html içinde <div id="auth-nav"> statik bir yedek
  * içerik ("Giriş Yap" linki + görünmez bir "Hesabım ▾" iskeleti, bkz.
@@ -165,112 +164,16 @@ function renderGirisLinki(container) {
   container.appendChild(a);
 }
 
-function renderHesapMenusu(container, role) {
-  const wrap = document.createElement("div");
-  wrap.className = "auth-nav-dropdown";
-
-  // "Hesabım" = tıklanınca DOĞRUDAN Ana Ekran'a (panel) giden bağlantı; yanındaki ayrı "▾" düğmesi ise küçük menüyü
-  // (Ana Ekran / Çıkış Yap) açar — çıkış her sayfadan erişilebilir kalır. (Önceden tek düğme yalnızca menüyü açıyordu.)
-  const baglanti = document.createElement("a");
-  baglanti.className = "auth-nav-btn";
-  baglanti.href = relUrl("/panel/dashboard.html#me-hub");
-  baglanti.title = "Ana Ekran'a git";
-  baglanti.textContent = "Hesabım";
-
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "auth-nav-btn auth-nav-ok";
-  btn.setAttribute("aria-haspopup", "true");
-  btn.setAttribute("aria-expanded", "false");
-  btn.setAttribute("aria-label", "Hesap menüsünü aç/kapat");
-  btn.textContent = "▾";
-
-  const menu = document.createElement("div");
-  menu.className = "auth-nav-menu";
-  menu.setAttribute("role", "menu");
-  menu.hidden = true;
-
-  // TÜM panel linkleri artık TEK sayfaya — /panel/dashboard.html'e —
-  // ilgili sekmenin hash'iyle gidiyor. Eski bağımsız sayfalar
-  // (/panel/panel.html, /panel/admin.html, /panel/uye-ayarlari.html ...)
-  // silinmedi, hâlâ çalışıyor; ama menü artık birleşik panele
-  // yönlendiriyor, böylece kullanıcı sekmeler arasında sayfa yenilemeden
-  // dolaşıyor.
-  const DASH = "/panel/dashboard.html";
-  // Eski panel kısayolları (Sohbet, Üye Ayarları, Admin Paneli, Admin Güvenliği, GitHub İçerik, İzleme/Okuma) menüden KALDIRILDI:
-  // hepsi artık Ana Ekran (Hub) içinde, rol/yetkiye göre kartlar olarak duruyor (assets/js/hub/hub.js). Sayfalar silinmedi.
-  const linkler = [{ href: `${DASH}#me-hub`, etiket: "🧭 Ana Ekran" }];
-
-  linkler.forEach(({ href, etiket }) => {
-    const a = document.createElement("a");
-    a.href = relUrl(href);
-    a.textContent = etiket;
-    a.setAttribute("role", "menuitem");
-    menu.appendChild(a);
-  });
-
-  const cikisBtn = document.createElement("button");
-  cikisBtn.type = "button";
-  cikisBtn.className = "auth-nav-menu-cikis";
-  cikisBtn.setAttribute("role", "menuitem");
-  cikisBtn.textContent = "Çıkış Yap";
-  cikisBtn.addEventListener("click", async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) console.error("signOut hatası (yine de yönlendiriliyor):", error);
-    } catch (err) {
-      console.error("signOut() beklenmedik hata (yine de yönlendiriliyor):", err);
-    } finally {
-      window.location.href = relUrl("/");
-    }
-  });
-  menu.appendChild(cikisBtn);
-
-  function menuyuKapat() {
-    menu.hidden = true;
-    btn.setAttribute("aria-expanded", "false");
-  }
-  function menuyuAcKapa() {
-    const acik = !menu.hidden;
-    menu.hidden = acik;
-    btn.setAttribute("aria-expanded", String(!acik));
-  }
-
-  btn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    menuyuAcKapa();
-  });
-
-  // NOT: document'a eklenen "dışarı tıklayınca kapat" / "Escape ile kapat"
-  // dinleyicileri ÖNCEDEN her renderHesapMenusu() çağrısında (ör. başka
-  // bir sekmede giriş/çıkış yapılınca tetiklenen onAuthStateChange'de)
-  // YENİDEN ekleniyor, hiç kaldırılmıyordu — bu bir memory leak'ti ve
-  // zamanla document'ta onlarca yinelenen dinleyici birikip menü
-  // davranışının (kapatma/Escape) garip şekilde katlanarak tetiklenmesine
-  // yol açabiliyordu. Şimdi menü DOM'dan kaldırıldığında (yeni bir
-  // renderHesapMenusu/renderGirisLinki çağrısı container'ı temizlediğinde)
-  // bu dinleyicileri de KENDİMİZ temizliyoruz.
-  const disariTiklamaDinleyici = (e) => {
-    if (!wrap.isConnected) {
-      document.removeEventListener("click", disariTiklamaDinleyici);
-      document.removeEventListener("keydown", escDinleyici);
-      return;
-    }
-    if (!wrap.contains(e.target)) menuyuKapat();
-  };
-  const escDinleyici = (e) => {
-    if (!wrap.isConnected) {
-      document.removeEventListener("click", disariTiklamaDinleyici);
-      document.removeEventListener("keydown", escDinleyici);
-      return;
-    }
-    if (e.key === "Escape") menuyuKapat();
-  };
-  document.addEventListener("click", disariTiklamaDinleyici);
-  document.addEventListener("keydown", escDinleyici);
-
-  wrap.appendChild(baglanti);
-  wrap.appendChild(btn);
-  wrap.appendChild(menu);
-  container.appendChild(wrap);
+/**
+ * "Hesabım" = açılır pencere YOK; tek bir bağlantı, doğrudan panelin Ana Ekranı'na (#me-hub) götürür.
+ * (Önceki sürümdeki "▾" düğmesi + Ana Ekran/Çıkış Yap açılır menüsü kaldırıldı. Çıkış Yap artık panelin üst satırında:
+ * panel/dashboard.html #cikis-btn.) Dinleyici/menü durumu olmadığı için sızıntı veya yinelenen menü riski de kalmadı.
+ */
+function renderHesapMenusu(container, _role) {
+  const a = document.createElement("a");
+  a.href = relUrl("/panel/dashboard.html#me-hub");
+  a.textContent = "Hesabım";
+  a.title = "Ana Ekran'a git";
+  if (window.location.pathname.includes("/panel/")) a.className = "active";
+  container.appendChild(a);
 }
