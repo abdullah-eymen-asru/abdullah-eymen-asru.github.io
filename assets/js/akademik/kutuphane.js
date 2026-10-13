@@ -9,7 +9,7 @@ import { supabase, esc, el, toast, tarih, bayt, debounce, dosyaIndir, panoyaKopy
 import { TURLER, BICIMLER, atifUret, atifKutusuHtml, markdownKaynakca, alintiMarkdown, bibtexUret, bibtexAyristir, risUret, risAyristir, icerikBicimiTahmin, yazarMetniAyristir, yazarlariMetneCevir } from "./atif.js";
 import { kunyeGetir } from "./kunye.js";
 import { okuyucuAc } from "./okuyucu.js";
-import { motorAyarlari, yayimlananSurumler, surumuDene, surumuSabitle } from "./motor.js";
+import { motorPaneliKur } from "./motor-paneli.js";
 
 const GORUNURLUK = { ozel: "Özel", ekip: "Ekip", herkese_acik: "Herkese açık" };
 const KAP_ETIKET = { makale: "Dergi adı", kitap: "Yayınevi", kitap_bolumu: "Yayınevi", bildiri: "Bildiri / kongre adı", tez: "Üniversite", rapor: "Kurum / yayıncı", web: "Site adı", diger: "Yayıncı / kaynak" };
@@ -54,6 +54,7 @@ function kutuphaneKur(kok, profil, owner) {
         <button type="button" role="tab" class="aktif" data-kapsam="benim" aria-selected="true">Kütüphanem</button>
         <button type="button" role="tab" data-kapsam="paylasilan" aria-selected="false">Benimle paylaşılanlar</button>
       </nav>
+      <div class="ak-motor" data-ak-motor></div>
       <div class="ak-dropzone" data-ak-dz tabindex="0" role="button" aria-label="PDF yüklemek için tıkla ya da sürükle">
         <strong>PDF'leri buraya sürükle</strong> <span>ya da seçmek için tıkla — her PDF için bir kaynak oluşturulur. Boyut sınırı yok.</span>
         <input type="file" class="ak-gizli-alan" data-ak-pdf accept="application/pdf,.pdf" multiple aria-label="PDF dosyaları">
@@ -525,38 +526,14 @@ function kutuphaneKur(kok, profil, owner) {
     dl.showModal();
   }
 
-  /* ------------------------ owner: okuyucu motoru kartı ------------------------ */
-  async function motorKarti() {
-    const yer = q("[data-ak-motor]");
-    if (!yer) return;
-    yer.innerHTML = '<p class="ak-bos">Okuyucu motoru bilgisi alınıyor…</p>';
-    const ayar = await motorAyarlari();
-    let surumler = [];
-    try { surumler = await yayimlananSurumler(); } catch { /* çevrimdışı olabilir */ }
-    const son = surumler[0];
-    const guncel = son && son !== ayar.pdfjs;
-    yer.innerHTML = `<details class="ak-motor-kutu"${guncel ? " open" : ""}><summary>⚙️ Okuyucu motoru: PDF.js <strong>${esc(ayar.pdfjs)}</strong> · pdf-lib ${esc(ayar.pdflib)}${guncel ? ` <span class="ak-rozet ak-yeni">Yeni sürüm: ${esc(son)}</span>` : ""}</summary>
-      <p>Tüm kullanıcılar bu sürümü kullanır (resmi PDF.js, jsDelivr CDN). Yeni sürümü önce dene, sonra sabitle; sorun çıkarsa eski sürüme dönebilirsin. Okuyucu hiçbir zaman açılamazsa sınanmış varsayılan sürüme düşer.</p>
-      <div class="ak-motor-satir"><label>Sürüm <select data-m="surum">${(surumler.length ? surumler : [ayar.pdfjs]).map((s) => `<option value="${esc(s)}"${s === ayar.pdfjs ? " selected" : ""}>${esc(s)}${s === ayar.pdfjs ? " (aktif)" : ""}${s === son ? " — en yeni" : ""}</option>`).join("")}</select></label>
-        <button type="button" class="ak-btn" data-m="dene">Dene</button>
-        <button type="button" class="ak-btn ak-btn-birincil" data-m="sabitle">Bu sürümü sabitle</button>
-        ${guncel ? '<button type="button" class="ak-btn ak-btn-birincil" data-m="son">Okuyucu Motorunu Güncelle (en yeni)</button>' : ""}
-        <span data-m-durum aria-live="polite"></span></div></details>`;
-    const durum = yer.querySelector("[data-m-durum]");
-    yer.onclick = async (e) => {
-      const t = e.target.closest("[data-m]")?.dataset.m;
-      if (!t || t === "surum") return;
-      const secili = t === "son" ? son : yer.querySelector('[data-m="surum"]').value;
-      durum.textContent = `PDF.js ${secili} deneniyor…`;
-      const sonuc = await surumuDene(secili);
-      if (!sonuc.ok) { durum.textContent = `✗ ${secili} yüklenemedi; sabitlenmedi.`; return; }
-      if (t === "dene") { durum.textContent = `✓ ${secili} yüklenebiliyor (henüz aktif değil).`; return; }
-      try {
-        await surumuSabitle(secili);
-        durum.textContent = `✓ ${secili} sabitlendi. Kullanıcılar sayfayı yenileyince geçer.`;
-        toast(`Okuyucu motoru PDF.js ${secili} olarak sabitlendi.`, "basari");
-      } catch (h) { durum.textContent = `✗ ${h.message}`; }
-    };
+  /* ------------------------ okuyucu motoru paneli (herkes: kişisel tercih; owner: + site varsayılanı) ------------------------ */
+  // Panelin kendisi motor-paneli.js'tedir; burada yalnızca kutusuna bağlanır. Hata olursa kütüphane yine çalışır.
+  function motorKarti() {
+    return motorPaneliKur(q("[data-ak-motor]"), { owner }).catch((h) => {
+      console.error("motor-paneli.js:", h);
+      const yer = q("[data-ak-motor]");
+      if (yer) yer.replaceChildren(el("p", { class: "ak-bos" }, "Okuyucu motoru paneli yüklenemedi."));
+    });
   }
 
   /* ------------------------------- olay bağlama ------------------------------- */
@@ -606,8 +583,8 @@ function kutuphaneKur(kok, profil, owner) {
       d.uyeler = data || [];
       q('[data-f="uye"]').innerHTML = `<option value="">Tüm üyeler (${d.uyeler.length})</option>` + d.uyeler.map((u) => `<option value="${esc(u.user_id)}">${esc(u.ad || u.eposta)} — ${u.kaynak_sayisi} kaynak · ${bayt(u.toplam_bayt)}</option>`).join("");
     });
-    motorKarti();
   }
+  motorKarti();
   return { yukle };
 }
 
