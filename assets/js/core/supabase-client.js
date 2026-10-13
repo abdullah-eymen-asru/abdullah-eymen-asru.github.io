@@ -341,6 +341,13 @@ export function guncelOnaySurumleri({ yenile = false } = {}) {
         ({ data, error } = await supabase.from("site_ayarlari").select("guncel_kvkk_surumu").eq("id", 1).maybeSingle());
       }
       if (error || !data?.guncel_kvkk_surumu) {
+        // YEDEK YOL (migration 0089): tablo okunamıyorsa (ör. 'demo' rollü hesabın RLS'i, 0087 eksik, geçici hata) sürümleri dar
+        // SECURITY DEFINER RPC'den al. Aksi halde "sürüm bilinmiyor" sayılıp yeni sürümü onaylamamış kişi kilitlenmiyordu.
+        try {
+          const { data: r, error: re } = await supabase.rpc("guncel_onay_surumleri");
+          const satir = Array.isArray(r) ? r[0] : r;
+          if (!re && satir?.kvkk) return { kvkk: satir.kvkk, riza: satir.riza || satir.kvkk };
+        } catch { /* RPC yok (0089 uygulanmamış): aşağıdaki güvenli varsayılana düş */ }
         console.error("Güncel onay sürümleri okunamadı:", error);
         if (_onaySurumleriSozu === sozu) _onaySurumleriSozu = null;
         return { kvkk: null, riza: null };
