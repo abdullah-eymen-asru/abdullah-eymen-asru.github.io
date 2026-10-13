@@ -17,6 +17,8 @@
  */
 import { requireAuthOrShowError } from "./auth/auth-guard.js";
 import { wireUserChat, wireAdminChat } from "./chat.js";
+// DEMO / VİTRİN: sahte sohbetlerde "ben" = bu oturumdaki kişi (gerçek demo üyesinde gerçek kullanıcı id'si).
+import { isDemoMode, demoUidAyarla } from "./demo/demo-durum.js";
 
 function uyeMarkup() {
   return `
@@ -134,6 +136,7 @@ function konuOnDoldurmayiUygula() {
 
 async function init() {
   const { session, profile } = await requireAuthOrShowError({ role: null });
+  if (isDemoMode) demoUidAyarla(profile?.id || session?.user?.id);
   document.getElementById("loading")?.setAttribute("hidden", "");
   document.getElementById("app").hidden = false;
 
