@@ -1,6 +1,6 @@
 [⬅️ README'ye dön](../README.md)
 
-[📖 Site Rehberi](./01-site-rehberi.md) · [🔐 Supabase Sistemi](./02-supabase-sistemi.md) · [🍴 Fork Kurulumu](./03-fork-kurulumu.md) · **☁️ Cloudflare Secret & Ayarlar**
+[📖 Site Rehberi](./01-site-rehberi.md) · [🔐 Supabase Sistemi](./02-supabase-sistemi.md) · [🍴 Fork Kurulumu](./03-fork-kurulumu.md) · **☁️ Cloudflare Secret & Ayarlar** · [🔄 Dönüştürücü & Belge Düzenleyici](./05-donusturucu.md) · [📑 Belge Tarayıcı & Sıkıştırma](./06-belge-tarayici.md)
 
 ---
 
@@ -760,6 +760,6 @@ Kurulumdan sonra tek tek işaretle:
 
 [⬅️ README'ye dön](../README.md)
 
-[📖 Site Rehberi](./01-site-rehberi.md) · [🔐 Supabase Sistemi](./02-supabase-sistemi.md) · [🍴 Fork Kurulumu](./03-fork-kurulumu.md) · **☁️ Cloudflare Secret & Ayarlar**
+[📖 Site Rehberi](./01-site-rehberi.md) · [🔐 Supabase Sistemi](./02-supabase-sistemi.md) · [🍴 Fork Kurulumu](./03-fork-kurulumu.md) · **☁️ Cloudflare Secret & Ayarlar** · [🔄 Dönüştürücü & Belge Düzenleyici](./05-donusturucu.md) · [📑 Belge Tarayıcı & Sıkıştırma](./06-belge-tarayici.md)
 
 ---
