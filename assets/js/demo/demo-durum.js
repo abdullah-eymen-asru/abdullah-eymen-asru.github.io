@@ -47,10 +47,11 @@ export const VARSAYILAN_CONFIG = Object.freeze({
   v: 1,
   adminlerDegistirebilir: false,
   herkeseAcik: false, // anonim (hesapsız) demo girişi: VARSAYILAN KAPALI; yalnızca Site Sahibi açar (owner_demo_herkese_acik_ayarla)
-  hub: { aktif: true, kartlar: { "content-notlar": true, "media-arsiv": true, "lib-kutuphane": true, "sys-metrik": true } },
+  hub: { aktif: true, kartlar: { "content-notlar": true, "media-arsiv": true, "lib-kutuphane": true, "users-mesajlar": true, "sys-metrik": true } },
   pdf: { aktif: true, duzenlemeAraclari: true },
   arsiv: { aktif: true, zipInceleme: true },
   notlar: { aktif: true, filtreCipleri: true },
+  mesajlar: { aktif: true }, // Sohbet / Mesajlar (örnek sohbetler; gönderme/silme salt-okunur toast'a takılır)
   sistem: { aktif: true },
 });
 
@@ -60,6 +61,7 @@ export const DEMO_SEKMELERI = Object.freeze({
   "content-notlar": "notlar",
   "media-arsiv": "arsiv",
   "lib-kutuphane": "pdf",
+  "users-mesajlar": "mesajlar",
   "sys-metrik": "sistem",
 });
 
@@ -79,6 +81,14 @@ export const isDemoMode = demoModuAktifMi();
 if (isDemoMode) {
   window.AEA_DEMO = Object.freeze({ isDemoMode: true });
   document.documentElement.dataset.demo = "1";
+}
+
+/** Demo oturumundaki kişinin kimliği: anonim ziyaretçide sahte DEMO_UID; gerçek 'demo' üyesinde GERÇEK kullanıcı id'si.
+ *  Sahte sohbet/mesaj verisi "benim" mesajlarını bu id ile üretir (mesajlar.js kurulumda ayarlar). */
+let gecerliUid = DEMO_UID;
+export const demoUidAl = () => gecerliUid;
+export function demoUidAyarla(uid) {
+  if (typeof uid === "string" && /^[0-9a-f-]{36}$/i.test(uid)) gecerliUid = uid;
 }
 
 /** Gerçek hesabıyla demo rolünde giren üye mi? (Anonim ziyaretçi değil.) */
@@ -173,7 +183,7 @@ export async function demoCikisYap(supabaseUrl, anonAnahtar) {
 function birlestir(taban, gelen) {
   const cikti = JSON.parse(JSON.stringify(taban));
   if (!gelen || typeof gelen !== "object") return cikti;
-  for (const bolum of ["hub", "pdf", "arsiv", "notlar", "sistem"]) {
+  for (const bolum of ["hub", "pdf", "arsiv", "notlar", "mesajlar", "sistem"]) {
     const g = gelen[bolum];
     if (!g || typeof g !== "object") continue;
     for (const alan of Object.keys(cikti[bolum])) {
