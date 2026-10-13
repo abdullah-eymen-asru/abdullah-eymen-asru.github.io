@@ -13,10 +13,12 @@
 |---|---|---|---|
 | Hangi dosya ne işe yarar, neyi nerede değiştiririm? Tema, yorumlar, izlediklerim/okuduklarım tablosu, hesabım menüsü ve güvenlik notları da bu sekmede. | Supabase kurulum adımları, RLS, sorun giderme, e-posta/2FA/dosya paylaşımı akışları **ve en son yapılan düzeltmelerin değişiklik geçmişi (changelog)**. | Bu depoyu fork edip kendi sitene uyarlamak istersen atman gereken adımlar. | Hangi Cloudflare Worker'a hangi secret/değişken girilir, değer nereden bulunur; Pages build ve `LANG` ayarları. |
 
+> 🧰 Ek rehberler: [🔄 Dönüştürücü & Belge Düzenleyici](rehber/05-donusturucu.md) · [📑 Belge Tarayıcı & Sıkıştırma](rehber/06-belge-tarayici.md)
+
 ## Bu depo hakkında kısa özet
 
 - **Jekyll** ile üretilen, **Cloudflare Pages** ve **GitHub Pages**'te aynı anda barınabilen kişisel bir site.
 - Blog, akademik projeler, izlediklerim/okuduklarım (Cloudflare Worker ile GitHub Projects'ten çekilir), iletişim formu ve **Supabase tabanlı** üyelik/panel/admin sistemi içerir.
-- Detaylı dokümantasyon uzun olduğu için üstteki 4 sekmeye bölündü (`rehber/` klasörü) — bu sayede README kısa kalıyor, her konu kendi dosyasında.
+- Detaylı dokümantasyon uzun olduğu için üstteki sekmelere (4 ana + 2 ek rehber, `rehber/` klasörü) bölündü — bu sayede README kısa kalıyor, her konu kendi dosyasında.
 
 ---
