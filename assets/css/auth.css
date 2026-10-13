@@ -604,15 +604,16 @@
 .msg-yeni-btn {
   width: 100%;
   padding: 10px 12px;
-  border: none;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
   border-radius: 8px;
-  background: var(--accent);
-  color: #fff;
+  background: color-mix(in srgb, var(--accent) 14%, var(--card-bg));
+  color: var(--accent);
   font-weight: 600;
   font-size: 0.88rem;
   cursor: pointer;
 }
-.msg-yeni-btn:hover { filter: brightness(1.08); }
+.msg-yeni-btn:hover { background: color-mix(in srgb, var(--accent) 24%, var(--card-bg)); }
+.msg-yeni-btn:focus-visible, .chat-form button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .msg-yeni-form-wrap {
   padding: 10px 12px;
@@ -710,8 +711,15 @@
   border-bottom: 1px solid var(--border);
 }
 .msg-konusma-item:hover { background: var(--tag-bg); }
-.msg-konusma-item.active { background: var(--accent); color: #fff; }
-.msg-konusma-item.active .msg-konusma-sil { color: #fff; }
+/* RENK DENGESİ (BUG FİX): seçili konuşma eskiden düz --accent zemin + beyaz yazıydı; koyu temada --accent açık
+   mavi (#6ea8ff) olduğundan göz kamaştırıyor ve beyaz yazı okunmuyordu. Artık zemine hafif vurgu tonu + sol çizgi. */
+.msg-konusma-item.active {
+  background: color-mix(in srgb, var(--accent) 14%, var(--card-bg));
+  color: var(--text);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.msg-konusma-item.active .msg-konusma-baslik { color: var(--accent); }
+.msg-konusma-item.active .msg-konusma-sil { color: inherit; opacity: 0.7; }
 
 .msg-konusma-sec {
   display: flex;
@@ -762,7 +770,7 @@
   color: #fff;
   border-left-color: #c0392b;
 }
-.msg-konusma-item.active .msg-konusma-sil { border-left-color: rgba(255, 255, 255, 0.35); }
+.msg-konusma-item.active .msg-konusma-sil { border-left-color: var(--border); }
 
 .msg-thread-pane {
   display: flex;
@@ -1025,4 +1033,16 @@
   font-size: 0.95rem;
   letter-spacing: 0.03em;
   user-select: all;
+}
+
+/* ---- Koyu tema: parlak (--accent #6ea8ff) dolgu yüzeyler — kamaştırmasın, okunur kalsın ---- */
+[data-theme="dark"] .chat-mesaj--ben {
+  background: color-mix(in srgb, var(--accent) 24%, var(--card-bg));
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+}
+[data-theme="dark"] .chat-form button,
+[data-theme="dark"] .msg-geri-btn:hover {
+  background: color-mix(in srgb, var(--accent) 85%, #000);
+  color: #0b1220;
 }
