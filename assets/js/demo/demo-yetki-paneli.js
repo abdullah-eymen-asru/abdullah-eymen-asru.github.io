@@ -36,12 +36,14 @@ const BOLUMLER = [
   { yol: "pdf.aktif", baslik: "📖 PDF Kütüphanesi & Okuyucu", aciklama: "Örnek PDF'li kütüphane ve okuyucu.", alt: [["pdf.duzenlemeAraclari", "PDF Düzenleme Araçları Çubuğu"]] },
   { yol: "arsiv.aktif", baslik: "🗄️ Arşiv & Dosya Gezgini", aciklama: "Sahte klasör/dosya ağacı.", alt: [["arsiv.zipInceleme", "Örnek ZIP İnceleme"]] },
   { yol: "notlar.aktif", baslik: "🗒️ Notlar", aciklama: "Sahte, şifreli not örnekleri.", alt: [["notlar.filtreCipleri", "Filtreleme Çipleri / Etiket Arama"]] },
+  { yol: "mesajlar.aktif", baslik: "💬 Sohbet / Mesajlar", aciklama: "Örnek sohbetler (salt-okunur): demo hesabı mesajları görür, gönderemez/silemez." },
   { yol: "sistem.aktif", baslik: "📊 Sistem / Metrik", aciklama: "Statik vitrin grafikleri." },
 ];
 const KART_ETIKETLERI = {
   "content-notlar": "Notlar kartı",
   "media-arsiv": "Arşiv & Dosya Gezgini kartı",
   "lib-kutuphane": "PDF Kütüphanesi kartı",
+  "users-mesajlar": "Sohbet / Mesajlar kartı",
   "sys-metrik": "Sistem / Metrik kartı",
 };
 
