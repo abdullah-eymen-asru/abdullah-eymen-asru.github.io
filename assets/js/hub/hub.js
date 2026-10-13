@@ -23,6 +23,7 @@ const ACIKLAMA = {
   "users-uye": "Üyeleri, rolleri ve onayları yönet.",
   "users-mesajlar": "Sohbet ve mesajlar.",
   "tool-donusturucu": "PDF/Word/görsel dönüştür, tarayıcıda düzenle.",
+  "tool-belge-tarayici": "Belgeleri tara, birleştir, boyutunu küçült; PDF/ZIP olarak indir.",
   "sys-guvenlik": "Admin güvenliği, denetim ve onaylar.",
   "sys-yetki": "Rol bazlı yetkiler ve erişim kalkanı.",
   "sys-kvkk": "KVKK ve açık rıza metinleri / sürümleri.",
