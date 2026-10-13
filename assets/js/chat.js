@@ -51,16 +51,30 @@ const adVeRol = (ad, rol) => `${ad || "—"} (${rolEtiketi(rol)})`;
 
 /** id listesi → { id: {ad, rol} }. Sunucu RPC'si (mesaj_kisi_bilgileri, migration 0091) üyenin görebileceği kişileri döner;
  *  RPC yoksa/başarısızsa (migration henüz çalışmadıysa) eski yola (profiles) düşer ve rol bilinmez. */
+const KISI_ONBELLEK = new Map(); // id → { ad, rol, t } — her 10 sn'lik yoklamada ağa gitmeyip isimler "geç gelmesin" diye
+const KISI_TTL_MS = 5 * 60 * 1000;
 async function kisiBilgileriGetir(idler) {
   const harita = {};
   if (!idler || idler.length === 0) return harita;
-  const { data, error } = await supabase.rpc("mesaj_kisi_bilgileri", { p_ids: idler });
+  const simdi = Date.now();
+  const eksik = [];
+  idler.forEach((id) => {
+    const k = KISI_ONBELLEK.get(id);
+    if (k && simdi - k.t < KISI_TTL_MS) harita[id] = { ad: k.ad, rol: k.rol };
+    else eksik.push(id);
+  });
+  if (eksik.length === 0) return harita;
+  const yaz = (p) => {
+    harita[p.id] = { ad: p.full_name || p.email, rol: p.role };
+    KISI_ONBELLEK.set(p.id, { ...harita[p.id], t: simdi });
+  };
+  const { data, error } = await supabase.rpc("mesaj_kisi_bilgileri", { p_ids: eksik });
   if (!error && Array.isArray(data)) {
-    data.forEach((p) => (harita[p.id] = { ad: p.full_name || p.email, rol: p.role }));
+    data.forEach(yaz);
     return harita;
   }
-  const { data: eski } = await supabase.from("profiles").select("id, full_name, email, role").in("id", idler);
-  (eski || []).forEach((p) => (harita[p.id] = { ad: p.full_name || p.email, rol: p.role }));
+  const { data: eski } = await supabase.from("profiles").select("id, full_name, email, role").in("id", eksik);
+  (eski || []).forEach(yaz);
   return harita;
 }
 
@@ -93,6 +107,13 @@ function mesajBalonuHtml(m, benimId, gonderenAdlari) {
 }
 
 function mesajListesiniCiz(listEl, mesajlar, benimId, gonderenAdlari) {
+  // BUG FİX (10 sn'lik yoklama): liste her seferinde baştan çizilip en alta kaydırılıyordu → yukarı kaydırıp eski
+  // mesajı okuyan kişi sürekli aşağı atılıyor, seçili metin kayboluyordu. Artık içerik DEĞİŞMEDİYSE hiçbir şey yapılmaz;
+  // değiştiyse yalnızca kullanıcı zaten en alttaysa (ya da liste ilk kez çiziliyorsa) en alta inilir.
+  const imza = (mesajlar || []).map((m) => `${m.id}:${gonderenAdlari?.[m.sender_id] || ""}`).join("|");
+  if (listEl._imza === imza && listEl.childElementCount > 0) return;
+  const enAltta = listEl._imza === undefined || listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight < 60;
+  listEl._imza = imza;
   if (!mesajlar || mesajlar.length === 0) {
     listEl.innerHTML = `<p class="chat-bos">Henüz mesaj yok. İlk mesajı sen gönder.</p>`;
     return;
@@ -114,7 +135,7 @@ function mesajListesiniCiz(listEl, mesajlar, benimId, gonderenAdlari) {
       listEl.querySelector(`[data-id="${id}"]`)?.remove();
     });
   });
-  listEl.scrollTop = listEl.scrollHeight;
+  if (enAltta) listEl.scrollTop = listEl.scrollHeight;
 }
 
 /** Konuşma listesindeki tek bir satırın HTML'i — hem üye hem admin tarafında
@@ -374,6 +395,7 @@ export async function wireUserChat(profile) {
   }
 
   function konusmaSec(id) {
+    if (SECILI_KONUSMA !== id) threadListEl._imza = undefined; // yeni konuşma: baştan çiz + en alta in
     SECILI_KONUSMA = id;
     const k = KONUSMALAR.find((x) => x.id === id);
     const hedefAdi = k?.hedef_admin_id ? HEDEF_ADLARI[k.hedef_admin_id] : null;
@@ -633,6 +655,7 @@ export async function wireAdminChat(adminId) {
   }
 
   function konusmaSec(id) {
+    if (SECILI_KONUSMA !== id) threadListEl._imza = undefined; // yeni konuşma: baştan çiz + en alta in
     SECILI_KONUSMA = id;
     const k = KONUSMALAR.find((x) => x.id === id);
     baslikEl.textContent = k ? `${PROFIL_ADLARI[k.user_id] || "Bilinmeyen üye"} — ${k.konu}` : "Konuşma";
