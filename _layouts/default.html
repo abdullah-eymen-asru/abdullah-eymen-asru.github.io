@@ -958,6 +958,10 @@
         // anda "temasız/belirsiz" bir durumda kalmaması, bazı mobil
         // tarayıcıların (Samsung Internet gibi) bu belirsizliği kendi
         // karartma sezgisiyle doldurmaya çalışmasını önlüyor.
+        // Tüm geçişleri bir kare kapat: renkler aynı anda değişsin (style.css → .tema-anlik).
+        const kok = document.documentElement;
+        kok.classList.add("tema-anlik");
+        requestAnimationFrame(() => requestAnimationFrame(() => kok.classList.remove("tema-anlik")));
         if (aktifKoyu) {
           document.documentElement.setAttribute("data-theme", "light");
         } else {
