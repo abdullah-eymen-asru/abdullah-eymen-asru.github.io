@@ -231,7 +231,7 @@ export const demoSupabase = {
  *   • auth.*                 → GERÇEK (signOut: gerçek oturumu kapatır + demo bayrağını siler)
  *   • from("profiles")       → select GERÇEK (yalnızca kendi satırı: 0086); update → dar RPC demo_profil_ad_guncelle (0087)
  *   • from("site_ayarlari")  → select GERÇEK (herkese açık veri; KVKK sürüm kontrolü için); yazma engelli
- *   • rpc(<hesap RPC'leri>)  → GERÇEK (aşağıdaki liste); diğer her rpc → sahte/engelli
+ *   • rpc(<hesap + mesajlaşma RPC'leri>) → GERÇEK (aşağıdaki liste); mesajlaşma tabloları da GERÇEK (0091); diğer her rpc → sahte/engelli
  *   • geri kalan her şey     → sahte (Sorgu / mock) — salt-okunur
  * ============================================================================================================ */
 const UYE_GERCEK_RPC = new Set([
@@ -246,7 +246,16 @@ const UYE_GERCEK_RPC = new Set([
   "oturumlarimi_listele",
   "oturum_sonlandir",
   "kullanici_email_identity_ekle",
+  // Sohbet / Mesajlar (migration 0091): demo üyesi GERÇEKTEN mesaj gönderip alabilir (yalnızca KENDİ sohbetleri; RLS)
+  "baslat_konusma",
+  "mesaj_hedef_listesi_getir",
+  "mesaj_kisi_bilgileri",
+  "konusmayi_kendimden_gizle",
+  "mesaji_kendimden_gizle",
 ]);
+
+/** Demo üyesinde GERÇEK istemciye giden mesajlaşma tabloları (RLS yalnızca kendi satırlarını verir). */
+const UYE_GERCEK_TABLOLAR = new Set(["conversations", "messages", "konusma_gizlemeleri", "mesaj_gizlemeleri"]);
 
 const engelliSonuc = () => {
   demoBildir();
@@ -276,29 +285,6 @@ class UyeProfilGuncelle {
     if (error) return { data: null, error, count: null, status: 400 };
     return { data: this.tek ? data : [data], error: null, count: null, status: 200 };
   }
-}
-
-/** Sahte sohbet profillerinin kimlikleri (demo-mock-veri.js → id(501)/id(502)); gerçek hiçbir kullanıcıyla eşleşmez. */
-const SAHTE_PROFIL_ID = /^d3c10000-0000-4000-8000-0000000005\d\d$/;
-
-/**
- * Demo üyesinin profiles.select(...) çağrısı. Varsayılan: GERÇEK istemci (yalnızca kendi satırı — 0086).
- * İSTİSNA: `.in("id", [...])` listesinde SAHTE sohbet profili kimliği varsa (Mesajlar'da gönderen adlarını çözerken)
- * sorgu sahte tabloya gider; böylece "Örnek Yönetici" gibi adlar görünür ve gerçek hiçbir profil okunmaz/sızmaz.
- */
-function profilSecimi(gercek, secimArgs) {
-  const gercekSorgu = gercek.from("profiles").select(...secimArgs);
-  return new Proxy(gercekSorgu, {
-    get(hedef, ad) {
-      if (ad === "in") {
-        return (kol, idler) => (kol === "id" && Array.isArray(idler) && idler.some((x) => SAHTE_PROFIL_ID.test(String(x)))
-          ? new Sorgu("profiles").select(...secimArgs).in(kol, idler)
-          : hedef.in(kol, idler));
-      }
-      const v = hedef[ad];
-      return typeof v === "function" ? v.bind(hedef) : v;
-    },
-  });
 }
 
 export function demoUyeSupabaseKur(gercek) {
@@ -333,12 +319,14 @@ export function demoUyeSupabaseKur(gercek) {
     from(tablo) {
       if (tablo === "profiles") {
         const { insert, upsert, delete: sil } = engelliYazma("profiles");
-        return { select: (...a) => profilSecimi(gercek, a), update: (yuk) => new UyeProfilGuncelle(gercek, yuk), insert, upsert, delete: sil };
+        return { select: (...a) => gercek.from("profiles").select(...a), update: (yuk) => new UyeProfilGuncelle(gercek, yuk), insert, upsert, delete: sil };
       }
       if (tablo === "site_ayarlari") {
         const { insert, upsert, update, delete: sil } = engelliYazma("site_ayarlari");
         return { select: (...a) => gercek.from("site_ayarlari").select(...a), insert, upsert, update, delete: sil };
       }
+      // Gerçek Realtime WebSocket'i ağ kalkanı engeller; sohbet ekranı 10 sn'lik yoklamayla güncellenir (chat.js), kanal sahte kalır.
+      if (UYE_GERCEK_TABLOLAR.has(tablo)) return gercek.from(tablo);
       return new Sorgu(tablo);
     },
     rpc(ad, args) {
