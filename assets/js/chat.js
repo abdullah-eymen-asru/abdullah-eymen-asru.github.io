@@ -29,8 +29,39 @@
 import { supabase, escapeHtml, showMessage, kucukHarfeCevirTr, kullaniciAramayaUyuyorMu } from "./core/supabase-client.js";
 
 /** Bir hedef (admin/owner) rol kodunu ekranda gösterilecek etikete çevirir. */
+const ROL_ETIKETLERI = {
+  owner: "Site Sahibi",
+  admin: "Yönetici",
+  manager: "İçerik Sorumlusu",
+  editor: "İçerik Editörü",
+  special_user: "Özel Üye",
+  user: "Üye",
+  demo: "Demo Üye",
+};
+/** Herhangi bir rol kodunu ekranda gösterilecek Türkçe üye türüne çevirir (bilinmeyen rol: "Üye"). */
+export function rolEtiketi(rol) {
+  return ROL_ETIKETLERI[rol] || "Üye";
+}
 function hedefRolEtiketi(rol) {
   return rol === "owner" ? "Site Sahibi" : "Yönetici";
+}
+
+/** İsimlerin yanına üye türünü yazar: "Ad Soyad (Yönetici)". */
+const adVeRol = (ad, rol) => `${ad || "—"} (${rolEtiketi(rol)})`;
+
+/** id listesi → { id: {ad, rol} }. Sunucu RPC'si (mesaj_kisi_bilgileri, migration 0091) üyenin görebileceği kişileri döner;
+ *  RPC yoksa/başarısızsa (migration henüz çalışmadıysa) eski yola (profiles) düşer ve rol bilinmez. */
+async function kisiBilgileriGetir(idler) {
+  const harita = {};
+  if (!idler || idler.length === 0) return harita;
+  const { data, error } = await supabase.rpc("mesaj_kisi_bilgileri", { p_ids: idler });
+  if (!error && Array.isArray(data)) {
+    data.forEach((p) => (harita[p.id] = { ad: p.full_name || p.email, rol: p.role }));
+    return harita;
+  }
+  const { data: eski } = await supabase.from("profiles").select("id, full_name, email, role").in("id", idler);
+  (eski || []).forEach((p) => (harita[p.id] = { ad: p.full_name || p.email, rol: p.role }));
+  return harita;
 }
 
 function formatSaat(iso) {
@@ -145,8 +176,8 @@ async function gonderenAdlariniGetir(mesajlar) {
   const adlar = {};
   const idler = [...new Set((mesajlar || []).map((m) => m.sender_id))];
   if (idler.length === 0) return adlar;
-  const { data } = await supabase.from("profiles").select("id, full_name, email").in("id", idler);
-  (data || []).forEach((p) => (adlar[p.id] = p.full_name || p.email));
+  const kisiler = await kisiBilgileriGetir(idler);
+  Object.entries(kisiler).forEach(([id, k]) => (adlar[id] = adVeRol(k.ad, k.rol)));
   return adlar;
 }
 
@@ -204,7 +235,7 @@ export async function wireUserChat(profile) {
     const { data, error } = await supabase.rpc("mesaj_hedef_listesi_getir");
     HEDEF_ADAYLARI = error ? [] : data || [];
     HEDEF_ADLARI = {};
-    HEDEF_ADAYLARI.forEach((a) => (HEDEF_ADLARI[a.id] = a.full_name || hedefRolEtiketi(a.role)));
+    HEDEF_ADAYLARI.forEach((a) => (HEDEF_ADLARI[a.id] = adVeRol(a.full_name, a.role)));
   }
 
   function hedefEtiketiGuncelle() {
@@ -476,9 +507,9 @@ export async function wireAdminChat(adminId) {
     // göstermek için de hedef_admin_id'leri (varsa) TEK sorguda çekiyoruz.
     const idler = [...new Set([...KONUSMALAR.map((k) => k.user_id), ...KONUSMALAR.map((k) => k.hedef_admin_id)].filter(Boolean))];
     if (idler.length > 0) {
-      const { data: profiller } = await supabase.from("profiles").select("id, full_name, email").in("id", idler);
+      const kisiler = await kisiBilgileriGetir(idler);
       PROFIL_ADLARI = {};
-      (profiller || []).forEach((p) => (PROFIL_ADLARI[p.id] = p.full_name || p.email));
+      Object.entries(kisiler).forEach(([id, k]) => (PROFIL_ADLARI[id] = adVeRol(k.ad, k.rol)));
     }
 
     ONIZLEMELER = await sonMesajOnizlemeleriGetir(KONUSMALAR.map((k) => k.id));
@@ -658,7 +689,7 @@ export async function wireAdminChat(adminId) {
         .map(
           (u) => `
         <button type="button" class="msg-uye-sonuc-item" data-id="${u.id}" data-isim="${escapeHtml(u.full_name || "Üye")}">
-          <span class="msg-uye-sonuc-isim">${escapeHtml(u.full_name || "—")}</span>
+          <span class="msg-uye-sonuc-isim">${escapeHtml(u.full_name || "—")} <span class="msg-hedef-rozet">${escapeHtml(rolEtiketi(u.role))}</span></span>
         </button>`
         )
         .join("");
