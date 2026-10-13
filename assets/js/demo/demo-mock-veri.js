@@ -13,7 +13,7 @@
  *   • r2_arsiv          : sahte klasör/dosya ağacı (örnek PDF, örnek ZIP, örnek görsel; gerçek R2 anahtarı YOK).
  *   • rpc               : yetki/özet/kota RPC'lerinin sabit yanıtları (r2 "1.240 / 100.000 istek" vb.).
  */
-import { DEMO_UID, DEMO_PROFIL } from "./demo-durum.js";
+import { DEMO_UID, DEMO_PROFIL, demoUidAl } from "./demo-durum.js";
 import { DEMO_DOSYALARI, DEMO_AKADEMIK_PDF_ID } from "./demo-ag-kalkani.js";
 
 const GUN = 86400000;
@@ -213,13 +213,46 @@ export const ARSIV_SATIRLARI = [
 ];
 
 /* ------------------------------------------------------------------ */
+/* SOHBET / MESAJLAR (conversations, messages) — tamamen sahte          */
+/* ------------------------------------------------------------------ */
+// Karşı taraf: iki SAHTE yönetici profili (gerçek hiçbir hesapla eşleşmez). "Ben" = demoUidAl() (anonim: DEMO_UID, demo üyesi: gerçek id).
+const SOHBET_YONETICI = id(501);
+const SOHBET_SAHIP = id(502);
+const SOHBET_PROFILLERI = [
+  { id: SOHBET_YONETICI, full_name: "Örnek Yönetici", first_name: "Örnek", last_name: "Yönetici", role: "admin", email: "yonetici@ornek.invalid" },
+  { id: SOHBET_SAHIP, full_name: "Örnek Site Sahibi", first_name: "Örnek", last_name: "Site Sahibi", role: "owner", email: "sahip@ornek.invalid" },
+];
+const SOHBET_KONUSMALARI = [
+  { id: id(601), konu: "Hoş geldin — vitrin sohbeti (örnek)", hedef_admin_id: SOHBET_YONETICI, gun: 0 },
+  { id: id(602), konu: "Akademik Kütüphane hakkında soru (örnek)", hedef_admin_id: SOHBET_SAHIP, gun: 2 },
+];
+const SOHBET_MESAJLARI = [
+  { id: id(701), konusma: id(601), gonderen: "yonetici", body: "Merhaba! Bu, vitrin modundaki örnek bir sohbettir. Gerçek mesajlaşma verisi burada gösterilmez.", saat: 5 },
+  { id: id(702), konusma: id(601), gonderen: "ben", body: "Merhaba, teşekkürler. Mesajlar bölümü nasıl çalışıyor?", saat: 4 },
+  { id: id(703), konusma: id(601), gonderen: "yonetici", body: "Üyeler yöneticilere konu başlıklı sohbet açar; yanıtlar aynı konuşmada görünür. Demo modunda yeni mesaj gönderilemez.", saat: 3 },
+  { id: id(711), konusma: id(602), gonderen: "ben", body: "PDF okuyucunun motor sürümünü kendim seçebiliyor muyum?", saat: 52 },
+  { id: id(712), konusma: id(602), gonderen: "sahip", body: "Evet: Akademik Kütüphane'deki “PDF okuyucu motoru” kutusundan Otomatik, En yeni ya da belirli bir sürümü seçebilirsin.", saat: 50 },
+];
+const GONDEREN_ID = { yonetici: SOHBET_YONETICI, sahip: SOHBET_SAHIP };
+
+const sohbetKonusmalari = () => SOHBET_KONUSMALARI.map((k) => {
+  const sonSaat = Math.min(...SOHBET_MESAJLARI.filter((m) => m.konusma === k.id).map((m) => m.saat));
+  return { id: k.id, user_id: demoUidAl(), konu: k.konu, hedef_admin_id: k.hedef_admin_id, son_mesaj_at: once(0, sonSaat), created_at: once(k.gun + 1) };
+});
+const sohbetMesajlari = () => SOHBET_MESAJLARI.map((m) => ({
+  id: m.id, conversation_id: m.konusma, sender_id: m.gonderen === "ben" ? demoUidAl() : GONDEREN_ID[m.gonderen], body: m.body, created_at: once(0, m.saat),
+}));
+
+/* ------------------------------------------------------------------ */
 /* TABLO KAYDI                                                          */
 /* ------------------------------------------------------------------ */
-const profilSatiri = { ...DEMO_PROFIL, created_at: once(60), updated_at: once(1) };
+const profilSatiri = () => ({ ...DEMO_PROFIL, id: demoUidAl(), created_at: once(60), updated_at: once(1) });
 
 /** tablo adı → satır dizisi (ya da async üretici). Burada OLMAYAN her tablo boş [] döner. */
 const TABLOLAR = {
-  profiles: () => [profilSatiri],
+  profiles: () => [profilSatiri(), ...SOHBET_PROFILLERI],
+  conversations: () => sohbetKonusmalari(),
+  messages: () => sohbetMesajlari(),
   site_ayarlari: () => [{ id: 1, guncel_kvkk_surumu: "v1.0", guncel_riza_surumu: "v1.0", github_io_aktif: true, pages_dev_aktif: true, kilitli_rotalar: { "github.io": [], "pages.dev": [] }, bakim_mesaji: "" }],
   site_settings: () => [{ id: 1, kayitlar_acik: true }],
   notlar: () => notSatirlariniHazirla(),
@@ -260,6 +293,8 @@ const RPC_SABIT = {
   r2_kota_durumu: [{ sinif: "A", sayi: 38 }, { sinif: "B", sayi: 1240 }],
   arsiv_benimle_paylasilanlar: [],
   arsiv_kullanici_ara: [],
+  // Mesajlar: "Kime?" listesi (e-posta içermez — gerçek RPC ile aynı sözleşme: id, full_name, role)
+  mesaj_hedef_listesi_getir: SOHBET_PROFILLERI.map(({ id: pid, full_name, role }) => ({ id: pid, full_name, role })),
 };
 
 export async function rpcYaniti(ad, args = {}) {
