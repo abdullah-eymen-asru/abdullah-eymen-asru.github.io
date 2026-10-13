@@ -59,6 +59,11 @@
   transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 
+/* TEMA GEÇİŞİ SENKRONU (BUG FİX): bazı bileşenler kendi "transition: transform …" kuralıyla yukarıdaki genel renk geçişini
+   EZİYOR, kalanlar 0.12 sn'de yumuşak geçiyordu → tema değişince kimi alanlar (isim, rozet vb.) diğerlerinden "geç" dönüyordu.
+   Anahtara basılırken <html>'e kısa süre .tema-anlik eklenir; her şey AYNI karede değişir (bkz. _layouts/default.html). */
+.tema-anlik *, .tema-anlik *::before, .tema-anlik *::after { transition: none !important; }
+
 /* MOBİL YATAY TAŞMA (BUG FİX): overflow-x:hidden SADECE <body>'e
    uygulandığında bazı mobil tarayıcılarda (özellikle iOS Safari) yeterli
    olmuyor — gerçek kaydırma/viewport elemanı çoğu zaman <html>'in
