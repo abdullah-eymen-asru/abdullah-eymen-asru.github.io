@@ -11,9 +11,8 @@
 --   2) Mevcut demo_config satırına 'mesajlar' bölümü (varsayılan AÇIK) ve 'users-mesajlar' kartı eklenir; mevcut diğer
 --      ayarlara dokunulmaz.
 --
--- GÜVENLİK NOTU (değişmeyen izolasyon): demo hesabı conversations/messages tablolarından HİÇBİR satır okuyamaz/yazamaz
--- (0083 restrictive RLS). Demodaki Sohbet/Mesajlar ekranı istemcideki SAHTE örnek sohbetlerle çalışır
--- (assets/js/demo/demo-mock-veri.js); gönderme/silme eylemleri "salt-okunur" toast'una takılır, sunucuya hiçbir şey gitmez.
+-- NOT: Hesabı olan 'demo' üyeler GERÇEK mesajlaşma kullanır (bkz. 0091). Bu bölümün sahte örnek sohbetleri yalnızca
+-- hesapsız (anonim) vitrin ziyaretçisi içindir (assets/js/demo/demo-mock-veri.js); onda gönderme eylemleri salt-okunur toast'una takılır.
 -- ============================================================================
 
 create or replace function public.demo_config_gecerli_mi(p jsonb)
