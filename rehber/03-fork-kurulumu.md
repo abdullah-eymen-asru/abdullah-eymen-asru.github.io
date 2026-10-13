@@ -1,6 +1,6 @@
 [⬅️ README'ye dön](../README.md)
 
-[📖 Site Rehberi](./01-site-rehberi.md) · [🔐 Supabase Sistemi](./02-supabase-sistemi.md) · **🍴 Fork Kurulumu** · [☁️ Cloudflare Secret & Ayarlar](./04-cloudflare-secretlar.md)
+[📖 Site Rehberi](./01-site-rehberi.md) · [🔐 Supabase Sistemi](./02-supabase-sistemi.md) · **🍴 Fork Kurulumu** · [☁️ Cloudflare Secret & Ayarlar](./04-cloudflare-secretlar.md) · [🔄 Dönüştürücü & Belge Düzenleyici](./05-donusturucu.md) · [📑 Belge Tarayıcı & Sıkıştırma](./06-belge-tarayici.md)
 
 ---
 
@@ -297,7 +297,7 @@ yazman güvenlidir, GitHub Secrets'a eklemene gerek yoktur.
 
 [⬅️ README'ye dön](../README.md)
 
-[📖 Site Rehberi](./01-site-rehberi.md) · [🔐 Supabase Sistemi](./02-supabase-sistemi.md) · **🍴 Fork Kurulumu** · [☁️ Cloudflare Secret & Ayarlar](./04-cloudflare-secretlar.md)
+[📖 Site Rehberi](./01-site-rehberi.md) · [🔐 Supabase Sistemi](./02-supabase-sistemi.md) · **🍴 Fork Kurulumu** · [☁️ Cloudflare Secret & Ayarlar](./04-cloudflare-secretlar.md) · [🔄 Dönüştürücü & Belge Düzenleyici](./05-donusturucu.md) · [📑 Belge Tarayıcı & Sıkıştırma](./06-belge-tarayici.md)
 
 ---
 
