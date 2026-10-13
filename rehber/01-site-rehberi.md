@@ -1,6 +1,6 @@
 [⬅️ README'ye dön](../README.md)
 
-**📖 Site Rehberi** · [🔐 Supabase Sistemi](./02-supabase-sistemi.md) · [🍴 Fork Kurulumu](./03-fork-kurulumu.md) · [☁️ Cloudflare Secret & Ayarlar](./04-cloudflare-secretlar.md)
+**📖 Site Rehberi** · [🔐 Supabase Sistemi](./02-supabase-sistemi.md) · [🍴 Fork Kurulumu](./03-fork-kurulumu.md) · [☁️ Cloudflare Secret & Ayarlar](./04-cloudflare-secretlar.md) · [🔄 Dönüştürücü & Belge Düzenleyici](./05-donusturucu.md) · [📑 Belge Tarayıcı & Sıkıştırma](./06-belge-tarayici.md)
 
 ---
 
@@ -785,7 +785,7 @@ ayarı oluşturup `_includes/comments.html` içindeki ilgili
 | Dosya | Ne işe yarar |
 |---|---|
 | `_layouts/default.html` içinde `#auth-nav` | Nav'daki tek kapsayıcı — JS yüklenmeden önce görünen statik "Giriş Yap" linkini içerir (progressive enhancement / no-JS yedeği). |
-| `assets/js/auth/nav-auth.js` | Sayfa açılışında oturumu kontrol edip `#auth-nav`'ın içeriğini dolduran script. Çıkış yapmışken tek bir "Giriş Yap" linki, giriş yapmışken "Hesabım ▾" açılır menüsü (Panelim, adminse Admin Paneli ve GitHub İçerik Yönetimi, Çıkış Yap) gösterir. Başka bir sekmede oturum açılıp kapandığında `onAuthStateChange` ile kendini günceller. |
+| `assets/js/auth/nav-auth.js` | Sayfa açılışında oturumu kontrol edip `#auth-nav`'ın içeriğini dolduran script. Çıkış yapmışken tek bir "Giriş Yap" linki, giriş yapmışken tek bir "Hesabım" bağlantısı gösterir (açılır menü YOK; doğrudan panelin Ana Ekranı'na gider, Çıkış Yap panelin içindedir). Başka bir sekmede oturum açılıp kapandığında `onAuthStateChange` ile kendini günceller. |
 | `assets/style.css` içinde `.auth-nav*` sınıfları | Açılır menünün görünümü — mevcut `nav a` stiliyle aynı renk değişkenlerini kullanır, açık/koyu temayla otomatik uyumludur. |
 
 Bu menü, sitenin Supabase kullanıcı sistemine bağlıdır — bkz. aşağıdaki
@@ -869,7 +869,7 @@ isteği 200 ile kabul eder ama hiçbir yere bildirim göndermez (loglar).
 
 [⬅️ README'ye dön](../README.md)
 
-**📖 Site Rehberi** · [🔐 Supabase Sistemi](./02-supabase-sistemi.md) · [🍴 Fork Kurulumu](./03-fork-kurulumu.md) · [☁️ Cloudflare Secret & Ayarlar](./04-cloudflare-secretlar.md)
+**📖 Site Rehberi** · [🔐 Supabase Sistemi](./02-supabase-sistemi.md) · [🍴 Fork Kurulumu](./03-fork-kurulumu.md) · [☁️ Cloudflare Secret & Ayarlar](./04-cloudflare-secretlar.md) · [🔄 Dönüştürücü & Belge Düzenleyici](./05-donusturucu.md) · [📑 Belge Tarayıcı & Sıkıştırma](./06-belge-tarayici.md)
 
 ---
 
