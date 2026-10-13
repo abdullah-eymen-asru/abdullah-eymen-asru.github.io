@@ -327,6 +327,13 @@ function ayrilirkenSor() {
     .then((ok) => { if (ok) oturumuSifirla(); return ok; });
 }
 
+/** Erişim ayarı TEK yerdedir (Yetki Ayarları); yalnızca yönetebilene yönlendirme notu. Karar veritabanındadır. */
+async function yonetimNotu() {
+  const { data } = await supabase.rpc("donusturucu_yonetim_yetkisi_var_mi");
+  if (data !== true) return null;
+  return el("p", { class: "dn-muted" }, "Bu aracın kimler tarafından kullanılabileceği tek yerden yönetilir: ", el("a", { href: "#sys-yetki", text: "Sistem & Güvenlik → Yetki Ayarları" }), ".");
+}
+
 async function kur() {
   if (!kok) return;
   // GUARD (derinlemesine savunma): yetki yoksa hiçbir arayüz/kütüphane yüklenmez.
@@ -349,6 +356,7 @@ async function kur() {
   kontrolEl = el("div", { class: "bt-seritler" }, sayacEl, kamera);
   kok.replaceChildren(rozet, el("div", { class: "dn-guvenli-serit" }, sifirla, bellekEl), dropzone(), kontrolEl, listeEl, ayarKarti(), eylemKarti(), girdiEl, kameraEl);
   ciz(); tahminiTetikle();
+  yonetimNotu().then((n) => { if (n) kok.append(n); }).catch(() => {});
   window.addEventListener("pagehide", () => { try { oturumuSifirla(); } catch { /* yok say */ } });
   ayrilmaKancasiKaydet("tool-belge-tarayici", ayrilirkenSor);
 }
