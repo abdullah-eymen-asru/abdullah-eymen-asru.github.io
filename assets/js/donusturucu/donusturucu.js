@@ -16,7 +16,6 @@ import { cikisDestekleniyor } from "./motor-gorsel.js";
 import { belgeHtmlAl } from "./belge-oku.js";
 import { veriDonustur } from "./motor-veri.js";
 import { kutuphaneListesi } from "./cdn.js";
-import { yetkiPaneliniKur } from "./yetki-ortak.js";
 import { sifirla as bellekSifirla, kaydet as bellekKaydet, dugumKaydet } from "./bellek.js";
 import { ayrilmaKancasiKaydet } from "../core/gezinme-kilidi.js";
 
@@ -419,18 +418,17 @@ function kutuphaneKarti() {
   return d;
 }
 
-async function yonetimKarti() {
+/**
+ * Erişim ayarları TEK yerdedir: Sistem & Güvenlik → Yetki Ayarları ("Dönüştürücü, Belge Tarayıcı & Sıkıştırma" satırı).
+ * (Önceden bu araçta ikinci bir "Erişim yönetimi" paneli vardı; iki yerde ayar kafa karıştırıyordu ve oradaki
+ * "Adminler de yönetebilsin" anahtarı migration 0079'dan beri hiçbir şeyi etkilemiyordu → kaldırıldı.)
+ * Yalnızca yönetebilen kişiye (owner / yetkili admin) yönlendirme notu gösterilir; yetki kararı veritabanındadır.
+ */
+async function yonetimNotu() {
   const { data } = await supabase.rpc("donusturucu_yonetim_yetkisi_var_mi");
   if (data !== true) return null;
-  const d = el("details", { class: "dn-kart" }, el("summary", { text: "⚙️ Erişim yönetimi (kimler bu aracı kullanabilir?)" }));
-  const icerik = el("div", {});
-  const m = el("div", { class: "auth-message", hidden: true, role: "status" });
-  d.append(icerik, m);
-  let yuklendi = false;
-  d.addEventListener("toggle", () => {
-    if (d.open && !yuklendi) { yuklendi = true; yetkiPaneliniKur(icerik, m).catch((h) => showMessage(m, hataMetni(h), "error")); }
-  });
-  return d;
+  const a = el("a", { href: "#sys-yetki", text: "Sistem & Güvenlik → Yetki Ayarları" });
+  return el("p", { class: "dn-muted" }, "Bu aracın (ve Belge Tarayıcı'nın) kimler tarafından kullanılabileceği tek yerden yönetilir: ", a, ".");
 }
 
 /* ------------------------------ bellek güvenliği ------------------------------ */
@@ -527,7 +525,7 @@ async function kur() {
     return;
   }
   kok.classList.add("dn-kok");
-  const yonetim = await yonetimKarti();
+  const yonetim = await yonetimNotu().catch(() => null);
   kok.replaceChildren(gizlilikRozeti(), el("div", { class: "dn-guvenli-serit" }, sifirlaDugmesi(), el("span", { class: "dn-muted", text: "Ortak cihazdaysan işin bitince belleği temizle." })), ana, calismaAlani, girdi, ...(yonetim ? [yonetim] : []), kutuphaneKarti());
   await ciz();
   window.addEventListener("pagehide", () => { try { oturumuSifirla(); } catch { /* yok say */ } });
