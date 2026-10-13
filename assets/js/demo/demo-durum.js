@@ -83,14 +83,6 @@ if (isDemoMode) {
   document.documentElement.dataset.demo = "1";
 }
 
-/** Demo oturumundaki kişinin kimliği: anonim ziyaretçide sahte DEMO_UID; gerçek 'demo' üyesinde GERÇEK kullanıcı id'si.
- *  Sahte sohbet/mesaj verisi "benim" mesajlarını bu id ile üretir (mesajlar.js kurulumda ayarlar). */
-let gecerliUid = DEMO_UID;
-export const demoUidAl = () => gecerliUid;
-export function demoUidAyarla(uid) {
-  if (typeof uid === "string" && /^[0-9a-f-]{36}$/i.test(uid)) gecerliUid = uid;
-}
-
 /** Gerçek hesabıyla demo rolünde giren üye mi? (Anonim ziyaretçi değil.) */
 export function demoUyeMi() {
   try { return sessionStorage.getItem(UYE_BAYRAK) === "1"; } catch { return false; }
