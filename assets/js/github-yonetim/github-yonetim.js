@@ -357,11 +357,11 @@ const OZELLIK_KATALOGU = [
     rolSutunlari: ["user", "special_user", "editor", "manager", "admin"],
   },
   {
-    // bkz. migration 0077 — Dönüştürücü & Belge Düzenleyici. Önceki ayrı "Dönüştürücü" sekmesi buraya taşındı.
+    // bkz. migration 0077 — Dönüştürücü, Belge Tarayıcı & Sıkıştırma (aynı can_use_converter anahtarı). Önceki ayrı "Dönüştürücü" sekmesi buraya taşındı.
     // VARSAYILAN KAPALI (diğer satırların tersi): anahtar açılana kadar yalnızca owner kullanır. Kaynak: donusturucu_yetkileri.
     anahtar: "donusturucu",
-    baslik: "Dönüştürücü & Belge Düzenleyici",
-    aciklama: "Dosya biçimi dönüştürme + tarayıcı içi PDF/Word/metin düzenleme. Varsayılan KAPALI; dosyalar tarayıcıdan çıkmaz. Kapalı rol menüde aracı görmez.",
+    baslik: "Dönüştürücü, Belge Tarayıcı & Sıkıştırma",
+    aciklama: "Dosya biçimi dönüştürme, tarayıcı içi PDF/Word/metin düzenleme ve Belge Tarayıcı (çoklu birleştirme + boyut küçültme). TEK anahtar: üçü de buradan açılıp kapanır, araçların içinde ayrı bir yetki paneli yoktur. Varsayılan KAPALI; dosyalar tarayıcıdan çıkmaz. Kapalı rol menüde araçları görmez.",
     rolSutunlari: ["admin", "manager", "editor", "special_user", "user"],
     kaynak: "donusturucu",
   },
