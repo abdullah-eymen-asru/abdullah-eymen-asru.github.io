@@ -1,3 +1,9 @@
+[⬅️ README'ye dön](../README.md)
+
+[📖 Site Rehberi](./01-site-rehberi.md) · [🔐 Supabase Sistemi](./02-supabase-sistemi.md) · [🍴 Fork Kurulumu](./03-fork-kurulumu.md) · [☁️ Cloudflare Secret & Ayarlar](./04-cloudflare-secretlar.md) · **🔄 Dönüştürücü & Belge Düzenleyici** · [📑 Belge Tarayıcı & Sıkıştırma](./06-belge-tarayici.md)
+
+---
+
 # 05 — Evrensel Dönüştürücü & Tarayıcı İçi Belge Düzenleyici
 
 **Gizlilik ilkesi:** dosyalar yalnızca sekmenin belleğinde (File/Blob/ArrayBuffer) durur. Supabase'e, R2'ye, Worker'a ya da başka bir
@@ -7,7 +13,7 @@ sunucuya **gitmez**. Ağ trafiği yalnızca açık kaynak kütüphane kodunun CD
 ## Kurulum (sırayla)
 1. Supabase SQL Editor'de `supabase/migrations/0077_donusturucu_yetkisi.sql` dosyasını **tek seferde** çalıştır (tekrar çalıştırmak güvenli).
 2. Siteyi yayınla (CSP'ye `'wasm-unsafe-eval'` eklendi, aşağıya bak).
-3. Panel → Yetki Ayarları → **🔄 Dönüştürücü** sekmesinden istediğin rolleri aç. Varsayılan: yalnızca owner.
+3. Panel → Sistem & Güvenlik → Yetki Ayarları → **Dönüştürücü, Belge Tarayıcı & Sıkıştırma** satırından istediğin rolleri aç. Varsayılan: yalnızca owner. (Aynı anahtar [📑 Belge Tarayıcı](./06-belge-tarayici.md) için de geçerlidir.)
 
 ## Yetki modeli
 | Parça | Davranış |
@@ -15,7 +21,7 @@ sunucuya **gitmez**. Ağ trafiği yalnızca açık kaynak kütüphane kodunun CD
 | `can_use_converter` | rol bazlı (admin, manager, editor, special_user, user). Satır yok = **kapalı**. owner her zaman yetkili. |
 | Menü | `Araçlar → Dönüştürücü & Editör`; yetkisiz rol hiç görmez (`dashboard.js › gorunurMu`, `izin:"donusturucu"`). |
 | Guard | `#tool-donusturucu` adresine elle gidilirse `gorunurMu` yönlendirir; ayrıca modül kütüphane yüklemeden önce `donusturucu_yetkisi_var_mi()` RPC'sini sorar. |
-| Yönetim | owner: 5 rolün hepsi + "Adminler de yönetebilsin" anahtarı. Yetkili admin (owner izin verdiyse): admin DIŞINDAKİ roller; araç içindeki "⚙️ Erişim yönetimi" kartından. Admin, admin rolünü ve bu anahtarı değiştiremez. |
+| Yönetim | **TEK yer:** Yetki Ayarları matrisi. Araçların içinde ayrı bir "Erişim yönetimi" paneli YOKTUR (iki yerde ayar kafa karıştırıyordu; eski panelin "Adminler de yönetebilsin" anahtarı 0079'dan beri etkisizdi, kaldırıldı). owner tüm rolleri; yetkili admin (Yetki Ayarları'na erişimi owner açtıysa) admin DIŞI rolleri değiştirir. |
 
 > Dürüst not: araç statik, herkese açık sitede çalışan istemci kodudur. Guard menüyü, rotayı ve arayüzü korur; araç sunucu
 > verisine dokunmadığı için korunacak gizli bir veri yoktur. Gerçek sınır, yetki RPC'leri ve tablolara istemci erişiminin kapalı olmasıdır.
@@ -23,7 +29,7 @@ sunucuya **gitmez**. Ağ trafiği yalnızca açık kaynak kütüphane kodunun CD
 ## Dosyalar
 - `assets/js/donusturucu/` — `donusturucu.js` (giriş), `tur-matrisi.js`, `donustur.js`, `belge-ir.js`, `belge-oku.js`, `belge-docx.js`,
   `belge-pdf.js`, `belge-epub.js`, `pdf-metin.js`, `motor-gorsel.js`, `motor-veri.js`, `temizle.js`, `zengin-duzenleyici.js`,
-  `metin-duzenleyici.js`, `vurgu.js`, `pdf-duzenleyici.js`, `pdf-yukle.js`, `cdn.js`, `ortak.js`, `yetki-ortak.js`, `yetki-paneli.js`
+  `metin-duzenleyici.js`, `vurgu.js`, `pdf-duzenleyici.js`, `pdf-yukle.js`, `cdn.js`, `ortak.js`
 - `assets/css/donusturucu.css`
 - `supabase/migrations/0077_donusturucu_yetkisi.sql`
 
@@ -101,3 +107,7 @@ PDF → md/png/docx, PDF birleştirme, zengin editör (kalın, geri al/yinele, h
 metin, döndürme, silme, sıralama, kayıt — çıktı poppler ile doğrulandı), taşma (375 px ve 1280 px), Guard (yetkisiz → arayüz kurulmaz).
 Gerçek CDN'den yüklenen **mammoth, DOMPurify, pdfmake, heic2any** bu ortamda ağ olmadığı için çalıştırılamadı: ilk canlı denemede
 DOCX→, →PDF ve HEIC dönüşümlerini bir kez dene (hata olursa konsolda sürüm/yol mesajı çıkar).
+
+---
+
+[📖 Site Rehberi](./01-site-rehberi.md) · [🔐 Supabase Sistemi](./02-supabase-sistemi.md) · [🍴 Fork Kurulumu](./03-fork-kurulumu.md) · [☁️ Cloudflare Secret & Ayarlar](./04-cloudflare-secretlar.md) · **🔄 Dönüştürücü & Belge Düzenleyici** · [📑 Belge Tarayıcı & Sıkıştırma](./06-belge-tarayici.md)
