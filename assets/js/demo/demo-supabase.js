@@ -238,6 +238,7 @@ const UYE_GERCEK_RPC = new Set([
   "is_demo",
   "demo_profil_ad_guncelle",
   "kvkk_onayini_ver",
+  "guncel_onay_surumleri", // migration 0089: KVKK/Açık Rıza sürüm kontrolü (demo üyesi de yeni sürümü onaylamak zorunda)
   "kendi_onay_gecmisim",
   "yedek_kod_durumu",
   "yedek_kodlar_olustur",
