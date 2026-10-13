@@ -13,7 +13,7 @@
  *   • r2_arsiv          : sahte klasör/dosya ağacı (örnek PDF, örnek ZIP, örnek görsel; gerçek R2 anahtarı YOK).
  *   • rpc               : yetki/özet/kota RPC'lerinin sabit yanıtları (r2 "1.240 / 100.000 istek" vb.).
  */
-import { DEMO_UID, DEMO_PROFIL, demoUidAl } from "./demo-durum.js";
+import { DEMO_UID, DEMO_PROFIL } from "./demo-durum.js";
 import { DEMO_DOSYALARI, DEMO_AKADEMIK_PDF_ID } from "./demo-ag-kalkani.js";
 
 const GUN = 86400000;
@@ -215,7 +215,8 @@ export const ARSIV_SATIRLARI = [
 /* ------------------------------------------------------------------ */
 /* SOHBET / MESAJLAR (conversations, messages) — tamamen sahte          */
 /* ------------------------------------------------------------------ */
-// Karşı taraf: iki SAHTE yönetici profili (gerçek hiçbir hesapla eşleşmez). "Ben" = demoUidAl() (anonim: DEMO_UID, demo üyesi: gerçek id).
+// YALNIZCA hesapsız (anonim) vitrin ziyaretçisi içindir; gerçek "demo" rollü üyeler GERÇEK mesajlaşmayı kullanır (0091).
+// Karşı taraf: iki SAHTE yönetici profili (gerçek hiçbir hesapla eşleşmez). "Ben" = DEMO_UID.
 const SOHBET_YONETICI = id(501);
 const SOHBET_SAHIP = id(502);
 const SOHBET_PROFILLERI = [
@@ -237,16 +238,16 @@ const GONDEREN_ID = { yonetici: SOHBET_YONETICI, sahip: SOHBET_SAHIP };
 
 const sohbetKonusmalari = () => SOHBET_KONUSMALARI.map((k) => {
   const sonSaat = Math.min(...SOHBET_MESAJLARI.filter((m) => m.konusma === k.id).map((m) => m.saat));
-  return { id: k.id, user_id: demoUidAl(), konu: k.konu, hedef_admin_id: k.hedef_admin_id, son_mesaj_at: once(0, sonSaat), created_at: once(k.gun + 1) };
+  return { id: k.id, user_id: DEMO_UID, konu: k.konu, hedef_admin_id: k.hedef_admin_id, son_mesaj_at: once(0, sonSaat), created_at: once(k.gun + 1) };
 });
 const sohbetMesajlari = () => SOHBET_MESAJLARI.map((m) => ({
-  id: m.id, conversation_id: m.konusma, sender_id: m.gonderen === "ben" ? demoUidAl() : GONDEREN_ID[m.gonderen], body: m.body, created_at: once(0, m.saat),
+  id: m.id, conversation_id: m.konusma, sender_id: m.gonderen === "ben" ? DEMO_UID : GONDEREN_ID[m.gonderen], body: m.body, created_at: once(0, m.saat),
 }));
 
 /* ------------------------------------------------------------------ */
 /* TABLO KAYDI                                                          */
 /* ------------------------------------------------------------------ */
-const profilSatiri = () => ({ ...DEMO_PROFIL, id: demoUidAl(), created_at: once(60), updated_at: once(1) });
+const profilSatiri = () => ({ ...DEMO_PROFIL, id: DEMO_UID, created_at: once(60), updated_at: once(1) });
 
 /** tablo adı → satır dizisi (ya da async üretici). Burada OLMAYAN her tablo boş [] döner. */
 const TABLOLAR = {
@@ -298,6 +299,11 @@ const RPC_SABIT = {
 };
 
 export async function rpcYaniti(ad, args = {}) {
+  if (ad === "mesaj_kisi_bilgileri") {
+    const tum = [{ id: DEMO_UID, full_name: DEMO_PROFIL.full_name, role: "demo" }, ...SOHBET_PROFILLERI.map(({ id: pid, full_name, role }) => ({ id: pid, full_name, role }))];
+    const istenen = new Set(args.p_ids || []);
+    return tum.filter((k) => istenen.has(k.id));
+  }
   if (ad === "r2_arsiv_ara") {
     const q = String(args.p_q || "").toLocaleLowerCase("tr").trim().split(/\s+/).filter(Boolean);
     return ARSIV_SATIRLARI.filter((s) => !s.sifreli && q.every((t) => s.ad.toLocaleLowerCase("tr").includes(t))).map((s) => ({ ...s }));
