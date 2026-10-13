@@ -824,6 +824,8 @@ function wireYetkiAltSekmeler() {
   sec(sekmeler.find((s) => s.dataset.yaPane === kayitli) || sekmeler[0]);
 }
 
+const ROL_ADLARI_TR = { owner: "Site Sahibi", admin: "Yönetici", manager: "İçerik Sorumlusu", editor: "İçerik Editörü", special_user: "Özel Üye", user: "Üye", demo: "Demo Üye" };
+
 async function init() {
   // Tek, paylaşılan temel oturum/rol kontrolü — role:null, yani sadece
   // giriş yapmış olmak yeterli. Modül-özel rol kısıtları SADECE sidebar
@@ -831,12 +833,14 @@ async function init() {
   // modülün kendi requireAuthOrShowError({role:...}) çağrısı YİNE de
   // (savunma derinliği olarak) çalışmaya devam eder.
   const { profile } = await requireAuthOrShowError({ role: null });
+  // İSİM/ROL ARTIK ERKEN YAZILIR (BUG FİX): eskiden demo yapılandırması (en geç ~6 sn) beklendikten SONRA yazıldığı için
+  // kenar çubuğundaki isim geç geliyordu.
+  document.getElementById("dash-ad-soyad").textContent =
+    profile.full_name || [profile.first_name, profile.last_name].filter(Boolean).join(" ") || profile.email || "";
+  document.getElementById("dash-rol").textContent = isDemoMode ? "Demo / Vitrin Modu" : `Rol: ${ROL_ADLARI_TR[profile.role] || profile.role}`;
   // Demo: görünürlük yapılandırması hazır olmadan menü çizilmez (en geç ~6 sn; başarısızsa varsayılan/önbellek).
   if (isDemoMode) await configHazir();
 
-  document.getElementById("dash-ad-soyad").textContent =
-    profile.full_name || [profile.first_name, profile.last_name].filter(Boolean).join(" ") || profile.email || "";
-  document.getElementById("dash-rol").textContent = isDemoMode ? "Demo / Vitrin Modu" : `Rol: ${profile.role}`;
 
   GIRIS_PROFIL_ROLU = profile.role;
   profile.izinler = await izinleriYukle(profile.role);
