@@ -1,9 +1,11 @@
 /*
- * assets/js/belge-tarayici/belge-tarayici.js — Belge Tarayıcı, Kümülatif Çoklu Birleştirici, Evrensel Sıkıştırma & Bellek Korumalı Dönüştürücü.
+ * assets/js/belge-tarayici/belge-tarayici.js — Belge Tarayıcı & Birleştirici (kompakt arayüz).
  * -----------------------------------------------------------------------
- *  SIFIR SUNUCU MALİYETİ : dosyalar yalnızca bu sekmenin belleğinde işlenir; Worker / Supabase / R2'ye HİÇBİR istek gitmez
+ *  SIFIR SUNUCU MALİYETİ : dosyalar yalnızca bu sekmenin belleğinde işlenir; Worker / Supabase / R2'ye HİÇBİR dosya gitmez
  *                          (tek ağ trafiği: açık kaynak kütüphane kodunun CDN'den indirilmesi; Supabase yalnızca yetki RPC'si için).
- *  GUARD                 : donusturucu_yetkisi_var_mi() (migration 0077) — Dönüştürücü ile aynı anahtar (yeni migration gerekmez).
+ *  GUARD                 : donusturucu_yetkisi_var_mi() (migration 0077) — Dönüştürücü ile aynı anahtar.
+ *  AKIŞ (3 adım)         : 1) Ekle  2) Ayarla (Tarama · Kalite · Çıktı; "Gelişmiş" katlanır)  3) İndir / Paylaş.
+ *  OTOMATİK BELGE        : fotoğraflarda kâğıt algılanır (belge-bul.js), arka plan kesilir, perspektif düzeltilir (WhatsApp "belge tara" gibi).
  *  BELLEK                : bellek-kalkani.js (tuval 0×0, URL revoke, tampon null, sıralı boru hattı).
  * -----------------------------------------------------------------------
  */
@@ -11,12 +13,11 @@ import { supabase, showMessage } from "../core/supabase-client.js";
 import { ayrilmaKancasiKaydet } from "../core/gezinme-kilidi.js";
 import { el, bos, dugme, ilerlemeCubugu, bayt, onayIste, isBaglami, IptalHatasi, hataMetni } from "../donusturucu/ortak.js";
 import { girdiTuru, dosyayiAyikla, KABUL } from "./girdi.js";
-import { ogeyiIsle } from "./tarama.js";
+import { ogeyiIsle, belgeyiAlgila, kosalariDondur } from "./tarama.js";
 import { koseDuzenle } from "./perspektif-arayuz.js";
-import { PROFILLER, COZUNURLUKLER, varsayilanAyar, profilUygula, tahminiBoyut, tuvalBlob, webpDestekli } from "./sikistir.js";
-import { pdfIndir, gorselleriIndir, zipIndir } from "./disa-aktar.js";
-import { tuvalBirak, nesneUrl, urlBirak, bellekDurumu, hepsiniBirak } from "./bellek-kalkani.js";
-import { kosalariDondur } from "./tarama.js";
+import { PROFILLER, COZUNURLUKLER, varsayilanAyar, profilUygula, tahminiBoyut, tuvalBlob } from "./sikistir.js";
+import { uret, indir, paylas, paylasilabilir, toplamBayt } from "./disa-aktar.js";
+import { nesneUrl, urlBirak, bellekDurumu, hepsiniBirak, tuvalBirak } from "./bellek-kalkani.js";
 
 const MAKS_OGE = 300;
 const MAKS_DOSYA = 250 * 1024 * 1024;
@@ -28,44 +29,60 @@ const bildir = (m, t = "info") => { if (!mesajEl) return; if (!m) { mesajEl.hidd
 let ogeler = [];
 let idSayac = 0;
 let ayar = varsayilanAyar();
-let ayikla = null; // isBaglami (yükleme)
-let calisiyor = null; // isBaglami (dışa aktarma)
+let ayikla = null;   // yükleme bağlamı
+let calisiyor = null; // dışa aktarma bağlamı
 let surukleId = null;
+const kartlar = new Map(); // id → <li>
 
 const ilerleme = ilerlemeCubugu();
 const listeEl = el("ul", { class: "bt-izgara", "aria-label": "Sayfa kuyruğu" });
 const sayacEl = el("span", { class: "bt-sayac", role: "status", "aria-live": "polite" });
 const tahminEl = el("output", { class: "bt-tahmin", "aria-live": "polite" });
-const bellekEl = el("span", { class: "dn-muted bt-bellek", title: "Açık tuval ve Object URL sayısı: işlem bitince tuval 0 olmalıdır" });
+const bellekEl = el("span", { class: "bt-bellek", title: "Açık tuval ve Object URL sayısı: işlem bitince tuval 0 olmalıdır" });
 const girdiEl = el("input", { type: "file", multiple: true, accept: KABUL, hidden: true, "aria-label": "Dosya seç" });
 const kameraEl = el("input", { type: "file", accept: "image/*", capture: "environment", hidden: true, "aria-label": "Kamera ile çek" });
 let butonlar = {};
-let kontrolEl = null;
+let bosAlanEl = null;
+let ayarKapEl = null;
+
+const MOD_AD = { sihirli: "Renkli", bw: "Siyah-beyaz", orijinal: "Orijinal" };
+const MOD_SIRA = ["genel", "sihirli", "bw", "orijinal"];
+const etkinMod = (o) => (o.mod && o.mod !== "genel" ? o.mod : ayar.mod);
 
 /* ------------------------------ kuyruk ------------------------------ */
-
-const etkinMod = (o) => (o.mod && o.mod !== "genel" ? o.mod : ayar.mod);
 
 let onizlemeZinciri = Promise.resolve();
 function onizlemeYenile(o) {
   onizlemeZinciri = onizlemeZinciri.then(async () => {
     if (!ogeler.includes(o)) return;
     try {
+      if (o.algi === "bekliyor") await algila(o);
+      if (!ogeler.includes(o)) return;
       const c = await ogeyiIsle(o, { mod: etkinMod(o), maksKenar: 380, maksKisa: 380, kaynakMaksKenar: 1100 });
       try {
         const b = await tuvalBlob(c, "image/jpeg", 0.72);
         const eski = o.onizUrl;
-        o.onizUrl = nesneUrl(b);
-        if (eski) urlBirak(eski);
+        if (ogeler.includes(o)) { o.onizUrl = nesneUrl(b); o.onizHata = null; if (eski) urlBirak(eski); } 
       } finally { tuvalBirak(c); }
     } catch (h) { o.onizHata = h?.message || String(h); }
-    ciz();
+    kartGuncelle(o);
   }).catch(() => {});
   return onizlemeZinciri;
 }
 
+/** Fotoğraftaki belgeyi bulur; bulamazsa kırpma yapılmaz (o.algi = "yok"). */
+async function algila(o) {
+  try {
+    const r = await belgeyiAlgila(o.blob, o.ad, o.dondur || 0);
+    if (r && r.kose) { o.kose = r.kose; o.algi = "otomatik"; } else if (r && r.tam) o.algi = "tam"; else o.algi = "yok";
+  } catch { o.algi = "yok"; }
+}
+
+const algilanabilir = (o) => o.tur === "foto";
+
 function ogeEkle(veri) {
-  const o = { id: ++idSayac, v: 0, dondur: 0, kose: null, mod: "genel", onizUrl: null, ...veri };
+  const o = { id: ++idSayac, v: 0, dondur: 0, kose: null, mod: "genel", onizUrl: null, algi: "atla", ...veri };
+  if (ayar.otoBelge && algilanabilir(o)) o.algi = "bekliyor";
   ogeler.push(o);
   onizlemeYenile(o);
   return o;
@@ -77,6 +94,7 @@ function ogeSil(o) {
   ogeler.splice(i, 1);
   if (o.onizUrl) urlBirak(o.onizUrl);
   o.blob = null; o.onizUrl = null;
+  kartlar.get(o.id)?.remove(); kartlar.delete(o.id);
   tahminiTetikle(); ciz();
 }
 
@@ -88,6 +106,14 @@ function tasi(o, yon) {
 }
 
 function degisti(o) { o.v += 1; onizlemeYenile(o); tahminiTetikle(); }
+
+/** "Belgeyi otomatik bul" anahtarı değişince tüm uygun sayfalar yeniden değerlendirilir; elle yapılan kırpmalara dokunulmaz. */
+function otoBelgeDegisti() {
+  for (const o of ogeler) {
+    if (!algilanabilir(o) || o.algi === "elle") continue;
+    if (ayar.otoBelge) { if (o.algi !== "otomatik") { o.algi = "bekliyor"; degisti(o); } } else if (o.algi === "otomatik" || o.algi === "yok" || o.algi === "tam") { o.kose = null; o.algi = "atla"; degisti(o); }
+  }
+}
 
 async function dosyalariAl(fl) {
   bildir("");
@@ -126,7 +152,7 @@ async function dosyalariAl(fl) {
   }
   tahminiTetikle(); ciz();
   const parcalar = [];
-  if (eklenen) parcalar.push(`${eklenen} sayfa eklendi (toplam ${ogeler.length}).`);
+  if (eklenen) parcalar.push(`${eklenen} sayfa eklendi.`);
   if (uyarilar.length) parcalar.push(uyarilar.join(" "));
   if (red.length) parcalar.push(`Atlanan: ${red.join("; ")}`);
   if (parcalar.length) bildir(parcalar.join(" "), red.length && !eklenen ? "error" : "info");
@@ -135,96 +161,126 @@ async function dosyalariAl(fl) {
 /* ------------------------------ canlı boyut tahmini ------------------------------ */
 
 let tahminZamani = null;
+const ciktiEtiketi = () => (ayar.cikti === "pdf" ? "PDF" : ayar.format === "ayni" ? "Görseller" : ayar.format.toUpperCase());
 function tahminiTetikle() {
   clearTimeout(tahminZamani);
-  if (!ogeler.length) { tahminEl.textContent = "Kuyruk boş."; return; }
-  tahminEl.textContent = "Tahmini boyut hesaplanıyor…";
+  if (!ogeler.length) { tahminEl.textContent = ""; return; }
+  tahminEl.textContent = "Boyut hesaplanıyor…";
   tahminZamani = setTimeout(async () => {
     try {
-      const t = await tahminiBoyut(ogeler.slice(), { ...ayar });
+      const t = await tahminiBoyut(ogeler.slice(), { ...ayar, format: ayar.format === "ayni" ? "jpeg" : ayar.format });
       if (t.iptal) return;
-      const yuzde = (a, b) => (a > 0 ? Math.max(0, Math.round((1 - b / a) * 100)) : 0);
-      const fark = t.pdf <= t.once ? `%${yuzde(t.once, t.pdf)} küçülme` : "kaynağa göre büyür (vektör PDF/küçük kaynak görüntüye çevrilir)";
-      const parca = [`PDF: ${bayt(t.once)} → ~${bayt(t.pdf)} (${fark})`];
-      if (ayar.format !== "jpeg") parcaEkle(parca, t);
-      else parca.push(`Görseller/ZIP: ~${bayt(t.gorsel)}`);
-      tahminEl.textContent = parca.join(" · ");
+      const hedef = ayar.cikti === "pdf" ? t.pdf : t.gorsel;
+      tahminEl.textContent = `${ciktiEtiketi()} ≈ ${bayt(hedef)}${t.once ? ` (kaynak ${bayt(t.once)})` : ""}`;
     } catch (h) { tahminEl.textContent = `Tahmin yapılamadı: ${h.message || h}`; }
   }, 600);
 }
-const parcaEkle = (p, t) => p.push(`${ayar.format.toUpperCase()} görseller/ZIP: ~${bayt(t.gorsel)}`);
 
-/* ------------------------------ arayüz ------------------------------ */
+/* ------------------------------ ayar bileşenleri ------------------------------ */
 
-function secim(etiket, id, secenekler, deger, degisince, yardim) {
+/** Seçenek düğmeli kısa kontrol + seçili seçeneğin tek satırlık açıklaması ("bu ne işe yarar?"). */
+function segment({ baslik, secenekler, deger, degisince }) {
+  const ipucu = el("p", { class: "bt-ipucu" });
+  const dugmeler = secenekler.map(([v, t, aciklama]) => {
+    const b = el("button", { type: "button", class: "bt-seg-btn", "aria-pressed": String(v === deger), text: t });
+    b.dataset.v = v; b.dataset.ipucu = aciklama || "";
+    return b;
+  });
+  const guncelle = (v) => { dugmeler.forEach((b) => { const a = b.dataset.v === v; b.setAttribute("aria-pressed", String(a)); if (a) ipucu.textContent = b.dataset.ipucu; }); };
+  dugmeler.forEach((b) => b.addEventListener("click", () => { guncelle(b.dataset.v); degisince(b.dataset.v); }));
+  guncelle(deger);
+  return { el: el("div", { class: "bt-satir" }, el("span", { class: "bt-satir-baslik", text: baslik }), el("div", { class: "bt-seg", role: "group", "aria-label": baslik }, ...dugmeler), ipucu), guncelle };
+}
+
+function aralik({ id, etiket, aciklama, min, max, adim, deger, bicim, degisince }) {
+  const r = el("input", { type: "range", id, min: String(min), max: String(max), step: String(adim), value: String(deger), "aria-label": etiket });
+  const o = el("output", { for: id, text: bicim(deger) });
+  r.addEventListener("input", () => { o.textContent = bicim(Number(r.value)); degisince(Number(r.value)); });
+  return { r, o, el: el("div", { class: "bt-gel" }, el("div", { class: "bt-gel-ust" }, el("label", { for: id, text: etiket }), o), r, el("p", { class: "bt-ipucu", text: aciklama })) };
+}
+
+function secimAlani(etiket, id, secenekler, deger, degisince, aciklama) {
   const s = el("select", { id, class: "dn-select" }, ...secenekler.map(([v, t]) => el("option", { value: v, text: t })));
   s.value = deger;
   s.addEventListener("change", () => degisince(s.value));
-  return el("div", { class: "bt-alan" }, el("label", { for: id, text: etiket }), s, yardim ? el("small", { class: "dn-muted", text: yardim }) : null);
+  return { s, el: el("div", { class: "bt-gel" }, el("label", { for: id, text: etiket }), s, el("p", { class: "bt-ipucu", text: aciklama })) };
 }
 
 function ayarKarti() {
-  const profilBtn = Object.entries(PROFILLER).map(([k, p]) => {
-    const b = dugme({ metin: p.ad, class: "bt-profil", "aria-pressed": ayar.profil === k ? "true" : "false", title: p.aciklama });
-    b.dataset.profil = k;
-    b.append(el("small", { class: "dn-muted", text: `${p.dpi} DPI · %${p.kalite}` }));
-    b.addEventListener("click", () => { ayar = profilUygula(ayar, k); ayarCiz(); ogeler.forEach((o) => onizlemeYenile(o)); tahminiTetikle(); });
-    return b;
-  });
-  const kalite = el("input", { type: "range", id: "bt-kalite", min: "10", max: "100", step: "1", value: String(ayar.kalite), "aria-label": "Görsel kalitesi yüzdesi" });
-  const kaliteDeger = el("output", { for: "bt-kalite", text: `%${ayar.kalite}` });
-  kalite.addEventListener("input", () => { ayar.kalite = Number(kalite.value); ayar.profil = "ozel"; kaliteDeger.textContent = `%${ayar.kalite}`; profilIsaret(); tahminiTetikle(); });
-  const dpi = el("input", { type: "range", id: "bt-dpi", min: "72", max: "300", step: "2", value: String(ayar.dpi), "aria-label": "A4 çözünürlüğü (DPI)" });
-  const dpiDeger = el("output", { for: "bt-dpi", text: `${ayar.dpi} DPI` });
-  dpi.addEventListener("input", () => { ayar.dpi = Number(dpi.value); ayar.profil = "ozel"; dpiDeger.textContent = `${ayar.dpi} DPI`; profilIsaret(); tahminiTetikle(); });
-  const profilIsaret = () => profilBtn.forEach((b) => b.setAttribute("aria-pressed", ayar.profil === b.dataset.profil ? "true" : "false"));
-  const cozunurluk = secim("Maksimum çözünürlük", "bt-cozunurluk", Object.entries(COZUNURLUKLER), ayar.cozunurluk, (v) => { ayar.cozunurluk = v; ayar.profil = "ozel"; profilIsaret(); dpi.disabled = v !== "a4"; tahminiTetikle(); });
-  dpi.disabled = ayar.cozunurluk !== "a4";
-  const mod = secim("Tarama modu", "bt-mod", [["orijinal", "Orijinal"], ["sihirli", "Renkli Temiz Belge (Magic Color)"], ["bw", "B&W Tarayıcı"]], ayar.mod, (v) => { ayar.mod = v; ogeler.forEach((o) => onizlemeYenile(o)); tahminiTetikle(); });
-  const format = secim("Görsel/ZIP biçimi", "bt-format", [["jpeg", "JPEG"], ["webp", "WebP"], ["png", "PNG (kayıpsız, kalite uygulanmaz)"]], ayar.format, (v) => { ayar.format = v; tahminiTetikle(); }, "PDF her zaman JPEG gömer.");
-  const sayfa = secim("PDF sayfa boyutu", "bt-sayfa", [["a4", "A4 (sığdır, ortala)"], ["gorsel", "Görsel boyutunda"]], ayar.sayfa, (v) => { ayar.sayfa = v; });
-  const zip = secim("ZIP sıkıştırma (DEFLATE)", "bt-zip", [["6", "Seviye 6 (hızlı)"], ["7", "Seviye 7"], ["8", "Seviye 8"], ["9", "Seviye 9 (en küçük)"]], String(ayar.zipSeviye), (v) => { ayar.zipSeviye = Number(v); }, "JPEG zaten sıkışıktır; kazanç küçüktür.");
-  webpDestekli().then((ok) => { if (!ok) { const o = format.querySelector('option[value="webp"]'); if (o) o.textContent = "WebP (bu tarayıcıda yok → JPEG)"; } });
+  const yenidenIsle = () => { ogeler.forEach((o) => onizlemeYenile(o)); tahminiTetikle(); };
+
+  const oto = el("input", { type: "checkbox", id: "bt-oto", role: "switch", class: "bt-anahtar" });
+  oto.checked = ayar.otoBelge;
+  oto.addEventListener("change", () => { ayar.otoBelge = oto.checked; otoBelgeDegisti(); });
+  const otoSatir = el("label", { class: "bt-oto", for: "bt-oto" },
+    el("span", {}, el("strong", { text: "Belgeyi otomatik bul ve arka planı kes" }),
+      el("small", { text: "Fotoğraftaki kâğıdı algılar, masa/el gibi arka planı atar, eğik çekimi düzleştirir. PDF ve taramalara uygulanmaz." })), oto);
+
+  const tarama = segment({ baslik: "Tarama", deger: ayar.mod, secenekler: [
+    ["sihirli", "Renkli temiz", "Gölgeyi ve sararmayı siler, kâğıdı beyazlatır; mühür/imza rengi korunur. Faturalar için en iyisi."],
+    ["bw", "Siyah-beyaz", "Fotokopi gibi keskin siyah yazı; dosya en küçük. Düz metin belgeleri için."],
+    ["orijinal", "Orijinal", "Renklere dokunmaz (yalnızca kırpma/düzeltme). Fotoğraf ve renkli çizimler için."]],
+  degisince: (v) => { ayar.mod = v; yenidenIsle(); } });
+
+  const kalite = segment({ baslik: "Kalite", deger: ayar.profil, secenekler: Object.entries(PROFILLER).map(([k, p]) => [k, p.ad.replace(" (Önerilen)", ""), `${p.aciklama} · ${p.dpi} DPI · %${p.kalite}. ${k === "web" ? "E-posta/form yüklemek için küçük dosya." : k === "dengeli" ? "Çoğu iş için ideal." : "Arşiv; en büyük dosya."}`]),
+    degisince: (v) => { ayar = profilUygula(ayar, v); ayarCiz(); yenidenIsle(); } });
+
+  const cikti = segment({ baslik: "Çıktı", deger: ayar.cikti === "pdf" ? "pdf" : ayar.format, secenekler: [
+    ["pdf", "PDF", "Tüm sayfalar tek PDF dosyası."],
+    ["jpeg", "JPG", "Her sayfa ayrı JPG görsel (küçük, her yerde açılır)."],
+    ["png", "PNG", "Kayıpsız görsel; büyük dosya, kalite ayarı uygulanmaz."],
+    ["webp", "WebP", "JPG'den küçük modern görsel (bazı eski uygulamalar açamaz)."],
+    ["ayni", "Aynı biçim", "Her sayfa yüklediğin dosyanın biçiminde (JPG→JPG, PNG→PNG; PDF/HEIC → JPG) çıkar."]],
+  degisince: (v) => { if (v === "pdf") ayar.cikti = "pdf"; else { ayar.cikti = "gorsel"; ayar.format = v; } paketSatiri.hidden = ayar.cikti === "pdf"; eylemGuncelle(); tahminiTetikle(); } });
+
+  const paket = segment({ baslik: "Paket", deger: ayar.paket, secenekler: [["zip", "ZIP", "Görseller tek ZIP dosyasında iner."], ["tek", "Tek tek", "Her görsel ayrı iner (tarayıcı birden çok indirme için izin isteyebilir)."]],
+    degisince: (v) => { ayar.paket = v; eylemGuncelle(); } });
+  const paketSatiri = paket.el; paketSatiri.hidden = ayar.cikti === "pdf";
+
+  // Gelişmiş
+  const kal = aralik({ id: "bt-kalite", etiket: "Görsel kalitesi", aciklama: "Yüksek = net ama büyük dosya. 80 çoğu belge için fark edilmez; 55 altı yazıda bulanıklık yapabilir.", min: 10, max: 100, adim: 1, deger: ayar.kalite, bicim: (v) => `%${v}`,
+    degisince: (v) => { ayar.kalite = v; ayar.profil = "ozel"; kalite.guncelle("ozel"); tahminiTetikle(); } });
+  const dpi = aralik({ id: "bt-dpi", etiket: "A4 yoğunluğu (DPI)", aciklama: "Sayfanın piksel yoğunluğu. 150-200 ekran/e-posta, 300 baskı. Küçük kaynak büyütülmez.", min: 72, max: 300, adim: 2, deger: ayar.dpi, bicim: (v) => `${v} DPI`,
+    degisince: (v) => { ayar.dpi = v; ayar.profil = "ozel"; kalite.guncelle("ozel"); tahminiTetikle(); } });
+  const coz = secimAlani("Çözünürlük sınırı", "bt-cozunurluk", Object.entries(COZUNURLUKLER), ayar.cozunurluk, (v) => { ayar.cozunurluk = v; ayar.profil = "ozel"; kalite.guncelle("ozel"); dpi.r.disabled = v !== "a4"; tahminiTetikle(); }, "Sayfanın en fazla ulaşacağı boyut. \"A4\" seçiliyken yukarıdaki DPI geçerlidir.");
+  dpi.r.disabled = ayar.cozunurluk !== "a4";
+  const sayfa = secimAlani("PDF sayfa boyutu", "bt-sayfa", [["a4", "A4 (sığdır, ortala)"], ["gorsel", "Görsel boyutunda"]], ayar.sayfa, (v) => { ayar.sayfa = v; }, "A4: standart yazdırılabilir sayfa. Görsel boyutu: kenar boşluğu olmayan, belgenin kendi ölçüsü.");
+  const zip = secimAlani("ZIP sıkıştırma", "bt-zip", [["6", "Seviye 6 (hızlı)"], ["7", "Seviye 7"], ["8", "Seviye 8"], ["9", "Seviye 9 (en küçük)"]], String(ayar.zipSeviye), (v) => { ayar.zipSeviye = Number(v); }, "JPG zaten sıkışıktır; kazanç küçüktür.");
+
+  const gelismis = el("details", { class: "bt-gelismis" }, el("summary", { text: "Gelişmiş ayarlar" }), el("div", { class: "bt-gel-izgara" }, kal.el, dpi.el, coz.el, sayfa.el, zip.el));
+
   return el("section", { class: "dn-kart bt-ayarlar", "aria-labelledby": "bt-ayar-baslik" },
-    el("h3", { id: "bt-ayar-baslik", text: "⚙️ Çıktı & Sıkıştırma" }),
-    el("div", { class: "bt-profiller", role: "group", "aria-label": "Hızlı profiller" }, ...profilBtn),
-    el("div", { class: "bt-alan bt-alan--aralik" }, el("label", { for: "bt-kalite", text: "Görsel kalitesi" }), kalite, kaliteDeger),
-    el("div", { class: "bt-alan bt-alan--aralik" }, el("label", { for: "bt-dpi", text: "A4 yoğunluğu" }), dpi, dpiDeger),
-    el("div", { class: "bt-ayar-izgara" }, cozunurluk, mod, format, sayfa, zip),
-    el("div", { class: "bt-tahmin-kutu" }, el("strong", { text: "Tahmini boyut: " }), tahminEl));
+    el("h3", { id: "bt-ayar-baslik", text: "Ayarlar" }), otoSatir, tarama.el, kalite.el, cikti.el, paketSatiri, gelismis);
 }
 
-function ayarCiz() { const eski = document.querySelector(".bt-ayarlar"); if (eski) eski.replaceWith(ayarKarti()); }
+function ayarCiz() { const eski = ayarKapEl?.querySelector(".bt-ayarlar"); const yeni = ayarKarti(); if (eski) eski.replaceWith(yeni); else ayarKapEl?.append(yeni); }
 
-function kartCiz(o, i) {
-  const sil = dugme({ ikon: "✕", kucuk: true, tur: "hayalet", "aria-label": `${o.ad} sayfasını kaldır`, title: "Kaldır" });
-  const sol = dugme({ ikon: "◀", kucuk: true, tur: "hayalet", "aria-label": "Öne al", title: "Öne al" });
-  const sag = dugme({ ikon: "▶", kucuk: true, tur: "hayalet", "aria-label": "Sona al", title: "Sona al" });
-  const don = dugme({ ikon: "↻", kucuk: true, tur: "hayalet", "aria-label": "90° döndür", title: "90° döndür" });
-  const kose = dugme({ ikon: "✂", kucuk: true, tur: "hayalet", "aria-label": "Köşeleri düzelt (perspektif)", title: "Köşeleri düzelt", ...(o.kose ? { "aria-pressed": "true" } : {}) });
-  sil.disabled = !!calisiyor; sol.disabled = i === 0; sag.disabled = i === ogeler.length - 1;
-  sil.addEventListener("click", () => ogeSil(o));
-  sol.addEventListener("click", () => tasi(o, -1));
-  sag.addEventListener("click", () => tasi(o, 1));
-  don.addEventListener("click", () => { o.dondur = (o.dondur + 90) % 360; if (o.kose) o.kose = kosalariDondur(o.kose, 1); degisti(o); });
-  kose.addEventListener("click", async () => {
-    try {
-      const k = await koseDuzenle(o);
-      if (k) { o.kose = k; degisti(o); ciz(); }
-    } catch (h) { bildir(h.message || String(h), "error"); }
+/* ------------------------------ sayfa kartları ------------------------------ */
+
+function durumMetni(o) {
+  if (o.algi === "bekliyor") return ["bt-durum--bekle", "Belge aranıyor…"];
+  if (o.algi === "otomatik") return ["bt-durum--iyi", "✓ Belge kesildi"];
+  if (o.algi === "elle") return ["bt-durum--iyi", "✂ Elle ayarlandı"];
+  if (o.algi === "yok") return ["bt-durum--uyari", "Kenar bulunamadı · ayarla"];
+  return ["", ""];
+}
+
+function kartOlustur(o) {
+  const btn = (ikon, ad, fn) => { const b = dugme({ ikon, kucuk: true, tur: "hayalet", "aria-label": ad, title: ad }); b.addEventListener("click", (e) => { e.stopPropagation(); fn(); }); return b; };
+  const sol = btn("◀", "Öne al", () => tasi(o, -1));
+  const sag = btn("▶", "Sona al", () => tasi(o, 1));
+  const don = btn("↻", "90° döndür", () => { o.dondur = (o.dondur + 90) % 360; if (o.kose) o.kose = kosalariDondur(o.kose, 1); degisti(o); });
+  const mod = btn("◐", "Bu sayfanın tarama modunu değiştir (genel → renkli → siyah-beyaz → orijinal)", () => { o.mod = MOD_SIRA[(MOD_SIRA.indexOf(o.mod) + 1) % MOD_SIRA.length]; degisti(o); });
+  const kes = btn("✂", "Kenarları düzelt (4 köşe)", async () => {
+    try { const k = await koseDuzenle(o); if (k) { o.kose = k; o.algi = "elle"; degisti(o); } } catch (h) { bildir(h.message || String(h), "error"); }
   });
-  const modSec = el("select", { class: "dn-select bt-oge-mod", "aria-label": `${o.ad} için tarama modu` },
-    ...[["genel", "Genel mod"], ["orijinal", "Orijinal"], ["sihirli", "Magic Color"], ["bw", "B&W"]].map(([v, t]) => el("option", { value: v, text: t })));
-  modSec.value = o.mod;
-  modSec.addEventListener("change", () => { o.mod = modSec.value; degisti(o); });
-  const gorsel = o.onizUrl
-    ? el("img", { class: "bt-kucuk", src: o.onizUrl, alt: `Sayfa ${i + 1}: ${o.ad}`, draggable: "false" })
-    : el("div", { class: "bt-kucuk bt-kucuk--bos", text: o.onizHata ? "Önizleme yok" : "…" });
-  const li = el("li", { class: "bt-kart", draggable: "true", "data-id": String(o.id) },
-    el("span", { class: "bt-sira", text: String(i + 1) }), gorsel,
-    el("span", { class: "bt-ad", title: o.ad, text: o.ad }),
-    el("span", { class: "dn-muted bt-meta", text: `${o.w}×${o.h}${o.kose ? " · düzeltildi" : ""}` }),
-    modSec, el("div", { class: "bt-kart-eylem" }, sol, sag, don, kose, sil));
+  const sil = btn("✕", "Sayfayı kaldır", () => ogeSil(o));
+  const resimKap = el("div", { class: "bt-resim" });
+  const sira = el("span", { class: "bt-sira" });
+  const durum = el("span", { class: "bt-durum" });
+  const ad = el("span", { class: "bt-ad", title: o.ad, text: o.ad });
+  const li = el("li", { class: "bt-kart", draggable: "true", "data-id": String(o.id) }, sira, resimKap, durum, ad, el("div", { class: "bt-kart-eylem" }, sol, sag, don, mod, kes, sil));
+  resimKap.addEventListener("click", () => kes.click());
   li.addEventListener("dragstart", (e) => { surukleId = o.id; li.classList.add("bt-surukleniyor"); try { e.dataTransfer.setData("text/plain", String(o.id)); e.dataTransfer.effectAllowed = "move"; } catch { /* yok say */ } });
   li.addEventListener("dragend", () => { surukleId = null; li.classList.remove("bt-surukleniyor"); });
   li.addEventListener("dragover", (e) => { if (surukleId != null) { e.preventDefault(); li.classList.add("bt-hedef"); } });
@@ -239,33 +295,61 @@ function kartCiz(o, i) {
     ogeler.splice(ogeler.indexOf(o), 0, kaynak);
     ciz();
   });
+  li._ref = { sol, sag, sil, sira, resimKap, durum, mod, ad };
   return li;
 }
 
-function ciz() {
-  bos(listeEl);
-  ogeler.forEach((o, i) => listeEl.append(kartCiz(o, i)));
-  const toplam = ogeler.reduce((a, o) => a + (o.orijinalBayt || 0), 0);
-  sayacEl.textContent = ogeler.length ? `${ogeler.length} sayfa · kaynak ${bayt(toplam)}` : "Kuyruk boş — dosya ekle.";
-  const durum = bellekDurumu();
-  bellekEl.textContent = `RAM kalkanı: ${durum.tuval} açık tuval · ${durum.url} açık URL`;
-  const bos0 = !ogeler.length; const mesgul = !!calisiyor || !!ayikla;
-  for (const [ad, b] of Object.entries(butonlar)) b.disabled = ad === "iptal" ? !(calisiyor || ayikla) : (bos0 || mesgul);
-  if (butonlar.temizle) butonlar.temizle.disabled = bos0 || mesgul;
+/** Tek kartın içeriğini günceller (tüm listeyi yeniden kurmaz → önizleme gelince titreme/yeniden çizim yok). */
+function kartGuncelle(o) {
+  const li = kartlar.get(o.id); if (!li) return;
+  const r = li._ref;
+  const img = r.resimKap.firstElementChild;
+  if (o.onizUrl) {
+    if (img?.tagName === "IMG") { if (img.getAttribute("src") !== o.onizUrl) img.src = o.onizUrl; } else r.resimKap.replaceChildren(el("img", { class: "bt-kucuk", src: o.onizUrl, alt: `Sayfa: ${o.ad}`, draggable: "false" }));
+  } else if (!img || img.tagName === "IMG") r.resimKap.replaceChildren(el("div", { class: "bt-kucuk bt-kucuk--bos", text: o.onizHata ? "Önizleme yok" : "…" }));
+  const [sinif, metin] = durumMetni(o);
+  r.durum.className = `bt-durum ${sinif}`; r.durum.textContent = metin;
+  const m = o.mod !== "genel" ? ` · ${MOD_AD[o.mod]}` : "";
+  r.ad.textContent = `${o.ad}${m}`;
+  r.mod.classList.toggle("bt-aktif", o.mod !== "genel");
 }
 
-function dropzone() {
+function ciz() {
+  const sirali = [];
+  ogeler.forEach((o, i) => {
+    let li = kartlar.get(o.id);
+    if (!li) { li = kartOlustur(o); kartlar.set(o.id, li); kartGuncelle(o); }
+    li._ref.sira.textContent = String(i + 1);
+    li._ref.sol.disabled = i === 0; li._ref.sag.disabled = i === ogeler.length - 1; li._ref.sil.disabled = !!calisiyor;
+    sirali.push(li);
+  });
+  listeEl.replaceChildren(...sirali);
+  const toplam = ogeler.reduce((a, o) => a + (o.orijinalBayt || 0), 0);
+  sayacEl.textContent = ogeler.length ? `${ogeler.length} sayfa · kaynak ${bayt(toplam)}` : "Henüz sayfa yok";
+  const durum = bellekDurumu();
+  bellekEl.textContent = `RAM: ${durum.tuval} tuval · ${durum.url} URL`;
+  const bos0 = !ogeler.length; const mesgul = !!calisiyor || !!ayikla;
+  if (bosAlanEl) bosAlanEl.hidden = !bos0;
+  listeEl.hidden = bos0;
+  if (ayarKapEl) ayarKapEl.hidden = bos0;
+  for (const [ad, b] of Object.entries(butonlar)) b.disabled = ad === "iptal" ? !(calisiyor || ayikla) : (ad === "ekle" || ad === "kamera") ? !!calisiyor : (bos0 || mesgul);
+}
+
+function bosAlan() {
   const dz = el("div", { class: "dn-dropzone bt-dropzone", role: "button", tabindex: "0", "aria-label": "Dosya eklemek için tıkla ya da dosyaları buraya bırak" },
     el("span", { class: "dn-dropzone-ikon", "aria-hidden": "true", text: "🗂️" }),
-    el("strong", { text: "Sayfaları buraya bırak ya da eklemek için dokun" }),
-    el("span", { class: "dn-muted", text: "JPG, PNG, WebP, TIFF, HEIC, PDF, DOCX (içindeki görseller). Yeni dosyalar listenin sonuna EKLENİR; mevcut sayfalar silinmez." }));
+    el("strong", { text: "Belge fotoğrafı, PDF veya Word ekle" }),
+    el("span", { class: "dn-muted", text: "Sürükle-bırak ya da dokun. JPG, PNG, WebP, HEIC, TIFF, PDF, DOCX. Yeni dosyalar listenin sonuna eklenir." }));
   dz.addEventListener("click", () => girdiEl.click());
   dz.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); girdiEl.click(); } });
-  const dosyaMi = (e) => [...(e.dataTransfer?.types || [])].includes("Files");
-  for (const o of ["dragenter", "dragover"]) dz.addEventListener(o, (e) => { if (dosyaMi(e)) { e.preventDefault(); dz.classList.add("dn-surukle"); } });
-  for (const o of ["dragleave", "drop"]) dz.addEventListener(o, () => dz.classList.remove("dn-surukle"));
-  dz.addEventListener("drop", (e) => { if (dosyaMi(e)) { e.preventDefault(); dosyalariAl([...e.dataTransfer.files]); } });
   return dz;
+}
+
+function bagliSurukle(hedef) {
+  const dosyaMi = (e) => [...(e.dataTransfer?.types || [])].includes("Files");
+  for (const o of ["dragenter", "dragover"]) hedef.addEventListener(o, (e) => { if (dosyaMi(e)) { e.preventDefault(); hedef.classList.add("dn-surukle"); } });
+  for (const o of ["dragleave", "drop"]) hedef.addEventListener(o, () => hedef.classList.remove("dn-surukle"));
+  hedef.addEventListener("drop", (e) => { if (dosyaMi(e)) { e.preventDefault(); dosyalariAl([...e.dataTransfer.files]); } });
 }
 
 girdiEl.addEventListener("change", () => { dosyalariAl([...girdiEl.files]); girdiEl.value = ""; });
@@ -273,41 +357,48 @@ kameraEl.addEventListener("change", () => { dosyalariAl([...kameraEl.files]); ka
 
 /* ------------------------------ dışa aktarma ------------------------------ */
 
-async function aktar(ad, fn, etiket) {
+async function aktar(paylasim) {
   if (calisiyor || !ogeler.length) return;
   bildir("");
   const ctx = isBaglami((o, m) => ilerleme.ayarla(o, m));
   calisiyor = ctx; ciz();
   ilerleme.ayarla(0, "Başlıyor…");
   try {
-    const r = await fn(ogeler.slice(), { ...ayar }, ctx);
-    bildir(`${etiket} hazır: ${r.adet} sayfa, ${bayt(r.boyut)}.${r.not ? ` ${r.not}` : ""}`, "success");
+    const r = await uret(ogeler.slice(), { ...ayar }, ctx);
+    const boyut = toplamBayt(r.dosyalar);
+    let sonuc = "indirildi";
+    if (paylasim) {
+      try { await paylas(r.dosyalar); sonuc = "paylaşıldı"; } catch (h) {
+        if (h?.name === "AbortError") sonuc = "iptal";
+        else { await indir(r.dosyalar, ctx); sonuc = "indirildi (paylaşım bu tarayıcıda/an kullanılamadı)"; }
+      }
+    } else await indir(r.dosyalar, ctx);
+    if (sonuc !== "iptal") bildir(`${ciktiEtiketi()} ${sonuc}: ${ogeler.length} sayfa, ${bayt(boyut)}.${r.not ? ` ${r.not}` : ""}`, "success");
   } catch (h) {
     if (h instanceof IptalHatasi) bildir("İşlem iptal edildi; geçici bellek serbest bırakıldı.", "info");
-    else bildir(`${etiket} oluşturulamadı: ${hataMetni(h)}`, "error");
+    else bildir(`Oluşturulamadı: ${hataMetni(h)}`, "error");
   } finally {
     calisiyor = null; ilerleme.gizle(); ciz();
   }
 }
 
+function eylemGuncelle() {
+  if (!butonlar.indir) return;
+  const m = butonlar.indir.querySelector(".dn-btn-metin");
+  if (m) m.textContent = ayar.cikti === "pdf" ? "PDF indir" : ayar.paket === "tek" || ogeler.length === 1 ? `${ciktiEtiketi()} indir` : `${ciktiEtiketi()} (ZIP) indir`;
+}
+
 function eylemKarti() {
   const mk = (ad, ikon, metin, tur) => (butonlar[ad] = dugme({ ikon, metin, tur }));
-  const pdf = mk("pdf", "📄", "PDF indir", "birincil");
-  const gor = mk("gorsel", "🖼️", "Görselleri tek tek indir");
-  const zip = mk("zip", "🗜️", "ZIP olarak indir");
-  const iptal = mk("iptal", "⏹️", "İptal et");
-  const temizle = mk("temizle", "🗑️", "Kuyruğu boşalt", "tehlike-hafif");
-  pdf.addEventListener("click", () => aktar("pdf", pdfIndir, "PDF"));
-  gor.addEventListener("click", () => aktar("gorsel", gorselleriIndir, "Görseller"));
-  zip.addEventListener("click", () => aktar("zip", zipIndir, "ZIP"));
+  const ind = mk("indir", "⬇️", "PDF indir", "birincil");
+  const pay = mk("paylas", "📤", "Paylaş");
+  const iptal = mk("iptal", "⏹️", "İptal");
+  ind.addEventListener("click", () => aktar(false));
+  pay.addEventListener("click", () => aktar(true));
   iptal.addEventListener("click", () => { ayikla?.iptal(); calisiyor?.iptal(); });
-  temizle.addEventListener("click", async () => {
-    if (!(await onayIste({ baslik: "Kuyruk boşaltılsın mı?", metin: "Tüm sayfalar bellekten silinir.", tamam: "Boşalt", tehlike: true }))) return;
-    oturumuSifirla(); bildir("Kuyruk boşaltıldı, bellek temizlendi.", "success");
-  });
-  return el("section", { class: "dn-kart", "aria-labelledby": "bt-aktar-baslik" },
-    el("h3", { id: "bt-aktar-baslik", text: "📤 Dışa aktar" }),
-    el("div", { class: "bt-eylemler" }, pdf, gor, zip, iptal, temizle), ilerleme.el);
+  const destek = typeof navigator !== "undefined" && typeof navigator.share === "function" && typeof navigator.canShare === "function";
+  pay.hidden = !destek; // yalnızca dosya paylaşımı destekleyen cihazda (telefon/Safari/Chrome Android) görünür
+  return el("div", { class: "bt-eylemler" }, el("div", { class: "bt-eylem-dugmeler" }, ind, pay, iptal), tahminEl, ilerleme.el);
 }
 
 /* ------------------------------ bellek / yaşam döngüsü ------------------------------ */
@@ -315,9 +406,9 @@ function eylemKarti() {
 function oturumuSifirla() {
   ayikla?.iptal(); calisiyor?.iptal();
   for (const o of ogeler) { if (o.onizUrl) urlBirak(o.onizUrl); o.blob = null; o.onizUrl = null; }
-  ogeler = [];
+  ogeler = []; kartlar.clear();
   hepsiniBirak();
-  tahminEl.textContent = "Kuyruk boş.";
+  tahminEl.textContent = "";
   ciz();
 }
 
@@ -327,16 +418,14 @@ function ayrilirkenSor() {
     .then((ok) => { if (ok) oturumuSifirla(); return ok; });
 }
 
-/** Erişim ayarı TEK yerdedir (Yetki Ayarları); yalnızca yönetebilene yönlendirme notu. Karar veritabanındadır. */
 async function yonetimNotu() {
   const { data } = await supabase.rpc("donusturucu_yonetim_yetkisi_var_mi");
   if (data !== true) return null;
-  return el("p", { class: "dn-muted" }, "Bu aracın kimler tarafından kullanılabileceği tek yerden yönetilir: ", el("a", { href: "#sys-yetki", text: "Sistem & Güvenlik → Yetki Ayarları" }), ".");
+  return el("p", { class: "dn-muted", }, "Bu aracı kimlerin kullanabileceği: ", el("a", { href: "#sys-yetki", text: "Sistem & Güvenlik → Yetki Ayarları" }), ".");
 }
 
 async function kur() {
   if (!kok) return;
-  // GUARD (derinlemesine savunma): yetki yoksa hiçbir arayüz/kütüphane yüklenmez.
   const { data: yetkili, error } = await supabase.rpc("donusturucu_yetkisi_var_mi");
   if (error) { kok.replaceChildren(el("p", { class: "auth-message error", text: hataMetni(error) })); return; }
   if (yetkili !== true) {
@@ -344,18 +433,27 @@ async function kur() {
     return;
   }
   kok.classList.add("dn-kok", "bt-kok");
-  const rozet = el("div", { class: "dn-gizlilik", role: "note" }, el("span", { "aria-hidden": "true", text: "🔒" }),
-    el("span", {}, el("b", { text: "Sıfır sunucu isteği: dosyalar cihazından çıkmaz." }), " Tarama, sıkıştırma ve birleştirme tarayıcında yapılır; Worker/Supabase/R2'ye dosya gönderilmez."));
-  const sifirla = dugme({ metin: "Oturumu Sıfırla", ikon: "🧹", class: "dn-sifirla", title: "Tüm sayfaları, önizlemeleri ve tuvalleri bellekten siler" });
-  sifirla.addEventListener("click", async () => {
-    if (!ogeler.length) { bildir("Bellekte silinecek sayfa yok.", "info"); return; }
-    if (await onayIste({ baslik: "Oturum sıfırlansın mı?", metin: "Kuyruktaki tüm sayfalar bellekten silinecek.", tamam: "Sıfırla ve sil", tehlike: true })) { oturumuSifirla(); bildir("Oturum sıfırlandı.", "success"); }
-  });
-  const kamera = dugme({ metin: "Kamera ile çek", ikon: "📷" });
+
+  const ekle = dugme({ metin: "Dosya ekle", ikon: "＋", tur: "birincil" });
+  const kamera = dugme({ metin: "Kamera", ikon: "📷" });
+  const bosalt = dugme({ metin: "Boşalt", ikon: "🗑️", tur: "hayalet", title: "Tüm sayfaları, önizlemeleri ve tuvalleri bellekten siler" });
+  butonlar.ekle = ekle; butonlar.kamera = kamera; butonlar.bosalt = bosalt;
+  ekle.addEventListener("click", () => girdiEl.click());
   kamera.addEventListener("click", () => kameraEl.click());
-  kontrolEl = el("div", { class: "bt-seritler" }, sayacEl, kamera);
-  kok.replaceChildren(rozet, el("div", { class: "dn-guvenli-serit" }, sifirla, bellekEl), dropzone(), kontrolEl, listeEl, ayarKarti(), eylemKarti(), girdiEl, kameraEl);
-  ciz(); tahminiTetikle();
+  bosalt.addEventListener("click", async () => {
+    if (!ogeler.length) return;
+    if (await onayIste({ baslik: "Kuyruk boşaltılsın mı?", metin: "Tüm sayfalar bellekten silinir.", tamam: "Boşalt", tehlike: true })) { oturumuSifirla(); bildir("Kuyruk boşaltıldı, bellek temizlendi.", "success"); }
+  });
+
+  const gizlilik = el("p", { class: "bt-gizlilik" }, "🔒 Dosyaların cihazından çıkmaz; her şey tarayıcında işlenir.");
+  const ust = el("div", { class: "bt-ust" }, el("div", { class: "bt-ust-sol" }, ekle, kamera, sayacEl), el("div", { class: "bt-ust-sag" }, bellekEl, bosalt));
+  bosAlanEl = bosAlan();
+  ayarKapEl = el("div", { class: "bt-ayar-kap" });
+  const eylem = el("section", { class: "dn-kart bt-eylem-kart" }, eylemKarti());
+  ayarKapEl.append(ayarKarti(), eylem);
+  kok.replaceChildren(gizlilik, ust, bosAlanEl, listeEl, ayarKapEl, girdiEl, kameraEl);
+  bagliSurukle(kok);
+  ciz(); eylemGuncelle();
   yonetimNotu().then((n) => { if (n) kok.append(n); }).catch(() => {});
   window.addEventListener("pagehide", () => { try { oturumuSifirla(); } catch { /* yok say */ } });
   ayrilmaKancasiKaydet("tool-belge-tarayici", ayrilirkenSor);
