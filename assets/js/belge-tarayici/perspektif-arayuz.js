@@ -81,7 +81,7 @@ export async function koseDuzenle(oge) {
       otomatik.disabled = true; not.textContent = "Kâğıt kenarları aranıyor…";
       try {
         const k = await otomatikKose(tuval);
-        if (k) { kose = k; cizUst(-1); not.textContent = "Köşeler bulundu; gerekirse pinleri ince ayarla."; } else not.textContent = "Otomatik algılanamadı (arka plan–kâğıt kontrastı düşük). Pinleri elle yerleştir.";
+        if (k) { kose = k; cizUst(-1); not.textContent = "Köşeler bulundu; gerekirse pinleri ince ayarla."; } else not.textContent = "Belge sınırı güvenle bulunamadı (arka plan kâğıtla çok benzer olabilir). Pinleri elle yerleştir.";
       } finally { otomatik.disabled = false; }
     });
     sifirla.addEventListener("click", () => { kose = VARSAYILAN_KOSELER(); cizUst(-1); not.textContent = ""; });
