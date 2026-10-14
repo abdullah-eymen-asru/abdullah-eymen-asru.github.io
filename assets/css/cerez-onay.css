@@ -293,3 +293,8 @@ body.cerez-panel-acik { overflow: hidden; }
 @media (max-width: 360px) {
   .cerez-banner-aksiyonlar { grid-template-columns: 1fr; }
 }
+
+/* 2026-10: sabit çerez bandı sayfanın alt içeriğini (ör. panel sonuç listeleri) örtüyordu.
+   Bant görünürken sayfaya bandın yüksekliği kadar alt boşluk eklenir (kapanınca kendiliğinden kalkar). */
+body:has(#cerez-banner:not([hidden])) { padding-bottom: 190px; }
+@media (max-width: 700px) { body:has(#cerez-banner:not([hidden])) { padding-bottom: 320px; } }
