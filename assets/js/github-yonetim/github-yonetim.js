@@ -97,6 +97,7 @@
  *   deploy ettikten sonra bu değeri kendi Worker adresinle değiştirmen
  *   gerekir (bkz. Worker dosyasının başındaki ortam değişkeni listesi).
  */
+import { yetkiBilgiKur } from "./yetki-bilgi.js";
 import { requireAuthOrShowError } from "../auth/auth-guard.js";
 import { escapeHtml, showMessage, supabase, kucukHarfeCevirTr, kullaniciAramayaUyuyorMu } from "../core/supabase-client.js";
 
@@ -5715,12 +5716,15 @@ async function yetkiAyarlariTablosunuYukle() {
     // oluşturur (ilk görülme sırasına göre, katalog sırasını takip eder).
     // Yetkili admin, admin rolünün anahtarlarını göremez/değiştiremez (kendi yetkisini genişletemez).
     const yaRoller = (o) => (o.rolSutunlari || ["admin"]).filter((r) => sahipMi || (r !== "admin" && r !== "owner"));
+    // ALFABETİK DÜZEN (Türkçe sıralama): özellik başlıkları ve rol sütunları A→Z; "Tüm roller" sütunu hep en sonda.
+    const KATALOG_ALFABETIK = [...OZELLIK_KATALOGU].sort((a, b) => a.baslik.localeCompare(b.baslik, "tr"));
     const tumRoller = [];
-    OZELLIK_KATALOGU.forEach((o) => {
+    KATALOG_ALFABETIK.forEach((o) => {
       yaRoller(o).forEach((r) => {
         if (!tumRoller.includes(r)) tumRoller.push(r);
       });
     });
+    tumRoller.sort((a, b) => (YA_ROL_ETIKETLERI[a] || a).localeCompare(YA_ROL_ETIKETLERI[b] || b, "tr"));
 
     // "Tüm roller" sütunu: bir satırdaki (birden çok rolü olan) özelliği o satırın BÜTÜN
     // rolleri için tek tıkla kapatır/açar (altta yetkiAyariniTopluKaydet).
@@ -5728,7 +5732,7 @@ async function yetkiAyarlariTablosunuYukle() {
       tumRoller.map((r) => `<th scope="col">${escapeHtml(YA_ROL_ETIKETLERI[r] || r)}</th>`).join("") +
       '<th scope="col">Tüm roller</th>';
 
-    const satirlarHtml = OZELLIK_KATALOGU.map((ozellik) => {
+    const satirlarHtml = KATALOG_ALFABETIK.map((ozellik) => {
       const ozellikRolleri = yaRoller(ozellik);
       if (!ozellikRolleri.length) return "";
       const hucreler = tumRoller.map((rol) => {
@@ -5761,7 +5765,8 @@ async function yetkiAyarlariTablosunuYukle() {
       return `
         <tr role="row" data-ya-ara="${escapeHtml(`${ozellik.baslik} ${ozellik.aciklama} ${ozellik.anahtar} ${ozellikRolleri.map((r) => YA_ROL_ETIKETLERI[r] || r).join(" ")}`.toLocaleLowerCase("tr"))}">
           <td role="rowheader" class="ya-ozellik-hucre">
-            <span class="ya-ozellik-adi">${escapeHtml(ozellik.baslik)}</span>
+            <span class="ya-ozellik-adi">${escapeHtml(ozellik.baslik)}
+              <button type="button" class="ya-bilgi-btn" data-ya-bilgi="${escapeHtml(ozellik.anahtar)}" aria-expanded="false" aria-label="${escapeHtml(ozellik.baslik)} hakkında bilgi" title="Bu yetki ne işe yarar?">ⓘ</button></span>
             <span class="ya-ozellik-aciklama">${escapeHtml(ozellik.aciklama)}</span>
           </td>
           ${hucreler}
@@ -5797,6 +5802,7 @@ async function yetkiAyarlariTablosunuYukle() {
       if (error) { k.checked = !k.checked; showMessage(msgEl, `Kaydedilemedi: ${error.message}`, "error"); return; }
       showMessage(msgEl, `Adminlerin Yetki Ayarları'na erişimi: ${k.checked ? "AÇIK" : "kapalı"}.`, "success");
     });
+    yetkiBilgiKur(alan, OZELLIK_KATALOGU);
     yaAramaUygula();
 
     alan.querySelectorAll('input[data-ya-ozellik]').forEach((input) => {
