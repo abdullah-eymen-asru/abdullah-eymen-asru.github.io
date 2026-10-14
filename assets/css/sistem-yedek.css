@@ -231,21 +231,37 @@
 .hk-zaman { list-style: none; margin: 8px 0 0; padding: 0 0 0 14px; border-left: 2px solid var(--sy-cizgi); display: grid; gap: 8px; font-size: .86rem; }
 .hk-anahtar { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--sy-cizgi); }
 .hk-anahtar:last-child { border-bottom: 0; }
-.hk-anahtar input { width: 26px; height: 26px; flex: none; accent-color: var(--accent); }
 .hk-anahtar p { margin: 2px 0 0; font-size: .84rem; color: var(--muted); }
 
-/* Üye onay kayıtları: liste kendi içinde kayar; üye sayısı ne olursa olsun sayfa uzamaz. Arama, filtre ve sayfalama görünür kalır. */
-.hk-liste {
-  display: grid; gap: 10px; align-content: start;
-  max-height: min(62vh, 560px);
-  overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
-  padding: 2px 4px 2px 0; margin: 12px 0 4px;
-  scrollbar-width: thin;
-}
+/* Üye onay kayıtları (Hukuki Metinler). BUG FİX: arama kutusu, filtre çipleri ve liste birbirine yapışıyor/üst üste biniyordu
+   (odak halkası çiplerin üstüne taşıyordu); liste her tuş vuruşunda boşalıp yüksekliği çökerttiği için sayfa zıplıyordu. */
+.hk-uyeler { display: flex; flex-direction: column; gap: 12px; }
+.hk-uyeler > h2, .hk-uyeler > p { margin: 0; }
+.hk-aracubugu { display: grid; gap: 10px; min-width: 0; }
+.hk-aracubugu .sy-cipler { padding: 4px 4px 6px; margin: 0 -4px; }
+.hk-arama-temizle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
+.hk-arama-temizle:hover { color: var(--text); background: var(--sy-vurgu-zemin); }
+.hk-arama-temizle[hidden] { display: none; }
+.hk-uyeler .sy-arama .sy-girdi { padding-right: 44px; }
+.hk-liste { display: grid; gap: 10px; align-content: start; min-height: 220px; margin: 0; transition: opacity .12s; }
+.hk-liste--mesgul { opacity: .55; pointer-events: none; }
 .hk-satir { min-width: 0; }
 .hk-satir-ust strong { overflow-wrap: anywhere; min-width: 0; }
 .hk-satir small { overflow-wrap: anywhere; }
-@media (max-width: 640px) { .hk-liste { max-height: 58vh; } }
+.hk-iskelet { min-height: 92px; background: linear-gradient(90deg, var(--sy-yuzey), var(--sy-vurgu-zemin), var(--sy-yuzey)); background-size: 200% 100%; }
+@media (prefers-reduced-motion: no-preference) { .hk-iskelet { animation: hk-parilti 1.2s linear infinite; } }
+@keyframes hk-parilti { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.hk-bos { padding: 18px 4px; text-align: center; }
+.hk-sayfalama { margin: 2px 0 0; }
+.hk-sayfa-bilgi { font-variant-numeric: tabular-nums; }
+.hk-sayfalama[hidden] { display: none; }
+/* Yetki anahtarları: gerçek açma/kapama anahtarı görünümü (önceden büyük boş kutu gibi görünüyordu) */
+.hk-anahtar input[type="checkbox"] { appearance: none; -webkit-appearance: none; position: relative; width: 46px; height: 26px; flex: none; border-radius: 999px; border: 1px solid var(--sy-cizgi); background: var(--sy-vurgu-zemin); cursor: pointer; transition: background-color .15s, border-color .15s; }
+.hk-anahtar input[type="checkbox"]::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: var(--muted); transition: transform .15s, background-color .15s; }
+.hk-anahtar input[type="checkbox"]:checked { background: var(--accent); border-color: var(--accent); }
+.hk-anahtar input[type="checkbox"]:checked::after { transform: translateX(20px); background: var(--sy-on-vurgu); }
+.hk-anahtar input[type="checkbox"]:disabled { opacity: .55; cursor: wait; }
+@media (prefers-reduced-motion: reduce) { .hk-anahtar input[type="checkbox"], .hk-anahtar input[type="checkbox"]::after, .hk-liste { transition: none; } }
 
 /* ===== v2 (migration 0081): alt sekmeler, Depolama Gezgini, İçe Aktar, silme onayı, silinen üye dosyaları ===== */
 .sy-altsekmeler { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 16px; padding: 4px; border: 1px solid var(--sy-cizgi); border-radius: 12px; background: var(--sy-yuzey); }
