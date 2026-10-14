@@ -35,6 +35,14 @@ export function girdiTuru(f) {
   return null;
 }
 
+/** Çıktıda "aynı biçim" seçilirse sayfa hangi biçimde kodlanacak: JPEG/PNG/WebP korunur, diğerleri JPEG olur. */
+function mimeBelirle(blob, uz) {
+  const t = String(blob.type || "").toLowerCase();
+  if (t === "image/png" || uz === "png") return "image/png";
+  if (t === "image/webp" || uz === "webp") return "image/webp";
+  return "image/jpeg";
+}
+
 const tuvalJpeg = (c, kalite = CALISMA_KALITE) => new Promise((coz, red) => c.toBlob((b) => (b ? coz(b) : red(new Error("Tuval dışa aktarılamadı."))), "image/jpeg", kalite));
 
 function iptalKontrol(ctx) { if (ctx?.iptalEdildi) throw new IptalHatasi(); }
@@ -68,7 +76,7 @@ async function tekGorsel(file, onOge, uyar) {
         blob = await tuvalJpeg(c);
       } finally { tuvalBirak(c); }
     } else if (uz === "gif") uyar(`${file.name}: GIF'in yalnızca ilk karesi alındı.`);
-    await onOge({ ad: `${adsizAl(file.name)}`, blob, w: cozum.w, h: cozum.h, orijinalBayt: file.size, kaynakAd: file.name });
+    await onOge({ ad: `${adsizAl(file.name)}`, blob, w: cozum.w, h: cozum.h, orijinalBayt: file.size, kaynakAd: file.name, tur: "foto", kaynakMime: mimeBelirle(blob, uz) });
   } finally { cozum.kapat?.(); }
   return { adet: 1 };
 }
@@ -80,7 +88,7 @@ async function tiffAyikla(file, onOge, ctx, uyar) {
   try {
     const c = await createImageBitmap(file);
     const w = c.width; const h = c.height; c.close?.();
-    await onOge({ ad: adsizAl(file.name), blob: file, w, h, orijinalBayt: file.size, kaynakAd: file.name });
+    await onOge({ ad: adsizAl(file.name), blob: file, w, h, orijinalBayt: file.size, kaynakAd: file.name, tur: "tarama", kaynakMime: "image/jpeg" });
     uyar(`${file.name}: yerel çözümleyici kullanıldı (çok sayfalı TIFF'in yalnızca ilk sayfası).`);
     return { adet: 1 };
   } catch { /* UTIF'e düş */ }
@@ -114,7 +122,7 @@ async function tiffAyikla(file, onOge, ctx, uyar) {
       } else blob = await tuvalJpeg(kaynak);
     } finally { tuvalBirak(kaynak); }
     ifd.data = null; ifd.t = null; // büyük tamponları bırak
-    await onOge({ ad: adet > 1 ? `${adsizAl(file.name)}-s${i + 1}` : adsizAl(file.name), blob, w, h, orijinalBayt: Math.round(file.size / adet), kaynakAd: file.name });
+    await onOge({ ad: adet > 1 ? `${adsizAl(file.name)}-s${i + 1}` : adsizAl(file.name), blob, w, h, orijinalBayt: Math.round(file.size / adet), kaynakAd: file.name, tur: "tarama", kaynakMime: "image/jpeg" });
     await nefes();
   }
   buf = null;
@@ -150,7 +158,7 @@ async function pdfAyikla(file, onOge, ctx, uyar) {
         g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
         await sayfa.render({ canvasContext: g, viewport: vp }).promise;
         const blob = await tuvalJpeg(c);
-        await onOge({ ad: `${adsizAl(file.name)}-s${n}`, blob, w: c.width, h: c.height, orijinalBayt: Math.round(file.size / adet), kaynakAd: file.name });
+        await onOge({ ad: `${adsizAl(file.name)}-s${n}`, blob, w: c.width, h: c.height, orijinalBayt: Math.round(file.size / adet), kaynakAd: file.name, tur: "pdf", kaynakMime: "image/jpeg" });
       } finally {
         try { sayfa.cleanup?.(); } catch { /* yok say */ }
         c = tuvalBirak(c);
@@ -206,7 +214,7 @@ async function docxAyikla(file, onOge, ctx, uyar) {
       try {
         const c = await gorselCoz(blob, yol);
         const w = c.w; const h = c.h; c.kapat?.();
-        await onOge({ ad: `${adsizAl(file.name)}-g${i}`, blob, w, h, orijinalBayt: blob.size, kaynakAd: file.name });
+        await onOge({ ad: `${adsizAl(file.name)}-g${i}`, blob, w, h, orijinalBayt: blob.size, kaynakAd: file.name, tur: "docx", kaynakMime: blob.type || "image/jpeg" });
       } catch { uyar(`${file.name}: ${yol.split("/").pop()} çözülemedi, atlandı.`); }
       await nefes();
     }
