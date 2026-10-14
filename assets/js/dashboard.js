@@ -42,6 +42,7 @@ import { hubCiz, sonKullanilanKaydet } from "./hub/hub.js";
 // DEMO / VİTRİN MODU (migration 0083): rol 'demo' + sahte veri katmanı. Görünürlük TEK yerden gelir: demoSekmeAcikMi()
 // (izinli sekme listesi + Site Sahibi'nin canlı yapılandırması). Ayrıntı: assets/js/demo/*.
 import { isDemoMode, configHazir, demoSekmeAcikMi, demoHubKartiAcikMi } from "./demo/demo-durum.js";
+import { hizliKur } from "./dashboard-hizli.js";
 
 /* ------------------------------------------------------------------ */
 /* 1) Modül tanımları                                                  */
@@ -839,6 +840,7 @@ async function init() {
   document.getElementById("dash-ad-soyad").textContent =
     profile.full_name || [profile.first_name, profile.last_name].filter(Boolean).join(" ") || profile.email || "";
   document.getElementById("dash-rol").textContent = isDemoMode ? "Demo / Vitrin Modu" : `Rol: ${ROL_ADLARI_TR[profile.role] || profile.role}`;
+  hizliKur(); // Hemen Çıkış Yap + canlı okunmamış rozeti (assets/js/dashboard-hizli.js)
   // Demo: görünürlük yapılandırması hazır olmadan menü çizilmez (en geç ~6 sn; başarısızsa varsayılan/önbellek).
   if (isDemoMode) await configHazir();
 
