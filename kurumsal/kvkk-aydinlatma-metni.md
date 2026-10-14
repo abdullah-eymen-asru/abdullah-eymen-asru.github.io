@@ -69,8 +69,10 @@ permalink: "/kurumsal/kvkk-aydinlatma-metni.html"
     yönetilen bir TOTP (Authenticator uygulaması) gizli anahtarı ve
     yedek kodlar saklanır. Bu anahtar tarafımdan görüntülenemez.</li>
   <li><strong>Mesajlaşma verisi:</strong> panelin Sohbet/Mesajlar
-    özelliğini kullanırsanız, gönderdiğiniz ve aldığınız mesajların
-    içeriği, katılımcıları ve zaman damgaları saklanır (bkz. § 6).</li>
+    özelliğini kullanırsanız, sohbetin katılımcıları, zaman damgaları ve
+    <strong>uçtan uca şifrelenmiş</strong> mesaj içeriği ile konu başlığı
+    saklanır. Mesajlar tarayıcınızda şifrelenir; veritabanına açık metin
+    yazılmaz (bkz. § 6 ve § 7).</li>
   <li><strong>Not ve dosya verisi:</strong> yetkili olduğunuz modüllerde
     (not defteri, dosya arşivi) oluşturduğunuz notlar ve yüklediğiniz
     dosyalar, tarayıcınızda şifrelenmiş biçimde saklanır; dosya
@@ -153,8 +155,13 @@ permalink: "/kurumsal/kvkk-aydinlatma-metni.html"
   <li><strong>Hesap ve profil verileri:</strong> hesabınız açık olduğu
     sürece saklanır; "Hesabımı Kalıcı Olarak Sil" ile anında ve geri
     alınamaz şekilde silinir (bkz. § 5).</li>
-  <li><strong>Mesajlar:</strong> bir mesajı veya konuşmayı sildiğinizde, silme
-    işlemi kayıtlı bir süre sonunda (yaklaşık 30 gün) kalıcı hale gelir.</li>
+  <li><strong>Mesajlar:</strong> “Sadece benden sil” yalnızca kendi görünümünüzden
+    kaldırır; “Herkesten sil” (yalnızca kendi mesajınız için) mesajı tüm taraflar
+    için veritabanından siler. Bir sohbeti kapattığınızda önce çöp kutusuna taşınır;
+    çöp kutusundan “kalıcı sil” dediğinizde şifre anahtarınız yok edilir. Sohbetin
+    tüm tarafları kalıcı sildiğinde mesajlar, anahtar zarfları ve ilişkili izler
+    veritabanından tamamen silinir; tüm tarafların çöpe attığı sohbetler en geç
+    yaklaşık 30 gün sonra otomatik olarak silinir.</li>
   <li><strong>Notlar ve dosyalar:</strong> siz sildiğinizde ya da hesabınızı
     sildiğinizde kaldırılır.</li>
   <li><strong>İletişim formu yanıtları:</strong> talebiniz hâlinde silinir.</li>
@@ -163,7 +170,35 @@ permalink: "/kurumsal/kvkk-aydinlatma-metni.html"
 </ul>
 
 
-<h2>7. Başvuru Usulü ve Kurul'a Şikâyet</h2>
+<h2>7. Mesajlaşma Modülünün Amacı, Hukuki Sebebi ve Yedekleme</h2>
+<p>
+  Sohbet/Mesajlar modülü; <strong>teknik destek, operasyonel iletişim, sorun çözümü
+  ve yönetim–üye koordinasyonu</strong> amacıyla sunulur; genel amaçlı bir sosyal
+  mesajlaşma hizmeti değildir. Mesajlar uçtan uca şifrelidir: içerik, sohbete erişimi olan
+  taraflarca çözülebilecek şekilde tarayıcıda şifrelenir ve sunucuda yalnızca şifreli
+  biçimde (okunamaz halde) tutulur.
+</p>
+<ul>
+  <li><strong>Hukuki sebep:</strong> sistem güvenliğinin sağlanması ve olası
+    uyuşmazlıkların çözümü bakımından veri sorumlusunun
+    <strong>meşru menfaati (KVKK m.5/2-f)</strong> ile bir hakkın tesisi, kullanılması
+    veya korunması için veri işlemenin zorunlu olması
+    (<strong>KVKK m.5/2-e</strong>); hizmetin sunulması için gerektiği ölçüde sözleşmenin
+    ifası (m.5/2-c).</li>
+  <li><strong>Yedekleme:</strong> ilgili mesajlaşmalar; sistem güvenliği, uyuşmazlık
+    çözümü ve periyodik <strong>sistem felaket yedeklemeleri</strong> sırasında
+    <strong>şifreli/güvenli biçimde</strong> yedek kapsamına alınabilir. Yedekte mesaj
+    içeriği şifreli kalır; yedeği alan kişi şifreli paketi çözemez.</li>
+  <li><strong>Erişim:</strong> bir sohbete yalnızca o sohbetin tarafları ve hedef yönetici
+    seçilmediyse yetkili yöneticiler/site sahibi erişebilir. Özel nitelikli kişisel veri
+    ve gereksiz bilgi paylaşmamanızı öneririz.</li>
+  <li><strong>Haklarınız:</strong> § 5'teki haklarınızı bu veriler bakımından da
+    kullanabilirsiniz; silme talepleriniz yasal saklama yükümlülükleri ve haklı
+    menfaatler saklı kalmak üzere değerlendirilir.</li>
+</ul>
+
+
+<h2>8. Başvuru Usulü ve Kurul'a Şikâyet</h2>
 <p>
   KVKK m.11 kapsamındaki taleplerinizi
   <a href="{{ '/kurumsal/iletisim.html' | relative_url }}">iletişim sayfası</a>
