@@ -30,7 +30,7 @@ export const A4_PT = { w: 595.28, h: 841.89 };
 
 export const varsayilanAyar = () => ({
   profil: "dengeli", ...{ dpi: PROFILLER.dengeli.dpi, kalite: PROFILLER.dengeli.kalite, cozunurluk: PROFILLER.dengeli.cozunurluk },
-  mod: "sihirli", format: "jpeg", sayfa: "a4", zipSeviye: 6,
+  mod: "sihirli", format: "jpeg", sayfa: "a4", zipSeviye: 6, cikti: "pdf", paket: "zip", otoBelge: true,
 });
 
 export function profilUygula(ayar, ad) {
