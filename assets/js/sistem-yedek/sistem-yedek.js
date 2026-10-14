@@ -143,19 +143,31 @@ async function kur() {
 
   /* ---------------- 2) Dışa aktarma formu ---------------- */
   // Kapsam kartları (yalnızca owner'da seçenek vardır; diğer roller yalnızca kendi verisini alır)
-  const benim = secenekKarti({ id: "sy-kapsam-benim", baslik: "Benim verilerim", aciklama: "Hesabına ait kayıtlar, dosyalar ve notlar.", kucuk: true, secili: true });
+  const benim = secenekKarti({ id: "sy-kapsam-benim", baslik: "Sadece Kendi Verilerimi İndir (Kişisel Yedek)", aciklama: "Yalnızca senin oluşturduğun notlar, yüklediğin dosyalar ve profil verilerin — hafif paket.", kucuk: true, secili: true });
   const seciliK = secenekKarti({ id: "sy-kapsam-secili", baslik: "Seçili üyeler", aciklama: "Üyeleri arayıp işaretle; yalnızca onların kayıtları ve dosyaları pakete girer (notlar hariç).", kucuk: true });
-  const tumK = secenekKarti({ id: "sy-kapsam-tum", baslik: "Tüm sistem — felaket yedeği", aciklama: "Bütün kullanıcıların verisi. Yukarıdaki iki seçeneği kapsar.", kucuk: true });
+  const tumK = secenekKarti({ id: "sy-kapsam-tum", baslik: "Tam Sistem & Felaket Kurtarma Yedeği", aciklama: "Tüm veritabanı (şema + veri), yapılandırmalar ve bütün kullanıcıların dosyaları. Mesajlar uçtan uca ŞİFRELİ taşınır. Yukarıdaki iki seçeneği kapsar.", kucuk: true });
   const secilenler = new Map();
   const secici = ownerMi ? uyeSecici(secilenler, () => durumGuncelle()) : null;
   const seciciKutu = el("div", { class: "sy-alt", hidden: true }, secici?.kok);
   let seciciYuklendi = false;
 
-  const hassasK = secenekKarti({ id: "sy-hassas", baslik: "Mesajlaşma kayıtlarını da dahil et", aciklama: "KVKK açısından hassas veri içerir; yalnızca gerçekten gerekliyse işaretle.", kucuk: true });
+  const hassasK = secenekKarti({ id: "sy-hassas", baslik: "Eski DÜZ METİN mesajları da dahil et", aciklama: "Şifreli mesajlar zaten pakete girer (okunamaz haldedir). Bu seçenek yalnızca şifreleme öncesi kalmış açık metin mesajları ekler — KVKK açısından hassastır; gerçekten gerekliyse işaretle.", kucuk: true });
   const hassasKutu = el("div", { class: "sy-alt", hidden: true }, hassasK.etiket);
+
+  // İKİLİ YEDEK AYRIMI: tek tıkla iki net paket (kapsam + bileşenleri birlikte ayarlar).
+  const paketKisisel = dugme({ metin: "👤 Kişisel yedek (hafif)", tur: "ikincil", kucuk: true });
+  const paketTam = dugme({ metin: "🛟 Tam sistem & felaket kurtarma", tur: "ikincil", kucuk: true });
+  const paketSec = (tam) => {
+    tumK.girdi.checked = tam; seciliK.girdi.checked = false; benim.girdi.checked = !tam;
+    for (const [id, k] of kutular) { if (k.girdi.disabled) continue; k.girdi.checked = tam ? id !== "github" || tamMi : ["veritabani", "r2", "notlar"].includes(id); }
+    durumGuncelle();
+  };
+  paketKisisel.addEventListener("click", () => paketSec(false));
+  paketTam.addEventListener("click", () => paketSec(true));
 
   const kapsamIcerik = ownerMi
     ? [
+        el("div", { class: "sy-eylemler" }, paketKisisel, paketTam),
         el("div", { class: "sy-secenekler" }, benim.etiket, seciliK.etiket, seciciKutu, tumK.etiket),
         hassasKutu,
       ]
@@ -240,7 +252,7 @@ async function kur() {
     if (kapsam === "tum") {
       const tamam = await onayIste({
         baslik: "Tüm sistem yedeği alınsın mı?",
-        metin: ["TÜM kullanıcıların verilerini içeren tam sistem yedeği alınacak.", "Paket gizli veriler içerir; güvenli bir yerde sakla ve yetkisiz kimseyle paylaşma."],
+        metin: ["TÜM kullanıcıların verilerini içeren tam sistem yedeği alınacak.", "Paket gizli veriler içerir; güvenli bir yerde sakla ve yetkisiz kimseyle paylaşma. Mesajlaşma kayıtları uçtan uca şifreli taşınır (anahtar zarfları dahil); geri yüklemede aynı hesaplar gerekir."],
         tamam: "Yedeği oluştur",
         tehlike: true,
       });
