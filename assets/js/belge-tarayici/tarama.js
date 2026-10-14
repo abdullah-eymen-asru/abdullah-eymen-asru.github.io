@@ -11,6 +11,7 @@
 import { gorselCoz } from "../donusturucu/motor-gorsel.js";
 import { nefes } from "../donusturucu/ortak.js";
 import { tuvalAl, tuvalBirak, KAYNAK_MAKS_KENAR, alanaSigdir } from "./bellek-kalkani.js";
+import { belgeKosesiBul, koseleriIceCek, gercekOran, ALGILAMA_KENARI } from "./belge-bul.js";
 
 const BANT = 192; // satır
 
@@ -303,47 +304,39 @@ export async function modUygula(tuval, mod) {
   else if (mod === "bw") await sauvola(tuval);
 }
 
-/* ------------------------------ otomatik köşe ------------------------------ */
+/* ------------------------------ otomatik köşe / belge algılama ------------------------------ */
 
-/** Kâğıt, arka plandan parlaksa: küçük kopyada Otsu eşiği → en uç 4 nokta. Başarısızsa null. */
-export async function otomatikKose(kaynakTuvali) {
-  const k = 200 / Math.max(kaynakTuvali.width, kaynakTuvali.height);
-  const w = Math.max(16, Math.round(kaynakTuvali.width * Math.min(1, k)));
-  const h = Math.max(16, Math.round(kaynakTuvali.height * Math.min(1, k)));
+/**
+ * Tuvaldeki belgeyi (kâğıt) arka plandan ayırır: belge-bul.js (çok aday + puanlama). Küçültülmüş kopyada çalışır (~320 px).
+ * @returns {{kose:number[][], guven:number, tam?:boolean}|null}  null = emin değil (kırpma yapılmaz)
+ */
+export async function belgeyiAlgilaTuval(tuval) {
+  const k = ALGILAMA_KENARI / Math.max(tuval.width, tuval.height);
+  const w = Math.max(24, Math.round(tuval.width * Math.min(1, k)));
+  const h = Math.max(24, Math.round(tuval.height * Math.min(1, k)));
   const c = tuvalAl(w, h);
   try {
     const g = c.getContext("2d", { willReadFrequently: true });
-    g.drawImage(kaynakTuvali, 0, 0, w, h);
+    g.imageSmoothingQuality = "high";
+    g.drawImage(tuval, 0, 0, w, h);
     const d = g.getImageData(0, 0, w, h).data;
-    const hist = new Uint32Array(256);
-    for (let i = 0; i < d.length; i += 4) hist[(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) | 0] += 1;
-    const n = w * h; let sum = 0; for (let i = 0; i < 256; i += 1) sum += i * hist[i];
-    let sb = 0; let wb = 0; let max = 0; let esik = 127;
-    for (let i = 0; i < 256; i += 1) {
-      wb += hist[i]; if (!wb) continue;
-      const wf = n - wb; if (!wf) break;
-      sb += i * hist[i];
-      const mb = sb / wb; const mf = (sum - sb) / wf;
-      const v = wb * wf * (mb - mf) * (mb - mf);
-      if (v > max) { max = v; esik = i; }
-    }
-    let tl = null; let tr = null; let br = null; let bl = null;
-    let a = 0; let enKucukTS = Infinity; let enBuyukTS = -Infinity; let enKucukFark = Infinity; let enBuyukFark = -Infinity;
-    for (let y = 0; y < h; y += 1) {
-      for (let x = 0; x < w; x += 1) {
-        const i = (y * w + x) * 4;
-        if (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2] <= esik) continue;
-        a += 1;
-        const t = x + y; const f = x - y;
-        if (t < enKucukTS) { enKucukTS = t; tl = [x, y]; }
-        if (t > enBuyukTS) { enBuyukTS = t; br = [x, y]; }
-        if (f > enBuyukFark) { enBuyukFark = f; tr = [x, y]; }
-        if (f < enKucukFark) { enKucukFark = f; bl = [x, y]; }
-      }
-    }
-    if (!tl || !tr || !br || !bl || a < n * 0.15 || a > n * 0.97) return null;
-    return [tl, tr, br, bl].map(([x, y]) => [Math.max(0, Math.min(1, x / (w - 1))), Math.max(0, Math.min(1, y / (h - 1)))]);
+    await nefes();
+    const r = belgeKosesiBul(d, w, h);
+    if (!r || r.tam) return r ? { ...r, kose: null } : null;
+    return { ...r, kose: koseleriIceCek(r.kose) };
   } finally { tuvalBirak(c); }
+}
+
+/** Bir öğenin kaynağından (döndürme dahil) belgeyi algılar. Başarısızsa null. */
+export async function belgeyiAlgila(blob, ad, dondur = 0) {
+  const { tuval } = await kaynakTuvaliAl(blob, ad, dondur, 640);
+  try { return await belgeyiAlgilaTuval(tuval); } finally { tuvalBirak(tuval); }
+}
+
+/** Eski ad (köşe düzenleme penceresi "Otomatik algıla" düğmesi): yalnızca köşeleri döndürür, bulamazsa null. */
+export async function otomatikKose(kaynakTuvali) {
+  const r = await belgeyiAlgilaTuval(kaynakTuvali);
+  return r && r.kose ? r.kose : null;
 }
 
 /* ------------------------------ ana boru hattı ------------------------------ */
@@ -360,8 +353,14 @@ export async function ogeyiIsle(oge, secenek) {
     const kose = oge.kose || VARSAYILAN_KOSELER();
     const duzelt = !kosesiVarsayilanMi(kose);
     const P = kose.map(([x, y]) => [x * (sw - 1), y * (sh - 1)]);
-    const dogalW = duzelt ? Math.max(uzun(P[0], P[1]), uzun(P[3], P[2])) : sw;
-    const dogalH = duzelt ? Math.max(uzun(P[0], P[3]), uzun(P[1], P[2])) : sh;
+    let dogalW = duzelt ? Math.max(uzun(P[0], P[1]), uzun(P[3], P[2])) : sw;
+    let dogalH = duzelt ? Math.max(uzun(P[0], P[3]), uzun(P[1], P[2])) : sh;
+    if (duzelt) {
+      // Perspektifte kenar uzunlukları yanıltır (yakın kenar uzun görünür): kâğıdın GERÇEK en/boy oranı kestirilir; alan korunur.
+      const r = gercekOran(P, sw, sh);
+      const basit = dogalW / dogalH;
+      if (r && r / basit > 0.6 && r / basit < 1.67) { const alan = dogalW * dogalH; dogalW = Math.sqrt(alan * r); dogalH = Math.sqrt(alan / r); }
+    }
     const k = Math.min(1, (secenek.maksKenar || Infinity) / Math.max(dogalW, dogalH), (secenek.maksKisa || Infinity) / Math.min(dogalW, dogalH));
     const hedef = alanaSigdir(Math.max(1, dogalW * k), Math.max(1, dogalH * k));
     if (duzelt) {
