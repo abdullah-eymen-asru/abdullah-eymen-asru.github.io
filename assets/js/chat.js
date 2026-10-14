@@ -26,6 +26,7 @@
  * ".msg-panel" bölümü. Dar ekranlarda (telefon) tek pane görünür, bir
  * konuşma seçilince "← Geri" butonuyla listeye dönülür.
  */
+import { aliciSeciciKur } from "./mesaj-alici-secici.js";
 import { supabase, escapeHtml, showMessage, kucukHarfeCevirTr, kullaniciAramayaUyuyorMu } from "./core/supabase-client.js";
 
 /** Bir hedef (admin/owner) rol kodunu ekranda gösterilecek etikete çevirir. */
@@ -504,8 +505,243 @@ export async function wireAdminChat(adminId) {
   const baslikEl = document.getElementById("chat-thread-baslik-admin");
   const geriBtn = document.getElementById("chat-geri-btn-admin");
   const msg = document.getElementById("chat-message-admin");
-  const aramaInput = document.getElementById("chat-uye-arama");
-  const aramaSonucEl = document.getElementById("chat-uye-arama-sonuc");
+  const yeniMesajBtn = document.getElementById("chat-alici-ac");
+  const seciciEl = document.getElementById("chat-alici-secici");
+
+  let SECILI_KONUSMA = null;
+  let KONUSMALAR = []; // { id, user_id, konu, son_mesaj_at, hedef_admin_id }
+  let ONIZLEMELER = {};
+  let PROFIL_ADLARI = {}; // user_id (ve hedef_admin_id) -> "Ad Soyad (ya da e-posta)"
+  let SECILI_UYE = null; // admin arama sonucundan bir üye seçtiyse: { id, isim }
+
+  async function konusmalariYukle() {
+    const { data, error } = await supabase
+      .from("conversations")
+      .select("id, user_id, konu, son_mesaj_at, hedef_admin_id")
+      .order("son_mesaj_at", { ascending: false });
+
+    if (error) {
+      listPaneEl.innerHTML = `<p class="chat-bos">Konuşmalar yüklenemedi.</p>`;
+      return;
+    }
+    KONUSMALAR = data || [];
+
+    // Üye adları İÇİN user_id'leri, "kime yazmak istemiş" bilgisini
+    // göstermek için de hedef_admin_id'leri (varsa) TEK sorguda çekiyoruz.
+    const idler = [...new Set([...KONUSMALAR.map((k) => k.user_id), ...KONUSMALAR.map((k) => k.hedef_admin_id)].filter(Boolean))];
+    if (idler.length > 0) {
+      const kisiler = await kisiBilgileriGetir(idler);
+      PROFIL_ADLARI = {};
+      Object.entries(kisiler).forEach(([id, k]) => (PROFIL_ADLARI[id] = adVeRol(k.ad, k.rol)));
+    }
+
+    ONIZLEMELER = await sonMesajOnizlemeleriGetir(KONUSMALAR.map((k) => k.id));
+    konusmaListesiniCiz();
+  }
+
+  function konusmaListesiniCiz() {
+    const gosterilecekler = SECILI_UYE ? KONUSMALAR.filter((k) => k.user_id === SECILI_UYE.id) : KONUSMALAR;
+
+    let ustBar = "";
+    if (SECILI_UYE) {
+      ustBar = `
+        <div class="msg-filtre-bar">
+          <span>${escapeHtml(SECILI_UYE.isim)} ile sohbetler</span>
+          <button type="button" id="chat-filtre-temizle" class="msg-filtre-temizle-btn">Tüm Konuşmalar</button>
+        </div>
+        <button type="button" id="chat-yeni-sohbet-btn-admin" class="msg-yeni-btn">+ Yeni Sohbet Başlat</button>
+        <div id="chat-yeni-sohbet-form-wrap-admin" class="msg-yeni-form-wrap" hidden>
+          <form id="chat-yeni-sohbet-form-admin" novalidate>
+            <input id="chat-yeni-sohbet-konu-admin" type="text" maxlength="120" placeholder="Konu (ör. Ödeme sorunu)" required>
+            <div class="msg-yeni-form-btnler">
+              <button type="submit" class="btn-primary">Başlat</button>
+              <button type="button" id="chat-yeni-sohbet-iptal-admin" class="btn-secondary">Vazgeç</button>
+            </div>
+          </form>
+        </div>`;
+    }
+
+    const listeHtml =
+      gosterilecekler.length === 0
+        ? `<p class="chat-bos">${SECILI_UYE ? "Bu üyeyle henüz sohbet yok. Yukarıdan yeni bir tane başlatabilirsin." : "Henüz hiç mesaj yok."}</p>`
+        : gosterilecekler
+            .map((k) => {
+              const hedefAdi = k.hedef_admin_id ? PROFIL_ADLARI[k.hedef_admin_id] : null;
+              return konusmaOgesiHtml({
+                id: k.id,
+                baslikMetni: PROFIL_ADLARI[k.user_id] || "Bilinmeyen üye",
+                konu: hedefAdi ? `${k.konu} · Kime: ${hedefAdi}` : k.konu,
+                sonMesaj: ONIZLEMELER[k.id],
+                aktif: k.id === SECILI_KONUSMA,
+              });
+            })
+            .join("");
+
+    listPaneEl.innerHTML = ustBar + `<div class="msg-konusma-liste-ic">${listeHtml}</div>`;
+
+    listPaneEl.querySelectorAll(".msg-konusma-sec").forEach((btn) => {
+      btn.addEventListener("click", () => konusmaSec(btn.dataset.id));
+    });
+    listPaneEl.querySelectorAll(".msg-konusma-sil").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.id;
+        const basarili = await konusmaSil(id, msg);
+        if (!basarili) return;
+        if (SECILI_KONUSMA === id) {
+          SECILI_KONUSMA = null;
+          threadListEl.innerHTML = "";
+          form.hidden = true;
+          baslikEl.textContent = "Bir konuşma seç.";
+          panelEl.classList.remove("msg-panel--thread-aktif");
+        }
+        await konusmalariYukle();
+      });
+    });
+    document.getElementById("chat-filtre-temizle")?.addEventListener("click", () => {
+      SECILI_UYE = null;
+      konusmaListesiniCiz();
+    });
+    wireYeniSohbetAdmin();
+  }
+
+  function wireYeniSohbetAdmin() {
+    const btn = document.getElementById("chat-yeni-sohbet-btn-admin");
+    const formWrap = document.getElementById("chat-yeni-sohbet-form-wrap-admin");
+    const yForm = document.getElementById("chat-yeni-sohbet-form-admin");
+    const konuInput = document.getElementById("chat-yeni-sohbet-konu-admin");
+    const iptalBtn = document.getElementById("chat-yeni-sohbet-iptal-admin");
+    if (!btn) return;
+
+    btn.addEventListener("click", () => {
+      formWrap.hidden = !formWrap.hidden;
+      if (!formWrap.hidden) konuInput.focus();
+    });
+    iptalBtn.addEventListener("click", () => {
+      formWrap.hidden = true;
+      yForm.reset();
+    });
+    yForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const konu = konuInput.value.trim();
+      if (!konu || !SECILI_UYE) return;
+      const sBtn = yForm.querySelector('button[type="submit"]');
+      sBtn.disabled = true;
+      const { data, error } = await supabase.rpc("baslat_konusma", {
+        p_konu: konu,
+        p_hedef_kullanici_id: SECILI_UYE.id,
+      });
+      sBtn.disabled = false;
+      if (error) {
+        showMessage(msg, "Sohbet başlatılamadı: " + error.message);
+        return;
+      }
+      await konusmalariYukle();
+      konusmaSec(data);
+    });
+  }
+
+  async function mesajlariYukle() {
+    if (!SECILI_KONUSMA) return;
+    const { data, error } = await supabase
+      .from("messages")
+      .select("id, sender_id, body, created_at")
+      .eq("conversation_id", SECILI_KONUSMA)
+      .order("created_at", { ascending: true });
+    if (error) {
+      threadListEl.innerHTML = `<p class="chat-bos">Mesajlar yüklenemedi.</p>`;
+      return;
+    }
+    const gonderenAdlari = await gonderenAdlariniGetir(data);
+    mesajListesiniCiz(threadListEl, data, adminId, gonderenAdlari);
+  }
+
+  function konusmaSec(id) {
+    if (SECILI_KONUSMA !== id) threadListEl._imza = undefined; // yeni konuşma: baştan çiz + en alta in
+    SECILI_KONUSMA = id;
+    const k = KONUSMALAR.find((x) => x.id === id);
+    baslikEl.textContent = k ? `${PROFIL_ADLARI[k.user_id] || "Bilinmeyen üye"} — ${k.konu}` : "Konuşma";
+    form.hidden = false;
+    listPaneEl.querySelectorAll(".msg-konusma-item").forEach((b) => b.classList.toggle("active", b.dataset.id === id));
+    panelEl.classList.add("msg-panel--thread-aktif"); // dar ekranda thread görünümüne geç
+    mesajlariYukle();
+  }
+
+  geriBtn?.addEventListener("click", () => panelEl.classList.remove("msg-panel--thread-aktif"));
+
+  /* ---- Alıcı seçici (gruplu + sayfalı; e-posta hiçbir yerde görünmez — bkz. mesaj-alici-secici.js, migration 0092) ---- */
+  const seciciKapat = () => { seciciEl.hidden = true; listPaneEl.hidden = false; yeniMesajBtn.setAttribute("aria-expanded", "false"); };
+  const secici = aliciSeciciKur({
+    kok: seciciEl,
+    onKapat: seciciKapat,
+    onSec: (u) => { SECILI_UYE = { id: u.id, isim: u.isim }; seciciKapat(); konusmaListesiniCiz(); },
+  });
+  yeniMesajBtn?.addEventListener("click", () => {
+    if (!seciciEl.hidden) { seciciKapat(); return; }
+    listPaneEl.hidden = true; yeniMesajBtn.setAttribute("aria-expanded", "true");
+    secici.ac();
+  });
+
+  await konusmalariYukle();
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!SECILI_KONUSMA) return;
+    const body = textarea.value.trim();
+    if (!body) return;
+    const btn = form.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    const { error } = await supabase.from("messages").insert({
+      conversation_id: SECILI_KONUSMA,
+      sender_id: profile.id,
+      body,
+    });
+    btn.disabled = false;
+    if (error) {
+      showMessage(msg, "Mesaj gönderilemedi: " + error.message);
+      return;
+    }
+    textarea.value = "";
+    await mesajlariYukle();
+    await konusmalariYukle();
+  });
+
+  // Canlı güncelleme: RLS zaten sadece bu üyenin kendi konuşmalarını
+  // görmesine izin verir, o yüzden filtresiz dinlemek güvenlidir (admin
+  // tarafındaki desenle aynı mantık).
+  supabase
+    .channel(`chat-user-${profile.id}`)
+    .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, () => {
+      konusmalariYukle();
+      mesajlariYukle();
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, () => konusmalariYukle())
+    .subscribe();
+
+  // Realtime bir sebeple bağlanamazsa diye basit bir yedek: her 10 saniyede
+  // bir sessizce tazele.
+  setInterval(() => {
+    konusmalariYukle();
+    mesajlariYukle();
+  }, 10000);
+}
+
+/* ---------------------------------------------------------------------- */
+/* ADMİN TARAFI — panel/admin.md                                          */
+/* ---------------------------------------------------------------------- */
+export async function wireAdminChat(adminId) {
+  const wrap = document.getElementById("chat-admin");
+  if (!wrap) return;
+
+  const panelEl = document.getElementById("chat-panel-admin");
+  const listPaneEl = document.getElementById("chat-konusma-liste");
+  const threadListEl = document.getElementById("chat-mesaj-liste-admin");
+  const form = document.getElementById("chat-form-admin");
+  const textarea = document.getElementById("chat-metin-admin");
+  const baslikEl = document.getElementById("chat-thread-baslik-admin");
+  const geriBtn = document.getElementById("chat-geri-btn-admin");
+  const msg = document.getElementById("chat-message-admin");
+  const yeniMesajBtn = document.getElementById("chat-alici-ac");
+  const seciciEl = document.getElementById("chat-alici-secici");
 
   let SECILI_KONUSMA = null;
   let KONUSMALAR = []; // { id, user_id, konu, son_mesaj_at, hedef_admin_id }
