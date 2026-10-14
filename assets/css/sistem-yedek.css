@@ -336,3 +336,14 @@
 .sy-wk-sert { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; font-size: 0.9rem; }
 .sy-wk-gunluk { margin-top: 10px; }
 .sy-wk-gunluk summary { cursor: pointer; font-weight: 600; }
+
+/* --- 2026-10 buton/metin kırılma düzeltmeleri (ekran görüntüsü: "S il" iki satıra bölünüyordu) --- */
+.sy-tablo td { overflow-wrap: break-word; }                      /* "anywhere" düğme içindeki kelimeyi de bölüyordu */
+.sy-tablo td .sy-btn { white-space: nowrap; overflow-wrap: normal; word-break: keep-all; flex: none; }
+.sy-tablo td:last-child { white-space: nowrap; width: 1%; }
+.sy-tablo td[data-etiket="IP"], .sy-tablo td[data-etiket="Boyut"], .sy-tablo td[data-etiket="Tarih"] { white-space: nowrap; }
+.sy-eylemler { display: flex; gap: 10px; flex-wrap: wrap; align-items: stretch; }
+.sy-eylemler > .sy-btn { white-space: normal; text-align: center; }
+.sy-ia-liste .sy-ia-satir { flex-wrap: wrap; row-gap: 4px; min-width: 0; }
+.sy-ia-notlar li { overflow-wrap: anywhere; }
+.sy-ia-log { max-height: 180px; overflow-y: auto; margin: 8px 0; padding-left: 18px; font-size: .85rem; }
