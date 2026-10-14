@@ -82,9 +82,9 @@ function adminMarkup() {
       <div id="chat-panel-admin" class="msg-panel msg-panel--admin">
         <aside class="msg-list-pane">
           <div class="msg-list-header">
-            <input id="chat-uye-arama" type="search" class="msg-uye-arama" placeholder="Üye ara (isim veya e-posta)...">
-            <div id="chat-uye-arama-sonuc" class="msg-uye-arama-sonuc" hidden></div>
+            <button type="button" id="chat-alici-ac" class="msg-yeni-btn" aria-expanded="false">＋ Yeni mesaj — kişi seç</button>
           </div>
+          <div id="chat-alici-secici" class="msg-alici" hidden></div>
           <div id="chat-konusma-liste" class="msg-konusma-liste"><p class="chat-bos">Yükleniyor...</p></div>
         </aside>
 
@@ -143,7 +143,7 @@ async function init() {
 
   if (adminMi) {
     aciklama.textContent =
-      "Üyelerin sana gönderdiği tüm konuşmalar burada. Soldan bir konuşma seç, ya da yukarıdan isim/e-posta ile üye arayıp onunla yeni bir konuşma başlat.";
+      "Üyelerin sana gönderdiği tüm konuşmalar burada. Soldan bir konuşma seç, ya da \"Yeni mesaj\" ile gruptan (yönetim, içerik ekibi, özel üyeler, üyeler, demo) kişi seçip yeni konuşma başlat. E-posta adresleri gösterilmez.";
     icerik.innerHTML = adminMarkup();
     // BUG FİX (eksik geri dönüş linki): bu sayfaya (mesajlar.html)
     // ADMİN olarak gelindiğinde admin.md'ye dönmenin tek yolu tarayıcının
