@@ -127,9 +127,16 @@ body {
 #dash-nav {
   display: flex;
   flex-direction: column;
+  /* BUG FİX: style.css'teki genel `nav { align-items:center; flex-wrap:wrap }` kuralı burayı da etkiliyordu;
+     alt menü kutuları içeriği kadar daralıp ORTALANIYOR, her grupta satırlar farklı hizada/genişlikte görünüyordu. */
+  align-items: stretch;
+  flex-wrap: nowrap;
+  flex-grow: 0;
   gap: 2px;
   padding: 0 8px;
 }
+.dash-nav-group-items { width: 100%; min-width: 0; }
+#dash-nav a { min-width: 0; overflow-wrap: anywhere; }
 
 /*
  * ANA SEKME (GRUP) BAŞLIĞI — artık düz bir yazı değil, AÇILIR/KAPANIR bir
@@ -830,3 +837,13 @@ body.dash-nav-acik {
 .hub-kart-ikon { font-size: 1.5rem; line-height: 1.2; flex: none; }
 .hub-kart-govde { display: grid; gap: 2px; min-width: 0; }
 .hub-kart-govde small { color: var(--muted); overflow-wrap: anywhere; }
+
+
+/* ===== Panel sayfası üst şeridi (BUG FİX) =====
+   Site başlığı 860px'lik .wrap içinde olduğundan marka + 5 bağlantı + "Koyu mod" anahtarı geniş ekranda bile
+   İKİ SATIRA kırılıyor, başlık ~95px yer kaplıyor ve altından geçen içerik yarı saydam şeritte (mavi lekeler) görünüyordu.
+   Panelde başlık, panelle aynı genişlikte tek satır olur; opak zemin + blur yok (kaydırmada GPU yükü de azalır). */
+body.dash-sayfa .site-header { background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; padding: 10px 0; }
+body.dash-sayfa .site-header .wrap { max-width: min(1680px, 100vw - 32px); padding: 0; flex-wrap: nowrap; }
+body.dash-sayfa .site-header nav { min-width: 0; }
+@media (max-width: 640px) { body.dash-sayfa .site-header .wrap { max-width: none; padding: 0 16px; } }
