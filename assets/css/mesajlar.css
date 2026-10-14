@@ -194,3 +194,90 @@
 .msg-alici-liste { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
 .msg-alici-liste .msg-uye-sonuc-item { width: 100%; text-align: left; }
 .msg-alici-daha { align-self: center; }
+
+/* ============================================================================
+   2026-10 YENİ MESAJLAŞMA ARAYÜZÜ (assets/js/mesajlasma/arayuz.js) — "msj-" önekli
+   ============================================================================ */
+.msj-kok { position: relative; min-width: 0; }
+.msj-panel { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); border: 1px solid var(--border); border-radius: 14px; background: var(--card-bg); overflow: hidden; height: min(72vh, 720px); min-height: 440px; }
+.msj-sol, .msj-sag { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.msj-sol { border-right: 1px solid var(--border); padding: 10px; gap: 8px; overflow: hidden; }
+.msj-sol [hidden], .msj-sag [hidden], .msj-yeni-alan[hidden] { display: none !important; }
+.msj-sol-ust { display: flex; gap: 8px; flex-wrap: wrap; }
+.msj-sol-ust .msj-btn { flex: 1 1 120px; }
+.msj-ara { width: 100%; box-sizing: border-box; padding: 9px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); font: inherit; }
+.msj-liste { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 6px; }
+.msj-yeni-alan { max-height: 55%; overflow-y: auto; border: 1px solid var(--border); border-radius: 12px; padding: 10px; background: var(--bg); }
+.msj-yeni-form { display: flex; flex-direction: column; gap: 8px; }
+.msj-yeni-form input, .msj-yeni-form select { width: 100%; box-sizing: border-box; padding: 9px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); color: var(--text); font: inherit; }
+.msj-yeni-kime { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; overflow-wrap: anywhere; }
+.msj-yeni-btnler { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.msj-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--tag-bg); color: var(--text); font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap; line-height: 1.2; }
+.msj-btn:hover { border-color: var(--accent); }
+.msj-btn:focus-visible, .msj-ikon-btn:focus-visible, .msj-satir:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.msj-btn--birincil { background: var(--accent); border-color: var(--accent); color: #fff; }
+.msj-btn--tehlike { border-color: #c0392b; color: #c0392b; background: transparent; }
+.msj-btn--tehlike:hover { background: #c0392b; color: #fff; }
+.msj-btn[disabled] { opacity: .55; cursor: not-allowed; }
+.msj-kucuk { padding: 5px 10px; font-size: .85rem; }
+.msj-cop-eylem { display: flex; justify-content: flex-end; }
+
+.msj-satir { position: relative; display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; cursor: pointer; background: var(--card-bg); min-width: 0; }
+.msj-satir:hover { border-color: var(--accent); }
+.msj-satir--aktif { border-color: var(--accent); background: var(--tag-bg); }
+.msj-satir--yeni { border-left: 4px solid var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--card-bg)); }
+.msj-satir--yeni .msj-satir-konu { font-weight: 800; }
+.msj-satir-ust, .msj-satir-alt { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.msj-satir-konu { flex: 1 1 auto; min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msj-satir-kisi { flex: 1 1 auto; min-width: 0; color: var(--muted); font-size: .82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msj-satir-zaman { flex: none; color: var(--muted); font-size: .78rem; }
+.msj-satir-onizleme { color: var(--muted); font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msj-satir-eylem { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.msj-pin { flex: none; font-size: .85rem; }
+.msj-rozet { flex: none; min-width: 20px; padding: 1px 7px; border-radius: 999px; background: var(--accent); color: #fff; font-size: .75rem; font-weight: 800; text-align: center; line-height: 1.5; font-variant-numeric: tabular-nums; }
+
+.msj-sag-ust { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); min-width: 0; }
+.msj-baslik { flex: 1 1 auto; min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msj-geri { display: none; border: 1px solid var(--border); background: var(--tag-bg); color: var(--text); border-radius: 10px; padding: 6px 12px; font: inherit; cursor: pointer; }
+.msj-ikon-btn { flex: none; border: 1px solid var(--border); background: var(--tag-bg); color: var(--text); border-radius: 10px; width: 38px; height: 38px; font-size: 1rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.msj-ikon-btn--aktif { border-color: var(--accent); background: var(--accent); }
+.msj-ikon-btn--tehlike:hover { border-color: #c0392b; color: #c0392b; }
+.msj-govde { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.msj-bos { margin: auto; color: var(--muted); text-align: center; padding: 20px; }
+.msj-mesaj { display: flex; flex-direction: column; gap: 3px; max-width: min(78%, 640px); min-width: 0; }
+.msj-mesaj--ben { align-self: flex-end; align-items: flex-end; }
+.msj-mesaj--karsi { align-self: flex-start; align-items: flex-start; }
+.msj-gonderen { font-size: .75rem; color: var(--muted); }
+.msj-metin-balon { padding: 9px 13px; border-radius: 14px; background: var(--tag-bg); border: 1px solid var(--border); white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
+.msj-mesaj--ben .msj-metin-balon { background: var(--accent); border-color: var(--accent); color: #fff; }
+.msj-metin-balon--hata { font-style: italic; opacity: .85; }
+.msj-meta { font-size: .72rem; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.msj-mesaj-sil { border: 0; background: none; color: var(--muted); font: inherit; font-size: .72rem; cursor: pointer; text-decoration: underline; padding: 2px 4px; }
+.msj-mesaj-sil:hover { color: #c0392b; }
+.msj-form { display: flex; gap: 8px; align-items: flex-end; padding: 10px 12px; border-top: 1px solid var(--border); }
+.msj-metin { flex: 1 1 auto; min-width: 0; resize: none; padding: 9px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); color: var(--text); font: inherit; max-height: 140px; }
+.msj-gonder { flex: none; }
+.msj-bildirim { margin-top: 10px; }
+
+.msj-modal-kaplama { position: fixed; inset: 0; z-index: 9999; background: rgba(0, 0, 0, .55); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.msj-modal { width: min(440px, 100%); background: var(--card-bg); color: var(--text); border: 1px solid var(--border); border-radius: 16px; padding: 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, .4); }
+.msj-modal-baslik { margin: 0 0 8px; font-size: 1.1rem; }
+.msj-modal-metin { margin: 0 0 16px; color: var(--muted); line-height: 1.5; }
+.msj-modal-eylem { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.msj-modal-eylem .msj-btn { flex: 1 1 auto; }
+
+/* Okunmamış rozeti (sidebar / üst bar / Ana Ekran kartı) */
+.dash-rozet { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; margin-left: 8px; border-radius: 999px; background: #e0245e; color: #fff; font-size: .72rem; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.dash-rozet[hidden] { display: none !important; }
+.dash-nokta { position: absolute; top: 6px; right: 6px; width: 11px; height: 11px; border-radius: 50%; background: #e0245e; border: 2px solid var(--bg); }
+.dash-nokta[hidden] { display: none !important; }
+
+@media (max-width: 860px) {
+  .msj-panel { grid-template-columns: 1fr; height: min(78vh, 760px); }
+  .msj-sol { border-right: 0; }
+  .msj-kok[data-acik="liste"] .msj-sag { display: none; }
+  .msj-kok[data-acik="sohbet"] .msj-sol { display: none; }
+  .msj-geri { display: inline-flex; }
+  .msj-mesaj { max-width: 88%; }
+}
