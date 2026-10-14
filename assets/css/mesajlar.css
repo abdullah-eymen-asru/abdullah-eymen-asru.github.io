@@ -175,3 +175,22 @@
     transform: translateX(-50%);
   }
 }
+
+/* ===== Alıcı seçici (Site Sahibi / Yönetici): gruplu + sayfalı; taşma yok ===== */
+.msg-list-pane [hidden], .msg-alici[hidden] { display: none !important; }
+.msg-alici { display: flex; flex-direction: column; gap: 10px; padding: 10px; min-width: 0; min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; }
+.msg-alici-ust { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.msg-alici-geri { flex: none; width: 34px; height: 34px; border: 1px solid var(--border); border-radius: 50%; background: var(--tag-bg); color: var(--text); cursor: pointer; font-size: 1rem; }
+.msg-alici-geri:hover { border-color: var(--accent); }
+.msg-alici-baslik { font-weight: 700; font-size: .95rem; overflow-wrap: anywhere; min-width: 0; }
+.msg-alici-gruplar { display: grid; gap: 8px; }
+.msg-alici-grup { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; text-align: left; border: 1px solid var(--border); border-radius: 12px; background: var(--card-bg, var(--bg)); color: var(--text); font: inherit; cursor: pointer; min-width: 0; }
+.msg-alici-grup:hover:not(:disabled) { border-color: var(--accent); background: var(--tag-bg); }
+.msg-alici-grup:disabled { opacity: .5; cursor: default; }
+.msg-alici-ikon { flex: none; font-size: 1.35rem; }
+.msg-alici-grup-ad { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.msg-alici-grup-ad small { color: var(--muted); font-size: .78rem; }
+.msg-alici-adet { flex: none; min-width: 28px; padding: 2px 9px; border-radius: 999px; background: var(--tag-bg); border: 1px solid var(--border); font-size: .8rem; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+.msg-alici-liste { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.msg-alici-liste .msg-uye-sonuc-item { width: 100%; text-align: left; }
+.msg-alici-daha { align-self: center; }
