@@ -32,6 +32,9 @@ function metinKarti({ baslik, link, surum, ozet, yetkili, yetkiNotu, onayMetni, 
     const yeni = girdi.value.trim();
     if (!BICIM.test(yeni)) return showMessage(mesaj, 'Sürüm "v1.2" biçiminde olmalı (v + sayı + nokta + sayı).', "error");
     if (yeni === mevcut) return showMessage(mesaj, "Bu zaten yürürlükteki sürüm.", "error");
+    const sayilar = (v) => /^v(\d+)\.(\d+)$/.exec(v || "")?.slice(1).map(Number);
+    const [yb, yk] = sayilar(yeni) || [0, 0]; const [mb, mk] = sayilar(mevcut) || [0, 0];
+    if (yb < mb || (yb === mb && yk < mk)) return showMessage(mesaj, `Yeni sürüm (${yeni}) yürürlükteki sürümden (${mevcut}) küçük olamaz; sürüm numarası yalnızca artar.`, "error");
     const tamam = await onayIste({ baslik: `${baslik}: ${mevcut} → ${yeni}`, metin: [onayMetni, "Metni ÖNCE yayınladığından (deploy) emin ol. Yalnızca yazım düzeltmesi için sürüm yükseltme."], tamam: "Yayınla", tehlike: true });
     if (!tamam) return;
     dugmeYayin.disabled = true;
@@ -91,22 +94,48 @@ function yetkiBolumu(satir, mesaj) {
   );
 }
 
-/** Üye onay kayıtları: arama + filtre + her üyenin zaman damgalı geçmişi. */
+/** E-posta ekranda maskeli gösterilir (yalnızca Site Sahibi'ne zaten döner): "ey•••@gmail.com". */
+const epostaMaskele = (e) => {
+  const m = /^([^@]{1,2})[^@]*(@.+)$/.exec(String(e || ""));
+  return m ? `${m[1]}•••${m[2]}` : "";
+};
+
+/**
+ * Üye onay kayıtları: arama + filtre + sayfalama + her üyenin zaman damgalı geçmişi.
+ * KARARLILIK (arama sırasında sayfanın kasması/zıplaması düzeltmeleri):
+ *  - Liste her istekte "Yükleniyor…" ile BOŞALTILMAZ (yükseklik çökmüyor → sayfa zıplamıyor). Eski içerik soluk kalır,
+ *    yanıt gelince tek hamlede değişir; ilk yüklemede sabit yükseklikli iskelet satırlar gösterilir.
+ *  - İstek numarası: geç gelen eski yanıt yenisinin üzerine yazamaz (yarış durumu).
+ *  - Debounce 350 ms, Türkçe IME bileşimi (composition) sırasında istek atılmaz, aynı sorgu tekrar sorulmaz.
+ *  - Sayfa/filtre değişince boş sayfada kalınmaz; sayfa değişince araç çubuğu görünür alana getirilir.
+ *  - İç içe kaydırma kaldırıldı (liste sayfayla birlikte kayar; sayfalama zaten uzunluğu sınırlar).
+ */
 function uyeKayitlari() {
-  const SAYFA = 20;
+  const SAYFA = 15;
   let q = "";
   let filtre = "hepsi";
   let ofset = 0;
+  let toplam = 0;
+  let istekNo = 0;
+  let mesgul = false;
   let zamanlayici = null;
-  const girdi = el("input", { type: "search", class: "sy-girdi", placeholder: "Üye adıyla ara…", "aria-label": "Üye ara", autocomplete: "off" });
+  let bilesim = false;
+  let sonSorgu = "";
+
+  const girdi = el("input", { type: "search", class: "sy-girdi", placeholder: "Üye adıyla ara…", "aria-label": "Üye ara", autocomplete: "off", spellcheck: "false", enterkeyhint: "search", maxlength: "80" });
+  const temizleBtn = el("button", { type: "button", class: "hk-arama-temizle", "aria-label": "Aramayı temizle", hidden: true });
+  temizleBtn.append(ikon("kapat"));
   const cipler = el("div", { class: "sy-cipler", role: "group", "aria-label": "Onay durumu filtresi" });
-  const liste = el("div", { class: "hk-liste", "aria-live": "polite" });
-  const sayfalama = el("div", { class: "sy-sayfalama" });
+  const liste = el("div", { class: "hk-liste", "aria-live": "polite", "aria-busy": "false" });
+  const bilgi = el("span", { class: "muted hk-sayfa-bilgi", role: "status" });
+  const oncekiBtn = dugme({ metin: "Önceki", tur: "ikincil", kucuk: true });
+  const sonrakiBtn = dugme({ metin: "Sonraki", tur: "ikincil", kucuk: true });
+  const sayfalama = el("div", { class: "sy-sayfalama hk-sayfalama" }, oncekiBtn, bilgi, sonrakiBtn);
   const FILTRELER = [["hepsi", "Hepsi"], ["eski", "Güncel olmayan onay"], ["rizasiz", "Açık rızası yok"], ["onaysiz", "Aydınlatma onayı yok"]];
 
   const cipCiz = () => cipler.replaceChildren(...FILTRELER.map(([k, ad]) => {
     const b = el("button", { type: "button", class: "sy-sec", "aria-pressed": String(filtre === k), text: ad });
-    b.addEventListener("click", () => { filtre = k; ofset = 0; cipCiz(); yukle(); });
+    b.addEventListener("click", () => { if (filtre === k) return; filtre = k; ofset = 0; cipCiz(); yukle(); });
     return b;
   }));
 
@@ -115,13 +144,16 @@ function uyeKayitlari() {
     return el("span", { class: `sy-rozet ${guncel ? "sy-rozet--iyi" : "sy-rozet--uyari"}`, text: `${ad}: ${surum || "?"} · ${tarih ? tarihMetni(tarih) : "tarih yok"}${guncel ? "" : " (eski)"}` });
   };
 
-  const gecmisAc = async (u, kutu, btn) => {
-    if (!kutu.hidden) { kutu.hidden = true; btn.querySelector("span").textContent = "Geçmiş"; return; }
-    kutu.hidden = false;
-    btn.querySelector("span").textContent = "Gizle";
+  const gecmisKutusu = async (u, kutu) => {
+    const no = (kutu._no = (kutu._no || 0) + 1);
     kutu.replaceChildren(el("p", { class: "muted", text: "Yükleniyor…" }));
     const { data, error } = await supabase.rpc("uye_onay_gecmisi", { p_uye: u.id });
-    if (error) return kutu.replaceChildren(el("p", { class: "auth-message error", text: error.message }));
+    if (no !== kutu._no) return;
+    if (error) {
+      const tekrar = dugme({ metin: "Tekrar dene", tur: "ikincil", kucuk: true });
+      tekrar.addEventListener("click", () => gecmisKutusu(u, kutu));
+      return kutu.replaceChildren(el("p", { class: "auth-message error", text: error.message }), tekrar);
+    }
     kutu.replaceChildren(!data?.length
       ? el("p", { class: "muted", text: "Bu üye için kayıt yok." })
       : el("ul", { class: "hk-zaman" }, data.map((g) => el("li", {},
@@ -130,38 +162,91 @@ function uyeKayitlari() {
           g.kaynak === "geri_doldurma" ? el("span", { class: "muted", text: " (mevcut durumdan aktarıldı; önceki sürümler bilinmiyor)" }) : null))));
   };
 
-  async function yukle() {
-    liste.replaceChildren(el("p", { class: "muted", text: "Yükleniyor…" }));
+  const satirCiz = (u) => {
+    const gecmis = el("div", { hidden: true });
+    const btn = dugme({ metin: "Geçmiş", ikonAdi: "ara", tur: "ikincil", kucuk: true, "aria-expanded": "false" });
+    const etiket = btn.querySelector("span");
+    btn.addEventListener("click", () => {
+      const acik = !gecmis.hidden;
+      gecmis.hidden = acik;
+      btn.setAttribute("aria-expanded", String(!acik));
+      if (etiket) etiket.textContent = acik ? "Geçmiş" : "Gizle";
+      if (!acik && !gecmis.dataset.yuklendi) { gecmis.dataset.yuklendi = "1"; gecmisKutusu(u, gecmis); }
+    });
+    return el("article", { class: "hk-satir" },
+      el("div", { class: "hk-satir-ust" }, el("strong", { text: `${u.ad} · ${ROLLER[u.rol] || u.rol}` }), btn),
+      u.eposta ? el("small", { class: "muted", text: epostaMaskele(u.eposta) }) : null,
+      el("div", { class: "hk-satir-durum" }, rozet(u.kvkk_verildi, u.kvkk_guncel, u.kvkk_surum, u.kvkk_tarih, "Aydınlatma"), rozet(u.riza_verildi, u.riza_guncel, u.riza_surum, u.riza_tarih, "Açık rıza")),
+      gecmis);
+  };
+
+  const iskelet = () => liste.replaceChildren(...[0, 1, 2].map(() => el("div", { class: "hk-satir hk-iskelet", "aria-hidden": "true" })));
+
+  const durumuGuncelle = () => {
+    liste.setAttribute("aria-busy", String(mesgul));
+    liste.classList.toggle("hk-liste--mesgul", mesgul);
+    oncekiBtn.disabled = mesgul || ofset === 0;
+    sonrakiBtn.disabled = mesgul || ofset + SAYFA >= toplam;
+    bilgi.textContent = toplam ? `${ofset + 1}–${Math.min(ofset + SAYFA, toplam)} / ${toplam}` : "";
+    sayfalama.hidden = toplam <= SAYFA;
+  };
+
+  async function yukle({ kaydir = false } = {}) {
+    const no = ++istekNo;
+    mesgul = true;
+    if (!liste.children.length) iskelet();
+    durumuGuncelle();
     const { data, error } = await supabase.rpc("uye_onay_durumlari", { p_q: q, p_filtre: filtre, p_limit: SAYFA, p_ofset: ofset });
+    if (no !== istekNo) return; // daha yeni bir istek var; bu yanıt eski
+    mesgul = false;
     if (error) {
-      liste.replaceChildren(el("p", { class: "auth-message error", text: yokMu(error) ? "0076 numaralı migration henüz çalıştırılmamış." : error.message }));
+      const tekrar = dugme({ metin: "Tekrar dene", tur: "ikincil", kucuk: true });
+      tekrar.addEventListener("click", () => yukle());
+      liste.replaceChildren(el("p", { class: "auth-message error", text: yokMu(error) ? "0076 numaralı migration henüz çalıştırılmamış." : error.message }), tekrar);
+      durumuGuncelle();
       return;
     }
     const satirlar = data || [];
-    const toplam = satirlar[0] ? Number(satirlar[0].toplam) : 0;
-    liste.replaceChildren(...(satirlar.length ? satirlar.map((u) => {
-      const gecmis = el("div", { hidden: true });
-      const btn = dugme({ metin: "Geçmiş", ikonAdi: "ara", tur: "ikincil", kucuk: true });
-      btn.addEventListener("click", () => gecmisAc(u, gecmis, btn));
-      return el("article", { class: "hk-satir" },
-        el("div", { class: "hk-satir-ust" }, el("strong", { text: `${u.ad} · ${ROLLER[u.rol] || u.rol}` }), btn),
-        u.eposta ? el("small", { class: "muted", text: u.eposta }) : null,
-        el("div", { class: "hk-satir-durum" }, rozet(u.kvkk_verildi, u.kvkk_guncel, u.kvkk_surum, u.kvkk_tarih, "Aydınlatma"), rozet(u.riza_verildi, u.riza_guncel, u.riza_surum, u.riza_tarih, "Açık rıza")),
-        gecmis);
-    }) : [el("p", { class: "muted", text: "Bu filtreyle eşleşen üye yok." })]));
-    sayfalama.replaceChildren(
-      dugme({ metin: "Önceki", tur: "ikincil", kucuk: true, disabled: ofset === 0, onclick: () => { ofset = Math.max(0, ofset - SAYFA); yukle(); } }),
-      el("span", { class: "muted", text: toplam ? `${ofset + 1}–${Math.min(ofset + SAYFA, toplam)} / ${toplam}` : "" }),
-      dugme({ metin: "Sonraki", tur: "ikincil", kucuk: true, disabled: ofset + SAYFA >= toplam, onclick: () => { ofset += SAYFA; yukle(); } })
-    );
+    if (!satirlar.length && ofset > 0) { ofset = 0; return yukle(); } // silinme/filtre sonrası boş sayfada kalma
+    toplam = satirlar[0] ? Number(satirlar[0].toplam) : 0;
+    liste.replaceChildren(...(satirlar.length ? satirlar.map(satirCiz) : [el("p", { class: "muted hk-bos", text: q || filtre !== "hepsi" ? "Bu arama/filtreyle eşleşen üye yok." : "Henüz üye yok." })]));
+    durumuGuncelle();
+    if (kaydir) {
+      const r = araCubugu.getBoundingClientRect();
+      if (r.top < 0 || r.top > window.innerHeight * 0.6) araCubugu.scrollIntoView({ block: "start", behavior: "auto" });
+    }
   }
-  girdi.addEventListener("input", () => { clearTimeout(zamanlayici); zamanlayici = setTimeout(() => { q = girdi.value.trim(); ofset = 0; yukle(); }, 300); });
+
+  const sorguyuUygula = () => {
+    const yeni = girdi.value.trim();
+    temizleBtn.hidden = !girdi.value;
+    if (yeni === sonSorgu) return;
+    sonSorgu = yeni; q = yeni; ofset = 0;
+    yukle();
+  };
+  girdi.addEventListener("compositionstart", () => { bilesim = true; });
+  girdi.addEventListener("compositionend", () => { bilesim = false; clearTimeout(zamanlayici); zamanlayici = setTimeout(sorguyuUygula, 350); });
+  girdi.addEventListener("input", () => {
+    temizleBtn.hidden = !girdi.value;
+    if (bilesim) return;
+    clearTimeout(zamanlayici);
+    zamanlayici = setTimeout(sorguyuUygula, 350);
+  });
+  girdi.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); clearTimeout(zamanlayici); sorguyuUygula(); }
+    else if (e.key === "Escape" && girdi.value) { e.preventDefault(); girdi.value = ""; clearTimeout(zamanlayici); sorguyuUygula(); }
+  });
+  temizleBtn.addEventListener("click", () => { girdi.value = ""; clearTimeout(zamanlayici); sorguyuUygula(); girdi.focus(); });
+  oncekiBtn.addEventListener("click", () => { if (mesgul) return; ofset = Math.max(0, ofset - SAYFA); yukle({ kaydir: true }); });
+  sonrakiBtn.addEventListener("click", () => { if (mesgul) return; ofset += SAYFA; yukle({ kaydir: true }); });
+
+  const araCubugu = el("div", { class: "hk-aracubugu" }, el("div", { class: "sy-arama" }, ikon("ara"), girdi, temizleBtn), cipler);
   cipCiz();
   yukle();
-  return el("section", { class: "sy-bolum" },
+  return el("section", { class: "sy-bolum hk-uyeler" },
     el("h2", { text: "Üye onay kayıtları" }),
-    el("p", { class: "muted", text: "Her üyenin hangi aydınlatma ve açık rıza sürümünü ne zaman onayladığı (veya geri çektiği) otomatik kaydedilir." }),
-    el("div", { class: "sy-arama" }, ikon("ara"), girdi), cipler, liste, sayfalama);
+    el("p", { class: "muted", text: "Her üyenin hangi aydınlatma ve açık rıza sürümünü ne zaman onayladığı (veya geri çektiği) otomatik kaydedilir. E-posta adresleri maskelenir." }),
+    araCubugu, liste, sayfalama);
 }
 
 async function kur() {
