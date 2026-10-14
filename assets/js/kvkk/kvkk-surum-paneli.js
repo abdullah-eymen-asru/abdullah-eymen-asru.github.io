@@ -94,11 +94,6 @@ function yetkiBolumu(satir, mesaj) {
   );
 }
 
-/** E-posta ekranda maskeli gösterilir (yalnızca Site Sahibi'ne zaten döner): "ey•••@gmail.com". */
-const epostaMaskele = (e) => {
-  const m = /^([^@]{1,2})[^@]*(@.+)$/.exec(String(e || ""));
-  return m ? `${m[1]}•••${m[2]}` : "";
-};
 
 /**
  * Üye onay kayıtları: arama + filtre + sayfalama + her üyenin zaman damgalı geçmişi.
@@ -175,7 +170,7 @@ function uyeKayitlari() {
     });
     return el("article", { class: "hk-satir" },
       el("div", { class: "hk-satir-ust" }, el("strong", { text: `${u.ad} · ${ROLLER[u.rol] || u.rol}` }), btn),
-      u.eposta ? el("small", { class: "muted", text: epostaMaskele(u.eposta) }) : null,
+      u.eposta ? el("small", { class: "muted", text: u.eposta }) : null,
       el("div", { class: "hk-satir-durum" }, rozet(u.kvkk_verildi, u.kvkk_guncel, u.kvkk_surum, u.kvkk_tarih, "Aydınlatma"), rozet(u.riza_verildi, u.riza_guncel, u.riza_surum, u.riza_tarih, "Açık rıza")),
       gecmis);
   };
@@ -245,7 +240,7 @@ function uyeKayitlari() {
   yukle();
   return el("section", { class: "sy-bolum hk-uyeler" },
     el("h2", { text: "Üye onay kayıtları" }),
-    el("p", { class: "muted", text: "Her üyenin hangi aydınlatma ve açık rıza sürümünü ne zaman onayladığı (veya geri çektiği) otomatik kaydedilir. E-posta adresleri maskelenir." }),
+    el("p", { class: "muted", text: "Her üyenin hangi aydınlatma ve açık rıza sürümünü ne zaman onayladığı (veya geri çektiği) otomatik kaydedilir. E-posta adresleri yasal ispat amacıyla TAM açık gösterilir (yalnızca Site Sahibi, Admin ve hukuki metin yetkisi olanlar bu listeyi görebilir)." }),
     araCubugu, liste, sayfalama);
 }
 
