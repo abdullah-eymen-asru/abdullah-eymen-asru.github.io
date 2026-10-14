@@ -832,6 +832,7 @@ async function init() {
   // görünürlüğünü ve hangi script'in yükleneceğini belirler; her
   // modülün kendi requireAuthOrShowError({role:...}) çağrısı YİNE de
   // (savunma derinliği olarak) çalışmaya devam eder.
+  document.body.classList.add("dash-sayfa"); // üst şerit düzeni (dashboard.css)
   const { profile } = await requireAuthOrShowError({ role: null });
   // İSİM/ROL ARTIK ERKEN YAZILIR (BUG FİX): eskiden demo yapılandırması (en geç ~6 sn) beklendikten SONRA yazıldığı için
   // kenar çubuğundaki isim geç geliyordu.
