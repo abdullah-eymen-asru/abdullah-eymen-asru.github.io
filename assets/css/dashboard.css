@@ -847,3 +847,22 @@ body.dash-sayfa .site-header { background: var(--bg); -webkit-backdrop-filter: n
 body.dash-sayfa .site-header .wrap { max-width: min(1680px, 100vw - 32px); padding: 0; flex-wrap: nowrap; }
 body.dash-sayfa .site-header nav { min-width: 0; }
 @media (max-width: 640px) { body.dash-sayfa .site-header .wrap { max-width: none; padding: 0 16px; } }
+
+/* --- Hızlı erişim: Hemen Çıkış Yap + okunmamış rozeti (assets/js/dashboard-hizli.js) --- */
+.dash-hizli-cikis { margin-top: 10px; width: 100%; box-sizing: border-box; padding: 9px 12px; border-radius: 10px; border: 1px solid #c0392b; background: transparent; color: #c0392b; font: inherit; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.dash-hizli-cikis:hover, .dash-hizli-cikis:focus-visible { background: #c0392b; color: #fff; outline: none; }
+.dash-hizli-cikis[disabled] { opacity: .6; cursor: wait; }
+.dash-hizli-cikis--bar { margin: 0 0 0 auto; width: auto; padding: 6px 10px; font-size: .85rem; }
+.dash-nav-toggle--rozetli { position: relative; }
+.dash-nav-group-label { display: inline-flex; align-items: center; }
+#dash-nav a { display: flex; align-items: center; }
+#dash-nav a .dash-rozet { margin-left: auto; }
+.hub-kart .dash-rozet { margin-left: 8px; vertical-align: middle; }
+
+/* --- Yetki Ayarları: ⓘ bilgi düğmesi + bilgilendirme kartı (assets/js/github-yonetim/yetki-bilgi.js) --- */
+.ya-bilgi-btn { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin-left: 6px; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: var(--tag-bg); color: var(--accent); font: inherit; font-size: .85rem; line-height: 1; cursor: pointer; vertical-align: middle; }
+.ya-bilgi-btn:hover, .ya-bilgi-btn:focus-visible, .ya-bilgi-btn[aria-expanded="true"] { border-color: var(--accent); outline: none; background: var(--accent); color: #fff; }
+.ya-bilgi-karti { position: fixed; z-index: 10000; max-width: calc(100vw - 24px); box-sizing: border-box; padding: 14px 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--card-bg); color: var(--text); box-shadow: 0 16px 48px rgba(0, 0, 0, .35); font-size: .88rem; line-height: 1.5; }
+.ya-bilgi-karti h4 { margin: 0 0 8px; font-size: 1rem; }
+.ya-bilgi-karti p { margin: 0 0 8px; overflow-wrap: anywhere; }
+.ya-bilgi-kapat { margin-top: 2px; padding: 5px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--tag-bg); color: var(--text); font: inherit; cursor: pointer; }
