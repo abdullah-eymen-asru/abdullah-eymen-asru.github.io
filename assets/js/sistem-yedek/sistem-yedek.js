@@ -21,6 +21,8 @@ import { yedekAl, dosyaAdi } from "./disa-aktar.js";
 import { aliciOlustur } from "./zip-yazici.js";
 import { gezginCiz } from "./gezgin.js";
 import { icAktarCiz } from "./ice-aktar.js";
+import { kisiselVeriCiz } from "./kisisel-veri.js";
+import { r2CopCiz } from "./r2-cop.js";
 
 const ROLLER = { owner: "Site Sahibi", admin: "Yönetici", manager: "İçerik Sorumlusu", editor: "Editör", special_user: "Özel Üye", user: "Üye" };
 
@@ -136,6 +138,17 @@ async function kur() {
   const tamMi = tamYetki === true;
   const { data: oturum } = await supabase.auth.getSession();
   const benimId = oturum?.session?.user?.id || null;
+
+  // ÜST DÜZEY AYRIM: "👤 Kişisel Verilerim" (herkes, demo dahil) ve "🛟 Tüm Sistem & Felaket Kurtarma" (yalnızca owner / yetkilendirilmiş admin).
+  // Yetkisiz rol sistem sekmesini HİÇ görmez (güvenlik yine RPC + worker'dadır).
+  const kisiselKok = el("div", { class: "sy-ust-panel" });
+  kisiselVeriCiz(kisiselKok, mesaj);
+  if (!tamMi && !ownerMi) { kok.replaceChildren(kisiselKok); return; }
+  const sistemKok = el("div", { class: "sy-ust-panel", hidden: true });
+  const ustSerit = el("div", { class: "sy-ustsekmeler", role: "tablist", "aria-label": "Yedekleme alanları" });
+  const ustTanim = [{ id: "kisisel", ad: "👤 Kişisel Verilerim", panel: kisiselKok }, { id: "sistem", ad: "🛟 Tüm Sistem & Felaket Kurtarma", panel: sistemKok }];
+  const ustSec = (id) => { for (const t of ustTanim) { t.panel.hidden = t.id !== id; t.dugme.setAttribute("aria-selected", String(t.id === id)); } };
+  for (const t of ustTanim) { t.dugme = el("button", { type: "button", role: "tab", class: "sy-ustsekme", text: t.ad, "aria-selected": "false" }); t.dugme.addEventListener("click", () => ustSec(t.id)); ustSerit.append(t.dugme); }
 
   /* ---------------- 1) Depolama durumu ---------------- */
   const depolamaKok = el("div", { class: "sy-depolama" });
@@ -348,6 +361,10 @@ async function kur() {
     const gzKok = el("div", { class: "sy-sekme-panel", hidden: true });
     sekmeTanimlari.push({ id: "gezgin", ad: "🗂️ Depolama gezgini", panel: gzKok, kur: () => gezginCiz(gzKok, mesaj) });
   }
+  if (ownerMi) {
+    const copKok = el("div", { class: "sy-sekme-panel", hidden: true });
+    sekmeTanimlari.push({ id: "cop", ad: "🧹 R2 çöp toplayıcı", panel: copKok, kur: () => r2CopCiz(copKok, mesaj) });
+  }
   const serit = el("div", { class: "sy-altsekmeler", role: "tablist", "aria-label": "Sistem yedekleme bölümleri" });
   const kuruldu = new Set(["disa"]);
   const sekmeSec = (id) => {
@@ -364,7 +381,10 @@ async function kur() {
     t.dugme.addEventListener("click", () => sekmeSec(t.id));
     serit.append(t.dugme);
   }
-  kok.replaceChildren(...(sekmeTanimlari.length > 1 ? [serit] : []), ...sekmeTanimlari.map((t) => t.panel));
+  const sistemUyari = el("p", { class: "sy-bilgi sy-bilgi--uyari" }, ikon("uyari"), el("span", { text: "DİKKAT: Bu alan TÜM sistemi (veritabanı, tüm üyelerin dosyaları, yapılandırma) kapsar. Kişisel notların/mesajların için soldaki “Kişisel Verilerim” sekmesini kullan; buradaki geri yükleme sistem verisini DEĞİŞTİRİR." }));
+  sistemKok.replaceChildren(sistemUyari, ...(sekmeTanimlari.length > 1 ? [serit] : []), ...sekmeTanimlari.map((t) => t.panel));
+  kok.replaceChildren(ustSerit, kisiselKok, sistemKok);
+  ustSec("kisisel");
   sekmeSec("disa");
 
   durumGuncelle();
