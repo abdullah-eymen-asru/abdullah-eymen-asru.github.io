@@ -18,6 +18,7 @@
  */
 import { supabase } from "../core/supabase-client.js";
 import { zipAc } from "./zip-oku.js";
+import * as Rewrap from "../kurtarma-kiti/yeniden-zarfla.js"; // farklı hesap/altyapı: Yedek Kurtarma Kodu + yeniden zarflama (2026-10)
 import { el, bayt, hataMetni, workerFetch, dugme, ikon, onayIste, r2AnahtarGecerli, R2_KAYNAK_ADLARI } from "./ortak.js";
 
 // FK BAĞIMLILIK SIRASI (ebeveyn → çocuk). Sunucu RPC'si her satırı UPSERT eder (INSERT … ON CONFLICT (pk) DO UPDATE | DO NOTHING):
@@ -77,6 +78,7 @@ async function analizEt(dosyalar, sema, ilerleme, ctx = {}) {
   const bosTablolar = []; // tek satırda özetlenir
   const kapsamDisi = [];  // üye modunda yazılamayan hesap/sistem tabloları
   const gevsek = [];          // eşleştirilecek tekil dosyalar {ad, boyut, al}
+  const ozel = {};            // yeniden zarflama için ham satırlar (üye kipinde "kapsam dışı" olsalar bile): tablo -> satırlar
 
   const tabloEkle = (tablo, satirlar, kaynak, yontem) => {
     const t = sema.find((x) => x.tablo === tablo);
@@ -90,6 +92,7 @@ async function analizEt(dosyalar, sema, ilerleme, ctx = {}) {
     let satirlar;
     try { satirlar = await jsonSatirlari(blob); } catch (h) { notlar.push(`${etiket}: atlandı — ${h.message}`); return; }
     const kokAd = ad.split("/").pop().replace(/\.json$/i, "");
+    if (Rewrap.OZEL_TABLOLAR.includes(kokAd) && /(^|\/)veritabani\/json\//.test(ad)) (ozel[kokAd] ||= []).push(...satirlar);
     if (!satirlar.length) { bosTablolar.push(kokAd); return; }
     const t = tabloTespit(ad, satirlar, sema);
     if (!t) {
@@ -119,7 +122,7 @@ async function analizEt(dosyalar, sema, ilerleme, ctx = {}) {
             manifestYollari.add(e.yol);
             if (!g) { notlar.push(`MANIFEST: ${e.yol} pakette yok.`); continue; }
             if (!r2AnahtarGecerli(e.kaynak, e.anahtar)) { notlar.push(`MANIFEST: ${e.anahtar} bilinen anahtar biçimi değil (korumalı) — atlanacak.`); continue; }
-            r2.push({ kaynak: e.kaynak, anahtar: yeniAnahtar(e.kaynak, e.anahtar, ctx), ad: e.anahtar.split("/").pop(), boyut: g.usize, al: () => z.oku(g) });
+            r2.push({ kaynak: e.kaynak, anahtar: yeniAnahtar(e.kaynak, e.anahtar, ctx), eskiAnahtar: e.anahtar, ad: e.anahtar.split("/").pop(), boyut: g.usize, al: () => z.oku(g) });
           }
         } catch (h) { notlar.push(`r2/MANIFEST.json okunamadı: ${h.message}`); }
       }
@@ -152,7 +155,7 @@ async function analizEt(dosyalar, sema, ilerleme, ctx = {}) {
     const msj = kapsamDisi.filter((k) => MESAJ_TABLOLARI.has(k));
     const diger = kapsamDisi.filter((k) => !MESAJ_TABLOLARI.has(k));
     if (diger.length) notlar.push(`Kapsam dışı (hesap/rol/yetki/anahtar/onay verisi — üye geri yüklemesinde bilerek yazılmaz): ${diger.join(", ")}.`);
-    if (msj.length) notlar.push("Mesajlaşma kayıtları (uçtan uca şifreli) paketin içinde sağlam durur ama üye geri yüklemesinde yazılmaz; yalnızca Site Sahibi'nin Tam Sistem Kurtarması aynı hesaplar üzerinde geri yükler.");
+    if (msj.length) notlar.push("Mesajlaşma kayıtları (uçtan uca şifreli) ham hâliyle üye geri yüklemesinde yazılmaz. Yedek başka bir hesaba aitse ve Yedek Kurtarma Kodun varsa sohbetlerin kod girilince yeni anahtarlarına yeniden zarflanıp arşiv sohbeti olarak aktarılır; aynı hesap/altyapıda ham geri yükleme yalnızca Site Sahibi'nin Tam Sistem Kurtarması içindir.");
   }
   if (bosTablolar.length) notlar.push(`${bosTablolar.length} boş tablo atlandı: ${bosTablolar.join(", ")}.`);
 
@@ -171,7 +174,7 @@ async function analizEt(dosyalar, sema, ilerleme, ctx = {}) {
       });
     }
   }
-  return { tablolar: [...tablolar.values()].sort((a, b) => siraNo(a.tablo) - siraNo(b.tablo) || a.tablo.localeCompare(b.tablo)), r2, notlar };
+  return { tablolar: [...tablolar.values()].sort((a, b) => siraNo(a.tablo) - siraNo(b.tablo) || a.tablo.localeCompare(b.tablo)), r2, notlar, ozel };
 }
 
 /* ------------------------------ arayüz ------------------------------ */
@@ -211,6 +214,7 @@ export async function icAktarCiz(kok, mesaj, { uye = false } = {}) {
     if (!liste.length) return;
     try {
       plan = await analizEt(liste, sema, (m) => { durum.textContent = m; }, ctx);
+      try { plan.rewrap = await Rewrap.tespit(plan, uid || (await supabase.auth.getUser()).data?.user?.id); } catch { plan.rewrap = null; } // başka hesaba/altyapıya ait şifreli veri mi?
       durum.textContent = "";
       planCiz();
     } catch (h) { durum.textContent = ""; mesaj(`Analiz başarısız: ${hataMetni(h)}`); }
@@ -244,6 +248,7 @@ export async function icAktarCiz(kok, mesaj, { uye = false } = {}) {
     basla.addEventListener("click", () => calistir(basla));
     doldur(planKutu, 
       el("h3", { text: "Analiz sonucu" }),
+      Rewrap.seritCiz(plan.rewrap),
       plan.tablolar.length ? el("div", {}, el("strong", { text: "Veritabanı tabloları" }), el("ul", { class: "sy-ia-liste" }, tSatir)) : null,
       plan.r2.length ? el("div", {}, el("strong", { text: "R2 dosyaları" }), el("ul", { class: "sy-ia-liste" }, rSatir)) : null,
       plan.notlar.length ? el("div", { class: "sy-bilgi sy-bilgi--uyari" }, ikon("uyari"), el("ul", { class: "sy-ia-notlar" }, plan.notlar.slice(0, 30).map((n) => el("li", { text: n })))) : null,
@@ -256,8 +261,8 @@ export async function icAktarCiz(kok, mesaj, { uye = false } = {}) {
   }
 
   async function calistir(basla) {
-    const tSec = plan.tablolar.filter((t) => t.secili);
-    const rSec = plan.r2.filter((r) => r.secili && r.kaynak);
+    let tSec = plan.tablolar.filter((t) => t.secili);
+    let rSec = plan.r2.filter((r) => r.secili && r.kaynak);
     if (!tSec.length && !rSec.length) return mesaj("Geri yüklenecek bir öğe seç.");
     const tamam = await onayIste({
       baslik: mod === "uzerine" ? "Mevcut veriler yedektekiyle EZİLSİN mi?" : "Eksik veriler geri yüklensin mi?",
@@ -282,6 +287,7 @@ export async function icAktarCiz(kok, mesaj, { uye = false } = {}) {
 
     const rapor = { tablolar: {}, dosyalar: { yazildi: 0, atlandi: 0, hata: [] }, mod };
     let islem = null;
+    let rwSonuc = null; // yeniden zarflama (farklı hesap/altyapı): ham anahtar baytları R2 yazımları bitene dek tutulur
     try {
       if (!uye) { // denetim günlüğü yalnızca Site Sahibi işlemleri için (üyenin kendi geri yüklemesi kendi verisidir)
         const b = await supabase.rpc("sistem_islem_baslat", { p_tur: "geri_yukleme", p_ayrinti: { mod, tablolar: tSec.map((t) => t.tablo), dosya: rSec.length } });
@@ -289,6 +295,17 @@ export async function icAktarCiz(kok, mesaj, { uye = false } = {}) {
         islem = b.data;
       }
       const iptalKontrol = () => { if (denetci.signal.aborted) throw new DOMException("İptal edildi", "AbortError"); };
+
+      // 0) FARKLI HESAP / ALTYAPI: Yedek Kurtarma Kodu → eski notlar/sohbetler/ekler bu hesabın anahtarlarına YENİDEN ZARFLANIR (tarayıcıda).
+      if (plan.rewrap?.yabanci) {
+        asama.textContent = "Yedek Kurtarma Kodu bekleniyor…";
+        const kimlik = uid || (await supabase.auth.getUser()).data?.user?.id;
+        rwSonuc = await Rewrap.calistir(plan, { uid: kimlik }, { logla, asama: (m) => { asama.textContent = m; } });
+        rapor.yenidenZarflama = rwSonuc.rapor;
+        tSec = plan.tablolar.filter((t) => t.secili);
+        rSec = plan.r2.filter((r) => r.secili && r.kaynak);
+        cubuk.max = String(Math.max(1, tSec.reduce((n, t) => n + t.satirlar.length, 0) + rSec.length));
+      }
 
       // 1) tablolar — en çok 3 tur; FK hatası alan tablolar sonraki turda "eksikleri" kipiyle tekrar denenir
       let bekleyen = tSec;
@@ -346,6 +363,7 @@ export async function icAktarCiz(kok, mesaj, { uye = false } = {}) {
     } finally {
       denetci = null;
       basla.disabled = false;
+      rwSonuc?.temizle?.(); // eski DEK / RSA özel anahtar baytlarını sıfırla
       // gizlilik/bellek: yedek içeriğini bellekten bırak
       for (const t of plan?.tablolar || []) t.satirlar = [];
       for (const r of plan?.r2 || []) r.al = null;
