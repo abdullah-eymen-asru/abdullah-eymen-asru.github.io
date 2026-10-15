@@ -14,7 +14,8 @@ const enc = new TextEncoder();
 const dec = new TextDecoder();
 const ANAHTARLAR = new Map(); // sohbetId -> CryptoKey
 const ZARFLAR = new Map();    // sohbetId -> base64 zarf (benim)
-const TAMAMLANAN = new Set(); // eksik zarf tamamlama denenen sohbetler (oturum başına bir kez)
+const TAMAMLANAN = new Map(); // sohbetId -> son eksik-zarf tamamlama zamanı (60 sn aralık: karşı taraf sonradan düzelirse tekrar denenir)
+const TAMAMLAMA_ARALIK = 60000;
 const BOZUK = new Set();      // bayat zarfı temizlenmeye çalışılan sohbetler (oturum başına bir kez)
 
 const b64 = (buf) => {
@@ -98,16 +99,38 @@ export async function coz(key, b64s, aad) {
   } catch { return null; }
 }
 
-/** Anahtarı bilen kişi, sonradan yetkili olan / anahtarı geç oluşan kişilerin zarfını tamamlar (oturumda sohbet başına 1 kez). */
-export async function eksikZarflariTamamla(id) {
-  if (TAMAMLANAN.has(id)) return;
-  TAMAMLANAN.add(id);
+/**
+ * Anahtarı bilen kişi, sonradan yetkili olan / anahtarı geç oluşan / anahtarı yenilenen kişilerin zarfını tamamlar.
+ * 60 sn'de sohbet başına 1 kez (eskiden oturumda 1 kez'di: karşı taraf SONRADAN düzelirse hiç yeniden denenmiyordu). zorla: aralığı yok say.
+ * Dönüş: yazılan zarf sayısı (hata/gereksizse 0). Hata fırlatmaz.
+ */
+export async function eksikZarflariTamamla(id, zorla = false) {
+  const t = Date.now();
+  if (!zorla && t - (TAMAMLANAN.get(id) || 0) < TAMAMLAMA_ARALIK) return 0;
+  TAMAMLANAN.set(id, t);
   try {
     const key = await sohbetAnahtari(id);
-    if (!key) return;
+    if (!key) return 0;
     const { data: eksik, error } = await supabase.rpc("mesaj_eksik_zarflar", { p_id: id });
-    if (error || !eksik?.length) return;
+    if (error || !eksik?.length) return 0;
     const { zarflar } = await zarflariHazirla(key, eksik);
     if (zarflar.length) await supabase.rpc("mesaj_zarf_ekle", { p_id: id, p_zarflar: zarflar });
-  } catch { /* best-effort */ }
+    return zarflar.length;
+  } catch { return 0; /* best-effort */ }
+}
+
+/** TANILAMA: bir sohbetin anahtar durumu → { zarfVar, anahtarAcilir, eksik (zarfı olmayan kişi sayısı | null) }. Önce zarflarimiYukle() çağrılmış olmalı. */
+export async function sohbetTani(id) {
+  const t = { zarfVar: ZARFLAR.has(id), anahtarAcilir: false, eksik: null };
+  try { t.anahtarAcilir = !!(await sohbetAnahtari(id)); } catch (e) { t.hata = e?.name || "hata"; }
+  try { const { data } = await supabase.rpc("mesaj_eksik_zarflar", { p_id: id }); if (Array.isArray(data)) t.eksik = data.length; } catch { /* yok say */ }
+  return t;
+}
+
+/** ONAR: açılıyorsa eksik zarfları hemen tamamlar; zarf bayatsa siler (karşı taraf açınca yeniden paylaşır). → "acik" | "bayat-silindi" | "bayat-silinemedi" | "zarf-yok" */
+export async function sohbetiOnar(id) {
+  if (!ZARFLAR.has(id)) return "zarf-yok";
+  if (await sohbetAnahtari(id)) { await eksikZarflariTamamla(id, true); return "acik"; }
+  BOZUK.delete(id); await bayatZarfiTemizle(id);
+  return ZARFLAR.has(id) ? "bayat-silinemedi" : "bayat-silindi";
 }
