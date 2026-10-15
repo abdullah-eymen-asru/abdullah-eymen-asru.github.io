@@ -21,17 +21,24 @@
  * "kurtarma kodu yok" şartının kaçınılmaz bedelidir (escrow). Saf E2EE değildir.
  */
 import { supabase } from "../core/supabase-client.js";
+import * as Kasa from "../notlar/kasa.js";
 
 /*
- * 2026-10 KURTARMA PAROLASI KATMANI (migration 0095) — "Özel anahtar açılamadı" hatasının KALICI çözümü.
- * KÖK NEDEN: özel anahtar YALNIZCA Worker'ın türettiği kasa anahtarıyla sarılıydı (tek kilit). Worker sırrı (E2EE_KASA_SECRET)
- * değişince/yanlış ortamda deploy edilince/farklı projeye taşınınca aynı kullanıcı için FARKLI kasa anahtarı türüyor ve
- * AES-GCM çözümü sessizce başarısız oluyordu; satır bir kez yazılıp UPDATE yolu olmadığı için de onarılamıyordu.
- * ÇÖZÜM: özel anahtar ikinci bir kilitle — kullanıcının KURTARMA PAROLASINDAN (PBKDF2-SHA256, 600k tur) türetilen AES-GCM anahtarıyla —
- * sarılıp sarılı olarak saklanır. Parola ve türetilen anahtar sunucuya HİÇ gitmez. Worker sarmalı bozulursa parola girilir, anahtar
- * açılır ve Worker sarmalı otomatik yeniden yazılır (e2ee_kasa_sarmalini_yenile). Başka cihaz/gizli sekmede de aynı parola yeter.
- * Anahtarlar yalnızca bellekte; "Bu cihazda hatırla" işaretlenirse YALNIZCA çıkarılamaz (non-extractable) CryptoKey nesnesi IndexedDB'ye konur.
+ * 2026-10 (migration 0096) — MESAJLAŞMA ANAHTARI GİRİŞ OTURUMUNA BAĞLANDI; ayrı "Kurtarma Parolası" kutusu KALDIRILDI.
+ * ÖZEL ANAHTARIN ÜÇ (+1) KİLİDİ, açılış sırasıyla:
+ *   1) DEK sarmalı  : Notlar kasasının DEK'i (giriş parolası → PBKDF2 → KEK → DEK; Google'da bağımsız Kasa Parolası) özel anahtarı sarar.
+ *                     Kasa girişte sessizce açıldığı için mesajlar da AYNI ANDA açılır; Worker'a istek bile atılmaz.
+ *   2) Worker sarmalı: Worker'ın kullanıcıya özel türettiği kasa anahtarı (eski/yedek yol). Kasa kilitliyken — özellikle Google hesaplarında,
+ *                     giriş parolası olmadığından — mesajların kilitlenmemesini sağlar.
+ *   3) Cihaz anahtarı: "bu cihazda hatırla" ile IndexedDB'de duran ÇIKARILAMAZ CryptoKey (eski kurtarma parolasıyla açıldıysa).
+ *   +) Yedek Kurtarma Kodu (Kit): Notlar DEK'i + RSA özel anahtarı TEK blobda, kod-türevli anahtarla sarılı (kurtarma-kiti/kit.js).
+ * ESKİ kurtarma parolası (0095) yalnızca onu daha önce belirlemiş hesapların verisi yetim kalmasın diye AÇMA yönünde korunur; yeni
+ * parola belirlenemez.
+ * NEDEN "OAuth BİLETİNDEN TÜRETİLEN ANAHTAR" YOK? Supabase/Google oturum belirteçleri (JWT, provider token) saatlik döner ve sunucu
+ * tarafından görülebilir; onlardan türeyen anahtar ya her saat değişir ya da sunucunun da türetebildiği bir anahtardır (E2EE olmaz).
+ * Bu yüzden Google hesapları Notlar'daki ÇÖZÜMÜN AYNISINI kullanır: bağımsız Kasa Parolası (parola_tur='kasa') + cihazda KEK önbelleği.
  */
+export const KDF_TUR_VARSAYILAN = 600000;
 export const KURTARMA_KDF_TUR = 600000;
 export const KURTARMA_PAROLA_MIN = 10;
 
@@ -59,7 +66,7 @@ async function jwt() {
   return data.session;
 }
 
-let anahtarOnbellek = null; // { uid, kasa, ozel, acik }
+let anahtarOnbellek = null; // { uid, ozel, acik }
 
 async function kasaAnahtariniAl(session) {
   const r = await fetch(`${ARSIV_WORKER_URL}/kasa-anahtari`, {
@@ -71,53 +78,155 @@ async function kasaAnahtariniAl(session) {
   return crypto.subtle.importKey("raw", b64coz(anahtar), "AES-GCM", false, ["encrypt", "decrypt"]);
 }
 
+const SATIR_KOLONLARI = "acik_anahtar, sarili_ozel_anahtar, iv, kurtarma_sarili_ozel_anahtar, dek_sarili_ozel_anahtar, dek_iv";
+const DEK_ETIKET = "e2ee-ozel-anahtar";
+const ozelImport = (pkcs8) => crypto.subtle.importKey("pkcs8", pkcs8, { name: "RSA-OAEP", hash: "SHA-256" }, false, ["decrypt"]);
+
+/** DEK sarmalından PKCS8 baytlarını açar (Notlar kasası AÇIKSA ve sarmal varsa); olmazsa null. */
+async function pkcs8DekIle(satir) {
+  if (!satir?.dek_sarili_ozel_anahtar || !Kasa.kasaAcikMi()) return null;
+  try { return await Kasa.dekIleAc(satir.dek_sarili_ozel_anahtar, satir.dek_iv, DEK_ETIKET); } catch { return null; }
+}
+/** Worker kasa anahtarıyla sarılı PKCS8'i açar; Worker'a ulaşılamazsa { hata: "ag" }, sarmal açılamazsa null. */
+async function pkcs8WorkerIle(session, satir) {
+  let kasa;
+  try { kasa = await kasaAnahtariniAl(session); } catch { return { hata: "ag" }; }
+  try { return await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64coz(satir.iv), additionalData: enc.encode(session.user.id) }, kasa, b64coz(satir.sarili_ozel_anahtar)); }
+  catch { return null; }
+}
+
+/** Notlar kasası açıkken özel anahtarı (varsa) DEK'e de sarar → bundan sonra mesajlar giriş oturumuyla açılır. Hata fırlatmaz. */
+async function dekSarmaliniYaz(pkcs8) {
+  try {
+    if (!Kasa.kasaAcikMi()) return false;
+    const { sarili, iv } = await Kasa.dekIleSar(pkcs8, DEK_ETIKET);
+    const { error } = await supabase.rpc("e2ee_dek_sarmali_kaydet", { p_sarili: sarili, p_iv: iv });
+    return !error;
+  } catch { return false; }
+}
+
 /** Oturum açmış kullanıcının anahtarlarını hazırlar (yoksa oluşturur). Sessiz, kullanıcıdan hiçbir şey istemez. */
 export async function anahtarlariHazirla() {
   const session = await jwt();
   const uid = session.user.id;
   if (anahtarOnbellek?.uid === uid) return anahtarOnbellek;
 
-  const kasa = await kasaAnahtariniAl(session);
-  const aad = enc.encode(uid);
-
-  const oku = () => supabase.from("e2ee_kullanici_anahtarlari")
-    .select("acik_anahtar, sarili_ozel_anahtar, iv").eq("kullanici_id", uid).maybeSingle();
-
+  const oku = () => supabase.from("e2ee_kullanici_anahtarlari").select(SATIR_KOLONLARI).eq("kullanici_id", uid).maybeSingle();
   let { data: satir, error } = await oku();
+  if (error && /dek_sarili|dek_iv|kurtarma_sarili|42703/.test(`${error.code} ${error.message}`)) {
+    // 0096 henüz çalıştırılmamış: eski kolonlarla devam et (Worker yolu).
+    ({ data: satir, error } = await supabase.from("e2ee_kullanici_anahtarlari").select("acik_anahtar, sarili_ozel_anahtar, iv").eq("kullanici_id", uid).maybeSingle());
+  }
   if (error) throw new Error("Anahtar kaydı okunamadı.");
 
+  // İLK KURULUM: anahtar çifti yok → üret. sarili_ozel_anahtar zorunlu kolon olduğundan Worker sarmalı yazılır; kasa açıksa DEK sarmalı da eklenir.
   if (!satir) {
+    const kasa = await kasaAnahtariniAl(session);
     const cift = await crypto.subtle.generateKey(RSA, true, ["encrypt", "decrypt"]);
     const acik = await crypto.subtle.exportKey("spki", cift.publicKey);
     const ozel = await crypto.subtle.exportKey("pkcs8", cift.privateKey);
     const iv = crypto.getRandomValues(new Uint8Array(12));
-    const sarili = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: aad }, kasa, ozel);
+    const sarili = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: enc.encode(uid) }, kasa, ozel);
     const { error: eklemeHatasi } = await supabase.from("e2ee_kullanici_anahtarlari").insert({
       kullanici_id: uid, acik_anahtar: b64(acik), sarili_ozel_anahtar: b64(sarili), iv: b64(iv),
     });
-    // Başka bir sekme aynı anda yazmış olabilir (PK çakışması) -> kazananı oku.
-    ({ data: satir, error } = await oku());
+    ({ data: satir, error } = await oku()); // başka sekme aynı anda yazmış olabilir (PK çakışması) → kazananı oku
     if (error || !satir) throw new Error(eklemeHatasi ? "Anahtar kaydı yazılamadı." : "Anahtar kaydı okunamadı.");
+    if (!eklemeHatasi) await dekSarmaliniYaz(ozel);
   }
 
-  let ozelAnahtar;
-  try {
-    const duz = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv: b64coz(satir.iv), additionalData: aad }, kasa, b64coz(satir.sarili_ozel_anahtar));
-    ozelAnahtar = await crypto.subtle.importKey("pkcs8", duz, { name: "RSA-OAEP", hash: "SHA-256" }, false, ["decrypt"]);
-  } catch {
-    // Worker kasa anahtarı sarmalı açamadı. Önce bu cihazda hatırlanan anahtar, sonra kurtarma parolası yolu.
-    const yerel = await cihazAnahtariniOku(uid);
-    if (yerel) { anahtarOnbellek = { uid, ozel: yerel, acik: satir.acik_anahtar }; return anahtarOnbellek; }
-    throw new E2EEKilitHatasi("Özel anahtar açılamadı (kasa anahtarı değişmiş olabilir).", { kurtarmaVar: !!satir.kurtarma_sarili_ozel_anahtar });
+  // 1) DEK sarmalı (giriş oturumuna bağlı yol — Worker'a istek yok)
+  let pkcs8 = await pkcs8DekIle(satir);
+  let workerAgHatasi = false;
+  // 2) Worker kasa sarmalı (yedek yol)
+  if (!pkcs8) {
+    const w = await pkcs8WorkerIle(session, satir);
+    if (w?.hata === "ag") workerAgHatasi = true;
+    else if (w) {
+      pkcs8 = w;
+      // Sessiz geçiş: kasa açıksa ve DEK sarmalı henüz yoksa şimdi ekle (bir kez).
+      if (!satir.dek_sarili_ozel_anahtar) dekSarmaliniYaz(pkcs8);
+    }
   }
-  anahtarOnbellek = { uid, ozel: ozelAnahtar, acik: satir.acik_anahtar };
-  return anahtarOnbellek;
+  if (pkcs8) {
+    anahtarOnbellek = { uid, ozel: await ozelImport(pkcs8), acik: satir.acik_anahtar };
+    return anahtarOnbellek;
+  }
+  // 3) Bu cihazda hatırlanan anahtar
+  const yerel = await cihazAnahtariniOku(uid);
+  if (yerel) { anahtarOnbellek = { uid, ozel: yerel, acik: satir.acik_anahtar }; return anahtarOnbellek; }
+
+  const durum = { kurtarmaVar: !!satir.kurtarma_sarili_ozel_anahtar, notlarKilitli: !Kasa.kasaAcikMi(), dekSarmalVar: !!satir.dek_sarili_ozel_anahtar };
+  // Worker'a hiç ulaşılamadı ve çözümü başka yol da yok: bu bir kilit değil, ağ sorunudur.
+  if (workerAgHatasi && !durum.dekSarmalVar) throw new Error("Kasa anahtarı alınamadı.");
+  throw kilitHatasi(durum);
+}
+function kilitHatasi(durum) {
+  return new E2EEKilitHatasi(
+    durum.dekSarmalVar && durum.notlarKilitli
+      ? "Mesajların anahtarı Notlar kasana bağlı; kasan bu cihazda kilitli."
+      : "Özel anahtar açılamadı (kasa anahtarı değişmiş olabilir).", durum);
+}
+
+/**
+ * Notlar kasası AÇILDIKTAN sonra çağrılır (girişte sessiz açma, Notlar kilidi, Kit ile kurtarma): özel anahtar henüz DEK'e sarılı
+ * değilse sarar. Kasa kilitliyse ya da anahtar açılamıyorsa sessizce false döner.
+ */
+export async function anahtariGirisaBagla() {
+  try {
+    if (!Kasa.kasaAcikMi()) return false;
+    const session = await jwt();
+    const { data: satir } = await supabase.from("e2ee_kullanici_anahtarlari").select(SATIR_KOLONLARI).eq("kullanici_id", session.user.id).maybeSingle();
+    if (!satir || satir.dek_sarili_ozel_anahtar) return !!satir;
+    const pkcs8 = await ozelAnahtarPkcs8().catch(() => null);
+    return pkcs8 ? await dekSarmaliniYaz(pkcs8) : false;
+  } catch { return false; }
+}
+
+/** Panel açılışında (dashboard.js): Notlar kasasını sessizce aç ve mesajlaşma anahtarını bağla. Hiçbir şey sormaz, hata fırlatmaz. */
+export async function girisOturumunaBagla() {
+  try {
+    const session = await jwt();
+    if (await Kasa.kasaSessizAc(session)) await anahtariGirisaBagla();
+  } catch { /* kasa/ağ hazır değil: mesajlar Worker yoluyla açılmaya devam eder */ }
+}
+
+/** Özel anahtarın PKCS8 baytları (Kit oluşturma / yeniden zarflama için). Çağıran işini bitince .fill(0) yapmalıdır. */
+export async function ozelAnahtarPkcs8() {
+  const session = await jwt();
+  const { data: satir } = await supabase.from("e2ee_kullanici_anahtarlari").select(SATIR_KOLONLARI).eq("kullanici_id", session.user.id).maybeSingle();
+  if (!satir) throw new Error("Anahtar kaydı bulunamadı.");
+  const d = await pkcs8DekIle(satir);
+  if (d) return new Uint8Array(d);
+  const w = await pkcs8WorkerIle(session, satir);
+  if (w && !w.hata) return new Uint8Array(w);
+  throw new E2EEKilitHatasi("Özel anahtar açılamadı.", { kurtarmaVar: !!satir.kurtarma_sarili_ozel_anahtar, notlarKilitli: !Kasa.kasaAcikMi(), dekSarmalVar: !!satir.dek_sarili_ozel_anahtar });
+}
+
+/**
+ * Kit/yeniden zarflama sonrası: çözülmüş PKCS8'i bu oturumun anahtarı yapar ve (kasa açıksa) DEK'e, (Worker erişilebiliyorsa)
+ * Worker kasa anahtarına yeniden sarar → bozuk sarmallar kendini onarır.
+ */
+export async function ozelAnahtariIceAktar(pkcs8, { cihazdaHatirla = false } = {}) {
+  const session = await jwt();
+  const uid = session.user.id;
+  const ozel = await ozelImport(pkcs8);
+  const { data: s } = await supabase.from("e2ee_kullanici_anahtarlari").select("acik_anahtar").eq("kullanici_id", uid).maybeSingle();
+  anahtarOnbellek = { uid, ozel, acik: s?.acik_anahtar };
+  if (cihazdaHatirla) await cihazAnahtariniKaydet(uid, ozel);
+  const dekYazildi = await dekSarmaliniYaz(pkcs8);
+  let workerOnarildi = false;
+  try {
+    const kasa = await kasaAnahtariniAl(session);
+    const iv = rastgele(12);
+    const yeni = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: enc.encode(uid) }, kasa, pkcs8);
+    const { error } = await supabase.rpc("e2ee_kasa_sarmalini_yenile", { p_sarili: b64(yeni), p_iv: b64(iv) });
+    workerOnarildi = !error;
+  } catch { /* Worker yoksa sorun değil */ }
+  return { onarildi: dekYazildi || workerOnarildi };
 }
 
 /* ------------------------- KURTARMA PAROLASI ------------------------- */
-
-const ozelImport = (pkcs8) => crypto.subtle.importKey("pkcs8", pkcs8, { name: "RSA-OAEP", hash: "SHA-256" }, false, ["decrypt"]);
 
 /** PBKDF2-SHA256(parola, tuz, tur) → AES-GCM-256 (yalnızca şifrele/çöz). Mesaj yedeği de aynı türetmeyi kullanır. */
 export async function parolaAnahtariTuret(parola, tuzU8, tur = KURTARMA_KDF_TUR, kullanim = ["encrypt", "decrypt"]) {
@@ -128,62 +237,30 @@ export const b64Kodla = b64;
 export const b64Coz = b64coz;
 export const rastgele = (n) => crypto.getRandomValues(new Uint8Array(n));
 
-/** Anahtar kaydının durumu (ağ: 1 RPC). { var, kurtarma_var, kurtarma_at } */
+/** Anahtar kaydının durumu (ağ: 1 RPC). { var, kurtarma_var (ESKİ parola), dek_var, kit_var, kit_at } */
 export async function anahtarDurumu() {
   const { data, error } = await supabase.rpc("e2ee_durum");
-  if (error) throw new Error(/does not exist|PGRST202|42883|schema cache/i.test(error.message || "") ? "0095 numaralı migration henüz çalıştırılmamış." : error.message);
-  return data || { var: false, kurtarma_var: false };
+  if (error) throw new Error(/does not exist|PGRST202|42883|schema cache/i.test(error.message || "") ? "0096 numaralı migration henüz çalıştırılmamış." : error.message);
+  return data || { var: false, kurtarma_var: false, kit_var: false };
 }
 
-/** Worker kasa anahtarıyla sarılı özel anahtarı (PKCS8) YEREL olarak açar; çağıran işini bitirince referansı bırakmalıdır. */
-async function pkcs8Al(session) {
-  const uid = session.user.id;
-  const kasa = await kasaAnahtariniAl(session);
-  const { data: s } = await supabase.from("e2ee_kullanici_anahtarlari").select("sarili_ozel_anahtar, iv").eq("kullanici_id", uid).maybeSingle();
-  if (!s) throw new Error("Anahtar kaydı bulunamadı.");
-  try { return await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64coz(s.iv), additionalData: enc.encode(uid) }, kasa, b64coz(s.sarili_ozel_anahtar)); }
-  catch { throw new E2EEKilitHatasi("Özel anahtar açılamadı (kasa anahtarı değişmiş olabilir)."); }
-}
-
-/** Anahtar şu an açılabiliyorken kurtarma parolasını belirler/değiştirir. Sunucuya yalnızca SARILI blob gider. */
-export async function kurtarmaParolasiBelirle(parola) {
-  if (typeof parola !== "string" || parola.length < KURTARMA_PAROLA_MIN) throw new Error(`Kurtarma parolası en az ${KURTARMA_PAROLA_MIN} karakter olmalı.`);
-  const session = await jwt();
-  await anahtarlariHazirla(); // kayıt yoksa oluşturur; açılamıyorsa E2EEKilitHatasi fırlatır
-  const pkcs8 = await pkcs8Al(session);
-  const tuz = rastgele(16); const iv = rastgele(12);
-  const k = await parolaAnahtariTuret(parola, tuz);
-  const sarili = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: enc.encode(session.user.id) }, k, pkcs8);
-  const { error } = await supabase.rpc("e2ee_kurtarma_kaydet", { p_sarili: b64(sarili), p_iv: b64(iv), p_tuz: b64(tuz), p_tur: KURTARMA_KDF_TUR });
-  if (error) throw new Error(error.message);
-}
-
-/** Kurtarma parolasıyla özel anahtarı AÇAR (başka cihaz / gizli sekme / Worker sırrı değişmiş durum) ve Worker sarmalını onarır. */
+/**
+ * ESKİ kurtarma parolasıyla (0095) özel anahtarı AÇAR. YENİ parola belirlenemez; bu yol yalnızca daha önce parola koymuş hesaplar içindir.
+ * Açılan anahtar DEK'e/Worker'a yeniden sarılır (kendini onarma).
+ */
 export async function kurtarmaParolasiylaAc(parola, { cihazdaHatirla = false } = {}) {
   const session = await jwt();
   const uid = session.user.id;
   const { data: s, error } = await supabase.from("e2ee_kullanici_anahtarlari")
     .select("acik_anahtar, kurtarma_sarili_ozel_anahtar, kurtarma_iv, kurtarma_tuz, kurtarma_kdf_tur").eq("kullanici_id", uid).maybeSingle();
   if (error) throw new Error("Anahtar kaydı okunamadı.");
-  if (!s?.kurtarma_sarili_ozel_anahtar) throw new Error("Bu hesapta kurtarma parolası tanımlı değil.");
+  if (!s?.kurtarma_sarili_ozel_anahtar) throw new Error("Bu hesapta eski kurtarma parolası tanımlı değil.");
   let pkcs8;
   try {
     const k = await parolaAnahtariTuret(parola, b64coz(s.kurtarma_tuz), s.kurtarma_kdf_tur || KURTARMA_KDF_TUR);
     pkcs8 = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64coz(s.kurtarma_iv), additionalData: enc.encode(uid) }, k, b64coz(s.kurtarma_sarili_ozel_anahtar));
   } catch { throw new Error("Hatalı kurtarma parolası."); }
-  const ozel = await ozelImport(pkcs8);
-  anahtarOnbellek = { uid, ozel, acik: s.acik_anahtar };
-  if (cihazdaHatirla) await cihazAnahtariniKaydet(uid, ozel);
-  // KENDİNİ ONARMA: Worker kasa anahtarıyla yeniden sar (başarısız olursa oturum yine de açık kalır).
-  let onarildi = false;
-  try {
-    const kasa = await kasaAnahtariniAl(session);
-    const iv = rastgele(12);
-    const yeni = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: enc.encode(uid) }, kasa, pkcs8);
-    const { error: e2 } = await supabase.rpc("e2ee_kasa_sarmalini_yenile", { p_sarili: b64(yeni), p_iv: b64(iv) });
-    onarildi = !e2;
-  } catch { /* kasa anahtarı alınamadı: sorun değil, parola yolu çalışmaya devam eder */ }
-  return { onarildi };
+  return ozelAnahtariIceAktar(new Uint8Array(pkcs8), { cihazdaHatirla });
 }
 
 /** SON ÇARE (kurtarma parolası yok): yeni anahtar çifti. Eski sohbet anahtar zarfları silinir; karşı taraf geçmişi yeniden paylaşır. */
@@ -200,6 +277,7 @@ export async function anahtariSifirla() {
   if (error) throw new Error(error.message);
   anahtarOnbellek = { uid, ozel: await ozelImport(ozel), acik: b64(acik) };
   await cihazAnahtariniSil(uid);
+  await dekSarmaliniYaz(new Uint8Array(ozel)); // kasa açıksa yeni anahtar da giriş oturumuna bağlansın
   return data;
 }
 
@@ -234,6 +312,9 @@ export async function anahtarKaydiniSessizHazirla() {
 }
 
 export function anahtarOnbellegiTemizle() { anahtarOnbellek = null; }
+
+// Notlar kasası (giriş parolası / Kasa Parolası / Kit) HERHANGİ bir yoldan açıldığında mesaj anahtarını aynı DEK'e bağla (bir kez, sessiz).
+if (typeof window !== "undefined") window.addEventListener("aea:kasa-acildi", () => { anahtariGirisaBagla(); });
 
 // Çıkış yapılınca bellekteki (çözülmüş) özel anahtar referansını bırak.
 supabase.auth.onAuthStateChange((olay) => { if (olay === "SIGNED_OUT") { anahtarOnbellegiTemizle(); idbIs("readwrite", (s) => s.clear()).catch(() => {}); } });
