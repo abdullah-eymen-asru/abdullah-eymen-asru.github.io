@@ -159,6 +159,7 @@ export async function anahtarlariHazirla() {
   const durum = { kurtarmaVar: !!satir.kurtarma_sarili_ozel_anahtar, notlarKilitli: !Kasa.kasaAcikMi(), dekSarmalVar: !!satir.dek_sarili_ozel_anahtar };
   // Worker'a hiç ulaşılamadı ve çözümü başka yol da yok: bu bir kilit değil, ağ sorunudur.
   if (workerAgHatasi && !durum.dekSarmalVar) throw new Error("Kasa anahtarı alınamadı.");
+  console.info("[e2ee] özel anahtar açılamadı:", { ...durum, workerAgHatasi, kasaAcik: Kasa.kasaAcikMi() }); // teşhis (gizli veri yok)
   throw kilitHatasi(durum);
 }
 function kilitHatasi(durum) {
@@ -267,7 +268,10 @@ export async function kurtarmaParolasiylaAc(parola, { cihazdaHatirla = false } =
 export async function anahtariSifirla() {
   const session = await jwt();
   const uid = session.user.id;
-  const kasa = await kasaAnahtariniAl(session);
+  // Worker erişilemiyorsa sıfırlama DÜŞMESİN: atılan rastgele anahtarla sar (yer tutucu; asıl kilit DEK sarmalıdır).
+  let kasa;
+  try { kasa = await kasaAnahtariniAl(session); }
+  catch { kasa = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt"]); }
   const cift = await crypto.subtle.generateKey(RSA, true, ["encrypt", "decrypt"]);
   const acik = await crypto.subtle.exportKey("spki", cift.publicKey);
   const ozel = await crypto.subtle.exportKey("pkcs8", cift.privateKey);
