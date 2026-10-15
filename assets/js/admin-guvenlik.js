@@ -38,6 +38,7 @@
  *     tümünü, doluysa o tarihten eskisini) topluca siler.
  */
 import { supabase, showMessage, escapeHtml } from "./core/supabase-client.js";
+import { tekKanal } from "./core/realtime.js";
 import { requireAuthOrShowError } from "./auth/auth-guard.js";
 import { el, tarihMetni, uyeAdi, uyeBilgileri, bilgiSatiri, ROL_ETIKETI } from "./gatekeeper/degisiklik-kaydi.js";
 
@@ -809,8 +810,7 @@ function wireVakaOlaylari(kutu) {
 /* verdi, zaman aşımı işlendi) sayfa yenilemeden anında yansısın diye.     */
 /* ---------------------------------------------------------------------- */
 function wireRealtime() {
-  supabase
-    .channel("admin-guvenlik-degisiklikler")
+  tekKanal("admin-guvenlik-degisiklikler")
     .on("postgres_changes", { event: "*", schema: "public", table: "admin_denetim" }, () => {
       loadVakalar();
       loadAdminListesi();
