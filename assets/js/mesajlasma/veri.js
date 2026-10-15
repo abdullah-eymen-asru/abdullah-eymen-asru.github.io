@@ -98,31 +98,73 @@ export const sabitle = (id, v) => supabase.rpc("konusmayi_sabitle", { p_id: id, 
 export const okunduIsaretle = (id) => (E2EE_AKTIF ? supabase.rpc("konusmayi_okundu_isaretle", { p_id: id }) : Promise.resolve());
 
 // ---- mesajlar -----------------------------------------------------------------------------------
+// 0096 (yanit_id) çalıştırılmadıysa sütun yok: bir kez algılanır, sohbet yüklemesi bozulmaz.
+let YANIT_DESTEGI = true;
 export async function mesajlariYukle(sohbet) {
-  const { data, error } = await supabase.from("messages").select("id, sender_id, body, sifreli, created_at")
-    .eq("conversation_id", sohbet.id).order("created_at", { ascending: true }).limit(500);
+  const oku = (kolon) => supabase.from("messages").select(kolon).eq("conversation_id", sohbet.id).order("created_at", { ascending: true }).limit(500);
+  let { data, error } = await oku(YANIT_DESTEGI ? "id, sender_id, body, sifreli, created_at, yanit_id" : "id, sender_id, body, sifreli, created_at");
+  if (error && YANIT_DESTEGI && /yanit_id|42703/.test(`${error.code} ${error.message}`)) { YANIT_DESTEGI = false; ({ data, error } = await oku("id, sender_id, body, sifreli, created_at")); }
   if (error) throw error;
   const key = await S.sohbetAnahtari(sohbet.id);
   const kisiler = await kisiBilgileri((data || []).map((m) => m.sender_id));
+  const yildizlar = await yildizKumesi(sohbet.id);
   const out = [];
-  for (const m of data || []) out.push(await mesajiCoz(m, sohbet.id, key, kisiler));
+  for (const m of data || []) { const c = await mesajiCoz(m, sohbet.id, key, kisiler); c.yildizli = yildizlar.has(m.id); out.push(c); }
   return out;
 }
 export async function mesajiCoz(m, sohbetId, key, kisiler) {
   const k = key === undefined ? await S.sohbetAnahtari(sohbetId) : key;
   const metin = m.sifreli ? await S.coz(k, m.body, sohbetId) : m.body;
   const kisi = (kisiler || (await kisiBilgileri([m.sender_id])))[m.sender_id];
-  return { id: m.id, sender_id: m.sender_id, created_at: m.created_at, sifreli: m.sifreli, metin, cozulemedi: metin == null, gonderen: kisi };
+  return { id: m.id, sender_id: m.sender_id, created_at: m.created_at, sifreli: m.sifreli, metin, cozulemedi: metin == null, gonderen: kisi, yanit_id: m.yanit_id || null };
+}
+
+/* ---------- WhatsApp tarzı: sabit mesaj + yıldız (migration 0096; tablolar yoksa sessizce devre dışı) ---------- */
+async function yildizKumesi(sohbetId) {
+  try {
+    const { data, error } = await supabase.from("mesaj_yildizlari").select("message_id").eq("conversation_id", sohbetId);
+    return error ? new Set() : new Set((data || []).map((r) => r.message_id));
+  } catch { return new Set(); }
+}
+export async function mesajiYildizla(id, yildiz) { const r = await supabase.rpc("mesaji_yildizla", { p_message_id: id, p_yildiz: yildiz }); if (r.error) throw r.error; }
+/** Yukarı sabitle: sohbet başına tek mesaj; yenisi eskisinin yerine geçer. */
+export async function mesajiSabitle(id) { const r = await supabase.rpc("mesaji_sabitle", { p_message_id: id }); if (r.error) throw r.error; }
+export async function mesajSabitiniKaldir(sohbetId) { const r = await supabase.rpc("mesaj_sabitini_kaldir", { p_conversation_id: sohbetId }); if (r.error) throw r.error; }
+/** Sohbetin sabit mesajının kimliği (yoksa/tablo yoksa null). */
+export async function sabitMesajKimligi(sohbetId) { try { const r = await supabase.rpc("sohbet_sabit_mesaj", { p_id: sohbetId }); return r.error ? null : r.data || null; } catch { return null; } }
+/** Tek mesajı çözerek getirir (500'lük listede olmayan sabit mesaj için). */
+export async function tekMesaj(sohbet, id) {
+  const { data } = await supabase.from("messages").select("id, sender_id, body, sifreli, created_at").eq("id", id).eq("conversation_id", sohbet.id).maybeSingle();
+  return data ? mesajiCoz(data, sohbet.id) : null;
+}
+/** Yıldızlı mesajlar (tüm sohbetler): [{ ...çözülmüş mesaj, sohbetId }]; yeniden eskiye. */
+export async function yildizliMesajlar(sohbetler) {
+  const { data, error } = await supabase.from("mesaj_yildizlari").select("message_id, conversation_id, created_at").order("created_at", { ascending: false }).limit(300);
+  if (error || !data?.length) return [];
+  const haritasi = new Map(sohbetler.map((c) => [c.id, c]));
+  const { data: ms } = await supabase.from("messages").select("id, conversation_id, sender_id, body, sifreli, created_at").in("id", data.map((r) => r.message_id));
+  const kisiler = await kisiBilgileri((ms || []).map((m) => m.sender_id));
+  const out = [];
+  for (const r of data) {
+    const m = (ms || []).find((x) => x.id === r.message_id); const c = haritasi.get(r.conversation_id);
+    if (!m || !c) continue;
+    const cz = await mesajiCoz(m, c.id, undefined, kisiler);
+    out.push({ ...cz, sohbetId: c.id, yildizli: true });
+  }
+  return out;
 }
 
 /** Mesaj gönder. Şifreli sohbetse şifreler; eski (düz) sohbetse önce şifreli sürüme yükseltir. */
-export async function mesajGonder(sohbet, metin) {
+export async function mesajGonder(sohbet, metin, yanitId = null) {
   if (E2EE_AKTIF) {
     if (!sohbet.e2ee) await sohbetiYukselt(sohbet);
     let key = await S.sohbetAnahtari(sohbet.id);
     if (!key) throw new Error("Bu sohbetin şifre anahtarı sende yok; sohbetin diğer tarafı sohbeti açtığında otomatik paylaşılır.");
     const body = await S.sifrele(key, metin, sohbet.id);
-    const { data, error } = await supabase.from("messages").insert({ conversation_id: sohbet.id, sender_id: (await supabase.auth.getUser()).data.user.id, body, sifreli: true }).select("id").single();
+    const satir = { conversation_id: sohbet.id, sender_id: (await supabase.auth.getUser()).data.user.id, body, sifreli: true };
+    if (yanitId && YANIT_DESTEGI) satir.yanit_id = yanitId; // yalnızca hedef mesajın kimliği (düz); alıntı metni istemcide çözülür
+    let { data, error } = await supabase.from("messages").insert(satir).select("id").single();
+    if (error && satir.yanit_id && /yanit_id|42703/.test(`${error.code} ${error.message}`)) { YANIT_DESTEGI = false; delete satir.yanit_id; ({ data, error } = await supabase.from("messages").insert(satir).select("id").single()); }
     if (error) throw error;
     S.eksikZarflariTamamla(sohbet.id);
     return data;
