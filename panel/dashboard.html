@@ -1732,6 +1732,7 @@ permalink: "/panel/dashboard.html"
         <button type="button" id="nt-kurtarma-toggle" class="btn-secondary csp-w-auto">Parolam değişti, kurtarma anahtarı kullan</button>
         <button type="button" id="nt-kit-toggle" class="btn-secondary csp-w-auto" hidden>🔑 Yedek Kurtarma Koduyla aç</button>
       </div>
+      <p class="muted">ℹ️ Yedek Kurtarma Kodu Notlar + Mesajlar için ortaktır; mesaj anahtarı sıfırlanırsa ya da kod yenilenirse eski kod çalışmaz.</p>
     </form>
   </div>
 
@@ -1742,6 +1743,11 @@ permalink: "/panel/dashboard.html"
       Notların cihazında şifrelenir; sunucu içeriği okuyamaz. Bunun bedeli: parolanı unutur (ya da giriş parolan
       “şifremi unuttum” ile sıfırlanırsa), <strong>bu anahtar olmadan notların kalıcı olarak açılamaz</strong>.
       Bir parola yöneticisine ya da çıktıya kaydet; bir daha gösterilmeyecek.
+    </p>
+    <p class="muted">
+      <strong>ℹ️ İki ayrı yedek var.</strong> (1) Bu <em>kurtarma anahtarı</em> yalnızca Notlar kasasını açar; yenilemek mesajları ve
+      Yedek Kurtarma Kodunu etkilemez. (2) <em>Yedek Kurtarma Kodu</em> (Mesajlar sayfasındaki 🔑) Notlar + Mesajlar için <strong>ortak tek koddur</strong>:
+      yenilenirse ya da mesaj şifreleme anahtarı sıfırlanırsa eski kod geçersiz olur ve Notlar için de yeni kod üretmen gerekir.
     </p>
     <code id="nt-kurtarma-metin" class="nt-kurtarma-metin"></code>
     <div class="csp-flex-gap10-wrap">
@@ -1937,6 +1943,11 @@ permalink: "/panel/dashboard.html"
           <button type="button" id="nt-yedek-sifreli-btn" class="nt-btn">Şifreli yedek (.json)</button>
           <button type="button" id="nt-kurtarma-yenile-btn" class="nt-btn">Kurtarma anahtarını yenile</button>
         </div>
+        <p class="muted">
+          ℹ️ Kurtarma anahtarını yenilemek eskisini geçersiz kılar (yalnızca Notlar). Notlar + Mesajlar için ortak
+          <strong>Yedek Kurtarma Kodu</strong> ayrıdır: yenilenirse ya da mesaj şifreleme anahtarı sıfırlanırsa eski kod geçersiz olur;
+          Notlar için de yeni kod üretmen gerekir (Mesajlar › 🔑 Yedek Kurtarma Kodu).
+        </p>
         <div class="nt-guvenlik-satir">
           <button type="button" id="nt-kasa-parola-btn" class="nt-btn" hidden>Kasa Parolasını değiştir</button>
         </div>
