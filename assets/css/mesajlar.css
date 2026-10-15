@@ -206,7 +206,7 @@
 .msj-sol-ust { display: flex; gap: 8px; flex-wrap: wrap; }
 .msj-sol-ust .msj-btn { flex: 1 1 120px; }
 .msj-ara { width: 100%; box-sizing: border-box; padding: 9px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); font: inherit; }
-.msj-liste { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 6px; }
+.msj-liste { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: auto; display: flex; flex-direction: column; gap: 6px; }
 .msj-yeni-alan { max-height: 55%; overflow-y: auto; border: 1px solid var(--border); border-radius: 12px; padding: 10px; background: var(--bg); }
 .msj-yeni-form { display: flex; flex-direction: column; gap: 8px; }
 .msj-yeni-form input, .msj-yeni-form select { width: 100%; box-sizing: border-box; padding: 9px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); color: var(--text); font: inherit; }
@@ -243,7 +243,7 @@
 .msj-ikon-btn { flex: none; border: 1px solid var(--border); background: var(--tag-bg); color: var(--text); border-radius: 10px; width: 38px; height: 38px; font-size: 1rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
 .msj-ikon-btn--aktif { border-color: var(--accent); background: var(--accent); }
 .msj-ikon-btn--tehlike:hover { border-color: #c0392b; color: #c0392b; }
-.msj-govde { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.msj-govde { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 .msj-bos { margin: auto; color: var(--muted); text-align: center; padding: 20px; }
 .msj-mesaj { display: flex; flex-direction: column; gap: 3px; max-width: min(78%, 640px); min-width: 0; }
 .msj-mesaj--ben { align-self: flex-end; align-items: flex-end; }
@@ -377,3 +377,36 @@
 .msj-kilit-form { display: grid; gap: 8px; margin-top: 8px; }
 .msj-kilit-alan { display: grid; gap: 4px; font-size: .9rem; }
 .msj-kilit-onay { display: flex; gap: 8px; align-items: flex-start; font-size: .88rem; }
+
+/* ============================================================================
+   2026-10 SADELEŞTİRME + KAYDIRMA DÜZELTMELERİ
+   - Panel yüksekliği dvh ile (mobil adres çubuğu yüzünden taşma/kırpılma biter); vh yalnızca eski tarayıcı yedeği.
+   - İç kaydırma alanları sayfa kaydırmasını yutmaz (overscroll zincirlenir; yatay taşma kapalı).
+   - Kilitliyken tek sütun, sade kart: sol liste/başlık/boş butonlar gizlenir, panel içeriğe göre uzar (iç kaydırma yok).
+   ============================================================================ */
+.msj-liste, .msj-govde, .msg-alici { overscroll-behavior-x: none; -webkit-overflow-scrolling: touch; }
+.msj-panel { height: clamp(460px, calc(100vh - 220px), 820px); }
+@supports (height: 100dvh) { .msj-panel { height: clamp(460px, calc(100dvh - 220px), 820px); } }
+@media (max-width: 860px) {
+  .msj-panel { height: calc(100vh - 190px); min-height: 420px; }
+  @supports (height: 100dvh) { .msj-panel { height: calc(100dvh - 190px); } }
+}
+.msj-kilit [hidden] { display: none !important; }
+
+.msj-kok[data-kilit="1"] .msj-panel { grid-template-columns: 1fr; height: auto; min-height: 0; overflow: visible; }
+.msj-kok[data-kilit="1"] .msj-sol,
+.msj-kok[data-kilit="1"] .msj-sag-ust,
+.msj-kok[data-kilit="1"] .msj-yildiz-btn,
+.msj-kok[data-kilit="1"] .msj-kurtarma-btn { display: none !important; }
+.msj-kok[data-kilit="1"] .msj-sag { display: flex !important; }
+.msj-kok[data-kilit="1"] .msj-govde { overflow: visible; padding: 28px 16px; }
+
+.msj-kilit { margin: 0 auto; width: 100%; max-width: 420px; padding: 4px 0; gap: 14px; }
+.msj-kilit-baslik { font-size: 1.15rem; }
+.msj-kilit-girdi { min-height: 46px; font-size: 16px; } /* 16px: iOS odaklanınca yakınlaştırmasın */
+.msj-kilit-ana { width: 100%; min-height: 46px; }
+.msj-kilit-detay { text-align: left; border: 0; border-top: 1px solid var(--border); border-radius: 0; padding: 6px 0 0; margin-top: 4px; }
+.msj-kilit-detay summary { display: flex; align-items: center; min-height: 40px; color: var(--muted); font-weight: 600; font-size: .9rem; }
+.msj-kilit-detay[open] summary { margin-bottom: 6px; }
+.msj-kilit-detay .msj-kucuk { width: 100%; min-height: 40px; margin-top: 10px; }
+.msj-kilit-detay .msj-kilit-form + .msj-kilit-form { margin-top: 12px; }
