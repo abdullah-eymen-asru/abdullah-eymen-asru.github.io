@@ -58,24 +58,34 @@ export async function mesajYedeginiIceAktar(nesne, parola, ilerleme = () => {}) 
     ilerleme(`Sohbet ${++n}/${nesne.sohbetler.length} içe aktarılıyor…`);
     let duz;
     try { duz = await cozJson(k, s.veri, `sohbet:${s.id}`); } catch { throw new Error("Hatalı yedekleme parolası (ya da dosya değiştirilmiş)."); }
-    // Yeni sohbet anahtarı → HEDEF hesabın açık anahtarına yeniden zarfla
-    const anahtar = await S.yeniSohbetAnahtari();
-    const benim = (await supabase.auth.getUser()).data.user.id;
-    const { zarflar } = await S.zarflariHazirla(anahtar, [benim]);
-    if (!zarflar.length) throw new Error("Şifreleme anahtarın hazır değil; sayfayı yenileyip tekrar dene.");
-    // AAD = yeni sohbet kimliği henüz yok → mesaj gövdesi AAD'si için sunucudan dönen kimlik gerekir; bu yüzden önce kaynak kimliği AAD olarak kullanılamaz.
-    // Çözüm: mesajlar sohbet kimliği BİLİNDİKTEN sonra şifrelenir → iki aşama: boş arşiv sohbeti, sonra mesaj ekleme (aynı RPC, p_kaynak ile yinelenmez).
-    const konuSifreli = await S.sifrele(anahtar, duz.konu || "Arşiv", "konu");
-    const ilk = await supabase.rpc("mesaj_yedek_ice_aktar", { p_kaynak: s.id, p_konu_sifreli: konuSifreli, p_zarflar: zarflar, p_mesajlar: [] });
-    if (ilk.error) throw new Error(ilk.error.message);
-    if (!ilk.data?.yeni) { sonuc.atlanan += 1; continue; }
-    const yeniId = ilk.data.id;
-    S.anahtariKaydet(yeniId, anahtar, zarflar[0].zarf);
-    const govdeler = [];
-    for (const m of duz.mesajlar.slice(0, 3000)) govdeler.push({ gonderen: m.g, created_at: m.t, body: await S.sifrele(anahtar, m.m, yeniId) });
-    const iki = await supabase.rpc("mesaj_yedek_mesaj_ekle", { p_id: yeniId, p_mesajlar: govdeler });
-    if (iki.error) throw new Error(iki.error.message);
-    sonuc.sohbet += 1; sonuc.mesaj += govdeler.length;
+    const r = await arsivSohbetiYaz({ kaynakId: s.id, konu: duz.konu, mesajlar: duz.mesajlar });
+    if (!r.yeni) { sonuc.atlanan += 1; continue; }
+    sonuc.sohbet += 1; sonuc.mesaj += r.mesaj;
   }
   return sonuc;
+}
+
+/**
+ * ORTAK YENİDEN ZARFLAMA YAZICISI (parolalı mesaj yedeği + Kurtarma Kiti içe aktarması kullanır):
+ * YENİ sohbet anahtarı üretir → HEDEF (şu an giriş yapmış) hesabın AÇIK anahtarıyla zarflar (konusma_zarflari) → konu ve mesajları bu
+ * anahtarla (AAD = yeni sohbet kimliği) yeniden şifreleyip arşiv sohbeti olarak yazar. Aynı kaynak ikinci kez yinelenmez.
+ * mesajlar: [{ g: gönderen uuid, t: ISO zaman, m: düz metin }]. Dönüş: { yeni, id, mesaj }.
+ */
+export async function arsivSohbetiYaz({ kaynakId, konu, mesajlar }) {
+  const anahtar = await S.yeniSohbetAnahtari();
+  const benim = (await supabase.auth.getUser()).data.user.id;
+  const { zarflar } = await S.zarflariHazirla(anahtar, [benim]);
+  if (!zarflar.length) throw new Error("Şifreleme anahtarın hazır değil; sayfayı yenileyip tekrar dene.");
+  // AAD yeni sohbet kimliğine bağlı → önce boş arşiv sohbeti (RPC kaynağa göre yinelemeyi önler), sonra mesajlar yeni kimlikle şifrelenip eklenir.
+  const konuSifreli = await S.sifrele(anahtar, konu || "Arşiv", "konu");
+  const ilk = await supabase.rpc("mesaj_yedek_ice_aktar", { p_kaynak: kaynakId, p_konu_sifreli: konuSifreli, p_zarflar: zarflar, p_mesajlar: [] });
+  if (ilk.error) throw new Error(ilk.error.message);
+  if (!ilk.data?.yeni) return { yeni: false, id: ilk.data?.id, mesaj: 0 };
+  const yeniId = ilk.data.id;
+  S.anahtariKaydet(yeniId, anahtar, zarflar[0].zarf);
+  const govdeler = [];
+  for (const m of (mesajlar || []).slice(0, 3000)) govdeler.push({ gonderen: m.g, created_at: m.t, body: await S.sifrele(anahtar, m.m, yeniId) });
+  const iki = await supabase.rpc("mesaj_yedek_mesaj_ekle", { p_id: yeniId, p_mesajlar: govdeler });
+  if (iki.error) throw new Error(iki.error.message);
+  return { yeni: true, id: yeniId, mesaj: govdeler.length };
 }
