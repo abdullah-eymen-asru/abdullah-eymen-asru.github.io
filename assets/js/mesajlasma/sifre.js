@@ -37,11 +37,14 @@ export async function zarflarimiYukle() {
 }
 export const zarfimVarMi = (id) => ZARFLAR.has(id);
 
+/** Özel anahtarın AÇILABİLİR olduğunu doğrular; açılamıyorsa E2EEKilitHatasi fırlatır (arayüz kurtarma panelini gösterir). */
+export async function anahtarHazirMi() { await anahtarlariHazirla(); return true; }
+
 export async function sohbetAnahtari(id) {
   if (ANAHTARLAR.has(id)) return ANAHTARLAR.get(id);
   const zarf = ZARFLAR.get(id);
   if (!zarf) return null;
-  const { ozel } = await anahtarlariHazirla();
+  const { ozel } = await anahtarlariHazirla(); // açılamazsa E2EEKilitHatasi yukarı fırlar (sessiz null DEĞİL)
   let ham;
   try { ham = await crypto.subtle.decrypt({ name: "RSA-OAEP" }, ozel, b64coz(zarf)); } catch { return null; }
   const k = await crypto.subtle.importKey("raw", ham, "AES-GCM", true, ["encrypt", "decrypt"]);
