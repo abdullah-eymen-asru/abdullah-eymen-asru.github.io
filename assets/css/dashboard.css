@@ -99,7 +99,14 @@ body {
   max-height: calc(100vh - var(--dash-header-h) - 16px);
   max-height: calc(100dvh - var(--dash-header-h) - 16px);
   overflow-y: auto;
-  overscroll-behavior: contain;
+  /* 2026-10 SIDEBAR "TAKILMA" DÜZELTMESİ: eskiden burada "overscroll-behavior: contain" vardı. Masaüstünde imleç kenar çubuğunun üstündeyken
+     tekerlek, çubuk sonuna gelince SAYFAYA GEÇMİYOR (scroll chaining kapalı) → sayfa "kilitleniyor/takılıyor" hissi. Artık "auto":
+     iç kaydırma bitince tekerlek sayfayı kaydırır. "contain" yalnızca mobil çekmecede (aşağıda) kalır. */
+  overscroll-behavior: auto;
+  align-self: start;        /* grid'de uzayıp sticky'yi bozmasın */
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: var(--card-bg, var(--bg));
@@ -427,6 +434,7 @@ body {
     height: 100vh;
     height: 100dvh;
     max-height: none;
+    overscroll-behavior: contain; /* çekmece açıkken kaydırma arkadaki sayfaya sızmasın (masaüstünde "auto") */
     /* iOS'ta çentik/ev çubuğu altında kalmasın */
     padding-bottom: env(safe-area-inset-bottom, 0px);
     -webkit-overflow-scrolling: touch;
@@ -866,3 +874,24 @@ body.dash-sayfa .site-header nav { min-width: 0; }
 .ya-bilgi-karti h4 { margin: 0 0 8px; font-size: 1rem; }
 .ya-bilgi-karti p { margin: 0 0 8px; overflow-wrap: anywhere; }
 .ya-bilgi-kapat { margin-top: 2px; padding: 5px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--tag-bg); color: var(--text); font: inherit; cursor: pointer; }
+
+/* ------------------------------------------------------------------------
+ * 2026-10 SIDEBAR KAYDIRMA/TAKILMA — ek güvenceler
+ * ------------------------------------------------------------------------
+ * 1) "overflow-x: clip" desteklemeyen eski tarayıcılar (Safari ≤15) body'ye "hidden" uygular; bu body'yi bir kaydırma kabına çevirir ve
+ *    "position: sticky" kenar çubuğu artık sayfa kaydırmasını izlemez (yukarıda/aşağıda kilitli görünür). Bu tarayıcılarda body'deki
+ *    yatay kırpmayı kaldırıp taşmayı ana içerik kabına (.dash-main) kısıtlıyoruz → sticky çalışır.
+ * 2) Kısa ekranda genişletilmiş grup + uzun menü: sidebar kendi içinde kaydırılır (max-height + overflow-y: auto); sayfa gövdesi etkilenmez.
+ */
+@supports not (overflow-x: clip) {
+  html,
+  body {
+    overflow-x: visible;
+  }
+  .dash-main {
+    overflow-x: auto;
+  }
+}
+@media (min-width: 981px) {
+  .dash-sidebar { z-index: 2; } /* içerik kartlarının (transform/position) kenar çubuğunu örtmesini önler */
+}
