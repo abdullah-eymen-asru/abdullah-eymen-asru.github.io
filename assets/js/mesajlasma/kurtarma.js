@@ -52,17 +52,35 @@ function dogrulamaliForm({ baslik, aciklama, alanlar, tamamMetin = "Kaydet" }, i
 
 export { dogrulamaliForm };
 
-/** Kilitli durum paneli (sohbet alanında hata yerine gösterilir). durum: E2EEKilitHatasi.durum. onAcildi(sonuc) → sohbetleri yeniden yükle. */
+/**
+ * Kilitli durum paneli (sohbet alanında hata yerine gösterilir). durum: E2EEKilitHatasi.durum. onAcildi(sonuc) → sohbetleri yeniden yükle.
+ * SADE AKIŞ (2026-10): tek parola kutusu + tek birincil düğme. Notlar kasası zaten açıksa parola bile sorulmaz: anahtar sessizce
+ * onarılır. Yedek kod / eski parola / sıfırlama "Parolamı unuttum ya da açılmıyor" altında KAPALI durur.
+ */
 export function kilitPaneli({ durum = {}, onAcildi }) {
   cssYukle();
   const hata = h("p", { class: "msj-kilit-hata", role: "alert", hidden: true });
   const hataYaz = (m) => { hata.textContent = m; hata.hidden = !m; };
   const girdi = (ipucu, etiket, ac = "current-password") => h("input", { type: "password", class: "msj-kilit-girdi", placeholder: ipucu, "aria-label": etiket, autocomplete: ac });
 
-  // 1) Notlar kasasını giriş/Kasa parolasıyla aç
+  /** Anahtar açılamadıysa: güvenliyse sessizce yenile (kurtarma kodu istemeden); değilse kullanıcıyı kod bölümüne yönlendir. */
+  const anahtariHazirlaYadaOnar = async () => {
+    try { await E.anahtarlariHazirla(); await E.anahtariGirisaBagla(); return { giris: true }; }
+    catch (er) {
+      if (er?.name !== "E2EEKilitHatasi") throw er;
+      const o = await E.anahtariOtomatikOnar();
+      if (o.onarildi) return { giris: true, yenilendi: true };
+      kodBolumu.open = true;
+      throw new Error(o.neden === "zarf-var"
+        ? "Parolan doğru ve kasan açıldı, ancak mevcut sohbetlerinin anahtarı bu cihazda açılamıyor. Yedek Kurtarma Kodunu gir (aşağıda açıldı)."
+        : "Parolan doğru ve kasan açıldı, ancak mesaj anahtarı onarılamadı. Yedek Kurtarma Kodunu dene ya da sayfayı yenileyip tekrar dene.");
+    }
+  };
+
+  // 1) Notlar kasasını giriş/Kasa parolasıyla aç (ANA YOL)
   const parola = girdi("Giriş parolan", "Giriş parolası");
   const etiketMetin = h("span", { text: "Giriş parolan" });
-  const acBtn = h("button", { type: "submit", class: "msj-btn msj-btn--birincil", text: "Kilidi aç" });
+  const acBtn = h("button", { type: "submit", class: "msj-btn msj-btn--birincil msj-kilit-ana", text: "Kilidi aç" });
   const parolaForm = h("form", { class: "msj-kilit-form", novalidate: true }, h("label", { class: "msj-kilit-alan" }, etiketMetin, parola), acBtn);
   (async () => { // Google (bağımsız) kasada parola alanı "Kasa Parolası" olur
     try { const uid = (await supabase.auth.getUser()).data?.user?.id; const o = await Kasa.kasaOzeti(uid); if (o.bagimsiz) { etiketMetin.textContent = "Kasa Parolan (Google hesabı)"; parola.placeholder = "Kasa Parolan"; } } catch { /* varsayılan */ }
@@ -74,44 +92,39 @@ export function kilitPaneli({ durum = {}, onAcildi }) {
       const { data } = await supabase.auth.getSession();
       const r = await Kasa.parolaIleAc(data.session, parola.value);
       parola.value = "";
-      if (r.durum !== "acik" && r.durum !== "yeni-kasa") throw new Error("Hatalı parola. Unuttuysan Yedek Kurtarma Kodunu kullan.");
+      if (r.durum !== "acik" && r.durum !== "yeni-kasa") throw new Error("Hatalı parola. Unuttuysan aşağıdan Yedek Kurtarma Kodunu kullan.");
       E.anahtarOnbellegiTemizle();
-      await E.anahtarlariHazirla(); // DEK sarmalıyla açılamazsa fırlatır → aşağıda gösterilir
-      await E.anahtariGirisaBagla();
-      onAcildi({ giris: true });
-    } catch (er) { hataYaz(er.name === "E2EEKilitHatasi" ? "Notlar kasan açıldı ama mesaj anahtarı henüz kasaya bağlı değil; Yedek Kurtarma Koduyla aç." : (er.message || String(er))); acBtn.disabled = false; }
+      onAcildi(await anahtariHazirlaYadaOnar());
+    } catch (er) { hataYaz(er.message || String(er)); acBtn.disabled = false; }
   });
 
-  // 2) Yedek Kurtarma Kodu (+ isteğe bağlı kasa parolasını yeniden kurma)
+  // 2) Yedek Kurtarma Kodu (+ isteğe bağlı kasa parolasını yeniden kurma) — KAPALI başlar
   const kod = h("input", { type: "text", class: "msj-kilit-girdi", placeholder: "XXXX-XXXX-XXXX-XXXX", "aria-label": "Yedek kurtarma kodu", autocomplete: "off", autocapitalize: "characters", maxlength: "19" });
   kod.addEventListener("input", () => { kod.value = Kit.kodBicimle(kod.value); });
-  const yeniParola = girdi("Notlar kasası için parola (isteğe bağlı)", "Notlar kasası için yeni parola", "new-password");
+  const yeniParola = girdi("Yeni parola (yalnızca giriş parolanı unuttuysan)", "Notlar kasası için yeni parola", "new-password");
   const hatirla = h("input", { type: "checkbox" });
   const kodBtn = h("button", { type: "submit", class: "msj-btn msj-btn--ikincil", text: "Kodla aç" });
   const kodForm = h("form", { class: "msj-kilit-form", novalidate: true },
     h("label", { class: "msj-kilit-alan" }, h("span", { text: "Yedek Kurtarma Kodu" }), kod),
-    h("label", { class: "msj-kilit-alan" }, h("span", { text: "Notlar kasasını da bu parolayla yeniden kur (giriş parolanı unuttuysan)" }), yeniParola),
-    h("label", { class: "msj-kilit-onay" }, hatirla, h("span", { text: "Bu cihazda hatırla (yalnızca kendi cihazında işaretle)" })), kodBtn);
+    h("label", { class: "msj-kilit-alan" }, h("span", { text: "Yeni parola (isteğe bağlı)" }), yeniParola),
+    h("label", { class: "msj-kilit-onay" }, hatirla, h("span", { text: "Bu cihazda hatırla (yalnızca kendi cihazında)" })), kodBtn);
   kodForm.addEventListener("submit", async (e) => {
     e.preventDefault(); if (!kod.value) return kod.focus();
     kodBtn.disabled = true; hataYaz("");
     try { const r = await Kit.kitIleAc(kod.value, { parola: yeniParola.value || null, cihazdaHatirla: hatirla.checked }); kod.value = yeniParola.value = ""; onAcildi(r); }
     catch (er) { hataYaz(er.message || String(er)); kodBtn.disabled = false; }
   });
-  const kodBolumu = h("details", { class: "msj-kilit-detay", open: !durum.dekSarmalVar || undefined },
-    h("summary", { text: "🔑 Yedek Kurtarma Koduyla aç" }), kodForm);
 
   // 3) ESKİ kurtarma parolası (yalnızca zaten varsa)
-  let eskiBolum = null;
+  let eskiForm = null;
   if (durum.kurtarmaVar) {
     const eski = girdi("Eski kurtarma parolan", "Eski kurtarma parolası");
-    const eskiBtn = h("button", { type: "submit", class: "msj-btn msj-btn--ikincil", text: "Aç" });
-    const eskiForm = h("form", { class: "msj-kilit-form", novalidate: true }, eski, eskiBtn);
+    const eskiBtn = h("button", { type: "submit", class: "msj-btn msj-btn--ikincil", text: "Eski parolayla aç" });
+    eskiForm = h("form", { class: "msj-kilit-form", novalidate: true }, eski, eskiBtn);
     eskiForm.addEventListener("submit", async (e) => {
       e.preventDefault(); if (!eski.value) return eski.focus(); eskiBtn.disabled = true; hataYaz("");
       try { const r = await E.kurtarmaParolasiylaAc(eski.value); eski.value = ""; onAcildi(r); } catch (er) { hataYaz(er.message || String(er)); eskiBtn.disabled = false; }
     });
-    eskiBolum = h("details", { class: "msj-kilit-detay" }, h("summary", { text: "Eski kurtarma parolam var" }), eskiForm);
   }
 
   // 4) Son çare
@@ -123,13 +136,22 @@ export function kilitPaneli({ durum = {}, onAcildi }) {
     try { await E.anahtariSifirla(); onAcildi({ sifirlandi: true }); } catch (er) { hataYaz(er.message || String(er)); sifirla.disabled = false; }
   });
 
-  return h("div", { class: "msj-kilit", role: "region", "aria-label": "Şifreli sohbet kilidi" },
-    h("div", { class: "msj-kilit-ikon", "aria-hidden": "true", text: "🔐" }),
-    h("h3", { class: "msj-kilit-baslik", text: "Şifreli sohbetlerin kilitli" }),
-    h("p", { class: "msj-kilit-metin", text: durum.dekSarmalVar && durum.notlarKilitli
-      ? "Mesajların anahtarı Notlar kasana bağlı ve kasan bu cihazda kilitli. Giriş parolanı yazman yeterli."
-      : "Mesaj anahtarın bu cihazda açılamadı. Giriş parolanla Notlar kasanı aç; olmazsa Yedek Kurtarma Kodunu kullan." }),
-    parolaForm, hata, kodBolumu, eskiBolum, sifirla);
+  const kodBolumu = h("details", { class: "msj-kilit-detay" },
+    h("summary", { text: "Parolamı unuttum / açılmıyor" }), kodForm, eskiForm, sifirla);
+
+  const metin = h("p", { class: "msj-kilit-metin", text: "Devam etmek için giriş parolanı yaz. Bu parola Notlar kasanı ve mesajlarını birlikte açar." });
+  const kutu = h("div", { class: "msj-kilit", role: "region", "aria-label": "Şifreli sohbet kilidi" },
+    h("h3", { class: "msj-kilit-baslik", text: "🔐 Şifreli sohbetler" }), metin, parolaForm, hata, kodBolumu);
+
+  // Notlar kasası ZATEN açıksa (girişte sessiz açıldı) parola sorma: anahtarı sessizce onar/bağla.
+  if (Kasa.kasaAcikMi()) {
+    metin.textContent = "Kilit açılıyor…"; parolaForm.hidden = true; kodBolumu.hidden = true;
+    (async () => {
+      try { E.anahtarOnbellegiTemizle(); onAcildi(await anahtariHazirlaYadaOnar()); }
+      catch (er) { metin.textContent = "Devam etmek için giriş parolanı yaz."; parolaForm.hidden = false; kodBolumu.hidden = false; hataYaz(er.message || String(er)); }
+    })();
+  }
+  return kutu;
 }
 
 export { doldur };
