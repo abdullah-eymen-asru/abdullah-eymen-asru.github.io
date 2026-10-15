@@ -191,11 +191,10 @@ const NAV = [
       // role:"admin" + izin:"kvkk": owner her zaman görür; admin sadece owner "adminler KVKK
       // sürümünü değiştirebilsin" anahtarını açtıysa (bkz. gorunurMu / izinleriYukle).
       { id: "sys-kvkk", icon: "📜", label: "Hukuki Metinler", module: "kvkkSurum", role: "admin", izin: "kvkk" },
-      { id: "sys-uye-aktarim", icon: "📤", label: "Üye Verisi İndirme", module: "uyeAktarimYetki", role: "owner" },
+      // "Üye Verisi İndirme" ve "Demo Yetki & Görünürlük" artık Yetki Ayarları'nın alt sekmeleridir (tek çatı; eski #sys-uye-aktarim / #sys-demo adresleri yönlendirilir).
       // role:null + izin:"sistemyedek": owner her zaman görür; diğer roller yalnızca owner can_export_system'i açtıysa.
       { id: "sys-silme-onayi", icon: "🧹", label: "Silinen Hesap Verileri", module: "silmeOnayi", role: null, izin: "silmeonayi", defaultAcilis: false },
       // Demo Yetki & Görünürlük Paneli: owner her zaman; admin (rol:"admin" kapısı) salt-okunur görür, yazma DB'de.
-      { id: "sys-demo", icon: "🎭", label: "Demo Yetki & Görünürlük", module: "demoYetki", role: "admin", defaultAcilis: false },
       // Demo modunda görünen statik "Sistem / Metrikler" sayfası (gerçek R2/Supabase metriği DEĞİL).
       { id: "sys-metrik", icon: "📊", label: "Sistem / Metrikler", module: "demoMetrik", role: null, demoOnly: true, defaultAcilis: false },
       { id: "sys-github", icon: "🔑", label: "GitHub / Worker Bağlantısı", module: "gy" },
@@ -535,6 +534,10 @@ let hubNesnesi = null;
 let hubVerisi = null; // { gruplar, profil }
 
 async function showView(viewId, moduleKey) {
+  if (viewId === "sys-uye-aktarim" || viewId === "sys-demo") { // eski adresler → birleşik Yetki Ayarları
+    try { sessionStorage.setItem(YA_ALTSEKME_ANAHTARI, viewId === "sys-demo" ? "ya-pane-demo" : "ya-pane-uye"); } catch { /* depo kapalı */ }
+    return showView("sys-yetki", "gy");
+  }
   const target = document.getElementById(`view-${viewId}`);
   if (!target) return;
 
@@ -577,6 +580,9 @@ async function showView(viewId, moduleKey) {
   // Bu iki modül yalnızca Site Sahibi'nin sekmelerini doldurur (yetkili admin yalnızca Özellikler'i görür).
   if (viewId === "sys-yetki" && GIRIS_PROFIL_ROLU === "owner") await ensureModuleLoaded("arsivIzin");
   if (viewId === "sys-yetki" && GIRIS_PROFIL_ROLU === "owner") await ensureModuleLoaded("kalkan");
+  // Birleşik panel: Demo Görünürlük (admin salt-okunur / owner yazar) + Üye Verisi İndirme (yalnızca owner)
+  if (viewId === "sys-yetki") await ensureModuleLoaded("demoYetki");
+  if (viewId === "sys-yetki" && GIRIS_PROFIL_ROLU === "owner") await ensureModuleLoaded("uyeAktarimYetki");
 }
 
 function hubuCiz() {
@@ -769,6 +775,7 @@ const YA_ALTSEKME_ANAHTARI = "aea_yetki_altsekme";
 function wireYetkiAltSekmeler() {
   const serit = document.getElementById("ya-altsekmeler");
   if (!serit) return;
+  if (GIRIS_PROFIL_ROLU !== "owner") { document.getElementById("ya-pane-uye")?.remove(); } // üye verisi indirme izinleri yalnızca Site Sahibi
   // Owner değilse github-yonetim.js ilgili paneli DOM'dan silebilir; paneli olmayan sekmeyi at.
   const sekmeler = [...serit.querySelectorAll("[data-ya-pane]")].filter((s) => {
     if (document.getElementById(s.dataset.yaPane)) return true;
