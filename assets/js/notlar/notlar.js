@@ -2820,7 +2820,7 @@ async function sifreliYedekIndir() {
 
 async function kurtarmaAnahtariniYenile() {
   const varMi = Kasa.kurtarmaAnahtariVarMi();
-  if (varMi && !window.confirm("Yeni bir kurtarma anahtarı üretilecek; ESKİSİ GEÇERSİZ olacak. Devam edilsin mi?")) return;
+  if (varMi && !window.confirm("Yeni bir kurtarma anahtarı üretilecek; ESKİSİ GEÇERSİZ olacak (yalnızca Notlar kasası için).\n\nBilgi: Notlar + Mesajlar için ortak Yedek Kurtarma Kodu bundan etkilenmez; ancak o kod yenilenirse ya da mesaj şifreleme anahtarı sıfırlanırsa eski kod geçersiz olur ve Notlar için de yeni kod üretmen gerekir.\n\nDevam edilsin mi?")) return;
   try {
     kurtarmaKartiniGoster(await Kasa.kurtarmaAnahtariniYenile(), () => {
       ekranGoster("ana");
