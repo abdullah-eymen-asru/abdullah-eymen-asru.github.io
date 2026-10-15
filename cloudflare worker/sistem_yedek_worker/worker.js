@@ -584,7 +584,14 @@ async function workerSert(env, kimlik, istek, cors) {
   if (!r.ok || j.success === false) {
     return json({ error: `Cloudflare reddetti: ${j?.errors?.[0]?.message || "HTTP " + r.status}` }, 502, cors);
   }
-  return json({ ok: true, ad, workersDev: g.acik }, 200, cors);
+  // DOĞRULAMA: Cloudflare'ın 200'üne güvenme; workers.dev alt alan adının GERÇEK durumunu geri oku. (Okuma başarısız olursa dogrulandi: null)
+  let gercek = null;
+  try {
+    const o = await fetch(adres, { headers: { Authorization: `Bearer ${env.CF_WORKERS_TOKEN}` } });
+    const oj = await o.json().catch(() => ({}));
+    if (o.ok && typeof oj?.result?.enabled === "boolean") gercek = oj.result.enabled;
+  } catch { /* okuma başarısız: doğrulanamadı */ }
+  return json({ ok: true, ad, workersDev: gercek ?? g.acik, dogrulandi: gercek === null ? null : gercek === g.acik }, 200, cors);
 }
 
 /** R2 ÇÖP TOPLAYICI (owner): bir sayfa (500 nesne) tarar; veritabanında karşılığı OLMAYAN ve 24 saatten eski nesneleri döndürür. SİLMEZ.
