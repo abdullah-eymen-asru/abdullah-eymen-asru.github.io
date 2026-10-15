@@ -24,12 +24,13 @@ const e = (t, o = {}, ...c) => {
 };
 
 /** @param {{kok:HTMLElement, onSec:(u:{id:string,isim:string,rol:string})=>void, onKapat:()=>void}} p */
-export function aliciSeciciKur({ kok, onSec, onKapat }) {
+export function aliciSeciciKur({ kok, onSec, onKapat, coklu = null }) {
+  // coklu: { secili: Map<id,{isim,rol}>, onDegisti: () => void } → tıklama kişiyi seçer/kaldırır (grup kurma/üye ekleme); kapatma ← ile.
   let grup = null; let q = ""; let ofset = 0; let toplam = 0; let istekNo = 0; let zaman = null; let ozet = null; let satirlar = [];
 
   const geri = e("button", { type: "button", class: "msg-alici-geri", "aria-label": "Kapat" , text: "←" });
   const baslik = e("span", { class: "msg-alici-baslik", text: "Kime mesaj göndereceksin?" });
-  const arama = e("input", { type: "search", class: "msg-uye-arama", placeholder: "İsimle ara…", "aria-label": "Alıcı ara", autocomplete: "off", maxlength: "60" });
+  const arama = e("input", { type: "search", class: "msg-uye-arama", placeholder: "İsim veya e-posta ile ara…", "aria-label": "Alıcı ara", autocomplete: "off", maxlength: "60" });
   const govde = e("div", { class: "msg-alici-govde" });
   const ust = e("div", { class: "msg-alici-ust" }, geri, baslik);
   kok.replaceChildren(ust, arama, govde);
@@ -54,8 +55,14 @@ export function aliciSeciciKur({ kok, onSec, onKapat }) {
     const g = GRUPLAR.find((x) => x.k === grup);
     baslik.textContent = g ? `${g.ikon} ${g.ad}` : `Arama sonuçları`;
     const ogeler = satirlar.map((u) => {
-      const b = e("button", { type: "button", class: "msg-uye-sonuc-item" }, e("span", { class: "msg-uye-sonuc-isim" }, `${u.ad} `, rolRozet(u.rol)));
-      b.addEventListener("click", () => onSec({ id: u.id, isim: u.ad, rol: u.rol }));
+      const secili = !!coklu?.secili.has(u.id);
+      const b = e("button", { type: "button", class: `msg-uye-sonuc-item${secili ? " msg-uye-sonuc-item--secili" : ""}`, "aria-pressed": coklu ? String(secili) : null },
+        e("span", { class: "msg-uye-sonuc-isim" }, coklu ? (secili ? "✓ " : "＋ ") : "", `${u.ad} `, rolRozet(u.rol)));
+      b.addEventListener("click", () => {
+        if (!coklu) return onSec({ id: u.id, isim: u.ad, rol: u.rol });
+        if (coklu.secili.has(u.id)) coklu.secili.delete(u.id); else coklu.secili.set(u.id, { isim: u.ad, rol: u.rol });
+        coklu.onDegisti?.(); listeyiCiz(false);
+      });
       return b;
     });
     const ic = [];
