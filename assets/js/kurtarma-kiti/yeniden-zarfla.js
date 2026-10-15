@@ -27,7 +27,7 @@ import { arsivSohbetiYaz } from "../sistem-yedek/mesaj-yedek.js";
 
 /** ice-aktar.js bu tabloların satırlarını (üye kipinde "kapsam dışı" olsalar bile) plan.ozel'e kopyalar. */
 export const OZEL_TABLOLAR = ["e2ee_kullanici_anahtarlari", "not_kasasi", "conversations", "konusma_zarflari", "messages"];
-const MESAJ_TABLOLARI = ["conversations", "messages", "konusma_zarflari", "konusma_gizlemeleri", "mesaj_gizlemeleri", "konusma_durumlari", "konusma_uyeleri"];
+const MESAJ_TABLOLARI = ["conversations", "messages", "mesaj_sabitleri", "mesaj_yildizlari", "konusma_zarflari", "konusma_gizlemeleri", "mesaj_gizlemeleri", "konusma_durumlari", "konusma_uyeleri"];
 const KASA_TABLOLARI = ["not_kasasi", "e2ee_kullanici_anahtarlari"];
 
 const satirlar = (plan, ad) => plan.tablolar.find((t) => t.tablo === ad)?.satirlar || plan.ozel?.[ad] || [];
