@@ -281,6 +281,50 @@ export async function anahtariSifirla() {
   return data;
 }
 
+/**
+ * OTOMATİK ONARIM (2026-10): Kullanıcı kasasını kendi parolasıyla açtı (kimliğini kanıtladı) ama mesaj özel anahtarı hiçbir sarmalla
+ * (DEK / Worker / cihaz) açılamıyor. Bu, çoğunlukla ESKİ bir kurulumdan kalan bozuk sarmal demektir ve kurtarılacak bir şey yoksa
+ * kullanıcıyı "Yedek Kurtarma Kodu" sormakla yormanın anlamı yok.
+ *   GÜVENLİ KOŞUL: bu kullanıcıya zarflanmış HİÇ sohbet anahtarı (konusma_zarflari) ve HİÇ özel dosya anahtarı (ozel_icerik_anahtarlar)
+ *   yoksa eski anahtarla çözülecek hiçbir veri yoktur → yeni RSA çifti üretilir, DEK'e (ve erişilebiliyorsa Worker'a) sarılır.
+ *   Zarf varsa ASLA otomatik sıfırlanmaz (veri kaybı olurdu) → { onarildi: false, neden: "zarf-var" }; arayüz kurtarma koduna yönlendirir.
+ * Dönüş: { onarildi: boolean, neden?: string }. Hata fırlatmaz.
+ */
+export async function anahtariOtomatikOnar() {
+  try {
+    if (!Kasa.kasaAcikMi()) return { onarildi: false, neden: "kasa-kilitli" };
+    const session = await jwt();
+    const uid = session.user.id;
+    const say = async (tablo, kolon) => {
+      const { count, error } = await supabase.from(tablo).select(kolon, { count: "exact", head: true }).eq(kolon, uid);
+      if (error) throw error;
+      return count || 0;
+    };
+    const zarf = await say("konusma_zarflari", "user_id");
+    let dosya = 0;
+    try { dosya = await say("ozel_icerik_anahtarlar", "alici_id"); } catch { /* tablo yoksa sorun değil */ }
+    if (zarf > 0 || dosya > 0) return { onarildi: false, neden: "zarf-var" };
+
+    const cift = await crypto.subtle.generateKey(RSA, true, ["encrypt", "decrypt"]);
+    const acik = await crypto.subtle.exportKey("spki", cift.publicKey);
+    const ozel = await crypto.subtle.exportKey("pkcs8", cift.privateKey);
+    // sarili_ozel_anahtar kolonu NOT NULL: Worker erişilebiliyorsa onunla sar (yedek yol çalışsın); erişilemiyorsa atılan rastgele
+    // anahtarla sar (hiç açılmayacak bir yer tutucu; asıl kilit DEK sarmalıdır ve hemen aşağıda yazılır).
+    let sarmaAnahtari;
+    try { sarmaAnahtari = await kasaAnahtariniAl(session); }
+    catch { sarmaAnahtari = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt"]); }
+    const iv = rastgele(12);
+    const sarili = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: enc.encode(uid) }, sarmaAnahtari, ozel);
+    const { error } = await supabase.rpc("e2ee_anahtari_sifirla", { p_acik: b64(acik), p_sarili: b64(sarili), p_iv: b64(iv) });
+    if (error) return { onarildi: false, neden: error.message || "sunucu" };
+
+    anahtarOnbellek = { uid, ozel: await ozelImport(ozel), acik: b64(acik) };
+    await cihazAnahtariniSil(uid);
+    const dekYazildi = await dekSarmaliniYaz(new Uint8Array(ozel));
+    return { onarildi: dekYazildi, neden: dekYazildi ? undefined : "dek-yazilamadi" };
+  } catch (er) { return { onarildi: false, neden: er?.message || "hata" }; }
+}
+
 /* ---- "Bu cihazda hatırla": yalnızca ÇIKARILAMAZ CryptoKey, IndexedDB (düz metin anahtar baytı ASLA yazılmaz) ---- */
 const IDB_AD = "aea_e2ee"; const IDB_DEPO = "anahtarlar";
 const idbAc = () => new Promise((coz, red) => {
