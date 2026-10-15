@@ -912,6 +912,8 @@ permalink: "/panel/dashboard.html"
         <button type="button" role="tab" class="ya-altsekme" id="ya-tab-tezgah" data-ya-pane="ya-pane-tezgah" aria-controls="ya-pane-tezgah" aria-selected="false" tabindex="-1">🌱 Tezgâh (kişi bazlı)</button>
         <button type="button" role="tab" class="ya-altsekme" id="ya-tab-r2" data-ya-pane="ra-izin-bolumu" aria-controls="ra-izin-bolumu" aria-selected="false" tabindex="-1">🗄️ Dosya Yöneticisi</button>
         <button type="button" role="tab" class="ya-altsekme" id="ya-tab-kalkan" data-ya-pane="gk-kalkan-bolumu" aria-controls="gk-kalkan-bolumu" aria-selected="false" tabindex="-1">🛡️ Erişim Kalkanı</button>
+        <button type="button" role="tab" class="ya-altsekme" id="ya-tab-demo" data-ya-pane="ya-pane-demo" aria-controls="ya-pane-demo" aria-selected="false" tabindex="-1">🎭 Demo Görünürlük</button>
+        <button type="button" role="tab" class="ya-altsekme" id="ya-tab-uye" data-ya-pane="ya-pane-uye" aria-controls="ya-pane-uye" aria-selected="false" tabindex="-1">📤 Üye Verisi İndirme</button>
       </div>
 
       <!-- 1) Özellik matrisi. id="yetki-ayarlari" ve içindeki id'ler AYNEN korundu:
@@ -989,6 +991,21 @@ permalink: "/panel/dashboard.html"
           <div id="gk-izin-mesaj" class="auth-message" hidden></div>
         </div>
       </section>
+
+      <!-- 5) Demo görünürlük & yetki (assets/js/demo/demo-yetki-paneli.js; eskiden ayrı #sys-demo sayfasıydı) -->
+      <section id="ya-pane-demo" class="panel-section ya-pane" role="tabpanel" aria-labelledby="ya-tab-demo" hidden>
+        <h2>Demo Görünürlük &amp; Yetki</h2>
+        <p class="muted">Demo kullanıcılarının hangi sekmeleri ve araçları göreceği. Demo hesabı, mesajlaşmayı diğer üyelerle birebir aynı şekilde kullanır.</p>
+        <div id="demo-yetki-kok"><p class="muted">Yükleniyor...</p></div>
+      </section>
+
+      <!-- 6) Üye verisi indirme / export yetkileri (assets/js/uye-disa-aktar/yetki-paneli.js; yalnızca Site Sahibi) -->
+      <section id="ya-pane-uye" class="panel-section ya-pane" role="tabpanel" aria-labelledby="ya-tab-uye" hidden>
+        <h2>Üye Verisi İndirme Yetkileri</h2>
+        <p class="muted">Hangi rollerin (ve hangi yöneticinin) üye bilgilerini (CSV, Excel, TXT, PDF) indirebileceğini belirle ve geçmişi izle.</p>
+        <div id="uye-aktarim-kok"><p class="muted">Yükleniyor...</p></div>
+        <div id="uye-aktarim-mesaj" class="auth-message" hidden></div>
+      </section>
     </section>
 
     <!-- KVKK metin sürümü (assets/js/kvkk/kvkk-surum-paneli.js; tablo site_ayarlari, migration 0064/0065).
@@ -1006,13 +1023,6 @@ permalink: "/panel/dashboard.html"
       </section>
     </section>
 
-    <!-- Üye verisi indirme izinleri + geçmiş (assets/js/uye-disa-aktar/yetki-paneli.js; migration 0069 + 0071). Sadece Site Sahibi. -->
-    <section class="dash-view" id="view-sys-uye-aktarim" hidden data-view="sys-uye-aktarim">
-      <h1>Üye Verisi İndirme</h1>
-      <p class="muted">Hangi yöneticinin üye bilgilerini (CSV, Excel, TXT, PDF) indirebileceğini belirle ve geçmişi izle.</p>
-      <div id="uye-aktarim-kok"><p class="muted">Yükleniyor...</p></div>
-      <div id="uye-aktarim-mesaj" class="auth-message" hidden></div>
-    </section>
 
     <!-- Silinen hesapların artık verisi (assets/js/silme-onayi/silme-onayi.js; migration 0078). Owner her zaman; admin yalnızca
          Yetki Ayarları › Özellikler'den "Silinen Hesapların Artık Verisi" açıksa (yalnızca öneri gönderebilir). -->
@@ -1029,11 +1039,6 @@ permalink: "/panel/dashboard.html"
 
     <!-- Sistem Yedekleme & Depolama Yönetimi (assets/js/sistem-yedek/sistem-yedek.js; migration 0074 + sistem-yedek-worker).
          Owner her zaman; diğer roller yalnızca can_export_system açıksa. -->
-    <!-- Demo Yetki & Görünürlük Paneli (assets/js/demo/demo-yetki-paneli.js; migration 0083). Owner yazar; admin yalnızca izin verilirse. -->
-    <section class="dash-view" id="view-sys-demo" hidden data-view="sys-demo">
-      <h1>Demo Yetki &amp; Görünürlük</h1>
-      <div id="demo-yetki-kok"><p class="muted">Yükleniyor...</p></div>
-    </section>
 
     <!-- Demo "Sistem / Metrikler" (yalnızca demo modunda; statik vitrin rakamları — assets/js/demo/demo-metrik.js) -->
     <section class="dash-view" id="view-sys-metrik" hidden data-view="sys-metrik">
