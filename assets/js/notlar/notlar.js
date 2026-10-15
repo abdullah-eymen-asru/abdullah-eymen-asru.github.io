@@ -24,6 +24,8 @@
 import { supabase, showMessage, kucukHarfeCevirTr, guvenliDisUrlMi } from "../core/supabase-client.js";
 import { requireAuthOrShowError } from "../auth/auth-guard.js";
 import * as Kasa from "./kasa.js";
+import * as Kit from "../kurtarma-kiti/kit.js";
+import { kodSor } from "../kurtarma-kiti/kit-arayuz.js";
 import * as Bicim from "./bicim.js";
 
 /* ------------------------------------------------------------------ */
@@ -2539,6 +2541,8 @@ async function kilitKartiniHazirla({ kasaVar, kurtarmaGerekli = false, bagimsiz 
   kpAc.hidden = !kasaParolasiBelirlenecek;
   uyari.hidden = true;
   toggle.hidden = false;
+  // Yedek Kurtarma Kodu (tek kod: Notlar + Mesajlaşma): yalnızca kasa zaten varsa anlamlıdır.
+  $("nt-kit-toggle").hidden = !kasaVar || kasaParolasiBelirlenecek;
 
   if (kasaParolasiBelirlenecek) {
     aciklama.textContent =
@@ -2735,6 +2739,29 @@ async function kilitFormuGonderildi(olay) {
     btn.disabled = false;
     btn.textContent = !$("nt-kurtarma-alan").hidden ? "Kurtarma anahtarıyla aç" : "Kasayı aç";
   }
+}
+
+/**
+ * "Yedek Kurtarma Koduyla aç": XXXX-XXXX-XXXX-XXXX kodu girilince kit'teki Notlar DEK'i çözülür ve kasa, verilen parola için yeniden
+ * kurulup doğrudan açılır (notlar yeniden şifrelenmez). Parola alanı: bağımsız kasada YENİ Kasa Parolası, değilse GÜNCEL giriş parolası
+ * (yanlış yazılan parolayla zarfı kurmak kullanıcıyı yine kilitlerdi: önce geçici istemciyle doğrulanır).
+ */
+async function kitIleAcDiyalogu() {
+  const k = S.kilit || {};
+  const sonuc = await kodSor({
+    baslik: "Yedek Kurtarma Koduyla aç",
+    aciklama: k.bagimsiz
+      ? "Kasa Parolanı unuttuysan Yedek Kurtarma Kodunu yaz ve kasan için YENİ bir Kasa Parolası belirle. Notların korunur."
+      : "Giriş parolan değiştiyse/sıfırlandıysa Yedek Kurtarma Kodunu ve şu anki (güncel) giriş parolanı yaz; kasa yeni parolana göre yeniden kurulur. Notların korunur.",
+    tamamMetin: "Kasayı aç",
+    parolaAlani: { etiket: k.bagimsiz ? "Yeni Kasa Parolası" : "Güncel giriş parolan", ipucu: k.bagimsiz ? `En az ${Kasa.KASA_PAROLASI_MIN} karakter` : "", zorunlu: true },
+    dogrula: async (kod, parola) => {
+      if (k.bagimsiz && parola.length < Kasa.KASA_PAROLASI_MIN) throw new Error(`Yeni Kasa Parolası en az ${Kasa.KASA_PAROLASI_MIN} karakter olmalı.`);
+      if (!k.bagimsiz && !(await girisParolasiniDogrula(parola))) throw new Error("Hatalı giriş parolası: şu anki (güncel) giriş parolanı yaz.");
+      return Kit.notlarKasasiniKitIleAc(kod, parola);
+    },
+  });
+  if (sonuc) { bildir("Kasa Yedek Kurtarma Koduyla açıldı.", "success"); await kasaSonucunuUygula(sonuc); }
 }
 
 async function kasaVarMi() {
@@ -3321,6 +3348,7 @@ function baglantilariKur() {
   document.addEventListener("selectionchange", araciGuncelle);
   // Kilit / kurtarma
   $("nt-kilit-form").addEventListener("submit", kilitFormuGonderildi);
+  $("nt-kit-toggle").addEventListener("click", kitIleAcDiyalogu);
   $("nt-kurtarma-toggle").addEventListener("click", () => {
     const acilacak = $("nt-kurtarma-alan").hidden;
     kurtarmaModunuAyarla(acilacak);
