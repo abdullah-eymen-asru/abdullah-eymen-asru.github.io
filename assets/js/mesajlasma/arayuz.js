@@ -20,6 +20,8 @@ import { okunmamisYenile } from "./okunmamis.js";
 import { canliBaslat, canliDinle } from "./canli.js";
 import { kilitPaneli, kitKartiAc } from "./kurtarma.js";
 import * as Kit from "../kurtarma-kiti/kit.js";
+import * as E from "../r2-arsiv/e2ee.js";
+import * as Kasa from "../notlar/kasa.js";
 import { bildirimDurumu, bildirimAc, bildirimKapat, acikSohbetAyarla, bildirimTiklamasiniDinle } from "./bildirim.js";
 
 let AKTIF_ORNEK = null; // SPA'da ikinci kurulumda eskisi temizlenir (çift dinleyici/zamanlayıcı yok)
@@ -65,7 +67,8 @@ export async function mesajlasmaKur(kok, { profile, adminMi, konuOnDolgu = "" })
   const bildirimBtn = h("button", { type: "button", class: "msj-btn msj-btn--ikincil msj-bildirim-btn", "aria-pressed": "false" });
   const kurtarmaBtn = V.E2EE_AKTIF ? h("button", { type: "button", class: "msj-btn msj-btn--ikincil msj-kurtarma-btn", title: "Notlar + Mesajlaşma için tek Yedek Kurtarma Kodu" }, "🔑 Yedek Kurtarma Kodu") : null;
   const yildizBtn = h("button", { type: "button", class: "msj-btn msj-btn--ikincil msj-yildiz-btn", title: "Yıldızladığın mesajlar" }, "⭐ Yıldızlı mesajlar");
-  const ustbar = h("div", { class: "msj-ustbar" }, h("span", { class: "msj-ustbar-bilgi", text: "Mesajlar uçtan uca şifrelidir." }), h("div", { class: "msj-ustbar-eylem" }, yildizBtn, kurtarmaBtn, bildirimBtn));
+  const taniBtn = V.E2EE_AKTIF ? h("button", { type: "button", class: "msj-btn msj-btn--ikincil msj-tani-btn", title: "Şifreleme / anahtar durumunu kontrol et ve onar" }, "🩺 Tanılama") : null;
+  const ustbar = h("div", { class: "msj-ustbar" }, h("span", { class: "msj-ustbar-bilgi", text: "Mesajlar uçtan uca şifrelidir." }), h("div", { class: "msj-ustbar-eylem" }, yildizBtn, kurtarmaBtn, taniBtn, bildirimBtn));
   doldur(kok, h("div", { class: "msj-kok", "data-acik": "liste" }, ustbar, uyari, panel, bildirim));
   const kokEl = kok.querySelector(".msj-kok");
 
@@ -91,6 +94,59 @@ export async function mesajlasmaKur(kok, { profile, adminMi, konuOnDolgu = "" })
   bildirimBtnCiz();
   kurtarmaBtn?.addEventListener("click", async () => { if (await kitKartiAc(duyur)) uyariKontrol(true); });
   yildizBtn.addEventListener("click", () => yildizPaneliAc());
+  taniBtn?.addEventListener("click", () => taniAc());
+
+  // ---------- 🩺 Tanılama: hesap + kasa + anahtar + sohbet bazında durum raporu ve tek tıkla onarım ----------
+  async function taniRaporu() {
+    const satirlar = [];
+    const ekle = (m) => satirlar.push(m);
+    ekle(`Kasa (Notlar): ${Kasa.kasaAcikMi() ? "AÇIK" : "KİLİTLİ"}`);
+    try { const d = await E.anahtarDurumu(); ekle(`Anahtar kaydı: ${d.var ? "var" : "YOK"} · Giriş bağlı (DEK) sarmal: ${d.dek_var ? "var" : "yok"} · Yedek Kurtarma Kodu: ${d.kit_var ? "var" : "yok"}${d.kurtarma_var ? " · eski kurtarma parolası var" : ""}`); }
+    catch (e) { ekle(`Anahtar durumu okunamadı: ${e.message || e}`); }
+    let anahtarTamam = false;
+    try { anahtarTamam = await E.anahtarCiftiTutarliMi(); ekle(`Özel anahtar ↔ açık anahtar eşleşmesi: ${anahtarTamam ? "TUTARLI ✓" : "TUTARSIZ ✗ (anahtar açılamıyor ya da başka anahtar yüklü)"}`); }
+    catch (e) { ekle(`Özel anahtar açılamadı: ${e.message || e}`); }
+    try { await S.zarflarimiYukle(); } catch { ekle("Zarflarım okunamadı."); }
+    const sorunlu = [];
+    for (const c of durum.sohbetler.filter((x) => x.e2ee)) {
+      const t = await S.sohbetTani(c.id);
+      const ad = `${c.grup ? "Grup" : karsiTaraf(c)} · ${c.id.slice(0, 8)}`;
+      const d = !t.zarfVar ? "ZARFIN YOK (anahtarı bilen taraf sohbeti açınca paylaşılır)" : t.anahtarAcilir ? "açılıyor ✓" : "ZARF BAYAT/AÇILMIYOR ✗";
+      ekle(`• ${ad}: ${d}${t.eksik ? ` · zarfı eksik kişi: ${t.eksik}` : ""}`);
+      if (!t.anahtarAcilir || t.eksik) sorunlu.push(c.id);
+    }
+    if (!durum.sohbetler.some((x) => x.e2ee)) ekle("Şifreli sohbet yok.");
+    return { satirlar, sorunlu, anahtarTamam };
+  }
+  async function taniAc() {
+    const onceki = document.activeElement;
+    const pre = h("pre", { class: "msj-tani", text: "Kontrol ediliyor…" });
+    const kopyala = h("button", { type: "button", class: "msj-btn msj-btn--ikincil", text: "Kopyala" });
+    const onar = h("button", { type: "button", class: "msj-btn msj-btn--birincil", text: "Onar", disabled: true });
+    const kapat = h("button", { type: "button", class: "msj-btn msj-btn--ikincil", text: "Kapat" });
+    const kutu = h("div", { class: "msj-modal msj-modal--genis", role: "dialog", "aria-modal": "true", "aria-label": "Şifreleme tanılama" },
+      h("h3", { class: "msj-modal-baslik", text: "🩺 Şifreleme tanılama" }), pre,
+      h("p", { class: "msj-modal-metin", text: "Onar: açılabilen sohbetlerde eksik zarfları hemen tamamlar, bayat zarfları siler (anahtarı bilen taraf sohbeti açınca yeniden paylaşır). Hiçbir mesaj silinmez." }),
+      h("div", { class: "msj-modal-eylem" }, kopyala, kapat, onar));
+    const kaplama = h("div", { class: "msj-modal-kaplama" }, kutu);
+    const bitir = () => { kaplama.remove(); document.removeEventListener("keydown", tus, true); onceki?.focus?.(); };
+    const tus = (e) => { if (e.key === "Escape") { e.stopPropagation(); bitir(); } };
+    kaplama.addEventListener("mousedown", (e) => { if (e.target === kaplama) bitir(); });
+    kapat.addEventListener("click", bitir);
+    document.body.append(kaplama); document.addEventListener("keydown", tus, true);
+    let son = null;
+    const calistir = async () => { onar.disabled = true; pre.textContent = "Kontrol ediliyor…"; son = await taniRaporu(); pre.textContent = son.satirlar.join("\n"); onar.disabled = !son.sorunlu.length; };
+    kopyala.addEventListener("click", async () => { try { await navigator.clipboard.writeText(pre.textContent); kopyala.textContent = "Kopyalandı ✓"; } catch { kopyala.textContent = "Kopyalanamadı"; } });
+    onar.addEventListener("click", async () => {
+      onar.disabled = true; pre.textContent = "Onarılıyor…";
+      for (const id of son.sorunlu) { try { await S.sohbetiOnar(id); } catch { /* sıradaki */ } }
+      await calistir();
+      pre.textContent += "\n\nOnarım denendi. Hâlâ ✗ varsa: anahtarı bilen taraf (karşı hesap) bu sohbeti bir kez açmalı; ikisi de kaybettiyse o eski sohbet geri gelmez.";
+    });
+    await calistir();
+  }
+  // Anahtar sahibi olduğum sohbetlerde eksik/bayat kalan zarfları listeyi açar açmaz tamamla (sohbeti tek tek açmak gerekmesin).
+  async function arkaplandaZarfTamamla() { let n = 0; for (const c of durum.sohbetler) { if (n >= 25) break; if (c.e2ee && S.zarfimVarMi(c.id)) { n++; await S.eksikZarflariTamamla(c.id); } } }
 
   // Yedek Kurtarma Kodu henüz üretilmediyse bir kez (oturum başına) nazikçe hatırlat.
   async function uyariKontrol(gizle = false) {
@@ -174,7 +230,7 @@ export async function mesajlasmaKur(kok, { profile, adminMi, konuOnDolgu = "" })
       durum: e?.durum || {},
       onAcildi: async (r) => {
         durum.kilitli = false; delete kokEl.dataset.kilit; S.anahtarlariBirak(); V.aramaIndeksiniTemizle();
-        duyur(r?.sifirlandi ? "Anahtar sıfırlandı. Eski sohbetler, karşı taraf geçmişi paylaşınca ekrana gelir." : r?.yenilendi ? "Kilit açıldı; mesaj anahtarın yenilendi. Eski Yedek Kurtarma Kodun varsa geçersiz oldu — yenisini indir." : r?.onarildi ? "Kilit açıldı ve kasa sarmalı onarıldı." : "Kilit açıldı.");
+        duyur(r?.sifirlandi ? "Anahtar sıfırlandı. Eski sohbetler, karşı taraf geçmişi paylaşınca ekrana gelir." : r?.yenilendi ? "Kilit açıldı; mesaj anahtarın yenilendi. Eski Yedek Kurtarma Kodun (Notlar'ı da kapsar) geçersiz oldu — yenisini indir." : r?.onarildi ? "Kilit açıldı ve kasa sarmalı onarıldı." : "Kilit açıldı.");
         sagiSifirla(); await yukle(); await uyariKontrol();
         // Anahtar yenilendiyse/ilk kurulumda Yedek Kurtarma Kodu henüz yoksa, kodu şimdi indirtmek için kartı kendiliğinden aç (bir kez).
         if (r?.yenilendi || r?.sifirlandi) { try { if (!(await Kit.kitDurumu()).kitVar && !uyari.hidden && (await kitKartiAc(duyur))) uyari.hidden = true; } catch { /* migration 0096 yoksa sessiz */ } }
@@ -190,6 +246,7 @@ export async function mesajlasmaKur(kok, { profile, adminMi, konuOnDolgu = "" })
       durum.kilitli = false; delete kokEl.dataset.kilit;
       if (V.E2EE_AKTIF) { const c = await V.copKutusu().catch(() => []); durum.copAdet = c.length; if (durum.mod === "cop") durum.cop = c; }
       await listeyiCiz();
+      if (V.E2EE_AKTIF) arkaplandaZarfTamamla();
       if (durum.secili) { const g = durum.sohbetler.find((x) => x.id === durum.secili.id); if (g) { durum.secili = g; } sabitCiz(); }
     } catch (e) {
       if (kilitMi(e)) kilitGoster(e);
