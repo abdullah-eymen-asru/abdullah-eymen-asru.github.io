@@ -149,3 +149,27 @@ export async function kitIleAc(kodMetni, { parola = null, cihazdaHatirla = false
   } finally { k.dek?.fill(0); k.rsa?.fill(0); }
   return { mesajlar, notlar, onarildi };
 }
+
+/**
+ * NOTLAR SEKMESİ — "Kasa parolamı unuttum": kendi satırımdaki kit'i kodla açar, Notlar DEK'ini çözer ve dek_parola zarfını `parola` için
+ * YENİDEN kurar (bağımsız kasada yeni Kasa Parolası, değilse güncel giriş parolası). Notlar yeniden şifrelenmez (DEK aynıdır).
+ * Kodda mesaj anahtarı da varsa mesajlaşma anahtarı da aynı anda onarılır (sessiz, başarısız olsa bile kasa açılışını bozmaz).
+ * Dönüş: Kasa.kitIleKasaAc sonucu ({ durum: "acik" }).
+ */
+export async function notlarKasasiniKitIleAc(kodMetni, parola) {
+  const { data: o } = await supabase.auth.getSession();
+  const session = o.session;
+  if (!session) throw new KitHatasi("OTURUM", "Oturum bulunamadı.");
+  const { data: satir, error } = await supabase.from("e2ee_kullanici_anahtarlari")
+    .select("kullanici_id, kit_sarili, kit_iv, kit_tuz, kit_kdf_tur").eq("kullanici_id", session.user.id).maybeSingle();
+  if (error) throw new KitHatasi("SUNUCU", "Anahtar kaydı okunamadı.");
+  if (!satir?.kit_sarili) throw new KitHatasi("KIT_YOK", "Bu hesapta Yedek Kurtarma Kodu üretilmemiş. (Eski kurtarma anahtarın varsa onu kullan.)");
+  const k = await kitSatiriniAc(satir, kodMetni);
+  try {
+    if (k.uid !== session.user.id) throw new KitHatasi("BASKA_HESAP", "Bu kod başka bir hesaba ait. Başka hesabın yedeği için Sistem Yedeği › İçe aktar ekranını kullan.");
+    if (!k.dek) throw new KitHatasi("DEK_YOK", "Bu kod Notlar anahtarını içermiyor (Notlar kasası kilitliyken üretilmiş). Notlar kasası için eski kurtarma anahtarını kullan.");
+    const sonuc = await Kasa.kitIleKasaAc(session, k.dek, parola);
+    if (k.rsa) { try { await E.ozelAnahtariIceAktar(k.rsa); } catch { /* mesaj anahtarı onarılamadıysa kasa yine açıktır */ } }
+    return sonuc;
+  } finally { k.dek?.fill(0); k.rsa?.fill(0); }
+}
