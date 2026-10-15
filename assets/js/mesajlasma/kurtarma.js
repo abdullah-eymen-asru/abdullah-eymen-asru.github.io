@@ -128,9 +128,9 @@ export function kilitPaneli({ durum = {}, onAcildi }) {
   }
 
   // 4) Son çare
-  const sifirla = h("button", { type: "button", class: "msj-btn msj-btn--tehlike msj-kucuk", text: "Anahtarı sıfırla (son çare)" });
+  const sifirla = h("button", { type: "button", class: "msj-btn msj-btn--tehlike msj-kucuk", text: "Yedek kodum yok → yeni anahtar oluştur" });
   sifirla.addEventListener("click", async () => {
-    const o = await modalSor({ baslik: "Şifreleme anahtarı sıfırlansın mı?", metin: "Yeni bir anahtar çifti oluşturulur. Eski sohbetlerin anahtarı sende silinir; karşı taraf (anahtarı hâlâ bilen) sohbeti açınca geçmişi sana yeniden paylaşır. Karşı tarafın da erişimi yoksa o sohbet geri getirilemez. Eski Yedek Kurtarma Kodun da geçersiz olur; yenisini üretmelisin. Şifreli özel dosyaların için sana verilen anahtarlar da silinir.", secenekler: [{ metin: "Evet, sıfırla", deger: true, tur: "tehlike" }, { metin: "Vazgeç", deger: null }] });
+    const o = await modalSor({ baslik: "Şifreleme anahtarı sıfırlansın mı?", metin: "Bu cihazda açılamayan eski anahtarın yerine yenisi oluşturulur ve parolana bağlanır; bundan sonra parolan yeterli olur. Eski sohbet anahtarların silinir; karşı taraf sohbeti açınca geçmişi sana otomatik yeniden paylaşır. Karşı tarafın da erişimi yoksa o eski sohbet geri getirilemez. Eski Yedek Kurtarma Kodun da geçersiz olur; yenisini üretmelisin. Şifreli özel dosyaların için sana verilen anahtarlar da silinir.", secenekler: [{ metin: "Evet, sıfırla", deger: true, tur: "tehlike" }, { metin: "Vazgeç", deger: null }] });
     if (!o) return;
     sifirla.disabled = true;
     try { await E.anahtariSifirla(); onAcildi({ sifirlandi: true }); } catch (er) { hataYaz(er.message || String(er)); sifirla.disabled = false; }
