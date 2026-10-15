@@ -16,7 +16,7 @@ async function init() {
   const aciklama = document.getElementById("mesajlar-aciklama");
   const adminMi = profile.role === "admin" || profile.role === "owner";
   if (aciklama) aciklama.textContent = adminMi
-    ? "Üyelerin sana gönderdiği tüm konuşmalar burada. Mesajlar uçtan uca şifrelidir; “Yeni mesaj” ile gruptan kişi seçebilirsin."
+    ? "Üyelerin sana gönderdiği tüm konuşmalar burada. Mesajlar uçtan uca şifrelidir; “Yeni mesaj” ile kişi seçebilir, “Yeni grup” ile ekip odası kurabilirsin."
     : "Site yöneticisiyle yazışabilirsin — farklı konularda istediğin kadar ayrı sohbet açabilirsin. Mesajların uçtan uca şifrelidir.";
 
   // Bağımsız /panel/mesajlar.html'de admin için "Admin Paneline Dön" bağlantısı (dashboard içinde gösterilmez).
