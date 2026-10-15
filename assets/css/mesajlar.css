@@ -281,3 +281,45 @@
   .msj-geri { display: inline-flex; }
   .msj-mesaj { max-width: 88%; }
 }
+
+/* ============================================================================
+   2026-10 NİHAİ MİMARİ EKLERİ: üst şerit, kilit paneli, yönetim kartları, tikler, grup, uyarı
+   ============================================================================ */
+.msj-ustbar { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.msj-ustbar-bilgi { color: var(--muted); font-size: .85rem; }
+.msj-ustbar-eylem { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.msj-bildirim-btn[aria-pressed="true"] { border-color: var(--accent); }
+.msj-uyari { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; padding: 10px 14px; margin-bottom: 10px; border: 1px solid var(--accent); border-radius: 12px; background: color-mix(in srgb, var(--accent) 10%, var(--card-bg)); }
+.msj-uyari[hidden] { display: none !important; }
+.msj-uyari-eylem { display: flex; gap: 8px; }
+.msj-ikon-btn--etiketli { width: auto; padding: 0 12px; gap: 6px; }
+.msj-ikon-etiket { font-size: .82rem; font-weight: 600; }
+.msj-tik { color: var(--muted); font-weight: 800; letter-spacing: -2px; }
+.msj-tik--okundu { color: #2f8bff !important; }
+.msj-bolum-baslik { margin: 4px 0 6px; font-size: .95rem; }
+.msj-bos--kisa { padding: 6px 0 10px; margin: 0; text-align: left; }
+.msj-yonetim { display: grid; gap: 8px; }
+.msj-yonetim-kart { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; text-align: left; border: 1px solid var(--border); border-radius: 12px; background: var(--card-bg); color: var(--text); font: inherit; cursor: pointer; min-width: 0; }
+.msj-yonetim-kart:hover, .msj-yonetim-kart:focus-visible { border-color: var(--accent); background: var(--tag-bg); outline: none; }
+.msj-yonetim-ikon { font-size: 1.3rem; flex: none; }
+.msj-yonetim-ad { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.msj-yonetim-ad small { color: var(--muted); }
+.msj-yeni-ipucu { margin: 0 0 8px; color: var(--muted); font-size: .85rem; }
+.msj-cipler { display: flex; flex-wrap: wrap; gap: 6px; }
+.msj-cip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--tag-bg); font-size: .82rem; }
+.msj-cip button { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 2px 6px; font: inherit; }
+.msj-modal--genis { width: min(520px, 100%); max-height: 85vh; overflow-y: auto; }
+.msj-uye-liste { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.msj-uye-satir { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; }
+.msg-uye-sonuc-item--secili { background: var(--tag-bg); border-color: var(--accent); }
+.msj-kilit { margin: auto; max-width: 440px; padding: 24px 18px; text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+.msj-kilit-ikon { font-size: 2.2rem; }
+.msj-kilit-baslik { margin: 0; }
+.msj-kilit-metin { margin: 0; color: var(--muted); line-height: 1.5; }
+.msj-kilit-form { display: flex; flex-direction: column; gap: 10px; text-align: left; }
+.msj-kilit-alan { display: flex; flex-direction: column; gap: 4px; font-size: .85rem; }
+.msj-kilit-girdi { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); font: inherit; }
+.msj-kilit-onay { display: flex; align-items: center; gap: 8px; font-size: .85rem; }
+.msj-kilit-hata { margin: 0; color: #c0392b; font-size: .85rem; }
+.msj-kilit-hata[hidden] { display: none !important; }
+@media (max-width: 860px) { .msj-ikon-etiket { display: none; } .msj-ikon-btn--etiketli { width: 38px; padding: 0; } }
