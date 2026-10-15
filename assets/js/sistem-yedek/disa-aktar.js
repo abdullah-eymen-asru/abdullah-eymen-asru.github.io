@@ -198,7 +198,7 @@ export function dosyaAdi() {
  * @param {object} p { bilesenler:Set<string>, kapsam:'kendi'|'secili'|'tum', hedefler:string[] (kapsam='secili' iken üye id'leri), hedefAdlari:string[], hassas:boolean, bicimler:{json,sql}, alici, ilerleme(fn), sinyal }
  * @returns {Promise<{boyut:number, blob:Blob|null, ozet:object}>}
  */
-export async function yedekAl({ bilesenler, kapsam, hedefler = [], hedefAdlari = [], hassas, bicimler, alici, ilerleme, sinyal }) {
+export async function yedekAl({ bilesenler, kapsam, hedefler = [], hedefAdlari = [], hassas, bicimler, alici, ilerleme, sinyal, ekDosyalar = [], sadeceEk = false }) {
   const secili = new Set(bilesenler);
   const { data: oturum, error } = await supabase.rpc("sistem_export_baslat", {
     p_bilesenler: [...secili], p_kapsam: kapsam, p_hassas: !!hassas, p_hedefler: kapsam === "secili" ? hedefler : [],
@@ -215,20 +215,21 @@ export async function yedekAl({ bilesenler, kapsam, hedefler = [], hedefAdlari =
   };
 
   try {
-    if (secili.has("veritabani") || secili.has("notlar")) {
+    if (!sadeceEk && (secili.has("veritabani") || secili.has("notlar"))) {
       ilerleme({ asama: "Tablo listesi alınıyor…" });
       const { data: tablolar, error: te } = await supabase.rpc("sistem_export_tablo_listesi", { p_id: oturum });
       if (te) throw new Error(hataMetni(te));
       if (!bicimler.json && !bicimler.sql) throw new Error("Veritabanı için en az bir biçim (JSON / SQL) seç.");
       await veritabaniYaz(zip, oturum, tablolar || [], bicimler, ilerleme, sinyal, ozet);
     }
-    if (secili.has("r2") || secili.has("notlar")) {
+    if (!sadeceEk && (secili.has("r2") || secili.has("notlar"))) {
       await r2Yaz(zip, oturum, ilerleme, sinyal, ozet);
     }
     if (secili.has("github") || secili.has("icerik_md")) {
       await githubYaz(zip, oturum, secili, ilerleme, sinyal, ozet);
     }
 
+    for (const e of ekDosyalar) await zip.dosyaEkle(e.ad, e.icerik); // örn. mesajlar/mesajlarim.parolali.json (istemcide parolayla şifrelenmiş)
     ilerleme({ asama: "Paket kapatılıyor…" });
     await zip.dosyaEkle("manifest.json", JSON.stringify(ozet, null, 2));
     await zip.dosyaEkle("OKUBENI.txt", okubeni(ozet));
