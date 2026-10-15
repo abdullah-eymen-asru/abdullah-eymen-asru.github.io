@@ -1,12 +1,27 @@
 /*
  * assets/js/mesajlasma/okunmamis.js — canlı okunmamış mesaj sayacı (tek paylaşılan durum).
- * İstek ekonomisi: 1 RPC + 1 realtime kanalı; olay gelince 800 ms debounce; sekme gizliyken yoklama YOK;
- * yedek yoklama 2 dk'da bir (yalnızca sekme görünürken).
+ * İstek ekonomisi: 1 RPC; Realtime artık canli.js'teki TEK kanaldan gelir; olay gelince 800 ms debounce; sekme gizliyken yoklama YOK;
+ * yedek yoklama 2 dk'da bir (yalnızca sekme görünürken). visibilitychange dinleyicisi bir kez eklenir (eskiden her başlatmada birikiyordu).
  */
 import { supabase } from "../core/supabase-client.js";
 import { isDemoMode } from "../demo/demo-durum.js";
+import { canliBaslat, canliDinle } from "./canli.js";
+import { bildirimDurumu, mesajBildirimiGoster, acikSohbet } from "./bildirim.js";
+import { kisiBilgileri } from "./veri.js";
 
-let TOPLAM = 0; let KANAL = null; let ZAMAN = null; let YOKLAMA = null; let UID = null;
+/** Gelen mesaj için (açıksa) bildirim: sessiz sohbet ve ekranda açık sohbet hariç. Metin YOK (E2EE). Hangi sekmede olursan ol çalışır. */
+async function bildirimle(m) {
+  if (bildirimDurumu() !== "acik") return;
+  if (!document.hidden && acikSohbet() === m.conversation_id) return;
+  try {
+    const { data } = await supabase.from("konusma_durumlari").select("sessiz").eq("conversation_id", m.conversation_id).maybeSingle();
+    if (data?.sessiz) return;
+    const k = (await kisiBilgileri([m.sender_id]))[m.sender_id];
+    await mesajBildirimiGoster({ gonderen: k?.ad, sohbetId: m.conversation_id });
+  } catch { /* bildirim best-effort */ }
+}
+
+let TOPLAM = 0; let ZAMAN = null; let YOKLAMA = null; let BASLADI = false; let CIKIS = null; let GORUNURLUK = false;
 const DINLEYICILER = new Set();
 export const okunmamisSayisi = () => TOPLAM;
 export function okunmamisDinle(fn) { DINLEYICILER.add(fn); fn(TOPLAM); return () => DINLEYICILER.delete(fn); }
@@ -22,20 +37,16 @@ export async function okunmamisYenile() {
 const ertele = () => { clearTimeout(ZAMAN); ZAMAN = setTimeout(okunmamisYenile, 800); };
 
 export async function okunmamisBaslat() {
-  if (isDemoMode || KANAL) return;
-  const { data } = await supabase.auth.getUser();
-  UID = data?.user?.id; if (!UID) return;
+  if (isDemoMode || BASLADI) return;
+  BASLADI = true;
   await okunmamisYenile();
-  KANAL = supabase.channel(`msj-rozet-${UID}`)
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (p) => { if (p.new?.sender_id !== UID) ertele(); })
-    .on("postgres_changes", { event: "DELETE", schema: "public", table: "messages" }, ertele)
-    .subscribe();
+  await canliBaslat();
+  CIKIS = canliDinle((o) => { if (o.tur === "mesaj-sil" || (o.tur === "mesaj-ekle" && !o.ben)) ertele(); if (o.tur === "mesaj-ekle" && !o.ben) bildirimle(o.yeni); });
   YOKLAMA = setInterval(() => { if (!document.hidden) okunmamisYenile(); }, 120000);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) okunmamisYenile(); });
+  if (!GORUNURLUK) { GORUNURLUK = true; document.addEventListener("visibilitychange", () => { if (BASLADI && !document.hidden) okunmamisYenile(); }); }
   supabase.auth.onAuthStateChange((o) => { if (o === "SIGNED_OUT") okunmamisDurdur(); });
 }
 export function okunmamisDurdur() {
-  clearTimeout(ZAMAN); clearInterval(YOKLAMA);
-  if (KANAL) supabase.removeChannel(KANAL);
-  KANAL = null; TOPLAM = 0; yay();
+  clearTimeout(ZAMAN); clearInterval(YOKLAMA); CIKIS?.(); CIKIS = null;
+  BASLADI = false; TOPLAM = 0; yay();
 }
