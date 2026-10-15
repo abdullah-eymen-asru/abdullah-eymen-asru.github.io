@@ -18,6 +18,7 @@
  * (admin-change-email, delete-account) — sadece görünüm/gezinme farklı.
  */
 import { supabase, showMessage, escapeHtml, kucukHarfeCevirTr, kullaniciAramayaUyuyorMu } from "./core/supabase-client.js";
+import { tekKanal } from "./core/realtime.js";
 import { requireAuthOrShowError } from "./auth/auth-guard.js";
 
 const DELETE_ACCOUNT_FUNCTION_URL =
@@ -136,8 +137,7 @@ let REALTIME_TIMER = null;
 function wireRealtime() {
   if (REALTIME_KURULDU) return;
   REALTIME_KURULDU = true;
-  supabase
-    .channel("uye-ayarlari-profiles-degisiklik")
+  tekKanal("uye-ayarlari-profiles-degisiklik")
     .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => {
       clearTimeout(REALTIME_TIMER);
       REALTIME_TIMER = setTimeout(() => loadUsers(), 600);
