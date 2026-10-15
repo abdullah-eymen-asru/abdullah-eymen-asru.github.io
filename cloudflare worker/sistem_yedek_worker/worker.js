@@ -587,6 +587,27 @@ async function workerSert(env, kimlik, istek, cors) {
   return json({ ok: true, ad, workersDev: g.acik }, 200, cors);
 }
 
+/** R2 ÇÖP TOPLAYICI (owner): bir sayfa (500 nesne) tarar; veritabanında karşılığı OLMAYAN ve 24 saatten eski nesneleri döndürür. SİLMEZ.
+ *  Silme, onaydan sonra mevcut POST /r2/sil akışıyla (anahtar biçimi beyaz listesi + denetim) yapılır. 24 sa koruma: yüklenmekte olan dosya silinmesin. */
+async function hayaletTara(env, kimlik, url, cors) {
+  if (!(await ownerMi(env, kimlik))) return json({ error: "Yalnızca Site Sahibi." }, 403, cors);
+  const kaynak = url.searchParams.get("b") || "";
+  const { kova, hata } = kaynakKovasi(env, kaynak, cors);
+  if (hata) return hata;
+  const imlec = url.searchParams.get("c") || undefined;
+  const l = await kova.list({ limit: 500, cursor: imlec });
+  const sinir = Date.now() - 24 * 3600 * 1000;
+  const aday = l.objects.filter((o) => anahtarSilinebilirMi(kaynak, o.key) && new Date(o.uploaded).getTime() < sinir);
+  let hayalet = [];
+  if (aday.length) {
+    const r = await rpc(env, kimlik, "sistem_r2_bilinmeyenleri", { p_kaynak: kaynak, p_anahtarlar: aday.map((o) => o.key) });
+    if (r.hata) return json({ error: r.hata }, yetkisizMi(r.durum) ? 403 : 502, cors);
+    const set = new Set(r.veri || []);
+    hayalet = aday.filter((o) => set.has(o.key)).map((o) => ({ anahtar: o.key, boyut: o.size, yuklenme: o.uploaded }));
+  }
+  return json({ taranan: l.objects.length, hayalet, sonraki: l.truncated ? l.cursor : null }, 200, cors);
+}
+
 export default {
   async fetch(istek, env) {
     const cors = corsBasliklari(istek);
@@ -640,6 +661,7 @@ export default {
       if (yol === "/kota") return await kotaGetir(env, kimlik, cors);
       if (yol === "/worker-sert/durum") return json({ yapilandirildi: !!(env.CF_ACCOUNT_ID && env.CF_WORKERS_TOKEN) }, 200, cors);
       if (yol === "/r2/gezgin") return await r2Gezgin(env, kimlik, url, cors);
+      if (yol === "/r2/hayalet-tara") return await hayaletTara(env, kimlik, url, cors);
       if (yol === "/r2/boyut") return await r2Boyut(env, kimlik, url, cors);
       if (yol === "/uye/dosya") return await uyeDosya(env, kimlik, url, cors);
     } catch (hata) {
