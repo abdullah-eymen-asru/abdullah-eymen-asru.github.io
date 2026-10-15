@@ -347,3 +347,11 @@
 .sy-ia-liste .sy-ia-satir { flex-wrap: wrap; row-gap: 4px; min-width: 0; }
 .sy-ia-notlar li { overflow-wrap: anywhere; }
 .sy-ia-log { max-height: 180px; overflow-y: auto; margin: 8px 0; padding-left: 18px; font-size: .85rem; }
+
+/* 2026-10: üst düzey iki alan — Kişisel Verilerim / Tüm Sistem & Felaket Kurtarma (net ayrım) */
+.sy-ustsekmeler { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; padding: 6px; border: 1px solid var(--border); border-radius: 14px; background: var(--card-bg); }
+.sy-ustsekme { flex: 1 1 220px; min-height: 44px; padding: 10px 16px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--text); font: inherit; font-weight: 700; cursor: pointer; }
+.sy-ustsekme:hover { border-color: var(--accent); }
+.sy-ustsekme[aria-selected="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+.sy-ustsekme[aria-selected="true"]:nth-child(2) { background: #b9770e; border-color: #b9770e; }
+.sy-ust-panel[hidden] { display: none !important; }
