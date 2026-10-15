@@ -316,6 +316,11 @@ async function kurtarmaKekiOlustur(kurtarmaBaytlari) {
 /* ------------------------------------------------------------------ */
 
 let oturum = null; // { uid, eposta, dek, kek, satir }
+// Kasa her açıldığında (giriş, parola, kurtarma) haber ver: mesajlaşma anahtarı (e2ee.js) aynı DEK'e bağlanabilsin (migration 0096).
+function oturumKur(o) {
+  oturum = o;
+  try { if (o?.dek && o.uid !== DEMO_UID) window.dispatchEvent(new CustomEvent("aea:kasa-acildi")); } catch { /* window yok */ }
+}
 
 export const kasaAcikMi = () => !!oturum?.dek;
 
@@ -450,7 +455,7 @@ export async function kasaBaslat(session) {
     if (kekOnbellek) {
       const dek = await kekIleDekAc(satir, kekOnbellek, uid);
       if (dek) {
-        oturum = { uid, eposta, dek, kek: kekOnbellek, satir };
+        oturumKur({ uid, eposta, dek, kek: kekOnbellek, satir });
         // Parola dışarıdan (ör. "şifremi unuttum") değişmiş ve kullanıcı bu cihazda YENİ parolayla
         // girmişse: önbellekteki anahtar hâlâ geçerli → zarfı yeni parolaya taşı, kurtarma anahtarı gerekmesin.
         if (bekleyenKullan) await girisParolasiniUyumla(session, uid, satir, kekOnbellek);
@@ -497,7 +502,7 @@ async function girisParolasiniUyumla(session, uid, satir, kekOnbellek) {
     const taze = await kasaSatiriniGetir(uid);
     const kek = await kekTuret(kayit.baz, b64Coz(taze.kdf_salt), taze.kdf_iter);
     const dek = await dekAc(taze.dek_parola, kek, uid, "dek-parola", false);
-    oturum = { uid, eposta: oturum?.eposta || "", dek, kek, satir: taze };
+    oturumKur({ uid, eposta: oturum?.eposta || "", dek, kek, satir: taze });
     await kekiOnbellegeAl(uid, kek);
     await bekleyenParolaMalzemesiniSil();
   } catch (hata) {
@@ -508,14 +513,14 @@ async function girisParolasiniUyumla(session, uid, satir, kekOnbellek) {
 async function bazIleBaslat(uid, eposta, satir, baz) {
   if (!satir) {
     const k = await yeniKasaKur(uid, baz);
-    oturum = { uid, eposta, dek: k.dek, kek: k.kek, satir: k.satir };
+    oturumKur({ uid, eposta, dek: k.dek, kek: k.kek, satir: k.satir });
     await kekiOnbellegeAl(uid, k.kek);
     return { durum: "yeni-kasa", kurtarmaMetni: k.kurtarmaMetni };
   }
   const kek = await kekTuret(baz, b64Coz(satir.kdf_salt), satir.kdf_iter);
   const dek = await kekIleDekAc(satir, kek, uid);
   if (!dek) return { durum: "kurtarma-gerekli" };
-  oturum = { uid, eposta, dek, kek, satir };
+  oturumKur({ uid, eposta, dek, kek, satir });
   await kekiOnbellegeAl(uid, kek);
   return { durum: "acik" };
 }
@@ -536,7 +541,7 @@ export async function kasaParolasiIleKur(session, parola, kurtarmaIste) {
   const baz = await parolaMalzemesiOlustur(p);
   p = null;
   const k = await yeniKasaKur(uid, baz, { parolaTur: "kasa", kurtarma: !!kurtarmaIste });
-  oturum = { uid, eposta, dek: k.dek, kek: k.kek, satir: k.satir };
+  oturumKur({ uid, eposta, dek: k.dek, kek: k.kek, satir: k.satir });
   await kekiOnbellegeAl(uid, k.kek);
   return { durum: k.kurtarmaMetni ? "yeni-kasa" : "acik", kurtarmaMetni: k.kurtarmaMetni };
 }
@@ -573,7 +578,7 @@ export async function kasaParolasiniDegistir(mevcutParola, yeniParola) {
   const taze = await kasaSatiriniGetir(uid);
   const kek = await kekTuret(yeniBaz, b64Coz(taze.kdf_salt), taze.kdf_iter);
   const dek = await dekAc(taze.dek_parola, kek, uid, "dek-parola", false);
-  oturum = { ...oturum, dek, kek, satir: taze };
+  oturumKur({ ...oturum, dek, kek, satir: taze });
   await kekiOnbellegeAl(uid, kek);
   return { durum: "acik" };
 }
@@ -646,7 +651,7 @@ export async function kurtarmaIleAc(session, kurtarmaMetni, parola) {
   const taze = await kasaSatiriniGetir(uid);
   const kek = await kekTuret(baz, b64Coz(taze.kdf_salt), taze.kdf_iter);
   const dek = await dekAc(taze.dek_parola, kek, uid, "dek-parola", false);
-  oturum = { uid, eposta, dek, kek, satir: taze };
+  oturumKur({ uid, eposta, dek, kek, satir: taze });
   await kekiOnbellegeAl(uid, kek);
   await bekleyenParolaMalzemesiniSil();
   return { durum: "acik" };
@@ -694,7 +699,7 @@ export async function parolaDegisimindeZarfiYenile(uid, yeniBaz) {
   const taze = await kasaSatiriniGetir(uid);
   const yeniKek = await kekTuret(yeniBaz, b64Coz(taze.kdf_salt), taze.kdf_iter);
   const dek = await dekAc(taze.dek_parola, yeniKek, uid, "dek-parola", false);
-  oturum = { uid, eposta: oturum?.eposta || "", dek, kek: yeniKek, satir: taze };
+  oturumKur({ uid, eposta: oturum?.eposta || "", dek, kek: yeniKek, satir: taze });
   await kekiOnbellegeAl(uid, yeniKek);
   return { yapildi: true };
 }
@@ -827,3 +832,105 @@ export async function ekiCoz(arrayBuffer, r2Anahtari) {
 
 export const kullaniciKimligi = () => oturum?.uid || null;
 export const sifreliYedekIcinKasaSatiri = () => oturum?.satir || null;
+
+/* ------------------------------------------------------------------ */
+/* 8) MESAJLAŞMA BAĞI + KURTARMA KİTİ KÖPRÜSÜ (2026-10, migration 0096) */
+/* ------------------------------------------------------------------ */
+// Mesajlaşmanın RSA özel anahtarı artık bu kasanın DEK'iyle de sarılır: giriş yapınca kasa açılır → mesajlar da açılır.
+// DEK burada extractable:false kalır; dışarıya yalnızca (a) o anahtarla şifreleme/çözme ve (b) Kurtarma Kiti için GEÇİCİ ham kopya verilir.
+
+/** Kasa açıksa küçük bir sırrı (ör. RSA özel anahtarı PKCS8) DEK ile AES-GCM sarar. AAD = kullanıcı|etiket. */
+export async function dekIleSar(bayt, etiket) {
+  const { uid, dek } = oturumGerekli();
+  const iv = rastgele(12);
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: aad(uid, etiket) }, dek, bayt);
+  return { sarili: b64Kodla(ct), iv: b64Kodla(iv) };
+}
+
+/** dekIleSar'ın tersi. Açılamazsa (yanlış DEK/bozuk veri) fırlatır. */
+export async function dekIleAc(sariliB64, ivB64, etiket) {
+  const { uid, dek } = oturumGerekli();
+  return crypto.subtle.decrypt({ name: "AES-GCM", iv: b64Coz(ivB64), additionalData: aad(uid, etiket) }, dek, b64Coz(sariliB64));
+}
+
+/**
+ * GİRİŞTE SESSİZ AÇMA: hesapta zaten bir Not Kasası varsa ve bu cihazda/girişte anahtar malzemesi hazırsa kasayı kullanıcıya
+ * hiçbir şey sormadan açar (e-posta/şifre girişi: girişte yakalanan parola malzemesi ya da cihazdaki dışa aktarılamaz KEK;
+ * Google: cihazdaki KEK — Kasa Parolası bir kez girildikten sonra). Kasa YOKSA yeni kasa KURMAZ: ilk kurulumda gösterilmesi gereken
+ * kurtarma metni vardır; bu yüzden kurulum Notlar sekmesinde yapılır. Dönüş: true = kasa açık.
+ */
+export async function kasaSessizAc(session) {
+  if (demoModuAktifMi() || !session?.user) return false;
+  if (oturum?.dek && oturum.uid === session.user.id) return true;
+  const satir = await kasaSatiriniGetir(session.user.id);
+  if (!satir) return false;
+  const sonuc = await kasaBaslat(session);
+  return sonuc?.durum === "acik";
+}
+
+/** Kilit paneli için: kasa türü (giriş parolası mı, bağımsız Kasa Parolası mı) — kasa kilitliyken de çalışır. */
+export async function kasaOzeti(uid) {
+  const satir = await kasaSatiriniGetir(uid);
+  return { kasaVar: !!satir, bagimsiz: satir?.parola_tur === "kasa", kurtarmaVar: !!satir?.dek_kurtarma };
+}
+
+/** KURTARMA KİTİ için DEK'in GEÇİCİ ham kopyası (32 bayt). Çağıran işi bitince .fill(0) yapmalıdır. */
+export async function kitIcinDekHamAl() {
+  const { uid, kek } = oturumGerekli();
+  if (!kek) throw new Error("Not Kasası bu cihazda yeniden kurulmalı (parola ile aç).");
+  const satir = await kasaSatiriniGetir(uid);
+  if (!satir) throw new Error("Bu hesapta henüz bir Not Kasası yok.");
+  const gecici = await dekAc(satir.dek_parola, kek, uid, "dek-parola", true);
+  return new Uint8Array(await crypto.subtle.exportKey("raw", gecici));
+}
+
+/** Kit'ten gelen ham DEK, bu hesabın kasasına gerçekten ait mi? Bir notu çözmeyi dener (not yoksa doğrulanamaz → null). */
+export async function dekHamBuHesabaAitMi(dekHam) {
+  const uid = oturum?.uid || (await supabase.auth.getUser()).data?.user?.id;
+  const { data } = await supabase.from("notlar").select("id, ciphertext, iv").eq("user_id", uid).limit(1);
+  if (!data?.length) return null;
+  try { await eskiDekIleNotCoz(dekHam, uid, data[0].id, data[0].ciphertext, data[0].iv); return true; } catch { return false; }
+}
+
+/**
+ * PAROLA/KİLİT KURTARMA (Kit ile): ham DEK'ten, verilen parola için dek_parola zarfını baştan kurar ve kasayı açar.
+ * `parola`: bağımsız kasada Kasa Parolası, değilse giriş parolası. Notlar yeniden şifrelenmez (DEK aynı kalır).
+ */
+export async function kitIleKasaAc(session, dekHam, parola) {
+  const uid = session.user.id;
+  const satir = await kasaSatiriniGetir(uid);
+  if (!satir) throw new Error("Bu hesapta henüz bir Not Kasası yok; önce Notlar sekmesini aç.");
+  if (typeof parola !== "string" || parola.length < 8) throw new Error("Kasa için bir parola yazmalısın (en az 8 karakter).");
+  if (satir.parola_tur === "kasa" && parola.length < KASA_PAROLASI_MIN) throw new Error(`Kasa Parolası en az ${KASA_PAROLASI_MIN} karakter olmalı.`);
+  const uygun = await dekHamBuHesabaAitMi(dekHam);
+  if (uygun === false) throw new Error("Bu kod, bu hesabın şimdiki Not Kasası'na ait değil (kasa sonradan yeniden kurulmuş olabilir).");
+  const dekGecici = await crypto.subtle.importKey("raw", dekHam, "AES-GCM", true, ["encrypt", "decrypt"]);
+  let p = parola;
+  const baz = await parolaMalzemesiOlustur(p);
+  p = null;
+  await zarfiYenile(uid, satir, dekGecici, baz);
+  const taze = await kasaSatiriniGetir(uid);
+  const kek = await kekTuret(baz, b64Coz(taze.kdf_salt), taze.kdf_iter);
+  const dek = await dekAc(taze.dek_parola, kek, uid, "dek-parola", false);
+  oturumKur({ uid, eposta: session.user.email || "", dek, kek, satir: taze });
+  await kekiOnbellegeAl(uid, kek);
+  await bekleyenParolaMalzemesiniSil();
+  return { durum: "acik" };
+}
+
+/* ---- YEDEĞİ BAŞKA HESABA TAŞIMA: ESKİ hesabın DEK'iyle çöz (AAD eski kullanıcı kimliğini içerir), YENİ kasayla yeniden şifrele ---- */
+async function eskiDekAnahtari(dekHam) {
+  return crypto.subtle.importKey("raw", dekHam, "AES-GCM", false, ["decrypt"]);
+}
+
+export async function eskiDekIleNotCoz(dekHam, eskiUid, notId, ciphertextB64, ivB64) {
+  const k = await eskiDekAnahtari(dekHam);
+  const acik = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64Coz(ivB64), additionalData: aad(eskiUid, "not", notId) }, k, b64Coz(ciphertextB64));
+  return JSON.parse(dec.decode(acik));
+}
+
+export async function eskiDekIleEkCoz(dekHam, eskiUid, eskiR2Anahtari, arrayBuffer) {
+  const k = await eskiDekAnahtari(dekHam);
+  const ham = new Uint8Array(arrayBuffer);
+  return crypto.subtle.decrypt({ name: "AES-GCM", iv: ham.slice(0, 12), additionalData: aad(eskiUid, "ek", eskiR2Anahtari) }, k, ham.slice(12));
+}
