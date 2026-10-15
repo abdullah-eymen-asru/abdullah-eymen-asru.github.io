@@ -8,13 +8,14 @@
  * GÜVEN MODELİ (dürüst): e2ee.js ile aynı — kasa anahtarını türeten Worker sırrı sahibi teknik olarak çözebilir.
  */
 import { supabase } from "../core/supabase-client.js";
-import { anahtarlariHazirla, aliciAnahtarlariniGetir, anahtariZarfla } from "../r2-arsiv/e2ee.js";
+import { anahtarlariHazirla, aliciAnahtarlariniGetir, anahtariZarfla, anahtarCiftiTutarliMi } from "../r2-arsiv/e2ee.js";
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 const ANAHTARLAR = new Map(); // sohbetId -> CryptoKey
 const ZARFLAR = new Map();    // sohbetId -> base64 zarf (benim)
 const TAMAMLANAN = new Set(); // eksik zarf tamamlama denenen sohbetler (oturum başına bir kez)
+const BOZUK = new Set();      // bayat zarfı temizlenmeye çalışılan sohbetler (oturum başına bir kez)
 
 const b64 = (buf) => {
   const u8 = new Uint8Array(buf);
@@ -24,7 +25,7 @@ const b64 = (buf) => {
 };
 const b64coz = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 
-export function anahtarlariBirak() { ANAHTARLAR.clear(); ZARFLAR.clear(); TAMAMLANAN.clear(); }
+export function anahtarlariBirak() { ANAHTARLAR.clear(); ZARFLAR.clear(); TAMAMLANAN.clear(); BOZUK.clear(); }
 supabase.auth.onAuthStateChange((o) => { if (o === "SIGNED_OUT") anahtarlariBirak(); });
 window.addEventListener("pagehide", anahtarlariBirak);
 
@@ -46,10 +47,25 @@ export async function sohbetAnahtari(id) {
   if (!zarf) return null;
   const { ozel } = await anahtarlariHazirla(); // açılamazsa E2EEKilitHatasi yukarı fırlar (sessiz null DEĞİL)
   let ham;
-  try { ham = await crypto.subtle.decrypt({ name: "RSA-OAEP" }, ozel, b64coz(zarf)); } catch { return null; }
+  try { ham = await crypto.subtle.decrypt({ name: "RSA-OAEP" }, ozel, b64coz(zarf)); } catch { await bayatZarfiTemizle(id); return null; }
   const k = await crypto.subtle.importKey("raw", ham, "AES-GCM", true, ["encrypt", "decrypt"]);
   ANAHTARLAR.set(id, k);
   return k;
+}
+
+/**
+ * KENDİNİ ONARMA: zarfım VAR ama özel anahtarımla açılmıyorsa zarf BAYAT'tır (anahtarım sonradan yenilendi; zarf eski açık anahtarla
+ * şifrelenmişti). Zarf satırı "var" göründüğü için karşı taraf onu hiç yeniden paylaşmıyordu → sonsuza kadar "anahtar yok".
+ * Çözüm: anahtar çiftimin tutarlı olduğu doğrulanırsa (yanlış anahtar yüklü değilse) bayat zarfı sil → sohbet "eksik zarf" olur ve
+ * anahtarı bilen taraf sohbeti açınca yeni açık anahtarıma göre otomatik yeniden paylaşır. Oturumda sohbet başına bir kez; hata yutulur.
+ */
+async function bayatZarfiTemizle(id) {
+  if (BOZUK.has(id)) return; BOZUK.add(id);
+  try {
+    if (!(await anahtarCiftiTutarliMi())) return; // yanlış/başka anahtar yüklü olabilir: zarfa DOKUNMA
+    const { data, error } = await supabase.rpc("mesaj_bayat_zarfi_temizle", { p_id: id });
+    if (!error && data) { ZARFLAR.delete(id); TAMAMLANAN.delete(id); }
+  } catch { /* migration 0098 yoksa ya da ağ yoksa sessiz */ }
 }
 
 export const yeniSohbetAnahtari = () => crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
