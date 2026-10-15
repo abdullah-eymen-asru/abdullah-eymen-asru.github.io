@@ -20,11 +20,13 @@ import { supabase } from "../core/supabase-client.js";
 import { zipAc } from "./zip-oku.js";
 import { el, bayt, hataMetni, workerFetch, dugme, ikon, onayIste, r2AnahtarGecerli, R2_KAYNAK_ADLARI } from "./ortak.js";
 
-const SIRA = ["profiles", "e2ee_kullanici_anahtarlari", "conversations", "konusma_zarflari", "messages", "konusma_gizlemeleri", "mesaj_gizlemeleri", "konusma_durumlari", "not_kasasi", "notlar", "not_ek_kayitlari", "akademik_kaynaklar", "akademik_notlar", "r2_arsiv", "taslak_icerikler", "special_content", "content_access"];
+// FK BAĞIMLILIK SIRASI (ebeveyn → çocuk). Sunucu RPC'si her satırı UPSERT eder (INSERT … ON CONFLICT (pk) DO UPDATE | DO NOTHING):
+// yeniden çalıştırma / kısmi yedek çakışmada patlamaz. Listede olmayan tablolar en sona (999) gider; FK hatası alanlar sonraki turda yeniden denenir.
+const SIRA = ["profiles", "e2ee_kullanici_anahtarlari", "conversations", "konusma_uyeleri", "konusma_zarflari", "messages", "konusma_gizlemeleri", "mesaj_gizlemeleri", "konusma_durumlari", "not_kasasi", "notlar", "not_ek_kayitlari", "akademik_kaynaklar", "akademik_notlar", "r2_arsiv", "ozel_icerik_anahtarlar", "taslak_icerikler", "special_content", "content_access"];
 const SAYFA = 200;
 /** replaceChildren(null) ekrana "null" yazıyordu (ekran görüntüsündeki "null"/"nullnull"): boş çocukları ayıklar. */
 const doldur = (kap, ...c) => kap.replaceChildren(...c.flat(Infinity).filter((x) => x != null && x !== false));
-const MESAJ_TABLOLARI = new Set(["conversations", "messages", "konusma_zarflari", "konusma_gizlemeleri", "mesaj_gizlemeleri", "konusma_durumlari"]);
+const MESAJ_TABLOLARI = new Set(["conversations", "messages", "konusma_zarflari", "konusma_gizlemeleri", "mesaj_gizlemeleri", "konusma_durumlari", "konusma_uyeleri"]);
 const MAKS_JSON = 150 * 1024 * 1024;
 const siraNo = (t) => { const i = SIRA.indexOf(t); return i < 0 ? 999 : i; };
 
@@ -290,7 +292,7 @@ export async function icAktarCiz(kok, mesaj, { uye = false } = {}) {
 
       // 1) tablolar — en çok 3 tur; FK hatası alan tablolar sonraki turda "eksikleri" kipiyle tekrar denenir
       let bekleyen = tSec;
-      for (let tur = 1; tur <= 3 && bekleyen.length; tur++) {
+      for (let tur = 1; tur <= 4 && bekleyen.length; tur++) {
         const sonraki = [];
         for (const t of bekleyen) {
           const m = tur === 1 ? mod : "eksikleri";
@@ -307,9 +309,9 @@ export async function icAktarCiz(kok, mesaj, { uye = false } = {}) {
             for (const h of data.hatalar || []) if (top.hatalar.length < 5 && !top.hatalar.includes(h)) top.hatalar.push(h);
           }
           top.hatali = hataliBu; // son turdaki kalan hata
-          logla(`${hataliBu ? "⚠️" : "✓"} ${t.tablo} (tur ${tur}): +${top.eklenen} eklendi · ${top.guncellenen} güncellendi${hataliBu ? ` · ${hataliBu} hatalı → ${tur < 3 ? "sonraki turda yeniden denenecek" : "raporlandı"}` : ""}`);
+          logla(`${hataliBu ? "⚠️" : "✓"} ${t.tablo} (tur ${tur}): +${top.eklenen} eklendi · ${top.guncellenen} güncellendi${hataliBu ? ` · ${hataliBu} hatalı → ${tur < 4 ? "sonraki turda yeniden denenecek" : "raporlandı"}` : ""}`);
           rapor.tablolar[t.tablo] = top;
-          if (hataliBu && tur < 3) sonraki.push(t);
+          if (hataliBu && tur < 4) sonraki.push(t);
         }
         bekleyen = sonraki;
       }
