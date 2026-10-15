@@ -18,7 +18,9 @@ const acikTuvaller = new Set();
 /** iOS Safari tuval alanı ~16,7 MP ile sınırlıdır; masaüstünde güvenli üst sınır daha geniştir. */
 export const MAKS_TUVAL_ALANI = () => (IOS_MU() ? 14_000_000 : 64_000_000);
 /** Kaynak (decode) tuvalinin en uzun kenarı: perspektif örneklemesi için ImageData tutulur, bu yüzden sınırlıdır. */
-export const KAYNAK_MAKS_KENAR = () => (IOS_MU() ? 3000 : 4096);
+/* iOS Safari/WebKit: tuvale alınmadan ÖNCE en-boy oranı korunarak max(w,h) <= 2048 ZORUNLU (downsampling); işlem sonunda tuvalBirak width=height=0 yapar. */
+export const IOS_MAKS_KENAR = 2048;
+export const KAYNAK_MAKS_KENAR = () => (IOS_MU() ? IOS_MAKS_KENAR : 4096);
 
 export function tuvalAl(w, h) {
   const c = document.createElement("canvas");
