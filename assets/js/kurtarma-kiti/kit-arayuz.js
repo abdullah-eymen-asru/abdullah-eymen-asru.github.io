@@ -66,6 +66,7 @@ export function kitKartiAc(duyur = () => {}) {
         catch (e) { hata.textContent = e.message || String(e); hata.hidden = false; uret.disabled = false; }
       });
       govde.replaceChildren(bilgiKarti(),
+        h("p", { class: "kk-durum", text: "ℹ️ Bu TEK kod hem Notlar'ı hem Mesajları kapsar. Mesaj şifreleme anahtarı sıfırlanırsa/yenilenirse bu kod geçersiz olur ve Notlar için de yeni kod üretmen gerekir; yeni kod üretmek de eskisini geçersiz kılar." }),
         durum.kitVar
           ? h("p", { class: "kk-durum kk-durum--iyi", text: `✓ Bir kod üretilmiş (${new Date(durum.kitAt).toLocaleString("tr-TR")}). Kodu kaybettiysen yenisini üretebilirsin; eski kod çalışmaz.` })
           : h("p", { class: "kk-durum kk-durum--uyari", text: "Henüz kod üretilmedi. Yedeğini başka bir hesaba taşıyabilmek için bir kez oluştur." }),
