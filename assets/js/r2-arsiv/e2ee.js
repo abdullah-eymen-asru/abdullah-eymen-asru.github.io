@@ -329,6 +329,22 @@ export async function anahtariOtomatikOnar() {
   } catch (er) { return { onarildi: false, neden: er?.message || "hata" }; }
 }
 
+/**
+ * Yüklü özel anahtar, sunucudaki açık anahtarımla GERÇEKTEN eşleşiyor mu? (rastgele 32 bayt: açık anahtarla şifrele → özelle çöz)
+ * Bir sohbet zarfı açılamadığında "zarf bayat mı (başka/eski açık anahtarla şifrelenmiş), yoksa yanlış anahtar mı yüklü?" ayrımı içindir.
+ */
+export async function anahtarCiftiTutarliMi() {
+  try {
+    const { ozel, acik } = await anahtarlariHazirla();
+    if (!acik) return false;
+    const pub = await crypto.subtle.importKey("spki", b64coz(acik), { name: "RSA-OAEP", hash: "SHA-256" }, false, ["encrypt"]);
+    const m = rastgele(32);
+    const c = await crypto.subtle.encrypt({ name: "RSA-OAEP" }, pub, m);
+    const d = new Uint8Array(await crypto.subtle.decrypt({ name: "RSA-OAEP" }, ozel, c));
+    return d.length === 32 && d.every((v, i) => v === m[i]);
+  } catch { return false; }
+}
+
 /* ---- "Bu cihazda hatırla": yalnızca ÇIKARILAMAZ CryptoKey, IndexedDB (düz metin anahtar baytı ASLA yazılmaz) ---- */
 const IDB_AD = "aea_e2ee"; const IDB_DEPO = "anahtarlar";
 const idbAc = () => new Promise((coz, red) => {
