@@ -121,7 +121,11 @@ export async function anahtarlariHazirla() {
 
   // İLK KURULUM: anahtar çifti yok → üret. sarili_ozel_anahtar zorunlu kolon olduğundan Worker sarmalı yazılır; kasa açıksa DEK sarmalı da eklenir.
   if (!satir) {
-    const kasa = await kasaAnahtariniAl(session);
+    // Worker erişilemiyorsa anahtar üretimi DÜŞMESİN (yoksa kullanıcının açık anahtarı hiç oluşmaz → kimse ona zarf yazamaz):
+    // atılan rastgele anahtarla sar (yer tutucu); asıl kilit hemen ardından yazılan DEK sarmalıdır.
+    let kasa;
+    try { kasa = await kasaAnahtariniAl(session); }
+    catch { kasa = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt"]); }
     const cift = await crypto.subtle.generateKey(RSA, true, ["encrypt", "decrypt"]);
     const acik = await crypto.subtle.exportKey("spki", cift.publicKey);
     const ozel = await crypto.subtle.exportKey("pkcs8", cift.privateKey);
