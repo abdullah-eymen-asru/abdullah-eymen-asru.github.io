@@ -355,3 +355,7 @@
 .sy-ustsekme[aria-selected="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
 .sy-ustsekme[aria-selected="true"]:nth-child(2) { background: #b9770e; border-color: #b9770e; }
 .sy-ust-panel[hidden] { display: none !important; }
+.sy-wk-bilgi { margin-top: 8px; border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; }
+.sy-wk-bilgi summary { cursor: pointer; font-weight: 600; }
+.sy-wk-bilgi-icerik p { margin: 8px 0 0; line-height: 1.5; font-size: 0.9rem; }
+.sy-wk-gunluk-satir { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: space-between; }
