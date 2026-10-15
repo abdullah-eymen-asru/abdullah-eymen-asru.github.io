@@ -32,6 +32,7 @@
  * güncellenir.
  */
 import { supabase, escapeHtml, kucukHarfeCevirTr, kullaniciAramayaUyuyorMu, rolEtiketi, showMessage } from "./core/supabase-client.js";
+import { tekKanal } from "./core/realtime.js";
 import { requireAuthOrShowError } from "./auth/auth-guard.js";
 import { imzaliLinkUret } from "./dosya-paylasim.js";
 
@@ -263,8 +264,7 @@ let ATAMA_LISTESI_REALTIME_TIMER = null;
 function wireAtamaListesiRealtime() {
   if (ATAMA_LISTESI_REALTIME_KURULDU) return;
   ATAMA_LISTESI_REALTIME_KURULDU = true;
-  supabase
-    .channel("admin-icerik-atama-profiles-degisiklik")
+  tekKanal("admin-icerik-atama-profiles-degisiklik")
     .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => {
       clearTimeout(ATAMA_LISTESI_REALTIME_TIMER);
       ATAMA_LISTESI_REALTIME_TIMER = setTimeout(() => loadUsers(), 600);
