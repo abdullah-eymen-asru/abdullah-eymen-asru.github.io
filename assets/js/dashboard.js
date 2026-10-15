@@ -563,6 +563,17 @@ async function showView(viewId, moduleKey) {
 
   aktifGrubuAc(viewId);
 
+  // Aktif sekme, kendi içinde kaydırılan kenar çubuğunda görünür kalsın. scrollIntoView KULLANILMAZ: sayfayı da kaydırıp
+  // "sidebar/sayfa takıldı" hissi yaratırdı; yalnızca kenar çubuğunun kendi scrollTop'u ayarlanır.
+  requestAnimationFrame(() => {
+    const kenar = document.getElementById("dash-sidebar");
+    const link = document.querySelector(`#dash-nav a[data-view-id="${viewId}"]`);
+    if (!kenar || !link || kenar.scrollHeight <= kenar.clientHeight) return;
+    const k = kenar.getBoundingClientRect(), l = link.getBoundingClientRect();
+    if (l.top < k.top + 8) kenar.scrollTop -= k.top + 8 - l.top;
+    else if (l.bottom > k.bottom - 8) kenar.scrollTop += l.bottom - (k.bottom - 8);
+  });
+
   // Mobil üst şeritte "şu an hangi sekmedeyim" yazsın — dar ekranda
   // sidebar kapalı olduğu için tek ipucu bu.
   const basligiAl =
@@ -884,7 +895,9 @@ async function init() {
   // girdiyse başkaları ona şifreli dosya gönderebilir (alıcının açık anahtarı gerekir).
   // Worker kapalıysa/yoksa sessizce atlanır; paneli asla bozmaz.
   // (Demo'da atlanır: Worker'a hiç istek gitmesin.)
-  if (!isDemoMode) import("./r2-arsiv/e2ee.js").then((m) => m.anahtarKaydiniSessizHazirla()).catch(() => {}); // kayıt varsa Worker'a istek ATILMAZ (kota)
+  // 2026-10: önce anahtar kaydı, sonra GİRİŞE BAĞLAMA — Notlar kasası (giriş parolası / Google'da cihazdaki KEK) sessizce açılır, mesajlaşma
+  // anahtarı aynı DEK'e bağlanır. Kullanıcıya hiçbir şey sorulmaz; kasa yoksa yeni kasa KURULMAZ (kurulum Notlar'da, kurtarma metniyle).
+  if (!isDemoMode) import("./r2-arsiv/e2ee.js").then(async (m) => { await m.anahtarKaydiniSessizHazirla(); await m.girisOturumunaBagla(); }).catch(() => {}); // kayıt varsa Worker'a istek ATILMAZ (kota)
 
   buildSidebar(profile);
   // Hub: sidebar ile AYNI görünürlük kuralı (gorunurMu); Ana Ekran kartı kendisi için çizilmez.
