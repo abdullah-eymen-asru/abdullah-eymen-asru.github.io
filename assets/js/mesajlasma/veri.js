@@ -32,9 +32,12 @@ export async function kisiBilgileri(idler) {
 // ---- sohbet listesi -----------------------------------------------------------------------------
 /** Gelen kutusu: sohbetler + konu çözümü + son mesaj önizlemesi + durum (pin/okunmamış). Sorgu sayısı sabit (≈5). */
 export async function sohbetleriYukle() {
-  if (E2EE_AKTIF) await S.zarflarimiYukle().catch(() => {});
+  if (E2EE_AKTIF) {
+    await S.anahtarHazirMi();                    // kilitliyse E2EEKilitHatasi → arayüz kurtarma panelini açar
+    await S.zarflarimiYukle().catch(() => {});
+  }
   const { data: konv, error } = await supabase.from("conversations")
-    .select("id, user_id, hedef_admin_id, konu, konu_sifreli, e2ee, son_mesaj_at, created_at")
+    .select("id, user_id, hedef_admin_id, konu, konu_sifreli, e2ee, grup, son_mesaj_at, created_at")
     .order("son_mesaj_at", { ascending: false }).limit(300);
   if (error) throw error;
   const liste = konv || [];
@@ -43,7 +46,7 @@ export async function sohbetleriYukle() {
   if (ids.length) {
     if (E2EE_AKTIF) {
       const [d, o] = await Promise.all([
-        supabase.from("konusma_durumlari").select("conversation_id, sabit, sabit_at"),
+        supabase.from("konusma_durumlari").select("conversation_id, sabit, sabit_at, sessiz"),
         supabase.rpc("okunmamis_mesaj_ozeti"),
       ]);
       (d.data || []).forEach((x) => durum.set(x.conversation_id, x));
@@ -63,7 +66,7 @@ export async function sohbetleriYukle() {
     if (sm) {
       onizleme = sm.sifreli ? ((await S.coz(await S.sohbetAnahtari(c.id), sm.body, c.id)) ?? "🔒 Şifre çözülemedi") : sm.body;
     }
-    sonuc.push({ ...c, konu_gosterim: konu, onizleme, sabit: !!d?.sabit, sabit_at: d?.sabit_at || null, okunmamis: okunmamis.get(c.id) || 0, son: sm?.created_at || c.son_mesaj_at, uye: kisiler[c.user_id], hedef: kisiler[c.hedef_admin_id] });
+    sonuc.push({ ...c, konu_gosterim: konu, onizleme, sessiz: !!d?.sessiz, sabit: !!d?.sabit, sabit_at: d?.sabit_at || null, okunmamis: okunmamis.get(c.id) || 0, son: sm?.created_at || c.son_mesaj_at, uye: kisiler[c.user_id], hedef: kisiler[c.hedef_admin_id] });
   }
   return sonuc;
 }
@@ -164,11 +167,49 @@ export async function sohbetBaslat({ konu, hedefKullanici = null, hedefAdmin = n
 }
 
 export async function mesajiSil(id, herkesten) {
+  // Sunucu (mesaji_herkesten_sil + RLS) zaten yalnızca göndericiye izin verir; istemci de aynı kuralı uygular.
+  if (herkesten) { const benim = (await supabase.auth.getUser()).data?.user?.id; const { data: m } = await supabase.from("messages").select("sender_id").eq("id", id).maybeSingle(); if (m && m.sender_id !== benim) throw new Error("Karşı tarafın mesajını herkesten silemezsin."); }
   const { error } = herkesten
     ? await supabase.rpc("mesaji_herkesten_sil", { p_message_id: id })
     : await supabase.rpc("mesaji_kendimden_gizle", { p_message_id: id });
   if (error) throw error;
 }
+
+// ---- okundu / sessize alma / yönetim listesi / gruplar -----------------------------------------------
+/** Karşı tarafın en son okuma zamanı (kimlik açıklamadan). null = henüz okunmadı. */
+export async function karsiOkundu(id) {
+  if (!E2EE_AKTIF) return null;
+  const { data, error } = await supabase.rpc("sohbet_karsi_okundu", { p_id: id });
+  return error ? null : data;
+}
+export const sessize = (id, v) => supabase.rpc("konusmayi_sessize_al", { p_id: id, p_sessiz: v });
+
+/** Üyenin yazabileceği yönetici/site sahibi listesi ("Yönetim ile İletişim"). E-posta dönmez. */
+export async function yonetimListesi() {
+  const { data, error } = await supabase.rpc("mesaj_hedef_listesi_getir");
+  if (error) throw error;
+  return data || [];
+}
+
+export async function grupBaslat({ ad, uyeIdler }) {
+  const { data: idler, error: e1 } = await supabase.rpc("grup_zarf_aday_idleri", { p_uyeler: uyeIdler });
+  if (e1) throw e1;
+  const key = await S.yeniSohbetAnahtari();
+  const { zarflar } = await S.zarflariHazirla(key, idler);
+  const benim = (await supabase.auth.getUser()).data.user.id;
+  const adSifreli = await S.sifrele(key, ad, "konu");
+  const { data, error } = await supabase.rpc("baslat_grup_sohbeti", { p_konu_sifreli: adSifreli, p_uyeler: uyeIdler, p_zarflar: zarflar });
+  if (error) throw error;
+  S.anahtariKaydet(data, key, zarflar.find((z) => z.user_id === benim)?.zarf);
+  return data;
+}
+export async function grupUyeleri(id) {
+  const { data, error } = await supabase.rpc("grup_uyeleri", { p_id: id });
+  if (error) throw error;
+  return data || [];
+}
+export const grupUyeEkle = async (id, uye) => { const r = await supabase.rpc("grup_uye_ekle", { p_id: id, p_uye: uye }); if (r.error) throw r.error; };
+export const grupUyeCikar = async (id, uye) => { const r = await supabase.rpc("grup_uye_cikar", { p_id: id, p_uye: uye }); if (r.error) throw r.error; };
 
 // ---- içerik araması (YALNIZCA arama yazılınca, bellekte; tarayıcıdan çıkmaz) ----------------------------
 let INDEKS = null; let INDEKS_T = 0;
