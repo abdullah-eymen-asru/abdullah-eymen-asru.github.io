@@ -14,7 +14,7 @@
  * innerHTML YOK, inline stil YOK (CSP).
  */
 import { supabase } from "../core/supabase-client.js";
-import { el, dugme, onayIste, hataMetni, tarihMetni, workerJson } from "./ortak.js";
+import { el, dugme, onayIste, silOnayiIste, hataMetni, tarihMetni, workerJson } from "./ortak.js";
 
 const ONBELLEK_ANAHTARI = "aea_wk_v1"; // worker-kapi.js'in önbelleği: bu tarayıcıda değişiklik hemen görünsün
 
@@ -28,6 +28,7 @@ export function workerAnahtarKarti() {
 
   let sertDestek = false;
   let sertSecili = false;
+  let ownerMi = false;
 
   async function sertDurumu() {
     try { sertDestek = (await workerJson("/worker-sert/durum")).yapilandirildi === true; } catch { sertDestek = false; }
@@ -53,8 +54,10 @@ export function workerAnahtarKarti() {
       // Açarken sert katman yapılandırılmışsa önce workers.dev'i aç (önceden sert kapatılmış olabilir); kapatırken yalnızca seçiliyse kapat.
       let sertUyari = null;
       if (satir.tur === "worker" && sertDestek && (acik || sertSecili)) {
-        try { await workerJson("/worker-sert", { yontem: "POST", govde: { ad: satir.ad, acik } }); }
-        catch (h) { sertUyari = `Sert katman uygulanamadı: ${h.message || h}`; }
+        try {
+          const r = await workerJson("/worker-sert", { yontem: "POST", govde: { ad: satir.ad, acik } });
+          if (r?.dogrulandi === false) sertUyari = `Cloudflare isteği kabul etti ama workers.dev adresi beklenen durumda değil (şu an: ${r.workersDev ? "AÇIK" : "KAPALI"}). Birkaç saniye sonra Yenile'ye bas; sürerse Cloudflare panelinden kontrol et.`;
+        } catch (h) { sertUyari = `Sert katman uygulanamadı: ${h.message || h}`; }
       }
       const { error } = await supabase.rpc("worker_anahtari_ayarla", { p_ad: satir.ad, p_acik: acik });
       if (error) throw error;
@@ -83,6 +86,7 @@ export function workerAnahtarKarti() {
     yenile.disabled = true;
     try {
       await sertDurumu();
+      try { ownerMi = (await supabase.rpc("is_owner")).data === true; } catch { ownerMi = false; }
       const { data, error } = await supabase.from("worker_anahtarlari")
         .select("ad, etiket, tur, acik, korumali, guncelleme").order("tur", { ascending: false }).order("etiket");
       if (error) throw error;
@@ -90,17 +94,52 @@ export function workerAnahtarKarti() {
       sertKutu.addEventListener("change", () => { sertSecili = sertKutu.checked; });
       const gunlukKok = el("div", {});
       const gunluk = el("details", { class: "sy-wk-gunluk" }, el("summary", { text: "Son değişiklikler" }), gunlukKok);
+      async function gunlukCiz() {
+        const { data: g, error: e } = await supabase.rpc("worker_anahtar_gunlugu_getir", { p_adet: 15 });
+        if (e) { gunlukKok.replaceChildren(el("p", { class: "auth-message error", text: /does not exist|PGRST202|42883|schema cache/i.test(e.message || "") ? "Günlük için migration 0096 çalıştırılmalı." : hataMetni(e) })); return; }
+        const satirlar = g || [];
+        const temizle = ownerMi && satirlar.length
+          ? dugme({ metin: "🗑 Günlüğü temizle", tur: "ikincil", kucuk: true }) : null;
+        temizle?.addEventListener("click", async () => {
+          const ok = await silOnayiIste({
+            baslik: "Değişiklik günlüğü kalıcı olarak silinsin mi?",
+            ozet: ["Tüm “Son değişiklikler” kayıtları veritabanından silinir."],
+            uyari: ["Geri alınamaz. Servislerin açık/kapalı durumu etkilenmez.", "Yalnızca “günlük temizlendi (kim, ne zaman)” izi kalır."],
+            onayMetni: "SİL", tamam: "Günlüğü temizle",
+          });
+          if (!ok) return;
+          temizle.disabled = true;
+          const { error: er } = await supabase.rpc("owner_worker_gunlugunu_temizle");
+          if (er) { gunlukKok.prepend(el("p", { class: "auth-message error", text: `Temizlenemedi: ${hataMetni(er)}` })); temizle.disabled = false; return; }
+          await gunlukCiz();
+        });
+        gunlukKok.replaceChildren(
+          satirlar.length ? el("ul", { class: "sy-kota-liste" }, satirlar.map((x) => {
+            const sil = ownerMi ? dugme({ metin: "Sil", tur: "ikincil", kucuk: true }) : null;
+            sil?.addEventListener("click", async () => {
+              sil.disabled = true;
+              const { error: er } = await supabase.rpc("owner_worker_gunluk_satiri_sil", { p_id: x.id });
+              if (er) { sil.disabled = false; gunlukKok.prepend(el("p", { class: "auth-message error", text: `Silinemedi: ${hataMetni(er)}` })); return; }
+              await gunlukCiz();
+            });
+            return el("li", { class: "sy-wk-gunluk-satir" },
+              el("span", { text: x.ozet ? `Günlük temizlendi · ${x.kullanici}` : `${x.ad} → ${x.acik ? "açıldı" : "kapatıldı"} · ${x.kullanici}` }),
+              el("span", { class: "muted", text: tarihMetni(x.zaman) }), sil);
+          })) : el("p", { class: "muted sy-not", text: "Kayıtlı değişiklik yok." }),
+          temizle ? el("div", { class: "sy-eylemler" }, temizle) : null);
+      }
       let gunlukYuklendi = false;
       gunluk.addEventListener("toggle", async () => {
         if (!gunluk.open || gunlukYuklendi) return;
-        gunlukYuklendi = true;
-        const { data: g, error: e } = await supabase.rpc("worker_anahtar_gunlugu_getir", { p_adet: 15 });
-        gunlukKok.replaceChildren(e
-          ? el("p", { class: "auth-message error", text: hataMetni(e) })
-          : el("ul", { class: "sy-kota-liste" }, (g || []).map((x) => el("li", {},
-              el("span", { text: `${x.ad} → ${x.acik ? "açıldı" : "kapatıldı"} · ${x.kullanici}` }),
-              el("span", { class: "muted", text: tarihMetni(x.zaman) })))));
+        gunlukYuklendi = true; await gunlukCiz();
       });
+      // Açılır-kapanır bilgi kartı: "Sert kapatma" ne yapar, ne zaman açılmalı?
+      const bilgi = el("details", { class: "sy-wk-bilgi" },
+        el("summary", { text: "ℹ️ Sert kapatma nedir? Ne zaman açılmalı?" }),
+        el("div", { class: "sy-wk-bilgi-icerik" },
+          el("p", {}, el("strong", { text: "Ne yapar? " }), "Cloudflare Workers'ın varsayılan *.workers.dev adresini kapatır. Adres kapalıyken gelen istek Worker'a hiç ulaşmaz ve günlük 100.000 ücretsiz istek kotasına SAYILMAZ; böylece yetkisiz istekler ve tarama botları kotayı bitiremez. (Normal “Kapat” yalnızca erken 503 döner; o istekler yine kotaya yazılır.)"),
+          el("p", {}, el("strong", { text: "Ne zaman açılmalı? " }), "Bakım/yedekleme sırasında dış trafiği tamamen kesmek ya da kota saldırısı altında olduğunda işaretle ve ilgili Worker'ı kapat. Normal yayında işaretsiz bırak; Worker'ı tekrar AÇARKEN adres otomatik yeniden açılır."),
+          el("p", { class: "muted", text: "Pages Function (Gatekeeper) için sert kapatma yoktur; sistem-yedek-worker kendini kapatamaz. İşlem sonrası adresin gerçek durumu Cloudflare'dan geri okunarak doğrulanır." })));
       govde.replaceChildren(
         uyari ? el("p", { class: "auth-message error", text: uyari }) : null,
         el("p", { class: "muted sy-not", text: "Kapalı bir servise tarayıcılar istek göndermez, Worker'lar gelen isteği hemen reddeder; Gatekeeper Function ise isteği işlemeden geçirir. Kota dolmadan önce yoğun/gereksiz servisleri buradan kapatabilirsin." }),
@@ -109,6 +148,7 @@ export function workerAnahtarKarti() {
           el("span", { text: sertDestek
             ? "Sert kapatma: Worker'ı kapatırken workers.dev adresini de kapat (istek kotaya hiç sayılmaz)."
             : "Sert kapatma kapalı: CF_WORKERS_TOKEN (Workers Scripts › Edit) tanımlı değil — rehber/04-cloudflare-secretlar.md § 4.10c." })),
+        bilgi,
         gunluk);
     } catch (h) {
       govde.replaceChildren(el("p", { class: "auth-message error", text: /does not exist|42P01|PGRST205|schema cache/i.test(h?.message || "")
