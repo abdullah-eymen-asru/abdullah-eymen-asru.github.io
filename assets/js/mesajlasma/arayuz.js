@@ -166,16 +166,18 @@ export async function mesajlasmaKur(kok, { profile, adminMi, konuOnDolgu = "" })
   }
 
   function kilitGoster(e) {
-    durum.kilitli = true; durum.secili = null;
+    durum.kilitli = true; durum.secili = null; kokEl.dataset.kilit = "1"; // kilitliyken sade tek sütun (sol liste/başlık gizlenir)
     kapatBtn.hidden = copeTasiBtn.hidden = sabitBtn.hidden = sessizBtn.hidden = uyelerBtn.hidden = true; form.hidden = true;
     baslikEl.textContent = "Şifreli sohbetler kilitli";
     doldur(liste, h("p", { class: "msj-bos", text: "Kilit açılınca sohbetlerin burada listelenir." }));
     doldur(govde, kilitPaneli({
       durum: e?.durum || {},
       onAcildi: async (r) => {
-        durum.kilitli = false; S.anahtarlariBirak(); V.aramaIndeksiniTemizle();
-        duyur(r?.sifirlandi ? "Anahtar sıfırlandı. Eski sohbetler, karşı taraf geçmişi paylaşınca ekrana gelir." : r?.onarildi ? "Kilit açıldı ve kasa sarmalı onarıldı." : "Kilit açıldı.");
-        sagiSifirla(); await yukle(); uyariKontrol();
+        durum.kilitli = false; delete kokEl.dataset.kilit; S.anahtarlariBirak(); V.aramaIndeksiniTemizle();
+        duyur(r?.sifirlandi ? "Anahtar sıfırlandı. Eski sohbetler, karşı taraf geçmişi paylaşınca ekrana gelir." : r?.yenilendi ? "Kilit açıldı; mesaj anahtarın yenilendi. Eski Yedek Kurtarma Kodun varsa geçersiz oldu — yenisini indir." : r?.onarildi ? "Kilit açıldı ve kasa sarmalı onarıldı." : "Kilit açıldı.");
+        sagiSifirla(); await yukle(); await uyariKontrol();
+        // Anahtar yenilendiyse/ilk kurulumda Yedek Kurtarma Kodu henüz yoksa, kodu şimdi indirtmek için kartı kendiliğinden aç (bir kez).
+        if (r?.yenilendi || r?.sifirlandi) { try { if (!(await Kit.kitDurumu()).kitVar && !uyari.hidden && (await kitKartiAc(duyur))) uyari.hidden = true; } catch { /* migration 0096 yoksa sessiz */ } }
       },
     }));
     mobilGoster("sohbet");
@@ -185,7 +187,7 @@ export async function mesajlasmaKur(kok, { profile, adminMi, konuOnDolgu = "" })
     if (durum.yukleniyor) return; durum.yukleniyor = true;
     try {
       durum.sohbetler = await V.sohbetleriYukle();
-      durum.kilitli = false;
+      durum.kilitli = false; delete kokEl.dataset.kilit;
       if (V.E2EE_AKTIF) { const c = await V.copKutusu().catch(() => []); durum.copAdet = c.length; if (durum.mod === "cop") durum.cop = c; }
       await listeyiCiz();
       if (durum.secili) { const g = durum.sohbetler.find((x) => x.id === durum.secili.id); if (g) { durum.secili = g; } sabitCiz(); }
