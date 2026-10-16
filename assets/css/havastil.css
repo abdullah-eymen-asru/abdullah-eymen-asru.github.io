@@ -1,0 +1,92 @@
+/* assets/css/havastil.css — HavaStil (panel sekmesi + bağımsız PWA sayfası). Site değişkenlerini kullanır (açık/koyu otomatik).
+   CSP: satır içi stil yok. Taşma yok: her grid çocuğu min-width:0, uzun metinler kırılır. */
+.hv { display: flex; flex-direction: column; gap: .85rem; max-width: 52rem; margin: 0 auto; width: 100%; min-width: 0; }
+.hv *, .hv *::before, .hv *::after { box-sizing: border-box; }
+.hv-kart { background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; padding: .9rem 1rem; min-width: 0; overflow-wrap: anywhere; }
+.hv-kart.hv-kucuk { padding: .75rem .85rem; display: flex; flex-direction: column; gap: .45rem; }
+.hv-etiket { font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.hv-vurgu { color: var(--accent); }
+.hv-ipucu { font-size: .78rem; color: var(--muted); margin: 0; line-height: 1.45; }
+.hv-uyari { margin: .5rem 0 0; padding: .5rem .7rem; font-size: .82rem; border: 1px solid #d9a441; background: rgba(217, 164, 65, .14); border-radius: 10px; color: var(--text); }
+.hv h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0; }
+
+.hv-hukum { display: flex; align-items: center; gap: .85rem; border-color: var(--accent); }
+.hv-hukum-ikon { width: 2.6rem; height: 2.6rem; flex: 0 0 auto; display: grid; place-items: center; font-size: 1.4rem; border-radius: 12px; background: var(--bg); border: 1px solid var(--border); }
+.hv-hukum-metin { margin: .15rem 0 0; font-weight: 650; font-size: 1rem; line-height: 1.4; }
+
+.hv-arama-satir { display: flex; gap: .5rem; min-width: 0; }
+.hv-girdi { flex: 1 1 auto; min-width: 0; padding: .6rem .8rem; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; font-size: .92rem; }
+.hv-girdi:focus-visible, .hv-btn:focus-visible, .hv-seg-btn:focus-visible, .hv-cip:focus-visible, .hv-oneri:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hv-btn { display: inline-flex; align-items: center; justify-content: center; gap: .35rem; padding: .55rem .8rem; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; white-space: nowrap; min-height: 2.5rem; text-decoration: none; }
+.hv-btn:hover { border-color: var(--accent); }
+.hv-btn:disabled { opacity: .55; cursor: progress; }
+.hv-btn-ince { align-self: flex-start; }
+.hv-uygulama-baglanti { margin-bottom: .1rem; }
+.hv-oneriler { list-style: none; margin: .5rem 0 0; padding: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); max-height: 15rem; overflow-y: auto; }
+.hv-oneri { padding: .55rem .75rem; display: flex; flex-direction: column; gap: .1rem; cursor: pointer; border-bottom: 1px solid var(--border); min-width: 0; }
+.hv-oneri:last-child { border-bottom: 0; }
+.hv-oneri:hover { background: var(--card-bg); }
+.hv-cipler { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .5rem; }
+.hv-cipler:empty { display: none; }
+.hv-cip-kap { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; background: var(--bg); overflow: hidden; max-width: 100%; }
+.hv-cip, .hv-cip-sil { border: 0; background: transparent; color: var(--text); font: inherit; font-size: .82rem; cursor: pointer; padding: .3rem .65rem; }
+.hv-cip { max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hv-cip-sil { color: var(--muted); padding-left: .35rem; }
+.hv-cip-sil:hover { color: var(--text); }
+.hv-konumKaydet[hidden], .hv [hidden] { display: none !important; }
+
+.hv-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; }
+.hv-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .85rem; }
+.hv-seg { display: flex; flex-wrap: wrap; gap: .35rem; }
+.hv-seg-btn { flex: 1 1 auto; padding: .45rem .55rem; border-radius: 9px; border: 1px solid var(--border); background: var(--bg); color: var(--muted); font: inherit; font-size: .8rem; cursor: pointer; min-height: 2.4rem; }
+.hv-seg-btn[aria-pressed="true"] { border-color: var(--accent); color: var(--text); font-weight: 650; box-shadow: inset 0 0 0 1px var(--accent); }
+
+.hv-hava-ust { display: flex; justify-content: space-between; align-items: flex-start; gap: .75rem; }
+.hv-sicaklik-satir { display: flex; align-items: baseline; flex-wrap: wrap; gap: .2rem .75rem; margin-top: .15rem; }
+.hv-buyuk { font-size: 2.4rem; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
+.hv-metrikler { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5rem; margin-top: .85rem; padding-top: .85rem; border-top: 1px solid var(--border); }
+.hv-metrik { display: flex; flex-direction: column; gap: .15rem; text-align: center; padding: .45rem .2rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); min-width: 0; }
+.hv-metrik span { font-size: .66rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.hv-metrik strong { font-size: .88rem; }
+
+.hv-bolum { display: flex; flex-direction: column; gap: .6rem; }
+.hv-bolum-ust { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.hv-rozet { display: inline-block; padding: .2rem .6rem; font-size: .78rem; border: 1px solid var(--border); border-radius: 999px; background: var(--bg); color: var(--text); }
+.hv-katman { gap: .35rem; }
+.hv-katman-ad { margin: 0; font-weight: 650; font-size: .95rem; line-height: 1.35; }
+.hv-k1 { border-top: 3px solid #3b9edb; } .hv-k2 { border-top: 3px solid #d9a441; } .hv-k3 { border-top: 3px solid var(--accent); }
+.hv-aks { flex-direction: row; flex-wrap: wrap; align-items: center; gap: .4rem; }
+.hv-ai { background: var(--card-bg); }
+.hv-ai-metin { margin: .3rem 0; font-size: .92rem; font-style: italic; line-height: 1.55; }
+.hv-onay { display: flex; align-items: flex-start; gap: .55rem; font-size: .88rem; cursor: pointer; }
+.hv-onay input { margin-top: .2rem; flex: 0 0 auto; width: 1.1rem; height: 1.1rem; }
+.hv-kvkk summary { cursor: pointer; font-weight: 600; font-size: .88rem; }
+
+/* PWA bağımsız sayfa */
+.hv-sayfa { padding: .75rem .75rem 2rem; }
+.hv-sayfa h1 { font-size: 1.25rem; margin: 0 0 .75rem; }
+
+@media (max-width: 640px) {
+  .hv-grid-2, .hv-grid-3 { grid-template-columns: minmax(0, 1fr); }
+  .hv-metrikler { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hv-buyuk { font-size: 2rem; }
+  .hv-hava-ust { flex-direction: column; }
+}
+@media (prefers-reduced-motion: no-preference) { .hv-kart { transition: border-color .15s; } }
+
+/* Haber Doğrulama & Taktik */
+.hv-il-sec { flex: 0 1 11rem; min-width: 0; padding: .4rem .5rem; font-size: .82rem; }
+.hv-haberler { display: flex; flex-direction: column; gap: .5rem; min-width: 0; }
+.hv-haberler:empty { display: none; }
+.hv-haber { display: flex; flex-direction: column; gap: .35rem; padding: .6rem .7rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); min-width: 0; overflow-wrap: anywhere; }
+.hv-haber-ust { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .4rem; }
+.hv-haber-baslik { margin: 0; font-weight: 650; font-size: .9rem; line-height: 1.4; }
+.hv-haber-baslik a { color: var(--accent); }
+.hv-haber .hv-cipler { margin-top: 0; }
+.hv-sev-sari { border-color: #d9c341; } .hv-sev-turuncu { border-color: #e0802d; } .hv-sev-kirmizi { border-color: #d9483b; }
+.hv-rozet-yasak { border-color: #d9483b; }
+.hv-yasak-etiket { margin-left: .4rem; }
+.hv-haber-ayrinti summary { cursor: pointer; font-size: .8rem; color: var(--muted); }
+.hv-haber-ayrinti { display: flex; flex-direction: column; gap: .3rem; }
+.hv-elendi { opacity: .85; }
+.hv-ai-anahtar { margin-top: .6rem; padding-top: .6rem; border-top: 1px solid var(--border); font-size: .82rem; }
