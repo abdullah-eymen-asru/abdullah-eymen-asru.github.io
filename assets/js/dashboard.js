@@ -93,6 +93,9 @@ const MODULES = {
   // Belge Tarayıcı & Çoklu Birleştirici (assets/js/belge-tarayici/): %100 istemci, sıfır sunucu isteği. Yetki Dönüştürücü ile AYNI
   // (can_use_converter → NAV'daki izin:"donusturucu"); modül kendi içinde donusturucu_yetkisi_var_mi() ile tekrar doğrular (Guard).
   belgeTarayici: { src: "./belge-tarayici/belge-tarayici.js", role: null },
+  // HavaStil (migration 0099): hava durumuna göre katman/giyim danışmanı. Görünürlük role DEĞİL, Yetki Ayarları › Özellikler'deki
+  // "havastil" anahtarına bağlı (VARSAYILAN KAPALI; owner her zaman). NAV'daki izin:"havastil" + izinleriYukle. Modül kendi içinde RPC ile tekrar doğrular.
+  havastil: { src: "./havastil/panel.js", role: null },
   // Silinen hesapların artık verisi (migration 0078). Görünürlük: owner her zaman; admin yalnızca owner anahtarı açıksa
   // (NAV'daki izin:"silmeonayi"). Gerçek yetki RPC'lerde; kalıcı silme yalnızca owner (Edge Function).
   silmeOnayi: { src: "./silme-onayi/silme-onayi.js", role: null },
@@ -174,6 +177,8 @@ const NAV = [
       // Menüde görünmeyen rol, #tool-donusturucu adresine gitse bile hash Guard'ına (gorunurMu) takılır.
       { id: "tool-donusturucu", icon: "🔄", label: "Dönüştürücü & Editör", module: "donusturucu", role: null, izin: "donusturucu", defaultAcilis: false },
       { id: "tool-belge-tarayici", icon: "📑", label: "Belge Tarayıcı & Birleştirici", module: "belgeTarayici", role: null, izin: "donusturucu", defaultAcilis: false },
+      // role:null + izin:"havastil": owner her zaman görür; diğer roller yalnızca Yetki Ayarları'nda HavaStil açıldıysa.
+      { id: "tool-havastil", icon: "🌦️", label: "HavaStil (Giyim Danışmanı)", module: "havastil", role: null, izin: "havastil", defaultAcilis: false },
     ],
   },
   {
@@ -252,6 +257,9 @@ function gorunurMu(item, profile) {
   if (item.izin === "kvkk") {
     return profile.role === "owner" || !!profile.izinler?.kvkk;
   }
+  if (item.izin === "havastil") {
+    return profile.role === "owner" || !!profile.izinler?.havastil;
+  }
   if (item.izin === "arsiv") {
     const y = profile.izinler?.arsiv;
     return !!(y && (y.oku || y.yukle || y.sil || y.paylasilan_var));
@@ -267,7 +275,7 @@ async function izinleriYukle(rol) {
       .rpc("ozellik_erisimi_var_mi", { p_ozellik: anahtar, p_rol: rol })
       .then((r) => (r.error ? true : r.data !== false))
       .catch(() => true);
-  const [arsiv, kvkk, ozelIcerik, dosyaPaylasimi, akademikKutuphane, sistemYedek, donusturucu, silmeOnayi, yetkiAyarlari] = await Promise.all([
+  const [arsiv, kvkk, ozelIcerik, dosyaPaylasimi, akademikKutuphane, sistemYedek, donusturucu, silmeOnayi, yetkiAyarlari, havastil] = await Promise.all([
     supabase.rpc("r2_arsiv_yetkilerim").then((r) => (r.error ? undefined : r.data)).catch(() => undefined),
     supabase.rpc("hukuki_metin_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
     ozellikSor("ozel_icerik_yonetimi"),
@@ -281,6 +289,8 @@ async function izinleriYukle(rol) {
     supabase.rpc("hesap_silme_inceleme_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
     // adminler Yetki Ayarları'na erişebilsin (migration 0079): varsayılan KAPALI.
     supabase.rpc("yetki_ayarlari_yonetim_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
+    // havastil (migration 0099): varsayılan KAPALI → hata/ağ sorununda ya da migration yoksa false (güvenli yön).
+    supabase.rpc("havastil_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
   ]);
   return {
     arsiv,
@@ -289,6 +299,7 @@ async function izinleriYukle(rol) {
     donusturucu,
     silmeOnayi,
     yetkiAyarlari,
+    havastil,
     ozellikler: { ozel_icerik_yonetimi: ozelIcerik, dosya_paylasimi_yonetimi: dosyaPaylasimi, akademik_kutuphane: akademikKutuphane },
   };
 }
