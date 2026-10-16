@@ -17,6 +17,7 @@ permalink: "/panel/dashboard.html"
 <link rel="stylesheet" href="{{ '/assets/css/sistem-yedek.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/donusturucu.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/belge-tarayici.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/css/havastil.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/demo.css' | relative_url }}">
 
 <div class="loading-overlay" id="loading">Yükleniyor...</div>
@@ -1066,6 +1067,13 @@ permalink: "/panel/dashboard.html"
       <h1>Belge Tarayıcı &amp; Birleştirici</h1>
       <div id="bt-kok" class="bt-kok"><p class="muted">Yükleniyor...</p></div>
       <div id="bt-mesaj" class="auth-message" hidden role="status"></div>
+    </section>
+
+    <!-- HavaStil (assets/js/havastil/panel.js): hava durumuna göre katman/giyim danışmanı. Yetki: Yetki Ayarları › Özellikler › HavaStil (varsayılan KAPALI; owner her zaman).
+         Aynı arayüz bağımsız PWA sayfası olarak /panel/havastil/ adresinde de çalışır. -->
+    <section class="dash-view" id="view-tool-havastil" hidden data-view="tool-havastil">
+      <h1>HavaStil</h1>
+      <div id="hv-kok"><p class="muted">Yükleniyor...</p></div>
     </section>
 
     <section class="dash-view" id="view-sys-hakkimda" hidden data-view="sys-hakkimda">
