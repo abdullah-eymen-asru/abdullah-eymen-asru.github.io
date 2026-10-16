@@ -70,6 +70,7 @@ dosyasındaki adresi de güncellemen gerekir.
 | 4.8 | `substack_feed_proxy_worker` | `substack-feed-proxy-worker` | — | — | — *(hiçbir şey girilmez)* |
 | 4.9 | `akademik_kutuphane_worker` | `akademik-kutuphane-worker` | `SUPABASE_URL`, `SUPABASE_ANON_KEY` *(+ yalnızca çok büyük dosya imzası için: `ACCOUNT_ID`, `BUCKET_NAME`)* | — *(bilerek `service_role` yok)* *(+ yalnızca çok büyük dosya imzası için: `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`)* | `AKADEMIK_BUCKET` |
 | 4.10 | `sistem_yedek_worker` | `sistem-yedek-worker` | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `GITHUB_OWNER`, `GITHUB_REPO` *(+ isteğe bağlı `GITHUB_REF`, `MAX_TARAMA_SAYFA`)* | `GITHUB_PAT` *(yalnızca repo **özel** ise; bilerek `service_role` yok)* | `AKADEMIK_BUCKET`, `ARSIV_BUCKET`, `NOT_EK_BUCKET` *(üçü de isteğe bağlı; bağlamadığın kaynak pakete girmez)* |
+| 4.11 | `havastil_worker` | `havastil-worker` | `SUPABASE_URL`, `SUPABASE_ANON_KEY` *(+ isteğe bağlı `GROQ_MODEL`)* | `GROQ_API_KEY` *(bilerek `service_role` yok)* | — |
 
 > 💡 **"Variable mı Secret mı?" tablodaki sütunlar bir öneridir.** Kod ikisini de
 > aynı şekilde okur (`env.ADI`). Önemli olan, gizli değerlerin **Secret**
@@ -567,6 +568,40 @@ Panel: **Yedekleme & Verilerim → Depolama Durumu → 🔌 Worker anahtarları*
 
 **Gatekeeper kapalıyken:** pages.dev'de sunucu tarafı kilit yoktur (kilitli rotalar herkese açık olur); tarayıcıdaki perde güvenlik sınırı değildir. Bu yüzden kapatmayı yalnızca geçici kota acillerinde kullan.
 
+### 4.11 `havastil-worker` — HavaStil stilist yorumu (Groq API anahtarını gizler)
+
+**Ne yapar?** HavaStil'de (Araçlar › 🌦️ HavaStil, ayrıca `/panel/havastil/` PWA sayfası) kombin kartları basıldıktan sonra gelen kısa, esprili **stilist cümlesini** üretir. Groq API anahtarı yalnızca bu Worker'da durur; tarayıcıya hiç inmez (Supabase **migration 0099** ile birlikte kurulur).
+
+- `POST /stilist` — gövde yalnızca **sayılar ve sabit kodlardır** (hissedilen sıcaklık, gün içi fark, yağış %, rüzgâr, UV, tolerans, senaryo, katman kodları). **Konum (koordinat/adres) ve serbest metin Worker'a hiç gelmez**; bilinmeyen kod/aralık dışı değer 400 döner. Supabase JWT + `havastil_yetkisi_var_mi()` (Yetki Ayarları › HavaStil; varsayılan **kapalı**) doğrulanır.
+- `GET /haberler` — **Haber Doğrulama & Taktik** için ham başlıklar: **Tier-1** (AA, TRT Haber, MGM, AFAD) ve **Tier-2** (genel haber). JWT + yetki gerekir. Herkese aynı ulusal liste döner; **il/konum Worker'a gelmez**, clickbait/zaman/konum filtreleri **tarayıcıda** çalışır. Hiçbir LLM çağrısı yapmaz; 10 dk bellek önbelleği + Cloudflare edge önbelleği (5 dk) vardır.
+- `POST /stilist` — (yukarıdaki) + isteğe bağlı `haberId` (12 hex). Başlık, istemciden **gelmez**; Worker'ın kendi çektiği listeden id ile bulunur. Yalnızca kullanıcı arayüzde **AI destekli yorum (Mod B)** açtıysa çağrılır.
+- `GET /saglik` — `{ ok, groq_anahtari_var }`.
+- Kullanıcı başına hız sınırı (10 dk'da 12 istek) ve aynı koşullar için 30 dk bellek önbelleği vardır (Worker örneğinde, en-iyi-çaba).
+
+**Haber kaynakları hakkında dürüst not:** AA ve TRT doğrudan RSS'tir. MGM ve AFAD'ın herkese açık, kararlı bir RSS adresi **doğrulanamadı**; bu ikisi Google Haberler'in `site:` filtresiyle çekilir ve her öğenin gerçek yayıncı alan adı doğrulanır. Kurulumdan sonra panelde HavaStil › **Haber doğrulama › Nasıl çalışıyor?** içinde her kaynağın canlı durumunu (`✓ adet`, `– boş`, `✗ hata_…`) görürsün; bir kaynak hep `✗` ise `HABER_KAYNAKLARI` ile doğru adresi yaz.
+
+**Hava verisi bu Worker'dan GEÇMEZ:** Open-Meteo'ya tarayıcı doğrudan gider (sınır IP başınadır, Worker kotasını yemez). **MGM proxy'si bilerek yoktur** — bkz. `rehber/07-havastil.md` § Kararlar.
+
+**Kota:** Groq ücretsiz katmanı dakika/gün başına sınırlıdır; dolunca Worker 429 döner ve arayüz sessizce kural tabanlı cümleye düşer (giyim kararı etkilenmez). Cloudflare tarafında Worker kotası (100.000/gün) diğer Worker'larla ortaktır.
+
+| Tip | Ad | Değer | Nereden? |
+|---|---|---|---|
+| Variable | `SUPABASE_URL` | `https://<proje-ref>.supabase.co` | Bölüm 2.2 |
+| Variable | `SUPABASE_ANON_KEY` | `anon public` anahtarı | Bölüm 2.2 |
+| **Secret** | `GROQ_API_KEY` | `gsk_...` | [console.groq.com](https://console.groq.com) → **API Keys → Create API Key** (anahtar yalnızca bir kez gösterilir) |
+| Variable *(isteğe bağlı)* | `HABER_KAYNAKLARI` | varsayılan listeyi değiştirir | JSON dizi: `[{"id":"aa","ad":"Anadolu Ajansı","tier":1,"url":"https://…","alanlar":["aa.com.tr"]}]` — `alanlar`: yayıncı alan adı doğrulaması (eşleşmeyen öğe atılır; `null` = doğrulama yok, yalnız Tier-2 için). En çok 8 kaynak, yalnızca `https://` |
+| Variable *(isteğe bağlı)* | `GROQ_MODEL` | varsayılan `llama-3.1-8b-instant` | Groq'un model listesi sık değişir; bir model kaldırılırsa kodu değiştirmeden buradan yenisini yaz (ör. `llama-3.3-70b-versatile`) |
+
+**Kurulum adımları (sırayla):**
+
+1. Cloudflare → **Workers & Pages → Create → Create Worker**, adı **`havastil-worker`** (ad, `worker_anahtarlari` satırı ve istemci kapısıyla aynı olmalı), **Deploy**, ardından **Edit code** → `cloudflare worker/havastil_worker/worker.js` içeriğini yapıştır → **Deploy**.
+2. **Settings → Variables and Secrets**: tablodaki 3 değeri ekle (`GROQ_API_KEY` mutlaka **Secret**). R2 binding yok.
+3. Adresi doğrula: `https://havastil-worker.aeymena.workers.dev/saglik` → `{"ok":true,"groq_anahtari_var":true}`. Hesap alt alan adın `aeymena` değilse `assets/js/havastil/arayuz.js` içindeki `HAVASTIL_WORKER_URL`'yi güncelle.
+4. Supabase SQL Editor'de **`0099_havastil.sql`** dosyasını çalıştır.
+5. Panelde **Yetki Ayarları › Özellikler › HavaStil** satırı: varsayılan hepsi **kapalı** (yalnızca Site Sahibi kullanır). Başka bir rol için açmak istediğinde o rolün anahtarını aç.
+
+**Worker aç/kapa (kota koruması):** `havastil-worker`, **Yedekleme & Verilerim → Depolama Durumu → 🔌 Worker anahtarları** listesine `0099` ile eklenir. Kapatınca tarayıcılar istek göndermez (`worker-kapi.js`), Worker 503 döner; HavaStil çalışmaya devam eder, yalnızca stilist cümlesi kural tabanlı olur. Sert kapatma (workers.dev'i kapatma) için § 4.10c'deki `CF_WORKERS_TOKEN` yeterlidir; ek ayar gerekmez.
+
 ---
 
 ## 5. Cloudflare Pages ayarları
@@ -716,6 +751,7 @@ Kurulumdan sonra tek tek işaretle:
 - [ ] `r2-not-ek-worker`'da `service_role` yok.
 - [ ] `sistem-yedek-worker`'da `service_role` yok; varsa `GITHUB_PAT` **salt okunur** (Contents: Read-only) ve içerik yönetimi token'ından ayrı; `can_export_system` yalnızca gerçekten ihtiyacı olan rollerde açık.
 - [ ] `akademik-kutuphane-worker`'da `service_role` yok; `AKADEMIK_BUCKET` ayrı bir kovaya bağlı; (büyük dosya imzası kullanıyorsan) R2 token'ı yalnızca ilgili kovalara izinli ve kovada `PUT`'a izinli CORS kuralı var.
+- [ ] `havastil-worker`'da `service_role` yok; `GROQ_API_KEY` **Secret** (Variable değil) ve hiçbir `.js`/`.md` dosyasında ya da commit'te yok; Worker'a koordinat/adres gönderilmiyor (yalnızca sayılar + kodlar).
 - [ ] Kasa uç katmanını kurduysan: Pages'te `SUPABASE_ANON_KEY` olarak **anon public** var (`service_role` değil) ve `GK_COOKIE_SECRET` en az 32 karakterli bir **Secret**; değişkenler hem Production hem Preview'a girildi.
 - [ ] İki `GITHUB_TOKEN` (okuma/yazma) **farklı** token'lar; okuma olan yazma yetkisi taşımıyor.
 - [ ] R2 API token'ı **sadece kendi kovalarına** izinli.
