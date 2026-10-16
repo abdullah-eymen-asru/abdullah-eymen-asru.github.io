@@ -13,7 +13,7 @@
 |---|---|---|---|
 | Hangi dosya ne işe yarar, neyi nerede değiştiririm? Tema, yorumlar, izlediklerim/okuduklarım tablosu, hesabım menüsü ve güvenlik notları da bu sekmede. | Supabase kurulum adımları, RLS, sorun giderme, e-posta/2FA/dosya paylaşımı akışları **ve en son yapılan düzeltmelerin değişiklik geçmişi (changelog)**. | Bu depoyu fork edip kendi sitene uyarlamak istersen atman gereken adımlar. | Hangi Cloudflare Worker'a hangi secret/değişken girilir, değer nereden bulunur; Pages build ve `LANG` ayarları. |
 
-> 🧰 Ek rehberler: [🔄 Dönüştürücü & Belge Düzenleyici](rehber/05-donusturucu.md) · [📑 Belge Tarayıcı & Sıkıştırma](rehber/06-belge-tarayici.md)
+> 🧰 Ek rehberler: [🔄 Dönüştürücü & Belge Düzenleyici](rehber/05-donusturucu.md) · [📑 Belge Tarayıcı & Sıkıştırma](rehber/06-belge-tarayici.md) · [🌦️ HavaStil](rehber/07-havastil.md)
 
 ## Bu depo hakkında kısa özet
 
