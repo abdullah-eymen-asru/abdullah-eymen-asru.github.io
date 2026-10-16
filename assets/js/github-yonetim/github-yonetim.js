@@ -385,6 +385,16 @@ const OZELLIK_KATALOGU = [
     rolSutunlari: ["admin"],
     kaynak: "kapali",
   },
+  {
+    // bkz. migration 0099 — HavaStil (hava durumuna göre giyim danışmanı + haber doğrulama). VARSAYILAN KAPALI: yalnızca owner;
+    // "gerekli kişiler" için ilgili rol buradan açılır (yeni panel yok). Kaynak: ozellik_varsayilan_kapali (kaynak:"kapali").
+    // Kapalıyken menü yok, RLS ve havastil-worker reddeder.
+    anahtar: "havastil",
+    baslik: "HavaStil (Giyim Danışmanı)",
+    aciklama: "Hava durumuna göre katman/ayakkabı/renk önerisi, doğrulanmış haber taktiği ve isteğe bağlı konum senkronu. Varsayılan KAPALI; yalnızca Site Sahibi kullanır. Rol açıldığında o roldeki her üye kullanabilir; kayıtlı veri silinmez, kapatılınca erişim kesilir.",
+    rolSutunlari: ["admin", "manager", "editor", "special_user", "user"],
+    kaynak: "kapali",
+  },
 ];
 
 /** Sıradan bir kullanıcının (owner OLMAYAN) kendi rolü için bir özelliğe
