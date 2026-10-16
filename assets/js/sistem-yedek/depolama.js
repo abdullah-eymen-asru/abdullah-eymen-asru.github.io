@@ -50,6 +50,8 @@ const TABLO_BILGI = {
   akademik_kaynaklar: ["notlar", "Akademik Kütüphane kaynakları (PDF'lerin R2 yolu dahil)."],
   akademik_notlar: ["notlar", "Kaynaklara bağlı akademik notlar."],
   akademik_okuyucu_ayarlari: ["notlar", "PDF okuyucu tercihleri."],
+  havastil_konumlari: ["notlar", "HavaStil kayıtlı konumları (yalnızca üye “hesabımda sakla” derse; ≈100 m’ye yuvarlanmış)."],
+  havastil_tercihleri: ["notlar", "HavaStil tercihleri (sıcaklık algısı, günün planı)."],
   conversations: ["mesaj", "Mesajlaşma konuşmaları."],
   messages: ["mesaj", "Mesaj içerikleri (KVKK açısından hassas)."],
   konusma_gizlemeleri: ["mesaj", "Üyelerin kendi tarafında gizlediği konuşmalar."],
