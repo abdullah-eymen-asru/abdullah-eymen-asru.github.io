@@ -198,6 +198,31 @@ permalink: "/kurumsal/kvkk-aydinlatma-metni.html"
 </ul>
 
 
+<h2 id="havastil">7/A. HavaStil Modülü (İsteğe Bağlı Hava Durumu ve Giyim Danışmanı)</h2>
+<p>
+  HavaStil; hava durumu verisini ve günlük <strong>CLO (giysi yalıtımı)</strong> hesabını kullanarak bugün ne giyilmesi
+  gerektiği konusunda öneri sunan, <strong>yetkisi açılan üyelere özel ve isteğe bağlı</strong> bir modüldür. Amacı, hava ve giyim
+  kararına yardımcı olmaktır; <strong>konum verisi toplamak amaç değildir</strong>. Aşağıdaki tüm konumla ilgili özellikler isteğe bağlıdır;
+  hiçbirini kullanmadan, yalnızca şehir adı yazarak modülden yararlanabilirsiniz.
+</p>
+<ul>
+  <li><strong>Cihaz konumu (isteğe bağlı):</strong> yalnızca “Bulunduğum yer”e dokunur ve tarayıcınıza izin verirseniz kullanılır.
+    Koordinatlar tarayıcınızdan doğrudan hava durumu servisine (Open-Meteo) iletilir; bu sitenin sunucularında veya hesabınızda
+    <strong>kaydedilmez</strong>.</li>
+  <li><strong>Yer araması:</strong> yazdığınız metin, öneri listesi için Open-Meteo Geocoding servisine (ve yalnızca sokak/adres
+    araması isterseniz OpenStreetMap Nominatim servisine) gönderilir; kaydedilmez.</li>
+  <li><strong>Kayıtlı konumlar (isteğe bağlı):</strong> varsayılan olarak yalnızca cihazınızın yerel depolamasında tutulur.
+    <strong>“Hesabımda sakla”</strong> seçeneğini (varsayılan <em>kapalı</em>) kendiniz açarsanız; konum adı, simge, il/ilçe/ülke adı,
+    yaklaşık 110 m’ye yuvarlanmış koordinat ve tercihleriniz hesabınıza bağlı olarak saklanır. Dilediğiniz an kapatıp bu verileri
+    sildirebilirsiniz; hesabınız silindiğinde de silinir. <em>Hukuki sebep: açık rızanız (KVKK m.5/1).</em></li>
+  <li><strong>Haber doğrulama (isteğe bağlı):</strong> bugünü ilgilendiren hava uyarıları için herkese aynı haber havuzu çekilir;
+    konumunuz sunucuya gönderilmez, eşleştirme cihazınızda yapılır.</li>
+  <li><strong>Yapay zekâ yorumu (isteğe bağlı, varsayılan kapalı):</strong> açarsanız yalnızca sıcaklık/rüzgâr gibi sayılar, kıyafet bilgisi ve
+    varsa bir haber başlığı hizmet sağlayıcıya (Groq) aktarılır; konumunuz ve kimliğiniz aktarılmaz. Bu aktarım yurt dışındaki bir
+    hizmet sağlayıcıya yapılır ve yalnızca bu seçeneği açtığınızda gerçekleşir.</li>
+  <li><strong>Bildirim saatleri:</strong> belirlediğiniz uyarı saatleri yalnızca cihazınızda tutulur.</li>
+</ul>
+
 <h2>8. Başvuru Usulü ve Kurul'a Şikâyet</h2>
 <p>
   KVKK m.11 kapsamındaki taleplerinizi
