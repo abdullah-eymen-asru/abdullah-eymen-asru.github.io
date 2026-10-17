@@ -1,107 +1,87 @@
 /**
- * taktik.js — MOD A: YEREL KURAL MOTORU (sıfır maliyet, LLM yok). Filtreden geçmiş temiz başlığı doğrudan GİYİM kurallarına çevirir
- * ve cekirdek.js'in kararının ÜSTÜNE bindirir (çekirdek bozulmaz; aynı girdi → aynı çıktı).
- * Kullanıcının istediği 4 kural: fırtına/lodos · çöl tozu · don/buzlanma · sarı/turuncu(/kırmızı) kodlu sağanak.
- * Benim eklediklerim: kar/tipi · sıcak hava dalgası · yoğun sis.
+ * taktik.js — HABER → GİYİM KURALI motoru (yerel, deterministik, LLM YOK). Türkçe + İngilizce.
+ *  1) kurallariCikar(): temiz başlık/özetten hava olayı kurallarını çıkarır (fırtına, çöl tozu, don, sağanak/dolu/sel, kar, sıcak, sis).
+ *  2) dogrula(): kuralı Open-Meteo verisiyle ÇAPRAZ KONTROL eder ("haber doğrulama"): uyuşuyor / çelişiyor / ölçülemiyor.
+ *  3) kisitlaraCevir(): uygulanacak kuralları cekirdek.js'in beklediği kısıt nesnesine çevirir (yama değil; kombin seçimi bu kısıtlarla yapılır).
  */
 import { normalize } from "./iller.js";
-import { KATMAN } from "./cekirdek.js";
 
 const SEVIYE_SIRA = { uyari: 0, sari: 1, turuncu: 2, kirmizi: 3 };
 const SEVIYE_AD = { uyari: "Uyarı", sari: "Sarı kod", turuncu: "Turuncu kod", kirmizi: "Kırmızı kod" };
+export const seviyeAdi = (s) => SEVIYE_AD[s] || "Uyarı";
 
-function renkKodu(t) { return /kirmizi kod/.test(t) ? "kirmizi" : /turuncu kod/.test(t) ? "turuncu" : /sari kod/.test(t) ? "sari" : "uyari"; }
+function renkKodu(t) {
+  if (/kirmizi kod|red (weather )?(warning|alert)/.test(t)) return "kirmizi";
+  if (/turuncu kod|orange (weather )?(warning|alert)/.test(t)) return "turuncu";
+  if (/sari kod|yellow (weather )?(warning|alert)/.test(t)) return "sari";
+  return "uyari";
+}
 
+/** id, ikon, etiket, öncelik, kısa (kullanıcıya ne yapacağı), var (metin testi), dogrula (veri testi) */
 export const KURALLAR = [
-  { id: "firtina", ikon: "🌪️", etiket: "Fırtına / lodos / kuvvetli rüzgâr", oncelik: 5,
-    var: (t) => /(^|[^a-z0-9])(firtina|lodos|poyraz|kasirga|hortum)/.test(t) || /(kuvvetli|siddetli|sert) ruzgar|ruzgar (uyarisi|siddeti)|saatte \d+ km hizla esen/.test(t) },
-  { id: "col_tozu", ikon: "🏜️", etiket: "Çöl tozu / toz taşınımı", oncelik: 4,
-    var: (t) => /col tozu|sahra tozu|saharadan|toz tasinimi|toz bulutu|toz firtinasi/.test(t) },
-  { id: "don", ikon: "🧊", etiket: "Don / buzlanma", oncelik: 5,
-    var: (t) => /buzlanma|gizli buz|zirai don|(^|[^a-z0-9])don (olayi|riski|uyarisi|olacak|bekleniyor)|(^|[^a-z0-9])donma/.test(t) },
-  { id: "saganak", ikon: "⛈️", etiket: "Sağanak / kuvvetli yağış", oncelik: 5,
-    var: (t) => /saganak|(siddetli|kuvvetli|cok kuvvetli) yagis|sel (uyarisi|riski|tehlikesi|baskini)/.test(t) || (/(sari|turuncu|kirmizi) kod/.test(t) && /yagis|yagmur|sel([^a-z0-9]|$)/.test(t)) },
-  { id: "kar", ikon: "❄️", etiket: "Kar / tipi", oncelik: 4,
-    var: (t) => /(yogun|kuvvetli|siddetli) kar|kar yagisi|(^|[^a-z0-9])tipi|kar firtinasi/.test(t) },
-  { id: "sicak", ikon: "🥵", etiket: "Sıcak hava dalgası", oncelik: 3,
-    var: (t) => /sicak hava dalgasi|asiri sicak|bunaltici sicak|sicaklik uyarisi/.test(t) },
-  { id: "sis", ikon: "🌫️", etiket: "Yoğun sis", oncelik: 2,
-    var: (t) => /yogun sis|sis uyarisi|goruş mesafesi|gorus mesafesi/.test(t) },
+  { id: "firtina", ikon: "🌪️", etiket: "Fırtına / kuvvetli rüzgâr", oncelik: 5, kisa: "Şemsiyeyi bırak, kapüşonlu rüzgâr geçirmez bir dış kat giy.",
+    var: (t) => {
+      const duz = t.replace(/(kar|toz|snow ?|dust ?|sand ?|ice |winter |thunder ?)(firtinasi|storm)/g, " ");   // kar/toz/gök gürültülü fırtına ayrı kurallardır
+      return /(^|[^a-z0-9])(firtina|lodos|poyraz|kasirga|hortum|gale|hurricane|typhoon|cyclone|tornado|storm)/.test(duz)
+        || /(kuvvetli|siddetli|sert) ruzgar|ruzgar (uyarisi|siddeti)|saatte \d+ km hizla esen|(strong|high|damaging|gusty|severe) winds?|wind warning|gusts? (of|up to)/.test(t);
+    },
+    dogrula: (h) => (Math.max(h.gust ?? 0, h.wind ?? 0) >= 45 ? "ok" : Math.max(h.gust ?? 0, h.wind ?? 0) < 28 ? "celisiyor" : "belirsiz"),
+    veriNotu: (h) => `Modelde hamle ${Math.round(h.gust ?? h.wind ?? 0)} km/s` },
+  { id: "col_tozu", ikon: "🏜️", etiket: "Çöl tozu / toz taşınımı", oncelik: 4, kisa: "Açık renk giyme, maske tak, gözlük kullan.",
+    var: (t) => /col tozu|sahra tozu|saharadan|toz tasinimi|toz bulutu|toz firtinasi|sand ?storm|dust ?storm|saharan dust|dust cloud/.test(t),
+    dogrula: (h) => (h.dust == null ? "bilinmiyor" : h.dust >= 60 || (h.pm10 ?? 0) >= 100 ? "ok" : h.dust < 15 ? "celisiyor" : "belirsiz"),
+    veriNotu: (h) => (h.dust == null ? "Toz verisi yok" : `Modelde toz ${h.dust} µg/m³`) },
+  { id: "don", ikon: "🧊", etiket: "Don / buzlanma", oncelik: 5, kisa: "Derin kauçuk dişli (kaymaz) bot giy; düz tabanlı ayakkabıdan kaçın.",
+    var: (t) => /buzlanma|gizli buz|zirai don|(^|[^a-z0-9])don (olayi|riski|uyarisi|olacak|bekleniyor)|(^|[^a-z0-9])donma|black ice|(^|[^a-z0-9])frost|freezing (rain|fog|temperatures)|ice warning|icy (roads|conditions)/.test(t),
+    dogrula: (h) => ((h.minRaw ?? 20) <= 2 ? "ok" : (h.minRaw ?? 20) > 6 ? "celisiyor" : "belirsiz"),
+    veriNotu: (h) => `Modelde en düşük ${h.minRaw}°C` },
+  { id: "saganak", ikon: "⛈️", etiket: "Sağanak / dolu / sel", oncelik: 5, kisa: "Su geçirmez dış kat ve su geçirmez ayakkabı giy.",
+    var: (t) => /saganak|(siddetli|kuvvetli|cok kuvvetli) yagis|sel (uyarisi|riski|tehlikesi|baskini)|su baskini|(^|[^a-z0-9])dolu([^a-z0-9]|$)|heavy rain|torrential|downpour|flash flood|flood(ing)? (warning|risk|alert)|(^|[^a-z0-9])hail/.test(t)
+      || (/(sari|turuncu|kirmizi) kod|(yellow|orange|red) (weather )?(warning|alert)/.test(t) && /yagis|yagmur|sel([^a-z0-9]|$)|rain|flood/.test(t)),
+    dogrula: (h) => ((h.rainProb ?? 0) >= 50 || (h.precip ?? 0) >= 1 ? "ok" : (h.rainProb ?? 0) < 15 && (h.precip ?? 0) < 0.1 ? "celisiyor" : "belirsiz"),
+    veriNotu: (h) => `Modelde yağış ihtimali %${h.rainProb}` },
+  { id: "kar", ikon: "❄️", etiket: "Kar / tipi", oncelik: 4, kisa: "Sıcak dış kat, su geçirmez ve kaymaz kışlık bot giy.",
+    var: (t) => /(yogun|kuvvetli|siddetli) kar|kar yagisi|(^|[^a-z0-9])tipi|kar firtinasi|heavy snow|snow ?storm|blizzard|snow warning|winter storm/.test(t),
+    dogrula: (h) => ((h.raw ?? 20) <= 3 && ((h.precip ?? 0) > 0 || (h.snow ?? 0) > 0 || (h.rainProb ?? 0) >= 40) ? "ok" : (h.raw ?? 20) > 7 ? "celisiyor" : "belirsiz"),
+    veriNotu: (h) => `Modelde ${h.raw}°C` },
+  { id: "sicak", ikon: "🥵", etiket: "Sıcak hava dalgası", oncelik: 3, kisa: "En hafif, açık renk kıyafeti seç; bol su iç.",
+    var: (t) => /sicak hava dalgasi|asiri sicak|bunaltici sicak|sicaklik uyarisi|heat ?wave|extreme heat|heat warning|scorching/.test(t),
+    dogrula: (h) => ((h.maxRaw ?? 20) >= 33 ? "ok" : (h.maxRaw ?? 20) < 28 ? "celisiyor" : "belirsiz"),
+    veriNotu: (h) => `Modelde en yüksek ${h.maxRaw}°C` },
+  { id: "sis", ikon: "🌫️", etiket: "Yoğun sis", oncelik: 2, kisa: "Trafikte görünür ol: parlak veya yansıtıcı bir parça ekle.",
+    var: (t) => /yogun sis|sis uyarisi|gorus mesafesi|dense fog|thick fog|fog warning/.test(t),
+    dogrula: (h) => (h.gorus != null ? (h.gorus < 2000 ? "ok" : h.gorus > 8000 ? "celisiyor" : "belirsiz") : "bilinmiyor"),
+    veriNotu: (h) => (h.gorus != null ? `Modelde görüş ${(h.gorus / 1000).toFixed(1)} km` : "Görüş verisi yok") },
 ];
 
-/** Temiz başlığı (+özet) kurallara çevir. Eşleşme yoksa [] → haber "kritik" sayılmaz. */
 export function kurallariCikar({ baslik, ozet }) {
   const t = normalize(`${baslik} ${ozet || ""}`);
   const seviye = renkKodu(t);
   return KURALLAR.filter((k) => k.var(t)).map((k) => ({ id: k.id, ikon: k.ikon, etiket: k.etiket, oncelik: k.oncelik, seviye }));
 }
-export const seviyeAdi = (s) => SEVIYE_AD[s] || "Uyarı";
 export const seviyePuani = (kurallar) => Math.max(0, ...kurallar.map((k) => SEVIYE_SIRA[k.seviye] * 10 + k.oncelik));
 
-const AGIR = new Set(["o_orta", "o_teknik_dolgulu", "o_kalin"]);
-const KISA = {
-  firtina: "Şemsiyeyi bırak, kapüşonlu rüzgarlık giy.",
-  col_tozu: "Açık renk giyme, maske tak.",
-  don: "Derin kauçuk dişli (kaymaz) bot giy.",
-  saganak: "Su geçirmez dış kabuk giy.",
-  kar: "Su geçirmez, kaymaz kışlık bot ve sıcak dış kat giy.",
-  sicak: "En hafif, açık renk kıyafeti seç; su taşı.",
-  sis: "Trafikte görünür ol: parlak/yansıtıcı bir parça ekle.",
-};
+/** Kuralı hava verisiyle karşılaştır. @returns {{durum:'uyusuyor'|'celisiyor'|'belirsiz'|'olculemiyor', metin:string}} */
+export function dogrula(kural, h) {
+  const k = KURALLAR.find((x) => x.id === kural.id);
+  if (!k || !h) return { durum: "olculemiyor", metin: "Hava verisiyle kıyaslanamadı." };
+  const s = k.dogrula(h);
+  const not = k.veriNotu(h);
+  if (s === "ok") return { durum: "uyusuyor", metin: `Hava verisiyle uyuşuyor (${not}).` };
+  if (s === "celisiyor") return { durum: "celisiyor", metin: `Hava verisi farklı gösteriyor (${not}).` };
+  if (s === "bilinmiyor") return { durum: "olculemiyor", metin: `${not}; kıyaslanamadı.` };
+  return { durum: "belirsiz", metin: `Kısmen uyuşuyor (${not}).` };
+}
 
 /**
- * Çekirdek sonucuna taktik kurallarını bindirir. Girdi DEĞİŞMEZ; yeni nesne döner.
- * @param {object} sonuc degerlendir() çıktısı  @param {Array} kurallar kurallariCikar() birleşimi (id başına en yüksek seviye)
+ * Kullanılacak kuralları (id başına en yüksek seviye) cekirdek.js kısıtına çevir.
+ * @param {Array<{kurallar:Array}>} uygulananlar  haber.js'te "uygulandi" olarak işaretlenen uyarılar
  */
-export function taktikUygula(sonuc, kurallar) {
-  if (!kurallar?.length) return sonuc;
-  const idler = new Map();
-  for (const k of kurallar) { const o = idler.get(k.id); if (!o || SEVIYE_SIRA[k.seviye] > SEVIYE_SIRA[o.seviye]) idler.set(k.id, k); }
-  const var_ = (id) => idler.has(id);
-  const kodlar = { ...sonuc.kodlar };
-  const katmanlar = { ...sonuc.katmanlar };
-  let aks = [...sonuc.aksesuar], ayak = sonuc.ayakkabi, renk = sonuc.renk;
-  const yasaklar = [], notlar = [];
-  const ata = (anah, kod) => { kodlar[anah] = kod; katmanlar[{ b: "cekirdek", m: "orta", o: "kabuk" }[anah]] = { kod, ...KATMAN[kod] }; };
-  const ekle = (x) => { if (!aks.includes(x)) aks.push(x); };
-  const cikar = (alt) => { aks = aks.filter((a) => !a.toLowerCase().includes(alt)); };
-
-  if (var_("sicak")) { ata("b", "b_hafif"); ata("m", "m_yok"); ata("o", "o_yok"); ekle("🧢 Şapka"); ekle("💧 Su matarası"); }
-  if (var_("kar")) {
-    if (["o_yok", "o_ruzgarlik", "o_hafif_kabuk", "o_yagmurluk", "o_orta"].includes(kodlar.o)) ata("o", sonuc.clo >= 1.2 ? "o_kalin" : "o_teknik_dolgulu");
-    ekle("🧤 Eldiven"); ekle("🧢 Bere");
-    ayak = "Kar/tipi uyarısı: su geçirmez, kaymaz tabanlı kışlık bot giy.";
+export function kisitlaraCevir(uygulananlar) {
+  const kurallar = {};
+  for (const u of uygulananlar) for (const k of u.kurallar) {
+    const o = kurallar[k.id];
+    if (!o || SEVIYE_SIRA[k.seviye] > SEVIYE_SIRA[o.seviye]) kurallar[k.id] = { seviye: k.seviye };
   }
-  if (var_("saganak")) {
-    const sev = idler.get("saganak").seviye;
-    if (["o_yok", "o_ruzgarlik", "o_hafif_kabuk"].includes(kodlar.o) || (["turuncu", "kirmizi"].includes(sev) && kodlar.o === "o_orta")) ata("o", "o_yagmurluk");
-    else if (AGIR.has(kodlar.o)) notlar.push("Dış katman su itici olmalı; değilse üstüne yağmurluk ekle.");
-    if (!var_("firtina")) ekle("🌂 Katlanır şemsiye");
-    ayak = var_("don") ? ayak : "Sağanak uyarısı: su geçirmez (kauçuk/membranlı) bot veya ayakkabı giy; süet ve bez ayakkabıdan kaçın.";
-    yasaklar.push("Süet / bez ayakkabı");
-  }
-  if (var_("firtina")) {
-    if (kodlar.o === "o_yok") ata("o", "o_ruzgarlik");
-    else notlar.push("Dış katman rüzgâr geçirmez ve kapüşonlu olsun.");
-    cikar("şemsiye"); yasaklar.push("Şemsiye (rüzgâr ters çevirir)"); ekle("🧣 Boğazı koruyan ince atkı");
-  }
-  if (var_("col_tozu")) {
-    renk = "Çöl tozu uyarısı: açık renk giyme (toz ve çamurlu yağmur lekesi çok belli olur); orta/koyu ton ve kapalı yaka seç.";
-    ekle("😷 FFP2/N95 maske"); ekle("🕶️ Kapalı çerçeveli gözlük"); yasaklar.push("Açık renk kıyafet");
-  }
-  if (var_("don")) {
-    ayak = "Don/buzlanma uyarısı: derin kauçuk dişli (kaymaz tabanlı) bot giy; düz tabanlı sneaker ve deri taban yasak.";
-    ekle("🧤 Eldiven"); yasaklar.push("Düz / deri tabanlı ayakkabı");
-  }
-  if (var_("sis")) { renk = "Yoğun sis: trafikte görünür olmak için parlak veya yansıtıcı bir dış parça seç."; ekle("🦺 Yansıtıcı detay"); }
-  if (var_("sicak")) renk = "Sıcak hava dalgası: güneşi yansıtan açık tonlar (beyaz, bej) ve geniş, bol kesimler.";
-
-  const ust = [...idler.values()].sort((a, b) => (SEVIYE_SIRA[b.seviye] * 10 + b.oncelik) - (SEVIYE_SIRA[a.seviye] * 10 + a.oncelik))[0];
-  const hukum = `⚠ ${ust.etiket} (${seviyeAdi(ust.seviye)}): ${KISA[ust.id]}`;
-  const gorunen = [KATMAN[kodlar.b].ad, kodlar.m !== "m_yok" ? KATMAN[kodlar.m].ad : null, kodlar.o !== "o_yok" ? KATMAN[kodlar.o].ad : null].filter(Boolean).join(" + ");
-  return {
-    ...sonuc, kodlar, katmanlar, aksesuar: aks, ayakkabi: ayak, renk, hukum, gorunenKatmanMetni: gorunen,
-    taktikler: [...idler.values()].map((k) => ({ id: k.id, ikon: k.ikon, etiket: k.etiket, seviye: k.seviye, kisa: KISA[k.id] })),
-    yasaklar, taktikNotlari: notlar,
-  };
+  return { kurallar };
 }
