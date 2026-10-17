@@ -97,3 +97,17 @@ export function ilAniliyor(normMetin, il) {
   return false;
 }
 export function bolgeAniliyor(normMetin, il) { return BOLGELER[il.bolge].desen.test(normMetin); }
+
+
+/** Yazılan metne göre il önerileri (İNTERNETSİZ): önce baştan eşleşenler ("ank" → Ankara), sonra içinde geçenler. Yanlış yere düşmeyi önler. */
+export function yerelIlAra(q, en = 6) {
+  const t = normalize(q).trim();
+  if (t.length < 2) return [];
+  const bas = [], ic = [];
+  for (const il of ILLER) {
+    const adlar = [il.anahtar, ...il.takma];
+    if (adlar.some((a) => a.startsWith(t))) bas.push(il);
+    else if (t.length >= 3 && adlar.some((a) => a.includes(t))) ic.push(il);
+  }
+  return [...bas, ...ic].slice(0, en);
+}
