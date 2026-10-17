@@ -2,8 +2,8 @@
    ÖNBELLEĞE ALINANLAR: bu sayfanın kabuğu + havastil JS/CSS + site stilleri (aynı kaynaklı GET). 
    ÖNBELLEĞE ALINMAYANLAR: Supabase, Worker, Open-Meteo, Nominatim (çapraz kaynak: hiç dokunulmaz) ve oturum/kişisel veri.
    Hava verisi çevrimdışı desteği sayfanın kendi 30 dk localStorage önbelleğindedir. */
-const SURUM = "havastil-v2";
-const KABUK = ["/panel/havastil/", "/assets/css/havastil.css", "/assets/js/havastil/sayfa.js", "/assets/js/havastil/arayuz.js", "/assets/js/havastil/cekirdek.js", "/assets/js/havastil/veri.js", "/assets/js/havastil/bulut.js", "/assets/js/havastil/haber.js", "/assets/js/havastil/haber-filtre.js", "/assets/js/havastil/taktik.js", "/assets/js/havastil/iller.js", "/panel/havastil/ikon-192.png"];
+const SURUM = "havastil-v3";
+const KABUK = ["/panel/havastil/", "/assets/css/havastil.css", "/assets/js/havastil/arayuz.js", "/assets/js/havastil/bildirim.js", "/assets/js/havastil/bulut.js", "/assets/js/havastil/cekirdek.js", "/assets/js/havastil/haber-filtre.js", "/assets/js/havastil/haber.js", "/assets/js/havastil/hava-kodlari.js", "/assets/js/havastil/iller.js", "/assets/js/havastil/izin-yardim.js", "/assets/js/havastil/katalog.js", "/assets/js/havastil/konumlar.js", "/assets/js/havastil/sayfa.js", "/assets/js/havastil/taktik.js", "/assets/js/havastil/ui-ayar.js", "/assets/js/havastil/ui-haber.js", "/assets/js/havastil/ui-hava.js", "/assets/js/havastil/ui-kombin.js", "/assets/js/havastil/ui-konum.js", "/assets/js/havastil/ui-temel.js", "/assets/js/havastil/veri.js", "/panel/havastil/ikon-192.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(SURUM).then((c) => Promise.all(KABUK.map((u) => c.add(u).catch(() => { /* biri eksikse kurulum bozulmasın */ })))).then(() => self.skipWaiting()));
