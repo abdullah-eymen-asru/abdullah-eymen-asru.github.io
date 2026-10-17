@@ -199,6 +199,11 @@ permalink: "/kurumsal/gizlilik-politikasi.html"
     üzerinde yayımlanır; sitedeki ilgili bölüm bu yazıların herkese açık
     akışını (RSS) Cloudflare Worker üzerinden getirir. Substack sayfalarını
     ziyaret ettiğinizde Substack'in kendi gizlilik politikası geçerlidir.</li>
+  <li><strong>HavaStil (yetkisi açılan üyeler için, isteğe bağlı)</strong> — hava durumu için <strong>Open-Meteo</strong> (tarayıcıdan doğrudan),
+    yer araması için <strong>Open-Meteo Geocoding</strong> ve yalnızca kullanıcı isterse <strong>OpenStreetMap Nominatim</strong>; bugünkü hava uyarıları için
+    herkese aynı haber havuzu Cloudflare Worker üzerinden getirilir (konum gönderilmez); kullanıcı yapay zekâ yorumunu açarsa
+    <strong>Groq</strong> (yalnızca sayılar ve kıyafet bilgisi). Ayrıntı:
+    <a href="{{ '/kurumsal/kvkk-aydinlatma-metni.html' | relative_url }}#havastil">KVKK Aydınlatma Metni § 7/A</a>.</li>
 </ul>
 <p>
   Barındırma ve ağ sağlayıcılarının bağlantı kayıtları üzerindeki erişimim
