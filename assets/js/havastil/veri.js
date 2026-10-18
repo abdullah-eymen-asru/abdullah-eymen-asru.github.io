@@ -49,7 +49,7 @@ export async function havaGetir(lat, lon, { yenile = false } = {}) {
         + `&hourly=temperature_2m,apparent_temperature,weather_code,precipitation_probability,precipitation,snowfall,uv_index,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,dew_point_2m,pressure_msl,visibility,cloud_cover,shortwave_radiation,is_day,rain,showers,cape`
         + `&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,daylight_duration,uv_index_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max`
         + `&past_days=1&forecast_days=10`),
-      jsonAl(`${temel}&hourly=precipitation&models=${MODELLER}&forecast_days=2`, 6000).catch(() => null),   // fail-soft: tek model
+      jsonAl(`${temel}&hourly=precipitation&models=${MODELLER}&forecast_days=10`, 6000).catch(() => null),   // fail-soft: tek model
       jsonAl(`${HAVA_KALITESI_URL}?latitude=${lat}&longitude=${lon}&timezone=auto&current=european_aqi,pm10,pm2_5,dust,ozone&hourly=dust,pm10&forecast_days=2`, 6000).catch(() => null),
       jsonAl(`${temel}&minutely_15=precipitation&forecast_minutely_15=12`, 5000).catch(() => null),             // 15 dk'lık yağış (bölgeye göre; yoksa null)
     ]);
@@ -73,6 +73,34 @@ export function sonSicaklik(lat, lon) {
 
 /** Open-Meteo yanıtlarını (saat dilimi = konumun saat dilimi) motor girdisine çevirir. Saf fonksiyon (test edilebilir). */
 export function ozetle(ana, modeller, hk, dk) {
+  const v = ozetleAsil(ana, modeller, hk, dk);
+  uyumEkle(v, modeller, ana);
+  return v;
+}
+
+/**
+ * Model uyumu (0..1): aynı saat için yağış (≥ 0,1 mm) gören model oranı. PoP = Güven × Kapsam ayrıştırmasında "Güven" olarak kullanılır.
+ * Kaynaklar: Open-Meteo ana tahmin + ECMWF / ICON / GFS saatlik yağışı. 2'den az kaynak varsa null (ayrıştırma yapılmaz).
+ * Ayrıca bugünden itibaren TÜM saatler (tumSaatler, ≈ 10 gün) Derin analiz'in gün seçicisi için eklenir.
+ */
+function uyumEkle(v, modeller, ana) {
+  const H = ana.hourly;
+  const kaynaklar = [new Map(H.time.map((t, k) => [t, H.precipitation?.[k]]))];
+  const MH = modeller?.hourly;
+  if (MH?.time) for (const a of Object.keys(MH).filter((x) => x.startsWith("precipitation_"))) kaynaklar.push(new Map(MH.time.map((t, k) => [t, MH[a][k]])));
+  const uyum = (t) => {
+    const d = kaynaklar.map((m) => m.get(t)).filter(Number.isFinite);
+    return d.length >= 2 ? Math.round((d.filter((x) => x >= 0.1).length / d.length) * 100) / 100 : null;
+  };
+  const ekle = (x) => { x.uyum = uyum(x.t); return x; };
+  v.saatListe?.forEach(ekle);
+  v.yagisPencere?.forEach(ekle);
+  const bugun = (ana.current?.time || H.time[0]).slice(0, 10);
+  v.tumSaatler = H.time.map((t, k) => (t.slice(0, 10) >= bugun ? ekle(saatOge(H, k)) : null)).filter(Boolean);
+  v.modelKaynakSayisi = kaynaklar.length;
+}
+
+function ozetleAsil(ana, modeller, hk, dk) {
   const c = ana.current, H = ana.hourly;
   const simdiSaat = c.time.slice(0, 13);
   let i = H.time.findIndex((t) => t.startsWith(simdiSaat));
