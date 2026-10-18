@@ -6,6 +6,7 @@
 import { requireAuth } from "../auth/auth-guard.js";
 import { supabase } from "../core/supabase-client.js";
 import { havastilKur } from "./arayuz.js";
+import { demoModuAktifMi } from "../demo/demo-durum.js";
 
 function ekle(rel, oz) { const l = document.createElement("link"); l.rel = rel; for (const [k, v] of Object.entries(oz)) l.setAttribute(k, v); document.head.appendChild(l); }
 function meta(ad, icerik) { const m = document.createElement("meta"); m.name = ad; m.content = icerik; document.head.appendChild(m); }
@@ -22,6 +23,7 @@ async function basla() {
   meta("apple-mobile-web-app-title", "HavaStil");
 
   await requireAuth({ role: null });
+  if (demoModuAktifMi()) { if (yukleniyor) yukleniyor.hidden = true; await havastilKur(kok, { bagimsiz: true, vitrin: true }); return; }   // vitrin: yetki RPC'si ve servis çalışanı yok
   let yetkili = false;
   try { const { data, error } = await supabase.rpc("havastil_yetkisi_var_mi"); yetkili = !error && data === true; } catch { yetkili = false; }
   if (yukleniyor) yukleniyor.hidden = true;
