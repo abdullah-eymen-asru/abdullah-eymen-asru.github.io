@@ -7,6 +7,9 @@
  *      Böylece sayfa kaç kez açılırsa açılsın kaynaklara ≈ 10 dk'da en çok bir tur istek gider (kota tasarrufu) ve yanıt hızlıdır.
  * 2) STİLİST (Mod B)   POST /stilist   → Groq (v3 "taktik stilist"). Girdi: sayılar + sabit kelimeler (enum) + katalog id'leri + gün içi KRİZ ANI (+ isteğe bağlı haberId); serbest metin YOK.
  *      Model genel tavsiye/selam vermez, arayüzün zaten söylediklerini tekrarlamaz; yalnızca kriz anı için 2 cümle yazar (çıktı sunucuda da 2 cümleye kırpılır).
+ * 2b) YEREL HABER      GET /yerel-haber?ulke=FR&sehir=Paris  → Seçilen konumun ülke kodu (ISO) + şehir adıyla Google News coğrafi beslemesine (hl/gl/ceid) dinamik sorgu;
+ *      yerel resmî meteoroloji terimi (Unwetterwarnung, Vigilance météo, Severe weather…) otomatik eklenir. Yalnızca resmî kurumlar ve Tier-1 ajanslar geçer
+ *      (kaynak adı/alan adı izin listesi); soru işaretli başlıklar elenir. 10 dk önbellek, kullanıcı başına hız sınırı. Koordinat gelmez, yalnızca ülke kodu + şehir adı.
  * 3) TEŞHİS            GET /tani        → oturum/yetki/Groq anahtarı/model adımlarını tek tek sınar (arayüzde "Bağlantıyı test et").
  * 4) SAĞLIK            GET /saglik
  *
@@ -270,6 +273,48 @@ async function haberBaslikBul(env, ctx, id) {
   return b.replace(/["“”]/g, "'");
 }
 
+
+/* ============================ YEREL (DİNAMİK) HABER ============================ */
+// ülke → [hl, yerel resmî hava uyarısı terimi]. Tablo dışı ülkeler İngilizce ("Severe weather warning") ile aranır.
+const ULKE_DIL = {
+  FR: ["fr", "Vigilance météo"], BE: ["fr", "Vigilance météo"], CH: ["de", "Unwetterwarnung"], DE: ["de", "Unwetterwarnung"], AT: ["de", "Unwetterwarnung"],
+  ES: ["es", "alerta meteorológica"], MX: ["es", "alerta meteorológica"], AR: ["es", "alerta meteorológica"], CL: ["es", "alerta meteorológica"], CO: ["es", "alerta meteorológica"],
+  IT: ["it", "allerta meteo"], PT: ["pt-PT", "aviso meteorológico"], BR: ["pt-BR", "alerta meteorológico"], NL: ["nl", "weeralarm code oranje"],
+  PL: ["pl", "ostrzeżenie meteorologiczne"], CZ: ["cs", "výstraha počasí"], SE: ["sv", "vädervarning"], NO: ["no", "farevarsel vær"], DK: ["da", "vejrvarsel"], FI: ["fi", "säävaroitus"],
+  GR: ["el", "έκτακτο δελτίο καιρού"], RU: ["ru", "метеопредупреждение"], UA: ["uk", "штормове попередження"], JP: ["ja", "気象警報"], KR: ["ko", "기상특보"], CN: ["zh-CN", "气象预警"],
+  GB: ["en", "Severe weather warning"], IE: ["en", "Severe weather warning"], US: ["en", "Severe weather"], CA: ["en", "Severe weather"], AU: ["en", "Severe weather warning"], NZ: ["en", "Severe weather warning"], IN: ["en", "Severe weather"],
+  SA: ["ar", "تحذير الطقس"], AE: ["ar", "تحذير الطقس"], EG: ["ar", "تحذير الطقس"],
+};
+const TIER1 = /reuters|associated press|(^|[^a-z])ap news|agence france|(^|[^a-z])afp([^a-z]|$)|bbc|deutsche welle|(^|[^a-z])dw([^a-z]|$)|france ?24|euronews|al jazeera|anadolu|tagesschau|zdf|ard([^a-z]|$)|le monde|le figaro|franceinfo|france ?info|rtl|ansa|rai news|efe|rtve|el pa[ií]s|nos([^a-z]|$)|nrk|svt|yle|npr|cbc|abc news|nhk|xinhua|kyodo|the guardian|sky news|met office|m[ée]t[ée]o-?france|vigilance|deutscher wetterdienst|(^|[^a-z])dwd|aemet|noaa|national weather service|bureau of meteorology|environment canada|meteoswiss|geosphere|knmi|smhi|jma|meteorolog|civil protection|protezione civile|protection civile|bundesamt|bevölkerungsschutz|gouv|government|gov\./i;
+const RESMI = /m[ée]t[ée]o-?france|vigilance|deutscher wetterdienst|(^|[^a-z])dwd|met office|aemet|noaa|national weather service|bureau of meteorology|environment canada|meteoswiss|geosphere|knmi|smhi|jma|meteorolog|civil protection|protezione civile|protection civile|gouv|government|gov\./i;
+const yerelOnbellek = new Map(), yerelHiz = new Map();
+
+async function yerelHaberCek(ulke, sehir) {
+  const [hl, terim] = ULKE_DIL[ulke] || ["en", "Severe weather warning"];
+  const q = `${sehir} ${terim} when:1d`;
+  const gl = ulke, dil = hl.split("-")[0];
+  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=${encodeURIComponent(hl)}&gl=${gl}&ceid=${gl}:${encodeURIComponent(dil)}`;
+  const kontrol = new AbortController(); const z = setTimeout(() => kontrol.abort(), 9000);
+  try {
+    const r = await fetch(url, { signal: kontrol.signal, headers: { "User-Agent": "Mozilla/5.0 (compatible; HavaStil/2.0)", Accept: "application/rss+xml, application/xml;q=0.9" }, cf: { cacheTtl: 300, cacheEverything: true } });
+    if (!r.ok) return { durum: `hata_${r.status}`, haberler: [] };
+    const xml = (await r.text()).slice(0, 1_500_000);
+    const haberler = [];
+    for (const m of [...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)].slice(0, 40)) {
+      const o = rssAyristir(`<item>${m[1]}</item>`)[0];
+      if (!o?.baslik || !o.yayin || /[?？]/.test(o.baslik)) continue;
+      const kaynakEtiket = m[1].match(/<source(?:\s+url="([^"]*)")?[^>]*>([\s\S]*?)<\/source>/i);
+      const kaynakAd = kaynakEtiket ? duzMetin(kaynakEtiket[2]).slice(0, 60) : "";
+      const kaynakUrl = kaynakEtiket?.[1] || "";
+      const imza = `${kaynakAd} ${kaynakUrl}`;
+      if (!TIER1.test(imza)) continue;                                   // yalnızca resmî kurum / Tier-1 ajans
+      const baslik = o.baslik.replace(new RegExp(`\\s+-\\s+${kaynakAd.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`), "").slice(0, 220);
+      haberler.push({ id: await sha12(`gn|${o.link || baslik}`), kaynak: "gnews", kaynakAd: kaynakAd || "Google News", tur: "ajans", resmi: RESMI.test(imza), baslik, ozet: "", link: o.link.startsWith("https://") ? o.link : "", yayin: o.yayin });
+    }
+    return { durum: "ok", haberler: haberler.sort((a, b) => b.yayin.localeCompare(a.yayin)).slice(0, 12), sorgu: { hl, gl, terim } };
+  } catch (h) { return { durum: h?.name === "AbortError" ? "zaman_asimi" : "ag_hatasi", haberler: [] }; } finally { clearTimeout(z); }
+}
+
 /* ============================ GROQ (Mod B) ============================ */
 const KALDIRILMIS = /^(llama-3\.1-8b-instant|llama-3\.3-70b-versatile|llama3-8b-8192|llama3-70b-8192|mixtral-8x7b-32768|gemma2-9b-it)$/;
 function modelZinciri(env) {
@@ -402,6 +447,22 @@ const ASIL_ISLEYICI = {
       if (!["tr", "dunya"].includes(havuz)) return json({ error: "havuz tr ya da dunya olmalı." }, 400, cors);
       if (hizSiniri(haberHiz, u.kim.uid, 40)) return json({ error: "Çok sık istek.", hiz: true }, 429, { ...cors, "Retry-After": "120" });
       return json(await havuzAl(env, ctx, havuz), 200, cors);
+    }
+
+    if (yol === "/yerel-haber" && istek.method === "GET") {
+      const u = await yetkiliKullanici(env, istek, cors);
+      if (u.yanit) return u.yanit;
+      const p = new URL(istek.url).searchParams;
+      const ulke = String(p.get("ulke") || "").toUpperCase(), sehir = String(p.get("sehir") || "").replace(/[\u0000-\u001f"<>]/g, " ").trim().slice(0, 60);
+      if (!/^[A-Z]{2}$/.test(ulke) || sehir.length < 2) return json({ error: "ulke (ISO-2) ve sehir gerekli." }, 400, cors);
+      if (ulke === "TR") return json({ haberler: [], not: "Türkiye için /haberler havuzu kullanılır." }, 200, cors);
+      if (hizSiniri(yerelHiz, u.kim.uid, 30)) return json({ error: "Çok sık istek.", hiz: true }, 429, { ...cors, "Retry-After": "120" });
+      const anahtar = `${ulke}|${sehir.toLowerCase()}`;
+      const o = yerelOnbellek.get(anahtar);
+      if (o && Date.now() - o.t < 10 * 60 * 1000) return json({ ...o.veri, onbellek: true }, 200, cors);
+      const veri = await yerelHaberCek(ulke, sehir);
+      if (veri.durum === "ok") { if (yerelOnbellek.size > 300) yerelOnbellek.clear(); yerelOnbellek.set(anahtar, { t: Date.now(), veri }); }
+      return json(veri, 200, cors);
     }
 
     if (yol === "/tani" && istek.method === "GET") {
