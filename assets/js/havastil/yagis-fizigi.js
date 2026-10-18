@@ -32,11 +32,11 @@ export const YAGIS_SEVIYELERI = [
 ];
 
 export const CAPE_BANTLARI = [
-  { alt: 0, ust: 100, skor: 0, ad: "Kararlı", sinif: "d1", aciklama: "Atmosfer kararlı; yükselen hava hareketi yok denecek kadar az." },
-  { alt: 100, ust: 1000, skor: 1, ad: "Zayıf kararsızlık", sinif: "d2", aciklama: "Gök gürültüsü ihtimali düşük; yerel, kısa süreli sağanak çıkabilir." },
-  { alt: 1000, ust: 2500, skor: 2, ad: "Orta kararsızlık", sinif: "d3", aciklama: "Gök gürültülü sağanak ve dolu için uygun ortam; ani yağış beklenir." },
-  { alt: 2500, ust: 4000, skor: 3, ad: "Güçlü kararsızlık", sinif: "d4", aciklama: "Şiddetli fırtına, iri dolu ve ani rüzgâr hamlesi potansiyeli." },
-  { alt: 4000, ust: Infinity, skor: 4, ad: "Aşırı kararsızlık", sinif: "d5", aciklama: "Aşırı şiddetli konvektif fırtına potansiyeli; açıkta kalma." },
+  { alt: 0, ust: 100, skor: 0, ad: "Kararlı", oneri: "Önlem gerekmez.", sinif: "d1", aciklama: "Atmosfer kararlı; yükselen hava hareketi yok denecek kadar az." },
+  { alt: 100, ust: 1000, skor: 1, ad: "Zayıf kararsızlık", oneri: "Uzun süre açıkta kalacaksan hafif bir kabuk yanında olsun.", sinif: "d2", aciklama: "Gök gürültüsü ihtimali düşük; yerel, kısa süreli sağanak çıkabilir." },
+  { alt: 1000, ust: 2500, skor: 2, ad: "Orta kararsızlık", oneri: "Su geçirmez kabuk ve kapüşon hazır olsun; fırtına anında ağaç altında durma.", sinif: "d3", aciklama: "Gök gürültülü sağanak ve dolu için uygun ortam; ani yağış beklenir." },
+  { alt: 2500, ust: 4000, skor: 3, ad: "Güçlü kararsızlık", oneri: "Açık alan ve yüksek yerlerden uzak dur; zorunlu değilse uzun süre dışarıda kalma.", sinif: "d4", aciklama: "Şiddetli fırtına, iri dolu ve ani rüzgâr hamlesi potansiyeli." },
+  { alt: 4000, ust: Infinity, skor: 4, ad: "Aşırı kararsızlık", oneri: "Dışarıdaki planları ertele; kapalı ve sağlam bir yerde kal.", sinif: "d5", aciklama: "Aşırı şiddetli konvektif fırtına potansiyeli; açıkta kalma." },
 ];
 
 const sayi = (x) => (Number.isFinite(x) ? x : 0);
@@ -82,6 +82,29 @@ export function suMiktari(mm) {
 }
 const ayakkabiBenzetme = (mm) => (mm < 0.5 ? "bez ayakkabı bile zor ıslanır" : mm < 2 ? "bez ayakkabı çeker, su itici taban yeter" : "bez ayakkabı kesin ıslanır");
 
+/* ------------------------------ PoP = Güven × Kapsam ------------------------------ */
+/**
+ * Open-Meteo yalnızca PoP verir. NWS tanımı: PoP = Güven (C) × Kapsam (A). Burada
+ *   Güven  = yağışı gören model oranı (veri.js › uyumEkle: ana tahmin + ECMWF + ICON + GFS),
+ *   Kapsam = PoP ÷ Güven (bölgenin yağışı alacak kısmı; en fazla %100).
+ * Güven < PoP çıkarsa güven PoP'a yükseltilir (C × A = PoP korunur) ve sonuç "tahmini" işaretlenir. Model verisi yoksa ayrıştırma yapılmaz.
+ */
+export function popAyristir(pop, uyum) {
+  const P = Math.max(0, Math.min(100, Math.round(sayi(pop))));
+  if (uyum == null || !Number.isFinite(uyum)) return { pop: P, guven: null, kapsam: null, tahmini: false };
+  let C = Math.round(uyum * 100), tahmini = false;
+  if (C < P) { C = P; tahmini = true; }
+  return { pop: P, guven: C, kapsam: C > 0 ? Math.round((P / C) * 100) : 0, tahmini };
+}
+export function popYorumu({ pop, guven, kapsam }) {
+  if (pop < 10) return "Yağış beklenmiyor.";
+  if (guven == null) return `Yağış olasılığı %${pop}; model uyumu verisi bu saat için yok, ayrıştırılamadı.`;
+  if (guven >= 75 && kapsam >= 75) return "Modeller hemfikir ve yağış geniş alanı kaplıyor: yağış neredeyse kesin.";
+  if (guven >= 75) return "Modeller yağışta hemfikir ama yağış dağınık/yerel hücreler hâlinde: bazı yerlere düşer, bazılarına düşmez.";
+  if (kapsam >= 75) return "Yağış olursa geniş alana yayılır ama modeller kararsız: olup olmayacağı belirsiz.";
+  return "Modeller kararsız ve yağış yerel kalacak: düşük ihtimalli, dağınık yağış.";
+}
+
 /* ------------------------------ tek saat ------------------------------ */
 /** @param {{yagisOlasi?:number,yagis?:number,yagmur?:number,saganak?:number,cape?:number,hamle?:number,kod?:number,kar?:number}} x */
 export function saatAnaliz(x) {
@@ -111,7 +134,7 @@ export function saatAnaliz(x) {
   else if ((pop >= 30 && mm >= 0.05) || mm >= 0.2) seviye = 1;
   else seviye = 0;
 
-  return { mm, pop, E, cape, hamle, saganak, yagmur, kar, kod, tur, seviye, surpriz, firtina, zararsiz, karli, capeSkor: capeSeviye(cape).skor };
+  return { mm, pop, E, cape, hamle, saganak, yagmur, kar, kod, tur, seviye, surpriz, firtina, zararsiz, karli, capeSkor: capeSeviye(cape).skor, ...popAyristir(pop, x.uyum) };
 }
 
 /* ------------------------------ pencere (bugün kalan / yarın) ------------------------------ */
@@ -292,4 +315,12 @@ export function krizSatiri(k, parcalar = {}) {
     default:
       return "Gün içinde belirgin bir kriz anı görünmüyor.";
   }
+}
+
+/* ------------------------------ gün bazlı (Derin analiz gün seçicisi) ------------------------------ */
+/** veri.js › tumSaatler → [{ tarih, saatler, fizik }]; her gün 24 saat üzerinden aynı motorla analiz edilir. */
+export function gunAnalizleri(tumSaatler, { canta = "el" } = {}) {
+  const gruplar = new Map();
+  for (const x of tumSaatler || []) { const t = x.t.slice(0, 10); if (!gruplar.has(t)) gruplar.set(t, []); gruplar.get(t).push(x); }
+  return [...gruplar].map(([tarih, saatler]) => ({ tarih, saatler, fizik: yagisMotoru(saatler, { gun: "bugün", canta }) }));
 }
