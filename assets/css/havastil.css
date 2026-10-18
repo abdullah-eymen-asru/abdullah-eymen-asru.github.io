@@ -198,3 +198,113 @@
 /* bağımsız PWA sayfası */
 .hv-sayfa { padding: .75rem .75rem 2rem; }
 .hv-sayfa h1 { font-size: 1.25rem; margin: 0 0 .75rem; }
+
+/* =====================================================================================================
+   HavaStil v3 — Bugün (sade) + Derin analiz (uzman). Renk durumu: sakin = yeşil · dikkat = sarı · tehlike = kırmızı.
+   ===================================================================================================== */
+.hv { --hv-s0: var(--hv-yesil); --hv-s1: #7fbf6a; --hv-s2: var(--hv-mavi); --hv-s3: var(--hv-kirmizi); }
+
+/* gün içi katman planı: satır içi birleşme hatası düzeltildi */
+.hv-zaman-metin { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
+
+/* --- hüküm kartı --- */
+.hv-hukumkart { gap: .55rem; border-left: 6px solid var(--hv-yesil); }
+.hv-hukumkart.ton-dikkat { border-left-color: var(--hv-sari); background: linear-gradient(135deg, rgba(224, 169, 59, .12), transparent 70%), var(--hv-yuzey); }
+.hv-hukumkart.ton-tehlike { border-left-color: var(--hv-kirmizi); background: linear-gradient(135deg, rgba(229, 88, 74, .14), transparent 70%), var(--hv-yuzey); }
+.hv-hukum-ust { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+.hv-hukum-simdi { font-size: .85rem; color: var(--muted); }
+.hv-hukum-baslik { margin: 0; font-size: clamp(1.3rem, 4.6vw, 1.7rem); font-weight: 780; line-height: 1.22; letter-spacing: -.01em; }
+.hv-hukum-alt { margin: 0; font-size: .95rem; line-height: 1.5; }
+
+/* --- 4 kademeli yağış çubuğu --- */
+.hv-olcer-kutu { display: flex; flex-direction: column; gap: .3rem; margin-top: .2rem; }
+.hv-olcer { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .3rem; }
+.hv-olcer-hucre { display: flex; flex-direction: column; gap: .25rem; align-items: stretch; }
+.hv-olcer-blok { display: block; height: .7rem; border-radius: 999px; background: var(--bg); border: 1px solid var(--hv-cizgi); }
+.hv-olcer-hucre.dolu .hv-olcer-blok { border-color: transparent; opacity: .55; }
+.hv-olcer-hucre.aktif .hv-olcer-blok { opacity: 1; height: .95rem; margin-top: -.12rem; }
+.hv-olcer-hucre.s0.dolu .hv-olcer-blok { background: var(--hv-s0); } .hv-olcer-hucre.s1.dolu .hv-olcer-blok { background: var(--hv-s1); }
+.hv-olcer-hucre.s2.dolu .hv-olcer-blok { background: var(--hv-s2); } .hv-olcer-hucre.s3.dolu .hv-olcer-blok { background: var(--hv-s3); }
+.hv-olcer-ad { font-size: .72rem; color: var(--muted); text-align: center; }
+.hv-olcer-hucre.aktif .hv-olcer-ad { color: var(--text); font-weight: 700; }
+.hv-olcer-yazi { margin: 0; font-size: .86rem; }
+
+/* --- Bugünün Zırhı --- */
+.hv-zirh { gap: .8rem; }
+.hv-katmanlar { display: flex; flex-direction: column; }
+.hv-katman { position: relative; display: flex; flex-direction: column; gap: .1rem; padding: .55rem 0 .55rem 1rem; border-left: 4px solid var(--accent); }
+.hv-katman.k0 { border-left-color: rgba(74, 163, 255, .35); } .hv-katman.k1 { border-left-color: rgba(74, 163, 255, .65); } .hv-katman.k2 { border-left-color: var(--accent); }
+.hv-katman.bos { opacity: .55; }
+.hv-katman-rol { font-size: .76rem; color: var(--muted); }
+.hv-katman-ad { font-size: 1.02rem; }
+.hv-zirh-iki { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; padding-top: .6rem; border-top: 1px solid var(--hv-cizgi); }
+.hv-zirh-blok { display: flex; flex-direction: column; gap: .3rem; min-width: 0; }
+.hv-zirh-baslik { font-size: .76rem; color: var(--muted); }
+.hv-zirh-zemin, .hv-zirh-renk { margin: 0; font-size: .86rem; line-height: 1.5; }
+.hv-zirh-renk { color: var(--muted); }
+
+/* --- gün içi kritik an --- */
+.hv-kriz.var { border-color: var(--hv-sari); }
+.hv-kriz-metin { margin: 0; font-size: 1.02rem; font-weight: 600; line-height: 1.5; }
+
+/* --- saatlik akış --- */
+.hv-saat-seviye { display: block; width: 70%; height: .3rem; border-radius: 999px; background: var(--hv-cizgi); }
+.hv-saat-seviye.s1 { background: var(--hv-s1); } .hv-saat-seviye.s2 { background: var(--hv-s2); } .hv-saat-seviye.s3 { background: var(--hv-s3); }
+.hv-hamle { color: var(--hv-kirmizi) !important; font-weight: 700; }
+
+/* --- plan kutusu (kapalı <details>) --- */
+.hv-plan > summary { cursor: pointer; display: flex; flex-direction: column; gap: .1rem; list-style: none; }
+.hv-plan > summary::-webkit-details-marker { display: none; }
+.hv-plan-baslik { font-weight: 700; font-size: .92rem; }
+.hv-plan[open] > summary { margin-bottom: .5rem; }
+
+/* --- 10 gün yağış etiketi --- */
+.hv-yagis-etiket { font-weight: 700; }
+.hv-yagis-etiket.s2 { color: var(--hv-mavi) !important; } .hv-yagis-etiket.s3 { color: var(--hv-kirmizi) !important; }
+
+/* --- Derin analiz --- */
+.hv-uzman-giris { margin: 0; font-size: .88rem; color: var(--muted); line-height: 1.5; }
+.hv-uzman-kart { gap: .7rem; }
+.hv-uzman-not { margin: 0; font-size: .88rem; line-height: 1.5; }
+.hv-buyuk-deger { display: flex; align-items: baseline; flex-wrap: wrap; gap: .3rem .5rem; }
+.hv-buyuk-deger strong { font-size: 2.4rem; line-height: 1; letter-spacing: -.02em; } .hv-buyuk-deger span:not(.hv-rozet) { color: var(--muted); }
+.hv-skala { display: flex; flex-direction: column; gap: .2rem; }
+.hv-skala-seritler { position: relative; display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; }
+.hv-skala-bant { display: block; height: .8rem; border-radius: 4px; opacity: .45; }
+.hv-skala-bant.aktif { opacity: 1; }
+.hv-skala-bant.d1 { background: var(--hv-yesil); } .hv-skala-bant.d2 { background: #b7c93f; } .hv-skala-bant.d3 { background: var(--hv-sari); } .hv-skala-bant.d4 { background: #e0802d; } .hv-skala-bant.d5 { background: var(--hv-kirmizi); }
+.hv-skala-isaret { position: absolute; top: -.3rem; bottom: -.3rem; width: 3px; margin-left: -1.5px; border-radius: 2px; background: var(--text); }
+.hv-skala-etiketler { display: grid; grid-template-columns: repeat(5, 1fr); } .hv-skala-etiketler small { font-size: .68rem; color: var(--muted); }
+.hv-cape-seridi { display: flex; align-items: flex-end; gap: 2px; height: 3rem; }
+.hv-cape-cubuk { flex: 1 1 0; border-radius: 2px 2px 0 0; min-height: 4px; }
+.hv-cape-cubuk.d1 { background: var(--hv-yesil); } .hv-cape-cubuk.d2 { background: #b7c93f; } .hv-cape-cubuk.d3 { background: var(--hv-sari); } .hv-cape-cubuk.d4 { background: #e0802d; } .hv-cape-cubuk.d5 { background: var(--hv-kirmizi); }
+.hv-pay-kutu { display: flex; flex-direction: column; gap: .4rem; }
+.hv-pay { height: .9rem; border-radius: 999px; background: var(--hv-mavi); overflow: hidden; border: 1px solid var(--hv-cizgi); }
+.hv-pay-konv { display: block; height: 100%; background: var(--hv-sari); }
+.hv-pay-yazi { display: flex; flex-direction: column; gap: .15rem; font-size: .84rem; }
+.hv-formul { display: flex; align-items: center; justify-content: space-between; gap: .4rem; flex-wrap: wrap; }
+.hv-formul > div { display: flex; flex-direction: column; padding: .5rem .7rem; border: 1px solid var(--hv-cizgi); border-radius: 14px; background: var(--bg); min-width: 0; }
+.hv-formul > div.vurgu { border-color: var(--accent); }
+.hv-formul small { font-size: .7rem; color: var(--muted); } .hv-formul strong { font-size: 1.2rem; }
+.hv-formul-isaret { font-size: 1.2rem; color: var(--muted); }
+.hv-kurallar { display: flex; flex-direction: column; gap: .5rem; }
+.hv-kural { display: flex; flex-direction: column; gap: .2rem; padding: .6rem .75rem; border: 1px solid var(--hv-cizgi); border-radius: 14px; background: var(--bg); }
+.hv-kural.tetik { border-color: var(--hv-sari); }
+.hv-kural-ust { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.hv-kural small { font-size: .8rem; line-height: 1.4; }
+
+/* 48 saat matrisi */
+.hv-matris-kaydir { overflow-x: auto; border: 1px solid var(--hv-cizgi); border-radius: 14px; }
+.hv-matris { width: 100%; min-width: 34rem; border-collapse: collapse; font-size: .8rem; font-variant-numeric: tabular-nums; }
+.hv-matris th, .hv-matris td { padding: .4rem .55rem; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--hv-cizgi); }
+.hv-matris thead th { position: sticky; top: 0; background: var(--hv-yuzey); font-size: .72rem; color: var(--muted); font-weight: 650; }
+.hv-matris tbody th[scope="row"] { font-weight: 700; }
+.hv-matris .hv-matris-gun th { background: var(--bg); font-size: .78rem; }
+.hv-matris tr.s1 { box-shadow: inset 4px 0 0 var(--hv-s1); } .hv-matris tr.s2 { box-shadow: inset 4px 0 0 var(--hv-s2); background: rgba(74, 163, 255, .07); }
+.hv-matris tr.s3 { box-shadow: inset 4px 0 0 var(--hv-s3); background: rgba(229, 88, 74, .09); }
+.hv-matris .sessiz { color: var(--muted); }
+.hv-matris .hamle-yuksek { color: var(--hv-kirmizi); font-weight: 700; }
+.hv-matris td.cape.d3 { color: var(--hv-sari); font-weight: 700; } .hv-matris td.cape.d4, .hv-matris td.cape.d5 { color: var(--hv-kirmizi); font-weight: 700; }
+.hv-matris-kaydir:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (max-width: 640px) { .hv-zirh-iki { grid-template-columns: minmax(0, 1fr); } .hv-hukum-baslik { font-size: 1.3rem; } }
