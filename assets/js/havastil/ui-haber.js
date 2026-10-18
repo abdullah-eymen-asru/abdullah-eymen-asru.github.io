@@ -7,6 +7,7 @@ import { el, rozet, etiket, ipucu, kart, bolumBasligi, olay, isoZamanOnce, zaman
 import { seviyeAdi } from "./taktik.js";
 
 const HATA_METNI = {
+  vitrin: "Vitrin modunda haber akışı kapalıdır (Cloudflare Worker kotası korunur). Üye hesaplarında burada güncel resmî uyarılar listelenir.",
   worker_kapali: "Haber servisi şu an kapalı (kota koruması). Hava ve giyim önerisi etkilenmez.",
   yetkisiz: "Haber servisine erişim yetkin yok.",
   oturum_yok: "Oturum bulunamadı; haber kontrolü yapılamadı.",
@@ -24,6 +25,7 @@ function kapsamMetni(u) {
 export function haberSekmesi(d, kb) {
   const h = d.haber;
   const yenile = olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "↻ Yenile" }), "click", () => kb.haberYenile(true));
+  if (d.vitrin) return el("div", { class: "hv-sekme-govde" }, kart("", bolumBasligi("Resmî uyarılar"), ipucu(HATA_METNI.vitrin)));
   if (!d.haberAcik) return el("div", { class: "hv-sekme-govde" }, kart("", bolumBasligi("Resmî uyarılar"), ipucu("Haber doğrulama kapalı. Ayarlar'dan açabilirsin; açmak konumunu sunucuya göndermez.")));
   if (!h) return el("div", { class: "hv-sekme-govde" }, kart("", bolumBasligi("Resmî uyarılar", yenile), ipucu("🛰️ Haberler kontrol ediliyor…")));
   if (h.durum !== "ok" && h.durum !== "temiz") return el("div", { class: "hv-sekme-govde" }, kart("", bolumBasligi("Resmî uyarılar", yenile), ipucu(HATA_METNI[h.durum] || "Haberler kontrol edilemedi.")));
@@ -55,7 +57,7 @@ export function haberSekmesi(d, kb) {
   });
 
   const notlar = el("div", { class: "hv-kucuk-not" },
-    h.havuz === "dunya" ? ipucu("🌍 Türkiye dışı konumlarda yalnızca büyük hava olayları (BBC, Al Jazeera, DW vb. uluslararası kaynaklardan) görünür; yerel uyarılar için ulusal meteoroloji kurumuna bak.") : null,
+    h.havuz === "dunya" ? ipucu("🌍 Türkiye dışı konumlarda uluslararası kaynaklar (BBC, Al Jazeera, DW…) ve seçtiğin yerin ülkesine/şehrine göre dinamik yerel haber taraması (Google News, yerel resmî terimlerle) birlikte kullanılır; yalnızca resmî kurum ve büyük ajanslar süzgeçten geçer.") : null,
     d.konum.gps && !d.konum.ulke && !d.konum.il ? ipucu("Cihaz konumunun ilini/şehrini bulamadım; haber eşleştirmesi için üstteki arama kutusundan şehri seç.") : null,
     ipucu("Burada yalnızca BUGÜNÜ ilgilendiren, bulunduğun yeri anan ve giyimi etkileyen haberler gösterilir. Soru işaretli/sansasyonel başlıklar ve eski ya da gelecek günlere ait haberler otomatik ayıklanır. Konumun hiçbir sunucuya gönderilmez."));
   return el("div", { class: "hv-sekme-govde" }, ust, ...kartlar, notlar);
