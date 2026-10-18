@@ -60,26 +60,27 @@ export function ayarSekmesi(d, kb) {
 
   /* ---------- 2) Yapay zekâ ---------- */
   const taniKutu = el("div", { class: "hv-tani" });
-  const aiKutu = el("input", { type: "checkbox", id: "hv-ai-modu2" }); aiKutu.checked = d.aiModu;
+  const aiKutu = el("input", { type: "checkbox", id: "hv-ai-modu2", disabled: d.vitrin }); aiKutu.checked = d.aiModu && !d.vitrin;
   olay(aiKutu, "change", () => kb.aiModu(aiKutu.checked));
-  const taniBtn = olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "🔧 Bağlantıyı test et" }), "click", async () => {
+  const taniBtn = olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "🔧 Bağlantıyı test et", disabled: d.vitrin }), "click", async () => {
     taniBtn.disabled = true; taniKutu.replaceChildren(ipucu("Test ediliyor…"));
     const r = await kb.tani();
     taniBtn.disabled = false;
     doldur(taniKutu, ...(r.adimlar || []).map((a) => el("div", { class: `hv-tani-satir ${a.ok ? "ok" : "hata"}` }, el("span", { text: a.ok ? "✅" : "❌" }), el("div", {}, el("strong", { text: a.ad }), el("small", { class: "hv-ipucu", text: a.ayrinti })))), r.hata ? el("p", { class: "hv-uyari", text: r.hata }) : null);
   });
   const aiKart = kart("", bolumBasligi("✨ Yapay zekâ yorumu"),
-    el("label", { class: "hv-onay", for: "hv-ai-modu2" }, aiKutu, el("span", { text: "Yapay zekâ destekli kısa yorum (Groq)" })),
+    el("label", { class: "hv-onay", for: "hv-ai-modu2" }, aiKutu, el("span", { text: d.vitrin ? "Yapay zekâ destekli kısa yorum (Groq) — vitrin modunda kilitli 🔒" : "Yapay zekâ destekli kısa yorum (Groq)" })),
+    d.vitrin ? el("p", { class: "hv-uyari", text: "Vitrin/demo hesaplarında Mod B (Groq Worker) kesinlikle tetiklenmez; Cloudflare Worker ve Groq kotası korunur. Yalnızca ücretsiz kural tabanlı (Mod A) stilist cümlesi gösterilir." }) : null,
     ipucu("Kapalıyken (varsayılan) hiçbir yapay zekâ isteği yapılmaz; kombin kararını zaten yerel CLO motoru verir. Açıkken yalnızca sıcaklık/rüzgâr gibi sayılar, kıyafet parçaları ve (varsa) doğrulanmış bir haber başlığı gönderilir; konum gönderilmez."),
     taniBtn, taniKutu);
 
   /* ---------- 3) Bulut ---------- */
-  const bulutKutu = el("input", { type: "checkbox", id: "hv-bulut" }); bulutKutu.checked = d.bulut;
+  const bulutKutu = el("input", { type: "checkbox", id: "hv-bulut", disabled: d.vitrin }); bulutKutu.checked = d.bulut;
   const bulutDurum = el("p", { class: "hv-ipucu", id: "hv-bulut-durum" });
   olay(bulutKutu, "change", async () => { bulutDurum.textContent = ""; const m = await kb.bulutDegis(bulutKutu.checked); if (m) bulutDurum.textContent = m; bulutKutu.checked = d.bulut; });
   const bulutKart = kart("", bolumBasligi("☁️ Cihazlar arası senkron"),
     el("label", { class: "hv-onay", for: "hv-bulut" }, bulutKutu, el("span", { text: "Kayıtlı konumlarımı ve tercihlerimi hesabımda sakla" })),
-    ipucu("Varsayılan KAPALI. Açarsan yalnızca ⭐ ile kaydettiğin konumlar (≈100 m'ye yuvarlanmış) ve tercihlerin hesabında tutulur; anlık GPS konumun ve aramaların asla kaydedilmez."), bulutDurum);
+    ipucu(d.vitrin ? "Vitrin modunda hesap senkronu ve konum kaydetme kapalıdır." : "Varsayılan KAPALI. Açarsan yalnızca ⭐ ile kaydettiğin konumlar (adı ve koordinatı, yuvarlanmadan) ve tercihlerin hesabında tutulur; anlık GPS konumun ve aramaların asla kaydedilmez."), bulutDurum);
 
   /* ---------- 4) Haber doğrulama anahtarı ---------- */
   const haberKutu = el("input", { type: "checkbox", id: "hv-haber-acik" }); haberKutu.checked = d.haberAcik;
@@ -93,7 +94,7 @@ export function ayarSekmesi(d, kb) {
     el("p", { class: "hv-gizlilik-amac", text: "HavaStil'in tek amacı hava durumu ve günlük CLO (giysi yalıtımı) hesabıyla bugün ne giyeceğine karar vermene yardım etmektir. Konum toplamak amaç değildir; aşağıdaki her konum özelliği isteğe bağlıdır ve kapalı kalabilir." }),
     opsiyonel("📍", "Cihaz konumu (GPS)", "Kullanmazsan şehir adı yazman yeterli. Koordinat yalnızca hava servisine (Open-Meteo) gider; site sunucusuna ve hesabına kaydedilmez."),
     opsiyonel("⭐", "Konum kaydetme", "Kaydettiğin yerler varsayılan olarak yalnızca bu cihazda durur."),
-    opsiyonel("☁️", "Hesapta saklama", "Varsayılan kapalı. Açarsan yalnızca kaydettiğin konumlar ≈100 m'ye yuvarlanarak tutulur."),
+    opsiyonel("☁️", "Hesapta saklama", "Varsayılan kapalı. Açarsan yalnızca kaydettiğin konumlar (adı ve tam koordinatıyla) hesabında tutulur; kapatınca istersen silinir."),
     opsiyonel("📰", "Haber doğrulama", "Kapatılabilir. Konum sunucuya gönderilmez."),
     opsiyonel("✨", "Yapay zekâ yorumu", "Varsayılan kapalı. Açılırsa konum değil, yalnızca sayılar ve kıyafet bilgisi gider."),
     el("a", { class: "hv-baglanti", href: "/kurumsal/kvkk-aydinlatma-metni.html#havastil", text: "KVKK Aydınlatma Metni — HavaStil bölümü →" }));
