@@ -88,3 +88,13 @@ Amaç hava + CLO ile giyim kararıdır; **konum toplamak amaç değildir**. GPS,
 
 ## 9. Dosya haritası (`assets/js/havastil/`)
 `yagis-fizigi.js` (**yağış & fırtına motoru, PoP ayrıştırma, kriz anı**) · `tetikleyici.js` (**hangi veri hangi öneriyi tetikledi**) · `cekirdek.js` (CLO motoru) · `katalog.js` (parçalar) · `veri.js` (hava/geocoding; rain, showers, cape, ozon) · `hava-kodlari.js` · `iller.js` · `haber-filtre.js` · `taktik.js` · `haber.js` · `izin-yardim.js` · `bildirim.js` · `konumlar.js` · `bulut.js` · `ui-temel.js` · `ui-konum.js` · `ui-sade.js` (**Bugün**) · `ui-uzman.js` (**Derin analiz**) · `ui-kombin.js` (**tek Kombin sekmesi**) · `ui-hava.js` (10 gün) · `ui-haber.js` · `ui-ayar.js` · `arayuz.js` (kabuk) · `panel.js` / `sayfa.js` (girişler).
+
+## v4 — Meteoroloji, UX ve Veri Doğrulama revizyonu
+
+- **Kurulum:** Supabase'de `0101_havastil_dogrulama_vitrin.sql` çalıştır (numeric(9,6) koordinat, `yer_adi/mahalle/sokak`, UPDATE politikası, demo `havastil` bölümü). `havastil_worker/worker.js`'i yeniden deploy et (yeni uç: `GET /yerel-haber?ulke=FR&sehir=Paris`).
+- **Yeni sekmeler:** 🗓️ **Saatlik plan** (`ui-plan.js`, 14 güne kadar, saat saat, dokununca kombin tavsiyesi) ve 🔍 **Veri doğrulama** (`ui-lab.js`, herkese açık: ham Open-Meteo değerleri, ECMWF/ICON/GFS karşılaştırması, adım adım CLO formülü ve tetiklenen kurallar, haber doğrulaması). “10 gün” sekmesi artık **14 gün**.
+- **PoP = Güven × Kapsam:** PoP %5'in altındaysa ayrıştırma yapılmaz (“·”); model oyu PoP'tan düşükse hücre `*` ile “tahmini” işaretlenir. Efektif yağış ve CAPE halk diliyle (şiddet rozeti, 3 kademeli CAPE özeti) gösterilir.
+- **Konum:** koordinat artık yuvarlanmaz; kayıtlarda **konum ismi** (etiket) ve ✏️ düzenle (isim, simge, yeni aramayla koordinat; bulutta UPDATE). Serbest metin ve Ülke → Şehir → İlçe → Mahalle/Cadde araması (Nominatim, yedek Photon); rakım hava yanıtından gelir.
+- **Haber (Türkiye dışı):** Worker, ülke kodu + şehir adıyla Google News coğrafi beslemesini (`hl/gl/ceid`) yerel resmî terimle sorgular; yalnızca resmî kurum/Tier-1 ajans ve soru işaretsiz başlıklar geçer.
+- **Vitrin (demo/misafir):** konum her zaman İstanbul; “Konumu kaydet/düzenle”, hesap senkronu, haber Worker'ı ve **Mod B (Groq)** kapalı, yalnızca Mod A. Demo menüsü `tool-havastil` → `demo_config.havastil.aktif`.
+- Yeni dosyalar: `ui-plan.js`, `ui-lab.js`.
