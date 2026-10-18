@@ -1,6 +1,6 @@
 /**
  * arayuz.js — HavaStil kabuğu (panel sekmesi VE bağımsız PWA sayfası aynı kodu kullanır).
- * v3 sekmeler: Bugün (sade, 3 saniye kuralı) · Derin analiz (uzman) · 10 gün · Uyarılar · Ayarlar.
+ * v3.1 sekmeler: Bugün (sade, 3 saniye kuralı) · Kombin (tek yer: katmanlar, tetikleyiciler, çanta, plan) · Derin analiz (uzman, gün seçicili) · 10 gün · Uyarılar · Ayarlar.
  * Akış: havaGetir (Open-Meteo, tarayıcıdan) → haberTaktigi (havuz, kısıtlar) → yagisMotoru (PoP × hacim, showers, CAPE, hamle)
  *       → degerlendir (CLO motoru, kısıtlarla) → krizAniBul (gün içi çelişki anı) → ekran.
  * Karar HER ZAMAN yerel motordan çıkar; yapay zekâ (isteğe bağlı) yalnızca "gün içi kritik an" için 2 cümlelik yorum ekler.
@@ -16,6 +16,7 @@ import { konumBileseni } from "./ui-konum.js";
 import { yagisMotoru, krizAniBul, krizSatiri } from "./yagis-fizigi.js";
 import { bugunSekmesi } from "./ui-sade.js";
 import { derinSekmesi } from "./ui-uzman.js";
+import { kombinSekmesi } from "./ui-kombin.js";
 import { gunlukSekmesi } from "./ui-hava.js";
 import { haberSekmesi } from "./ui-haber.js";
 import { ayarSekmesi } from "./ui-ayar.js";
@@ -26,8 +27,8 @@ import { birlestir, bulutKonumEkle, bulutKonumSil, bulutTumunuSil, bulutTercihOk
 export { HAVASTIL_WORKER_URL };
 const VARSAYILAN_KONUM = { id: "41.008,28.978", ad: "İstanbul", lat: 41.008, lon: 28.978, ulke: "TR", ulkeAd: "Türkiye", ulkeAdEn: "Turkey", admin1: "İstanbul", il: "İstanbul", ikon: "diger" };
 const LS = { tercih: "hv_tercih2", eskiTercih: "hv_tercih", bulut: "hv_bulut", aiModu: "hv_ai_modu", haberAcik: "hv_haber_acik", sekme: "hv_sekme", ai: "hv_ai3_" };
-const SEKMELER = [["bugun", "Bugün", "🏠"], ["derin", "Derin analiz", "🔬"], ["gunluk", "10 gün", "📅"], ["haber", "Uyarılar", "🛰️"], ["ayar", "Ayarlar", "⚙️"]];
-const ESKI_SEKME = { ozet: "bugun", saatlik: "derin", kombin: "bugun" };      // v2'de kaydedilmiş sekme adları
+const SEKMELER = [["bugun", "Bugün", "🏠"], ["kombin", "Kombin", "🧥"], ["derin", "Derin analiz", "🔬"], ["gunluk", "10 gün", "📅"], ["haber", "Uyarılar", "🛰️"], ["ayar", "Ayarlar", "⚙️"]];
+const ESKI_SEKME = { ozet: "bugun", saatlik: "derin" };      // v2'de kaydedilmiş sekme adları
 const HAVA_TTL_MS = 30 * 60 * 1000, HABER_TTL_MS = 15 * 60 * 1000;
 
 function tercihOku() {
@@ -42,7 +43,7 @@ export async function havastilKur(kok, { bagimsiz = false } = {}) {
     aiModu: lsOku(LS.aiModu, false) === true, ai: { metin: "", etiket: "", hata: "" }, bulut: lsOku(LS.bulut, false) === true,
     haberAcik: lsOku(LS.haberAcik, true) !== false, hava: null, sonuc: null, haber: null, kombinNo: 0,
     sekme: SEKMELER.some(([id]) => id === kayitliSekme) ? kayitliSekme : "bugun",
-    fizik: null, kriz: null, planAcik: false,
+    fizik: null, kriz: null, planAcik: false, derinGun: 0,
     yenilemeNo: 0, haberNo: 0,
   };
   const kb = {};
@@ -63,7 +64,7 @@ export async function havastilKur(kok, { bagimsiz = false } = {}) {
       return olay(b, "click", () => kb.sekmeGit(id));
     }));
   }
-  const CIZICI = { bugun: bugunSekmesi, derin: derinSekmesi, gunluk: gunlukSekmesi, haber: haberSekmesi, ayar: ayarSekmesi };
+  const CIZICI = { bugun: bugunSekmesi, kombin: kombinSekmesi, derin: derinSekmesi, gunluk: gunlukSekmesi, haber: haberSekmesi, ayar: ayarSekmesi };
   function ciz() {
     sekmeBarCiz();
     try { icerik.replaceChildren(CIZICI[d.sekme](d, kb)); }
