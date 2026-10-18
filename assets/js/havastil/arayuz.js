@@ -1,8 +1,9 @@
 /**
  * arayuz.js — HavaStil kabuğu (panel sekmesi VE bağımsız PWA sayfası aynı kodu kullanır).
- * Sekmeler: Özet · Saatlik · 10 Gün · Kombin · Uyarılar · Ayarlar.
- * Akış: havaGetir (Open-Meteo, tarayıcıdan) → haberTaktigi (havuz, kısıtlar) → degerlendir (CLO motoru, kısıtlarla) → ekran.
- * Karar HER ZAMAN yerel motordan çıkar; yapay zekâ (isteğe bağlı) yalnızca kısa yorum ekler.
+ * v3 sekmeler: Bugün (sade, 3 saniye kuralı) · Derin analiz (uzman) · 10 gün · Uyarılar · Ayarlar.
+ * Akış: havaGetir (Open-Meteo, tarayıcıdan) → haberTaktigi (havuz, kısıtlar) → yagisMotoru (PoP × hacim, showers, CAPE, hamle)
+ *       → degerlendir (CLO motoru, kısıtlarla) → krizAniBul (gün içi çelişki anı) → ekran.
+ * Karar HER ZAMAN yerel motordan çıkar; yapay zekâ (isteğe bağlı) yalnızca "gün içi kritik an" için 2 cümlelik yorum ekler.
  */
 import { supabase } from "../core/supabase-client.js";
 import { degerlendir, SENARYOLAR, STIL_SECENEKLERI, CANTA_SECENEKLERI } from "./cekirdek.js";
@@ -12,8 +13,10 @@ import { KURALLAR } from "./taktik.js";
 import { havaKodu } from "./hava-kodlari.js";
 import { el, lsOku, lsYaz, olay, gec } from "./ui-temel.js";
 import { konumBileseni } from "./ui-konum.js";
-import { ozetSekmesi, saatlikSekmesi, gunlukSekmesi } from "./ui-hava.js";
-import { kombinSekmesi } from "./ui-kombin.js";
+import { yagisMotoru, krizAniBul, krizSatiri } from "./yagis-fizigi.js";
+import { bugunSekmesi } from "./ui-sade.js";
+import { derinSekmesi } from "./ui-uzman.js";
+import { gunlukSekmesi } from "./ui-hava.js";
 import { haberSekmesi } from "./ui-haber.js";
 import { ayarSekmesi } from "./ui-ayar.js";
 import { zamanlayiciBaslat } from "./bildirim.js";
@@ -22,8 +25,9 @@ import { birlestir, bulutKonumEkle, bulutKonumSil, bulutTumunuSil, bulutTercihOk
 
 export { HAVASTIL_WORKER_URL };
 const VARSAYILAN_KONUM = { id: "41.008,28.978", ad: "İstanbul", lat: 41.008, lon: 28.978, ulke: "TR", ulkeAd: "Türkiye", ulkeAdEn: "Turkey", admin1: "İstanbul", il: "İstanbul", ikon: "diger" };
-const LS = { tercih: "hv_tercih2", eskiTercih: "hv_tercih", bulut: "hv_bulut", aiModu: "hv_ai_modu", haberAcik: "hv_haber_acik", sekme: "hv_sekme", ai: "hv_ai2_" };
-const SEKMELER = [["ozet", "Özet", "🏠"], ["saatlik", "Saatlik", "🕒"], ["gunluk", "10 Gün", "📅"], ["kombin", "Kombin", "🧥"], ["haber", "Uyarılar", "🛰️"], ["ayar", "Ayarlar", "⚙️"]];
+const LS = { tercih: "hv_tercih2", eskiTercih: "hv_tercih", bulut: "hv_bulut", aiModu: "hv_ai_modu", haberAcik: "hv_haber_acik", sekme: "hv_sekme", ai: "hv_ai3_" };
+const SEKMELER = [["bugun", "Bugün", "🏠"], ["derin", "Derin analiz", "🔬"], ["gunluk", "10 gün", "📅"], ["haber", "Uyarılar", "🛰️"], ["ayar", "Ayarlar", "⚙️"]];
+const ESKI_SEKME = { ozet: "bugun", saatlik: "derin", kombin: "bugun" };      // v2'de kaydedilmiş sekme adları
 const HAVA_TTL_MS = 30 * 60 * 1000, HABER_TTL_MS = 15 * 60 * 1000;
 
 function tercihOku() {
@@ -32,11 +36,13 @@ function tercihOku() {
 }
 
 export async function havastilKur(kok, { bagimsiz = false } = {}) {
+  const kayitliSekme = ESKI_SEKME[lsOku(LS.sekme, "bugun")] || lsOku(LS.sekme, "bugun");
   const d = {
     konum: K.aktifOku(VARSAYILAN_KONUM), konumlar: K.listeyiOku(), tercih: tercihOku(),
     aiModu: lsOku(LS.aiModu, false) === true, ai: { metin: "", etiket: "", hata: "" }, bulut: lsOku(LS.bulut, false) === true,
     haberAcik: lsOku(LS.haberAcik, true) !== false, hava: null, sonuc: null, haber: null, kombinNo: 0,
-    sekme: SEKMELER.some(([id]) => id === lsOku(LS.sekme, "ozet")) ? lsOku(LS.sekme, "ozet") : "ozet",
+    sekme: SEKMELER.some(([id]) => id === kayitliSekme) ? kayitliSekme : "bugun",
+    fizik: null, kriz: null, planAcik: false,
     yenilemeNo: 0, haberNo: 0,
   };
   const kb = {};
@@ -57,7 +63,7 @@ export async function havastilKur(kok, { bagimsiz = false } = {}) {
       return olay(b, "click", () => kb.sekmeGit(id));
     }));
   }
-  const CIZICI = { ozet: ozetSekmesi, saatlik: saatlikSekmesi, gunluk: gunlukSekmesi, kombin: kombinSekmesi, haber: haberSekmesi, ayar: ayarSekmesi };
+  const CIZICI = { bugun: bugunSekmesi, derin: derinSekmesi, gunluk: gunlukSekmesi, haber: haberSekmesi, ayar: ayarSekmesi };
   function ciz() {
     sekmeBarCiz();
     try { icerik.replaceChildren(CIZICI[d.sekme](d, kb)); }
@@ -70,7 +76,9 @@ export async function havastilKur(kok, { bagimsiz = false } = {}) {
   function hesapla() {
     if (!d.hava) return;
     const ek = d.haberAcik && d.haber?.durum === "ok" ? d.haber.kisitlar : {};
-    d.sonuc = degerlendir(d.hava, { tolerans: d.tercih.tol, senaryo: d.tercih.sen, stil: d.tercih.stil, canta: d.tercih.canta, tohumKaydir: d.tercih.tohumKaydir }, ek);
+    d.fizik = yagisMotoru(d.hava.yagisPencere, { gun: d.hava.gun, canta: d.tercih.canta });
+    d.sonuc = degerlendir(d.hava, { tolerans: d.tercih.tol, senaryo: d.tercih.sen, stil: d.tercih.stil, canta: d.tercih.canta, tohumKaydir: d.tercih.tohumKaydir }, { ...ek, fizik: d.fizik });
+    d.kriz = krizAniBul(d.hava.yagisPencere, { senaryo: d.tercih.sen });
     if (d.kombinNo >= d.sonuc.kombinler.length) d.kombinNo = 0;
     kb.aiYorumIste(false);
   }
@@ -140,24 +148,32 @@ export async function havastilKur(kok, { bagimsiz = false } = {}) {
   kb.sil = async (id) => { const m = d.konumlar.find((x) => x.id === id); if (m?.bid) await bulutYaz(() => bulutKonumSil(m.bid)); d.konumlar = K.sil(d.konumlar, id); K.listeyiYaz(d.konumlar); konumB.ciz(); };
   kb.ilkeAl = (id) => { d.konumlar = K.varsayilanYap(d.konumlar, id); K.listeyiYaz(d.konumlar); konumB.ciz(); };
 
-  /* ---------------- stilist (Mod A yerel · Mod B Groq) ---------------- */
+  /* ---------------- gün içi kritik an: Mod A (yerel, deterministik) · Mod B (Groq, yalnızca sayılar) ---------------- */
   let aiZaman = 0;
   kb.aiModu = (v) => { d.aiModu = v; lsYaz(LS.aiModu, v); d.ai = { metin: "", etiket: "", hata: "" }; kb.aiYorumIste(true); ciz(); };
   kb.aiYorumIste = (zorla = false) => {
-    const s = d.sonuc, h = d.hava;
-    if (!s || !h) return;
-    const yerel = (etiket, hata = "") => { d.ai = { metin: `${s.hukum} Kombin: ${s.ozet}.`, etiket, hata }; if (d.sekme === "kombin") ciz(); };
+    const s = d.sonuc, h = d.hava, k = d.kriz, f = d.fizik;
+    if (!s || !h || !k || !f) return;
+    const p = s.kombinler[Math.min(d.kombinNo, s.kombinler.length - 1)].parcalar;
+    const yerel = (etiket, hata = "") => { d.ai = { metin: krizSatiri(k, p), etiket, hata }; kb.aiYenileEkran?.(); };
     clearTimeout(aiZaman);
-    if (!d.aiModu) return yerel("Yerel kural motoru (yapay zekâ kapalı: hiçbir yapay zekâ isteği yapılmaz).");
-    d.ai = { ...d.ai, etiket: "Yapay zekâ yorumu hazırlanıyor…", hata: "" };
+    if (!d.aiModu) return yerel("Yerel kural motoru · yapay zekâ kapalı, hiçbir yapay zekâ isteği yapılmaz.");
+    if (!k.var) return yerel("Gün içinde kritik an yok; yapay zekâya sorulmadı.");
+    d.ai = { ...d.ai, etiket: "Yapay zekâ kritik anı yorumluyor…", hata: "" }; kb.aiYenileEkran?.();
     aiZaman = setTimeout(async () => {
-      const p = s.kombinler[Math.min(d.kombinNo, s.kombinler.length - 1)].parcalar;
       const haberId = d.haberAcik && d.haber?.durum === "ok" ? d.haber.uygulananlar[0]?.id : undefined;
-      const govde = { sicaklik: h.apparent, delta: h.delta, yagis: h.rainProb, ruzgar: h.wind, uv: h.uv, senaryo: d.tercih.sen, tolerans: d.tercih.tol, canta: d.tercih.canta,
-        kodlar: { b: p.b?.id ?? null, m: p.m?.id ?? null, o: p.o?.id ?? null, p: p.p?.id ?? null, a: p.a?.id ?? null }, ...(haberId ? { haberId } : {}) };
+      // YALNIZCA sayılar, sabit kelimeler (enum) ve katalog id'leri gider; serbest metin, konum ve kimlik gitmez.
+      const govde = {
+        v: 3, sicaklik: h.apparent, delta: h.delta, hamle: f.hamleMax, cape: f.capeMax, yagisSeviye: f.seviye, yagisTur: f.tur, beklenenMm: Math.round(f.beklenenMm * 10) / 10, pop: f.enYuksekPop, uv: h.uv,
+        senaryo: d.tercih.sen, tolerans: d.tercih.tol, canta: d.tercih.canta,
+        kodlar: { b: p.b?.id ?? null, m: p.m?.id ?? null, o: p.o?.id ?? null, p: p.p?.id ?? null, a: p.a?.id ?? null },
+        bayraklar: { semsiyeYasak: f.semsiyeYasak, zararsiz: f.zararsiz, surpriz: f.surpriz },
+        kriz: { saat: k.saat, tur: k.tur, sicaklikOnce: k.sicaklikOnce, sicaklikSonra: k.sicaklikSonra, hamle: k.hamle, mm: k.mm, cape: k.cape },
+        ...(haberId ? { haberId } : {}),
+      };
       const anahtar = LS.ai + JSON.stringify(govde);
-      const k = lsOku(anahtar, null);
-      if (!zorla && k && Date.now() - k.t < 30 * 60 * 1000) { d.ai = { metin: k.metin, etiket: `Yapay zekâ yorumu${haberId ? " · haber başlığıyla" : ""}`, hata: "" }; if (d.sekme === "kombin") ciz(); return; }
+      const onbellek = lsOku(anahtar, null);
+      if (!zorla && onbellek && Date.now() - onbellek.t < 30 * 60 * 1000) { d.ai = { metin: onbellek.metin, etiket: `Yapay zekâ yorumu${haberId ? " · haber başlığıyla" : ""}`, hata: "" }; kb.aiYenileEkran?.(); return; }
       try {
         const { data } = await supabase.auth.getSession();
         const jeton = data?.session?.access_token;
@@ -171,7 +187,7 @@ export async function havastilKur(kok, { bagimsiz = false } = {}) {
         d.ai = { metin: j.metin, etiket: `Yapay zekâ yorumu (${j.model || "Groq"})${haberId ? " · haber başlığıyla" : ""}`, hata: "" };
         lsYaz(anahtar, { t: Date.now(), metin: j.metin });
         try { for (const a of Object.keys(localStorage)) if (a.startsWith(LS.ai) && a !== anahtar) { const e = JSON.parse(localStorage.getItem(a) || "null"); if (!e || Date.now() - e.t > 30 * 60 * 1000) localStorage.removeItem(a); } } catch { /* yok say */ }
-        if (d.sekme === "kombin") ciz();
+        kb.aiYenileEkran?.();
       } catch { yerel("Yapay zekâ yorumu alınamadı (ağ).", "Worker'a ulaşılamadı. Ayarlar › Bağlantıyı test et."); }
     }, 600);
   };
