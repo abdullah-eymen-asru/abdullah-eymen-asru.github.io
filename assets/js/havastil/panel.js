@@ -5,10 +5,13 @@
  */
 import { supabase } from "../core/supabase-client.js";
 import { havastilKur } from "./arayuz.js";
+import { demoModuAktifMi } from "../demo/demo-durum.js";
 
 const kok = document.getElementById("hv-kok");
 const hazirla = async () => {
   if (!kok) return;
+  // VİTRİN (demo/misafir): RPC sorulmaz (demo rolü zaten yetkisizdir); İstanbul vitrini, kayıt ve Mod B kapalı.
+  if (demoModuAktifMi()) { await havastilKur(kok, { vitrin: true }); return; }
   let yetkili = false;
   try { const { data, error } = await supabase.rpc("havastil_yetkisi_var_mi"); yetkili = !error && data === true; } catch { yetkili = false; }
   if (!yetkili) {
