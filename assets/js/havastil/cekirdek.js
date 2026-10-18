@@ -16,6 +16,7 @@
  * v3: yağış ve fırtına kısıtları artık yagis-fizigi.js'ten gelir (ek.fizik): saatlik PoP × hacim, showers, CAPE ve hamle kuralları.
  *     Zararsız çisentide şemsiye/ağır bot kısıtı YOK; CAPE > 1500 J/kg veya hamle > 40 km/s ise şemsiye sistemden çıkar.
  */
+import { tetikleyicileriBul } from "./tetikleyici.js";
 import { KATALOG, SLOT_LISTE, STILLER, ARALIK, OZEL } from "./katalog.js";
 
 export { KATALOG, STILLER };
@@ -310,6 +311,7 @@ export function degerlendir(h, t, ek = {}) {
     return ok;
   };
   const B = liste("b"), M = [null, ...liste("m")], O = [null, ...liste("o")], P = liste("p"), A = liste("a");
+  const tt = tetikleyicileriBul({ h, k, hedef, fz: ek?.fizik || null, tol: Number(t.tolerans) || 0, senaryoAd: SENARYOLAR[senaryo].ad });
   const hedefAyak = hedef.clo;
   const kombinler = [];
   const stilKumeleri = stilSecimi === "auto" ? [[sirasi[0]], [sirasi[1]], [sirasi[2]]] : [[stilSecimi], [stilSecimi, sirasi[0]], [sirasi[1]]];
@@ -431,7 +433,7 @@ export function degerlendir(h, t, ek = {}) {
     kombinler: kombinlerSon.map(({ _ham, ...x }) => x),
     kombin: kombinlerSon[0].parcalar,
     kodlar: { b: kod(b), m: kod(m), o: kod(o), p: kod(p), a: kod(a) },
-    ekstralar: ekstralar(k, h, etkin, ana.parcalar && { o: ana._ham.o, m: ana._ham.m }), zamanPlani, ipuclari: gunlukIpuclari(k, h, etkin),
+    ekstralar: ekstralar(k, h, etkin, ana.parcalar && { o: ana._ham.o, m: ana._ham.m }).map((e) => ({ ...e, tetik: tt.grup(e.grup) })), tetik: { liste: tt.liste, parca: tt.parca }, zamanPlani, ipuclari: gunlukIpuclari(k, h, etkin),
     ayakkabi, renk: renkStratejisi(k, h, etkin), kumas: kumasOnerisi(k, etkin, ana), kacin,
     neden, hukum, ikon, fizik: ek?.fizik || null,
     ozet: [b, m, o, p, a].filter(Boolean).map((x) => x.ad).join(" + "),
