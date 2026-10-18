@@ -14,18 +14,25 @@ Panelde **Araçlar › 🌦️ HavaStil** ve telefona kurulabilir bağımsız sa
 3. Siteyi yayınla (`_headers` içinde `geolocation=(self)` şart — aksi halde tarayıcı konumu hiç sormaz).
 4. HavaStil › Ayarlar › Yapay zekâ › **Bağlantıyı test et**.
 
-## 2. Sekmeler (v3: "İkili Katman")
-Arayüz iki algı düzeyine bölündü: **sıradan kullanıcı** 3 saniyede karar alır, **meteoroloji meraklısı** ayrı sekmede sayıları görür.
+## 2. Sekmeler (v3.1: "İkili Katman")
+Arayüz iki algı düzeyine bölündü: **sıradan kullanıcı** 3 saniyede karar alır, **meteoroloji meraklısı** ayrı sekmede sayıları görür. Kıyafetle ilgili her şey **tek bir Kombin sekmesinde** toplandı.
 
 | Sekme | İçerik |
 |---|---|
-| **Bugün** (sade) | Tek bakışta hüküm (ör. “Şemsiyesiz çıkabilirsin…”) + **4 kademeli yağış çubuğu** (Kurak/Sakin → Hafif çisenti (zararsız) → Sürekli yağmur → Tehlikeli/ani sağanak) + günlük hayat benzetmesi (“m²’ye yarım su bardağı”). **Bugünün Zırhı**: iç kat · çıkarılabilir orta kat · koruyucu dış kabuk, alt giyim, ayakkabı/zemin taktiği, çantaya atılacaklar, renk. **Gün içi kritik an** (stilist), saatlik akış, kapalı “Planın ve tercihlerin” kutusu |
-| **Derin analiz** (uzman) | **CAPE** (J/kg + 0–4 fırtına skalası) · **yağışın fiziği** (konvektif showers / geniş cephe rain) · **beklenen efektif yağış E = PoP × P** ve 3 karar kuralının tetik durumu · **mikro-iklim** (hamle, çiğ noktası, basınç 3/12 sa eğilimi, UV, yüzey ozonu, görüş, AQI) · **CLO bütçesi**, gün içi katman planı, tüm öneriler · **48 saatlik saat saat matris** (yağış türü, mm/E, CAPE, hamle, yalıtım ihtiyacı) |
+| **Bugün** (sade) | Hüküm (ör. “Şemsiyesiz çıkabilirsin…”), **hissedilen + ölçülen sıcaklık**, 4 kademeli yağış çubuğu (Kurak/Sakin → Hafif çisenti (zararsız) → Sürekli yağmur → Tehlikeli/ani sağanak) ve benzetme (“m²’ye yarım su bardağı”), tek satırlık kombin özeti + etken etiketleri, saatlik akış |
+| **Kombin** | Bugünün kombini (iç · çıkarılabilir orta · dış kabuk · alt giyim · ayakkabı) ve her satırın altında **“← neden:” tetikleyici etiketleri**; **Tetikleyiciler** (ölçülen değer, eşik, etkilediği öneriler: iki yönlü); çantaya at/yanına al (her biri etiketli); gün içi kritik an (stilist); gün içi katman planı; plan ve tercihler; CLO hesabı |
+| **Derin analiz** (uzman) | **Gün seçicili** (bugün + sonraki günler): gün özeti · **PoP = Güven × Kapsam** (saatlik ısı tablosu) · **CAPE** (şimdi, saatlik, günlük en yüksek, skala ve açıklamalar) · **yağışın fiziği** (saatlik konvektif/geniş cephe grafiği, ani↔sürekli ibresi) · **E = PoP × P** ve 3 karar kuralı · mikro-iklim (hamle, çiğ noktası, basınç eğilimi, UV, yüzey ozonu) · saat saat matris |
 | **10 gün** | Günlük min–max, aynı 4 kademeli yağış etiketi, rüzgâr, UV, giyim ipucu |
 | **Uyarılar** | Bugün **bu konum** için giyimi etkileyen resmî/güvenilir hava uyarıları |
 | **Ayarlar** | Saat bazlı uyarılar, yapay zekâ + bağlantı testi, bulut senkronu, haber doğrulama, gizlilik, teşhis |
 
-Eski sekme adları (`ozet`, `saatlik`, `kombin`) tarayıcıda otomatik yeni sekmelere eşlenir. Önceki “Saatlik” ve “Kombin” içeriği Derin analiz ve Bugünün Zırhı içine taşındı.
+Eski sekme adları (`ozet`, `saatlik`) tarayıcıda otomatik yeni sekmelere eşlenir.
+
+**PoP = Güven × Kapsam:** Open-Meteo yalnızca PoP verir. Güven = yağış gören model oranı (ana tahmin + ECMWF + ICON + GFS, saatlik); Kapsam = PoP ÷ Güven (en fazla %100). Bu **tahmini bir ayrıştırmadır**, çarpım her zaman PoP’a eşittir. Model verisi olmayan ileri günlerde yalnızca PoP gösterilir.
+
+**CAPE:** “Şimdi” değeri seçili konumun güncel saatlik model değeridir (↻ ile güncellenir); gün grafiği ve 10 günlük çubuklar saatlik tahminden gelir.
+
+**Tetikleyici sistemi (`tetikleyici.js`):** Isı, plan, sıcaklık algın, gün içi fark, yağış, sürpriz sağanak, zararsız çisenti, rüzgâr, fırtına, ıslak zemin, don, kar, sıcak, UV, hava kalitesi ve sis; her biri değer ve eşiğiyle listelenir, her kombin parçası ve ekstra öneri hangi tetikleyiciden doğduğunu taşır.
 
 ## 2A. Yağış ve fırtına dinamikleri (`yagis-fizigi.js`, saf JS)
 Open-Meteo’dan saatlik `precipitation_probability, precipitation, rain, showers, cape, wind_gusts_10m, weather_code` okunur. Karar kuralları (eşikler dosyada `ESIK` altında tek yerde):
@@ -80,4 +87,4 @@ Amaç hava + CLO ile giyim kararıdır; **konum toplamak amaç değildir**. GPS,
 - Servis çalışanı yalnızca `/panel/havastil/` kapsamındadır.
 
 ## 9. Dosya haritası (`assets/js/havastil/`)
-`yagis-fizigi.js` (**yağış & fırtına motoru, kriz anı**) · `cekirdek.js` (CLO motoru) · `katalog.js` (parçalar) · `veri.js` (hava/geocoding; rain, showers, cape, ozon) · `hava-kodlari.js` · `iller.js` · `haber-filtre.js` · `taktik.js` · `haber.js` · `izin-yardim.js` · `bildirim.js` · `konumlar.js` · `bulut.js` · `ui-temel.js` · `ui-konum.js` · `ui-sade.js` (**Bugün**) · `ui-uzman.js` (**Derin analiz**) · `ui-kombin.js` (CLO/plan/öneri blokları) · `ui-hava.js` (10 gün) · `ui-haber.js` · `ui-ayar.js` · `arayuz.js` (kabuk) · `panel.js` / `sayfa.js` (girişler).
+`yagis-fizigi.js` (**yağış & fırtına motoru, PoP ayrıştırma, kriz anı**) · `tetikleyici.js` (**hangi veri hangi öneriyi tetikledi**) · `cekirdek.js` (CLO motoru) · `katalog.js` (parçalar) · `veri.js` (hava/geocoding; rain, showers, cape, ozon) · `hava-kodlari.js` · `iller.js` · `haber-filtre.js` · `taktik.js` · `haber.js` · `izin-yardim.js` · `bildirim.js` · `konumlar.js` · `bulut.js` · `ui-temel.js` · `ui-konum.js` · `ui-sade.js` (**Bugün**) · `ui-uzman.js` (**Derin analiz**) · `ui-kombin.js` (**tek Kombin sekmesi**) · `ui-hava.js` (10 gün) · `ui-haber.js` · `ui-ayar.js` · `arayuz.js` (kabuk) · `panel.js` / `sayfa.js` (girişler).
