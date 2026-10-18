@@ -10,7 +10,7 @@ import { normalize, ilAniliyor, bolgeAniliyor, BOLGELER } from "./iller.js";
 export const CLICKBAIT_KALIPLARI = [
   /korkutan/, /felaket geliyor/, /(^|[^a-z0-9])o il(imiz|imize|imizde|e|de)?([^a-z0-9]|$)/, /tarih verildi/, /uzmanlar? uyardi/, /sakin yapmayin/,
   /kiyamet/, /dehset/, /inanamayacaksiniz/, /(^|[^a-z0-9])sok([^a-z0-9]|$)/, /herkes bunu/, /bunu gorenler/,
-  /you won'?t believe/, /(^|[^a-z0-9])shocking/, /terrifying/, /doom(sday)?/, /apocalypse/, /experts? (warn|fear)/, /this is why/, /what happens next/,
+  /choc(ant)?([^a-z0-9]|$)/, /incroyable/, /(^|[^a-z0-9])schock/, /unglaublich/, /sensacional/, /you won'?t believe/, /(^|[^a-z0-9])shocking/, /terrifying/, /doom(sday)?/, /apocalypse/, /experts? (warn|fear)/, /this is why/, /what happens next/,
 ];
 export function clickbaitMi(baslik) {
   if (/[?？]/.test(String(baslik))) return "soru işareti";
@@ -40,11 +40,13 @@ export function simdiBilgisi(d = new Date(), tz = "Europe/Istanbul") {
 }
 export const trSimdi = (d, tz) => simdiBilgisi(d, tz);
 
-export function zamanDegerlendir({ baslik, ozet, yayin }, simdi = new Date(), pencereSaat = 24, tz = "Europe/Istanbul") {
+export function zamanDegerlendir({ baslik, ozet, yayin, yerel }, simdi = new Date(), pencereSaat = 24, tz = "Europe/Istanbul") {
   const t = normalize(`${baslik} ${ozet || ""}`);
   const yas = (simdi.getTime() - new Date(yayin).getTime()) / 36e5;
   if (!Number.isFinite(yas)) return { gecerli: false, neden: "yayın zamanı yok" };
   if (yas > pencereSaat) return { gecerli: false, neden: `${pencereSaat} saatten eski` };
+  // Yerel dilde (fr/de/es…) dinamik Google News sorgusu zaten "son 24 saat" ile sınırlı; TR/EN gün-işareti kalıpları orada çalışmaz.
+  if (yerel) return yas <= 12 ? { gecerli: true, simdiIsareti: true } : { gecerli: false, neden: "yerel haber 12 saatten eski" };
 
   const s = simdiBilgisi(simdi, tz);
   const simdiIsareti = SIMDI_MARKERLARI.some((d) => d.test(t));
@@ -132,7 +134,8 @@ export function suz(haberler, { konum, il, simdi = new Date(), tz = "Europe/Ista
     const pencere = h.tur === "genel" ? 18 : 24;
     const z = zamanDegerlendir(h, simdi, pencere, tz);
     if (!z.gecerli) { elenen.zaman++; continue; }
-    const y = yerEslesmesi(h, konum, il);
+    // Yerel sorgu (Google News, şehir adıyla) zaten konuma özeldir: başlıkta ad geçmese de şehir kapsamı kabul edilir.
+    const y = yerEslesmesi(h, konum, il) || (h.yerel ? { kapsam: "il", ad: konum.adEn || konum.ad } : null);
     if (!y) { elenen.konum++; continue; }
     gecenler.push({ ...h, kapsam: y.kapsam, kapsamAd: y.ad, simdiIsareti: z.simdiIsareti, kismenGelecek: !!z.kismenGelecek });
   }
