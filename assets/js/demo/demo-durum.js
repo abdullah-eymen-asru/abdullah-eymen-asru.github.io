@@ -53,6 +53,7 @@ export const VARSAYILAN_CONFIG = Object.freeze({
   notlar: { aktif: true, filtreCipleri: true },
   mesajlar: { aktif: true }, // Sohbet / Mesajlar (örnek sohbetler; gönderme/silme salt-okunur toast'a takılır)
   sistem: { aktif: true },
+  havastil: { aktif: true }, // HavaStil vitrini (İstanbul; konum kaydetme ve Mod B kapalı) — migration 0101
 });
 
 /** Demo'da açılabilecek sekmeler ↔ hangi yapılandırma bölümüne bağlı. (Bunun DIŞINDAKİ hiçbir sekme demoda yoktur.) */
@@ -63,6 +64,7 @@ export const DEMO_SEKMELERI = Object.freeze({
   "lib-kutuphane": "pdf",
   "users-mesajlar": "mesajlar",
   "sys-metrik": "sistem",
+  "tool-havastil": "havastil",
 });
 
 /* ------------------------------ bayrak ------------------------------ */
@@ -175,7 +177,7 @@ export async function demoCikisYap(supabaseUrl, anonAnahtar) {
 function birlestir(taban, gelen) {
   const cikti = JSON.parse(JSON.stringify(taban));
   if (!gelen || typeof gelen !== "object") return cikti;
-  for (const bolum of ["hub", "pdf", "arsiv", "notlar", "mesajlar", "sistem"]) {
+  for (const bolum of ["hub", "pdf", "arsiv", "notlar", "mesajlar", "sistem", "havastil"]) {
     const g = gelen[bolum];
     if (!g || typeof g !== "object") continue;
     for (const alan of Object.keys(cikti[bolum])) {
