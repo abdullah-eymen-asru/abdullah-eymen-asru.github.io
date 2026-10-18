@@ -2,7 +2,9 @@
  * veri.js — HavaStil veri katmanı: Open-Meteo (hava + hava kalitesi + coklu model), Open-Meteo Geocoding, Nominatim (yalnız açık istekle).
  * -----------------------------------------------------------------------------------------------------------------
  * GİZLİLİK: hava istekleri TARAYICIDAN doğrudan Open-Meteo'ya gider; koordinat site sunucusuna/Supabase'e/Worker'a GÖNDERİLMEZ.
- * v3: saatlik rain/showers/cape (yağış fiziği motoru, yagis-fizigi.js) ve yüzey ozonu eklendi; önbellek öneki hv_hava4_.
+ * v3: saatlik rain/showers/cape (yağış fiziği motoru, yagis-fizigi.js) ve yüzey ozonu eklendi.
+ * v4: 14 günlük tahmin (saatlik plan sekmesi), ham değer konsolu + ECMWF/ICON/GFS model dizileri (Veri doğrulama sekmesi), rakım,
+ *     ~110 m yuvarlama KALDIRILDI (tam hassasiyet), küresel adres araması (Nominatim yapılandırılı/serbest + Photon yedeği); önbellek öneki hv_hava5_.
  * KOTA: Open-Meteo sınırı IP başınadır (kullanıcının kendi IP'si). Yanıtlar 30 dk localStorage'da önbelleklenir; çevrimdışıyken
  * son bilinen veri "eski" etiketiyle gösterilir. Nominatim politikası gereği otomatik tamamlama YAPILMAZ (yalnız kullanıcı isterse, 1 sn aralıkla).
  */
@@ -12,7 +14,9 @@ const GEO_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
 const MODELLER = "ecmwf_ifs025,icon_seamless,gfs_seamless";
 const ONBELLEK_OMRU_MS = 30 * 60 * 1000;
-const ONBELLEK_ONEKI = "hv_hava4_";
+const ONBELLEK_ONEKI = "hv_hava5_";          // v5: 14 gün, ham konsol, model dizileri, 4 ondalıklı (≈11 m) anahtar
+const GUN_SAYISI = 14;
+const nokta = (x) => Number(x).toFixed(4);   // koordinat YUVARLANMAZ (kullanıcı izniyle tam hassasiyet); yalnızca önbellek anahtarı 4 ondalık
 
 const yuv = (x) => Math.round(x);
 const sayi = (x, v = 0) => (Number.isFinite(x) ? x : v);
@@ -36,7 +40,7 @@ function gunEkle(tarih, n) {
 
 /** Hava + (başarısızsa sessiz geçen) çoklu model yağış kontrolü + hava kalitesi → motorun beklediği özet. */
 export async function havaGetir(lat, lon, { yenile = false } = {}) {
-  const anahtar = `${ONBELLEK_ONEKI}${lat.toFixed(2)}_${lon.toFixed(2)}`;
+  const anahtar = `${ONBELLEK_ONEKI}${nokta(lat)}_${nokta(lon)}`;
   try {
     const k = JSON.parse(localStorage.getItem(anahtar) || "null");
     if (!yenile && k && Date.now() - k.t < ONBELLEK_OMRU_MS) return { ...k.veri, alinma: k.t, eski: false, onbellek: true };
@@ -48,12 +52,13 @@ export async function havaGetir(lat, lon, { yenile = false } = {}) {
       jsonAl(`${temel}&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_gusts_10m,wind_direction_10m,precipitation,relative_humidity_2m,dew_point_2m,pressure_msl,cloud_cover,is_day`
         + `&hourly=temperature_2m,apparent_temperature,weather_code,precipitation_probability,precipitation,snowfall,uv_index,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,dew_point_2m,pressure_msl,visibility,cloud_cover,shortwave_radiation,is_day,rain,showers,cape`
         + `&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,daylight_duration,uv_index_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max`
-        + `&past_days=1&forecast_days=10`),
-      jsonAl(`${temel}&hourly=precipitation&models=${MODELLER}&forecast_days=10`, 6000).catch(() => null),   // fail-soft: tek model
+        + `&past_days=1&forecast_days=${GUN_SAYISI}`),
+      jsonAl(`${temel}&hourly=precipitation&models=${MODELLER}&forecast_days=${GUN_SAYISI}`, 7000).catch(() => null),   // fail-soft: tek model
       jsonAl(`${HAVA_KALITESI_URL}?latitude=${lat}&longitude=${lon}&timezone=auto&current=european_aqi,pm10,pm2_5,dust,ozone&hourly=dust,pm10&forecast_days=2`, 6000).catch(() => null),
       jsonAl(`${temel}&minutely_15=precipitation&forecast_minutely_15=12`, 5000).catch(() => null),             // 15 dk'lık yağış (bölgeye göre; yoksa null)
     ]);
     const veri = ozetle(ana, modeller, hk, dk);
+    veri.kaynakUrl = `${temel}&forecast_days=${GUN_SAYISI}`;
     const t0 = Date.now();
     try { localStorage.setItem(anahtar, JSON.stringify({ t: t0, veri })); } catch { /* yok say */ }
     return { ...veri, alinma: t0, eski: false, onbellek: false };
@@ -68,7 +73,7 @@ export async function havaGetir(lat, lon, { yenile = false } = {}) {
 
 /** Kayıtlı bir konumun önbellekteki son sıcaklığı (konum kartları için; ağ yok). */
 export function sonSicaklik(lat, lon) {
-  try { const k = JSON.parse(localStorage.getItem(`${ONBELLEK_ONEKI}${lat.toFixed(2)}_${lon.toFixed(2)}`) || "null"); return k?.veri ? { app: k.veri.apparent, t: k.t } : null; } catch { return null; }
+  try { const k = JSON.parse(localStorage.getItem(`${ONBELLEK_ONEKI}${nokta(lat)}_${nokta(lon)}`) || "null"); return k?.veri ? { app: k.veri.apparent, t: k.t } : null; } catch { return null; }
 }
 
 /** Open-Meteo yanıtlarını (saat dilimi = konumun saat dilimi) motor girdisine çevirir. Saf fonksiyon (test edilebilir). */
@@ -98,6 +103,23 @@ function uyumEkle(v, modeller, ana) {
   const bugun = (ana.current?.time || H.time[0]).slice(0, 10);
   v.tumSaatler = H.time.map((t, k) => (t.slice(0, 10) >= bugun ? ekle(saatOge(H, k)) : null)).filter(Boolean);
   v.modelKaynakSayisi = kaynaklar.length;
+  // Şeffaflık (Veri doğrulama sekmesi): her modelin ham saatlik yağış dizisi (mm). Open-Meteo modellere ayrı PoP VERMEZ; yalnızca miktar.
+  v.modelZaman = MH?.time || [];
+  v.modelDizi = {};
+  if (MH?.time) for (const a of Object.keys(MH).filter((x) => x.startsWith("precipitation_"))) v.modelDizi[a.replace("precipitation_", "")] = MH[a].map((x) => (Number.isFinite(x) ? Math.round(x * 100) / 100 : null));
+  const c = ana.current || {}, cu = ana.current_units || {};
+  const ik = H.time.findIndex((t) => t.startsWith((c.time || "").slice(0, 13)));
+  v.ham = {
+    alinan: c.time || null, rakim: Number.isFinite(ana.elevation) ? Math.round(ana.elevation) : null, tz: ana.timezone || null, tzKisa: ana.timezone_abbreviation || null,
+    enlem: ana.latitude ?? null, boylam: ana.longitude ?? null,
+    simdi: [
+      ["Ölçülen sıcaklık (temperature_2m)", c.temperature_2m, cu.temperature_2m], ["Hissedilen (apparent_temperature)", c.apparent_temperature, cu.apparent_temperature],
+      ["Rüzgâr hızı (wind_speed_10m)", c.wind_speed_10m, cu.wind_speed_10m], ["Rüzgâr hamlesi (wind_gusts_10m)", c.wind_gusts_10m, cu.wind_gusts_10m], ["Rüzgâr yönü (wind_direction_10m)", c.wind_direction_10m, cu.wind_direction_10m],
+      ["UV indeksi (uv_index, bu saat)", ik >= 0 ? H.uv_index?.[ik] : null, ana.hourly_units?.uv_index || ""], ["Bağıl nem (relative_humidity_2m)", c.relative_humidity_2m, cu.relative_humidity_2m],
+      ["Çiğ noktası (dew_point_2m)", c.dew_point_2m, cu.dew_point_2m], ["Basınç (pressure_msl)", c.pressure_msl, cu.pressure_msl], ["Bulut örtüsü (cloud_cover)", c.cloud_cover, cu.cloud_cover],
+      ["Yağış (precipitation, son saat)", c.precipitation, cu.precipitation], ["Hava kodu (weather_code, WMO)", c.weather_code, cu.weather_code],
+    ],
+  };
 }
 
 function ozetleAsil(ana, modeller, hk, dk) {
@@ -241,19 +263,45 @@ export async function yerAra(q) {
 }
 
 let sonNominatim = 0;
-/** Sokak/mahalle araması (Nominatim): yalnızca açık kullanıcı eylemiyle; en az 1,1 sn aralık. */
-export async function sokakAra(q) {
+const PHOTON_URL = "https://photon.komoot.io/api/";
+const nomSonucu = (r, q) => {
+  const a = r.address || {};
+  const sehir = a.city || a.town || a.village || a.municipality || a.county || "";
+  return {
+    id: `osm${r.osm_type || ""}${r.osm_id}`, ad: (r.name || a.road || r.display_name.split(",")[0] || q).slice(0, 60), adEn: sehir, ayrinti: r.display_name.split(",").slice(1, 5).join(",").trim(),
+    lat: Number(r.lat), lon: Number(r.lon), ulke: (a.country_code || "").toUpperCase(), ulkeAd: a.country || "", ulkeAdEn: a.country || "", admin1: a.state || a.province || "", admin1En: a.state || "", admin2: a.county || a.city_district || a.district || sehir || "",
+    mahalle: a.suburb || a.neighbourhood || a.quarter || a.city_district || "", sokak: a.road || "", nufus: 0, kaynak: "OpenStreetMap",
+  };
+};
+const photonSonucu = (f, q) => {
+  const p = f.properties || {}, [lon, lat] = f.geometry?.coordinates || [];
+  const sehir = p.city || p.town || p.village || p.county || "";
+  return {
+    id: `ph${p.osm_type || ""}${p.osm_id}`, ad: (p.name || p.street || q).slice(0, 60), adEn: sehir, ayrinti: [p.street, p.district, sehir, p.state, p.country].filter((x, i, arr) => x && arr.indexOf(x) === i && x !== p.name).join(", "),
+    lat: Number(lat), lon: Number(lon), ulke: (p.countrycode || "").toUpperCase(), ulkeAd: p.country || "", ulkeAdEn: p.country || "", admin1: p.state || "", admin1En: p.state || "", admin2: p.county || p.district || sehir || "",
+    mahalle: p.district || p.locality || "", sokak: p.street || "", nufus: 0, kaynak: "Photon (OSM)",
+  };
+};
+
+/**
+ * Küresel adres/sokak/mahalle araması. SERBEST METİN ("Esatpaşa Mahallesi, Ataşehir", "Times Square, New York") ya da
+ * HİYERARŞİK alanlar ({ ulke, sehir, ilce, mahalle }) — hiyerarşik alanlar en özelden genele doğru birleştirilip aynı arama motoruna verilir.
+ * Yalnızca açık kullanıcı eylemiyle çağrılır (Nominatim politikası: otomatik tamamlama YOK; en az 1,1 sn aralık).
+ * Birincil: Nominatim (OpenStreetMap). Boş/hatalı dönerse yedek: Photon (OSM tabanlı). Koordinat YUVARLANMAZ.
+ */
+export async function adresAra(girdi) {
+  const q = typeof girdi === "string" ? girdi.trim() : [girdi?.mahalle, girdi?.ilce, girdi?.sehir, girdi?.ulke].map((x) => String(x || "").trim()).filter(Boolean).join(", ");
+  if (q.length < 3) return [];
   const bekle = sonNominatim + 1100 - Date.now();
   if (bekle > 0) await new Promise((r) => setTimeout(r, bekle));
   sonNominatim = Date.now();
-  const j = await jsonAl(`${NOMINATIM_URL}?format=jsonv2&limit=6&addressdetails=1&accept-language=tr&q=${encodeURIComponent(q)}`, 9000);
-  return (Array.isArray(j) ? j : []).map((r) => {
-    const a = r.address || {};
-    const sehir = a.city || a.town || a.village || a.county || "";
-    return {
-      id: `osm${r.osm_id}`, ad: (r.name || r.display_name.split(",")[0] || q).slice(0, 60), adEn: sehir, ayrinti: r.display_name.split(",").slice(1, 4).join(",").trim(),
-      lat: Number(r.lat), lon: Number(r.lon), ulke: (a.country_code || "").toUpperCase(), ulkeAd: a.country || "", ulkeAdEn: a.country || "", admin1: a.state || a.province || "", admin1En: a.state || "", admin2: a.county || a.city_district || a.district || "",
-      mahalle: a.suburb || a.neighbourhood || a.quarter || "", sokak: a.road || "", nufus: 0,
-    };
-  }).filter((r) => Number.isFinite(r.lat) && Number.isFinite(r.lon));
+  try {
+    const j = await jsonAl(`${NOMINATIM_URL}?format=jsonv2&limit=6&addressdetails=1&accept-language=tr,en&q=${encodeURIComponent(q)}`, 9000);
+    const liste = (Array.isArray(j) ? j : []).map((r) => nomSonucu(r, q)).filter((r) => Number.isFinite(r.lat) && Number.isFinite(r.lon));
+    if (liste.length) return liste;
+  } catch { /* yedeğe geç */ }
+  const f = await jsonAl(`${PHOTON_URL}?q=${encodeURIComponent(q)}&limit=6&lang=en`, 9000);
+  return (f.features || []).map((x) => photonSonucu(x, q)).filter((r) => Number.isFinite(r.lat) && Number.isFinite(r.lon));
 }
+/** Eski ad (geriye uyum). */
+export const sokakAra = adresAra;
