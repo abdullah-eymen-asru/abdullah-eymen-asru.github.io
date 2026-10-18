@@ -1,7 +1,7 @@
 /**
- * ui-hava.js — 10 Gün sekmesi + ortak yardımcılar (v3).
+ * ui-hava.js — 14 Gün sekmesi + ortak yardımcılar (v3).
  * Özet / Saatlik / ayrıntı ızgarası artık ui-sade.js (Bugün) ve ui-uzman.js (Derin analiz) içinde.
- * 10 günlük satırlar da aynı 4 kademeli yağış dilini kullanır (yagis-fizigi.js › gunSeviyesi): %100 yağış ihtimali 0,2 mm çisentiyi şiddetli göstermez.
+ * 14 günlük (v4) satırlar da aynı 4 kademeli yağış dilini kullanır (yagis-fizigi.js › gunSeviyesi): %100 yağış ihtimali 0,2 mm çisentiyi şiddetli göstermez.
  */
 import { el, ipucu, kart, bolumBasligi } from "./ui-temel.js";
 import { havaKodu, gunAdi } from "./hava-kodlari.js";
@@ -46,12 +46,12 @@ export function gunlukSekmesi(d) {
     const gs = gunSeviyesi(g);
     const aralik = el("span", { class: "hv-aralik" }, (() => { const ic = el("span"); ic.style.left = `${((g.min - mn) / (mx - mn || 1)) * 100}%`; ic.style.width = `${Math.max(6, ((g.max - g.min) / (mx - mn || 1)) * 100)}%`; return ic; })());
     return el("div", { class: "hv-gun" },
-      el("div", { class: "hv-gun-ad" }, el("strong", { text: gunEtiketi(g.tarih, i) }), el("small", { text: g.tarih.slice(8, 10) + "." + g.tarih.slice(5, 7) })),
+      el("div", { class: "hv-gun-ad" }, el("strong", { class: "hv-gun-ad-yazi", text: gunEtiketi(g.tarih, i) }), el("small", { text: g.tarih.slice(8, 10) + "." + g.tarih.slice(5, 7) })),
       el("span", { class: "hv-saat-ikon", "aria-hidden": "true", title: k.ad, text: k.ikon }),
       el("div", { class: "hv-gun-yagis" }, el("small", { class: `hv-yagis-etiket s${gs.seviye}`, text: gs.kisa }), g.yagisToplam >= 0.1 ? el("small", { text: `${g.yagisToplam} mm` }) : null),
       el("div", { class: "hv-gun-aralik" }, el("small", { text: `${g.min}°` }), aralik, el("small", { text: `${g.max}°` })),
       el("small", { class: "hv-gun-ek", text: `💨 ${g.ruzgar}–${g.hamle} km/s · UV ${g.uv}` }),
       el("small", { class: "hv-gun-giyim", text: giyimIpucu(g, d.tercih) }));
   });
-  return el("div", { class: "hv-sekme-govde" }, kart("", bolumBasligi("10 günlük tahmin"), ipucu("Yağış etiketi olasılığa değil, beklenen su miktarına bakar. Öneri, günün ortalama hissedilen sıcaklığı ve senin tercihlerinle hesaplanır."), ...satirlar));
+  return el("div", { class: "hv-sekme-govde" }, kart("", bolumBasligi(`${h.gunluk.length} günlük tahmin`), ipucu("Yağış etiketi olasılığa değil, beklenen su miktarına bakar. Öneri, günün ortalama hissedilen sıcaklığı ve senin tercihlerinle hesaplanır."), ...satirlar));
 }
