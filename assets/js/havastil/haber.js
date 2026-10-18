@@ -10,7 +10,7 @@
  */
 import { supabase } from "../core/supabase-client.js";
 import { suz } from "./haber-filtre.js";
-import { kurallariCikar, dogrula, seviyePuani, kisitlaraCevir } from "./taktik.js";
+import { kurallariCikar, dogrula, seviyePuani, kisitlaraCevir, KURALLAR } from "./taktik.js";
 import { normalize, ilAdindan, enYakinIl } from "./iller.js";
 
 export const HAVASTIL_WORKER_URL = "https://havastil-worker.aeymena.workers.dev";
@@ -20,6 +20,39 @@ const MIN_ZORLA_MS = 2 * 60 * 1000;      // elle yenileme en sık 2 dk'da bir
 const LS_ON = "hv_havuz_";
 
 const bekleyen = new Map(); // havuz → Promise (aynı anda tek istek)
+
+/** Yerel resmî meteoroloji terimleriyle (Worker tarafında) dinamik Google News coğrafi taraması; burada yalnızca ülke kodu + şehir adı gider. */
+const YEREL_KURAL = [
+  ["firtina", /sturm|orkan|unwetter|tempete|vent violent|tormenta|temporal|tempesta|burrasca|storm|gale/],
+  ["saganak", /gewitter|starkregen|hagel|hochwasser|orage|pluies? (diluvienne|intense|torrentielle)|inondation|lluvia|alluvione|temporale|flood|heavy rain|thunder/],
+  ["don", /frost|glatteis|verglas|(^|[^a-z])gel([^a-z]|$)|helada|ghiaccio|(^|[^a-z])ice([^a-z]|$)|freez/],
+  ["kar", /schnee|neige|nieve|(^|[^a-z])neve|snow|blizzard/],
+  ["sicak", /hitze|canicule|ola de calor|ondata di caldo|heat ?wave/],
+  ["sis", /nebel|brouillard|niebla|nebbia|(^|[^a-z])fog/],
+];
+function yerelKurallar(h) {
+  const t = normalize(`${h.baslik} ${h.ozet || ""}`);
+  const seviye = /(^|[^a-z])(rot|rouge|roja|rosso|red)([^a-z]|$)|alerte rouge|stufe 4|warnstufe 4/.test(t) ? "kirmizi" : "uyari";
+  return YEREL_KURAL.filter(([, re]) => re.test(t)).map(([id]) => { const k = KURALLAR.find((x) => x.id === id); return { id, ikon: k.ikon, etiket: k.etiket, oncelik: k.oncelik, seviye }; });
+}
+async function yerelHaberAl(konum, zorla) {
+  const anahtar = `hv_yerel_${konum.ulke}_${String(konum.adEn || konum.ad).toLowerCase()}`;
+  const k = okuLS(anahtar);
+  if (k && Date.now() - k.t < (zorla ? MIN_ZORLA_MS : TTL_MS)) return k.haberler;
+  try {
+    const { data } = await supabase.auth.getSession();
+    const jeton = data?.session?.access_token;
+    if (!jeton) return k?.haberler || [];
+    const u = `${HAVASTIL_WORKER_URL}/yerel-haber?ulke=${encodeURIComponent(konum.ulke)}&sehir=${encodeURIComponent(konum.adEn || konum.ad)}`;
+    const kontrol = new AbortController(); const z = setTimeout(() => kontrol.abort(), 15000);
+    let r; try { r = await fetch(u, { headers: { Authorization: `Bearer ${jeton}` }, signal: kontrol.signal }); } finally { clearTimeout(z); }
+    if (!r.ok) return k?.haberler || [];
+    const j = await r.json();
+    const haberler = (Array.isArray(j.haberler) ? j.haberler : []).map((h) => ({ ...h, yerel: true }));
+    try { localStorage.setItem(anahtar, JSON.stringify({ t: Date.now(), haberler })); } catch { /* depo kapalı */ }
+    return haberler;
+  } catch { return k?.haberler || []; }
+}
 const okuLS = (k) => { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch { return null; } };
 
 /** Konumun havuzu: Türkiye'deyse "tr", değilse "dunya". */
@@ -72,6 +105,7 @@ const KURUMLAR = [
   [/karayollari|highway/, "Karayolları"],
 ];
 export function kurumBul(h) {
+  if (h.resmi) return h.kaynakAd;                       // Worker (yerel haber) resmî kurum izin listesinden geçirdi
   const t = normalize(`${h.baslik} ${h.ozet || ""}`);
   const k = KURUMLAR.find(([re]) => re.test(t));
   return k ? k[1] : null;
@@ -90,10 +124,12 @@ export async function haberTaktigi({ konum, hava, simdi = new Date(), zorla = fa
   if (!a.ok) return { durum: a.durum, uyarilar: [], uygulananlar: [], kisitlar: { kurallar: {} }, havuz: anahtar };
 
   const tz = hava?.tz || "Europe/Istanbul";
-  const { gecenler, elenen } = suz(a.havuz.haberler, { konum, il, simdi, tz });
+  let haberler = a.havuz.haberler;
+  if (!il && konum?.ulke) haberler = [...(await yerelHaberAl(konum, zorla)), ...haberler];   // Türkiye dışı: ülke kodu + şehir adıyla dinamik coğrafi tarama
+  const { gecenler, elenen } = suz(haberler, { konum, il, simdi, tz });
   const adaylar = [];
   for (const h of gecenler) {
-    const kurallar = kurallariCikar(h);
+    const kurallar = h.yerel ? [...kurallariCikar(h), ...yerelKurallar(h)].filter((k, i, arr) => arr.findIndex((x) => x.id === k.id) === i) : kurallariCikar(h);
     if (!kurallar.length) continue;
     adaylar.push({ ...h, kurallar, kurum: kurumBul(h) });
   }
