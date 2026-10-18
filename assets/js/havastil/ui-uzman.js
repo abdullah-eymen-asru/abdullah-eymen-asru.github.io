@@ -8,9 +8,9 @@
 import { el, rozet, ipucu, kart, bolumBasligi, olcek, olay, zamanOnce } from "./ui-temel.js";
 import { ruzgarYonu, uvSeviye, aqiSeviye, cigNoktasiKonfor, gunAdi } from "./hava-kodlari.js";
 import { hedefClo } from "./cekirdek.js";
-import { CAPE_BANTLARI, ESIK, YAGIS_SEVIYELERI, capeOrani, capeSeviye, saatAnaliz, saatMetniTam, gunAnalizleri, popYorumu } from "./yagis-fizigi.js";
+import { CAPE_BANTLARI, ESIK, YAGIS_SEVIYELERI, capeOrani, capeSeviye, saatAnaliz, saatMetniTam, gunAnalizleri, popYorumu, popPratik, guvenMetni, efektifSiddet, capeHalk } from "./yagis-fizigi.js";
 
-const n1 = (x, n = 1) => String(Number(x).toFixed(n)).replace(".", ",");
+const n1 = (x, n = 1) => String(Number(x).toFixed(n));          // v4: ondalık NOKTA (10 günlük liste ve ekran görüntüleriyle aynı biçim: 4.4 mm)
 const isaretli = (x) => (x == null ? "—" : `${x > 0 ? "+" : ""}${n1(x)}`);
 const gunEtiketi = (tarih, i) => (i === 0 ? "Bugün" : i === 1 ? "Yarın" : gunAdi(tarih));
 const TUR_AD = { yok: "—", cise: "Çisenti", genis: "Geniş cephe", konvektif: "Konvektif", karma: "Karma", kar: "Kar" };
@@ -53,15 +53,22 @@ function ozetKarti(G, h, gi) {
   const f = G.fizik, a = G.saatler.map(saatAnaliz);
   const zirve = a.reduce((m, x) => (x.pop > (m?.pop ?? -1) ? x : m), null);
   const zi = a.indexOf(zirve);
-  const kutu = (baslik, deger, alt, sinif) => el("div", { class: `hv-ozet-kutu ${sinif}` }, el("small", { text: baslik }), el("strong", { text: deger }), el("small", { text: alt }));
+  const sid = efektifSiddet(f.beklenenMm), ch = capeHalk(f.capeMax);
+  // v4: büyük, kalın ve net değer + okunaklı alt etiket (eski sürümde değerler silik/kırpılmış görünüyordu)
+  const kutu = (baslik, deger, birim, alt, sinif, ek) => el("div", { class: `hv-ozet-kutu ${sinif}` },
+    el("small", { class: "hv-ozet-baslik", text: baslik }),
+    el("strong", { class: "hv-ozet-deger" }, deger, birim ? el("span", { class: "hv-ozet-birim", text: ` ${birim}` }) : null),
+    el("small", { class: "hv-ozet-alt", text: alt }), ek || null);
+  const popSinif = zirve?.pop >= 70 ? "s2" : zirve?.pop >= 30 ? "s1" : "s0";
   return uzmanKart("Gün özeti", "Seçtiğin günün beş ana göstergesi. Renk, günlük karar için ne kadar dikkat gerektiğini söyler: yeşil sakin, sarı dikkat, kırmızı tehlike.",
     el("div", { class: "hv-ozet-grid" },
-      kutu("Yağış", f.kisaAd, f.toplamMm >= 0.1 ? `toplam ${n1(f.toplamMm)} mm` : "yağış yok", `s${f.seviye}`),
-      kutu("Yağış olasılığı (PoP)", `%${zirve?.pop ?? 0}`, zirve?.guven != null ? `%${zirve.guven} güven × %${zirve.kapsam} kapsam` : "en yüksek saat", `s${zirve?.pop >= 70 ? 2 : zirve?.pop >= 30 ? 1 : 0}`),
-      kutu("CAPE", `${f.capeMax}`, `J/kg · ${f.capeSeviye.ad}`, f.capeSeviye.sinif),
-      kutu("Rüzgâr hamlesi", `${f.hamleMax}`, `km/s${f.hamleMax > ESIK.firtinaHamle ? " · şemsiye yasak" : ""}`, f.hamleMax > 55 ? "d5" : f.hamleMax > 40 ? "d4" : f.hamleMax > 28 ? "d3" : "d1"),
-      kutu("Beklenen efektif yağış", `${n1(f.beklenenMm, 2)}`, "mm · E = PoP × P", f.beklenenMm >= 0.8 ? "d3" : "d1")),
-    el("small", { class: "hv-ipucu", text: `${gunEtiketi(G.tarih, gi)} ${G.tarih.slice(8, 10)}.${G.tarih.slice(5, 7)} · 24 saat analiz edildi${zirve ? ` · PoP zirvesi ${saatMetniTam(G.saatler[zi].saat)}` : ""}.` }));
+      kutu("Toplam yağış", n1(f.toplamMm), "mm", `${f.kisaAd}${f.toplamMm < 0.1 ? " · yağış yok" : ""}`, `s${f.seviye}`),
+      kutu("Yağış riski (PoP)", `%${zirve?.pop ?? 0}`, "", zirve?.guven != null ? `Güven %${zirve.guven}${zirve.tahmini ? "*" : ""} × Kapsam %${zirve.kapsam}${zirve.tahmini ? "*" : ""}` : "en yüksek saat", popSinif,
+        zirve?.guven != null ? el("small", { class: "hv-ozet-alt hv-ozet-yorum", text: guvenMetni(zirve.guven) }) : null),
+      kutu("CAPE (fırtına enerjisi)", `${f.capeMax}`, "J/kg", ch.ad, ch.sinif, el("small", { class: "hv-ozet-alt hv-ozet-yorum", text: ch.aciklama })),
+      kutu("Rüzgâr hamlesi", `${f.hamleMax}`, "km/s", f.hamleMax > ESIK.firtinaHamle ? "şemsiye yasak" : f.hamleMax > 28 ? "rahatsız edici" : "sakin", f.hamleMax > 55 ? "d5" : f.hamleMax > 40 ? "d4" : f.hamleMax > 28 ? "d3" : "d1"),
+      kutu("Efektif yağış beklentisi", n1(f.beklenenMm), "mm", `${sid.ad} / ${sid.ayrinti}`, sid.sinif, el("em", { class: `hv-siddet ${sid.sinif}`, text: sid.ad }))),
+    el("small", { class: "hv-ipucu", text: `${gunEtiketi(G.tarih, gi)} ${G.tarih.slice(8, 10)}.${G.tarih.slice(5, 7)} · 24 saat analiz edildi${zirve ? ` · PoP zirvesi ${saatMetniTam(G.saatler[zi].saat)}` : ""}. Efektif yağış = Σ (saatlik PoP × saatlik yağış).` }));
 }
 
 /* ------------------------------ 2) PoP = Güven × Kapsam ------------------------------ */
@@ -70,24 +77,29 @@ function popKarti(G, simdiT, h) {
   const zirve = a.reduce((m, y) => (y.pop > (m?.pop ?? -1) ? y : m), null);
   const bar = (ad, yuzde, sinif, alt) => el("div", { class: "hv-pop-satir" }, el("span", { class: "hv-pop-ad", text: ad }),
     el("span", { class: "hv-pop-bar" }, (() => { const i = el("span", { class: sinif }); i.style.width = `${yuzde ?? 0}%`; return i; })()), el("strong", { text: yuzde == null ? "—" : `%${yuzde}` }), alt ? el("small", { text: alt }) : null);
-  const hucre = (v, tur) => { const t = el("td", { class: `hv-isi ${tur}`, text: v == null ? "—" : String(v) }); t.style.setProperty("--v", String((v ?? 0) / 100)); return t; };
+  const hucre = (v, tur, y) => { const t = el("td", { class: `hv-isi ${tur}${y?.tahmini && tur !== "pop" ? " tahmini" : ""}`, text: v == null ? (y?.modelVar && tur !== "pop" ? "·" : "—") : `${v}${y?.tahmini && tur !== "pop" ? "*" : ""}` }); t.style.setProperty("--v", String((v ?? 0) / 100)); return t; };
   const baslikSatiri = el("tr", {}, el("th", { scope: "col", text: "Saat" }), ...a.map((y) => el("th", { scope: "col", class: y.x.t === simdiT ? "simdi" : "", text: String(y.x.saat).padStart(2, "0") })));
   const tablo = el("table", { class: "hv-isi-tablo" }, el("thead", {}, baslikSatiri),
     el("tbody", {},
-      el("tr", {}, el("th", { scope: "row", text: "PoP %" }), ...a.map((y) => hucre(y.pop, "pop"))),
-      el("tr", {}, el("th", { scope: "row", text: "Güven %" }), ...a.map((y) => hucre(y.guven, "guven"))),
-      el("tr", {}, el("th", { scope: "row", text: "Kapsam %" }), ...a.map((y) => hucre(y.kapsam, "kapsam")))));
-  const yok = a.every((y) => y.guven == null);
+      el("tr", {}, el("th", { scope: "row", text: "PoP %" }), ...a.map((y) => hucre(y.pop, "pop", y))),
+      el("tr", {}, el("th", { scope: "row", text: "Güven %" }), ...a.map((y) => hucre(y.guven, "guven", y))),
+      el("tr", {}, el("th", { scope: "row", text: "Kapsam %" }), ...a.map((y) => hucre(y.kapsam, "kapsam", y)))));
+  const yok = a.every((y) => !y.modelVar);
+  const pratik = zirve && zirve.pop >= 5 ? popPratik(zirve) : null;
+  const tahminiVar = a.some((y) => y.tahmini);
   return uzmanKart("Yağış olasılığı = Güven × Kapsam",
     "“%40 yağış ihtimali” iki ayrı şeyin çarpımıdır: Güven (yağışın olacağından ne kadar eminiz) ve Kapsam (olursa bölgenin ne kadarına düşer). Aynı %40, bambaşka iki durumu gizleyebilir.",
     zirve && zirve.pop >= 10 ? el("div", { class: "hv-pop-ayrisma" },
       el("small", { class: "hv-ipucu", text: `En yüksek olasılık ${saatMetniTam(zirve.x.saat)}:` }),
       bar("PoP", zirve.pop, "pop", null), zirve.guven != null ? bar("= Güven", zirve.guven, "guven", "modellerin yağışta uyumu") : null, zirve.guven != null ? bar("× Kapsam", zirve.kapsam, "kapsam", "bölgenin yağış alacak payı") : null,
+      pratik ? el("div", { class: "hv-pop-pratik" }, el("strong", { text: pratik.baslik }), el("code", { text: pratik.formul }), el("p", { class: "hv-pop-tavsiye", text: `Özet tavsiye: “${pratik.tavsiye}”` })) : null,
       el("p", { class: "hv-uzman-not", text: popYorumu(zirve) })) : el("p", { class: "hv-uzman-not", text: "Bu günün hiçbir saatinde belirgin yağış olasılığı yok (PoP < %10)." }),
     el("div", { class: "hv-matris-kaydir", tabindex: "0", role: "region", "aria-label": "Saatlik PoP, güven ve kapsam" }, tablo),
     okunus("Koyu hücre = yüksek değer. Üç satırı üst üste oku: PoP, Güven × Kapsam'a eşittir.",
       "Güven = ana tahmin + ECMWF + ICON + GFS modellerinden yağış gören modellerin oranı. Kapsam = PoP ÷ Güven.",
-      "Güven yüksek, kapsam düşük → yağış kesin ama yerel hücrelerle (sağanak). Güven düşük, kapsam yüksek → olursa her yere düşer ama belirsiz."),
+      "Güven yüksek, kapsam düşük → yağış kesin ama yerel hücrelerle (sağanak). Güven düşük, kapsam yüksek → olursa her yere düşer ama belirsiz.",
+      "· = risk %5'in altında, ayrıştırma gerekmiyor. Hücre soluksa o saatte yağış yok demektir.",
+      ...(tahminiVar ? ["* = tahmini: modellerin yağış gören oranı ana tahminin olasılığından düşük; Güven olasılığa eşitlendi, Kapsam bu yüzden üst sınırdır (kesin değil)."] : [])),
     el("small", { class: "hv-ipucu", text: yok ? "Bu gün için model uyumu verisi yok (modeller en fazla birkaç gün ileriye bakar): yalnızca PoP gösteriliyor." : "Not: Open-Meteo yalnızca PoP verir; Güven ve Kapsam, model uyumundan türetilen tahmini bir ayrıştırmadır (çarpımları her zaman PoP'a eşittir)." }),
     anlam(zirve && zirve.pop >= 30 ? "Güven yüksekse şemsiye/kabuk kararını ciddiye al; güven düşükse kabuğu çantada taşı, giymek zorunda kalmayabilirsin." : "Yağış için önlem gerekmiyor."));
 }
@@ -109,8 +121,8 @@ function capeKarti(G, gunler, gi, d, kb) {
   return uzmanKart("Atmosferik kararsızlık (CAPE)",
     "CAPE, ısınan nemli havanın yükselirken ne kadar enerji biriktirdiğini J/kg olarak ölçer: gök gürültülü fırtınanın yakıtıdır. Yüksek CAPE tek başına yağış demek değildir; yağış tetiklenirse ne kadar şiddetli olabileceğini söyler.",
     el("div", { class: "hv-cape-ikili" },
-      el("div", { class: `hv-cape-kutu ${sc.sinif}` }, el("small", { text: `Şimdi · ${d.konum.ad}` }), el("strong", { text: `${Math.round(simdi)} J/kg` }), el("small", { text: sc.ad }), el("small", { class: "hv-ipucu", text: `${zamanOnce(h.alinma || Date.now())} güncellendi` }), yenile),
-      el("div", { class: `hv-cape-kutu ${f.capeSeviye.sinif}` }, el("small", { text: `${gunEtiketi(G.tarih, gi)} · en yüksek` }), el("strong", { text: `${f.capeMax} J/kg` }), el("small", { text: f.capeSeviye.ad }), el("small", { class: "hv-ipucu", text: f.capeMax > 0 ? `${saatMetniTam(f.capeSaat)} civarında` : "gün boyu düşük" }))),
+      el("div", { class: `hv-cape-kutu ${sc.sinif}` }, el("small", { text: `Şimdi · ${d.konum.etiket || d.konum.ad}` }), el("strong", { text: `${Math.round(simdi)} J/kg` }), el("small", { text: sc.ad }), el("small", { class: "hv-cape-halk", text: `${capeHalk(simdi).ad}: ${capeHalk(simdi).aciklama}` }), el("small", { class: "hv-ipucu", text: `${zamanOnce(h.alinma || Date.now())} güncellendi` }), yenile),
+      el("div", { class: `hv-cape-kutu ${f.capeSeviye.sinif}` }, el("small", { text: `${gunEtiketi(G.tarih, gi)} · en yüksek` }), el("strong", { text: `${f.capeMax} J/kg` }), el("small", { text: f.capeSeviye.ad }), el("small", { class: "hv-cape-halk", text: `${capeHalk(f.capeMax).ad}: ${capeHalk(f.capeMax).aciklama}` }), el("small", { class: "hv-ipucu", text: f.capeMax > 0 ? `${saatMetniTam(f.capeSaat)} civarında` : "gün boyu düşük" }))),
     el("div", { class: "hv-skala" },
       el("div", { class: "hv-skala-seritler", role: "img", "aria-label": `CAPE ${f.capeMax} J/kg: ${f.capeSeviye.ad}` }, ...CAPE_BANTLARI.map((b) => el("span", { class: `hv-skala-bant ${b.sinif}${b.skor === f.capeSeviye.skor ? " aktif" : ""}` })), isaret),
       el("div", { class: "hv-skala-etiketler" }, ...CAPE_BANTLARI.map((b) => el("small", { text: b.alt === 0 ? "0" : b.alt >= 4000 ? "4000+" : String(b.alt) })))),
@@ -160,6 +172,7 @@ function beklenenKarti(G) {
       el("div", {}, el("small", { text: "PoP (en yüksek)" }), el("strong", { text: `%${f.enYuksekPop}` })), el("span", { class: "hv-formul-isaret", "aria-hidden": "true", text: "×" }),
       el("div", {}, el("small", { text: "P (günün hacmi)" }), el("strong", { text: `${n1(f.toplamMm)} mm` })), el("span", { class: "hv-formul-isaret", "aria-hidden": "true", text: "→" }),
       el("div", { class: "vurgu" }, el("small", { text: "E (saatlik toplam)" }), el("strong", { text: `${n1(f.beklenenMm, 2)} mm` }))),
+    (() => { const sd = efektifSiddet(f.beklenenMm); return el("p", { class: "hv-efektif-satir" }, el("strong", { text: "Efektif Yağış Beklentisi: " }), el("span", { text: `${n1(f.beklenenMm)} mm ` }), el("em", { class: `hv-siddet ${sd.sinif}`, text: `${sd.ad} / ${sd.ayrinti}` })); })(),
     a.length ? el("div", { class: "hv-e-liste" }, el("small", { class: "hv-ipucu", text: "E değerine en çok katkı yapan saatler:" }), ...a.map((y) => el("div", { class: "hv-e-satir" }, el("strong", { text: saatMetniTam(y.x.saat) }), el("span", { text: `%${y.pop} × ${n1(y.mm)} mm = ${n1(y.E, 2)} mm` })))) : null,
     el("div", { class: "hv-kurallar" }, ...f.kurallar.map((k) => el("div", { class: `hv-kural${k.tetik ? " tetik" : ""}` },
       el("div", { class: "hv-kural-ust" }, el("strong", { text: k.ad }), rozet(k.tetik ? "Tetiklendi" : "Tetiklenmedi", k.tetik ? "hv-rozet-onemli" : "")),
