@@ -2,6 +2,7 @@
  * veri.js — HavaStil veri katmanı: Open-Meteo (hava + hava kalitesi + coklu model), Open-Meteo Geocoding, Nominatim (yalnız açık istekle).
  * -----------------------------------------------------------------------------------------------------------------
  * GİZLİLİK: hava istekleri TARAYICIDAN doğrudan Open-Meteo'ya gider; koordinat site sunucusuna/Supabase'e/Worker'a GÖNDERİLMEZ.
+ * v3: saatlik rain/showers/cape (yağış fiziği motoru, yagis-fizigi.js) ve yüzey ozonu eklendi; önbellek öneki hv_hava4_.
  * KOTA: Open-Meteo sınırı IP başınadır (kullanıcının kendi IP'si). Yanıtlar 30 dk localStorage'da önbelleklenir; çevrimdışıyken
  * son bilinen veri "eski" etiketiyle gösterilir. Nominatim politikası gereği otomatik tamamlama YAPILMAZ (yalnız kullanıcı isterse, 1 sn aralıkla).
  */
@@ -11,7 +12,7 @@ const GEO_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
 const MODELLER = "ecmwf_ifs025,icon_seamless,gfs_seamless";
 const ONBELLEK_OMRU_MS = 30 * 60 * 1000;
-const ONBELLEK_ONEKI = "hv_hava3_";
+const ONBELLEK_ONEKI = "hv_hava4_";
 
 const yuv = (x) => Math.round(x);
 const sayi = (x, v = 0) => (Number.isFinite(x) ? x : v);
@@ -45,11 +46,11 @@ export async function havaGetir(lat, lon, { yenile = false } = {}) {
   try {
     const [ana, modeller, hk, dk] = await Promise.all([
       jsonAl(`${temel}&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_gusts_10m,wind_direction_10m,precipitation,relative_humidity_2m,dew_point_2m,pressure_msl,cloud_cover,is_day`
-        + `&hourly=temperature_2m,apparent_temperature,weather_code,precipitation_probability,precipitation,snowfall,uv_index,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,dew_point_2m,pressure_msl,visibility,cloud_cover,shortwave_radiation,is_day`
+        + `&hourly=temperature_2m,apparent_temperature,weather_code,precipitation_probability,precipitation,snowfall,uv_index,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,dew_point_2m,pressure_msl,visibility,cloud_cover,shortwave_radiation,is_day,rain,showers,cape`
         + `&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,daylight_duration,uv_index_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max`
         + `&past_days=1&forecast_days=10`),
       jsonAl(`${temel}&hourly=precipitation&models=${MODELLER}&forecast_days=2`, 6000).catch(() => null),   // fail-soft: tek model
-      jsonAl(`${HAVA_KALITESI_URL}?latitude=${lat}&longitude=${lon}&timezone=auto&current=european_aqi,pm10,pm2_5,dust&hourly=dust,pm10&forecast_days=2`, 6000).catch(() => null),
+      jsonAl(`${HAVA_KALITESI_URL}?latitude=${lat}&longitude=${lon}&timezone=auto&current=european_aqi,pm10,pm2_5,dust,ozone&hourly=dust,pm10&forecast_days=2`, 6000).catch(() => null),
       jsonAl(`${temel}&minutely_15=precipitation&forecast_minutely_15=12`, 5000).catch(() => null),             // 15 dk'lık yağış (bölgeye göre; yoksa null)
     ]);
     const veri = ozetle(ana, modeller, hk, dk);
@@ -122,7 +123,7 @@ export function ozetle(ana, modeller, hk, dk) {
     const idxK = ph?.time ? ph.time.map((t, k) => (t.startsWith(gun) && Number(t.slice(11, 13)) >= bas && Number(t.slice(11, 13)) <= 22 ? k : -1)).filter((k) => k >= 0) : [];
     kalite = {
       aqi: yuv(sayi(hk.current.european_aqi)), pm10: yuv(Math.max(sayi(hk.current.pm10), enBuyuk(idxK.map((k) => ph.pm10?.[k])))),
-      pm25: yuv(sayi(hk.current.pm2_5)), dust: yuv(Math.max(sayi(hk.current.dust), enBuyuk(idxK.map((k) => ph.dust?.[k])))),
+      pm25: yuv(sayi(hk.current.pm2_5)), ozon: yuv(sayi(hk.current.ozone)), dust: yuv(Math.max(sayi(hk.current.dust), enBuyuk(idxK.map((k) => ph.dust?.[k])))),
     };
   }
 
@@ -149,7 +150,20 @@ export function ozetle(ana, modeller, hk, dk) {
     recentPrecip: Math.round(recentPrecip * 10) / 10, yesterdayDiff, saat, gun: gunEtiketi, guncelleme: c.time,
     kalite, aqi: kalite?.aqi ?? null, dust: kalite?.dust ?? null, pm10: kalite?.pm10 ?? null,
     segmentler, saatlik, tz: ana.timezone || "Europe/Istanbul",
+    yagisPencere: pencere.map((k) => saatOge(H, k)), pencereGun: gun,
     ...genisVeri(ana, i, saat, bugun, dk),
+  };
+}
+
+/** Saatlik dizinin k. elemanı → motorun/arayüzün ortak saat nesnesi (yagis-fizigi.js bu alanları okur). */
+function saatOge(H, k) {
+  return {
+    t: H.time[k], saat: Number(H.time[k].slice(11, 13)), temp: yuv(H.temperature_2m[k]), app: yuv(H.apparent_temperature[k]), kod: H.weather_code?.[k] ?? 0,
+    yagisOlasi: yuv(sayi(H.precipitation_probability?.[k])), yagis: sayi(H.precipitation?.[k]), yagmur: sayi(H.rain?.[k]), saganak: sayi(H.showers?.[k]), kar: sayi(H.snowfall?.[k]),
+    cape: yuv(sayi(H.cape?.[k])),
+    ruzgar: yuv(sayi(H.wind_speed_10m?.[k])), hamle: yuv(sayi(H.wind_gusts_10m?.[k])), yon: yuv(sayi(H.wind_direction_10m?.[k])),
+    nem: yuv(sayi(H.relative_humidity_2m?.[k])), bulut: yuv(sayi(H.cloud_cover?.[k])), uv: Math.round(sayi(H.uv_index?.[k]) * 10) / 10, gunduz: H.is_day?.[k] !== 0,
+    cig: yuv(sayi(H.dew_point_2m?.[k])), basinc: yuv(sayi(H.pressure_msl?.[k])),
   };
 }
 
@@ -157,14 +171,7 @@ export function ozetle(ana, modeller, hk, dk) {
 function genisVeri(ana, i, saat, bugun, dk) {
   const c = ana.current, H = ana.hourly, D = ana.daily || {};
   const saatListe = [];
-  for (let k = i; k < Math.min(H.time.length, i + 49); k++) {
-    saatListe.push({
-      t: H.time[k], saat: Number(H.time[k].slice(11, 13)), temp: yuv(H.temperature_2m[k]), app: yuv(H.apparent_temperature[k]), kod: H.weather_code?.[k] ?? 0,
-      yagisOlasi: yuv(sayi(H.precipitation_probability?.[k])), yagis: sayi(H.precipitation?.[k]), kar: sayi(H.snowfall?.[k]),
-      ruzgar: yuv(sayi(H.wind_speed_10m?.[k])), hamle: yuv(sayi(H.wind_gusts_10m?.[k])), yon: yuv(sayi(H.wind_direction_10m?.[k])),
-      nem: yuv(sayi(H.relative_humidity_2m?.[k])), bulut: yuv(sayi(H.cloud_cover?.[k])), uv: Math.round(sayi(H.uv_index?.[k]) * 10) / 10, gunduz: H.is_day?.[k] !== 0,
-    });
-  }
+  for (let k = i; k < Math.min(H.time.length, i + 49); k++) saatListe.push(saatOge(H, k));
   const gunluk = (D.time || []).map((t, k) => ({
     tarih: t, kod: D.weather_code?.[k] ?? 0, max: yuv(D.temperature_2m_max[k]), min: yuv(D.temperature_2m_min[k]),
     appMax: yuv(D.apparent_temperature_max?.[k] ?? D.temperature_2m_max[k]), appMin: yuv(D.apparent_temperature_min?.[k] ?? D.temperature_2m_min[k]),
@@ -173,12 +180,14 @@ function genisVeri(ana, i, saat, bugun, dk) {
     ruzgar: yuv(sayi(D.wind_speed_10m_max?.[k])), hamle: yuv(sayi(D.wind_gusts_10m_max?.[k])),
   })).filter((g) => g.tarih >= bugun);
   // Basınç eğilimi (son 3 saat)
-  const basinc = c.pressure_msl, p3 = i >= 3 ? H.pressure_msl?.[i - 3] : null;
+  const basinc = c.pressure_msl, p3 = i >= 3 ? H.pressure_msl?.[i - 3] : null, p12 = i >= 12 ? H.pressure_msl?.[i - 12] : null;
+  const basincFark3 = Number.isFinite(p3) && Number.isFinite(basinc) ? Math.round((basinc - p3) * 10) / 10 : null;
+  const basincFark12 = Number.isFinite(p12) && Number.isFinite(basinc) ? Math.round((basinc - p12) * 10) / 10 : null;
   const basincEgilim = Number.isFinite(p3) && Number.isFinite(basinc) ? (basinc - p3 > 1 ? "yükseliyor" : basinc - p3 < -1 ? "düşüyor" : "sabit") : "—";
   const gorus = H.visibility?.[i];
   const dakikalik = dk?.minutely_15?.time ? dk.minutely_15.time.map((t, k) => ({ t, mm: sayi(dk.minutely_15.precipitation?.[k]) })).filter((x) => x.t >= c.time.slice(0, 16)).slice(0, 8) : null;
   return {
-    kod: c.weather_code ?? 0, ruzgarYon: yuv(sayi(c.wind_direction_10m)), cigNoktasi: yuv(sayi(c.dew_point_2m)), basinc: yuv(sayi(basinc)), basincEgilim,
+    kod: c.weather_code ?? 0, ruzgarYon: yuv(sayi(c.wind_direction_10m)), cigNoktasi: yuv(sayi(c.dew_point_2m)), basinc: yuv(sayi(basinc)), basincEgilim, basincFark3, basincFark12,
     gorus: Number.isFinite(gorus) ? yuv(gorus) : null, saatListe, gunluk, dakikalik, bugunDogus: gunluk[0]?.dogus || "", bugunBatis: gunluk[0]?.batis || "",
   };
 }
