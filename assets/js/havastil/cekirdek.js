@@ -13,6 +13,8 @@
  *      her çalıştırmada 3 farklı kombin (ana + 2 alternatif) döner.
  * 4) ZAMAN PLANI: sabah/öğle/akşam için ayrı CLO ihtiyacı → "şunu çıkar / şunu ekle".
  * Haber taktikleri (taktik.js) bu motora KISIT olarak girer (ek.kurallar); sonradan üstüne yama yapılmaz.
+ * v3: yağış ve fırtına kısıtları artık yagis-fizigi.js'ten gelir (ek.fizik): saatlik PoP × hacim, showers, CAPE ve hamle kuralları.
+ *     Zararsız çisentide şemsiye/ağır bot kısıtı YOK; CAPE > 1500 J/kg veya hamle > 40 km/s ise şemsiye sistemden çıkar.
  */
 import { KATALOG, SLOT_LISTE, STILLER, ARALIK, OZEL } from "./katalog.js";
 
@@ -63,14 +65,18 @@ function kisitlariCikar(h, t, ek) {
   const kural = ek?.kurallar || {};        // { firtina:{seviye}, saganak:{seviye}, don, kar, sicak, col_tozu, sis }
   const sev = (id) => ({ uyari: 1, sari: 1, turuncu: 2, kirmizi: 3 }[kural[id]?.seviye] || (kural[id] ? 1 : 0));
   const gust = h.gust ?? (h.wind || 0) * 1.4;
-  const yagis = Math.max(
-    (h.rainProb ?? 0) >= 40 || (h.precip ?? 0) >= 0.2 || (h.recentPrecip ?? 0) >= 1 ? 1 : 0,
-    (h.precip ?? 0) >= 1.5 ? 2 : 0, (h.precip ?? 0) >= 4 ? 3 : 0, sev("saganak"));
-  const ruzgar = Math.max((gust >= 35 || (h.wind || 0) >= 25) ? 1 : 0, (gust >= 55 || (h.wind || 0) >= 38) ? 2 : 0, sev("firtina") ? 2 : 0);
+  const fz = ek?.fizik || null;
+  // Yağış: fizik motoru varsa onun seviyesi (PoP tek başına karar vermez); yoksa eski olasılık kuralı. Islak zemin (son 6 saat ≥ 1 mm) her durumda ayakkabıyı etkiler.
+  const yagis = fz
+    ? Math.max(fz.kisit.yagis, (h.recentPrecip ?? 0) >= 1 ? 1 : 0, sev("saganak"))
+    : Math.max(
+      (h.rainProb ?? 0) >= 40 || (h.precip ?? 0) >= 0.2 || (h.recentPrecip ?? 0) >= 1 ? 1 : 0,
+      (h.precip ?? 0) >= 1.5 ? 2 : 0, (h.precip ?? 0) >= 4 ? 3 : 0, sev("saganak"));
+  const ruzgar = Math.max((gust >= 35 || (h.wind || 0) >= 25) ? 1 : 0, (gust >= 55 || (h.wind || 0) >= 38) ? 2 : 0, sev("firtina") ? 2 : 0, fz?.kisit.ruzgar ?? 0);
   const buz = (h.minRaw ?? 20) <= 1 || !!kural.don;
   const kar = !!kural.kar || ((h.raw ?? 20) <= 2 && (h.precip ?? 0) > 0) || (h.snow ?? 0) > 0;
   const sicak = !!kural.sicak || (h.__etkin ?? h.apparent) >= 27;
-  return { yagis, ruzgar, buz, kar, sicak, sicakAsiri: (h.__etkin ?? h.apparent) >= 32, sis: !!kural.sis, col: !!kural.col_tozu || (h.dust ?? 0) >= 80,
+  return { yagis, ruzgar, semsiyeYasak: !!fz?.semsiyeYasak || ruzgar >= 2, zararsiz: !!fz?.zararsiz, surpriz: !!fz?.surpriz, buz, kar, sicak, sicakAsiri: (h.__etkin ?? h.apparent) >= 32, sis: !!kural.sis, col: !!kural.col_tozu || (h.dust ?? 0) >= 80,
     uv: h.uv ?? 0, ofis: t.senaryo === "yuruyus_ofis", spor: t.senaryo === "spor", arac: t.senaryo === "arac",
     cantaYok: t.canta === "yok", canta: t.canta || "el",
     moduler: ((h.delta ?? 0) >= 8 && t.senaryo !== "arac") || t.senaryo === "disari" || t.senaryo === "gezi" };
@@ -181,8 +187,8 @@ function ekstralar(k, h, etkin, kombin) {
   // ---- Yağış ----
   if (k.yagis >= 1) {
     const kapusonVar = kombin?.o && (var_(kombin.o, "g") || var_(kombin.o, "s"));
-    if (k.cantaYok || k.ruzgar >= 2 || k.spor) {
-      ekle("Yağış", "🧥", kapusonVar ? "Kapüşonu kullan (dış kat su geçirmez/itici)" : "Hafif kapüşonlu yağmurluk / panço", k.cantaYok ? "Çantan yok: şemsiye elini bağlar, yağmurluk eller serbest ve ~150 g, cebe sığar" : "Rüzgârda şemsiye ters döner, kapüşon güvenli", "sart", "hafif", true);
+    if (k.cantaYok || k.semsiyeYasak || k.spor || k.surpriz) {
+      ekle("Yağış", "🧥", kapusonVar ? "Kapüşonu kullan (dış kat su geçirmez/itici)" : "Hafif kapüşonlu yağmurluk / panço", k.cantaYok ? "Çantan yok: şemsiye elini bağlar, yağmurluk eller serbest ve ~150 g, cebe sığar" : k.semsiyeYasak ? "Hamle/fırtına riski: şemsiye açmak tehlikeli ve işlevsiz, kapüşon güvenli" : k.surpriz ? "Ani sağanakta şemsiye açmaya vakit kalmaz; kapüşon anında devrede" : "Rüzgârda şemsiye ters döner, kapüşon güvenli", "sart", "hafif", true);
     } else {
       ekle("Yağış", "🌂", "Katlanır şemsiye", `Yağış ihtimali %${h.rainProb}; ~300 g, ${k.canta === "sirt" ? "sırt çantasının yan cebine" : "çantana"} sığar`, k.yagis >= 2 ? "sart" : "iyi", "orta", false);
       if (k.yagis === 1 && disarida) ekle("Yağış", "🧥", "Yedek: ince yağmurluk", "Şemsiyeyi unutursan ya da rüzgâr çıkarsa", "olabilir", "hafif", true);
@@ -370,14 +376,17 @@ export function degerlendir(h, t, ek = {}) {
   let ayakkabi;
   if (k.buz && a) ayakkabi = `Buzlanma riski: ${a.ad} (kaymaz taban). Düz tabanlı sneaker ve deri taban yasak.`;
   else if (k.kar) ayakkabi = `Kar/tipi: ${a.ad}. Su geçirmez ve kaymaz tabanlı olmalı.`;
+  else if (k.surpriz) ayakkabi = `Ani sağanak riski: ${a.ad}. Su geçirmez olsun; süet ve bez ayakkabı olmaz.`;
   else if (k.yagis >= 2) ayakkabi = `Kuvvetli yağış: ${a.ad}. Süet ve bez ayakkabıdan uzak dur.`;
   else if (k.yagis === 1) ayakkabi = `Zemin ıslak olabilir: ${a.ad}. Süet/bez ayakkabı bugün olmasın.`;
+  else if (k.zararsiz) ayakkabi = `Hafif çisenti zararsız: ${a.ad} yeter, ağır bot gerekmiyor. Su birikintilerinden uzak dur.`;
   else if (k.sicak) ayakkabi = `Sıcak: ${a.ad}. Çorabı ince ve nefes alır seç.`;
   else ayakkabi = `Zemin kuru görünüyor: ${a.ad} uygun.`;
 
   const kacin = [];
   if (k.yagis >= 1) kacin.push("Süet / bez ayakkabı");
-  if (k.ruzgar >= 2) kacin.push("Şemsiye (rüzgâr ters çevirir)");
+  if (k.semsiyeYasak) kacin.push("Şemsiye (açmak tehlikeli ve işlevsiz)");
+  if (k.zararsiz) kacin.push("Ağır bot ve şemsiye (çisenti zararsız)");
   if (k.col) kacin.push("Açık renk kıyafet");
   if (k.buz || k.kar) kacin.push("Düz / deri tabanlı ayakkabı");
   if (k.ofis) kacin.push("Kalın tek parça yün kazak");
@@ -387,6 +396,7 @@ export function degerlendir(h, t, ek = {}) {
     `Hedef ${hedef.clo.toFixed(2)} CLO: hissedilen ${h.apparent}°C → etkin ${etkin}°C (aktivite −${hedef.aktivite}${hedef.notlar.length ? "; " + hedef.notlar.join("; ") : ""}).`,
     `Seçilen kombin toplamı ${ana.toplam.toFixed(2)} CLO (fark ${ana.fark >= 0 ? "+" : ""}${ana.fark.toFixed(2)}); formül: 0,10 + 0,85 × Σ parça CLO.`,
   ];
+  if (ek?.fizik) neden.push(ek.fizik.neden);
   if (k.yagis >= 1) neden.push(`Yağış düzeyi ${k.yagis}/3 → ${o ? (var_(o, "g") ? "su geçirmez" : "su itici") + " dış kat" : "dış kat yok; şemsiye"} ve ıslakta uygun ayakkabı.`);
   if (k.ruzgar >= 1) neden.push(`Rüzgâr/hamle (${Math.round(h.gust ?? h.wind)} km/s) → rüzgâr geçirmez dış kat.`);
   if (k.ofis) neden.push("Kabuk & çekirdek: iç kat 21–23 °C ofiste rahat kalacak şekilde sınırlandı (≤ 0,80 CLO), ısıyı kabuk sağlıyor.");
@@ -398,10 +408,12 @@ export function degerlendir(h, t, ek = {}) {
   const hukumEn = (x) => x;
   if (k.buz) hukum = "Buzlanma riski: kalın giyin, kaymaz tabanlı ayakkabı seçin.";
   else if (k.kar) hukum = "Kar/tipi: sıcak dış kat ve su geçirmez kaymaz bot giyin.";
+  else if (k.surpriz) hukum = "Atmosfer patlamaya hazır: beklenmedik ani sağanak/dolu riski! Su geçirmez bot ve kapüşonlu teknik kabuk giyin.";
+  else if (k.semsiyeYasak) hukum = "Şemsiye açmak tehlikeli ve işlevsizdir, kapüşonlu teknik kabuk giyin.";
   else if (k.yagis >= 2) hukum = "Kuvvetli yağış: su geçirmez dış kat ve su geçirmez ayakkabı giyin.";
-  else if (k.ruzgar >= 2) hukum = "Sert rüzgâr: şemsiye yerine kapüşonlu, rüzgâr geçirmez dış kat giyin.";
   else if (k.yagis === 1) hukum = k.cantaYok ? "Yağış ihtimali var, çantan yok: şemsiye yerine kapüşonlu yağmurluk ve su itici ayakkabı giy."
     : h.modelFarki ? "Hava modelleri yağışta ayrışıyor: riskten kaçınıp şemsiye ve su itici ayakkabı alın." : "Yağış ihtimali var: şemsiye ve su itici ayakkabı hazırlayın.";
+  else if (k.zararsiz) hukum = "Hafif çisenti zararsız: şemsiyesiz ve ağır botsuz çıkabilirsin.";
   else if (k.ofis && o) hukum = "Kabuk & çekirdek: ofiste rahat bir alt kat, yürüyüşte koruyan bir dış kat giyin.";
   else if (k.moduler) hukum = `Gün içinde ${h.delta}°C fark var: çıkarılabilir bir orta katmanla çıkın.`;
   else if (k.sicakAsiri) hukum = "Aşırı sıcak: en hafif, açık renk kıyafeti seçin ve bol su için.";
@@ -410,7 +422,7 @@ export function degerlendir(h, t, ek = {}) {
   else if (hedef.clo >= 1.0) hukum = "Serin: orta katman ve ceketle çıkın.";
   else hukum = "Dengeli bir gün: hafif katmanlarla rahat çıkabilirsiniz.";
 
-  const ikon = k.buz ? "🧊" : k.kar ? "❄️" : k.yagis >= 2 ? "⛈️" : k.ruzgar >= 2 ? "🌪️" : k.yagis === 1 ? "☔" : k.ofis ? "🏢" : k.moduler ? "🧅" : k.sicak ? "☀️" : hedef.clo >= 1.6 ? "🧥" : "⚡";
+  const ikon = k.buz ? "🧊" : k.kar ? "❄️" : k.yagis >= 2 ? "⛈️" : k.ruzgar >= 2 ? "🌪️" : k.yagis === 1 ? "☔" : k.zararsiz ? "🌦️" : k.ofis ? "🏢" : k.moduler ? "🧅" : k.sicak ? "☀️" : hedef.clo >= 1.6 ? "🧥" : "⚡";
 
   return {
     clo: { hedef: hedef.clo, toplam: ana.toplam, fark: ana.fark, etkinSicaklik: hedef.etkin, aktivite: hedef.aktivite },
@@ -421,7 +433,7 @@ export function degerlendir(h, t, ek = {}) {
     kodlar: { b: kod(b), m: kod(m), o: kod(o), p: kod(p), a: kod(a) },
     ekstralar: ekstralar(k, h, etkin, ana.parcalar && { o: ana._ham.o, m: ana._ham.m }), zamanPlani, ipuclari: gunlukIpuclari(k, h, etkin),
     ayakkabi, renk: renkStratejisi(k, h, etkin), kumas: kumasOnerisi(k, etkin, ana), kacin,
-    neden, hukum, ikon,
+    neden, hukum, ikon, fizik: ek?.fizik || null,
     ozet: [b, m, o, p, a].filter(Boolean).map((x) => x.ad).join(" + "),
   };
 }
