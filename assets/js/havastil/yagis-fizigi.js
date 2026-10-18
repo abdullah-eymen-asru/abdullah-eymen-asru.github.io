@@ -87,14 +87,21 @@ const ayakkabiBenzetme = (mm) => (mm < 0.5 ? "bez ayakkabı bile zor ıslanır" 
  * Open-Meteo yalnızca PoP verir. NWS tanımı: PoP = Güven (C) × Kapsam (A). Burada
  *   Güven  = yağışı gören model oranı (veri.js › uyumEkle: ana tahmin + ECMWF + ICON + GFS),
  *   Kapsam = PoP ÷ Güven (bölgenin yağışı alacak kısmı; en fazla %100).
- * Güven < PoP çıkarsa güven PoP'a yükseltilir (C × A = PoP korunur) ve sonuç "tahmini" işaretlenir. Model verisi yoksa ayrıştırma yapılmaz.
+ * TUTARLILIK KURALLARI (v4):
+ *   • PoP < %5 → ayrıştırma ANLAMSIZ (0 × herhangi bir şey = 0); Güven/Kapsam null döner, arayüz "·" gösterir. Eski sürümde
+ *     "PoP 0 ama Güven 25" gibi çelişkili hücreler bu yüzden çıkıyordu.
+ *   • Model oyu PoP'tan DÜŞÜKSE (C < P) çarpım eşitliği korunamaz: Güven PoP'a yükseltilir ve sonuç `tahmini: true` ile işaretlenir
+ *     (arayüz yıldız + açıklama gösterir; kapsam o satırda kesin değil, üst sınır sayılır).
+ *   • Model verisi yoksa ayrıştırma yapılmaz (modelVar: false).
  */
 export function popAyristir(pop, uyum) {
   const P = Math.max(0, Math.min(100, Math.round(sayi(pop))));
-  if (uyum == null || !Number.isFinite(uyum)) return { pop: P, guven: null, kapsam: null, tahmini: false };
+  const modelVar = uyum != null && Number.isFinite(uyum);
+  if (!modelVar) return { pop: P, guven: null, kapsam: null, tahmini: false, modelVar: false };
+  if (P < 5) return { pop: P, guven: null, kapsam: null, tahmini: false, modelVar: true };
   let C = Math.round(uyum * 100), tahmini = false;
   if (C < P) { C = P; tahmini = true; }
-  return { pop: P, guven: C, kapsam: C > 0 ? Math.round((P / C) * 100) : 0, tahmini };
+  return { pop: P, guven: C, kapsam: C > 0 ? Math.min(100, Math.round((P / C) * 100)) : 0, tahmini, modelVar: true };
 }
 export function popYorumu({ pop, guven, kapsam }) {
   if (pop < 10) return "Yağış beklenmiyor.";
@@ -103,6 +110,60 @@ export function popYorumu({ pop, guven, kapsam }) {
   if (guven >= 75) return "Modeller yağışta hemfikir ama yağış dağınık/yerel hücreler hâlinde: bazı yerlere düşer, bazılarına düşmez.";
   if (kapsam >= 75) return "Yağış olursa geniş alana yayılır ama modeller kararsız: olup olmayacağı belirsiz.";
   return "Modeller kararsız ve yağış yerel kalacak: düşük ihtimalli, dağınık yağış.";
+}
+
+/** Güven yüzdesinin halk dilindeki karşılığı (modellerin yağışta uyumu). */
+export function guvenMetni(g) {
+  if (g == null) return "model verisi yok";
+  if (g >= 75) return "Modeller yağışta hemfikir";
+  if (g >= 50) return "Modellerin çoğu yağış görüyor";
+  if (g >= 25) return "Modeller kararsız";
+  return "Neredeyse hiçbir model yağış görmüyor";
+}
+/** Kapsam yüzdesinin halk dilindeki karşılığı (yağışın bölgede ne kadar yer tutacağı). */
+export function kapsamMetni(k) {
+  if (k == null) return "—";
+  if (k >= 85) return "Bölgenin tamamına yakınını etkileyen geniş yağış";
+  if (k >= 60) return "Bölgenin büyük kısmına düşecek yağış";
+  if (k >= 35) return "Bölgenin yarısını etkileyecek lokal sağanak";
+  if (k >= 15) return "Dağınık, yerel yağış hücreleri";
+  return "Çok dar, nokta atışı hücreler";
+}
+/**
+ * PoP'un pratik tercümesi: "Yağış Riski: %40 → [Güven: %80 (…) × Kapsam: %50 (…)]" + tek cümlelik tavsiye.
+ * @param {{pop:number,guven:number|null,kapsam:number|null,tahmini?:boolean}} a  saatAnaliz çıktısı
+ */
+export function popPratik(a) {
+  const baslik = `Yağış Riski: %${a.pop}`;
+  if (a.pop < 5) return { baslik, formul: "Güven × Kapsam ayrıştırması gerekmiyor (risk %5'in altında).", tavsiye: "Yağış beklenmiyor; yağmurluk gerekmez.", tahmini: false };
+  if (a.guven == null) return { baslik, formul: "Model uyumu verisi yok; ayrıştırma yapılamadı.", tavsiye: a.pop >= 50 ? "Yağış olasılığı yüksek: yağmurluk veya şemsiye al." : "Yağış olasılığı düşük ama sıfır değil: kabuğu çantada taşı.", tahmini: false };
+  const formul = `[Güven: %${a.guven}${a.tahmini ? "*" : ""} (${guvenMetni(a.guven)}) × Kapsam: %${a.kapsam}${a.tahmini ? "*" : ""} (${kapsamMetni(a.kapsam)})]`;
+  let tavsiye;
+  if (a.guven >= 70 && a.kapsam >= 60) tavsiye = "Yağmur kesin ve geniş alana yayılacak; yağmurluk ya da şemsiye şart, su itici ayakkabı giy.";
+  else if (a.guven >= 70) tavsiye = "Yağmur kesin yağacak ancak şehrin tamamına değil, yerel hücreler halinde düşecek; yanına hafif yağmurluk al.";
+  else if (a.kapsam >= 60) tavsiye = "Yağış olursa geniş alana yayılır ama modeller kararsız; kabuğu çantada taşı, gökyüzüne göre karar ver.";
+  else tavsiye = "Modeller kararsız ve yağış yerel kalacak; düşük ihtimalli, dağınık yağış. Hafif bir kabuk yeterli.";
+  return { baslik, formul, tavsiye, tahmini: !!a.tahmini };
+}
+
+/** Beklenen efektif yağış (E = PoP × P) için anlaşılır şiddet rozeti. */
+export function efektifSiddet(E) {
+  const e = Math.max(0, sayi(Number(E)));
+  if (e < 0.1) return { ad: "Yağış yok", ayrinti: "Kuru geçer", sinif: "d1", seviye: 0 };
+  if (e < ESIK.zararsizHacim) return { ad: "Çisenti", ayrinti: "Zar zor ıslatır", sinif: "d1", seviye: 1 };
+  if (e < 3) return { ad: "Hafif yağmur", ayrinti: "Islatır", sinif: "d2", seviye: 2 };
+  if (e < 8) return { ad: "Orta yağmur", ayrinti: "Şemsiyesiz ıslanırsın", sinif: "d3", seviye: 3 };
+  if (e < 20) return { ad: "Kuvvetli yağmur", ayrinti: "Göllenme olabilir", sinif: "d4", seviye: 4 };
+  return { ad: "Şiddetli yağış", ayrinti: "Sel ve göllenme riski", sinif: "d5", seviye: 5 };
+}
+export const efektifMetni = (E) => { const s = efektifSiddet(E); return `${(Math.round(sayi(E) * 10) / 10).toFixed(1)} mm (${s.ad} / ${s.ayrinti})`; };
+
+/** CAPE'in halk dilindeki 3 kademeli özeti (ayrıntılı 5 kademeli ölçek CAPE_BANTLARI'nda). */
+export function capeHalk(cape) {
+  const c = Math.max(0, sayi(Number(cape)));
+  if (c < 500) return { ad: "Atmosfer Kararlı", aciklama: "Gök gürültüsü ve dolu riski yok, sakin.", sinif: "d1" };
+  if (c <= 1500) return { ad: "Orta Kararsızlık", aciklama: "Lokal gök gürültülü sağanak geçişi olabilir.", sinif: "d3" };
+  return { ad: "Yüksek Enerji", aciklama: "Anlık fırtına, dolu ve yoğun şimşek aktivitesi olabilir.", sinif: "d5" };
 }
 
 /* ------------------------------ tek saat ------------------------------ */
