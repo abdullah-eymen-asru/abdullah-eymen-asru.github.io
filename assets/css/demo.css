@@ -83,3 +83,16 @@
 .demo-cubuk-dolu.demo-w-90{width:90%} .demo-seri-cubuk.demo-w-90{height:90%}
 .demo-cubuk-dolu.demo-w-95{width:95%} .demo-seri-cubuk.demo-w-95{height:95%}
 .demo-cubuk-dolu.demo-w-100{width:100%} .demo-seri-cubuk.demo-w-100{height:100%}
+
+/* v2 (0103) — Yetki Kontrolü: durum bandı, işlem göstergesi, satır içi onay */
+.demo-global .auth-message { margin: .4rem 0 .6rem; scroll-margin-top: 5rem; }
+.demo-global .auth-message--info { border-left: 4px solid var(--accent); }
+.demo-global .auth-message--warning { border-left: 4px solid #e0a93b; }
+.demo-anahtar--islem { cursor: progress; opacity: .8; }
+.demo-dondur { flex: none; width: .9rem; height: .9rem; border-radius: 50%; border: 2px solid var(--border); border-top-color: var(--accent); animation: demo-don .8s linear infinite; }
+@keyframes demo-don { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .demo-dondur { animation: none; } }
+.demo-anahtar small { flex: 1 1 100%; margin-left: 3rem; }
+.demo-onay { margin: .6rem 0 .2rem; padding: .8rem 1rem; border: 1px solid #e0a93b; border-radius: 12px; background: color-mix(in srgb, #e0a93b 10%, transparent); }
+.demo-onay p { margin: 0 0 .6rem; }
+.demo-onay-dugme { display: flex; flex-wrap: wrap; gap: .5rem; }
