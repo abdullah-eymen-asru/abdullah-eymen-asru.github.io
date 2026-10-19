@@ -27,12 +27,13 @@ export function yagisOzeti(h) {
 
 const gunEtiketi = (tarih, i) => (i === 0 ? "Bugün" : i === 1 ? "Yarın" : gunAdi(tarih));
 
-/* ------------------------------ 10 GÜN ------------------------------ */
+/* ------------------------------ 16 GÜN ------------------------------ */
 export function giyimIpucu(g, tercih) {
   const ort = (g.appMax + g.appMin) / 2;
   const c = hedefClo({ apparent: ort, raw: ort }, tercih.tol, tercih.sen).clo;
   const ana = c < 0.5 ? "Kısa kollu, hafif" : c < 0.8 ? "İnce uzun kollu / hafif ceket" : c < 1.1 ? "Ceket veya hırka" : c < 1.5 ? "Mont / kaban" : "Kalın mont, bere, eldiven";
   const gs = gunSeviyesi(g);
+  if (gs.kar || (g.karToplam ?? 0) >= 0.1) return `${ana} + şemsiyeyi bırak: derin kauçuk dişli kar botu, termal içlik, yün/polar ara kat, bere ve eldiven (≈ ${g.karToplam} cm kar)`;
   const yagis = gs.firtina ? " + kapüşonlu teknik kabuk (şemsiye değil)" : gs.seviye >= 3 ? " + yağmurluk ve su geçirmez bot" : gs.seviye === 2 ? " + yağmurluk/şemsiye" : "";
   return `${ana}${yagis}${g.uv >= 6 ? " + güneş koruması" : ""}`;
 }
@@ -48,10 +49,10 @@ export function gunlukSekmesi(d) {
     return el("div", { class: "hv-gun" },
       el("div", { class: "hv-gun-ad" }, el("strong", { class: "hv-gun-ad-yazi", text: gunEtiketi(g.tarih, i) }), el("small", { text: g.tarih.slice(8, 10) + "." + g.tarih.slice(5, 7) })),
       el("span", { class: "hv-saat-ikon", "aria-hidden": "true", title: k.ad, text: k.ikon }),
-      el("div", { class: "hv-gun-yagis" }, el("small", { class: `hv-yagis-etiket s${gs.seviye}`, text: gs.kisa }), g.yagisToplam >= 0.1 ? el("small", { text: `${g.yagisToplam} mm` }) : null),
+      el("div", { class: "hv-gun-yagis" }, el("small", { class: `hv-yagis-etiket s${gs.seviye}`, text: gs.kisa }), (g.karToplam ?? 0) >= 0.1 ? el("small", { text: `❄️ ${g.karToplam} cm` }) : g.yagisToplam >= 0.1 ? el("small", { text: `${g.yagisToplam} mm` }) : null),
       el("div", { class: "hv-gun-aralik" }, el("small", { text: `${g.min}°` }), aralik, el("small", { text: `${g.max}°` })),
       el("small", { class: "hv-gun-ek", text: `💨 ${g.ruzgar}–${g.hamle} km/s · UV ${g.uv}` }),
       el("small", { class: "hv-gun-giyim", text: giyimIpucu(g, d.tercih) }));
   });
-  return el("div", { class: "hv-sekme-govde" }, kart("", bolumBasligi(`${h.gunluk.length} günlük tahmin`), ipucu("Yağış etiketi olasılığa değil, beklenen su miktarına bakar. Öneri, günün ortalama hissedilen sıcaklığı ve senin tercihlerinle hesaplanır."), ...satirlar));
+  return el("div", { class: "hv-sekme-govde" }, kart("", bolumBasligi(`${h.gunluk.length} günlük tahmin`), ipucu("Yağış etiketi olasılığa değil, beklenen su miktarına bakar; kar günlerinde mm yerine taze kar (cm) gösterilir. Öneri, günün ortalama hissedilen sıcaklığı ve senin tercihlerinle hesaplanır. 16 günün ötesi için “Mevsimlik eğilim” sekmesine bak."), ...satirlar));
 }
