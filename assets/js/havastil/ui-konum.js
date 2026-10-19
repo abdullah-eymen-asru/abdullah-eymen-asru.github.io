@@ -43,9 +43,27 @@ export function konumBileseni(d, kb) {
   const mesaj = el("p", { class: "hv-ipucu", hidden: true });
   const yardimYeri = el("div");
   const araDugme = olay(el("button", { type: "button", class: "hv-btn hv-btn-ince hv-ara-dugme", "aria-label": "Ara", title: "Ara (Enter)" }, el("span", { "aria-hidden": "true", text: "🔎" }), el("span", { class: "hv-ara-dugme-yazi", text: "Ara" })), "click", () => akilliCozumle(giris.value));
-  const arama = el("div", { class: "hv-arama", hidden: true }, el("div", { class: "hv-arama-satir" }, giris, araDugme), mesaj, yardimYeri, sonuclar,
+  const aramaId = `hv-arama-ic-${Math.random().toString(36).slice(2, 7)}`;
+  const gizleDugme = olay(el("button", { type: "button", class: "hv-arama-gizle", "aria-label": "Arama alanını gizle", title: "Gizle", "aria-controls": aramaId }, el("span", { "aria-hidden": "true", text: "▲" }), el("span", { class: "hv-arama-gizle-yazi", text: "Gizle" })), "click", () => aramaAyarla(false, { odak: "hap" }));
+  const arama = el("div", { class: "hv-arama" }, el("div", { class: "hv-arama-ust" }, el("strong", { class: "hv-arama-baslik", text: "Konum ara" }), gizleDugme), el("div", { class: "hv-arama-satir" }, giris, araDugme), mesaj, yardimYeri, sonuclar,
     el("p", { class: "hv-ipucu hv-gizlilik-not", text: "Aradığın yerler hesabına kaydedilmez: öneriler Open-Meteo'dan, adres/sokak aramaları OpenStreetMap'ten (yalnızca yazdığın metinle ve sen istediğinde) alınır. Son aramalar yalnızca bu cihazda tutulur." }));
-  const kok = el("div", { class: "hv-konum" }, seritKutu, aktifBaslik, duzenle, arama);
+  const aramaIc = el("div", { class: "hv-arama-ic", id: aramaId }, arama);
+  const akordeon = el("div", { class: "hv-arama-akordeon" }, aramaIc);
+  const hap = olay(el("button", { type: "button", class: "hv-ara-hap", "aria-expanded": "false", "aria-controls": aramaId }, el("span", { "aria-hidden": "true", text: "🔍" }), el("span", { text: "Konum Değiştir / Ara" })), "click", () => aramaAyarla(true, { odak: "giris" }));
+  const durum = el("p", { class: "hv-bulut-durum", role: "status", "aria-live": "polite", hidden: true });
+  const kok = el("div", { class: "hv-konum" }, seritKutu, aktifBaslik, durum, duzenle, hap, akordeon);
+
+  // Arama bloğunun açık/kapalı tercihi OTURUM boyunca hatırlanır (sessionStorage; sekme kapanınca sıfırlanır). Varsayılan: kapalı.
+  const SS_ARAMA = "hv_arama_acik";
+  const ssOku = () => { try { return sessionStorage.getItem(SS_ARAMA) === "1"; } catch { return false; } };
+  const ssYaz = (v) => { try { sessionStorage.setItem(SS_ARAMA, v ? "1" : "0"); } catch { /* depo kapalı */ } };
+  let aramaAcik = false, durumZ = 0;
+  /** Bulut/eşitleme durum satırı (arayuz.js çağırır). tur: bilgi | ok | hata. sureMs > 0 ise kendiliğinden kaybolur. */
+  function durumYaz(metin, tur = "bilgi", sureMs = 0) {
+    clearTimeout(durumZ);
+    durum.hidden = !metin; durum.textContent = metin || ""; durum.dataset.tur = tur;
+    if (metin && sureMs) durumZ = setTimeout(() => { durum.hidden = true; durum.textContent = ""; }, sureMs);
+  }
 
   let aktifSatir = -1, satirlar = [], no = 0, zamanlayici = 0, duzenlenen = null;
   const vitrin = () => !!d.vitrin;
@@ -54,18 +72,20 @@ export function konumBileseni(d, kb) {
   function kartCiz(k, { gps = false } = {}) {
     const son = sonSicaklik(k.lat, k.lon);
     const secili = !gps && (d.konum && konumKimligi(d.konum) === k.id);
-    const b = el("button", { type: "button", class: `hv-konum-kart${secili ? " aktif" : ""}`, role: "listitem", "aria-current": secili ? "true" : null },
+    const b = el("button", { type: "button", class: `hv-konum-kart${secili ? " aktif" : ""}`, role: gps || vitrin() ? "listitem" : null, "aria-current": secili ? "true" : null },
       el("span", { class: "hv-konum-ikon", text: gps ? "📍" : IKONLAR[k.ikon] || "📍" }),
       el("span", { class: "hv-konum-metin" }, el("strong", { text: gps ? "Bulunduğum yer" : gorunenAd(k) }), el("small", { text: gps ? "Cihaz konumu" : altMetin(k) || "—" })),
       son ? el("span", { class: "hv-konum-sic", text: `${son.app}°` }) : null);
     olay(b, "click", () => (gps ? gpsDene() : kb.sec(k)));
     if (gps || vitrin()) return b;
+    // Kalem: kartın SAĞINDA, dikey ortalı, bağımsız dokunma alanı (görünür 32 px + görünmez halka ile ≥ 44 px). Sıcaklık/metinle çakışmaz.
+    b.classList.remove("aktif");
     const kalem = olay(el("button", { type: "button", class: "hv-kalem", "aria-label": `${gorunenAd(k)} konumunu düzenle`, title: "Düzenle" }, el("span", { "aria-hidden": "true", text: "✏️" })), "click", (e) => { e.stopPropagation(); duzenleAc(k); });
-    return el("div", { class: "hv-konum-sarmal" }, b, kalem);
+    return el("div", { class: `hv-konum-sarmal${secili ? " aktif" : ""}`, role: "listitem" }, b, kalem);
   }
   function ciz() {
     const kartlar = d.konumlar.map((k) => kartCiz(k));
-    const ekleBtn = el("button", { type: "button", class: "hv-konum-kart hv-konum-ekle", role: "listitem", "aria-expanded": String(!arama.hidden) },
+    const ekleBtn = el("button", { type: "button", class: "hv-konum-kart hv-konum-ekle", role: "listitem", "aria-expanded": String(aramaAcik) },
       el("span", { class: "hv-konum-ikon", text: "＋" }), el("span", { class: "hv-konum-metin" }, el("strong", { text: "Konum ekle" }), el("small", { text: "Ara veya bul" })));
     olay(ekleBtn, "click", () => aramaAcKapa());
     seritKutu.replaceChildren(...kartlar, kartCiz({ lat: 0, lon: 0, id: "gps" }, { gps: true }), ekleBtn);
@@ -137,11 +157,18 @@ export function konumBileseni(d, kb) {
   }
 
   /* ---------------- arama ---------------- */
-  function aramaAcKapa(ac) {
-    arama.hidden = ac === undefined ? !arama.hidden : !ac;
+  /** Akordeon aç/kapa. kalici=false: tercih hatırlanmaz (ör. GPS hata mesajı için geçici açılış). odak: "giris" | "hap" | "yok". */
+  function aramaAyarla(ac, { kalici = true, odak = null } = {}) {
+    aramaAcik = !!ac;
+    akordeon.classList.toggle("acik", aramaAcik);
+    aramaIc.inert = !aramaAcik; aramaIc.setAttribute("aria-hidden", String(!aramaAcik));
+    hap.hidden = aramaAcik; hap.setAttribute("aria-expanded", String(aramaAcik));
+    if (kalici) ssYaz(aramaAcik);
     ciz();
-    if (!arama.hidden) { sonuclariGoster(); giris.focus(); }
+    if (aramaAcik) { sonuclariGoster(); if (odak === "giris") giris.focus({ preventScroll: true }); }
+    else if (odak === "hap") hap.focus({ preventScroll: true });
   }
+  const aramaAcKapa = (ac) => aramaAyarla(ac === undefined ? !aramaAcik : ac, { odak: (ac === undefined ? !aramaAcik : ac) ? "giris" : null });
   /** Bir sonucu seçer: arama kapanır, adın tam hâli tamamlanır, son aramalara eklenir, konum değişir. */
   async function sonucuSec(r) {
     const konum = sonucuKonumaCevir(r);
@@ -253,7 +280,7 @@ export function konumBileseni(d, kb) {
   /* ---------------- GPS ---------------- */
   async function gpsDene() {
     mesajGoster(""); bosalt(yardimYeri);
-    arama.hidden = false;
+    aramaAyarla(true, { kalici: false, odak: "yok" });          // hata/izin mesajı görünsün (tercihi değiştirmez)
     if (!navigator.geolocation) { mesajGoster("Bu tarayıcı konum desteklemiyor; şehir adı yazarak devam edebilirsin."); return; }
     // Sitenin kendi güvenlik başlığı (Permissions-Policy: geolocation=()) konumu engelliyorsa tarayıcı HİÇ sormaz; ayar yardımı işe yaramaz.
     const pp = document.permissionsPolicy || document.featurePolicy;
@@ -267,6 +294,6 @@ export function konumBileseni(d, kb) {
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 5 * 60 * 1000 });
   }
 
-  ciz();
-  return { kok, ciz, gpsDene };
+  aramaAyarla(ssOku(), { kalici: false, odak: "yok" });   // ilk durum: oturumda hatırlanan tercih (yoksa kapalı) — ciz() de burada çalışır
+  return { kok, ciz, gpsDene, durumYaz };
 }
