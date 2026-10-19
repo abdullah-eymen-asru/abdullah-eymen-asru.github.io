@@ -12,6 +12,7 @@
  *      (kaynak adı/alan adı izin listesi); soru işaretli başlıklar elenir. 10 dk önbellek, kullanıcı başına hız sınırı. Koordinat gelmez, yalnızca ülke kodu + şehir adı.
  * 3) TEŞHİS            GET /tani        → oturum/yetki/Groq anahtarı/model adımlarını tek tek sınar (arayüzde "Bağlantıyı test et").
  * 4) SAĞLIK            GET /saglik
+ * 5) KOTA SAYACI (v4)  Her Groq isteği havastil_groq_say() RPC'siyle sayılır (istek, token, Groq kota başlıkları); okuma: havastil_groq_kota_durumu() (yalnızca Site Sahibi + yetkili Admin).
  *
  * GÜVENLİK: Supabase JWT + havastil_yetkisi_var_mi() (kendi jetonuyla; service_role YOK). Kullanıcı başına hız sınırı. Groq anahtarı yalnızca
  * env.GROQ_API_KEY (Secret) ve hiçbir yanıtta görünmez. Konum bilgisi bu Worker'a hiç gönderilmez.
@@ -102,7 +103,7 @@ const KATALOG_ETIKET = {
   a_bot_deri: "Deri bot (kauçuk taban)",
   a_bot_kaucuk: "Derin kauçuk dişli kaymaz bot",
   a_kis_botu: "Yalıtımlı kışlık bot",
-  a_kar_botu: "Kar botu (yalıtımlı, kaymaz)",
+  a_kar_botu: "Derin kauçuk dişli kar botu",
 };
 /* KATALOG:BITIS */
 const SENARYO_ETIKET = {
@@ -337,17 +338,33 @@ async function groqTek(env, model, mesajlar, maxTokens, ekParam = true) {
       body: JSON.stringify({ model, messages: mesajlar, max_completion_tokens: maxTokens, temperature: 0.7, ...(ekParam ? modelParam(model) : {}) }),
     });
     let g = null; try { g = await r.json(); } catch { /* json değil */ }
-    if (!r.ok) return { ok: false, durum: r.status, hata: kisalt(g?.error?.message), kod: g?.error?.code };
+    const baslik = { limit_istek: r.headers.get("x-ratelimit-limit-requests"), kalan_istek: r.headers.get("x-ratelimit-remaining-requests"), limit_token: r.headers.get("x-ratelimit-limit-tokens"), kalan_token: r.headers.get("x-ratelimit-remaining-tokens") };
+    const kullanim = { giris: Number(g?.usage?.prompt_tokens) || 0, cikis: Number(g?.usage?.completion_tokens) || 0 };
+    if (!r.ok) return { ok: false, durum: r.status, hata: kisalt(g?.error?.message), kod: g?.error?.code, baslik, kullanim };
     const metin = String(g?.choices?.[0]?.message?.content || "").replace(/\s+/g, " ").replace(/^["“”']+|["“”']+$/g, "").trim().slice(0, 360);
-    return metin ? { ok: true, metin, model: g.model || model } : { ok: false, durum: 200, hata: "Model boş yanıt döndürdü (token sınırı?)", kod: "bos" };
-  } catch (h) { return { ok: false, durum: 0, hata: h?.name === "AbortError" ? "Zaman aşımı" : "Ağ hatası", kod: "ag" }; } finally { clearTimeout(z); }
+    return metin ? { ok: true, metin, model: g.model || model, baslik, kullanim } : { ok: false, durum: 200, hata: "Model boş yanıt döndürdü (token sınırı?)", kod: "bos", baslik, kullanim };
+  } catch (h) { return { ok: false, durum: 0, hata: h?.name === "AbortError" ? "Zaman aşımı" : "Ağ hatası", kod: "ag", baslik: {}, kullanim: { giris: 0, cikis: 0 } }; } finally { clearTimeout(z); }
 }
 /** Model zincirini dener. 401/403/429'da durur (model değiştirmek çözmez); 400/404'te (model yok) sıradakine geçer. */
-async function groqZincir(env, mesajlar, maxTokens = 400) {
+/**
+ * KOTA SAYACI (migration 0102): Groq'a giden HER http isteği (başarılı, hatalı, yeniden deneme) public.havastil_groq_say() RPC'siyle sayılır.
+ * RPC kullanıcının KENDİ jetonuyla çağrılır (service_role yok); yanıtı beklenmez (ctx.waitUntil), sayaç hatası stilist yanıtını asla bozmaz.
+ * İsteğe bağlı sertleştirme: env.HAVASTIL_SAYAC_SIRRI tanımlıysa RPC'ye gönderilir (SQL tarafında owner_havastil_groq_sayac_sir_ayarla ile eşlenir).
+ */
+function sayacYaz(env, ctx, kim, model, s) {
+  if (!kim?.baslik || !env.SUPABASE_URL) return;
+  const sayi = (x) => { const n = Number(x); return Number.isFinite(n) ? Math.round(n) : null; };
+  const govde = { p_model: String(model).slice(0, 60), p_basari: !!s.ok, p_token_giris: s.kullanim?.giris || 0, p_token_cikis: s.kullanim?.cikis || 0,
+    p_limit_istek: sayi(s.baslik?.limit_istek), p_kalan_istek: sayi(s.baslik?.kalan_istek), p_limit_token: sayi(s.baslik?.limit_token), p_kalan_token: sayi(s.baslik?.kalan_token), p_sir: env.HAVASTIL_SAYAC_SIRRI || null };
+  const is = fetch(`${sunucuUrl(env)}/rest/v1/rpc/havastil_groq_say`, { method: "POST", headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: kim.baslik, "Content-Type": "application/json" }, body: JSON.stringify(govde) }).catch(() => {});
+  if (ctx?.waitUntil) ctx.waitUntil(is);
+}
+async function groqZincir(env, mesajlar, maxTokens = 400, sayac = null) {
   const denemeler = [];
   for (const model of modelZinciri(env)) {
     let s = await groqTek(env, model, mesajlar, maxTokens);
-    if (!s.ok && s.durum === 400 && /reasoning|include_reasoning|unsupported/i.test(s.hata || "")) s = await groqTek(env, model, mesajlar, maxTokens, false);
+    if (sayac) sayacYaz(env, sayac.ctx, sayac.kim, model, s);
+    if (!s.ok && s.durum === 400 && /reasoning|include_reasoning|unsupported/i.test(s.hata || "")) { s = await groqTek(env, model, mesajlar, maxTokens, false); if (sayac) sayacYaz(env, sayac.ctx, sayac.kim, model, s); }
     if (s.ok) return { ok: true, metin: s.metin, model: s.model, denemeler };
     denemeler.push({ model, durum: s.durum, kod: s.kod || "", mesaj: s.hata });
     if ([401, 403, 429, 0].includes(s.durum)) break;
@@ -367,7 +384,7 @@ function groqNeden(denemeler) {
 const YAGIS_TURLERI = { yok: "yağış yok", cise: "çisenti", genis: "geniş cephe yağışı", konvektif: "konvektif sağanak", karma: "karma yağış", kar: "kar" };
 const KRIZ_TURLERI = {
   ofis_cikis: "sıcak iç ortamdan (ofis/araç) soğuk dışarıya geçiş", ruzgar_hamle: "sert rüzgâr hamlesi", yagis: "yağışın başlaması/şiddetlenmesi",
-  konvektif: "ani konvektif sağanak/dolu riski", sicaklik_dususu: "kısa sürede ani soğuma",
+  konvektif: "ani konvektif sağanak/dolu riski", sicaklik_dususu: "kısa sürede ani soğuma", kar_buz: "kar yağışı / gizli buzlanma (kaygan zemin)",
 };
 const YAGIS_SEVIYE_AD = ["kurak", "hafif çisenti (zararsız)", "sürekli yağmur", "tehlikeli/ani sağanak"];
 
@@ -479,7 +496,7 @@ const ASIL_ISLEYICI = {
       if (y.hata) return json({ adimlar }, 200, cors);
       ekle("Groq anahtarı", !!env.GROQ_API_KEY, env.GROQ_API_KEY ? "GROQ_API_KEY tanımlı." : "GROQ_API_KEY tanımlı değil (Secret olarak ekle).");
       if (!env.GROQ_API_KEY) return json({ adimlar }, 200, cors);
-      const s = await groqZincir(env, [{ role: "system", content: "Kısa cevap ver." }, { role: "user", content: "Sadece 'tamam' yaz." }], 120);
+      const s = await groqZincir(env, [{ role: "system", content: "Kısa cevap ver." }, { role: "user", content: "Sadece 'tamam' yaz." }], 120, { ctx, kim });
       if (s.ok) ekle("Groq çağrısı", true, `Çalışıyor (model: ${s.model}).`);
       else { const n = groqNeden(s.denemeler); ekle("Groq çağrısı", false, `${n.ipucu} Denemeler: ${s.denemeler.map((d) => `${d.model} → ${d.durum}${d.mesaj ? ` (${d.mesaj})` : ""}`).join(" · ")}`); }
       const hv = havuzOnbellek.get("tr");
@@ -499,7 +516,7 @@ const ASIL_ISLEYICI = {
       if (var_ && Date.now() - var_.t < 30 * 60 * 1000) return json({ metin: var_.metin, model: "önbellek", onbellek: true }, 200, cors);
       if (hizSiniri(stilistHiz, u.kim.uid, 12)) return json({ error: "Çok sık istek: birkaç dakika sonra tekrar dene.", neden: "hiz", ipucu: "Dakikada çok fazla yorum istedin; kısa süre bekle.", hiz: true }, 429, { ...cors, "Retry-After": "300" });
       const haber = d.haberId ? await haberBaslikBul(env, ctx, d.haberId) : undefined;
-      const s = await groqZincir(env, [{ role: "system", content: SISTEM_ISTEMI }, { role: "user", content: istemMetni(d, haber) }], 400);
+      const s = await groqZincir(env, [{ role: "system", content: SISTEM_ISTEMI }, { role: "user", content: istemMetni(d, haber) }], 400, { ctx, kim: u.kim });
       if (!s.ok) { const n = groqNeden(s.denemeler); return json({ error: "Stilist şu an yanıt veremiyor.", ...n, denemeler: s.denemeler.map((x) => ({ model: x.model, durum: x.durum })) }, n.neden === "groq_kota" ? 429 : 502, cors); }
       if (stilistOnbellek.size > 500) stilistOnbellek.clear();
       const metin = yorumuTemizle(s.metin);
