@@ -1,144 +1,143 @@
 /**
- * haber-filtre.js — "Haber doğrulama" YEREL ve DETERMİNİSTİK süzgeçleri (LLM YOK, ağ YOK). Türkçe + İngilizce.
- *   1) Tık tuzağı: soru işareti / manipülatif kalıp → çöp
- *   2) Zaman: yalnızca BUGÜNÜ ilgilendirenler (gelecek gün, geçmiş gün ve eski haberler elenir) — haberin konumunun SAAT DİLİMİNE göre
- *   3) Yer: sokak → mahalle → ilçe → il/şehir → bölge → ülke sırasıyla EN ÖZEL eşleşme bulunur (hepsi tarayıcıda; sunucuya yer gitmez)
+ * bulut.js — HavaStil isteğe bağlı bulut senkronu (migration 0099 + 0100 + 0101: havastil_konumlari / havastil_tercihleri).
+ * BULUT ÖNCELİKLİ (v7, migration 0104): kullanıcı eşitlemeyi onayladıysa (ya da bulutta zaten kaydı varsa) konumlar hesabında tutulur; kapalıyken yalnızca cihazda durur. Eşitleme AÇIKKEN kaydettiği konumların adı (etiketi), yer adı, simgesi ve
+ * koordinatı (v4: YUVARLANMADAN, numeric(9,6); migration 0101) RLS ile yalnızca kendi satırı olarak Supabase'e yazılır; kapatınca isteğe bağlı silinir.
+ * Anlık GPS konumu ve arama metinleri ASLA kaydedilmez — yalnızca kullanıcının "⭐ Kaydet" dediği konumlar.
+ * DB sütunu `ad` = kullanıcıya görünen isim (etiket, yoksa yer adı; kullanıcı başına benzersiz); `yer_adi` = coğrafi yer adı (yalnızca etiket farklıysa dolar).
+ * Not: 0101 çalıştırılmadıysa yeni sütunlar yoktur; bu durumda yazma/okuma eski sütunlarla (geriye uyumlu) yapılır.
  */
-import { normalize, ilAniliyor, bolgeAniliyor, BOLGELER } from "./iller.js";
+import { supabase } from "../core/supabase-client.js";
 
-/* ------------------------------ 1) CLICKBAIT ------------------------------ */
-export const CLICKBAIT_KALIPLARI = [
-  /korkutan/, /felaket geliyor/, /(^|[^a-z0-9])o il(imiz|imize|imizde|e|de)?([^a-z0-9]|$)/, /tarih verildi/, /uzmanlar? uyardi/, /sakin yapmayin/,
-  /kiyamet/, /dehset/, /inanamayacaksiniz/, /(^|[^a-z0-9])sok([^a-z0-9]|$)/, /herkes bunu/, /bunu gorenler/,
-  /choc(ant)?([^a-z0-9]|$)/, /incroyable/, /(^|[^a-z0-9])schock/, /unglaublich/, /sensacional/, /you won'?t believe/, /(^|[^a-z0-9])shocking/, /terrifying/, /doom(sday)?/, /apocalypse/, /experts? (warn|fear)/, /this is why/, /what happens next/,
-];
-export function clickbaitMi(baslik) {
-  if (/[?？]/.test(String(baslik))) return "soru işareti";
-  const t = normalize(baslik);
-  return CLICKBAIT_KALIPLARI.some((d) => d.test(t)) ? "manipülatif kalıp" : null;
-}
+const duz = (x) => Math.round(Number(x) * 1e6) / 1e6;
+export const konumAnahtari = (k) => `${String(k.etiket || k.ad).trim().toLowerCase()}|${duz(k.lat)}|${duz(k.lon)}`;
+const SUTUNLAR = "id, ad, yer_adi, enlem, boylam, ikon, ulke, admin1, ilce, mahalle, sokak";
+const ESKI_SUTUNLAR = "id, ad, enlem, boylam, ikon, ulke, admin1, ilce";
+const SIRALI_SUTUNLAR = `${SUTUNLAR}, sira`;       // migration 0104; yoksa sırasıyla SUTUNLAR → ESKI_SUTUNLAR'a düşülür
+const sutunYok = (e) => /column|schema cache|42703|PGRST204|PGRST200/i.test(`${e?.code || ""} ${e?.message || ""}`);
 
-/* ------------------------------ 2) ZAMAN ------------------------------ */
-const GUN_TR = ["pazar", "pazartesi", "sali", "carsamba", "persembe", "cuma", "cumartesi"];
-const GUN_EN = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-const AY_TR = ["ocak", "subat", "mart", "nisan", "mayis", "haziran", "temmuz", "agustos", "eylul", "ekim", "kasim", "aralik"];
-const AY_EN = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
-export const SIMDI_MARKERLARI = [
-  /(^|[^a-z0-9])bugun/, /bu gece/, /(^|[^a-z0-9])anlik/, /su an(da)?([^a-z0-9]|$)/, /ogleden sonra/, /aksam([^a-z0-9]|$)/, /bu sabah/, /sabah saatlerinde/, /gece saatlerinde/,
-  /gun boyu/, /(^|[^a-z0-9])saatlerde/, /onumuzdeki (\d+ )?saat/, /ogle saatlerinde/,
-  /(^|[^a-z0-9])today/, /tonight/, /this (morning|afternoon|evening)/, /(^|[^a-z0-9])now([^a-z0-9]|$)/, /currently/, /(until|through) (this )?(evening|tonight)/, /(^|[^a-z0-9])overnight/,
-];
-export const TAZE_SAAT = 6;
+const satirdanKonum = (r) => {
+  const yer = r.yer_adi || r.ad;
+  return { bid: r.id, ...(Number.isFinite(r.sira) ? { sira: r.sira } : {}), ad: yer, ...(r.yer_adi && r.yer_adi !== r.ad ? { etiket: r.ad } : {}), lat: Number(r.enlem), lon: Number(r.boylam), ikon: r.ikon || "diger", ...(r.ulke ? { ulke: r.ulke } : {}), ...(r.admin1 ? { admin1: r.admin1, il: r.ulke === "TR" ? r.admin1 : undefined } : {}), ...(r.ilce ? { ilce: r.ilce } : {}), ...(r.mahalle ? { mahalle: r.mahalle } : {}), ...(r.sokak ? { sokak: r.sokak } : {}) };
+};
+const konumdanSatir = (k, uid) => ({
+  ...(uid ? { user_id: uid } : {}),
+  ad: String(k.etiket || k.ad).trim().slice(0, 40), yer_adi: k.etiket ? String(k.ad).trim().slice(0, 60) : null,
+  enlem: duz(k.lat), boylam: duz(k.lon), ikon: k.ikon || "diger",
+  ulke: (k.ulke || "").slice(0, 2) || null, admin1: (k.admin1 || "").slice(0, 60) || null, ilce: (k.ilce || "").slice(0, 60) || null, mahalle: (k.mahalle || "").slice(0, 60) || null, sokak: (k.sokak || "").slice(0, 60) || null,
+});
+const eskiSatir = ({ yer_adi, mahalle, sokak, ...r }) => r;
 
-/** Verilen saat diliminde "şimdi": { gunAdiTr, gunAdiEn, gun, ayTr, ayEn, haftaSonu } */
-export function simdiBilgisi(d = new Date(), tz = "Europe/Istanbul") {
-  let p;
-  try { p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "long", day: "numeric", month: "long" }).formatToParts(d).map((x) => [x.type, x.value])); }
-  catch { p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "long", day: "numeric", month: "long" }).formatToParts(d).map((x) => [x.type, x.value])); }
-  const gunEn = p.weekday.toLowerCase(), i = GUN_EN.indexOf(gunEn), ayEn = p.month.toLowerCase();
-  return { gunAdiEn: gunEn, gunAdiTr: GUN_TR[i], gun: Number(p.day), ayEn, ayTr: AY_TR[AY_EN.indexOf(ayEn)], haftaSonu: i === 0 || i === 6 };
-}
-export const trSimdi = (d, tz) => simdiBilgisi(d, tz);
-
-export function zamanDegerlendir({ baslik, ozet, yayin, yerel }, simdi = new Date(), pencereSaat = 24, tz = "Europe/Istanbul") {
-  const t = normalize(`${baslik} ${ozet || ""}`);
-  const yas = (simdi.getTime() - new Date(yayin).getTime()) / 36e5;
-  if (!Number.isFinite(yas)) return { gecerli: false, neden: "yayın zamanı yok" };
-  if (yas > pencereSaat) return { gecerli: false, neden: `${pencereSaat} saatten eski` };
-  // Yerel dilde (fr/de/es…) dinamik Google News sorgusu zaten "son 24 saat" ile sınırlı; TR/EN gün-işareti kalıpları orada çalışmaz.
-  if (yerel) return yas <= 12 ? { gecerli: true, simdiIsareti: true } : { gecerli: false, neden: "yerel haber 12 saatten eski" };
-
-  const s = simdiBilgisi(simdi, tz);
-  const simdiIsareti = SIMDI_MARKERLARI.some((d) => d.test(t));
-  let gelecek = false, gecmis = false;
-
-  if (/(^|[^a-z0-9])dun([^a-z0-9]|$)|gecen (hafta|gece)|yesterday|last (night|week)/.test(t)) gecmis = true;
-  if (/(^|[^a-z0-9])yarin|haftaya|gelecek hafta|onumuzdeki (gun|gunler|hafta|haftalar|ay)|\d+ gun sonra|(^|[^a-z0-9])hafta ici|tomorrow|next week|coming days|later this week|over the weekend/.test(t)) gelecek = true;
-  if (/hafta sonu|(^|[^a-z0-9])weekend/.test(t) && !s.haftaSonu) gelecek = true;
-  GUN_TR.forEach((g, i) => {
-    const desenTr = g === "pazar" ? /(^|[^a-z0-9])pazar (gunu|gunune|gunden|aksami|gecesi|sabahi|itibaren)/ : new RegExp(`(^|[^a-z0-9])${g}([^a-z0-9]|$)`);
-    const desenEn = new RegExp(`(^|[^a-z0-9])${GUN_EN[i]}([^a-z0-9]|$)`);
-    if ((desenTr.test(t) || desenEn.test(t)) && GUN_EN[i] !== s.gunAdiEn) gelecek = true;
-  });
-  for (const m of t.matchAll(new RegExp(`(\\d{1,2})\\s+(${AY_TR.join("|")}|${AY_EN.join("|")})`, "g"))) {
-    if (Number(m[1]) !== s.gun || ![s.ayTr, s.ayEn].includes(m[2])) gelecek = true;
+export async function bulutKonumlariCek() {
+  let error, data;
+  for (const [sutun, sirali] of [[SIRALI_SUTUNLAR, true], [SUTUNLAR, false], [ESKI_SUTUNLAR, false]]) {
+    let q = supabase.from("havastil_konumlari").select(sutun);
+    if (sirali) q = q.order("sira", { ascending: true });
+    ({ data, error } = await q.order("created_at", { ascending: true }));
+    if (!error || !sutunYok(error)) break;
   }
-  for (const m of t.matchAll(new RegExp(`(${AY_EN.join("|")})\\s+(\\d{1,2})`, "g"))) {
-    if (Number(m[2]) !== s.gun || m[1] !== s.ayEn) gelecek = true;
-  }
-  if (gecmis && !simdiIsareti) return { gecerli: false, neden: "geçmiş güne ait" };
-  if (gelecek && !simdiIsareti) return { gecerli: false, neden: "gelecek günü hedefliyor" };
-  if (!simdiIsareti && yas > TAZE_SAAT) return { gecerli: false, neden: "bugüne ait açık işaret yok" };
-  return { gecerli: true, simdiIsareti, kismenGelecek: gelecek };
+  if (error) throw error;
+  return (data || []).map(satirdanKonum);
 }
 
-/* ------------------------------ 3) YER (en özelden genele) ------------------------------ */
-const KAPSAM_SIRA = ["sokak", "mahalle", "ilce", "il", "bolge", "ulke"];
-const KAPSAM_AD = { sokak: "sokağını", mahalle: "mahallesini", ilce: "ilçesini", il: "ilini", bolge: "bölgesini", ulke: "ülkesini" };
-export const kapsamEtiketi = (k) => KAPSAM_AD[k] || "";
-const kacis = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** Bulutta kayıt var mı? (Yeni cihazda önceki rızanın kanıtı: başka cihazdan ⭐ ile kaydedilmiş konum/tercih.) */
+export async function bulutVarMi() {
+  const a = await supabase.from("havastil_konumlari").select("id", { count: "exact", head: true });
+  if (a.error) throw a.error;
+  if ((a.count || 0) > 0) return true;
+  const b = await supabase.from("havastil_tercihleri").select("user_id", { count: "exact", head: true });
+  if (b.error) throw b.error;
+  return (b.count || 0) > 0;
+}
 
-/** Bir adın metinde geçip geçmediği. Türkçe ekler (İstanbul'da/İstanbulda) ve İngilizce iyelik (London's) tolere edilir. */
-function adGeciyor(t, ad) {
-  const n = normalize(ad).trim();
-  if (n.length < 3) return false;
-  const e = kacis(n);
-  return new RegExp(`(^|[^a-z0-9])${e}(${n.length >= 5 ? "[a-z]{0,4}|" : ""}'[a-z]+|s)?([^a-z0-9]|$)`).test(t);
+/** "İlk sıraya al" vb.: listedeki sıraya göre sira alanını yazar (yalnızca bid'i olanlar; migration 0104 yoksa sessizce atlanır). */
+export async function bulutSiraYaz(liste) {
+  const sirali = liste.filter((k) => k.bid);
+  for (let i = 0; i < sirali.length; i++) {
+    const { error } = await supabase.from("havastil_konumlari").update({ sira: i }).eq("id", sirali[i].bid);
+    if (error) { if (sutunYok(error)) return; throw error; }
+  }
+}
+
+export async function bulutKonumEkle(k) {
+  const { data: o } = await supabase.auth.getSession();
+  const uid = o?.session?.user?.id;
+  if (!uid) throw new Error("Oturum yok.");
+  const yaz = (satir) => supabase.from("havastil_konumlari").upsert(satir, { onConflict: "user_id,ad" }).select("id").single();
+  let { data, error } = await yaz(konumdanSatir(k, uid));
+  if (error && sutunYok(error)) ({ data, error } = await yaz(eskiSatir(konumdanSatir(k, uid))));
+  if (error) throw error;
+  return data.id;
+}
+
+/** Düzenleme: etiket / simge / koordinat güncellemesi → UPDATE (satır kimliği `bid` ile; RLS yalnızca sahibine izin verir). */
+export async function bulutKonumGuncelle(bid, k) {
+  const gun = (satir) => supabase.from("havastil_konumlari").update(satir).eq("id", bid).select("id").single();
+  let { data, error } = await gun(konumdanSatir(k));
+  if (error && sutunYok(error)) ({ data, error } = await gun(eskiSatir(konumdanSatir(k))));
+  if (error) throw error;
+  return data.id;
+}
+
+export async function bulutKonumSil(bid) {
+  const { error } = await supabase.from("havastil_konumlari").delete().eq("id", bid);
+  if (error) throw error;
+}
+
+export async function bulutTumunuSil() {
+  const { data: o } = await supabase.auth.getSession();
+  const uid = o?.session?.user?.id;
+  if (!uid) return;
+  await supabase.from("havastil_konumlari").delete().eq("user_id", uid);
+  await supabase.from("havastil_tercihleri").delete().eq("user_id", uid);
+}
+
+export async function bulutTercihOku() {
+  const { data, error } = await supabase.from("havastil_tercihleri").select("tolerans, senaryo, stil, canta").maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
+export async function bulutTercihYaz({ tolerans, senaryo, stil, canta }) {
+  const { data: o } = await supabase.auth.getSession();
+  const uid = o?.session?.user?.id;
+  if (!uid) return;
+  const { error } = await supabase.from("havastil_tercihleri").upsert({ user_id: uid, tolerans, senaryo, stil: stil || "auto", canta: canta || "el", updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+  if (error) throw error;
 }
 
 /**
- * @param {{baslik,ozet}} h  @param {object} konum  { ulke, ad, adEn, admin1, admin1En, ulkeAd, ilce, mahalle, sokak, il }  @param {object|null} il  TR il nesnesi
- * @returns {{kapsam:string, ad:string}|null}  en özel eşleşme
+ * BULUT ÖNCELİKLİ eşitleme (oturum açıkken sayfa yüklenince / sekmeye dönünce):
+ *  • Bulut = doğruluk kaynağı: sıra ve içerik bulutakini izler.
+ *  • Yerelde `bid`i olup bulutta artık OLMAYAN kayıt başka cihazdan silinmiştir → yerelden de düşer.
+ *  • `bid`i olmayan yerel kayıt (henüz yüklenmemiş / çevrimdışı eklenmiş) buluta yüklenir (aynı anahtar bulutta varsa bulut kopyası kullanılır). En çok 20.
+ * @returns {{liste:object[], yuklenen:number, silinen:number}}
  */
-export function yerEslesmesi({ baslik, ozet }, konum, il) {
-  const t = normalize(`${baslik} ${ozet || ""}`);
-  const seviyeler = {};
-  if (konum.sokak) seviyeler.sokak = [konum.sokak];
-  if (konum.mahalle) seviyeler.mahalle = [konum.mahalle];
-  if (konum.ilce) seviyeler.ilce = [konum.ilce];
-  if (il) {
-    if (ilAniliyor(t, il)) return enOzel(seviyeler, t, { kapsam: "il", ad: il.ad });
-    if (bolgeAniliyor(t, il)) return enOzel(seviyeler, t, { kapsam: "bolge", ad: BOLGELER[il.bolge].ad });
-    if (/yurt genelinde|turkiye genelinde|tum yurtta|ulke genelinde|yurdun (genelinde|tamaminda)|turkiye'de|turkiye'nin|nationwide|across turkey/.test(t)) return enOzel(seviyeler, t, { kapsam: "ulke", ad: "Türkiye" });
-    return enOzel(seviyeler, t, null);
+export async function bulutEsitle(yerel) {
+  const bulut = await bulutKonumlariCek();
+  const bulutBid = new Set(bulut.map((k) => k.bid));
+  const var_ = new Set(bulut.map(konumAnahtari));
+  const silinen = yerel.filter((k) => k.bid && !bulutBid.has(k.bid)).length;
+  const sonuc = [...bulut];
+  let yuklenen = 0;
+  for (const k of yerel) {
+    if (k.bid || var_.has(konumAnahtari(k))) continue;
+    if (sonuc.length >= 20) break;
+    try { sonuc.push({ ...k, bid: await bulutKonumEkle(k) }); var_.add(konumAnahtari(k)); yuklenen++; } catch { /* ad çakışması vb.: atla */ }
   }
-  const sehir = [konum.ad, konum.adEn].filter(Boolean);
-  const bolge = [konum.admin1, konum.admin1En].filter((x, i, a) => x && a.indexOf(x) === i && !sehir.includes(x));
-  const ulke = [konum.ulkeAd, konum.ulkeAdEn].filter(Boolean);
-  if (sehir.some((a) => adGeciyor(t, a))) return enOzel(seviyeler, t, { kapsam: "il", ad: konum.adEn || konum.ad });
-  if (bolge.some((a) => adGeciyor(t, a))) return enOzel(seviyeler, t, { kapsam: "bolge", ad: konum.admin1En || konum.admin1 });
-  if (ulke.some((a) => adGeciyor(t, a))) return enOzel(seviyeler, t, { kapsam: "ulke", ad: konum.ulkeAdEn || konum.ulkeAd });
-  return enOzel(seviyeler, t, null);
-}
-function enOzel(seviyeler, t, genel) {
-  for (const k of ["sokak", "mahalle", "ilce"]) {
-    const ad = (seviyeler[k] || []).find((a) => adGeciyor(t, a));
-    if (ad) return { kapsam: k, ad };
-  }
-  return genel;
+  return { liste: sonuc, yuklenen, silinen };
 }
 
-/* ------------------------------ süzgeç hattı ------------------------------ */
-/**
- * @returns {{gecenler:Array, elenen:{clickbait:number,zaman:number,konum:number}}}
- */
-export function suz(haberler, { konum, il, simdi = new Date(), tz = "Europe/Istanbul" }) {
-  const elenen = { clickbait: 0, zaman: 0, konum: 0 };
-  const gecenler = [];
-  const gorulen = new Set();
-  for (const h of haberler) {
-    const anahtar = normalize(h.baslik).replace(/[^a-z0-9]+/g, " ").trim();
-    if (gorulen.has(anahtar)) continue;
-    gorulen.add(anahtar);
-    if (clickbaitMi(h.baslik)) { elenen.clickbait++; continue; }
-    const pencere = h.tur === "genel" ? 18 : 24;
-    const z = zamanDegerlendir(h, simdi, pencere, tz);
-    if (!z.gecerli) { elenen.zaman++; continue; }
-    // Yerel sorgu (Google News, şehir adıyla) zaten konuma özeldir: başlıkta ad geçmese de şehir kapsamı kabul edilir.
-    const y = yerEslesmesi(h, konum, il) || (h.yerel ? { kapsam: "il", ad: konum.adEn || konum.ad } : null);
-    if (!y) { elenen.konum++; continue; }
-    gecenler.push({ ...h, kapsam: y.kapsam, kapsamAd: y.ad, simdiIsareti: z.simdiIsareti, kismenGelecek: !!z.kismenGelecek });
-  }
-  return { gecenler, elenen };
+/** Eski ad (geriye uyum): ilk açılışta yerel + bulut birleşimi. */
+export async function birlestir(yerel) { return (await bulutEsitle(yerel)).liste; }
+
+/** Bulut hata kodu → kullanıcıya anlaşılır Türkçe metin. */
+export function bulutHataMetni(h) {
+  const m = `${h?.code || ""} ${h?.message || ""}`;
+  if (/42501|row-level security|permission denied/i.test(m)) return "⚠️ Hesabında HavaStil bulut kaydı yetkisi yok (RLS). Konum bu cihazda tutuldu.";
+  if (/42P01|does not exist|schema cache|PGRST205/i.test(m)) return "⚠️ Gerekli migration (0099–0104) çalıştırılmamış. Konum bu cihazda tutuldu.";
+  if (/En fazla 20/i.test(m)) return "⚠️ En fazla 20 konum kaydedebilirsin.";
+  if (/23505|duplicate key/i.test(m)) return "⚠️ Aynı isimde başka bir konumun var; ismi değiştir.";
+  if (/Oturum yok|JWT|401/i.test(m)) return "⚠️ Oturum süresi dolmuş olabilir; yeniden giriş yap. Konum bu cihazda tutuldu.";
+  if (/fetch|network|Failed|Load failed/i.test(m)) return "⚠️ Bağlantı yok: konum bu cihazda tutuldu, bağlanınca hesabınla eşitlenecek.";
+  return `⚠️ Hesapla eşitlenemedi (${h?.message || h}). Konum bu cihazda tutuldu.`;
 }
-export { KAPSAM_SIRA };
