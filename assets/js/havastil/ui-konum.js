@@ -9,14 +9,14 @@
  *  • "Bulunduğum yer": izin yoksa/reddedilmişse tarayıcıya özel adımlarla yönlendirir.
  */
 import { el, olay, rozet, ipucu, cipGrubu, izinYardimKarti, bosalt, etiket } from "./ui-temel.js";
-import { yerAra, adresAra, sonSicaklik } from "./veri.js";
+import { yerAra, adresAra, sonSicaklik, adEnTamamla } from "./veri.js";
 import { yerelIlAra, ilAdindan, enYakinIl, BOLGELER } from "./iller.js";
 import { IKONLAR, IKON_ADLARI, kayitliMi, konumKimligi, sonAramalar, sonAramaEkle, gorunenAd } from "./konumlar.js";
 import { izinDurumu, konumHataMetni } from "./izin-yardim.js";
 
 /** Open-Meteo/Nominatim/Photon/yerel sonucu → konum nesnesi */
 export function sonucuKonumaCevir(r) {
-  const k = { ad: r.ad, adEn: r.adEn, lat: r.lat, lon: r.lon, ulke: r.ulke, ulkeAd: r.ulkeAd, ulkeAdEn: r.ulkeAdEn, admin1: r.admin1, admin1En: r.admin1En, mahalle: r.mahalle, sokak: r.sokak };
+  const k = { omId: r.omId, ad: r.ad, adEn: r.adEn, lat: r.lat, lon: r.lon, ulke: r.ulke, ulkeAd: r.ulkeAd, ulkeAdEn: r.ulkeAdEn, admin1: r.admin1, admin1En: r.admin1En, mahalle: r.mahalle, sokak: r.sokak };
   if (r.ulke === "TR") {
     const il = ilAdindan(r.il || r.admin1) || enYakinIl(r.lat, r.lon);
     if (il) { k.il = il.ad; k.admin1 = il.ad; k.admin1En = il.ad; }
@@ -101,9 +101,10 @@ export function konumBileseni(d, kb) {
     const araBtn = olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "🔎 Ara" }), "click", async () => {
       const q = yeniAra.value.trim(); if (q.length < 3) { yeniDurum.textContent = "En az 3 harf yaz."; return; }
       araBtn.disabled = true; yeniDurum.textContent = "Aranıyor…";
-      const [a, b] = await Promise.allSettled([yerAra(q), adresAra(q)]);
+      let liste = [];
+      try { liste = (await yerAra(q)).slice(0, 8); } catch { /* adrese düş */ }
+      if (!liste.length) { try { liste = (await adresAra(q)).slice(0, 8); } catch { /* sonuç yok */ } }   // TEK kaynak sırayla: yalnız gerekirse ikincisine gidilir
       araBtn.disabled = false;
-      const liste = [...(a.status === "fulfilled" ? a.value.slice(0, 4) : []), ...(b.status === "fulfilled" ? b.value : [])].slice(0, 8);
       yeniDurum.textContent = liste.length ? "Yeni noktayı seç:" : "Sonuç bulunamadı.";
       yeniSonuc.replaceChildren(...liste.map((r) => el("li", { class: "hv-sonuc", role: "presentation" }, olay(el("button", { type: "button", class: "hv-sonuc-ana" },
         el("span", { class: "hv-bayrak", "aria-hidden": "true", text: BAYRAK(r.ulke) }), el("span", { class: "hv-konum-metin" }, el("strong", { text: r.ad }), el("small", { text: r.ayrinti || [r.admin2, r.admin1, r.ulkeAd].filter(Boolean).join(", ") }))), "click", () => {
@@ -159,7 +160,7 @@ export function konumBileseni(d, kb) {
       el("span", { class: "hv-bayrak", "aria-hidden": "true", text: tur === "son" ? "🕘" : BAYRAK(r.ulke || (konum.il ? "TR" : "")) }),
       el("span", { class: "hv-konum-metin" }, el("strong", { text: r.ad }), el("small", { text: r.ayrinti || [r.admin2, r.admin1, r.ulkeAd].filter(Boolean).join(", ") })),
       tur === "il" ? rozet("İl") : r.kaynak ? rozet(r.kaynak) : null);
-    olay(sec, "click", () => { sonAramaEkle(konum); kb.sec(konum); aramaAcKapa(false); giris.value = ""; });
+    olay(sec, "click", async () => { aramaAcKapa(false); giris.value = ""; const tam = await adEnTamamla(konum); sonAramaEkle(tam); kb.sec(tam); });
     if (vitrin()) return el("li", { class: "hv-sonuc", role: "presentation" }, sec);
     const yildiz = el("button", { type: "button", class: `hv-yildiz${kayitli ? " dolu" : ""}`, "aria-pressed": String(kayitli), "aria-label": `${r.ad} konumunu ${kayitli ? "kayıttan çıkar" : "kaydet"}`, title: kayitli ? "Kayıtlı" : "Kaydet" }, el("span", { "aria-hidden": "true", text: kayitli ? "★" : "☆" }));
     olay(yildiz, "click", (e) => { e.stopPropagation(); kb.kaydetDegistir(konum); const yeni = d.konumlar.find((x) => x.id === konumKimligi(konum)); yildiz.classList.toggle("dolu", !!yeni); yildiz.setAttribute("aria-pressed", String(!!yeni)); yildiz.firstChild.textContent = yeni ? "★" : "☆"; ciz(); if (yeni) duzenleAc(yeni, true); });
@@ -182,18 +183,20 @@ export function konumBileseni(d, kb) {
     if (!son.length) sonuclar.replaceChildren(el("li", { class: "hv-sonuc-bos", role: "presentation", text: "İl adının ilk harflerini yazman yeterli (“Ank” → Ankara). Sokak/mahalle için adresi yazıp Enter'a bas: “Esatpaşa Mahallesi, Ataşehir”, “Times Square, New York”." }));
   }
   function mesajGoster(m) { mesaj.hidden = !m; mesaj.textContent = m || ""; }
+  let iptal = null;
   async function ara(q) {
     const benim = ++no;
+    iptal?.abort(); iptal = new AbortController();
     const yerel = yerelIlAra(q).map((il) => ({ id: `il_${il.ad}`, ad: il.ad, adEn: il.ad, lat: il.lat, lon: il.lon, ulke: "TR", ulkeAd: "Türkiye", ulkeAdEn: "Turkey", admin1: il.ad, il: il.ad, ayrinti: `Türkiye · ${BOLGELER[il.bolge].ad} Bölgesi` }));
     sonuclariCiz([{ baslik: "Türkiye illeri", tur: "il", liste: yerel }, ...(q.length >= 3 ? [{ baslik: "Dünya geneli", tur: "dunya", liste: [], bos: "Aranıyor…" }] : [])]);
     if (q.length < 3) return;
     try {
-      const r = await yerAra(q);
+      const r = await yerAra(q, { sinyal: iptal.signal });
       if (benim !== no) return;
       const ilAdlari = new Set(yerel.map((x) => x.ad));
       const digerleri = r.filter((x) => !(x.ulke === "TR" && ilAdlari.has(x.ad) && !x.admin2)).slice(0, 8);
       sonuclariCiz([{ baslik: "Türkiye illeri", tur: "il", liste: yerel }, { baslik: "Şehir, ilçe, semt (dünya geneli)", tur: "dunya", liste: digerleri, bos: "Eşleşme bulunamadı. Adres/sokak için Enter'a bas." }]);
-    } catch { if (benim === no) mesajGoster("Öneriler alınamadı (ağ). İl adı yazarak yine de seçebilirsin."); }
+    } catch (h) { if (h?.name === "AbortError" || benim !== no) return; mesajGoster("Öneriler alınamadı (ağ). İl adı yazarak yine de seçebilirsin."); }
     if (benim === no) sokakDugmesiEkle(q);
   }
   function sokakDugmesiEkle(q) {
@@ -220,7 +223,7 @@ export function konumBileseni(d, kb) {
     clearTimeout(zamanlayici); mesajGoster("");
     const q = giris.value.trim();
     if (q.length < 2) { no++; sonuclariGoster(); return; }
-    zamanlayici = setTimeout(() => ara(q), 260);
+    zamanlayici = setTimeout(() => ara(q), 380);          // v5: daha seyrek istek (takılma yok), önceki istek iptal edilir
   });
   olay(giris, "keydown", (e) => {
     if (e.key === "Escape") { aramaAcKapa(false); return; }
