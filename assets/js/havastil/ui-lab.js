@@ -8,7 +8,7 @@
  *   4) Haber doğrulama katmanı  — filtreden geçen güncel uyarı: başlık, kaynak, yayın saati, kapsam; elenen sayıları. (Vitrinde Worker çağrılmaz.)
  * Burada yeni hesap YOKTUR: kendi çekirdek fonksiyonları (hedefClo, saatAnaliz, yagisMotoru) aynı girdilerle yeniden gösterilir.
  */
-import { el, kart, ipucu, bolumBasligi, rozet, zamanOnce } from "./ui-temel.js";
+import { el, kart, ipucu, bolumBasligi, rozet, zamanOnce, olay } from "./ui-temel.js";
 import { hedefClo, SENARYOLAR } from "./cekirdek.js";
 import { ESIK } from "./yagis-fizigi.js";
 
@@ -36,6 +36,35 @@ function hamKarti(d) {
 }
 
 /* ------------------------------ 2) üç model ------------------------------ */
+const UZLASI = [[0, "Hiçbiri görmüyor", "u0"], [25, "Yalnızca biri görüyor", "u1"], [50, "Yarısı görüyor", "u2"], [75, "Çoğu görüyor", "u3"], [100, "Hepsi hemfikir", "u4"]];
+const ESIKLER = [[0.1, "≥ 0,1 mm (damla)"], [0.5, "≥ 0,5 mm (hafif yağmur)"], [1, "≥ 1 mm (belirgin)"]];
+const uzlasiSeviye = (yuzde) => UZLASI.reduce((a, u) => (yuzde >= u[0] ? u : a), UZLASI[0]);
+/** Saatlik uzlaşı indeksi: kaynaklar (ana tahmin + modeller) arasında eşiği geçenlerin yüzdesi, 5 kademeye yuvarlanır. */
+function uzlasiBlogu(d, anahtarlar, ham, idx, sl) {
+  const esik = d.uzlasiEsik || 0.1;
+  const satirOy = sl.map((x) => {
+    const i = idx.get(x.t), kay = [x.yagis, ...anahtarlar.map((a) => (i != null ? ham[a][i] : null))].filter(Number.isFinite);
+    const goren = kay.filter((m) => m >= esik).length, yuzde = kay.length ? Math.round((goren / kay.length) * 100) : 0;
+    return { x, goren, n: kay.length, yuzde, u: uzlasiSeviye(yuzde) };
+  });
+  const dagilim = UZLASI.map(([y, ad, sinif]) => ({ y, ad, sinif, say: satirOy.filter((o) => o.u[0] === y).length }));
+  const ort = satirOy.length ? Math.round(satirOy.reduce((s, o) => s + o.yuzde, 0) / satirOy.length) : 0;
+  const yagisliSaat = satirOy.filter((o) => o.yuzde > 0);
+  const seritBar = el("div", { class: "hv-uzlasi-bar", role: "img", "aria-label": "24 saatlik uzlaşı dağılımı" }, ...dagilim.filter((g) => g.say > 0).map((g) => { const s = el("span", { class: `hv-uzlasi-dilim ${g.sinif}`, title: `${g.ad}: ${g.say} saat` }, el("small", { text: `%${g.y}` })); s.style.flexGrow = String(g.say); return s; }));
+  const saatSerit = el("div", { class: "hv-uzlasi-saatler", role: "list", "aria-label": "Saat saat uzlaşı" }, ...satirOy.map((o) => el("div", { class: `hv-uzlasi-saat ${o.u[2]}`, role: "listitem", title: `${String(o.x.saat).padStart(2, "0")}:00 · ${o.goren}/${o.n} kaynak yağış görüyor (%${o.yuzde}) · ${o.u[1]}` }, el("small", { text: String(o.x.saat).padStart(2, "0") }), el("strong", { text: o.yuzde ? `%${o.yuzde}` : "·" }))));
+  const esikGrubu = el("div", { class: "hv-cipgrup hv-cipgrup-kucuk", role: "group", "aria-label": "Yağış görme eşiği" }, ...ESIKLER.map(([e, ad]) => {
+    const b = el("button", { type: "button", class: "hv-cip-btn", "aria-pressed": String(esik === e), text: ad });
+    return olay(b, "click", () => { d.uzlasiEsik = e; d.kbCiz?.(); });
+  }));
+  const yorum = !yagisliSaat.length ? `Eşik ${esik} mm iken 24 saatte hiçbir kaynak yağış görmüyor: kuru bir gün, modeller arasında anlaşmazlık yok.`
+    : `Ortalama uzlaşı %${ort}. ${dagilim[4].say ? `${dagilim[4].say} saatte tüm kaynaklar hemfikir (yağış büyük olasılıkla gerçekleşir). ` : ""}${dagilim[1].say + dagilim[2].say ? `${dagilim[1].say + dagilim[2].say} saatte modeller ayrışıyor (yağış belirsiz: kabuğu çantada taşı). ` : ""}`;
+  return el("div", { class: "hv-uzlasi" }, el("h3", { class: "hv-alt-baslik", text: "Model uzlaşı indeksi (24 saat)" }),
+    el("div", { class: "hv-uzlasi-ust" }, el("small", { class: "hv-etiket", text: "Yağış görme eşiği" }), esikGrubu), seritBar, saatSerit,
+    el("div", { class: "hv-uzlasi-lejant" }, ...UZLASI.map(([y, ad, s]) => el("span", { class: `lej ${s}` }, `%${y} · ${ad}`))),
+    el("p", { class: "hv-uzman-not", text: yorum }),
+    el("small", { class: "hv-ipucu", text: `Kaynak sayısı saatte ${satirOy[0]?.n ?? 0} (ana tahmin + ${anahtarlar.length} model); bu yüzden uzlaşı yalnızca 0/25/50/75/100 değerlerini alır.` }));
+}
+
 function modelKarti(d) {
   const h = d.hava, ham = h.modelDizi || {}, anahtarlar = Object.keys(ham);
   if (!anahtarlar.length) return kart("hv-lab-kart", bolumBasligi("2 · ECMWF · ICON · GFS karşılaştırması"), ipucu("Çoklu model verisi alınamadı (ağ ya da sınır). Yalnızca ana tahmin kullanılıyor; Güven × Kapsam ayrıştırması bu durumda yapılmaz."));
@@ -55,9 +84,9 @@ function modelKarti(d) {
   });
   const ozet = el("div", { class: "hv-lab-modeller" }, ...anahtarlar.map((a) => el("div", { class: "hv-lab-model" }, el("small", { text: MODEL_AD[a] || a }), el("strong", { text: `${sayiMetni(toplam[a])} mm` }), el("small", { text: `${oy[a]} saatte yağış görüyor` }))));
   return kart("hv-lab-kart", bolumBasligi("2 · ECMWF · ICON · GFS karşılaştırması"),
-    ipucu("Önümüzdeki 24 saat için üç büyük modelin yağış tahmini yan yana. Dürüst not: Open-Meteo modellere ayrı “olasılık” vermez; yalnızca yağış miktarı (mm) verir. “%PoP” ana (harmanlanmış) tahminin olasılığıdır; “görüyor” oyu ≥ 0,1 mm yağış gösteren kaynaklardır."),
-    ozet,
-    tablo(["Saat", "Ana PoP", "Ana mm", ...anahtarlar.map((a) => `${MODEL_AD[a] || a} mm`), "Yağış gören"], satirlar, "hv-lab-tablo"),
+    ipucu("Önümüzdeki 24 saat için üç büyük modelin yağış tahmini yan yana. Open-Meteo modellere ayrı “olasılık” vermez; yalnızca yağış miktarı (mm) verir. Bu yüzden HavaStil, her modelin ham mm değerinin seçtiğin eşiği geçip geçmediğine bakar ve “kaç kaynak yağış görüyor” oranını UZLAŞI İNDEKSİ yapar (%0 · %25 · %50 · %75 · %100)."),
+    ozet, uzlasiBlogu(d, anahtarlar, ham, idx, sl),
+    el("details", { class: "hv-yardim" }, el("summary", { text: "Ham saatlik tablo (kendin doğrula)" }), tablo(["Saat", "Ana PoP", "Ana mm", ...anahtarlar.map((a) => `${MODEL_AD[a] || a} mm`), "Yağış gören"], satirlar, "hv-lab-tablo")),
     el("p", { class: "hv-ipucu", text: "Güven = yağış gören kaynakların oranı (ana tahmin + 3 model). Kapsam = PoP ÷ Güven. Bu yüzden modeller ayrışırsa Güven düşer ve “yağmur olur ama belirsiz” denir." }));
 }
 
@@ -112,7 +141,40 @@ function haberKarti(d) {
 
 export function dogrulaSekmesi(d, kb) {
   if (!d.hava || !d.sonuc) return kart("hv-bos", ipucu("Hava verisi yükleniyor…"));
+  d.kbCiz = kb.ciz;
   return el("div", { class: "hv-sekme-govde" },
     el("p", { class: "hv-uzman-giris", text: "Bu sayfa herkese açıktır. Amaç: HavaStil'in veri uydurmadığını göstermek — ham sayılar, üç büyük modelin karşılaştırması, kararın matematiği ve haber doğrulaması tek yerde." }),
-    hamKarti(d), modelKarti(d), cloKarti(d), haberKarti(d));
+    hamKarti(d), modelKarti(d), cloKarti(d), haberKarti(d), groqKarti(d, kb));
+}
+
+/* ------------------------------ 5) Groq kota & istek takibi (yalnızca Site Sahibi + yetkili Admin) ------------------------------ */
+const bin = (n) => Number(n || 0).toLocaleString("tr-TR");
+/**
+ * "🤖 Groq AI Kota & İstek Takibi". Veri YALNIZCA havastil_groq_kota_durumu() RPC'sinden gelir; RPC yetkisizse {gorebilir:false} döner ve kutu HİÇ çizilmez
+ * (normal kullanıcı, demo/vitrin, misafir). Yetki kararı veritabanındadır; buradaki gizleme yalnızca arayüzdür.
+ */
+function groqKarti(d, kb) {
+  if (d.vitrin) return null;
+  const g = d.groqKota;
+  if (!g) { kb.groqKotaYukle?.(); return null; }
+  if (!g.gorebilir) return null;
+  const bugun = g.bugun || {}, ay = g.ay || {};
+  const gl = Number(g.gunluk_limit) || 1000, al = Number(g.aylik_limit) || 30000;
+  const kalanG = Math.max(0, 100 - ((bugun.istek || 0) / gl) * 100), kalanA = Math.max(0, 100 - ((ay.istek || 0) / al) * 100);
+  const bar = (yuzdeKalan, sinif) => { const i = el("span", { class: sinif }); i.style.width = `${Math.max(2, yuzdeKalan)}%`; return el("span", { class: "hv-pop-bar" }, i); };
+  const son = g.son_limit || null;
+  return kart("hv-lab-kart hv-groq-kart", bolumBasligi("5 · 🤖 Groq AI Kota & İstek Takibi", olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "↻ Yenile" }), "click", () => { d.groqKota = null; kb.groqKotaYukle(true); })),
+    ipucu("Mod B (yapay zekâ stilisti) her Groq isteğini Worker üzerinden sayar. Günlük sayaç UTC gece yarısında sıfırlanır (Groq ile aynı). Bu kutuyu yalnızca Site Sahibi ve yetkisi açılan Yöneticiler görür."),
+    el("p", { class: "hv-groq-ozet" }, el("strong", { text: `Bugün: ${bin(bugun.istek)}/${bin(gl)} istek · Kalan: %${kalanG.toFixed(1)}` })),
+    bar(kalanG, kalanG < 10 ? "d5" : kalanG < 30 ? "d3" : "guven"),
+    el("p", { class: "hv-groq-ozet" }, el("strong", { text: `Bu ay: ${bin(ay.istek)}/${bin(al)} istek · Kalan: %${kalanA.toFixed(1)}` })),
+    bar(kalanA, kalanA < 10 ? "d5" : kalanA < 30 ? "d3" : "guven"),
+    el("div", { class: "hv-lab-modeller" },
+      el("div", { class: "hv-lab-model" }, el("small", { text: "Bugün başarılı / hatalı" }), el("strong", { text: `${bin(bugun.basarili)} / ${bin(bugun.hatali)}` })),
+      el("div", { class: "hv-lab-model" }, el("small", { text: "Bugün harcanan token" }), el("strong", { text: bin((bugun.token_giris || 0) + (bugun.token_cikis || 0)) }), el("small", { text: `${bin(bugun.token_giris)} giriş · ${bin(bugun.token_cikis)} çıkış` })),
+      el("div", { class: "hv-lab-model" }, el("small", { text: "Bu ay harcanan token" }), el("strong", { text: bin((ay.token_giris || 0) + (ay.token_cikis || 0)) }), el("small", { text: `${bin(ay.istek)} istek` }))),
+    (g.modeller || []).length ? tablo(["Model (bugün)", "İstek", "Hata"], g.modeller.map((m) => el("tr", {}, el("td", { text: m.model }), el("td", { text: bin(m.istek) }), el("td", { text: bin(m.hatali) }))), "hv-lab-tablo") : null,
+    son ? el("p", { class: "hv-ipucu", text: `Groq'un kendi bildirdiği son değerler (${zamanOnce(Date.parse(son.zaman))}): kalan istek ${son.kalan_istek ?? "—"}/${son.limit_istek ?? "—"} · kalan token ${son.kalan_token ?? "—"}/${son.limit_token ?? "—"}. Hesabının gerçek sınırı Groq konsolunda yazandır; ${bin(gl)}/${bin(al)} limitleri bu sayaç içindir.` })
+      : el("p", { class: "hv-ipucu", text: `Henüz Groq'tan limit başlığı alınmadı. Sayaç limitleri: günlük ${bin(gl)}, aylık ${bin(al)}.` }),
+    g.sahip ? el("p", { class: "hv-ipucu", text: "Site Sahibi: limitleri SQL ile değiştirebilirsin → select owner_havastil_groq_limit_ayarla(1000, 30000);" }) : null);
 }
