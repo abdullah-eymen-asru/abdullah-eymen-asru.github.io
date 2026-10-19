@@ -17,8 +17,8 @@
  *       document.getElementById('app').hidden = false;
  *     </script>
  */
-import { supabase, guncelOnaySurumleri } from "../core/supabase-client.js";
-import { demoModuAktifMi, demoBaslat, demoBayrakKaliciMi } from "../demo/demo-durum.js";
+import { supabase, guncelOnaySurumleri, SUPABASE_URL, SUPABASE_ANON_KEY } from "../core/supabase-client.js";
+import { demoModuAktifMi, demoBaslat, demoBayrakKaliciMi, demoHerkeseAcikMi } from "../demo/demo-durum.js";
 
 /**
  * @param {Object} opts
@@ -47,13 +47,21 @@ import { demoModuAktifMi, demoBaslat, demoBayrakKaliciMi } from "../demo/demo-du
  *                           verilse bile yukarıdaki 'owner' istisnası aynen
  *                           uygulanır (bkz. aşağıdaki requestingOwnerOnly).
  * @param {string} opts.redirectTo - yetkisizse gidilecek sayfa
+ * @param {boolean} opts.ziyaretciDemo - (yalnızca role:null sayfalar: panel, HavaStil) OTURUMSUZ ziyaretçi için "Herkese açık demo girişi"
+ *   anahtarı (Yetki Ayarları › Demo Görünürlük, migration 0085/0103) AÇIKSA giriş sayfasına ATILMAZ: demo (vitrin) modu başlatılıp sayfa
+ *   yeniden yüklenir. Anahtar KAPALIYSA (ya da okunamadıysa) eski davranış: giriş sayfasına yönlendirme. Durum her seferinde TAZE okunur.
  */
-export async function requireAuth({ role = null, redirectTo = "/hesap/giris.html" } = {}) {
+export async function requireAuth({ role = null, redirectTo = "/hesap/giris.html", ziyaretciDemo = false } = {}) {
   const {
     data: { session },
   } = await supabase.auth.getSession();
 
   if (!session) {
+    // HERKESE AÇIK DEMO: hesapsız ziyaretçiyi (yalnızca opt-in sayfalarda, ör. panel vitrini ve HavaStil) giriş sayfasına atmadan vitrine al.
+    // Yalnızca role:null sayfalarda: rol isteyen (admin vb.) sayfalara demo ile girilemez, onlar her zaman giriş ister.
+    if (ziyaretciDemo && role === null && !demoModuAktifMi() && (await demoHerkeseAcikMi(SUPABASE_URL, SUPABASE_ANON_KEY))) {
+      return anonimDemoyaGec(redirectTo);
+    }
     redirectWithReturnUrl(redirectTo);
     // Yönlendirme sırasında geri kalan kod çalışmaya devam etmesin diye
     // sonsuz bir promise döndürüp fonksiyonun asla "resolve" olmamasını
@@ -278,6 +286,20 @@ async function gercekHesapDemoMu() {
  */
 function demoyaGec(redirectTo) {
   demoBaslat({ uye: true }); // gerçek 'demo' rollü hesap: herkese açık anahtarı kapalıyken de girebilir
+  if (!demoBayrakKaliciMi()) {
+    redirectWithReturnUrl(redirectTo + (redirectTo.includes("?") ? "&" : "?") + "demo=depo");
+  } else {
+    window.location.reload();
+  }
+  return new Promise(() => {});
+}
+
+/**
+ * Oturumsuz ziyaretçiyi (herkese açık demo AÇIKKEN) demo moduna alıp sayfayı yeniden yükler. demoyaGec ile aynı döngü korumasını taşır:
+ * sekme deposu yazılamıyorsa bayrak yeniden yüklemede kaybolur → sonsuz döngü yerine açıklayıcı uyarıyla giriş sayfasına dönülür.
+ */
+function anonimDemoyaGec(redirectTo) {
+  demoBaslat(); // uye:false → anonim vitrin; anahtar kapanırsa demo-durum.js configiBaslat() oturumu sonlandırıp girişe yollar
   if (!demoBayrakKaliciMi()) {
     redirectWithReturnUrl(redirectTo + (redirectTo.includes("?") ? "&" : "?") + "demo=depo");
   } else {
