@@ -395,6 +395,15 @@ const OZELLIK_KATALOGU = [
     rolSutunlari: ["admin", "manager", "editor", "special_user", "user"],
     kaynak: "kapali",
   },
+  {
+    // bkz. migration 0102 — HavaStil Groq kota/istek sayacını görüntüleme. VARSAYILAN KAPALI. Site Sahibi her zaman görür;
+    // yalnızca Admin için açılabilir. Normal kullanıcı, demo ve misafir hiçbir koşulda göremez (karar veritabanındadır).
+    anahtar: "havastil_groq_kota",
+    baslik: "HavaStil Groq Kota Takibini Görüntüleme",
+    aciklama: "HavaStil › Veri Doğrulama içindeki “Groq AI Kota & İstek Takibi” kutusunu (günlük/aylık istek, kalan kota, token) görme. Varsayılan KAPALI; Site Sahibi her zaman görür. Normal kullanıcılar ve demo hesaplar göremez.",
+    rolSutunlari: ["admin"],
+    kaynak: "kapali",
+  },
 ];
 
 /** Sıradan bir kullanıcının (owner OLMAYAN) kendi rolü için bir özelliğe
