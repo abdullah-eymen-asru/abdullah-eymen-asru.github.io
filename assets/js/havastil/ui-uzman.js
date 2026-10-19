@@ -9,6 +9,7 @@ import { el, rozet, ipucu, kart, bolumBasligi, olcek, olay, zamanOnce } from "./
 import { ruzgarYonu, uvSeviye, aqiSeviye, cigNoktasiKonfor, gunAdi } from "./hava-kodlari.js";
 import { hedefClo } from "./cekirdek.js";
 import { karGorunumu } from "./ui-kar.js";
+import { gunIzgarasi } from "./ui-gun-secici.js";
 import { CAPE_BANTLARI, ESIK, YAGIS_SEVIYELERI, capeOrani, capeSeviye, saatAnaliz, saatMetniTam, gunAnalizleri, popYorumu, popPratik, guvenMetni, efektifSiddet, capeHalk } from "./yagis-fizigi.js";
 
 const n1 = (x, n = 1) => String(Number(x).toFixed(n));          // v4: ondalık NOKTA (10 günlük liste ve ekran görüntüleriyle aynı biçim: 4.4 mm)
@@ -39,14 +40,17 @@ function saatGrafigi(sl, simdiT, kolon, cizgiler = [], yEtiket = "") {
 
 /* ------------------------------ 0) gün seçici ------------------------------ */
 function gunSecici(gunler, gi, d, kb) {
-  return el("div", { class: "hv-gunsecici", role: "group", "aria-label": "Analiz edilecek gün" },
-    ...gunler.map((g, i) => {
+  // v6: ortak ızgara (ui-gun-secici.js) — yatay kaydırma yok; nokta göstergeleri: yağış seviyesi · CAPE · kar/buz
+  return gunIzgarasi({
+    gunler: gunler.map((g, i) => {
       const f = g.fizik;
-      const b = olay(el("button", { type: "button", class: "hv-gunchip", "aria-pressed": String(i === gi), title: `${gunEtiketi(g.tarih, i)}: ${f.seviyeAd}, CAPE ${f.capeMax} J/kg` },
-        el("strong", { text: gunEtiketi(g.tarih, i) }), el("small", { text: g.tarih.slice(8, 10) + "." + g.tarih.slice(5, 7) }),
-        el("span", { class: "hv-gunchip-nokta" }, el("i", { class: `s${f.seviye}`, title: f.seviyeAd }), el("i", { class: `cape ${f.capeSeviye.sinif}`, title: `CAPE ${f.capeSeviye.ad}` }), f.kar.var ? el("i", { class: "kar", title: `Taze kar ≈ ${f.kar.toplamCm} cm` }) : f.buzlanma.maxSeviye >= 2 ? el("i", { class: "buz", title: `Gizli buzlanma: ${f.buzlanma.ad}` }) : null)), "click", () => { d.derinGun = i; kb.ciz(); });
-      return b;
-    }));
+      const noktalar = [{ sinif: `s${f.seviye}`, baslik: f.seviyeAd }, { sinif: `cape ${f.capeSeviye.sinif}`, baslik: `CAPE ${f.capeSeviye.ad}` }];
+      if (f.kar.var) noktalar.push({ sinif: "kar", baslik: `Taze kar ≈ ${f.kar.toplamCm} cm` });
+      else if (f.buzlanma.maxSeviye >= 2) noktalar.push({ sinif: "buz", baslik: `Gizli buzlanma: ${f.buzlanma.ad}` });
+      return { tarih: g.tarih, noktalar, baslik: `${gunEtiketi(g.tarih, i)}: ${f.seviyeAd}, CAPE ${f.capeMax} J/kg` };
+    }),
+    aktif: gi, etiket: "Analiz edilecek gün", onSec: (i) => { d.derinGun = i; kb.ciz(); },
+  });
 }
 
 /* ------------------------------ 1) gün özeti ------------------------------ */
