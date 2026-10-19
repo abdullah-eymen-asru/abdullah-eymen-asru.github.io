@@ -62,10 +62,13 @@ export const guncelle = (liste, id, alanlar) => liste.map((x) => {
 export const varsayilanYap = (liste, id) => { const k = liste.find((x) => x.id === id); return k ? [k, ...liste.filter((x) => x.id !== id)] : liste; };
 export const kayitliMi = (liste, k) => liste.some((x) => x.id === konumKimligi(k) || (x.ad === k.ad && ayniKonum(x, k)));
 
-/** Son aramalar (kaydedilmemiş; yalnızca cihazda, en çok 6) */
-export const sonAramalar = () => OKU(LS.son, []).slice(0, 6);
+/** Son aramalar (kaydedilmemiş; yalnızca cihazda, en çok 5). Tek tek ve toplu silinebilir. */
+export const SON_ARAMA_SINIRI = 5;
+export const sonAramalar = () => { const l = OKU(LS.son, []); return (Array.isArray(l) ? l : []).filter((k) => k && k.id && Number.isFinite(k.lat) && Number.isFinite(k.lon)).slice(0, SON_ARAMA_SINIRI); };
 export function sonAramaEkle(k) {
   const t = temizle(k);
-  YAZ(LS.son, [t, ...sonAramalar().filter((x) => x.id !== t.id)].slice(0, 6));
+  YAZ(LS.son, [t, ...sonAramalar().filter((x) => x.id !== t.id)].slice(0, SON_ARAMA_SINIRI));
 }
+/** Tek bir geçmiş kaydını siler (kimlik = koordinattan türeyen konum kimliği). */
+export const sonAramaSil = (id) => YAZ(LS.son, sonAramalar().filter((x) => x.id !== id));
 export const sonAramalariTemizle = () => YAZ(LS.son, []);
