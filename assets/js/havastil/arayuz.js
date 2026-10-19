@@ -8,7 +8,7 @@
  */
 import { supabase } from "../core/supabase-client.js";
 import { degerlendir, SENARYOLAR, STIL_SECENEKLERI, CANTA_SECENEKLERI } from "./cekirdek.js";
-import { havaGetir } from "./veri.js";
+import { havaGetir, gecmisGunGetir } from "./veri.js";
 import { HAVASTIL_WORKER_URL, haberTaktigi } from "./haber.js";
 import { KURALLAR } from "./taktik.js";
 import { havaKodu } from "./hava-kodlari.js";
@@ -27,11 +27,11 @@ import { ayarSekmesi } from "./ui-ayar.js";
 import { mevsimSekmesi } from "./ui-mevsim.js";
 import { zamanlayiciBaslat } from "./bildirim.js";
 import * as K from "./konumlar.js";
-import { birlestir, bulutKonumEkle, bulutKonumGuncelle, bulutKonumSil, bulutTumunuSil, bulutTercihOku, bulutTercihYaz } from "./bulut.js";
+import { bulutEsitle, bulutVarMi, bulutSiraYaz, bulutHataMetni, bulutKonumEkle, bulutKonumGuncelle, bulutKonumSil, bulutTumunuSil, bulutTercihOku, bulutTercihYaz } from "./bulut.js";
 
 export { HAVASTIL_WORKER_URL };
 const VARSAYILAN_KONUM = { id: "41.008,28.978", ad: "İstanbul", lat: 41.008, lon: 28.978, ulke: "TR", ulkeAd: "Türkiye", ulkeAdEn: "Turkey", admin1: "İstanbul", il: "İstanbul", ikon: "diger" };
-const LS = { tercih: "hv_tercih2", eskiTercih: "hv_tercih", bulut: "hv_bulut", aiModu: "hv_ai_modu", haberAcik: "hv_haber_acik", sekme: "hv_sekme", ai: "hv_ai3_" };
+const LS = { tercih: "hv_tercih2", eskiTercih: "hv_tercih", bulut: "hv_bulut", silKuyrugu: "hv_bulut_sil", aiModu: "hv_ai_modu", haberAcik: "hv_haber_acik", sekme: "hv_sekme", ai: "hv_ai3_" };
 const SEKMELER = [["bugun", "Bugün", "🏠"], ["kombin", "Kombin", "🧥"], ["plan", "Saatlik plan", "🗓️"], ["derin", "Derin analiz", "🔬"], ["gunluk", "16 gün", "📅"], ["mevsim", "Mevsimlik eğilim", "🌍"], ["haber", "Uyarılar", "🛰️"], ["dogrula", "Veri doğrulama", "🔍"], ["ayar", "Ayarlar", "⚙️"]];
 const ESKI_SEKME = { ozet: "bugun", saatlik: "derin" };      // v2'de kaydedilmiş sekme adları
 const HAVA_TTL_MS = 30 * 60 * 1000, HABER_TTL_MS = 15 * 60 * 1000;
@@ -46,7 +46,7 @@ export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAkti
   const d = {
     vitrin: !!vitrin,
     konum: vitrin ? { ...VARSAYILAN_KONUM } : K.aktifOku(VARSAYILAN_KONUM), konumlar: vitrin ? [] : K.listeyiOku(), tercih: tercihOku(),
-    aiModu: vitrin ? false : lsOku(LS.aiModu, false) === true, ai: { metin: "", etiket: "", hata: "" }, bulut: vitrin ? false : lsOku(LS.bulut, false) === true,
+    aiModu: vitrin ? false : lsOku(LS.aiModu, false) === true, ai: { metin: "", etiket: "", hata: "" }, bulut: vitrin ? false : lsOku(LS.bulut, null) === true, bulutDurum: null, planGecmis: null,
     haberAcik: vitrin ? false : lsOku(LS.haberAcik, true) !== false, hava: null, sonuc: null, haber: null, kombinNo: 0, planGun: 0, planSaat: null,
     sekme: SEKMELER.some(([id]) => id === kayitliSekme) ? kayitliSekme : "bugun",
     fizik: null, kriz: null, planAcik: false, derinGun: 0, derinGorunum: null, takvimAcik: false, takvimAy: null, mevsimAy: null, iklim: null, groqKota: null, misafir: !!misafir,
@@ -62,7 +62,8 @@ export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAkti
   const vitrinBandi = vitrin ? el("div", { class: "hv-vitrin-bandi", role: "note" }, el("strong", { text: misafir ? "👋 Misafir vitrini · İstanbul" : "🎭 Vitrin modu · İstanbul" }),
     el("span", { text: " Tüm görsel özellikler, kombin kartları, 16 günlük saatlik plan, kar/don analizi ve veri doğrulama açık. Konum kaydetme, hesap senkronu ve yapay zekâ yorumu (Mod B) kilitlidir; ücretsiz kural tabanlı stilist (Mod A) çalışır." }),
     misafir ? el("a", { class: "hv-baglanti", href: "/hesap/giris.html?donus=/panel/havastil/", text: " Giriş yap →" }) : null) : null;
-  kok.replaceChildren(...[vitrinBandi, konumB.kok, sekmeBar, icerik].filter(Boolean));
+  const davetKutu = el("div", { class: "hv-bulut-davet-yeri" });
+  kok.replaceChildren(...[vitrinBandi, davetKutu, konumB.kok, sekmeBar, icerik].filter(Boolean));
 
   /* ---------------- çizim ---------------- */
   function sekmeBarCiz() {
@@ -140,23 +141,40 @@ export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAkti
   kb.sec = (k) => {
     d.konum = { ...K.temizle(k), ...(k.gps ? { gps: true } : {}) };
     d.kombinNo = 0; d.haber = null;
+    if (d.planGecmis) { const t = d.planGecmis.tarih; d.planGecmis = null; setTimeout(() => kb.gecmisSec(t), 0); }
     if (!d.vitrin) K.aktifYaz(d.konum);               // vitrinde seçim kalıcı değildir: yenilemede yine İstanbul
     konumB.ciz(); kb.yenile(false);
   };
-  async function bulutYaz(fn) { if (d.bulut && !d.vitrin) { try { return await fn(); } catch { /* sessiz */ } } return undefined; }
+  /* ---- bulut öncelikli kalıcılık ----
+   * Oturum açık + eşitleme açıkken: ekle/sil/düzenle ANINDA Supabase'e (INSERT/DELETE/UPDATE) gider; yerel önbellek (localStorage) işlem sonucuna göre yazılır.
+   * Ağ/RLS hatasında konum yerelde "beklemede" (bid yok) kalır ve bir sonraki eşitlemede yüklenir; silmeler kuyruğa alınır. Vitrin/misafirde buluta HİÇ istek gitmez. */
+  const kuyrukOku = () => { const k = lsOku(LS.silKuyrugu, []); return Array.isArray(k) ? k : []; };
+  async function bulutIsle(fn) {
+    if (!d.bulut || d.vitrin) return { atla: true };
+    konumB.durumYaz("☁️ Hesabınla eşitleniyor…", "bilgi");
+    try { const deger = await fn(); konumB.durumYaz("☁️ Hesabınla eşitlendi", "ok", 2500); return { ok: true, deger }; }
+    catch (h) { console.warn("HavaStil bulut:", h); konumB.durumYaz(bulutHataMetni(h), "hata"); return { ok: false, hata: h }; }
+  }
+  async function bulutSilIsle(bid) {
+    const r = await bulutIsle(() => bulutKonumSil(bid));
+    if (r.ok === false) lsYaz(LS.silKuyrugu, [...new Set([...kuyrukOku(), bid])]);     // sonra yeniden denenir
+  }
   kb.kaydetDegistir = async (k) => {
     if (d.vitrin) return;                               // vitrin: "Konumu kaydet" pasif
     const id = K.konumKimligi(k);
-    if (K.kayitliMi(d.konumlar, k)) { const m = d.konumlar.find((x) => x.id === id || (x.ad === k.ad && K.ayniKonum(x, k))); if (m?.bid) await bulutYaz(() => bulutKonumSil(m.bid)); d.konumlar = K.sil(d.konumlar, m?.id || id); }
-    else {
-      if (d.konumlar.length >= 20) return;
+    if (K.kayitliMi(d.konumlar, k)) {
+      const m = d.konumlar.find((x) => x.id === id || (x.ad === k.ad && K.ayniKonum(x, k)));
+      d.konumlar = K.sil(d.konumlar, m?.id || id); konumB.ciz();        // arayüz anında güncellenir
+      if (m?.bid) await bulutSilIsle(m.bid);
+    } else {
+      if (d.konumlar.length >= 20) { konumB.durumYaz("⚠️ En fazla 20 konum kaydedebilirsin.", "hata", 4000); return; }
       const yeni = { ...k, ad: k.ad === "Bulunduğum yer" ? "Konumum" : k.ad };
-      d.konumlar = K.ekle(d.konumlar, yeni);
+      d.konumlar = K.ekle(d.konumlar, yeni); konumB.ciz();                // arayüz anında güncellenir (senkron kısım burada biter)
       const kayit = d.konumlar.find((x) => x.id === id);
-      const bid = kayit && (await bulutYaz(() => bulutKonumEkle(kayit)));
-      if (bid) d.konumlar = K.guncelle(d.konumlar, id, { bid });
+      const r = kayit ? await bulutIsle(() => bulutKonumEkle(kayit)) : {};
+      if (r.ok && r.deger) d.konumlar = K.guncelle(d.konumlar, id, { bid: r.deger });
     }
-    K.listeyiYaz(d.konumlar); konumB.ciz();
+    K.listeyiYaz(d.konumlar); konumB.ciz();             // önbellek: bulut sonucundan SONRA (bid'li ya da beklemede)
   };
   /** Düzenle: isim/etiket, simge ve (yeni arama seçildiyse) koordinat + yer alanları. Bulutta UPDATE (satır kimliği bid ile). */
   kb.guncelle = async (id, alanlar) => {
@@ -166,19 +184,30 @@ export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAkti
     const koordDegisti = (Number.isFinite(alanlar.lat) && alanlar.lat !== eski.lat) || (Number.isFinite(alanlar.lon) && alanlar.lon !== eski.lon);
     d.konumlar = K.guncelle(d.konumlar, id, alanlar);
     const yeniId = K.konumKimligi({ lat: alanlar.lat ?? eski.lat, lon: alanlar.lon ?? eski.lon });
-    const yeni = d.konumlar.find((x) => x.id === yeniId);
-    if (yeni && d.bulut) {
-      if (yeni.bid) await bulutYaz(() => bulutKonumGuncelle(yeni.bid, yeni));
-      else { const bid = await bulutYaz(() => bulutKonumEkle(yeni)); if (bid) d.konumlar = K.guncelle(d.konumlar, yeniId, { bid }); }
-    }
+    let yeni = d.konumlar.find((x) => x.id === yeniId);
     if (K.konumKimligi(d.konum) === id && yeni) {
       d.konum = { ...K.temizle(yeni), ...(d.konum.gps ? { gps: true } : {}) }; K.aktifYaz(d.konum);
       if (koordDegisti) { d.haber = null; d.kombinNo = 0; kb.yenile(true); }
     }
-    K.listeyiYaz(d.konumlar); konumB.ciz(); ciz();
+    konumB.ciz(); ciz();
+    if (yeni) {
+      const r = yeni.bid ? await bulutIsle(() => bulutKonumGuncelle(yeni.bid, yeni)) : await bulutIsle(() => bulutKonumEkle(yeni));
+      if (r.ok && !yeni.bid && r.deger) d.konumlar = K.guncelle(d.konumlar, yeniId, { bid: r.deger });
+    }
+    K.listeyiYaz(d.konumlar); konumB.ciz();
   };
-  kb.sil = async (id) => { if (d.vitrin) return; const m = d.konumlar.find((x) => x.id === id); if (m?.bid) await bulutYaz(() => bulutKonumSil(m.bid)); d.konumlar = K.sil(d.konumlar, id); K.listeyiYaz(d.konumlar); konumB.ciz(); };
-  kb.ilkeAl = (id) => { if (d.vitrin) return; d.konumlar = K.varsayilanYap(d.konumlar, id); K.listeyiYaz(d.konumlar); konumB.ciz(); };
+  kb.sil = async (id) => {
+    if (d.vitrin) return;
+    const m = d.konumlar.find((x) => x.id === id);
+    d.konumlar = K.sil(d.konumlar, id); konumB.ciz();
+    if (m?.bid) await bulutSilIsle(m.bid);
+    K.listeyiYaz(d.konumlar);
+  };
+  kb.ilkeAl = async (id) => {
+    if (d.vitrin) return;
+    d.konumlar = K.varsayilanYap(d.konumlar, id); K.listeyiYaz(d.konumlar); konumB.ciz();
+    await bulutIsle(() => bulutSiraYaz(d.konumlar));
+  };
 
   /* ---------------- gün içi kritik an: Mod A (yerel, deterministik) · Mod B (Groq, yalnızca sayılar) ---------------- */
   let aiZaman = 0;
@@ -239,29 +268,81 @@ export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAkti
     } catch (h) { return { hata: h?.name === "AbortError" ? "Test zaman aşımına uğradı." : "Worker'a ulaşılamadı (adres/ağ/CORS). Worker adresi: " + HAVASTIL_WORKER_URL }; }
   };
 
-  /* ---------------- bulut senkronu ---------------- */
+  /* ---------------- bulut senkronu (bulut öncelikli) ---------------- */
+  let esitlemede = false, sonEsitleme = 0;
+  /** Bulut = doğruluk kaynağı. Açılışta, sekmeye dönünce (≥30 sn) ve eşitleme açılınca çağrılır. */
+  kb.bulutSenkronla = async ({ zorla = false } = {}) => {
+    if (d.vitrin || !d.bulut || esitlemede) return "";
+    if (!zorla && Date.now() - sonEsitleme < 30000) return "";
+    esitlemede = true;
+    konumB.durumYaz("☁️ Hesabınla eşitleniyor…", "bilgi");
+    try {
+      for (const bid of kuyrukOku()) { try { await bulutKonumSil(bid); } catch { continue; } lsYaz(LS.silKuyrugu, kuyrukOku().filter((x) => x !== bid)); }
+      const bekleyenSilme = new Set(kuyrukOku());
+      const { liste, yuklenen, silinen } = await bulutEsitle(d.konumlar.filter((k) => !k.bid || !bekleyenSilme.has(k.bid)));
+      d.konumlar = liste.filter((k) => !bekleyenSilme.has(k.bid)); K.listeyiYaz(d.konumlar);
+      const t = await bulutTercihOku();
+      if (t) { d.tercih = { ...d.tercih, tol: t.tolerans, sen: SENARYOLAR[t.senaryo] ? t.senaryo : d.tercih.sen, stil: STIL_SECENEKLERI[t.stil] ? t.stil : d.tercih.stil, canta: CANTA_SECENEKLERI[t.canta] ? t.canta : d.tercih.canta }; const { tohumKaydir, ...kalici } = d.tercih; lsYaz(LS.tercih, kalici); }
+      else await bulutTercihYaz({ tolerans: d.tercih.tol, senaryo: d.tercih.sen, stil: d.tercih.stil, canta: d.tercih.canta });
+      sonEsitleme = Date.now();
+      hesapla(); konumB.ciz(); ciz();
+      konumB.durumYaz(yuklenen || silinen ? `☁️ Eşitlendi (${yuklenen ? `${yuklenen} konum yüklendi` : ""}${yuklenen && silinen ? ", " : ""}${silinen ? `${silinen} konum başka cihazda silinmişti` : ""})` : "☁️ Hesabınla eşitlendi", "ok", 3000);
+      return "Senkron açık.";
+    } catch (h) {
+      console.warn("HavaStil eşitleme:", h);
+      konumB.durumYaz(bulutHataMetni(h), "hata");
+      return /does not exist|42P01|PGRST|schema cache|column/i.test(h?.message || "") ? "Gerekli migration (0099–0104) henüz çalıştırılmamış." : `Senkron başlatılamadı: ${h.message || h}`;
+    } finally { esitlemede = false; }
+  };
+  /** Açılış: karar verilmişse uygula; ilk kez ise önceki rızayı kanıtla (bulutta kayıt var → bu cihazda da aç), yoksa tek dokunuşluk davet göster. */
+  function davetCiz() {
+    const evet = olay(el("button", { type: "button", class: "hv-btn hv-btn-birincil", text: "Evet, tüm cihazlarımda eşitle" }), "click", async () => { davetKutu.replaceChildren(); await kb.bulutDegis(true); });
+    const hayir = olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "Hayır, yalnızca bu cihazda kalsın" }), "click", () => { lsYaz(LS.bulut, false); davetKutu.replaceChildren(); });
+    davetKutu.replaceChildren(el("div", { class: "hv-bulut-davet", role: "group", "aria-label": "Hesap eşitleme" },
+      el("p", {}, el("strong", { text: "☁️ Kayıtlı konumların tüm cihazlarında görünsün mü? " }), "⭐ ile kaydettiğin konumlar (ad, simge, koordinat) ve tercihlerin hesabında saklanır; telefonda eklediğin konum masaüstünde de çıkar. Anlık GPS konumun ve aramaların asla kaydedilmez. Ayarlar › Cihazlar arası senkron'dan dilediğin an kapatıp bulut verisini sildirebilirsin."),
+      el("div", { class: "hv-btn-satir" }, evet, hayir)));
+  }
+  kb.bulutBaslat = async () => {
+    if (d.vitrin) return;
+    if (lsOku(LS.bulut, null) === null) {
+      let var_ = false;
+      try { var_ = await bulutVarMi(); } catch { return; }                    // tablo/ağ yoksa sessiz geç; yerel çalışır
+      if (!var_) { davetCiz(); return; }
+      d.bulut = true; lsYaz(LS.bulut, true);                                 // başka cihazdaki rıza kanıtı
+    }
+    if (d.bulut) await kb.bulutSenkronla({ zorla: true });
+  };
   kb.bulutDegis = async (ac) => {
     if (d.vitrin) return "Vitrin modunda hesap senkronu kapalıdır.";
     if (ac) {
       d.bulut = true; lsYaz(LS.bulut, true);
-      try {
-        d.konumlar = await birlestir(d.konumlar); K.listeyiYaz(d.konumlar);
-        const t = await bulutTercihOku();
-        if (t) { d.tercih = { ...d.tercih, tol: t.tolerans, sen: SENARYOLAR[t.senaryo] ? t.senaryo : d.tercih.sen, stil: STIL_SECENEKLERI[t.stil] ? t.stil : d.tercih.stil, canta: CANTA_SECENEKLERI[t.canta] ? t.canta : d.tercih.canta }; const { tohumKaydir, ...kalici } = d.tercih; lsYaz(LS.tercih, kalici); }
-        else await bulutTercihYaz({ tolerans: d.tercih.tol, senaryo: d.tercih.sen, stil: d.tercih.stil, canta: d.tercih.canta });
-        hesapla(); konumB.ciz(); ciz();
-        return "Senkron açık.";
-      } catch (h) {
-        d.bulut = false; lsYaz(LS.bulut, false);
-        return /does not exist|42P01|PGRST|schema cache|column/i.test(h?.message || "") ? "Gerekli migration (0099 ve 0100) henüz çalıştırılmamış." : `Senkron başlatılamadı: ${h.message || h}`;
-      }
+      const m = await kb.bulutSenkronla({ zorla: true });
+      if (!/^Senkron açık/.test(m)) { d.bulut = false; lsYaz(LS.bulut, false); }
+      return m;
     }
     d.bulut = false; lsYaz(LS.bulut, false);
     d.konumlar = d.konumlar.map(({ bid, ...r }) => r); K.listeyiYaz(d.konumlar);
     if (window.confirm("Hesabında saklanan HavaStil konumları ve tercihleri de silinsin mi? (Bu cihazdakiler kalır.)")) {
-      try { await bulutTumunuSil(); return "Bulut verisi silindi."; } catch (h) { return `Silinemedi: ${h.message || h}`; }
+      try { await bulutTumunuSil(); lsYaz(LS.silKuyrugu, []); return "Bulut verisi silindi."; } catch (h) { return `Silinemedi: ${h.message || h}`; }
     }
     return "Senkron kapatıldı; bulut verisi hesabında duruyor.";
+  };
+
+  /* ---------------- geçmiş gün (Saatlik plan): son 92 gün → Forecast API past_days, daha eskisi → Historical (ERA5) ---------------- */
+  kb.gecmisSec = async (tarih) => {
+    if (!tarih) { d.planGecmis = null; ciz(); return; }
+    const no = (d.gecmisNo = (d.gecmisNo || 0) + 1);
+    const bugun = d.hava?.tumSaatler?.[0]?.t?.slice(0, 10);
+    d.planGecmis = { tarih, durum: "yukleniyor" }; d.planSaat = null; ciz();
+    try {
+      const g = await gecmisGunGetir(d.konum.lat, d.konum.lon, tarih, bugun);
+      if (no !== d.gecmisNo) return;
+      d.planGecmis = { tarih, durum: "ok", ...g };
+    } catch (h) {
+      if (no !== d.gecmisNo) return;
+      d.planGecmis = { tarih, durum: "hata", hata: h?.message || String(h) };
+    }
+    ciz();
   };
 
   /* ---------------- saat bazlı uyarılar ---------------- */
@@ -282,11 +363,11 @@ export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAkti
     if (d.haberAcik && (!d.haber || Date.now() - (d.haber.guncelleme || 0) > HABER_TTL_MS)) kb.haberYenile(false);
   };
   const aralik = setInterval(tazele, 5 * 60 * 1000);
-  const gorunur = async () => { if (!document.hidden) { await gec(300); tazele(); } };
+  const gorunur = async () => { if (!document.hidden) { await gec(300); tazele(); kb.bulutSenkronla(); } };   // diğer cihazda yapılan değişiklik sekmeye dönünce gelir
   document.addEventListener("visibilitychange", gorunur);
 
   /* ---------------- başlat ---------------- */
   ciz();
-  if (d.bulut && !d.vitrin) kb.bulutDegis(true).catch(() => {});
+  kb.bulutBaslat().catch(() => {});
   await kb.yenile(false);
 }
