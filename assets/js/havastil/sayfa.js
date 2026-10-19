@@ -11,6 +11,11 @@ import { demoModuAktifMi } from "../demo/demo-durum.js";
 function ekle(rel, oz) { const l = document.createElement("link"); l.rel = rel; for (const [k, v] of Object.entries(oz)) l.setAttribute(k, v); document.head.appendChild(l); }
 function meta(ad, icerik) { const m = document.createElement("meta"); m.name = ad; m.content = icerik; document.head.appendChild(m); }
 
+/** Anahtar okunamazsa AÇIK sayılır: vitrin yalnızca herkese açık Open-Meteo verisini gösterir, gizli veri yoktur. Anahtar KAPALIysa (false) giriş istenir. */
+async function misafirAcikMi() {
+  try { const { data, error } = await supabase.rpc("havastil_misafir_acik_mi"); return error ? true : data !== false; } catch { return true; }
+}
+
 const kok = document.getElementById("hv-kok");
 const yukleniyor = document.getElementById("hv-yukleniyor");
 
@@ -22,6 +27,17 @@ async function basla() {
   meta("mobile-web-app-capable", "yes");
   meta("apple-mobile-web-app-title", "HavaStil");
 
+  // v5 MİSAFİR AKIŞI: oturumu OLMAYAN gerçek ziyaretçi giriş sayfasına atılmaz. Yönetim Paneli › Yetki & Demo Ayarları › HavaStil
+  // "Oturumsuz misafir erişimi" anahtarı açıksa (varsayılan AÇIK) İstanbul vitrini tam işlevsel açılır (kayıt, düzenleme, hesap senkronu ve AI kilitli).
+  if (!demoModuAktifMi()) {
+    let oturum = null;
+    try { oturum = (await supabase.auth.getSession())?.data?.session || null; } catch { oturum = null; }
+    if (!oturum && (await misafirAcikMi())) {
+      if (yukleniyor) yukleniyor.hidden = true;
+      await havastilKur(kok, { bagimsiz: true, vitrin: true, misafir: true });   // servis çalışanı, yetki RPC'si, Worker ve Groq YOK
+      return;
+    }
+  }
   await requireAuth({ role: null });
   if (demoModuAktifMi()) { if (yukleniyor) yukleniyor.hidden = true; await havastilKur(kok, { bagimsiz: true, vitrin: true }); return; }   // vitrin: yetki RPC'si ve servis çalışanı yok
   let yetkili = false;
