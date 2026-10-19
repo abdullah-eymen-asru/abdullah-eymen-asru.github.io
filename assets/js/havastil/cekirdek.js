@@ -15,6 +15,7 @@
  * Haber taktikleri (taktik.js) bu motora KISIT olarak girer (ek.kurallar); sonradan üstüne yama yapılmaz.
  * v3: yağış ve fırtına kısıtları artık yagis-fizigi.js'ten gelir (ek.fizik): saatlik PoP × hacim, showers, CAPE ve hamle kuralları.
  *     Zararsız çisentide şemsiye/ağır bot kısıtı YOK; CAPE > 1500 J/kg veya hamle > 40 km/s ise şemsiye sistemden çıkar.
+ * v5: KAR/BUZLANMA algılanınca (karZorunlu) şemsiye KESİNLİKLE iptal; derin kauçuk dişli kar botu, termal içlik (iç kat), yün/polar ara katman, dış kabuk ve bere + eldiven ZORUNLU kılınır (aday listeleri bu parçalarla sınırlanır).
  */
 import { tetikleyicileriBul } from "./tetikleyici.js";
 import { KATALOG, SLOT_LISTE, STILLER, ARALIK, OZEL } from "./katalog.js";
@@ -74,16 +75,22 @@ function kisitlariCikar(h, t, ek) {
       (h.rainProb ?? 0) >= 40 || (h.precip ?? 0) >= 0.2 || (h.recentPrecip ?? 0) >= 1 ? 1 : 0,
       (h.precip ?? 0) >= 1.5 ? 2 : 0, (h.precip ?? 0) >= 4 ? 3 : 0, sev("saganak"));
   const ruzgar = Math.max((gust >= 35 || (h.wind || 0) >= 25) ? 1 : 0, (gust >= 55 || (h.wind || 0) >= 38) ? 2 : 0, sev("firtina") ? 2 : 0, fz?.kisit.ruzgar ?? 0);
-  const buz = (h.minRaw ?? 20) <= 1 || !!kural.don;
-  const kar = !!kural.kar || ((h.raw ?? 20) <= 2 && (h.precip ?? 0) > 0) || (h.snow ?? 0) > 0;
+  const buz = (h.minRaw ?? 20) <= 1 || !!kural.don || (fz?.buzlanma?.maxSeviye ?? 0) >= 2;
+  const kar = !!kural.kar || ((h.raw ?? 20) <= 2 && (h.precip ?? 0) > 0) || (h.snow ?? 0) > 0 || !!fz?.kar?.var;
+  // v5: kar/buzlanma KESİN algılandı (fizik motoru, ya da doğrulanmış haber kuralı: kar/don) → şemsiye iptal + zorunlu kış donanımı
+  const karZorunlu = !!fz?.kisit?.karZorunlu || !!kural.kar || !!kural.don;
   const sicak = !!kural.sicak || (h.__etkin ?? h.apparent) >= 27;
-  return { yagis, ruzgar, semsiyeYasak: !!fz?.semsiyeYasak || ruzgar >= 2, zararsiz: !!fz?.zararsiz, surpriz: !!fz?.surpriz, buz, kar, sicak, sicakAsiri: (h.__etkin ?? h.apparent) >= 32, sis: !!kural.sis, col: !!kural.col_tozu || (h.dust ?? 0) >= 80,
+  return { yagis, ruzgar, semsiyeYasak: !!fz?.semsiyeYasak || ruzgar >= 2 || karZorunlu, zararsiz: !!fz?.zararsiz, surpriz: !!fz?.surpriz, buz, kar, karZorunlu, sicak, sicakAsiri: (h.__etkin ?? h.apparent) >= 32, sis: !!kural.sis, col: !!kural.col_tozu || (h.dust ?? 0) >= 80,
     uv: h.uv ?? 0, ofis: t.senaryo === "yuruyus_ofis", spor: t.senaryo === "spor", arac: t.senaryo === "arac",
     cantaYok: t.canta === "yok", canta: t.canta || "el",
     moduler: ((h.delta ?? 0) >= 8 && t.senaryo !== "arac") || t.senaryo === "disari" || t.senaryo === "gezi" };
 }
 
 const var_ = (p, e) => !!p && p.etiket.has(e);
+/** v5 zorunlu kış donanımı: termal içlik (iç kat), yün/polar ara katman, derin kauçuk dişli kar botu. */
+const KAR_TERMAL = new Set(["b_termal_ic", "b_merino_orta"]);
+const yunPolar = (x) => !!x && (var_(x, "y") || String(x.id).includes("polar"));
+const zorunluParca = (slot, x) => (slot === "b" ? KAR_TERMAL.has(x.id) : slot === "m" ? yunPolar(x) : slot === "a" ? x.id === "a_kar_botu" : false);
 
 /** Bir kombinin (b,m,o,p) kısıt cezası ve bonusu. Ayakkabı ayrıca değerlendirilir. */
 const sadeceSpor = (x) => x && x.stil.has("S") && !x.stil.has("K") && !x.stil.has("C") && !x.stil.has("M");
@@ -105,6 +112,11 @@ function kombinPuani(k, b, m, o, p, hedef, st, tercihStiller, tohum, ceza) {
   // --- kar / buz ---
   if (k.kar && o && !var_(o, "s") && !var_(o, "g")) puan -= 40;
   if (k.kar && p.clo < 0.3) puan -= 25;
+  if (k.karZorunlu) {                                             // v5: termal içlik + yün/polar ara kat + dış kabuk zorunlu
+    if (!KAR_TERMAL.has(b.id)) puan -= 220;
+    if (!yunPolar(m)) puan -= 220;
+    if (!o) puan -= 200;
+  }
   // --- sıcak hava ---
   if (k.sicak) {
     if (m) puan -= 140;
@@ -151,6 +163,7 @@ function ayakkabiPuani(k, a, hedefAyak, tercihStiller, tohum, st, ceza) {
   let puan = -(ceza.get(a.id) || 0);
   if ((a.etiket.has("g")) && k.yagis === 0 && !k.buz && !k.kar) puan -= 8;      // kuru havada gereksiz teknik ayakkabı
   if ((k.buz || k.kar) && !var_(a, "k")) puan -= 120;
+  if (k.karZorunlu) puan += a.id === "a_kar_botu" ? 400 : -150;       // v5: derin kauçuk dişli kar botu zorunlu
   if (k.kar && !var_(a, "g")) puan -= 80;
   if (k.buz && !var_(a, "s") && !var_(a, "g")) puan -= 30;
   if (k.yagis >= 1 && var_(a, "x")) puan -= 90;
@@ -204,8 +217,14 @@ function ekstralar(k, h, etkin, kombin) {
   if (k.ruzgar >= 2 && disarida) ekle("Rüzgâr", "🕶️", "Gözlük (toz/çöp için)", "Sert rüzgârda göze toz ve parça kaçar", "olabilir", "hafif", true);
   if (k.ruzgar >= 2) ekle("Rüzgâr", "🏗️", "Ağaç/çatı/afiş altından geçme", "Sert hamlede düşen cisim riski", "iyi", "hafif", true);
   // ---- Soğuk ----
-  if (etkin <= 8 || (k.ruzgar >= 1 && etkin <= 12)) ekle("Soğuk", "🧢", "Bere / kulak örten başlık", "Baştan ısı kaybı yüksek", "iyi", "hafif", true);
-  if (etkin <= 5) ekle("Soğuk", "🧤", etkin <= -2 ? "Kalın eldiven" : "İnce eldiven", "Eller ve parmaklar ilk üşüyen uçlardır", etkin <= 0 ? "sart" : "iyi", "hafif", true);
+  if (etkin <= 8 || (k.ruzgar >= 1 && etkin <= 12) || k.karZorunlu) ekle("Soğuk", "🧢", "Bere / kulak örten başlık", k.karZorunlu ? "Kar/buzlanma: zorunlu aksesuar; baştan ısı kaybı yüksek" : "Baştan ısı kaybı yüksek", k.karZorunlu ? "sart" : "iyi", "hafif", true);
+  if (etkin <= 5 || k.karZorunlu) ekle("Soğuk", "🧤", etkin <= -2 || k.karZorunlu ? "Su geçirmez / kalın eldiven" : "İnce eldiven", k.karZorunlu ? "Kar/buzlanma: zorunlu aksesuar; ıslak eldiven üşütür" : "Eller ve parmaklar ilk üşüyen uçlardır", etkin <= 0 || k.karZorunlu ? "sart" : "iyi", "hafif", true);
+  // ---- Kar / Buzlanma (v5): zorunlu donanım ----
+  if (k.karZorunlu) {
+    ekle("Kar/Buz", "🥾", "Derin kauçuk dişli kar botu", "Kar/buzlanma: dişli, su geçirmez, kaymaz taban zorunlu", "sart", "agir", false);
+    ekle("Kar/Buz", "🧥", "Termal içlik + yün/polar ara katman", "Nem taşıyan iç kat + ısıyı tutan ara kat; dış kabuk bunların üstüne", "sart", "orta", false);
+    ekle("Kar/Buz", "☂️", "Şemsiye iptal", "Kar/buzlanmada şemsiye eli bağlar, rüzgârda işe yaramaz; kapüşonlu kabuk yeter", "sart", "hafif", true);
+  }
   if (etkin <= 3 || k.buz) ekle("Soğuk", "🧦", "Yün/merino çorap", "Terletmeden sıcak tutar", "iyi", "hafif", true);
   if (etkin <= 0) ekle("Soğuk", "🔥", "Tek kullanımlık el ısıtıcı", "Uzun beklemelerde (durak, peron) çok işe yarar", "olabilir", "hafif", true);
   if (etkin <= 3) ekle("Soğuk", "☕", "Termos / sıcak içecek", "Bekleme ve yolculukta iç ısıtır", "olabilir", "orta", k.canta !== "yok");
@@ -297,6 +316,7 @@ export function degerlendir(h, t, ek = {}) {
   // Parça cezaları: sıcaklık aralığı dışı → soft ceza; özel koşul sağlanmıyorsa → elenir
   const ceza = new Map();
   const cezaHesapla = (x) => {
+    if (k.karZorunlu && zorunluParca(x.slot, x)) return 0;          // v5: zorunlu kış parçaları sıcaklık aralığıyla elenmez
     if (OZEL[x.id] && !OZEL[x.id](k, etkin0)) return 999;
     const [lo, hi] = ARALIK[x.id] || [-99, 99];
     const dis = etkin0 < lo ? lo - etkin0 : etkin0 > hi ? etkin0 - hi : 0;
@@ -308,9 +328,10 @@ export function degerlendir(h, t, ek = {}) {
     hepsi.forEach((x) => ceza.set(x.id, cezaHesapla(x)));
     let ok = hepsi.filter((x) => ceza.get(x.id) < 60);
     if (ok.length < 3) ok = [...hepsi].filter((x) => ceza.get(x.id) < 900).sort((x, y) => ceza.get(x.id) - ceza.get(y.id)).slice(0, 4);
+    if (k.karZorunlu) for (const x of hepsi) if (zorunluParca(slot, x) && !ok.includes(x)) ok.push(x);   // v5: zorunlu parça listeden düşmesin
     return ok;
   };
-  const B = liste("b"), M = [null, ...liste("m")], O = [null, ...liste("o")], P = liste("p"), A = liste("a");
+  const B = liste("b"), M = k.karZorunlu ? liste("m") : [null, ...liste("m")], O = k.karZorunlu ? liste("o") : [null, ...liste("o")], P = liste("p"), A = liste("a");   // v5: kar/buzlanmada ara kat ve dış kabuk "yok" seçeneği kalkar
   const tt = tetikleyicileriBul({ h, k, hedef, fz: ek?.fizik || null, tol: Number(t.tolerans) || 0, senaryoAd: SENARYOLAR[senaryo].ad });
   const hedefAyak = hedef.clo;
   const kombinler = [];
@@ -376,7 +397,8 @@ export function degerlendir(h, t, ek = {}) {
 
   /* ---- metinler ---- */
   let ayakkabi;
-  if (k.buz && a) ayakkabi = `Buzlanma riski: ${a.ad} (kaymaz taban). Düz tabanlı sneaker ve deri taban yasak.`;
+  if (k.karZorunlu && a) ayakkabi = `Kar/buzlanma: ${a.ad}. Derin kauçuk dişli, su geçirmez ve kaymaz taban zorunlu; düz tabanlı ayakkabı ve şemsiye yok.`;
+  else if (k.buz && a) ayakkabi = `Buzlanma riski: ${a.ad} (kaymaz taban). Düz tabanlı sneaker ve deri taban yasak.`;
   else if (k.kar) ayakkabi = `Kar/tipi: ${a.ad}. Su geçirmez ve kaymaz tabanlı olmalı.`;
   else if (k.surpriz) ayakkabi = `Ani sağanak riski: ${a.ad}. Su geçirmez olsun; süet ve bez ayakkabı olmaz.`;
   else if (k.yagis >= 2) ayakkabi = `Kuvvetli yağış: ${a.ad}. Süet ve bez ayakkabıdan uzak dur.`;
@@ -405,10 +427,12 @@ export function degerlendir(h, t, ek = {}) {
   if (k.moduler) neden.push(`Gün içi fark ${h.delta}°C → ara katman fermuarlı/çıkarılabilir seçildi.`);
   if (k.sicak) neden.push("Sıcak hava: ara kat ve dış kat devre dışı, nefes alan kumaşlar öne alındı.");
   if (k.buz) neden.push("Buzlanma riski: kaymaz taban zorunlu tutuldu.");
+  if (k.karZorunlu) neden.push("Kar/buzlanma algılandı: şemsiye iptal; derin kauçuk dişli kar botu, termal içlik, yün/polar ara kat, dış kabuk ve bere + eldiven zorunlu kılındı.");
 
   let hukum;
   const hukumEn = (x) => x;
-  if (k.buz) hukum = "Buzlanma riski: kalın giyin, kaymaz tabanlı ayakkabı seçin.";
+  if (k.karZorunlu) hukum = "Kar/buzlanma: şemsiye iptal; derin kauçuk dişli kar botu, termal içlik, yün/polar ara kat, bere ve eldiven giyin.";
+  else if (k.buz) hukum = "Buzlanma riski: kalın giyin, kaymaz tabanlı ayakkabı seçin.";
   else if (k.kar) hukum = "Kar/tipi: sıcak dış kat ve su geçirmez kaymaz bot giyin.";
   else if (k.surpriz) hukum = "Atmosfer patlamaya hazır: beklenmedik ani sağanak/dolu riski! Su geçirmez bot ve kapüşonlu teknik kabuk giyin.";
   else if (k.semsiyeYasak) hukum = "Şemsiye açmak tehlikeli ve işlevsizdir, kapüşonlu teknik kabuk giyin.";
