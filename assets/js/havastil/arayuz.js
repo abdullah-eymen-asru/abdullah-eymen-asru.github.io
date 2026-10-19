@@ -1,6 +1,6 @@
 /**
  * arayuz.js — HavaStil kabuğu (panel sekmesi VE bağımsız PWA sayfası aynı kodu kullanır).
- * v4 sekmeler: Bugün (sade, 3 saniye kuralı) · Kombin (tek yer: katmanlar, tetikleyiciler, çanta, plan) · Saatlik plan (7-14 gün, 24 saat) · Derin analiz (uzman, gün seçicili) · 14 gün · Uyarılar · Veri doğrulama (herkese açık şeffaflık laboratuvarı) · Ayarlar.
+ * v5 sekmeler: Bugün (sade, 3 saniye kuralı) · Kombin (tek yer: katmanlar, tetikleyiciler, çanta, plan) · Saatlik plan (16 gün, takvim/tarih seçici) · Derin analiz (🌧️ Yağmur Fiziği / ❄️ Kar & Don Dinamiği) · 16 gün · Mevsimlik eğilim (16 gün ötesi, iklim) · Uyarılar · Veri doğrulama (herkese açık şeffaflık laboratuvarı) · Ayarlar.
  * VİTRİN MODU (demo / misafir): konum her zaman İstanbul, "Konumu kaydet/düzenle" pasif, Mod B (Groq Worker) ve haber Worker'ı HİÇ çağrılmaz — yalnızca ücretsiz kural tabanlı (Mod A) cümle.
  * Akış: havaGetir (Open-Meteo, tarayıcıdan) → haberTaktigi (havuz, kısıtlar) → yagisMotoru (PoP × hacim, showers, CAPE, hamle)
  *       → degerlendir (CLO motoru, kısıtlarla) → krizAniBul (gün içi çelişki anı) → ekran.
@@ -24,6 +24,7 @@ import { dogrulaSekmesi } from "./ui-lab.js";
 import { demoModuAktifMi } from "../demo/demo-durum.js";
 import { haberSekmesi } from "./ui-haber.js";
 import { ayarSekmesi } from "./ui-ayar.js";
+import { mevsimSekmesi } from "./ui-mevsim.js";
 import { zamanlayiciBaslat } from "./bildirim.js";
 import * as K from "./konumlar.js";
 import { birlestir, bulutKonumEkle, bulutKonumGuncelle, bulutKonumSil, bulutTumunuSil, bulutTercihOku, bulutTercihYaz } from "./bulut.js";
@@ -31,7 +32,7 @@ import { birlestir, bulutKonumEkle, bulutKonumGuncelle, bulutKonumSil, bulutTumu
 export { HAVASTIL_WORKER_URL };
 const VARSAYILAN_KONUM = { id: "41.008,28.978", ad: "İstanbul", lat: 41.008, lon: 28.978, ulke: "TR", ulkeAd: "Türkiye", ulkeAdEn: "Turkey", admin1: "İstanbul", il: "İstanbul", ikon: "diger" };
 const LS = { tercih: "hv_tercih2", eskiTercih: "hv_tercih", bulut: "hv_bulut", aiModu: "hv_ai_modu", haberAcik: "hv_haber_acik", sekme: "hv_sekme", ai: "hv_ai3_" };
-const SEKMELER = [["bugun", "Bugün", "🏠"], ["kombin", "Kombin", "🧥"], ["plan", "Saatlik plan", "🗓️"], ["derin", "Derin analiz", "🔬"], ["gunluk", "14 gün", "📅"], ["haber", "Uyarılar", "🛰️"], ["dogrula", "Veri doğrulama", "🔍"], ["ayar", "Ayarlar", "⚙️"]];
+const SEKMELER = [["bugun", "Bugün", "🏠"], ["kombin", "Kombin", "🧥"], ["plan", "Saatlik plan", "🗓️"], ["derin", "Derin analiz", "🔬"], ["gunluk", "16 gün", "📅"], ["mevsim", "Mevsimlik eğilim", "🌍"], ["haber", "Uyarılar", "🛰️"], ["dogrula", "Veri doğrulama", "🔍"], ["ayar", "Ayarlar", "⚙️"]];
 const ESKI_SEKME = { ozet: "bugun", saatlik: "derin" };      // v2'de kaydedilmiş sekme adları
 const HAVA_TTL_MS = 30 * 60 * 1000, HABER_TTL_MS = 15 * 60 * 1000;
 
@@ -40,7 +41,7 @@ function tercihOku() {
   return { tol: [-3, 0, 3].includes(t.tol) ? t.tol : 0, sen: SENARYOLAR[t.sen] ? t.sen : "toplu", canta: CANTA_SECENEKLERI[t.canta] ? t.canta : "el", stil: STIL_SECENEKLERI[t.stil] ? t.stil : "auto", tohumKaydir: 0 };
 }
 
-export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAktifMi() } = {}) {
+export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAktifMi(), misafir = false } = {}) {
   const kayitliSekme = ESKI_SEKME[lsOku(LS.sekme, "bugun")] || lsOku(LS.sekme, "bugun");
   const d = {
     vitrin: !!vitrin,
@@ -48,7 +49,7 @@ export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAkti
     aiModu: vitrin ? false : lsOku(LS.aiModu, false) === true, ai: { metin: "", etiket: "", hata: "" }, bulut: vitrin ? false : lsOku(LS.bulut, false) === true,
     haberAcik: vitrin ? false : lsOku(LS.haberAcik, true) !== false, hava: null, sonuc: null, haber: null, kombinNo: 0, planGun: 0, planSaat: null,
     sekme: SEKMELER.some(([id]) => id === kayitliSekme) ? kayitliSekme : "bugun",
-    fizik: null, kriz: null, planAcik: false, derinGun: 0,
+    fizik: null, kriz: null, planAcik: false, derinGun: 0, derinGorunum: null, takvimAcik: false, takvimAy: null, mevsimAy: null, iklim: null, groqKota: null, misafir: !!misafir,
     yenilemeNo: 0, haberNo: 0,
   };
   const kb = {};
@@ -58,8 +59,9 @@ export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAkti
   const icerik = el("div", { class: "hv-icerik", role: "tabpanel", tabindex: "-1" });
   const konumB = konumBileseni(d, kb);
   kok.classList.add("hv");
-  const vitrinBandi = vitrin ? el("div", { class: "hv-vitrin-bandi", role: "note" }, el("strong", { text: "🎭 Vitrin modu · İstanbul" }),
-    el("span", { text: " Tüm görsel özellikler, kombin kartları, saatlik plan ve veri doğrulama açık. Konum kaydetme ve yapay zekâ yorumu (Mod B) kapalıdır; ücretsiz kural tabanlı stilist (Mod A) çalışır." })) : null;
+  const vitrinBandi = vitrin ? el("div", { class: "hv-vitrin-bandi", role: "note" }, el("strong", { text: misafir ? "👋 Misafir vitrini · İstanbul" : "🎭 Vitrin modu · İstanbul" }),
+    el("span", { text: " Tüm görsel özellikler, kombin kartları, 16 günlük saatlik plan, kar/don analizi ve veri doğrulama açık. Konum kaydetme, hesap senkronu ve yapay zekâ yorumu (Mod B) kilitlidir; ücretsiz kural tabanlı stilist (Mod A) çalışır." }),
+    misafir ? el("a", { class: "hv-baglanti", href: "/hesap/giris.html?donus=/panel/havastil/", text: " Giriş yap →" }) : null) : null;
   kok.replaceChildren(...[vitrinBandi, konumB.kok, sekmeBar, icerik].filter(Boolean));
 
   /* ---------------- çizim ---------------- */
@@ -71,7 +73,7 @@ export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAkti
       return olay(b, "click", () => kb.sekmeGit(id));
     }));
   }
-  const CIZICI = { bugun: bugunSekmesi, kombin: kombinSekmesi, plan: planSekmesi, derin: derinSekmesi, gunluk: gunlukSekmesi, haber: haberSekmesi, dogrula: dogrulaSekmesi, ayar: ayarSekmesi };
+  const CIZICI = { bugun: bugunSekmesi, kombin: kombinSekmesi, plan: planSekmesi, derin: derinSekmesi, gunluk: gunlukSekmesi, mevsim: mevsimSekmesi, haber: haberSekmesi, dogrula: dogrulaSekmesi, ayar: ayarSekmesi };
   function ciz() {
     sekmeBarCiz();
     try { icerik.replaceChildren(CIZICI[d.sekme](d, kb)); }
@@ -84,7 +86,7 @@ export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAkti
   function hesapla() {
     if (!d.hava) return;
     const ek = d.haberAcik && d.haber?.durum === "ok" ? d.haber.kisitlar : {};
-    d.fizik = yagisMotoru(d.hava.yagisPencere, { gun: d.hava.gun, canta: d.tercih.canta });
+    d.fizik = yagisMotoru(d.hava.yagisPencere, { gun: d.hava.gun, canta: d.tercih.canta, rakim: d.hava.rakim });
     d.sonuc = degerlendir(d.hava, { tolerans: d.tercih.tol, senaryo: d.tercih.sen, stil: d.tercih.stil, canta: d.tercih.canta, tohumKaydir: d.tercih.tohumKaydir }, { ...ek, fizik: d.fizik });
     d.kriz = krizAniBul(d.hava.yagisPencere, { senaryo: d.tercih.sen });
     if (d.kombinNo >= d.sonuc.kombinler.length) d.kombinNo = 0;
@@ -122,6 +124,16 @@ export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAkti
     d.haber = h; hesapla(); ciz();
   };
   kb.haberAcikDegis = (v) => { d.haberAcik = v; lsYaz(LS.haberAcik, v); d.haber = null; if (v) kb.haberYenile(true); else { hesapla(); ciz(); } };
+  /** Groq kota kutusu verisi (yalnızca üye; vitrin/misafir HİÇ çağırmaz). Yetkisizse RPC {gorebilir:false} döner → kutu çizilmez. */
+  let groqIstekte = false;
+  kb.groqKotaYukle = async (zorla = false) => {
+    if (d.vitrin || groqIstekte || (d.groqKota && !zorla)) return;
+    groqIstekte = true;
+    try { const { data, error } = await supabase.rpc("havastil_groq_kota_durumu"); d.groqKota = error || !data ? { gorebilir: false } : data; }
+    catch { d.groqKota = { gorebilir: false }; }
+    groqIstekte = false;
+    if (d.sekme === "dogrula" && d.groqKota.gorebilir) ciz();
+  };
   kb.kuralKisa = (id) => KURALLAR.find((k) => k.id === id)?.kisa || "";
 
   /* ---------------- konum işlemleri ---------------- */
