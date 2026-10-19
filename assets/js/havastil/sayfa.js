@@ -6,7 +6,7 @@
 import { requireAuth } from "../auth/auth-guard.js";
 import { supabase } from "../core/supabase-client.js";
 import { havastilKur } from "./arayuz.js";
-import { demoModuAktifMi } from "../demo/demo-durum.js";
+import { demoModuAktifMi, configHazir, ozellikAcikMi } from "../demo/demo-durum.js";
 
 function ekle(rel, oz) { const l = document.createElement("link"); l.rel = rel; for (const [k, v] of Object.entries(oz)) l.setAttribute(k, v); document.head.appendChild(l); }
 function meta(ad, icerik) { const m = document.createElement("meta"); m.name = ad; m.content = icerik; document.head.appendChild(m); }
@@ -38,8 +38,17 @@ async function basla() {
       return;
     }
   }
-  await requireAuth({ role: null });
-  if (demoModuAktifMi()) { if (yukleniyor) yukleniyor.hidden = true; await havastilKur(kok, { bagimsiz: true, vitrin: true }); return; }   // vitrin: yetki RPC'si ve servis çalışanı yok
+  // ziyaretciDemo: misafir anahtarı kapalıyken bile "Herkese açık demo girişi" AÇIKSA ziyaretçi giriş sayfasına atılmadan demo vitrine alınır.
+  await requireAuth({ role: null, ziyaretciDemo: true });
+  if (demoModuAktifMi()) {
+    if (yukleniyor) yukleniyor.hidden = true;
+    await configHazir();                                                // demo_config okunana dek bekler (en geç ~6 sn)
+    if (!ozellikAcikMi("havastil.aktif")) {                             // Site Sahibi demo menüsünde HavaStil'i kapattıysa vitrin açılmaz
+      const p = document.createElement("p"); p.className = "muted"; p.textContent = "HavaStil bu demoda kapalı.";
+      kok.replaceChildren(p); return;
+    }
+    await havastilKur(kok, { bagimsiz: true, vitrin: true }); return;
+  }   // vitrin: yetki RPC'si ve servis çalışanı yok
   let yetkili = false;
   try { const { data, error } = await supabase.rpc("havastil_yetkisi_var_mi"); yetkili = !error && data === true; } catch { yetkili = false; }
   if (yukleniyor) yukleniyor.hidden = true;
