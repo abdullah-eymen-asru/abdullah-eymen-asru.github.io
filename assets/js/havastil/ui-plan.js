@@ -1,6 +1,6 @@
 /**
  * ui-plan.js — "Saatlik plan" sekmesi (v5): gelecekteki herhangi bir günü (bugünden itibaren 16 güne kadar; Open-Meteo deterministik sınırı) SAAT SAAT planla.
- *   • Yatay kaydırılabilir gün seçici (Open-Meteo 14 günlük saatlik veri: veri.js › tumSaatler).
+ *   • v6 GÜN SEÇİCİ: 16 gün tek ızgarada (kaydırma yok), ‹ › okları, klavye okları, Bugün/+7/Son gün (ui-gun-secici.js). Eski yatay şerit + mini takvim kaldırıldı.
  *   • Seçilen günün 24 saati: Sıcaklık, Hissedilen, Rüzgâr yönü/hızı, Yağış (mm), PoP (%) ve Kıyafet önerisi (katman ikonu).
  *   • Bir saate dokununca kombin tavsiyesi dinamik güncellenir (ör. "14:00 - Tişört yeterli", "20:00 - Sıcaklık 7°C düşüyor, kaban şart").
  * Hesap: kıyafet katmanı, Kombin sekmesiyle AYNI CLO motorundan (cekirdek.js › hedefClo) ve aynı yağış fiziğinden (yagis-fizigi.js › saatAnaliz) gelir;
@@ -10,6 +10,7 @@ import { el, kart, ipucu, bolumBasligi, olay, rozet } from "./ui-temel.js";
 import { havaKodu, ruzgarYonu, gunAdi } from "./hava-kodlari.js";
 import { hedefClo } from "./cekirdek.js";
 import { saatAnaliz, efektifSiddet } from "./yagis-fizigi.js";
+import { gunIzgarasi } from "./ui-gun-secici.js";
 
 const pad = (s) => String(s).padStart(2, "0");
 const gunEtiketi = (tarih, i) => (i === 0 ? "Bugün" : i === 1 ? "Yarın" : gunAdi(tarih));
@@ -74,16 +75,20 @@ export function planSekmesi(d, kb) {
   const gunler = [...gruplar].map(([tarih, saatler]) => ({ tarih, saatler }));
   const gi = Math.min(d.planGun || 0, gunler.length - 1), G = gunler[gi], simdiT = h.saatListe?.[0]?.t;
 
-  const secici = el("div", { class: "hv-plan-gunler", role: "group", "aria-label": "Planlanacak gün (yatay kaydır)" },
-    ...gunler.map((g, i) => {
+  const secici = gunIzgarasi({
+    gunler: gunler.map((g, i) => {
       const mn = Math.min(...g.saatler.map((x) => x.app)), mx = Math.max(...g.saatler.map((x) => x.app));
       const analizler = g.saatler.map((x) => saatAnaliz(x)), yagmur = analizler.some((a) => a.seviye >= 2 && !a.karli), karGun = analizler.some((a) => a.karli && a.karCm >= 0.1), buzGun = analizler.some((a) => a.buz.seviye >= 2);
-      return olay(el("button", { type: "button", class: "hv-gun-btn hv-plan-gun", "aria-pressed": String(i === gi), title: `${gunEtiketi(g.tarih, i)} ${g.tarih.slice(8, 10)}.${g.tarih.slice(5, 7)}` },
-        el("strong", { text: gunEtiketi(g.tarih, i) }), el("small", { text: `${g.tarih.slice(8, 10)}.${g.tarih.slice(5, 7)}` }), el("small", { text: `${mn}°/${mx}°${karGun ? " ❄️" : buzGun ? " 🧊" : yagmur ? " 🌧️" : ""}` })),
-      "click", () => { d.planGun = i; d.planSaat = null; kb.ciz(); });
-    }));
+      const isaret = karGun ? "❄️" : buzGun ? "🧊" : yagmur ? "🌧️" : "";
+      return { tarih: g.tarih, alt: `${mn}°/${mx}°${isaret ? ` ${isaret}` : ""}`, baslik: `${gunEtiketi(g.tarih, i)} ${g.tarih.slice(8, 10)}.${g.tarih.slice(5, 7)}: ${mn}° – ${mx}° hissedilen${isaret ? ` ${isaret}` : ""}` };
+    }),
+    aktif: gi, etiket: "Planlanacak gün", onSec: (i) => { d.planGun = i; d.planSaat = null; kb.ciz(); },
+  });
+  const mevsimeGit = olay(el("button", { type: "button", class: "hv-baglanti", text: "16 günden sonrası için → Mevsimlik eğilim" }), "click", () => {
+    const son = gunler[gunler.length - 1].tarih, t = new Date(Date.UTC(Number(son.slice(0, 4)), Number(son.slice(5, 7)) - 1 + 1, 1));
+    d.mevsimAy = { y: t.getUTCFullYear(), m: t.getUTCMonth() }; kb.sekmeGit("mevsim");
+  });
 
-  const takvim = takvimKutusu(gunler, gi, d, kb);
   // Gün özeti
   const app = G.saatler.map((x) => x.app), mm = G.saatler.reduce((t, x) => t + x.yagis, 0), E = G.saatler.reduce((t, x) => t + saatAnaliz(x).E, 0);
   const popMax = Math.max(...G.saatler.map((x) => x.yagisOlasi)), sid = efektifSiddet(E);
@@ -132,65 +137,8 @@ export function planSekmesi(d, kb) {
 
   return el("div", { class: "hv-sekme-govde" },
     kart("hv-plan-kart", bolumBasligi("Detaylı saatlik planlama"),
-      ipucu(`Planlamak istediğin günü takvimden ya da şeritten seç (${gunler.length} gün, Open-Meteo deterministik sınırı); 24 saatin her biri için sıcaklık, rüzgâr, yağış/kar ve kıyafet katmanı listelenir. Bir saate dokun, o saatin kombin tavsiyesi güncellenir.`),
-      takvim, secici, ozet, tavsiye, tablo,
+      ipucu(`Planlamak istediğin güne dokun (${gunler.length} gün tek bakışta; ‹ › okları ya da klavyedeki ← → ile de gezebilirsin). 24 saatin her biri için sıcaklık, rüzgâr, yağış/kar ve kıyafet katmanı listelenir. Bir saate dokun, o saatin kombin tavsiyesi güncellenir.`),
+      secici, mevsimeGit, ozet, tavsiye, tablo,
       el("p", { class: "hv-ipucu", text: `Kıyafet katmanı: CLO = (33 − etkin sıcaklık) ÷ 15 − aktivite; plan “${d.tercih.sen}”, tolerans ${d.tercih.tol > 0 ? "+" : ""}${d.tercih.tol}°. Gelecek günlerde model belirsizliği artar: 7 günden sonrası eğilim olarak oku.` }),
       gi >= 7 ? rozet("⚠️ 7+ gün: tahmin belirsizliği yüksek", "hv-rozet-onemli") : null));
-}
-
-/* ------------------------------ hızlı tarih filtresi + mini takvim ------------------------------ */
-const AY_ADLARI = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
-const GUN_BAS = ["Pt", "Sa", "Ça", "Pe", "Cu", "Ct", "Pz"];
-const iso = (y, a, g) => `${y}-${pad(a + 1)}-${pad(g)}`;
-/**
- * Açılır mini takvim + tarih seçici. 16 gün içindeki günler seçilince o günün 24 saatlik dökümüne atlanır; 16 günün ötesindeki günler
- * (deterministik saatlik veri verilemez) "Mevsimlik eğilim" sekmesine, seçilen aya yönlendirir.
- */
-function takvimKutusu(gunler, gi, d, kb) {
-  const ilk = gunler[0].tarih, son = gunler[gunler.length - 1].tarih;
-  const secili = gunler[gi].tarih;
-  const idx = new Map(gunler.map((g, i) => [g.tarih, i]));
-  const [by, bm] = ilk.split("-").map(Number);
-  let ay = d.takvimAy || { y: Number(secili.slice(0, 4)), m: Number(secili.slice(5, 7)) - 1 };
-  const ayFarki = (ay.y - by) * 12 + (ay.m - (bm - 1));
-  const kutu = el("details", { class: "hv-takvim", open: !!d.takvimAcik });
-  kutu.addEventListener("toggle", () => { d.takvimAcik = kutu.open; });
-  const git = (tarih) => {
-    if (idx.has(tarih)) { d.planGun = idx.get(tarih); d.planSaat = null; d.takvimAcik = false; kb.ciz(); return; }
-    if (tarih > son) { d.mevsimAy = { y: Number(tarih.slice(0, 4)), m: Number(tarih.slice(5, 7)) - 1 }; kb.sekmeGit("mevsim"); }
-  };
-  const govde = el("div", { class: "hv-takvim-govde" });
-  const ciz = () => {
-    const ilkGun = new Date(Date.UTC(ay.y, ay.m, 1)), gunSayisi = new Date(Date.UTC(ay.y, ay.m + 1, 0)).getUTCDate();
-    const bosluk = (ilkGun.getUTCDay() + 6) % 7;
-    const hucreler = [];
-    for (let i = 0; i < bosluk; i++) hucreler.push(el("span", { class: "hv-takvim-bos", "aria-hidden": "true" }));
-    for (let g = 1; g <= gunSayisi; g++) {
-      const tarih = iso(ay.y, ay.m, g), icinde = idx.has(tarih), gelecek = tarih > son, gecmis = tarih < ilk;
-      const G = icinde ? gunler[idx.get(tarih)] : null;
-      const an = G ? G.saatler.map((x) => saatAnaliz(x)) : [];
-      const isaret = G ? (an.some((a) => a.karli && a.karCm >= 0.1) ? "❄️" : an.some((a) => a.buz.seviye >= 2) ? "🧊" : an.some((a) => a.seviye >= 2) ? "🌧️" : "") : "";
-      const b = el("button", { type: "button", class: `hv-takvim-gun${icinde ? " icinde" : ""}${gelecek ? " uzak" : ""}${tarih === secili ? " secili" : ""}`, disabled: gecmis, "aria-pressed": String(tarih === secili),
-        title: icinde ? "Bu günün 24 saatlik planı" : gelecek ? "16 günün ötesi: mevsimlik eğilim" : "Geçmiş gün" }, el("strong", { text: String(g) }), isaret ? el("small", { text: isaret }) : null);
-      olay(b, "click", () => git(tarih));
-      hucreler.push(b);
-    }
-    const ust = el("div", { class: "hv-takvim-ust" },
-      olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", "aria-label": "Önceki ay", disabled: ayFarki <= 0, text: "‹" }), "click", () => { ay = ay.m === 0 ? { y: ay.y - 1, m: 11 } : { y: ay.y, m: ay.m - 1 }; d.takvimAy = ay; d.takvimAcik = true; kb.ciz(); }),
-      el("strong", { text: `${AY_ADLARI[ay.m]} ${ay.y}` }),
-      olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", "aria-label": "Sonraki ay", disabled: ayFarki >= 12, text: "›" }), "click", () => { ay = ay.m === 11 ? { y: ay.y + 1, m: 0 } : { y: ay.y, m: ay.m + 1 }; d.takvimAy = ay; d.takvimAcik = true; kb.ciz(); }));
-    govde.replaceChildren(ust, el("div", { class: "hv-takvim-izgara", role: "group", "aria-label": `${AY_ADLARI[ay.m]} ${ay.y}` }, ...GUN_BAS.map((x) => el("small", { class: "hv-takvim-baslik", text: x })), ...hucreler),
-      el("p", { class: "hv-ipucu", text: `Koyu günler saatlik plana gider (${gunEtiketi(ilk, 0)} → ${son.slice(8, 10)}.${son.slice(5, 7)}). Daha ilerisi için güne dokun: saatlik tahmin yoktur, Mevsimlik eğilim açılır.` }));
-  };
-  ciz();
-  const girdi = el("input", { type: "date", class: "hv-girdi hv-tarih-girdi", min: ilk, max: son, value: secili, "aria-label": "Tarih seç" });
-  olay(girdi, "change", () => { if (girdi.value) git(girdi.value); });
-  const hizli = el("div", { class: "hv-btn-satir" },
-    olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "Bugün" }), "click", () => git(ilk)),
-    olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "Yarın" }), "click", () => git(gunler[Math.min(1, gunler.length - 1)].tarih)),
-    olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "+7 gün" }), "click", () => git(gunler[Math.min(7, gunler.length - 1)].tarih)),
-    olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "Son gün" }), "click", () => git(son)),
-    girdi);
-  kutu.append(el("summary", { text: `📆 Takvimden seç · ${secili.slice(8, 10)}.${secili.slice(5, 7)}.${secili.slice(0, 4)}` }), hizli, govde);
-  return kutu;
 }
