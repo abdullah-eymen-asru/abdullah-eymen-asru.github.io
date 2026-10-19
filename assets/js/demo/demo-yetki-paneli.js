@@ -38,6 +38,8 @@ const BOLUMLER = [
   { yol: "notlar.aktif", baslik: "🗒️ Notlar", aciklama: "Sahte, şifreli not örnekleri.", alt: [["notlar.filtreCipleri", "Filtreleme Çipleri / Etiket Arama"]] },
   { yol: "mesajlar.aktif", baslik: "💬 Sohbet / Mesajlar", aciklama: "Örnek sohbetler (salt-okunur): demo hesabı mesajları görür, gönderemez/silemez." },
   { yol: "sistem.aktif", baslik: "📊 Sistem / Metrik", aciklama: "Statik vitrin grafikleri." },
+  // v5: HavaStil vitrini artık arayüzden yönetilir (eskiden "SQL ile kapat" gerekiyordu). 'misafir' anahtarı sayfa anahtarından BAĞIMSIZDIR.
+  { yol: "havastil.aktif", baslik: "🌦️ HavaStil (Giyim Danışmanı)", aciklama: "Demo menüsünde İstanbul vitrini: 16 günlük saatlik plan, kar/don analizi, veri doğrulama. Konum kaydı ve yapay zekâ (Mod B) her zaman kilitli.", bagimsizAlt: true, alt: [["havastil.misafir", "Oturumsuz misafir erişimi (/panel/havastil/ doğrudan açılır, giriş sayfasına yönlendirmez)"]] },
 ];
 const KART_ETIKETLERI = {
   "content-notlar": "Notlar kartı",
@@ -142,7 +144,7 @@ async function baslat() {
     const matris = BOLUMLER.map((b) => {
       const acik = oku(cfg, b.yol) === true;
       const govde = el("div", { class: "demo-alt" });
-      for (const [yol, etiket] of b.alt || []) govde.append(anahtar(etiket, oku(cfg, yol), !duzenle || !acik, degis(yol)));
+      for (const [yol, etiket] of b.alt || []) govde.append(anahtar(etiket, oku(cfg, yol), !duzenle || (!acik && !b.bagimsizAlt), degis(yol)));
       if (b.kartlar) {
         for (const [id, etiket] of Object.entries(KART_ETIKETLERI)) {
           govde.append(anahtar(etiket, cfg.hub.kartlar[id] !== false, !duzenle || !acik, (v) => { cfg.hub.kartlar[id] = v; kirli = true; ciz(); },
