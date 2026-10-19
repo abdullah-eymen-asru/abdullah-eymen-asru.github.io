@@ -53,7 +53,7 @@ export const VARSAYILAN_CONFIG = Object.freeze({
   notlar: { aktif: true, filtreCipleri: true },
   mesajlar: { aktif: true }, // Sohbet / Mesajlar (örnek sohbetler; gönderme/silme salt-okunur toast'a takılır)
   sistem: { aktif: true },
-  havastil: { aktif: true }, // HavaStil vitrini (İstanbul; konum kaydetme ve Mod B kapalı) — migration 0101
+  havastil: { aktif: true, misafir: true }, // HavaStil vitrini (İstanbul; konum kaydetme ve Mod B kapalı) — migration 0101; misafir: oturumsuz ziyaretçi /panel/havastil/'e doğrudan girer — migration 0102
 });
 
 /** Demo'da açılabilecek sekmeler ↔ hangi yapılandırma bölümüne bağlı. (Bunun DIŞINDAKİ hiçbir sekme demoda yoktur.) */
