@@ -620,3 +620,40 @@
   .hv-gun-ad { min-width: 0; width: auto; }
   .hv-gun-aralik { grid-template-columns: 2.4rem minmax(2rem, 1fr) 2.4rem; }
 }
+
+/* ============================ v7: kalem ferahlatması, katlanabilir arama, bulut durumu, geçmiş hava ============================ */
+/* --- kayıtlı konum kartı: kalem artık kartın SAĞINDA, sıcaklıktan ayrı, dikey ortalı bağımsız dokunma alanı --- */
+.hv-konum-sarmal { position: static; flex: 0 0 auto; display: flex; align-items: stretch; min-width: 10.4rem; max-width: 15rem; border: 1px solid var(--hv-cizgi); border-radius: 16px; background: var(--hv-yuzey); scroll-snap-align: start; }
+.hv-konum-sarmal .hv-konum-kart { flex: 1 1 auto; min-width: 0; max-width: none; border: 0; background: transparent; box-shadow: none; border-radius: 16px 0 0 16px; padding-right: .5rem; }
+.hv-konum-sarmal.aktif { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; background: rgba(74, 163, 255, .08); }
+.hv-konum-sarmal .hv-konum-sic { flex: 0 0 auto; margin-left: .1rem; }
+.hv-kalem { position: relative; top: auto; right: auto; flex: 0 0 auto; align-self: center; width: 2rem; height: 2rem; margin: 0 .5rem 0 .15rem; border-radius: 50%; border: 1px solid var(--hv-cizgi); background: var(--bg); cursor: pointer; display: grid; place-items: center; font-size: .85rem; padding: 0; z-index: 1; }
+.hv-kalem::after { content: ""; position: absolute; inset: -.3rem; border-radius: 50%; }   /* görünmez halka: dokunma hedefi ≈ 44 px */
+
+/* --- katlanabilir arama: grid-template-rows 0fr→1fr akordeonu (JS yalnızca .acik sınıfı ve inert verir) --- */
+.hv-arama-akordeon { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .28s ease; margin-top: -.6rem; }
+.hv-arama-akordeon.acik { grid-template-rows: 1fr; margin-top: 0; }
+.hv-arama-ic { overflow: hidden; min-height: 0; visibility: hidden; transition: visibility 0s linear .28s; }
+.hv-arama-akordeon.acik > .hv-arama-ic { visibility: visible; transition-delay: 0s; overflow: visible; }
+@media (prefers-reduced-motion: reduce) { .hv-arama-akordeon, .hv-arama-ic { transition: none; } }
+.hv-arama-ust { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.hv-arama-baslik { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.hv-arama-gizle { display: inline-flex; align-items: center; gap: .3rem; min-height: 2.25rem; padding: .25rem .7rem; border-radius: 999px; border: 1px solid var(--hv-cizgi); background: var(--bg); color: var(--text); font: inherit; font-size: .8rem; font-weight: 650; cursor: pointer; }
+.hv-arama-gizle:hover, .hv-arama-gizle:focus-visible { border-color: var(--accent); outline: none; }
+.hv-ara-hap { align-self: flex-start; display: inline-flex; align-items: center; gap: .45rem; min-height: 2.5rem; padding: .4rem 1rem; border-radius: 999px; border: 1px solid var(--hv-cizgi); background: var(--hv-yuzey); color: var(--text); font: inherit; font-size: .88rem; font-weight: 650; cursor: pointer; }
+.hv-ara-hap:hover, .hv-ara-hap:focus-visible { border-color: var(--accent); outline: none; }
+
+/* --- bulut durum satırı + ilk kullanım daveti --- */
+.hv-bulut-durum { margin: 0; padding: .35rem .7rem; font-size: .78rem; border-radius: 10px; border: 1px solid var(--hv-cizgi); background: var(--hv-yuzey); color: var(--muted); align-self: flex-start; overflow-wrap: anywhere; }
+.hv-bulut-durum[data-tur="ok"] { color: var(--hv-yesil); border-color: var(--hv-yesil); }
+.hv-bulut-durum[data-tur="hata"] { color: var(--text); border-color: var(--hv-sari); background: rgba(224, 169, 59, .13); }
+.hv-bulut-davet { display: flex; flex-direction: column; gap: .5rem; padding: .85rem 1rem; border: 1px solid var(--accent); border-radius: 16px; background: rgba(74, 163, 255, .07); }
+.hv-bulut-davet p { margin: 0; font-size: .85rem; line-height: 1.45; }
+
+/* --- geçmiş gün (Saatlik plan) --- */
+.hv-gecmis { display: flex; flex-direction: column; gap: .5rem; padding: .7rem .8rem; border: 1px dashed var(--hv-cizgi); border-radius: 14px; }
+.hv-gecmis-satir { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.hv-gecmis .hv-girdi { width: auto; flex: 0 1 11rem; }
+.hv-gecmis-rozet { align-self: flex-start; }
+.hv-retro { display: flex; flex-direction: column; gap: .35rem; padding: .7rem .85rem; border-radius: 14px; border: 1px solid var(--hv-mavi); background: rgba(74, 163, 255, .07); font-size: .84rem; line-height: 1.5; }
+.hv-retro strong { font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
