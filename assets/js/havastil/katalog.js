@@ -84,7 +84,7 @@ const SATIRLAR = [
   ["a_bot_deri", "Deri bot (kauçuk taban)", "a", 0.12, "sko", "K", "Deri + kauçuk taban"],
   ["a_bot_kaucuk", "Derin kauçuk dişli kaymaz bot", "a", 0.14, "gsk", "D", "Kauçuk dişli taban"],
   ["a_kis_botu", "Yalıtımlı kışlık bot", "a", 0.22, "gsk", "D", "Membran + yalıtım"],
-  ["a_kar_botu", "Kar botu (yalıtımlı, kaymaz)", "a", 0.30, "gk", "D", "Membran + yalıtım"],
+  ["a_kar_botu", "Derin kauçuk dişli kar botu", "a", 0.30, "gsk", "D", "Kauçuk dişli taban + membran + yalıtım"],
 ];
 
 export const SLOTLAR = { b: "Çekirdek", m: "Modüler katman", o: "Koruyucu kabuk", p: "Alt giyim", a: "Ayakkabı" };
