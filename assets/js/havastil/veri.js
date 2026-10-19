@@ -336,3 +336,61 @@ export async function adresAra(girdi) {
 }
 /** Eski ad (geriye uyum). */
 export const sokakAra = adresAra;
+
+/* ------------------------------ geçmiş gün (v7) ------------------------------ */
+const ARSIV_URL = "https://archive-api.open-meteo.com/v1/archive";
+export const GECMIS_YAKIN_GUN = 92;                    // Forecast API `past_days` üst sınırı; daha eskisi Historical (ERA5) arşivinden
+const GECMIS_ONEKI = "hv_gecmis1_";
+const GECMIS_TTL = { forecast: 3 * 3600 * 1000, archive: 24 * 3600 * 1000 };
+const tarihGunu = (t) => { const [y, a, g] = t.split("-").map(Number); return Date.UTC(y, a - 1, g) / 86400000; };
+/** Konumun "bugün"üne göre kaç gün geride (bugün = 0, dün = 1). */
+export const gunGeri = (tarih, bugun) => Math.round(tarihGunu(bugun) - tarihGunu(tarih));
+/** Hangi API'nin kullanılacağı (arayüz rozeti ve test için). */
+export const gecmisKaynagi = (geri) => (geri <= GECMIS_YAKIN_GUN ? "forecast" : "archive");
+
+const ILERI_SAATLIK = "temperature_2m,apparent_temperature,weather_code,precipitation,rain,showers,snowfall,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,dew_point_2m,pressure_msl,cloud_cover,is_day,uv_index,cape,freezing_level_height,soil_temperature_0cm,snow_depth";
+const ARSIV_SAATLIK = "temperature_2m,apparent_temperature,weather_code,precipitation,rain,snowfall,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,dew_point_2m,pressure_msl,cloud_cover,is_day,snow_depth";
+const ARSIV_EK = "cape,soil_temperature_0_to_7cm";     // her konumda yoksa (HTTP 400) bunlarsız yeniden denenir
+
+/**
+ * Seçilen GEÇMİŞ günün 24 saatini döndürür (ölçülen/gerçekleşen değerler).
+ *  • ≤ 92 gün: Forecast API + past_days (modelin analiz alanı; PoP/UV/sıfır izotermi de gelir).
+ *  • > 92 gün: Historical Weather API (ERA5 yeniden analiz): PoP/UV/sıfır izotermi/sağanak YOKTUR; cape ve zemin sıcaklığı (0–7 cm) varsa kullanılır.
+ * Geçmişte yağış "oldu ya da olmadı" olduğundan olasılık yerine gerçekleşen değer kullanılır: yagisOlasi = yağış ≥ 0,1 mm ise 100, değilse 0.
+ * @returns {{kaynak:"forecast"|"archive", saatler:object[], geri:number, tz:string, rakim:number|null, onbellek:boolean, notlar:string[]}}
+ */
+export async function gecmisGunGetir(lat, lon, tarih, bugun) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(tarih || "")) throw new Error("Geçersiz tarih.");
+  const b = bugun || new Date().toISOString().slice(0, 10);
+  const geri = gunGeri(tarih, b);
+  if (geri < 1) throw new Error("Geçmiş için bugünden önceki bir gün seç.");
+  const kaynak = gecmisKaynagi(geri);
+  const anahtar = `${GECMIS_ONEKI}${kaynak}_${nokta(lat)}_${nokta(lon)}_${tarih}`;
+  try {
+    const k = JSON.parse(localStorage.getItem(anahtar) || "null");
+    if (k && Date.now() - k.t < GECMIS_TTL[kaynak]) return { ...k.veri, onbellek: true };
+  } catch { /* depo kapalı/bozuk */ }
+
+  let ana, notlar = [];
+  if (kaynak === "forecast") {
+    ana = await jsonAl(`${HAVA_URL}?latitude=${lat}&longitude=${lon}&timezone=auto&hourly=${ILERI_SAATLIK}&past_days=${geri}&forecast_days=1`, 12000);
+  } else {
+    const url = (alanlar) => `${ARSIV_URL}?latitude=${lat}&longitude=${lon}&timezone=auto&start_date=${tarih}&end_date=${tarih}&hourly=${alanlar}`;
+    try { ana = await jsonAl(url(`${ARSIV_SAATLIK},${ARSIV_EK}`), 15000); }
+    catch (h) { if (!/HTTP 400/.test(String(h?.message))) throw h; ana = await jsonAl(url(ARSIV_SAATLIK), 15000); }
+    notlar.push("ERA5 yeniden analiz verisi (≈ 25 km ızgara): yağış olasılığı, UV ve sıfır izotermi arşivde yoktur; zemin değeri 0–7 cm toprak sıcaklığıdır.");
+  }
+  const H = ana?.hourly;
+  if (!H?.time) throw new Error("Open-Meteo geçmiş veri döndürmedi.");
+  if (kaynak === "archive" && H.soil_temperature_0_to_7cm) H.soil_temperature_0cm = H.soil_temperature_0_to_7cm;
+  const idx = H.time.map((t, k) => (t.startsWith(tarih) ? k : -1)).filter((k) => k >= 0);
+  const saatler = idx.map((k) => {
+    const x = saatOge(H, k);
+    x.yagisOlasi = x.yagis >= 0.1 ? 100 : 0; x.uyum = null; x.gecmis = true;
+    return x;
+  }).filter((x) => Number.isFinite(x.temp) && Number.isFinite(x.app));
+  if (!saatler.length) throw new Error("Bu tarih için saatlik değer bulunamadı (arşivde henüz yayımlanmamış olabilir).");
+  const veri = { kaynak, saatler, geri, tz: ana.timezone || "", rakim: Number.isFinite(ana.elevation) ? Math.round(ana.elevation) : null, notlar };
+  try { localStorage.setItem(anahtar, JSON.stringify({ t: Date.now(), veri })); } catch { /* yok say */ }
+  return { ...veri, onbellek: false };
+}
