@@ -79,8 +79,8 @@ export function ayarSekmesi(d, kb) {
   const bulutDurum = el("p", { class: "hv-ipucu", id: "hv-bulut-durum" });
   olay(bulutKutu, "change", async () => { bulutDurum.textContent = ""; const m = await kb.bulutDegis(bulutKutu.checked); if (m) bulutDurum.textContent = m; bulutKutu.checked = d.bulut; });
   const bulutKart = kart("", bolumBasligi("☁️ Cihazlar arası senkron"),
-    el("label", { class: "hv-onay", for: "hv-bulut" }, bulutKutu, el("span", { text: "Kayıtlı konumlarımı ve tercihlerimi hesabımda sakla" })),
-    ipucu(d.vitrin ? "Vitrin modunda hesap senkronu ve konum kaydetme kapalıdır." : "Varsayılan KAPALI. Açarsan yalnızca ⭐ ile kaydettiğin konumlar (adı ve koordinatı, yuvarlanmadan) ve tercihlerin hesabında tutulur; anlık GPS konumun ve aramaların asla kaydedilmez."), bulutDurum);
+    el("label", { class: "hv-onay", for: "hv-bulut" }, bulutKutu, el("span", { text: "Kayıtlı konumlarımı ve tercihlerimi hesabımda sakla (tüm cihazlarımda eşitle)" })),
+    ipucu(d.vitrin ? "Vitrin modunda hesap senkronu ve konum kaydetme kapalıdır; buluta hiçbir istek gitmez." : "Açıkken ⭐ ile kaydettiğin konumlar (adı, simgesi ve koordinatı, yuvarlanmadan) ve tercihlerin anında hesabına yazılır; diğer cihazlarında sayfayı açınca ya da sekmeye dönünce görünür. İlk kullanımda sana sorulur; rızan olmadan hiçbir şey kaydedilmez. Anlık GPS konumun ve aramaların asla kaydedilmez. Kapatırsan bulut verisini de sildirebilirsin."), bulutDurum);
 
   /* ---------- 4) Haber doğrulama anahtarı ---------- */
   const haberKutu = el("input", { type: "checkbox", id: "hv-haber-acik" }); haberKutu.checked = d.haberAcik;
