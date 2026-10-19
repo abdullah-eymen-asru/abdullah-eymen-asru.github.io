@@ -211,10 +211,11 @@ permalink: "/kurumsal/kvkk-aydinlatma-metni.html"
     <strong>kaydedilmez</strong>.</li>
   <li><strong>Yer araması:</strong> yazdığınız metin, öneri listesi için Open-Meteo Geocoding servisine (ve yalnızca sokak/adres
     araması isterseniz OpenStreetMap Nominatim servisine) gönderilir; kaydedilmez.</li>
-  <li><strong>Kayıtlı konumlar (isteğe bağlı):</strong> varsayılan olarak yalnızca cihazınızın yerel depolamasında tutulur.
-    <strong>“Hesabımda sakla”</strong> seçeneğini (varsayılan <em>kapalı</em>) kendiniz açarsanız; konum adı, simge, il/ilçe/ülke adı,
-    yaklaşık 110 m’ye yuvarlanmış koordinat ve tercihleriniz hesabınıza bağlı olarak saklanır. Dilediğiniz an kapatıp bu verileri
-    sildirebilirsiniz; hesabınız silindiğinde de silinir. <em>Hukuki sebep: açık rızanız (KVKK m.5/1).</em></li>
+  <li><strong>Kayıtlı konumlar (isteğe bağlı):</strong> ⭐ ile kaydettiğiniz konumlar, ilk kullanımda sorulan
+    <strong>“tüm cihazlarımda eşitle”</strong> seçeneğini <em>kendiniz onaylarsanız</em> hesabınıza bağlı olarak saklanır (onaylamazsanız
+    yalnızca cihazınızın yerel depolamasında kalır). Saklanan veriler: konum adı, simge, il/ilçe/ülke adı, tarafınızdan kaydedilen noktanın
+    koordinatı ve tercihleriniz. Anlık cihaz konumunuz ve arama metinleriniz hiçbir zaman saklanmaz. Dilediğiniz an Ayarlar’dan eşitlemeyi kapatıp bu
+    verileri sildirebilirsiniz; hesabınız silindiğinde de silinir. <em>Hukuki sebep: açık rızanız (KVKK m.5/1).</em></li>
   <li><strong>Haber doğrulama (isteğe bağlı):</strong> bugünü ilgilendiren hava uyarıları için herkese aynı haber havuzu çekilir;
     konumunuz sunucuya gönderilmez, eşleştirme cihazınızda yapılır.</li>
   <li><strong>Yapay zekâ yorumu (isteğe bağlı, varsayılan kapalı):</strong> açarsanız yalnızca sıcaklık/rüzgâr gibi sayılar, kıyafet bilgisi ve
