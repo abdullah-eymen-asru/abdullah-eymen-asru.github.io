@@ -98,3 +98,18 @@ Amaç hava + CLO ile giyim kararıdır; **konum toplamak amaç değildir**. GPS,
 - **Haber (Türkiye dışı):** Worker, ülke kodu + şehir adıyla Google News coğrafi beslemesini (`hl/gl/ceid`) yerel resmî terimle sorgular; yalnızca resmî kurum/Tier-1 ajans ve soru işaretsiz başlıklar geçer.
 - **Vitrin (demo/misafir):** konum her zaman İstanbul; “Konumu kaydet/düzenle”, hesap senkronu, haber Worker'ı ve **Mod B (Groq)** kapalı, yalnızca Mod A. Demo menüsü `tool-havastil` → `demo_config.havastil.aktif`.
 - Yeni dosyalar: `ui-plan.js`, `ui-lab.js`.
+
+---
+
+## v5 — Kar & Don, 16 gün, misafir akışı, Groq sayacı (migration 0102)
+
+**Kurulum sırası:** (1) Supabase SQL Editor'de `supabase/migrations/0102_havastil_misafir_groq_sayac.sql` çalıştır. (2) Worker'ı yeniden yayınla (`cloudflare worker/havastil_worker/worker.js`). (3) Siteyi yayınla; servis çalışanı sürümü `havastil-v6` olduğundan eski önbellek kendiliğinden temizlenir.
+
+**Kar & Don:** WMO 71/73/75/77/85/86 + snowfall → sıvı eşdeğerden (SWE) taze kar cm; SLR 1:10 (T > −3 °C) / 1:15 (T ≤ −3 °C). Sıfır izotermi (m) ↔ konum rakımı; zemin yüzey sıcaklığı (`soil_temperature_0cm`) ile gizli buzlanma (Dikkat / Yüksek / Çok yüksek). Kar veya buzlanma ≥ Yüksek algılanınca şemsiye iptal; derin kauçuk dişli kar botu, termal içlik, yün/polar ara kat, dış kabuk, bere ve eldiven zorunlu. Derin analizde **🌧️ Yağmur Fiziği / ❄️ Kar & Don Dinamiği** alt sekmeleri vardır (seçilmezse gün fazına göre otomatik).
+
+**16 gün + takvim:** `forecast_days=16`. Saatlik planda açılır mini takvim ve tarih seçici; 16 gün ötesi güne dokunmak **Mevsimlik eğilim** sekmesini o ayla açar (Open-Meteo Climate API, 1991–2020 normaline göre sıcaklık/yağış sapması; hava tahmini değildir).
+
+**Misafir akışı:** Oturumsuz ziyaretçi `/panel/havastil/` adresine girişe atılmadan İstanbul vitrinini görür. Aç/kapa: *Yönetim Paneli › Yetki & Demo Ayarları › HavaStil › Oturumsuz misafir erişimi* (varsayılan AÇIK). SQL gerekmez.
+
+**Groq sayacı:** Her Groq isteği Worker tarafından `havastil_groq_say()` ile sayılır. Kutu: *HavaStil › Veri Doğrulama › 🤖 Groq AI Kota & İstek Takibi* (`Bugün: 42/1.000 istek · Kalan: %95.8`). Site Sahibi her zaman görür; Admin için *Yetki Ayarları › HavaStil Groq Kota Takibini Görüntüleme* anahtarı (varsayılan kapalı). Limitler: `select owner_havastil_groq_limit_ayarla(1000, 30000);`. Gün sınırı UTC'dir.
+İsteğe bağlı sertleştirme (sayaç sahteciliği): Worker'a `HAVASTIL_SAYAC_SIRRI` secret'ı ekle ve aynı değeri `select owner_havastil_groq_sayac_sir_ayarla('değer');` ile kaydet.
