@@ -8,6 +8,7 @@
 import { el, rozet, ipucu, kart, bolumBasligi, olcek, olay, zamanOnce } from "./ui-temel.js";
 import { ruzgarYonu, uvSeviye, aqiSeviye, cigNoktasiKonfor, gunAdi } from "./hava-kodlari.js";
 import { hedefClo } from "./cekirdek.js";
+import { karGorunumu } from "./ui-kar.js";
 import { CAPE_BANTLARI, ESIK, YAGIS_SEVIYELERI, capeOrani, capeSeviye, saatAnaliz, saatMetniTam, gunAnalizleri, popYorumu, popPratik, guvenMetni, efektifSiddet, capeHalk } from "./yagis-fizigi.js";
 
 const n1 = (x, n = 1) => String(Number(x).toFixed(n));          // v4: ondalık NOKTA (10 günlük liste ve ekran görüntüleriyle aynı biçim: 4.4 mm)
@@ -43,7 +44,7 @@ function gunSecici(gunler, gi, d, kb) {
       const f = g.fizik;
       const b = olay(el("button", { type: "button", class: "hv-gunchip", "aria-pressed": String(i === gi), title: `${gunEtiketi(g.tarih, i)}: ${f.seviyeAd}, CAPE ${f.capeMax} J/kg` },
         el("strong", { text: gunEtiketi(g.tarih, i) }), el("small", { text: g.tarih.slice(8, 10) + "." + g.tarih.slice(5, 7) }),
-        el("span", { class: "hv-gunchip-nokta" }, el("i", { class: `s${f.seviye}`, title: f.seviyeAd }), el("i", { class: `cape ${f.capeSeviye.sinif}`, title: `CAPE ${f.capeSeviye.ad}` }))), "click", () => { d.derinGun = i; kb.ciz(); });
+        el("span", { class: "hv-gunchip-nokta" }, el("i", { class: `s${f.seviye}`, title: f.seviyeAd }), el("i", { class: `cape ${f.capeSeviye.sinif}`, title: `CAPE ${f.capeSeviye.ad}` }), f.kar.var ? el("i", { class: "kar", title: `Taze kar ≈ ${f.kar.toplamCm} cm` }) : f.buzlanma.maxSeviye >= 2 ? el("i", { class: "buz", title: `Gizli buzlanma: ${f.buzlanma.ad}` }) : null)), "click", () => { d.derinGun = i; kb.ciz(); });
       return b;
     }));
 }
@@ -62,7 +63,7 @@ function ozetKarti(G, h, gi) {
   const popSinif = zirve?.pop >= 70 ? "s2" : zirve?.pop >= 30 ? "s1" : "s0";
   return uzmanKart("Gün özeti", "Seçtiğin günün beş ana göstergesi. Renk, günlük karar için ne kadar dikkat gerektiğini söyler: yeşil sakin, sarı dikkat, kırmızı tehlike.",
     el("div", { class: "hv-ozet-grid" },
-      kutu("Toplam yağış", n1(f.toplamMm), "mm", `${f.kisaAd}${f.toplamMm < 0.1 ? " · yağış yok" : ""}`, `s${f.seviye}`),
+      f.kar.var ? kutu("Taze kar", n1(f.kar.toplamCm), "cm", `SLR 1:${f.kar.slrAna ?? 10} · ${f.kar.siddet.ad}`, `s${Math.max(2, f.seviye)}`) : kutu("Toplam yağış", n1(f.toplamMm), "mm", `${f.kisaAd}${f.toplamMm < 0.1 ? " · yağış yok" : ""}`, `s${f.seviye}`),
       kutu("Yağış riski (PoP)", `%${zirve?.pop ?? 0}`, "", zirve?.guven != null ? `Güven %${zirve.guven}${zirve.tahmini ? "*" : ""} × Kapsam %${zirve.kapsam}${zirve.tahmini ? "*" : ""}` : "en yüksek saat", popSinif,
         zirve?.guven != null ? el("small", { class: "hv-ozet-alt hv-ozet-yorum", text: guvenMetni(zirve.guven) }) : null),
       kutu("CAPE (fırtına enerjisi)", `${f.capeMax}`, "J/kg", ch.ad, ch.sinif, el("small", { class: "hv-ozet-alt hv-ozet-yorum", text: ch.aciklama })),
@@ -236,10 +237,20 @@ function matrisKarti(G, simdiT, d) {
 /* ------------------------------ sekme ------------------------------ */
 export function derinSekmesi(d, kb) {
   if (!d.hava || !d.sonuc || !d.fizik) return kart("hv-bos", ipucu("Hava verisi yükleniyor…"));
-  const gunler = gunAnalizleri(d.hava.tumSaatler, { canta: d.tercih.canta });
+  const gunler = gunAnalizleri(d.hava.tumSaatler, { canta: d.tercih.canta, rakim: d.hava.rakim });
   if (!gunler.length) return kart("hv-bos", ipucu("Saatlik veri yüklenemedi; yenile (↻) ve tekrar dene."));
   const gi = Math.min(d.derinGun || 0, gunler.length - 1), G = gunler[gi], simdiT = d.hava.saatListe?.[0]?.t;
+  // v5: yağış tipine göre iki görünüm. Seçim yapılmadıysa (null) seçili günün fazına göre otomatik: kar/karışık → Kar & Don, aksi halde Yağmur.
+  const otomatik = G.fizik.faz === "kar" || G.fizik.faz === "karisik" || G.fizik.karZorunlu ? "kar" : "yagmur";
+  const gorunum = d.derinGorunum || otomatik;
+  const H = { uzmanKart, okunus, anlam, saatGrafigi, metrik, saatAnaliz };
+  const sekmeBtn = (id, ad) => olay(el("button", { type: "button", class: "hv-altsekme", role: "tab", "aria-selected": String(gorunum === id), text: ad }), "click", () => { d.derinGorunum = id; kb.ciz(); });
+  const altSekmeler = el("div", { class: "hv-altsekmeler", role: "tablist", "aria-label": "Yağış fiziği görünümü" }, sekmeBtn("yagmur", "🌧️ Yağmur Fiziği"), sekmeBtn("kar", "❄️ Kar & Don Dinamiği"),
+    d.derinGorunum ? olay(el("button", { type: "button", class: "hv-baglanti", text: "Otomatik" }), "click", () => { d.derinGorunum = null; kb.ciz(); }) : el("small", { class: "hv-ipucu", text: `Otomatik: ${otomatik === "kar" ? "kar/don" : "yağmur"}` }));
+  const govde = gorunum === "kar"
+    ? [...karGorunumu(G, { simdiT, H }), mikroKarti(G, gi, d), matrisKarti(G, simdiT, d)]
+    : [popKarti(G, simdiT, d.hava), capeKarti(G, gunler, gi, d, kb), fizikKarti(G, simdiT), beklenenKarti(G), mikroKarti(G, gi, d), matrisKarti(G, simdiT, d)];
   return el("div", { class: "hv-sekme-govde" },
     el("p", { class: "hv-uzman-giris", text: "Meteoroloji ve veri meraklıları için. Günlük karar “Bugün” ve “Kombin” sekmelerinde; burada kararın arkasındaki sayılar var. Bir gün seç, tüm bölümler o güne göre değişir." }),
-    gunSecici(gunler, gi, d, kb), ozetKarti(G, d.hava, gi), popKarti(G, simdiT, d.hava), capeKarti(G, gunler, gi, d, kb), fizikKarti(G, simdiT), beklenenKarti(G), mikroKarti(G, gi, d), matrisKarti(G, simdiT, d));
+    gunSecici(gunler, gi, d, kb), altSekmeler, ozetKarti(G, d.hava, gi), ...govde);
 }
