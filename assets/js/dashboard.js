@@ -863,7 +863,8 @@ async function init() {
   // modülün kendi requireAuthOrShowError({role:...}) çağrısı YİNE de
   // (savunma derinliği olarak) çalışmaya devam eder.
   document.body.classList.add("dash-sayfa"); // üst şerit düzeni (dashboard.css)
-  const { profile } = await requireAuthOrShowError({ role: null });
+  // ziyaretciDemo: "Herkese açık demo girişi" AÇIKSA oturumsuz ziyaretçi giriş sayfasına atılmaz, vitrine alınır (auth-guard.js); KAPALIYSA giriş istenir.
+  const { profile } = await requireAuthOrShowError({ role: null, ziyaretciDemo: true });
   // İSİM/ROL ARTIK ERKEN YAZILIR (BUG FİX): eskiden demo yapılandırması (en geç ~6 sn) beklendikten SONRA yazıldığı için
   // kenar çubuğundaki isim geç geliyordu.
   document.getElementById("dash-ad-soyad").textContent =
