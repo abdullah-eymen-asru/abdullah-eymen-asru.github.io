@@ -11,6 +11,9 @@
  *    VERİTABANINDA (owner her zaman; admin yalnızca global anahtar açıksa). Buradaki disabled durumları yalnızca arayüzdür.
  *  • Bu modül yalnızca GERÇEK (demo olmayan) oturumda yüklenir; sekme demoda zaten yoktur.
  *  • innerHTML yok; CSP uyumlu.
+ *  • v2 (0103): iki üst anahtar (adminler değiştirebilsin / herkese açık demo) ARTIK görünür durum bandı, meşgul göstergesi, satır içi onay
+ *    (window.confirm yok: bazı tarayıcılar onay penceresini bastırınca anahtar sessizce geri dönüyordu), sunucudan DÖNEN değerle çizim
+ *    ve hata sınıflandırması (eksik SQL / yetki / ağ) kullanır. Hata artık sayfanın en altında değil, anahtarların hemen üstünde görünür.
  */
 import { supabase, showMessage } from "../core/supabase-client.js";
 import { requireAuthOrShowError } from "../auth/auth-guard.js";
@@ -59,18 +62,38 @@ function yaz(cfg, yol, v) {
 async function baslat() {
   if (!kok) return;
   const { profile } = await requireAuthOrShowError({ role: "admin" });
-  const mesaj = el("div", { class: "auth-message", hidden: true });
+  const mesaj = el("div", { class: "auth-message demo-bant", role: "status", "aria-live": "polite", hidden: true }); // anahtarların ÜSTÜNDE: hata/başarı burada görünür
 
   let cfg = configBirlestir(VARSAYILAN_CONFIG, null);
   let durum = { is_owner: profile.role === "owner", can_edit: profile.role === "owner", admin_degistirebilir: false, herkese_acik: false };
   let kirli = false;
+  let onayBekliyor = false;                 // "Herkese açık" AÇILMADAN önce satır içi onay
+  const mesgul = new Set();                 // işlem süren anahtarlar ("admin" | "herkes")
+
+  /** Sunucu/ağ hatasını anlaşılır Türkçe metne çevirir (ham mesaj sonda parantez içinde kalır). */
+  function hataMetni(err, hangiSql) {
+    const kod = String(err?.code || "");
+    const ham = String(err?.message || err || "bilinmeyen hata");
+    if (kod === "42501" || /yetkisiz/i.test(ham)) return `Yetkisiz: bu anahtarı yalnızca Site Sahibi değiştirebilir. (${ham})`;
+    if (kod === "PGRST202" || kod === "42883" || /could not find the function|schema cache/i.test(ham))
+      return `Veritabanında gerekli fonksiyon yok. Supabase SQL Editor'de ${hangiSql} migration'ını çalıştır (en güvenlisi 0103_demo_ust_anahtarlar_onarim.sql). (${ham})`;
+    if (kod === "P0002" || /satırı bulunamadı/i.test(ham)) return `demo_config satırı yok. 0103_demo_ust_anahtarlar_onarim.sql dosyasını çalıştır. (${ham})`;
+    if (/failed to fetch|network|load failed/i.test(ham)) return `Sunucuya ulaşılamadı (ağ). Bağlantını kontrol edip tekrar dene. (${ham})`;
+    if (/jwt|expired|not authenticated/i.test(ham)) return `Oturum süresi dolmuş olabilir: sayfayı yenileyip tekrar giriş yap. (${ham})`;
+    return ham;
+  }
+  const bildir = (metin, tur = "error") => {
+    showMessage(mesaj, metin, tur);
+    try { mesaj.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch { /* eski tarayıcı */ }
+  };
 
   async function yukle() {
     const [c, d] = await Promise.all([supabase.rpc("demo_config_getir"), supabase.rpc("demo_config_yonetim_durumu")]);
-    if (c.error) return showMessage(mesaj, "Yapılandırma okunamadı: " + c.error.message + " (0083 migration'ı çalıştırıldı mı?)");
+    if (c.error) { bildir("Yapılandırma okunamadı: " + hataMetni(c.error, "0083"), "error"); return; }
     cfg = configBirlestir(VARSAYILAN_CONFIG, c.data);
     if (d.data) durum = { herkese_acik: false, ...d.data };
     durum.herkese_acik = c.data?.herkeseAcik === true;
+    durum.admin_degistirebilir = c.data?.adminlerDegistirebilir === true;
     kirli = false;
     ciz();
   }
@@ -79,48 +102,78 @@ async function baslat() {
     kaydetBtn.disabled = true;
     const { adminlerDegistirebilir, herkeseAcik, ...govde } = cfg; // global anahtarlar ayrı RPC'lerle yönetilir
     const { error } = await supabase.rpc("demo_config_kaydet", { p_config: govde });
-    if (error) showMessage(mesaj, "Kaydedilemedi: " + error.message);
+    if (error) bildir("Kaydedilemedi: " + hataMetni(error, "0083/0090/0101/0102"));
     else {
       kirli = false;
-      showMessage(mesaj, "Kaydedildi. Demo ziyaretçileri en geç ~90 sn içinde (yeni açılışta) değişikliği görür.", "success");
+      bildir("Kaydedildi. Demo ziyaretçileri en geç ~90 sn içinde (yeni açılışta) değişikliği görür.", "success");
     }
     guncelleDugme();
   }
 
-  async function globalDegis(acik) {
-    const { error } = await supabase.rpc("owner_demo_admin_izni_ayarla", { p_acik: acik });
-    if (error) {
-      showMessage(mesaj, "Değiştirilemedi: " + error.message);
+  /**
+   * İki global anahtar için ORTAK akış: RPC → sunucunun döndürdüğü değerle durum → taze okumayla doğrulama.
+   * İyimser çizim yok: anahtar, sunucu onaylayana dek "işleniyor" (pasif + dönen simge) gösterilir; hata olursa eski konuma döner
+   * VE nedeni anahtarların üstündeki bantta yazar.
+   */
+  async function globalYaz(kimlik, rpcAd, acik, basari, hangiSql) {
+    if (mesgul.has(kimlik)) return;
+    mesgul.add(kimlik); bildir("Kaydediliyor…", "info"); ciz();
+    let veri = null, hata = null;
+    try { ({ data: veri, error: hata } = await supabase.rpc(rpcAd, { p_acik: acik })); } catch (e) { hata = e; }
+    if (hata) {
+      mesgul.delete(kimlik);
+      bildir("Değiştirilemedi: " + hataMetni(hata, hangiSql));
       return ciz();
     }
-    durum.admin_degistirebilir = acik;
-    cfg.adminlerDegistirebilir = acik;
-    showMessage(mesaj, acik ? "Adminler artık demo yetkilerini değiştirebilir." : "Yalnızca Site Sahibi demo yetkilerini değiştirebilir.", "success");
+    // Sunucu yanıtı (0103: jsonb). Eski void sürümde yanıt boştur → taze okumaya güveniriz.
+    if (veri && typeof veri === "object") {
+      if (typeof veri.admin_degistirebilir === "boolean") durum.admin_degistirebilir = veri.admin_degistirebilir;
+      if (typeof veri.herkese_acik === "boolean") durum.herkese_acik = veri.herkese_acik;
+    }
+    let dogrulandi = false;
+    try {
+      const { data: taze, error: e2 } = await supabase.rpc("demo_config_getir");
+      if (!e2 && taze) {
+        durum.herkese_acik = taze.herkeseAcik === true;
+        durum.admin_degistirebilir = taze.adminlerDegistirebilir === true;
+        cfg.adminlerDegistirebilir = durum.admin_degistirebilir; cfg.herkeseAcik = durum.herkese_acik;
+        dogrulandi = true;
+      }
+    } catch { /* doğrulama okunamadı: yazma yine de başarılı */ }
+    mesgul.delete(kimlik);
+    const hedef = kimlik === "admin" ? durum.admin_degistirebilir : durum.herkese_acik;
+    if (dogrulandi && hedef !== acik) bildir("Sunucu değişikliği kabul etti ama değer tutmadı (başka bir oturum ya da çakışan bir politika olabilir). Sayfayı yenile.");
+    else bildir(basari(hedef), "success");
     ciz();
   }
 
-  async function herkeseAcikDegis(acik) {
-    if (acik && !window.confirm("Demo girişi HERKESE açılacak: giriş sayfasında düğme görünür ve hesapsız herkes vitrin (örnek veri, salt-okunur) modunu açabilir. Gerçek verilere erişilmez. Açılsın mı?")) return ciz();
-    const { error } = await supabase.rpc("owner_demo_herkese_acik_ayarla", { p_acik: acik });
-    if (error) {
-      showMessage(mesaj, "Değiştirilemedi: " + error.message + " (0085 migration'ı çalıştırıldı mı?)");
-      return ciz();
-    }
-    durum.herkese_acik = acik;
-    showMessage(mesaj, acik ? "Demo girişi artık HERKESE açık." : "Demo girişi kapatıldı: yalnızca 'demo' rollü üyeler girebilir. Açık demo oturumları bir sonraki yenilemede sonlanır.", "success");
-    ciz();
-  }
+  const globalDegis = (acik) =>
+    globalYaz("admin", "owner_demo_admin_izni_ayarla", acik,
+      (v) => (v ? "Adminler artık demo yetkilerini değiştirebilir." : "Yalnızca Site Sahibi demo yetkilerini değiştirebilir."), "0083");
 
-  const anahtar = (etiket, secili, pasif, degisti, ek = "") =>
-    el("label", { class: `demo-anahtar${pasif ? " demo-anahtar--pasif" : ""}` },
+  function herkeseAcikDegis(acik) {
+    if (acik) { onayBekliyor = true; bildir("Onay bekleniyor: aşağıdaki kutudan “Evet, herkese aç” seçeneğine bas.", "warning"); return ciz(); }
+    onayBekliyor = false;
+    return globalYaz("herkes", "owner_demo_herkese_acik_ayarla", false,
+      () => "Demo girişi kapatıldı: hesapsız ziyaretçiler giriş sayfasına yönlendirilir; yalnızca “demo” rollü üyeler demoya girer. Açık demo oturumları bir sonraki yenilemede sonlanır.", "0085");
+  }
+  const herkeseOnayla = () => {
+    onayBekliyor = false;
+    return globalYaz("herkes", "owner_demo_herkese_acik_ayarla", true,
+      () => "Demo girişi artık HERKESE açık: hesapsız ziyaretçi /panel/ ve HavaStil'e girişe zorlanmadan vitrin (örnek veri, salt-okunur) modunda girer.", "0085");
+  };
+
+  const anahtar = (etiket, secili, pasif, degisti, ek = "", islem = false) =>
+    el("label", { class: `demo-anahtar${pasif || islem ? " demo-anahtar--pasif" : ""}${islem ? " demo-anahtar--islem" : ""}`, "aria-busy": islem ? "true" : null },
       (() => {
-        const i = el("input", { type: "checkbox", role: "switch", checked: secili, disabled: pasif });
+        const i = el("input", { type: "checkbox", role: "switch", checked: secili, disabled: pasif || islem });
         i.checked = !!secili;
         i.addEventListener("change", () => degisti(i.checked));
         return i;
       })(),
       el("span", { class: "demo-anahtar-iz", "aria-hidden": "true" }),
       el("span", { class: "demo-anahtar-etiket", text: etiket }),
+      islem ? el("span", { class: "demo-dondur", "aria-hidden": "true" }) : null,
       ek ? el("small", { class: "muted", text: ek }) : null);
 
   const kaydetBtn = el("button", { type: "button", class: "btn-primary csp-w-auto", text: "Değişiklikleri Kaydet" });
@@ -131,14 +184,25 @@ async function baslat() {
     const duzenle = !!durum.can_edit;
     const degis = (yol) => (v) => { yaz(cfg, yol, v); kirli = true; ciz(); };
 
+    const sahip = !!durum.is_owner;
+    const onayKutusu = onayBekliyor
+      ? el("div", { class: "demo-onay", role: "alertdialog", "aria-label": "Herkese açık demo onayı" },
+          el("p", { text: "Demo girişi HERKESE açılacak: hesapsız her ziyaretçi, panele/HavaStil'e girişe zorlanmadan vitrin (örnek veri, salt-okunur) modunu açabilir. Gerçek verilere erişilmez (RLS izolasyonu). Açılsın mı?" }),
+          el("div", { class: "demo-onay-dugme" },
+            (() => { const b2 = el("button", { type: "button", class: "btn-primary csp-w-auto", text: "Evet, herkese aç" }); b2.addEventListener("click", herkeseOnayla); return b2; })(),
+            (() => { const b2 = el("button", { type: "button", class: "btn-secondary csp-w-auto", text: "Vazgeç" }); b2.addEventListener("click", () => { onayBekliyor = false; mesaj.hidden = true; ciz(); }); return b2; })()))
+      : null;
+
     const ust = el("section", { class: "panel-section demo-global" },
       el("h2", { text: "Yetki Kontrolü" }),
-      anahtar("Adminler Bu Demo Yetkilerini Değiştirebilsin mi?", durum.admin_degistirebilir, !durum.is_owner, globalDegis,
-        durum.is_owner ? "Kapalıyken yalnızca Site Sahibi değiştirir; adminler sadece okur." : "Bu anahtarı yalnızca Site Sahibi değiştirebilir."),
-      anahtar("Herkese açık demo girişi (hesapsız ziyaretçiler)", durum.herkese_acik, !durum.is_owner, herkeseAcikDegis,
-        durum.is_owner
-          ? (durum.herkese_acik ? "AÇIK: giriş sayfasında “Canlı Demo” düğmesi görünür; herkes girebilir." : "KAPALI (önerilen): düğme görünmez; yalnızca Üye Ayarları'nda rolü “Demo (vitrin)” yapılan üyeler demoya girer.")
-          : "Bu anahtarı yalnızca Site Sahibi değiştirebilir."),
+      mesaj,
+      anahtar("Adminler Bu Demo Yetkilerini Değiştirebilsin mi?", durum.admin_degistirebilir, !sahip, globalDegis,
+        sahip ? "Kapalıyken yalnızca Site Sahibi değiştirir; adminler sadece okur." : "Bu anahtarı yalnızca Site Sahibi değiştirebilir.", mesgul.has("admin")),
+      anahtar("Herkese açık demo girişi (hesapsız ziyaretçiler)", durum.herkese_acik && !onayBekliyor, !sahip, herkeseAcikDegis,
+        sahip
+          ? (durum.herkese_acik ? "AÇIK: hesapsız ziyaretçi /panel/ ve HavaStil'e giriş sayfasına atılmadan vitrin olarak girer; giriş sayfasında “Canlı Demo” düğmesi de görünür." : "KAPALI (önerilen): ziyaretçi giriş sayfasına yönlendirilir; yalnızca Üye Ayarları'nda rolü “Demo (vitrin)” yapılan üyeler demoya girer.")
+          : "Bu anahtarı yalnızca Site Sahibi değiştirebilir.", mesgul.has("herkes")),
+      onayKutusu,
       !duzenle ? el("p", { class: "auth-message auth-message--warning", text: "Salt-okunur: bu ayarları değiştirme yetkin yok (Site Sahibi adminlere izin vermemiş)." }) : null);
 
     const matris = BOLUMLER.map((b) => {
@@ -160,7 +224,7 @@ async function baslat() {
 
     kok.replaceChildren(
       el("p", { class: "muted", text: "Demo / vitrin ziyaretçisinin hangi sayfa ve alt özellikleri göreceğini canlı olarak belirle. Ayarlar Supabase'de (demo_config) tutulur; demo oturumu açıldığında okunur." }),
-      ust, el("div", { class: "panel-grid" }, matris), el("div", { class: "csp-mt-16" }, kaydetBtn), mesaj);
+      ust, el("div", { class: "panel-grid" }, matris), el("div", { class: "csp-mt-16" }, kaydetBtn));
     guncelleDugme();
   }
 
