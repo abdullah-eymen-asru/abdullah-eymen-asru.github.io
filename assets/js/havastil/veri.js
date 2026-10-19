@@ -3,6 +3,8 @@
  * -----------------------------------------------------------------------------------------------------------------
  * GİZLİLİK: hava istekleri TARAYICIDAN doğrudan Open-Meteo'ya gider; koordinat site sunucusuna/Supabase'e/Worker'a GÖNDERİLMEZ.
  * v3: saatlik rain/showers/cape (yağış fiziği motoru, yagis-fizigi.js) ve yüzey ozonu eklendi.
+ * v5: 16 günlük (Open-Meteo deterministik sınırı) saatlik tahmin; kar/don/buzlanma için freezing_level_height, soil_temperature_0cm, snow_depth, snowfall_sum eklendi;
+ *     arama tek kaynaklı (tek dil), iptal edilebilir ve önbellekli.
  * v4: 14 günlük tahmin (saatlik plan sekmesi), ham değer konsolu + ECMWF/ICON/GFS model dizileri (Veri doğrulama sekmesi), rakım,
  *     ~110 m yuvarlama KALDIRILDI (tam hassasiyet), küresel adres araması (Nominatim yapılandırılı/serbest + Photon yedeği); önbellek öneki hv_hava5_.
  * KOTA: Open-Meteo sınırı IP başınadır (kullanıcının kendi IP'si). Yanıtlar 30 dk localStorage'da önbelleklenir; çevrimdışıyken
@@ -14,17 +16,18 @@ const GEO_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
 const MODELLER = "ecmwf_ifs025,icon_seamless,gfs_seamless";
 const ONBELLEK_OMRU_MS = 30 * 60 * 1000;
-const ONBELLEK_ONEKI = "hv_hava5_";          // v5: 14 gün, ham konsol, model dizileri, 4 ondalıklı (≈11 m) anahtar
-const GUN_SAYISI = 14;
+const ONBELLEK_ONEKI = "hv_hava6_";          // v6: 16 gün, kar/don/buzlanma alanları (v5: 14 gün, ham konsol, model dizileri)
+export const GUN_SAYISI = 16;                 // Open-Meteo deterministik tahmin üst sınırı (forecast_days=16)
 const nokta = (x) => Number(x).toFixed(4);   // koordinat YUVARLANMAZ (kullanıcı izniyle tam hassasiyet); yalnızca önbellek anahtarı 4 ondalık
 
 const yuv = (x) => Math.round(x);
 const sayi = (x, v = 0) => (Number.isFinite(x) ? x : v);
 const enBuyuk = (d, v = 0) => { const a = d.filter(Number.isFinite); return a.length ? Math.max(...a) : v; };
 
-async function jsonAl(url, zamanAsimiMs = 9000) {
+export async function jsonAl(url, zamanAsimiMs = 9000, disSinyal = null) {
   const kontrol = new AbortController();
   const z = setTimeout(() => kontrol.abort(), zamanAsimiMs);
+  if (disSinyal) { if (disSinyal.aborted) kontrol.abort(); else disSinyal.addEventListener("abort", () => kontrol.abort(), { once: true }); }
   try {
     const r = await fetch(url, { signal: kontrol.signal, headers: { Accept: "application/json" } });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -50,8 +53,8 @@ export async function havaGetir(lat, lon, { yenile = false } = {}) {
   try {
     const [ana, modeller, hk, dk] = await Promise.all([
       jsonAl(`${temel}&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_gusts_10m,wind_direction_10m,precipitation,relative_humidity_2m,dew_point_2m,pressure_msl,cloud_cover,is_day`
-        + `&hourly=temperature_2m,apparent_temperature,weather_code,precipitation_probability,precipitation,snowfall,uv_index,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,dew_point_2m,pressure_msl,visibility,cloud_cover,shortwave_radiation,is_day,rain,showers,cape`
-        + `&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,daylight_duration,uv_index_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max`
+        + `&hourly=temperature_2m,apparent_temperature,weather_code,precipitation_probability,precipitation,snowfall,uv_index,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,dew_point_2m,pressure_msl,visibility,cloud_cover,shortwave_radiation,is_day,rain,showers,cape,freezing_level_height,soil_temperature_0cm,snow_depth`
+        + `&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,daylight_duration,uv_index_max,precipitation_sum,snowfall_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max`
         + `&past_days=1&forecast_days=${GUN_SAYISI}`),
       jsonAl(`${temel}&hourly=precipitation&models=${MODELLER}&forecast_days=${GUN_SAYISI}`, 7000).catch(() => null),   // fail-soft: tek model
       jsonAl(`${HAVA_KALITESI_URL}?latitude=${lat}&longitude=${lon}&timezone=auto&current=european_aqi,pm10,pm2_5,dust,ozone&hourly=dust,pm10&forecast_days=2`, 6000).catch(() => null),
@@ -103,6 +106,7 @@ function uyumEkle(v, modeller, ana) {
   const bugun = (ana.current?.time || H.time[0]).slice(0, 10);
   v.tumSaatler = H.time.map((t, k) => (t.slice(0, 10) >= bugun ? ekle(saatOge(H, k)) : null)).filter(Boolean);
   v.modelKaynakSayisi = kaynaklar.length;
+  v.rakim = Number.isFinite(ana.elevation) ? Math.round(ana.elevation) : null;   // sıfır izotermi ↔ konum rakımı karşılaştırması (yagis-fizigi.js)
   // Şeffaflık (Veri doğrulama sekmesi): her modelin ham saatlik yağış dizisi (mm). Open-Meteo modellere ayrı PoP VERMEZ; yalnızca miktar.
   v.modelZaman = MH?.time || [];
   v.modelDizi = {};
@@ -118,6 +122,10 @@ function uyumEkle(v, modeller, ana) {
       ["UV indeksi (uv_index, bu saat)", ik >= 0 ? H.uv_index?.[ik] : null, ana.hourly_units?.uv_index || ""], ["Bağıl nem (relative_humidity_2m)", c.relative_humidity_2m, cu.relative_humidity_2m],
       ["Çiğ noktası (dew_point_2m)", c.dew_point_2m, cu.dew_point_2m], ["Basınç (pressure_msl)", c.pressure_msl, cu.pressure_msl], ["Bulut örtüsü (cloud_cover)", c.cloud_cover, cu.cloud_cover],
       ["Yağış (precipitation, son saat)", c.precipitation, cu.precipitation], ["Hava kodu (weather_code, WMO)", c.weather_code, cu.weather_code],
+      ["Sıfır izotermi yüksekliği (freezing_level_height, bu saat)", ik >= 0 ? H.freezing_level_height?.[ik] : null, ana.hourly_units?.freezing_level_height || "m"],
+      ["Zemin yüzey sıcaklığı (soil_temperature_0cm, bu saat)", ik >= 0 ? H.soil_temperature_0cm?.[ik] : null, ana.hourly_units?.soil_temperature_0cm || "°C"],
+      ["Kar yağışı (snowfall, bu saat · modelin kendi dönüşümü)", ik >= 0 ? H.snowfall?.[ik] : null, ana.hourly_units?.snowfall || "cm"],
+      ["Yerdeki kar kalınlığı (snow_depth, bu saat)", ik >= 0 ? H.snow_depth?.[ik] : null, ana.hourly_units?.snow_depth || "m"],
     ],
   };
 }
@@ -206,7 +214,10 @@ function ozetleAsil(ana, modeller, hk, dk) {
 }
 
 /** Saatlik dizinin k. elemanı → motorun/arayüzün ortak saat nesnesi (yagis-fizigi.js bu alanları okur). */
+const sayiN = (x) => (Number.isFinite(x) ? x : null);
 function saatOge(H, k) {
+  let onceSivi = 0, onceKar = 0;
+  for (let j = Math.max(0, k - 3); j < k; j++) { onceSivi += sayi(H.rain?.[j]) + sayi(H.showers?.[j]); onceKar += sayi(H.snowfall?.[j]); }
   return {
     t: H.time[k], saat: Number(H.time[k].slice(11, 13)), temp: yuv(H.temperature_2m[k]), app: yuv(H.apparent_temperature[k]), kod: H.weather_code?.[k] ?? 0,
     yagisOlasi: yuv(sayi(H.precipitation_probability?.[k])), yagis: sayi(H.precipitation?.[k]), yagmur: sayi(H.rain?.[k]), saganak: sayi(H.showers?.[k]), kar: sayi(H.snowfall?.[k]),
@@ -214,6 +225,11 @@ function saatOge(H, k) {
     ruzgar: yuv(sayi(H.wind_speed_10m?.[k])), hamle: yuv(sayi(H.wind_gusts_10m?.[k])), yon: yuv(sayi(H.wind_direction_10m?.[k])),
     nem: yuv(sayi(H.relative_humidity_2m?.[k])), bulut: yuv(sayi(H.cloud_cover?.[k])), uv: Math.round(sayi(H.uv_index?.[k]) * 10) / 10, gunduz: H.is_day?.[k] !== 0,
     cig: yuv(sayi(H.dew_point_2m?.[k])), basinc: yuv(sayi(H.pressure_msl?.[k])),
+    // v5 kar/don/buzlanma: sıfır izotermi (m), zemin yüzey sıcaklığı (°C; yoksa null), yerdeki kar (cm), önceki 3 saatin sıvı yağışı (mm) ve kar yağışı (cm)
+    donma: sayiN(H.freezing_level_height?.[k]) == null ? null : Math.round(H.freezing_level_height[k]),
+    yuzey: sayiN(H.soil_temperature_0cm?.[k]) == null ? null : Math.round(H.soil_temperature_0cm[k] * 10) / 10,
+    karDerinlik: sayiN(H.snow_depth?.[k]) == null ? null : Math.round(H.snow_depth[k] * 1000) / 10,
+    onceSivi: Math.round(onceSivi * 10) / 10, onceKar: Math.round(onceKar * 10) / 10,
   };
 }
 
@@ -226,7 +242,7 @@ function genisVeri(ana, i, saat, bugun, dk) {
     tarih: t, kod: D.weather_code?.[k] ?? 0, max: yuv(D.temperature_2m_max[k]), min: yuv(D.temperature_2m_min[k]),
     appMax: yuv(D.apparent_temperature_max?.[k] ?? D.temperature_2m_max[k]), appMin: yuv(D.apparent_temperature_min?.[k] ?? D.temperature_2m_min[k]),
     dogus: D.sunrise?.[k] || "", batis: D.sunset?.[k] || "", gunUzunlugu: sayi(D.daylight_duration?.[k]),
-    uv: Math.round(sayi(D.uv_index_max?.[k]) * 10) / 10, yagisToplam: Math.round(sayi(D.precipitation_sum?.[k]) * 10) / 10, yagisOlasi: yuv(sayi(D.precipitation_probability_max?.[k])),
+    uv: Math.round(sayi(D.uv_index_max?.[k]) * 10) / 10, yagisToplam: Math.round(sayi(D.precipitation_sum?.[k]) * 10) / 10, karToplam: Math.round(sayi(D.snowfall_sum?.[k]) * 10) / 10, yagisOlasi: yuv(sayi(D.precipitation_probability_max?.[k])),
     ruzgar: yuv(sayi(D.wind_speed_10m_max?.[k])), hamle: yuv(sayi(D.wind_gusts_10m_max?.[k])),
   })).filter((g) => g.tarih >= bugun);
   // Basınç eğilimi (son 3 saat)
@@ -245,21 +261,36 @@ function genisVeri(ana, i, saat, bugun, dk) {
 /* ------------------------------ konum arama ------------------------------ */
 const ayrintiMetni = (r) => [r.admin2, r.admin1, r.country].filter((x, k, a) => x && a.indexOf(x) === k && x !== r.name).join(", ");
 
-/** Canlı öneri (Open-Meteo Geocoding): şehir/ilçe/semt — dünya geneli. TR ve EN adlar birleştirilir (yurt dışı haber araması İngilizce ad ister). */
-export async function yerAra(q) {
-  const url = (dil) => `${GEO_URL}?name=${encodeURIComponent(q)}&count=10&language=${dil}&format=json`;
-  const [tr, en] = await Promise.allSettled([jsonAl(url("tr"), 6000), jsonAl(url("en"), 6000)]);
-  if (tr.status === "rejected" && en.status === "rejected") throw tr.reason;
-  const enMap = new Map((en.status === "fulfilled" ? en.value.results || [] : []).map((r) => [r.id, r]));
-  const liste = (tr.status === "fulfilled" ? tr.value.results || [] : (en.value.results || [])).map((r) => {
-    const e = enMap.get(r.id) || r;
-    return {
-      id: `om${r.id}`, ad: r.name, adEn: e.name, ayrinti: ayrintiMetni(r), lat: r.latitude, lon: r.longitude,
-      ulke: r.country_code || "", ulkeAd: r.country || "", ulkeAdEn: e.country || r.country || "", admin1: r.admin1 || "", admin1En: e.admin1 || r.admin1 || "", admin2: r.admin2 || "", nufus: r.population || 0,
-    };
-  });
+/**
+ * Canlı öneri (Open-Meteo Geocoding): şehir/ilçe/semt — dünya geneli. v5: TEK kaynak, TEK istek (Türkçe adlar), önceki istek iptal edilebilir (sinyal),
+ * aynı sorgu 2 dk önbellekten gelir. Eski sürümde her tuşta TR + EN iki istek gidiyordu; İngilizce ad artık yalnızca konum SEÇİLİNCE (yurt dışı haber
+ * araması için) ve yalnızca gerekirse tek bir `get?id=` isteğiyle tamamlanır (adEnTamamla).
+ */
+const aramaOnbellek = new Map();
+const aramaSonucu = (r) => ({
+  id: `om${r.id}`, omId: r.id, ad: r.name, adEn: r.name, ayrinti: ayrintiMetni(r), lat: r.latitude, lon: r.longitude,
+  ulke: r.country_code || "", ulkeAd: r.country || "", ulkeAdEn: r.country || "", admin1: r.admin1 || "", admin1En: r.admin1 || "", admin2: r.admin2 || "", nufus: r.population || 0,
+});
+export async function yerAra(q, { sinyal = null } = {}) {
+  const anahtar = String(q).trim().toLocaleLowerCase("tr");
+  const o = aramaOnbellek.get(anahtar);
+  if (o && Date.now() - o.t < 120000) return o.liste;
+  const j = await jsonAl(`${GEO_URL}?name=${encodeURIComponent(q)}&count=10&language=tr&format=json`, 6000, sinyal);
   // Türkiye öncelikli, sonra nüfus
-  return liste.sort((a, b) => (b.ulke === "TR") - (a.ulke === "TR") || b.nufus - a.nufus);
+  const liste = (j.results || []).map(aramaSonucu).sort((a, b) => (b.ulke === "TR") - (a.ulke === "TR") || b.nufus - a.nufus);
+  if (aramaOnbellek.size > 60) aramaOnbellek.clear();
+  aramaOnbellek.set(anahtar, { t: Date.now(), liste });
+  return liste;
+}
+/** Seçilen YURT DIŞI konumun İngilizce adlarını (haber araması için) tek istekle tamamlar; başarısızsa mevcut adla devam edilir. */
+export async function adEnTamamla(k) {
+  if (!k || k.ulke === "TR" || !k.omId) return k;
+  try {
+    const j = await jsonAl(`https://geocoding-api.open-meteo.com/v1/get?id=${encodeURIComponent(k.omId)}&language=en&format=json`, 4000);
+    const r = j?.results?.[0] || j;
+    if (r?.name) return { ...k, adEn: r.name, ulkeAdEn: r.country || k.ulkeAdEn, admin1En: r.admin1 || k.admin1En };
+  } catch { /* İngilizce ad olmadan da çalışır */ }
+  return k;
 }
 
 let sonNominatim = 0;
