@@ -11,13 +11,13 @@ const SIRA = ["isi", "plan", "tolerans", "delta", "yagis", "surpriz", "zararsiz"
 /** Ekstra öneri grubu → olası tetikleyiciler (yalnızca aktif olanlar eklenir). */
 const GRUP_TETIK = {
   "Yağış": ["yagis", "surpriz", "firtina", "plan"], "Rüzgâr": ["ruzgar", "firtina"], "Soğuk": ["isi", "ruzgar", "tolerans"], "Güneş": ["uv", "sicak"],
-  "Hava": ["hava"], "Görünürlük": ["sis", "yagis"], "Ulaşım": ["yagis", "buz", "kar"], "Gün içi": ["delta", "plan"],
+  "Hava": ["hava"], "Görünürlük": ["sis", "yagis"], "Ulaşım": ["yagis", "buz", "kar"], "Gün içi": ["delta", "plan"], "Kar/Buz": ["kar", "buz"],
 };
 /** Kombin parçası → olası tetikleyiciler. */
 const PARCA_TETIK = {
-  b: ["isi", "plan", "tolerans", "sicak"],
-  m: ["isi", "delta", "tolerans", "plan"],
-  o: ["yagis", "surpriz", "ruzgar", "firtina", "kar", "isi"],
+  b: ["isi", "plan", "tolerans", "sicak", "kar", "buz"],
+  m: ["isi", "delta", "tolerans", "plan", "kar", "buz"],
+  o: ["yagis", "surpriz", "ruzgar", "firtina", "kar", "buz", "isi"],
   p: ["yagis", "kar", "isi"],
   a: ["yagis", "zemin", "buz", "kar", "surpriz", "zararsiz"],
 };
@@ -38,8 +38,8 @@ export function tetikleyicileriBul({ h, k, hedef, fz, tol, senaryoAd }) {
   if (k.ruzgar >= 1) ekle("ruzgar", "💨", "Rüzgâr", "Rüzgâr hamlesi", `${gust} km/s`, "≥ 35 km/s uyarı · > 40 km/s şemsiye yasak", "Rüzgâr geçirmez dış kat, boyunluk; gevşek parça taşınmaz.");
   if (k.semsiyeYasak) ekle("firtina", "🌪️", "Fırtına", "Şemsiye kırıcı", `CAPE ${fz?.capeMax ?? "—"} J/kg · hamle ${fz?.hamleMax ?? gust} km/s`, `CAPE > ${ESIK.firtinaCape} J/kg veya hamle > ${ESIK.firtinaHamle} km/s`, "Şemsiye listeden çıkar; kapüşonlu teknik kabuk giyilir.");
   if ((h.recentPrecip ?? 0) >= 1) ekle("zemin", "💧", "Islak zemin", "Son 6 saatte yağış", `${h.recentPrecip} mm`, "≥ 1 mm", "Zemin ıslak: su itici/kaymaz ayakkabı.");
-  if (k.buz) ekle("buz", "🧊", "Don", "Don riski", `en düşük ${h.minRaw}°`, "≤ 1° veya don uyarısı", "Kaymaz taban, yün çorap, dikkatli adım.");
-  if (k.kar) ekle("kar", "❄️", "Kar", "Kar / karla karışık yağış", "", "", "Su geçirmez, kaymaz ve sıcak tutan parçalar.");
+  if (k.buz) ekle("buz", "🧊", "Don", fz?.buzlanma?.maxSeviye >= 1 ? "Gizli buzlanma (black ice)" : "Don riski", fz?.buzlanma?.maxSeviye >= 1 ? `${fz.buzlanma.ad} · yüzey ${fz.buzlanma.enDusukYuzey}°` : `en düşük ${h.minRaw}°`, "yüzey ≤ 0° ve zemin ıslak ya da don uyarısı", "Derin kauçuk dişli bot, yün çorap, kısa adım; şemsiye iptal.");
+  if (k.kar) ekle("kar", "❄️", "Kar", "Kar / karla karışık yağış", fz?.kar?.var ? `≈ ${fz.kar.toplamCm} cm taze kar (SLR 1:${fz.kar.slrAna ?? 10})` : "", "WMO 71/73/75/77/85/86 ya da snowfall > 0", "Şemsiye iptal; derin kauçuk dişli kar botu, termal içlik, yün/polar ara kat, bere ve eldiven zorunlu.");
   if (k.sicak) ekle("sicak", "🔥", "Sıcak", "Yüksek etkin sıcaklık", `${hedef.etkin}°`, "≥ 27°", "İnce, nefes alan kumaşlar; su ve gölge önerileri.");
   if ((h.uv ?? 0) >= 3) ekle("uv", "☀️", "UV", "UV indeksi", `${h.uv}`, "≥ 3", "Güneş kremi, gözlük, şapka.");
   if (k.col || (h.aqi ?? 0) >= 80) ekle("hava", "😷", "Hava kalitesi", "Hava kalitesi / toz", k.col ? "çöl tozu" : `AQI ${h.aqi}`, "AQI ≥ 80 veya yüksek toz", "Maske ve iç mekân önlemleri.");
