@@ -7,7 +7,7 @@
  *                    Bugün yayınlanıp metinde "yarın/tomorrow/ertesi gün" geçiyorsa kalır ve kismenGelecek = true olur.
  *   3) KONUM       → en özelden genele: sokak → mahalle → ilçe → il/şehir → bölge → ülke. Hiçbiri eşleşmezse başka yerin haberidir.
  *                    Worker'ın konuma özel çektiği yerel haberler (h.yerel) zaten bu şehir için olduğundan konum testinden geçer.
- *öa
+ *
  * suz(haberler, { konum, il, simdi, tz }) → { gecenler: [{...haber, kapsam, kapsamAd, kismenGelecek}], elenen: { clickbait, zaman, konum } }
  *   • il: Türkiye'deyse iller.js il nesnesi ({ ad, bolge, … }), değilse null (dünya havuzu).
  * Konum Worker'a HİÇ gitmez; bu dosya yalnızca tarayıcıdaki havuz üzerinde çalışır.
