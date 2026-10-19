@@ -11,6 +11,7 @@ import { havaKodu, ruzgarYonu, gunAdi } from "./hava-kodlari.js";
 import { hedefClo } from "./cekirdek.js";
 import { saatAnaliz, efektifSiddet } from "./yagis-fizigi.js";
 import { gunIzgarasi } from "./ui-gun-secici.js";
+import { GECMIS_YAKIN_GUN } from "./veri.js";
 
 const pad = (s) => String(s).padStart(2, "0");
 const gunEtiketi = (tarih, i) => (i === 0 ? "Bugün" : i === 1 ? "Yarın" : gunAdi(tarih));
@@ -67,15 +68,62 @@ export function saatTavsiyesi(liste, i, tercih) {
   return { metin: `${metin}.`, ikon: k.ikon, ton };
 }
 
+/* ------------------------------ geçmiş gün (v7) ------------------------------ */
+const gunEkleStr = (t, n) => { const [y, a, g] = t.split("-").map(Number); return new Date(Date.UTC(y, a - 1, g + n)).toISOString().slice(0, 10); };
+const yilGeri = (t, n) => { const [y, a, g] = t.split("-").map(Number); return new Date(Date.UTC(y - n, a - 1, g)).toISOString().slice(0, 10); };
+const trTarih = (t) => new Date(`${t}T12:00:00Z`).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+
+/** O günün ölçülen değerlerine bakıp geriye dönük "ideal kombin ve hava seyri" özeti (aynı CLO motoru; yeni model yok). */
+export function retrospektif(saatler, tercih) {
+  const gun = saatler.filter((x) => x.saat >= 6 && x.saat <= 23), L = gun.length ? gun : saatler;
+  const soguk = L.reduce((m, x) => (x.app < m.app ? x : m), L[0]), sicak = L.reduce((m, x) => (x.app > m.app ? x : m), L[0]);
+  const ks = katman(soguk, tercih), kc = katman(sicak, tercih);
+  const satirlar = [];
+  if (ks.ad === kc.ad) satirlar.push(`Gün boyu ${ks.ad.toLocaleLowerCase("tr")} yeterliydi (hissedilen ${soguk.app}° – ${sicak.app}°).`);
+  else satirlar.push(`En soğuk an ${pad(soguk.saat)}:00 (hissedilen ${soguk.app}°): ${ks.ad}. En sıcak an ${pad(sicak.saat)}:00 (${sicak.app}°): ${kc.ad}.${sicak.app - soguk.app >= 6 ? " Fark büyüktü: katmanlı (soğan) giyinip gün içinde bir kat çıkarmak idealdi." : ""}`);
+  const mm = L.reduce((t, x) => t + x.yagis, 0), tepe = L.reduce((m, x) => (x.yagis > m.yagis ? x : m), L[0]);
+  const kc2 = Math.round(L.reduce((t, x) => { const a = saatAnaliz(x); return t + (a.karli ? a.karCm : 0); }, 0) * 10) / 10;
+  if (kc2 > 0) satirlar.push(`❄️ O gün yaklaşık ${kc2} cm taze kar gerçekleşti: kar botu, termal içlik, bere ve eldiven gerekirdi; şemsiye işe yaramazdı.`);
+  else if (mm >= 0.2) satirlar.push(`🌧️ Toplam ${mm.toFixed(1)} mm yağış ölçüldü (en yoğun saat ${pad(tepe.saat)}:00, ${tepe.yagis.toFixed(1)} mm): yağmurluk/şemsiye gerekirdi.`);
+  else satirlar.push("☀️ Anlamlı yağış gerçekleşmedi; yağmurluk gerekmezdi.");
+  const hamle = Math.max(...L.map((x) => x.hamle));
+  if (hamle >= 50) satirlar.push(`💨 Rüzgâr hamlesi ${hamle} km/s'e çıktı: rüzgâr geçirmeyen dış kat şarttı.`);
+  const buz = L.find((x) => saatAnaliz(x).buz.seviye >= 2);
+  if (buz) satirlar.push(`🧊 ${pad(buz.saat)}:00 civarında gizli buzlanma koşulu vardı: kauçuk dişli ayakkabı gerekirdi.`);
+  const ek = [...new Set(L.flatMap((x) => katman(x, tercih).ek))].slice(0, 4);
+  if (ek.length) satirlar.push(`Gün için tamamlayıcılar: ${ek.join(" · ")}.`);
+  return satirlar;
+}
+
+/** Tarih seçici + hızlı atlamalar + durum. Son 92 gün Forecast API (past_days), daha eskisi Historical (ERA5) — seçim şeffaf. */
+function gecmisPaneli(d, kb, bugun, pg) {
+  const dun = gunEkleStr(bugun, -1), ILK = "1940-01-01";
+  const giris = el("input", { type: "date", class: "hv-girdi", min: ILK, max: dun, value: pg?.tarih || "", "aria-label": "Geçmiş bir tarih seç" });
+  const uyari = el("p", { class: "hv-uyari", hidden: true, text: `Geçerli aralık: ${trTarih(ILK)} – ${trTarih(dun)}.` });
+  const git = (t) => { if (!t || t < ILK || t > dun) { uyari.hidden = false; return; } uyari.hidden = true; kb.gecmisSec(t); };
+  olay(giris, "change", () => git(giris.value));
+  const chip = (ad, t) => olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", "aria-pressed": String(pg?.tarih === t), text: ad }), "click", () => git(t));
+  const satir = el("div", { class: "hv-gecmis-satir" }, giris, chip("Dün", dun), chip("7 gün önce", gunEkleStr(bugun, -7)), chip("30 gün önce", gunEkleStr(bugun, -30)), chip("Geçen yıl bugün", yilGeri(bugun, 1)));
+  const ust = [el("strong", { class: "hv-etiket", text: "🕘 Geçmiş bir günü incele" })];
+  const kutu = el("div", { class: "hv-gecmis" }, ...ust, satir, uyari);
+  if (pg?.durum === "yukleniyor") kutu.append(el("p", { class: "hv-ipucu", role: "status", text: `⏳ ${trTarih(pg.tarih)} için geçmiş veri alınıyor…` }));
+  if (pg?.durum === "hata") kutu.append(el("p", { class: "hv-uyari", text: `Geçmiş veri alınamadı: ${pg.hata}` }), olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "↻ Tekrar dene" }), "click", () => kb.gecmisSec(pg.tarih)));
+  if (pg) kutu.append(olay(el("button", { type: "button", class: "hv-baglanti", text: "← Tahmine (bugün ve sonrası) dön" }), "click", () => kb.gecmisSec(null)));
+  return kutu;
+}
+
 export function planSekmesi(d, kb) {
   const h = d.hava;
   if (!h?.tumSaatler?.length) return kart("hv-bos", ipucu("Saatlik veri yükleniyor…"));
   const gruplar = new Map();
   for (const x of h.tumSaatler) { const t = x.t.slice(0, 10); if (!gruplar.has(t)) gruplar.set(t, []); gruplar.get(t).push(x); }
   const gunler = [...gruplar].map(([tarih, saatler]) => ({ tarih, saatler }));
-  const gi = Math.min(d.planGun || 0, gunler.length - 1), G = gunler[gi], simdiT = h.saatListe?.[0]?.t;
+  const bugun = h.tumSaatler[0].t.slice(0, 10), pg = d.planGecmis, gecmisOk = pg?.durum === "ok";
+  const panel = gecmisPaneli(d, kb, bugun, pg);
+  if (pg && !gecmisOk) return el("div", { class: "hv-sekme-govde" }, kart("hv-plan-kart", bolumBasligi("Geçmiş gün · saat saat"), panel));   // yükleniyor / hata: tahmin içeriği gösterilmez
+  const gi = gecmisOk ? -1 : Math.min(d.planGun || 0, gunler.length - 1), G = gecmisOk ? { tarih: pg.tarih, saatler: pg.saatler } : gunler[gi], simdiT = gecmisOk ? null : h.saatListe?.[0]?.t;
 
-  const secici = gunIzgarasi({
+  const secici = gecmisOk ? null : gunIzgarasi({
     gunler: gunler.map((g, i) => {
       const mn = Math.min(...g.saatler.map((x) => x.app)), mx = Math.max(...g.saatler.map((x) => x.app));
       const analizler = g.saatler.map((x) => saatAnaliz(x)), yagmur = analizler.some((a) => a.seviye >= 2 && !a.karli), karGun = analizler.some((a) => a.karli && a.karCm >= 0.1), buzGun = analizler.some((a) => a.buz.seviye >= 2);
@@ -84,7 +132,7 @@ export function planSekmesi(d, kb) {
     }),
     aktif: gi, etiket: "Planlanacak gün", onSec: (i) => { d.planGun = i; d.planSaat = null; kb.ciz(); },
   });
-  const mevsimeGit = olay(el("button", { type: "button", class: "hv-baglanti", text: "16 günden sonrası için → Mevsimlik eğilim" }), "click", () => {
+  const mevsimeGit = gecmisOk ? null : olay(el("button", { type: "button", class: "hv-baglanti", text: "16 günden sonrası için → Mevsimlik eğilim" }), "click", () => {
     const son = gunler[gunler.length - 1].tarih, t = new Date(Date.UTC(Number(son.slice(0, 4)), Number(son.slice(5, 7)) - 1 + 1, 1));
     d.mevsimAy = { y: t.getUTCFullYear(), m: t.getUTCMonth() }; kb.sekmeGit("mevsim");
   });
@@ -94,9 +142,9 @@ export function planSekmesi(d, kb) {
   const popMax = Math.max(...G.saatler.map((x) => x.yagisOlasi)), sid = efektifSiddet(E);
   const karCmGun = Math.round(G.saatler.reduce((s, x) => { const a = saatAnaliz(x); return s + (a.karli ? a.karCm : 0); }, 0) * 10) / 10;
   const ozet = el("div", { class: "hv-plan-ozet" },
-    el("span", {}, el("small", { text: "Hissedilen" }), el("strong", { text: `${Math.min(...app)}° – ${Math.max(...app)}°` })),
+    el("span", {}, el("small", { text: gecmisOk ? "Hissedilen (ölçülen)" : "Hissedilen" }), el("strong", { text: `${Math.min(...app)}° – ${Math.max(...app)}°` })),
     el("span", {}, el("small", { text: karCmGun > 0 ? "Taze kar" : "Toplam yağış" }), el("strong", { text: karCmGun > 0 ? `❄️ ${karCmGun} cm` : `${mm.toFixed(1)} mm` })),
-    el("span", {}, el("small", { text: "En yüksek PoP" }), el("strong", { text: `%${popMax}` })),
+    gecmisOk ? null : el("span", {}, el("small", { text: "En yüksek PoP" }), el("strong", { text: `%${popMax}` })),
     el("span", {}, el("small", { text: "Efektif yağış" }), el("strong", { text: `${E.toFixed(1)} mm` }), el("em", { class: `hv-siddet ${sid.sinif}`, text: sid.ad })));
 
   // Seçili saat: öntanımlı = bugünse şimdi, değilse 09:00 (planlama için en kullanışlı ilk saat)
@@ -124,7 +172,7 @@ export function planSekmesi(d, kb) {
       el("td", { class: "hv-plan-sic", text: `${x.temp}°` }), el("td", { text: `${x.app}°` }),
       el("td", { text: `${ruzgarYonu(x.yon)} ${x.ruzgar} km/s${x.hamle >= x.ruzgar + 12 ? ` (hamle ${x.hamle})` : ""}` }),
       el("td", { class: x.yagis >= 0.05 ? "" : "sessiz", text: a.karli && a.karCm >= 0.1 ? `❄️ ${a.karCm} cm` : x.yagis >= 0.05 ? `${x.yagis.toFixed(1)} mm` : "—" }),
-      el("td", { class: x.yagisOlasi < 10 ? "sessiz" : "", text: `%${x.yagisOlasi}` }),
+      el("td", { class: x.yagisOlasi < 10 ? "sessiz" : "", text: gecmisOk ? (x.yagis >= 0.1 ? "yağdı" : "—") : `%${x.yagisOlasi}` }),
       el("td", { class: a.buz.seviye >= 1 || (a.karli && a.karCm >= 0.1) ? "hv-plan-kar" : "sessiz", title: a.buz.neden }, a.karli && a.karCm >= 0.1 ? `SLR 1:${a.slr}` : null, a.karli && a.karCm >= 0.1 && a.buz.seviye >= 1 ? " · " : null, a.buz.seviye >= 1 ? `🧊 ${a.buz.ad}` : null, !(a.karli && a.karCm >= 0.1) && a.buz.seviye < 1 ? "—" : null),
       el("td", { class: "hv-plan-giyim" }, el("span", { class: "hv-plan-katman", "aria-hidden": "true", text: k.ikon }), el("span", {}, el("strong", { text: k.ad }), k.ek.length ? el("small", { text: k.ek.join(" · ") }) : null)));
     olay(tr, "click", () => sec(i)); olay(tr, "keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); sec(i); } });
@@ -132,13 +180,16 @@ export function planSekmesi(d, kb) {
     return tr;
   });
   const tablo = el("div", { class: "hv-matris-kaydir", tabindex: "0", role: "region", "aria-label": "Saat saat plan, yatay kaydırılabilir" },
-    el("table", { class: "hv-matris hv-plan-tablo" }, el("thead", {}, el("tr", {}, ...["Saat", "Hava", "Sıcaklık", "Hissedilen", "Rüzgâr", "Yağış / kar", "PoP", "Kar oranı · Buz", "Kıyafet"].map(th))), el("tbody", {}, ...govde)));
+    el("table", { class: "hv-matris hv-plan-tablo" }, el("thead", {}, el("tr", {}, ...["Saat", "Hava", "Sıcaklık", "Hissedilen", "Rüzgâr", "Yağış / kar", gecmisOk ? "Yağış oldu mu" : "PoP", "Kar oranı · Buz", "Kıyafet"].map(th))), el("tbody", {}, ...govde)));
   sec(secili);
 
+  const gecmisRozet = gecmisOk ? el("div", { class: "hv-gecmis-rozet" }, rozet("Geçmiş Hava Durumu (Ölçülen / Gerçekleşen Değerler)", "hv-rozet-onemli"),
+    el("p", { class: "hv-ipucu", text: `${gunAdi(pg.tarih)}, ${trTarih(pg.tarih)} · ${pg.kaynak === "forecast" ? `Kaynak: Open-Meteo Forecast API (past_days, son ${GECMIS_YAKIN_GUN} gün)` : `Kaynak: Open-Meteo Historical Weather API (ERA5 arşivi, ${GECMIS_YAKIN_GUN} günden eski)`}${pg.onbellek ? " · önbellekten" : ""}` })) : null;
+  const retro = gecmisOk ? el("div", { class: "hv-retro" }, el("strong", { text: "Kıyafet retrospektifi" }), ...retrospektif(G.saatler, d.tercih).map((m) => el("span", { text: m }))) : null;
   return el("div", { class: "hv-sekme-govde" },
-    kart("hv-plan-kart", bolumBasligi("Detaylı saatlik planlama"),
-      ipucu(`Planlamak istediğin güne dokun (${gunler.length} gün tek bakışta; ‹ › okları ya da klavyedeki ← → ile de gezebilirsin). 24 saatin her biri için sıcaklık, rüzgâr, yağış/kar ve kıyafet katmanı listelenir. Bir saate dokun, o saatin kombin tavsiyesi güncellenir.`),
-      secici, mevsimeGit, ozet, tavsiye, tablo,
-      el("p", { class: "hv-ipucu", text: `Kıyafet katmanı: CLO = (33 − etkin sıcaklık) ÷ 15 − aktivite; plan “${d.tercih.sen}”, tolerans ${d.tercih.tol > 0 ? "+" : ""}${d.tercih.tol}°. Gelecek günlerde model belirsizliği artar: 7 günden sonrası eğilim olarak oku.` }),
-      gi >= 7 ? rozet("⚠️ 7+ gün: tahmin belirsizliği yüksek", "hv-rozet-onemli") : null));
+    kart("hv-plan-kart", bolumBasligi(gecmisOk ? "Geçmiş gün · saat saat" : "Detaylı saatlik planlama"),
+      ipucu(gecmisOk ? "Seçtiğin günün ölçülen/gerçekleşen saatlik değerleri. Bir saate dokun, o saatte ne giyilmesi gerektiği güncellenir." : `Planlamak istediğin güne dokun (${gunler.length} gün tek bakışta; ‹ › okları ya da klavyedeki ← → ile de gezebilirsin). 24 saatin her biri için sıcaklık, rüzgâr, yağış/kar ve kıyafet katmanı listelenir. Bir saate dokun, o saatin kombin tavsiyesi güncellenir.`),
+      secici, mevsimeGit, panel, gecmisRozet, ozet, retro, tavsiye, tablo,
+      el("p", { class: "hv-ipucu", text: `Kıyafet katmanı: CLO = (33 − etkin sıcaklık) ÷ 15 − aktivite; plan “${d.tercih.sen}”, tolerans ${d.tercih.tol > 0 ? "+" : ""}${d.tercih.tol}°.${gecmisOk ? ` ${(pg.notlar || []).join(" ")}` : " Gelecek günlerde model belirsizliği artar: 7 günden sonrası eğilim olarak oku."}` }),
+      !gecmisOk && gi >= 7 ? rozet("⚠️ 7+ gün: tahmin belirsizliği yüksek", "hv-rozet-onemli") : null));
 }
