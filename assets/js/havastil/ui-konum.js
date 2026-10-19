@@ -3,15 +3,17 @@
  *  • Kayıtlı konumlar yatay KARTLAR olarak görünür: her kartta AÇIK KONUM İSMİ (ör. "Evim - Kadıköy"), yer ayrıntısı ve son sıcaklık; dokununca seçilir.
  *    Kayıtlı kartların köşesinde ✏️ "Düzenle" düğmesi: isim/etiket, simge ve (yeni arama ile) koordinat güncellenir (bulutta UPDATE).
  *  • Arama: önce İNTERNETSİZ il eşleşmesi, sonra dünya geneli Open-Meteo. Seçim AÇIKTIR (listeden seçmeden konum değişmez).
- *  • Sokak/adres (küresel): Enter ya da 🔎 düğmesiyle SERBEST METİN ("Times Square, New York") ve "Adım adım" HİYERARŞİK arama (Ülke → Şehir → İlçe → Mahalle/Cadde).
- *    Koordinat yuvarlanmaz; rakım hava yanıtıyla birlikte gelir ve aktif konum satırında gösterilir.
+ *  • TEK AKILLI ARAMA ÇUBUĞU (v6): "Sankt-Peterburg", "Esatpaşa, Ataşehir", "Times Square, New York" — tek kutu, tek adım. Yazarken öneriler (yerel il + Open-Meteo);
+ *    Enter/🔎 ile tam çözümleme: şehir/ilçe → Open-Meteo, adres/mahalle/sokak (virgül, rakam, 3+ sözcük ya da sonuç yoksa) → OpenStreetMap (Nominatim → Photon).
+ *    Tek sonuç çıkarsa doğrudan seçilir. Eski 4 kutulu "Adım adım ara" formu KALDIRILDI. Koordinat yuvarlanmaz; rakım hava yanıtıyla gelir.
+ *  • Son aramalar: en çok 5, kaydırılabilir; her satırda ✕ (tek sil) ve başlıkta "Tümünü Temizle" (yalnızca bu cihazın yerel geçmişi).
  *  • Vitrin modu (demo/misafir): konum kaydetme/düzenleme pasif; arama ve görüntüleme açık.
  *  • "Bulunduğum yer": izin yoksa/reddedilmişse tarayıcıya özel adımlarla yönlendirir.
  */
 import { el, olay, rozet, ipucu, cipGrubu, izinYardimKarti, bosalt, etiket } from "./ui-temel.js";
 import { yerAra, adresAra, sonSicaklik, adEnTamamla } from "./veri.js";
 import { yerelIlAra, ilAdindan, enYakinIl, BOLGELER } from "./iller.js";
-import { IKONLAR, IKON_ADLARI, kayitliMi, konumKimligi, sonAramalar, sonAramaEkle, gorunenAd } from "./konumlar.js";
+import { IKONLAR, IKON_ADLARI, kayitliMi, konumKimligi, sonAramalar, sonAramaEkle, sonAramaSil, sonAramalariTemizle, gorunenAd } from "./konumlar.js";
 import { izinDurumu, konumHataMetni } from "./izin-yardim.js";
 
 /** Open-Meteo/Nominatim/Photon/yerel sonucu → konum nesnesi */
@@ -36,14 +38,13 @@ export function konumBileseni(d, kb) {
   const seritKutu = el("div", { class: "hv-serit", role: "list", "aria-label": "Konumlarım" });
   const aktifBaslik = el("div", { class: "hv-aktif-konum" });
   const duzenle = el("div", { class: "hv-duzenle", hidden: true });
-  const giris = el("input", { type: "search", class: "hv-girdi", placeholder: "Şehir, ilçe, mahalle ya da adres yaz (örn. Times Square, New York)", "aria-label": "Konum ara", autocomplete: "off", maxlength: "120", enterkeyhint: "search" });
+  const giris = el("input", { type: "search", class: "hv-girdi", placeholder: "Şehir, ilçe, mahalle ya da adres yaz — örn. Times Square, New York", "aria-label": "Konum ara", autocomplete: "off", maxlength: "120", enterkeyhint: "search" });
   const sonuclar = el("ul", { class: "hv-sonuclar", role: "listbox" });
   const mesaj = el("p", { class: "hv-ipucu", hidden: true });
   const yardimYeri = el("div");
-  const adresDugme = olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "🔎 Adres/sokak ara" }), "click", () => serbestAdres());
-  const hiyerarsi = hiyerarsiKutusu();
-  const arama = el("div", { class: "hv-arama", hidden: true }, el("div", { class: "hv-arama-satir" }, giris, adresDugme), mesaj, yardimYeri, sonuclar, hiyerarsi.kok,
-    el("p", { class: "hv-ipucu hv-gizlilik-not", text: "Aradığın yerler hesabına kaydedilmez: öneriler Open-Meteo'dan, adres/sokak aramaları OpenStreetMap'ten (yalnızca yazdığın metinle ve sen istediğinde) alınır." }));
+  const araDugme = olay(el("button", { type: "button", class: "hv-btn hv-btn-ince hv-ara-dugme", "aria-label": "Ara", title: "Ara (Enter)" }, el("span", { "aria-hidden": "true", text: "🔎" }), el("span", { class: "hv-ara-dugme-yazi", text: "Ara" })), "click", () => akilliCozumle(giris.value));
+  const arama = el("div", { class: "hv-arama", hidden: true }, el("div", { class: "hv-arama-satir" }, giris, araDugme), mesaj, yardimYeri, sonuclar,
+    el("p", { class: "hv-ipucu hv-gizlilik-not", text: "Aradığın yerler hesabına kaydedilmez: öneriler Open-Meteo'dan, adres/sokak aramaları OpenStreetMap'ten (yalnızca yazdığın metinle ve sen istediğinde) alınır. Son aramalar yalnızca bu cihazda tutulur." }));
   const kok = el("div", { class: "hv-konum" }, seritKutu, aktifBaslik, duzenle, arama);
 
   let aktifSatir = -1, satirlar = [], no = 0, zamanlayici = 0, duzenlenen = null;
@@ -135,23 +136,18 @@ export function konumBileseni(d, kb) {
     ad.focus(); ad.select();
   }
 
-  /* ---------------- hiyerarşik arama ---------------- */
-  function hiyerarsiKutusu() {
-    const alan = (ad, ph) => el("input", { type: "text", class: "hv-girdi", placeholder: ph, "aria-label": ad, maxlength: "60", autocomplete: "off" });
-    const ulke = alan("Ülke", "Ülke (örn. Almanya)"), sehir = alan("Şehir", "Şehir (örn. Münih)"), ilce = alan("İlçe", "İlçe / semt (isteğe bağlı)"), mahalle = alan("Mahalle veya cadde", "Mahalle / cadde (isteğe bağlı)");
-    const git = olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "Adım adım ara" }), "click", () => {
-      const girdi = { ulke: ulke.value, sehir: sehir.value, ilce: ilce.value, mahalle: mahalle.value };
-      if ([girdi.ulke, girdi.sehir, girdi.ilce, girdi.mahalle].join("").trim().length < 3) { mesajGoster("Ülke → Şehir → İlçe → Mahalle/Cadde alanlarından en az birkaçını doldur."); return; }
-      adresCalistir(girdi, [girdi.mahalle, girdi.ilce, girdi.sehir, girdi.ulke].filter((x) => x.trim()).join(", "));
-    });
-    return { kok: el("details", { class: "hv-hiyerarsi" }, el("summary", { text: "🧭 Adım adım ara: Ülke → Şehir → İlçe → Mahalle/Cadde" }), el("div", { class: "hv-hiyerarsi-govde" }, ulke, sehir, ilce, mahalle, git)) };
-  }
-
   /* ---------------- arama ---------------- */
   function aramaAcKapa(ac) {
     arama.hidden = ac === undefined ? !arama.hidden : !ac;
     ciz();
     if (!arama.hidden) { sonuclariGoster(); giris.focus(); }
+  }
+  /** Bir sonucu seçer: arama kapanır, adın tam hâli tamamlanır, son aramalara eklenir, konum değişir. */
+  async function sonucuSec(r) {
+    const konum = sonucuKonumaCevir(r);
+    aramaAcKapa(false); giris.value = "";
+    const tam = await adEnTamamla(konum);
+    sonAramaEkle(tam); kb.sec(tam);
   }
   function satirYap(r, tur) {
     const konum = sonucuKonumaCevir(r);
@@ -160,17 +156,21 @@ export function konumBileseni(d, kb) {
       el("span", { class: "hv-bayrak", "aria-hidden": "true", text: tur === "son" ? "🕘" : BAYRAK(r.ulke || (konum.il ? "TR" : "")) }),
       el("span", { class: "hv-konum-metin" }, el("strong", { text: r.ad }), el("small", { text: r.ayrinti || [r.admin2, r.admin1, r.ulkeAd].filter(Boolean).join(", ") })),
       tur === "il" ? rozet("İl") : r.kaynak ? rozet(r.kaynak) : null);
-    olay(sec, "click", async () => { aramaAcKapa(false); giris.value = ""; const tam = await adEnTamamla(konum); sonAramaEkle(tam); kb.sec(tam); });
-    if (vitrin()) return el("li", { class: "hv-sonuc", role: "presentation" }, sec);
+    olay(sec, "click", () => sonucuSec(r));
+    // ✕ : yalnızca son aramalarda; yıldızın (kaydet) YANINDA. Vitrin/misafir modunda da çalışır (yerel geçmiş).
+    const sil = tur === "son" && r.id ? olay(el("button", { type: "button", class: "hv-sonuc-sil", "aria-label": `${r.ad} aramasını geçmişten sil`, title: "Geçmişten sil" }, el("span", { "aria-hidden": "true", text: "✕" })), "click", (e) => { e.stopPropagation(); sonAramaSil(r.id); sonuclariGoster(); }) : null;
+    if (vitrin()) return el("li", { class: "hv-sonuc", role: "presentation" }, sec, sil);
     const yildiz = el("button", { type: "button", class: `hv-yildiz${kayitli ? " dolu" : ""}`, "aria-pressed": String(kayitli), "aria-label": `${r.ad} konumunu ${kayitli ? "kayıttan çıkar" : "kaydet"}`, title: kayitli ? "Kayıtlı" : "Kaydet" }, el("span", { "aria-hidden": "true", text: kayitli ? "★" : "☆" }));
     olay(yildiz, "click", (e) => { e.stopPropagation(); kb.kaydetDegistir(konum); const yeni = d.konumlar.find((x) => x.id === konumKimligi(konum)); yildiz.classList.toggle("dolu", !!yeni); yildiz.setAttribute("aria-pressed", String(!!yeni)); yildiz.firstChild.textContent = yeni ? "★" : "☆"; ciz(); if (yeni) duzenleAc(yeni, true); });
-    return el("li", { class: "hv-sonuc", role: "presentation" }, sec, yildiz);
+    return el("li", { class: "hv-sonuc", role: "presentation" }, sec, yildiz, sil);
   }
   function sonuclariCiz(bolumler) {
     const lis = []; satirlar = [];
     for (const b of bolumler) {
       if (!b.liste.length && !b.bos) continue;
-      lis.push(el("li", { class: "hv-sonuc-baslik", role: "presentation", text: b.baslik }));
+      const baslik = el("li", { class: `hv-sonuc-baslik${b.eylem ? " hv-sonuc-baslik-eylemli" : ""}`, role: "presentation" }, el("span", { text: b.baslik }));
+      if (b.eylem && b.liste.length) baslik.append(olay(el("button", { type: "button", class: "hv-temizle", text: b.eylem.metin, "aria-label": b.eylem.etiket || b.eylem.metin }), "click", b.eylem.fn));
+      lis.push(baslik);
       if (!b.liste.length) lis.push(el("li", { class: "hv-sonuc-bos", role: "presentation", text: b.bos }));
       for (const r of b.liste) { const li = satirYap(r, b.tur); lis.push(li); satirlar.push(li.firstChild); }
     }
@@ -179,8 +179,9 @@ export function konumBileseni(d, kb) {
   }
   function sonuclariGoster() {
     const son = sonAramalar();
-    sonuclariCiz([{ baslik: "Son aramalar", tur: "son", liste: son.map((k) => ({ ...k, ayrinti: [k.ilce, k.il || k.admin1, k.ulkeAd].filter(Boolean).join(", ") })) }]);
-    if (!son.length) sonuclar.replaceChildren(el("li", { class: "hv-sonuc-bos", role: "presentation", text: "İl adının ilk harflerini yazman yeterli (“Ank” → Ankara). Sokak/mahalle için adresi yazıp Enter'a bas: “Esatpaşa Mahallesi, Ataşehir”, “Times Square, New York”." }));
+    sonuclariCiz([{ baslik: "Son aramalar", tur: "son", liste: son.map((k) => ({ ...k, ayrinti: [k.ilce, k.il || k.admin1, k.ulkeAd].filter(Boolean).join(", ") })),
+      eylem: { metin: "Tümünü Temizle", etiket: "Tüm son aramaları temizle", fn: () => { sonAramalariTemizle(); sonuclariGoster(); } } }]);
+    if (!son.length) sonuclar.replaceChildren(el("li", { class: "hv-sonuc-bos", role: "presentation", text: "Yazmaya başla: “Ank” → Ankara, “Esatpaşa, Ataşehir”, “Times Square, New York”. Enter ya da 🔎 ile adres/sokak dahil tam arama yapılır." }));
   }
   function mesajGoster(m) { mesaj.hidden = !m; mesaj.textContent = m || ""; }
   let iptal = null;
@@ -195,29 +196,38 @@ export function konumBileseni(d, kb) {
       if (benim !== no) return;
       const ilAdlari = new Set(yerel.map((x) => x.ad));
       const digerleri = r.filter((x) => !(x.ulke === "TR" && ilAdlari.has(x.ad) && !x.admin2)).slice(0, 8);
-      sonuclariCiz([{ baslik: "Türkiye illeri", tur: "il", liste: yerel }, { baslik: "Şehir, ilçe, semt (dünya geneli)", tur: "dunya", liste: digerleri, bos: "Eşleşme bulunamadı. Adres/sokak için Enter'a bas." }]);
+      sonuclariCiz([{ baslik: "Türkiye illeri", tur: "il", liste: yerel }, { baslik: "Şehir, ilçe, semt (dünya geneli)", tur: "dunya", liste: digerleri, bos: "Eşleşme yok. Enter ya da 🔎 ile adres/sokak dahil tam arama yap." }]);
     } catch (h) { if (h?.name === "AbortError" || benim !== no) return; mesajGoster("Öneriler alınamadı (ağ). İl adı yazarak yine de seçebilirsin."); }
-    if (benim === no) sokakDugmesiEkle(q);
   }
-  function sokakDugmesiEkle(q) {
-    if (q.length < 3) return;
-    const b = el("button", { type: "button", class: "hv-sokak-ara", text: `🔎 “${q}” için sokak/adres ara (küresel · OpenStreetMap)` });
-    olay(b, "click", () => serbestAdres());
-    sonuclar.append(el("li", { class: "hv-sonuc", role: "presentation" }, b));
-  }
-  async function adresCalistir(girdi, gosterim) {
-    mesajGoster(`“${gosterim}” aranıyor…`);
+  /** Adres benzeri mi? (virgül/noktalı virgül, rakım-numara ya da 3+ sözcük → doğrudan OSM adres araması daha isabetli) */
+  const adresBenzeri = (q) => /[,;]/.test(q) || /\d/.test(q) || q.split(/\s+/).filter(Boolean).length >= 3;
+  /**
+   * TEK ADIMDA ÇÖZÜMLEME (Enter / 🔎): kullanıcı alan seçmez; sistem metne göre kaynağı kendisi seçer ve kaynakları SIRAYLA dener (kota dostu):
+   *   1) metin tek bir Türkiye ilini tam eşliyorsa → internetsiz, anında seç.  2) adres benzeri değilse Open-Meteo yer adı.
+   *   3) sonuç yoksa ya da adres benzeriyse OpenStreetMap (Nominatim → Photon).  Tek sonuç → doğrudan seçilir; çoksa liste (ilk satır odaklı).
+   */
+  async function akilliCozumle(ham) {
+    const q = String(ham || "").trim();
+    if (q.length < 2) { mesajGoster("En az 2 harf yaz."); return; }
+    const benim = ++no; clearTimeout(zamanlayici); iptal?.abort();
+    const yerel = yerelIlAra(q);
+    const tam = yerel.find((il) => il.ad.toLocaleLowerCase("tr") === q.toLocaleLowerCase("tr"));
+    if (tam && !adresBenzeri(q)) { sonucuSec({ id: `il_${tam.ad}`, ad: tam.ad, adEn: tam.ad, lat: tam.lat, lon: tam.lon, ulke: "TR", ulkeAd: "Türkiye", ulkeAdEn: "Turkey", admin1: tam.ad, il: tam.ad }); return; }
+    mesajGoster(`“${q}” çözümleniyor…`); araDugme.disabled = true;
+    let liste = [], basarisiz = false;
     try {
-      const r = await adresAra(girdi);
-      mesajGoster("");
-      sonuclariCiz([{ baslik: "Sokak / adres sonuçları (küresel)", tur: "dunya", liste: r, bos: "Adres bulunamadı. Yazımı değiştir (örn. şehir ve ülkeyi ekle) ya da hiyerarşik alanları kullan." }]);
-    } catch { mesajGoster("Adres araması şu an yapılamadı. Biraz sonra dene."); }
-  }
-  function serbestAdres() {
-    const q = giris.value.trim();
-    if (q.length < 3) { mesajGoster("Önce en az 3 harf yaz."); return; }
-    ++no; clearTimeout(zamanlayici);
-    adresCalistir(q, q);
+      if (!adresBenzeri(q)) liste = (await yerAra(q)).slice(0, 8);
+      if (!liste.length) liste = await adresAra(q);
+    } catch {
+      try { liste = await adresAra(q); } catch { basarisiz = true; }
+    }
+    araDugme.disabled = false;
+    if (benim !== no) return;
+    if (basarisiz) { mesajGoster("Arama şu an yapılamadı (ağ ya da kaynak yoğun). Biraz sonra tekrar dene."); return; }
+    mesajGoster("");
+    if (liste.length === 1) { sonucuSec(liste[0]); return; }
+    sonuclariCiz([{ baslik: `“${q}” için sonuçlar`, tur: "dunya", liste, bos: "Bulunamadı. Şehir ve ülkeyi birlikte yaz (örn. “Esatpaşa, Ataşehir, İstanbul”)." }]);
+    if (satirlar.length) { aktifSatir = 0; satirlar[0].classList.add("odak"); }
   }
   olay(giris, "input", () => {
     clearTimeout(zamanlayici); mesajGoster("");
@@ -236,7 +246,7 @@ export function konumBileseni(d, kb) {
     } else if (e.key === "Enter") {
       e.preventDefault();
       if (aktifSatir >= 0) satirlar[aktifSatir].click();      // ↑↓ ile seçilmiş satır
-      else serbestAdres();                                     // Enter = küresel serbest metin / adres araması
+      else akilliCozumle(giris.value);                          // Enter = tek adımda akıllı çözümleme (şehir/ilçe/adres/sokak)
     }
   });
 
