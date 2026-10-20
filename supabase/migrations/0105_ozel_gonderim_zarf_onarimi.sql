@@ -64,7 +64,7 @@ create or replace function public.e2ee_anahtari_olmayanlar(p_ids uuid[])
 returns table (kullanici_id uuid, ad text)
 language sql stable security definer set search_path = public as $$
   select u.id, coalesce(nullif(btrim(p.full_name), ''), 'İsimsiz kullanıcı')
-    from unnest(coalesce(p_ids, '{}'::uuid[])[1:50]) as u(id)
+    from unnest((coalesce(p_ids, '{}'::uuid[]))[1:50]) as u(id)
     left join public.profiles p on p.id = u.id
    where auth.uid() is not null
      and not exists (select 1 from public.e2ee_kullanici_anahtarlari k
