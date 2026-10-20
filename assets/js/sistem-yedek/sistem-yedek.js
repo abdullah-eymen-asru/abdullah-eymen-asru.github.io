@@ -22,7 +22,7 @@ import { aliciOlustur } from "./zip-yazici.js";
 import { gezginCiz } from "./gezgin.js";
 import { icAktarCiz } from "./ice-aktar.js";
 import { kisiselVeriCiz } from "./kisisel-veri.js";
-import { r2CopCiz } from "./r2-cop.js";
+import { r2CopCiz, kilitliKasalariCiz } from "./r2-cop.js";
 
 const ROLLER = { owner: "Site Sahibi", admin: "Yönetici", manager: "İçerik Sorumlusu", editor: "Editör", special_user: "Özel Üye", user: "Üye" };
 
@@ -363,7 +363,15 @@ async function kur() {
   }
   if (ownerMi) {
     const copKok = el("div", { class: "sy-sekme-panel", hidden: true });
-    sekmeTanimlari.push({ id: "cop", ad: "🧹 R2 çöp toplayıcı", panel: copKok, kur: () => r2CopCiz(copKok, mesaj) });
+    sekmeTanimlari.push({ id: "cop", ad: "🧹 R2 artık dosyalar", panel: copKok, kur: () => r2CopCiz(copKok, mesaj) });
+  }
+  {
+    // Kilitli Not Kasalarını Temizleme (0108): Site Sahibi her zaman; Yönetici yalnızca Yetki Ayarları'nda açıldıysa. Karar veritabanında.
+    const { data: kasaYetkili } = await supabase.rpc("kilitli_kasa_temizleme_yetkili");
+    if (kasaYetkili === true) {
+      const kasaKok = el("div", { class: "sy-sekme-panel", hidden: true });
+      sekmeTanimlari.push({ id: "kasa", ad: "🔒 Kilitli not kasaları", panel: kasaKok, kur: () => kilitliKasalariCiz(kasaKok, mesaj) });
+    }
   }
   const serit = el("div", { class: "sy-altsekmeler", role: "tablist", "aria-label": "Sistem yedekleme bölümleri" });
   const kuruldu = new Set(["disa"]);
