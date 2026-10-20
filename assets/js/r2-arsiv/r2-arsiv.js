@@ -9,7 +9,7 @@
  * CSP: inline style/handler yok; DOM yalnızca createElement/textContent ile kurulur.
  */
 import { supabase } from "../core/supabase-client.js";
-import { anahtarlariHazirla, aliciAnahtarlariniGetir, dosyaCoz, anahtariYenidenZarfla } from "./e2ee.js";
+import { anahtarlariHazirla, aliciAnahtarlariniGetir, dosyaCoz, anahtariYenidenZarfla, zarflariKaydet } from "./e2ee.js";
 import {
   el, btn, boyutYaz, tarihYaz, aramaKelimeleri, normalize, vurgulu, worker, adGecerli,
   kategori, KATEGORI_IKON, basHarfler, avatarSinifi, ROL_ETIKETI,
@@ -426,8 +426,8 @@ async function paylasEkle(u) {
       .eq("dosya_id", paylasDosya.id).eq("alici_id", durum.uid).maybeSingle();
     if (error || !zarf) throw new Error("Bu dosyanın anahtarı bulunamadı.");
     const yeni = await anahtariYenidenZarfla(zarf.sarili_dosya_anahtari, harita.get(u.id));
-    const { error: ek } = await supabase.from("ozel_icerik_anahtarlar").insert({ dosya_id: paylasDosya.id, alici_id: u.id, sarili_dosya_anahtari: yeni });
-    if (ek) throw new Error(ek.code === "23505" ? `${u.ad} zaten erişebiliyor.` : "Paylaşım kaydedilemedi.");
+    const eklenen = await zarflariKaydet(paylasDosya.id, [{ alici_id: u.id, sarili_dosya_anahtari: yeni }]);
+    if (!eklenen) throw new Error(`${u.ad} zaten erişebiliyor.`);
   } catch (e) { paylasHata(e.message); }
   await paylasListele();
 }
