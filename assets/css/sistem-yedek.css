@@ -359,3 +359,61 @@
 .sy-wk-bilgi summary { cursor: pointer; font-weight: 600; }
 .sy-wk-bilgi-icerik p { margin: 8px 0 0; line-height: 1.5; font-size: 0.9rem; }
 .sy-wk-gunluk-satir { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: space-between; }
+
+/* ============================================================================================================
+ * v105 — Worker Kota Analitiği (ka-*), akıllı Kapat penceresi (wk-*), denetim günlüğü mobil düzeni
+ * ============================================================================================================ */
+.ka-kart { grid-column: 1 / -1; }
+.ka-govde { display: grid; gap: 12px; min-width: 0; }
+.ka-olcekler { display: flex; gap: 6px; padding: 5px; border: 1px solid var(--sy-cizgi); border-radius: 12px; background: var(--bg); overflow-x: auto; scrollbar-width: thin; }
+.ka-olcek { flex: 1 0 auto; min-height: 44px; padding: 0 16px; font: inherit; font-weight: 700; color: var(--text); background: transparent; border: 0; border-radius: 9px; cursor: pointer; white-space: nowrap; }
+.ka-olcek[aria-selected="true"] { color: var(--sy-on-vurgu); background: var(--accent); }
+.ka-gezinti { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.ka-donem { flex: 1 1 180px; text-align: center; font-size: 1rem; }
+.ka-ozet { display: flex; gap: 6px 18px; flex-wrap: wrap; margin: 0; padding: 10px 12px; border: 1px solid var(--sy-cizgi); border-radius: 12px; background: var(--sy-vurgu-zemin); font-size: .92rem; }
+.ka-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.ka-satir { display: grid; grid-template-columns: minmax(96px, 150px) minmax(0, 1fr) minmax(150px, 230px); align-items: center; gap: 10px; padding: 6px 10px; border: 1px solid transparent; border-radius: 10px; }
+.ka-satir:nth-child(odd) { background: color-mix(in srgb, var(--text) 4%, transparent); }
+.ka-satir--simdi { border-color: var(--accent); background: var(--sy-vurgu-zemin); }
+.ka-satir--bos .ka-etiket { color: var(--muted); }
+.ka-etiket { font-weight: 600; font-size: .9rem; white-space: nowrap; }
+.ka-satir .sy-cubuk { min-width: 0; }
+.ka-deger { display: flex; align-items: baseline; justify-content: flex-end; gap: 4px 8px; flex-wrap: wrap; text-align: right; font-variant-numeric: tabular-nums; }
+.ka-deger strong { font-size: .95rem; }
+.ka-yuzde { font-weight: 700; color: var(--accent); font-size: .85rem; }
+.ka-alt { flex-basis: 100%; font-size: .72rem; }
+@media (max-width: 640px) {
+  .ka-satir { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "etiket deger" "cubuk cubuk"; gap: 4px 10px; padding: 8px 10px; }
+  .ka-etiket { grid-area: etiket; }
+  .ka-deger { grid-area: deger; flex-wrap: nowrap; }
+  .ka-satir .sy-cubuk { grid-area: cubuk; }
+  .ka-alt { display: none; }
+  .ka-olcek { padding: 0 12px; }
+}
+
+/* Akıllı "Kapat" penceresi */
+.wk-secim { width: min(460px, calc(100vw - 24px)); }
+.wk-secenek { display: grid; gap: 4px; width: 100%; min-height: 64px; padding: 12px 14px; text-align: left; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--sy-cizgi); border-radius: 12px; cursor: pointer; }
+.wk-secenek strong { font-size: .98rem; }
+.wk-secenek span { font-size: .85rem; line-height: 1.4; color: var(--muted); }
+.wk-secenek:hover:not(:disabled), .wk-secenek:focus-visible { border-color: var(--accent); background: var(--sy-vurgu-zemin); outline: none; }
+.wk-secenek--sert:not(:disabled) strong { color: var(--sy-tehlike-metin); }
+.wk-secenek:disabled { opacity: .6; cursor: not-allowed; }
+.wk-donen { display: inline-block; width: 16px; height: 16px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; }
+@media (prefers-reduced-motion: no-preference) { .wk-donen { animation: wk-don .8s linear infinite; } }
+@keyframes wk-don { to { transform: rotate(360deg); } }
+.wk-onay { flex: 1 1 100%; justify-content: flex-start; white-space: normal; }
+.sy-wk-satir > .sy-btn { min-width: 116px; }
+
+/* Denetim günlüğü — mobil: "Sil" düğmesi taşması (td:last-child{width:1%} blok düzenini eziyordu), dokunma alanı ≥ 44px */
+@media (max-width: 640px) {
+  .sy-tablo td:last-child { width: 100%; white-space: normal; }
+  .sy-tablo td[data-etiket=""] { display: block; padding-top: 8px; }
+  .sy-tablo td[data-etiket=""] > .sy-btn { display: flex; width: 100%; min-height: 44px; justify-content: center; }
+  .sy-gunluk-ust { flex-direction: column; align-items: stretch; }
+  .sy-gunluk-ust > .sy-btn { width: 100%; min-height: 44px; }
+  .sy-sayfalama { display: grid; grid-template-columns: 1fr 1fr; }
+  .sy-sayfalama > .muted { grid-column: 1 / -1; order: -1; text-align: center; }
+  .sy-sayfalama > .sy-btn { width: 100%; min-height: 44px; flex: none; }
+  .sy-btn--kucuk { min-height: 44px; }
+}
