@@ -395,6 +395,33 @@ export async function aliciAnahtarlariniGetir(idler) {
   return { harita, eksik: idler.filter((id) => !harita.has(id)) };
 }
 
+/** Açık anahtarı OLMAYAN alıcıların adları (0105). RPC yoksa kimlik sayısına düşer; asla sessiz kalmaz. */
+export async function anahtariOlmayanlar(idler) {
+  const { data, error } = await supabase.rpc("e2ee_anahtari_olmayanlar", { p_ids: idler });
+  if (error || !Array.isArray(data) || !data.length) return idler.map(() => "bir alıcı");
+  return data.map((s) => s.ad || "bir alıcı");
+}
+
+/** RPC hata iletisini ("KOD: ayrıntı") kullanıcıya anlamlı Türkçe metne çevirir. */
+export function zarfHataMetni(error) {
+  const m = String(error?.message || "");
+  const alici = m.match(/ALICI_ANAHTARI_YOK:\s*(.*)$/i);
+  if (alici) return `Alıcının (${alici[1].trim()}) henüz şifreleme anahtarı bulunmuyor, şifreli dosya gönderilemez.`;
+  if (/YETKI_YOK/i.test(m)) return "Dosya gönderme yetkin yok.";
+  if (/DOSYA_YOK/i.test(m)) return "Bu şifreli dosya sana ait değil ya da bulunamadı.";
+  if (/ZARF_COK/i.test(m)) return "En fazla 50 alıcıya aynı anda gönderilebilir.";
+  if (/does not exist|PGRST202|42883|schema cache/i.test(m)) return "Şifre zarfları kaydedilemedi: 0105 numaralı migration henüz çalıştırılmamış.";
+  if (/infinite recursion|42P17/i.test(m)) return "Şifre zarfları kaydedilemedi: veritabanı politikası döngüsü (0105 migration'ı uygula).";
+  return `Şifre zarfları kaydedilemedi (${error?.code || "hata"}: ${m.slice(0, 160) || "ayrıntı yok"}).`;
+}
+
+/** Zarfları tek RPC ile kaydeder; dönüş: eklenen zarf sayısı. Hata metni yutulmaz. */
+export async function zarflariKaydet(dosyaId, zarflar) {
+  const { data, error } = await supabase.rpc("ozel_gonderim_zarflarini_kaydet", { p_dosya_id: dosyaId, p_zarflar: zarflar });
+  if (error) { console.error("[zarf]", error); throw new Error(zarfHataMetni(error)); }
+  return Number(data) || 0;
+}
+
 /** Şifreli boyut = düz boyut + 12 (IV) + 16 (GCM etiketi). Worker'a bildirilen boyut budur. */
 export const sifreliBoyut = (duzBoyut) => duzBoyut + 28;
 
