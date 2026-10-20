@@ -41,6 +41,7 @@
  *   GET  /kota                                     → (owner) Cloudflare ücretsiz GraphQL Analytics: bugünkü (UTC) Worker istek sayısı.
  *                                                    Secret'lar: CF_ACCOUNT_ID, CF_API_TOKEN (izin: Account › Account Analytics › Read).
  *                                                    Sonuç 60 sn edge cache'te tutulur (Analytics API'yi yormaz).
+ *   GET  /kota/analitik                            → (owner) SAATLİK dökümü (son ~31 gün, Workers + Pages Functions); günlük toplamlar worker_kota_gecmis'e (0106) yazılır.
  *
  * Ortam değişkenleri (Worker > Settings > Variables and Secrets):
  *   SUPABASE_URL        https://<proje-ref>.supabase.co          (Text)
@@ -513,6 +514,77 @@ async function kotaGetir(env, kimlik, cors) {
   return new Response(govde, { status: 200, headers: { ...cors, "Content-Type": "application/json" } });
 }
 
+/**
+ * Owner: SAATLİK kota dökümü (son ~31 gün) — GET /kota/analitik
+ * Veri modeli (ek maliyet yok): Cloudflare ücretsiz GraphQL Analytics; iki küme (Workers + Pages Functions) AYRI sorgulanır,
+ * yalnızca `datetimeHour` boyutuyla (≤ 31×24 = 744 satır). Yanıt 5 dk edge cache'te. Gün/hafta/ay/yıl toplamlarını istemci kurar.
+ * Ayrıca günlük toplamlar owner'ın KENDİ jetonuyla worker_kota_gecmisine_yaz() RPC'sine (migration 0106) upsert edilir → Cloudflare'in
+ * ~31 günlük saklama süresinden sonra da aylık/yıllık geçmiş korunur. Yanıt: { saatlik:[{t,w,p}], limit, gecmis_yazildi, pages_okunamadi }.
+ */
+async function kotaAnalitik(env, kimlik, cors) {
+  if (!(await ownerMi(env, kimlik))) return json({ error: "Yalnızca Site Sahibi." }, 403, cors);
+  const limit = parseInt(env.GUNLUK_ISTEK_LIMITI || "100000", 10) || 100000;
+  if (!env.CF_ACCOUNT_ID || !env.CF_API_TOKEN) return json({ yapilandirilmadi: true, limit }, 200, cors);
+
+  const simdi = new Date();
+  const kova = Math.floor(simdi.getTime() / 300000);               // 5 dk'lık edge cache kovası
+  const anahtar = new Request(`https://kota.invalid/analitik/v1/${env.CF_ACCOUNT_ID}/${kova}`);
+  const onbellek = caches.default;
+  let govdeMetni;
+  const var_ = await onbellek.match(anahtar);
+  if (var_) govdeMetni = await var_.text();
+  else {
+    const bit = new Date(Math.floor(simdi.getTime() / 3600000) * 3600000 + 3600000);          // içinde bulunulan saati de kapsa
+    const bas = new Date(bit.getTime() - 31 * 86400000 + 3600000);                            // 31 günü AŞMA (Cloudflare sınırı)
+    const graphql = async (sorgu) => {
+      const r = await fetch("https://api.cloudflare.com/client/v4/graphql", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${env.CF_API_TOKEN}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ query: sorgu, variables: { acc: env.CF_ACCOUNT_ID, from: bas.toISOString(), to: bit.toISOString() } }),
+      });
+      const g = await r.json().catch(() => ({}));
+      return { ok: r.ok && !(Array.isArray(g.errors) && g.errors.length), g };
+    };
+    const wQ = `query($acc:String!,$from:Time!,$to:Time!){viewer{accounts(filter:{accountTag:$acc}){workersInvocationsAdaptive(limit:10000,filter:{datetime_geq:$from,datetime_leq:$to}){sum{requests}dimensions{datetimeHour}}}}}`;
+    const pQ = `query($acc:String!,$from:Time!,$to:Time!){viewer{accounts(filter:{accountTag:$acc}){pagesFunctionsInvocationsAdaptiveGroups(limit:10000,filter:{datetime_geq:$from,datetime_leq:$to}){sum{requests}dimensions{datetimeHour}}}}}`;
+    let w, p;
+    try { [w, p] = await Promise.all([graphql(wQ), graphql(pQ).catch(() => ({ ok: false, g: {} }))]); }
+    catch { return json({ error: "Cloudflare Analytics'e ulaşılamadı.", limit }, 502, cors); }
+    const wSatir = w.g?.data?.viewer?.accounts?.[0]?.workersInvocationsAdaptive;
+    if (!w.ok || !Array.isArray(wSatir)) return json({ error: "Analytics yanıtı alınamadı (token izni: Account Analytics › Read olmalı).", limit }, 502, cors);
+    const pSatir = p.g?.data?.viewer?.accounts?.[0]?.pagesFunctionsInvocationsAdaptiveGroups;
+    const pagesOkundu = p.ok && Array.isArray(pSatir);
+    const saat = new Map();
+    const topla = (satirlar, alan) => {
+      for (const s of satirlar) {
+        const t = s.dimensions?.datetimeHour; if (!t) continue;
+        const k = new Date(t).toISOString();
+        const o = saat.get(k) || { t: k, w: 0, p: 0 };
+        o[alan] += Number(s.sum?.requests) || 0;
+        saat.set(k, o);
+      }
+    };
+    topla(wSatir, "w"); if (pagesOkundu) topla(pSatir, "p");
+    govdeMetni = JSON.stringify({
+      saatlik: [...saat.values()].sort((a, b) => (a.t < b.t ? -1 : 1)), limit,
+      pages_okunamadi: !pagesOkundu, guncelleme: simdi.toISOString(),
+    });
+    await onbellek.put(anahtar, new Response(govdeMetni, { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300" } }));
+  }
+
+  // Günlük (UTC) toplamlar → kalıcı geçmiş. Başarısız olursa analitik yine döner (migration 0106 henüz çalışmamış olabilir).
+  const veri = JSON.parse(govdeMetni);
+  const gun = new Map();
+  for (const s of veri.saatlik) {
+    const g = s.t.slice(0, 10); const o = gun.get(g) || { gun: g, workers: 0, pages: 0 };
+    o.workers += s.w; o.pages += s.p; gun.set(g, o);
+  }
+  let yazildi = false;
+  try { const r = await rpc(env, kimlik, "worker_kota_gecmisine_yaz", { p_satirlar: [...gun.values()] }); yazildi = !r.hata; } catch { /* geçmiş yazılamadı */ }
+  veri.gecmis_yazildi = yazildi;
+  return new Response(JSON.stringify(veri), { status: 200, headers: { ...cors, "Content-Type": "application/json", "Cache-Control": "no-store" } });
+}
+
 /** Silme kuyruğundaki üyenin dosyası: yalnızca hesap_silme_dosya_izinli_mi() onaylarsa akıtılır.
  *  Önizleme güvenliği: yalnızca izinli türler (PDF/PNG/JPEG/WebP/GIF) "inline" sayılır; SVG/HTML asla. */
 async function uyeDosya(env, kimlik, url, cors) {
@@ -666,6 +738,7 @@ export default {
       if (yol === "/github/zip") return await githubZip(env, kimlik, url, cors);
       if (yol === "/depolama") return await depolamaTara(env, kimlik, cors);
       if (yol === "/kota") return await kotaGetir(env, kimlik, cors);
+      if (yol === "/kota/analitik") return await kotaAnalitik(env, kimlik, cors);
       if (yol === "/worker-sert/durum") return json({ yapilandirildi: !!(env.CF_ACCOUNT_ID && env.CF_WORKERS_TOKEN) }, 200, cors);
       if (yol === "/r2/gezgin") return await r2Gezgin(env, kimlik, url, cors);
       if (yol === "/r2/hayalet-tara") return await hayaletTara(env, kimlik, url, cors);
