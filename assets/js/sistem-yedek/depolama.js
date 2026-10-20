@@ -8,6 +8,7 @@
 import { workerAnahtarKarti } from "./worker-anahtarlari.js";
 import { supabase } from "../core/supabase-client.js";
 import { el, bayt, hataMetni, workerFetch, workerJson, dugme, ikon, VARSAYILAN_DB_KOTA, VARSAYILAN_R2_KOTA } from "./ortak.js";
+import { kotaAnaliziKarti } from "./kota-analitigi.js";
 
 const KAYNAK_ADLARI = { arsiv: "Dosya Yöneticisi", akademik: "Akademik Kütüphane", notek: "Not ekleri" };
 
@@ -312,6 +313,7 @@ export async function depolamaCiz(kok) {
       kota("Supabase Veritabanı", "🗄️", Number(d.db_bayt) || 0, dbKota, dbAlt),
       kota("Cloudflare R2 Depolama", "☁️", r2Bayt, r2Kota, r2Alt),
       workerKotaKarti(),
+      kotaAnaliziKarti(),
       workerAnahtarKarti()
     )
   );
