@@ -59,7 +59,8 @@ const MODULES = {
   admin: { src: "./admin.js", role: ["admin", "manager"] },
   uye: { src: "./uye-ayarlari.js", role: "admin" },
   guvenlik: { src: "./admin-guvenlik.js", role: "admin" },
-  izleme: { src: "./izleme-okuma-yonetim/izleme-okuma-yonetim.js", role: "owner" },
+  // İzleme ve Okuma Yönetimi (migration 0108): görünürlük role DEĞİL, Yetki Ayarları › "izleme_okuma_yonetimi" anahtarına bağlı (VARSAYILAN KAPALI; owner her zaman).
+  izleme: { src: "./izleme-okuma-yonetim/izleme-okuma-yonetim.js", role: null },
   mesajlar: { src: "./mesajlar.js", role: null },
   // Notlarım (uçtan uca şifreli not sistemi) — yayıncılık akışındaki
   // roller (editor/manager; admin ve owner otomatik geçer). SQL: not_modulu_yetkili().
@@ -148,7 +149,7 @@ const NAV = [
     items: [
       { id: "media-r2", icon: "🗂️", label: "R2 Dosya Paylaşımı", module: "admin", role: ["admin", "manager", "editor"], ozellik: "dosya_paylasimi_yonetimi" },
       { id: "media-arsiv", icon: "🗄️", label: "Dosya Yöneticisi", module: "arsiv", role: null, izin: "arsiv", defaultAcilis: false },
-      { id: "media-izleme", icon: "🎬", label: "İzleme ve Okuma Yönetimi", module: "izleme" },
+      { id: "media-izleme", icon: "🎬", label: "İzleme ve Okuma Yönetimi", module: "izleme", role: null, izin: "izleme" },
       { id: "media-cv", icon: "📄", label: "Özgeçmiş (CV) & Profil Görseli", module: "gy" },
     ],
   },
@@ -248,6 +249,9 @@ function gorunurMu(item, profile) {
   if (item.izin === "yetkiayarlari") {
     return profile.role === "owner" || (profile.role === "admin" && !!profile.izinler?.yetkiAyarlari);
   }
+  if (item.izin === "izleme") {
+    return profile.role === "owner" || (profile.role === "admin" && !!profile.izinler?.izleme);
+  }
   if (item.izin === "silmeonayi") {
     return profile.role === "owner" || (profile.role === "admin" && !!profile.izinler?.silmeOnayi);
   }
@@ -275,7 +279,7 @@ async function izinleriYukle(rol) {
       .rpc("ozellik_erisimi_var_mi", { p_ozellik: anahtar, p_rol: rol })
       .then((r) => (r.error ? true : r.data !== false))
       .catch(() => true);
-  const [arsiv, kvkk, ozelIcerik, dosyaPaylasimi, akademikKutuphane, sistemYedek, donusturucu, silmeOnayi, yetkiAyarlari, havastil] = await Promise.all([
+  const [arsiv, kvkk, ozelIcerik, dosyaPaylasimi, akademikKutuphane, sistemYedek, donusturucu, silmeOnayi, yetkiAyarlari, havastil, izleme] = await Promise.all([
     supabase.rpc("r2_arsiv_yetkilerim").then((r) => (r.error ? undefined : r.data)).catch(() => undefined),
     supabase.rpc("hukuki_metin_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
     ozellikSor("ozel_icerik_yonetimi"),
@@ -291,6 +295,8 @@ async function izinleriYukle(rol) {
     supabase.rpc("yetki_ayarlari_yonetim_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
     // havastil (migration 0099): varsayılan KAPALI → hata/ağ sorununda ya da migration yoksa false (güvenli yön).
     supabase.rpc("havastil_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
+    // izleme_okuma_yonetimi (migration 0108): varsayılan KAPALI → hata/migration yoksa false.
+    supabase.rpc("izleme_okuma_yonetimi_yetkili").then((r) => (r.error ? false : !!r.data)).catch(() => false),
   ]);
   return {
     arsiv,
@@ -300,6 +306,7 @@ async function izinleriYukle(rol) {
     silmeOnayi,
     yetkiAyarlari,
     havastil,
+    izleme,
     ozellikler: { ozel_icerik_yonetimi: ozelIcerik, dosya_paylasimi_yonetimi: dosyaPaylasimi, akademik_kutuphane: akademikKutuphane },
   };
 }
