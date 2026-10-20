@@ -14,7 +14,43 @@
  * innerHTML YOK, inline stil YOK (CSP).
  */
 import { supabase } from "../core/supabase-client.js";
-import { el, dugme, onayIste, silOnayiIste, hataMetni, tarihMetni, workerJson } from "./ortak.js";
+import { el, dugme, silOnayiIste, hataMetni, tarihMetni, workerJson } from "./ortak.js";
+
+/**
+ * "Kapat" düğmesinin akıllı onay penceresi (mobil dostu <dialog>): Standart (503) ya da Sert (workers.dev'i kes) seçilir.
+ * @returns {Promise<"standart"|"sert"|null>}
+ */
+function kapatmaSecimiIste({ satir, sertKullanilabilir, sertNeden }) {
+  return new Promise((coz) => {
+    if (typeof HTMLDialogElement === "undefined" || typeof HTMLDialogElement.prototype.showModal !== "function") {
+      coz(window.confirm(`${satir.etiket} kapatılsın mı? (Standart kapatma)`) ? "standart" : null);
+      return;
+    }
+    const d = el("dialog", { class: "sy-dialog wk-secim" });
+    let sonuc = null;
+    const secenek = (anahtar, baslik, aciklama, tur, devreDisi) => {
+      const b = el("button", { type: "button", class: `wk-secenek wk-secenek--${tur}`, disabled: devreDisi || null },
+        el("strong", { text: baslik }), el("span", { text: aciklama }));
+      b.addEventListener("click", () => { sonuc = anahtar; d.close(); });
+      return b;
+    };
+    const iptal = dugme({ metin: "Vazgeç", tur: "ikincil" });
+    iptal.addEventListener("click", () => d.close());
+    d.append(el("div", { class: "sy-dialog-govde" },
+      el("h3", { class: "sy-dialog-baslik", text: `${satir.etiket} nasıl kapatılsın?` }),
+      el("p", { class: "muted", text: satir.tur === "pages_function"
+        ? "Gatekeeper kapalıyken pages.dev adresinde SUNUCU TARAFI KİLİT yoktur: kilitli rotalar herkese açık olur. Yalnızca geçici kapat."
+        : "Kapatılınca bu servise dayanan özellikler (dosya yükleme/indirme, listeler) çalışmaz; kullanıcılar “geçici olarak kapatıldı” görür." }),
+      secenek("standart", "Standart Kapat (503)", "Worker gelen isteğe hemen 503 döner. İstek yine de kotaya yazılır.", "standart", false),
+      secenek("sert", "Sert Kapat — workers.dev'i kes (0 kota)", sertKullanilabilir
+        ? "Adres Cloudflare'de kapatılır; istek Worker'a hiç ulaşmaz ve kotaya SAYILMAZ. Tekrar Açtığında adres otomatik açılır."
+        : sertNeden, "sert", !sertKullanilabilir),
+      el("div", { class: "sy-dialog-eylem" }, iptal)));
+    d.addEventListener("close", () => { d.remove(); coz(sonuc); });
+    document.body.append(d);
+    d.showModal();
+  });
+}
 
 const ONBELLEK_ANAHTARI = "aea_wk_v1"; // worker-kapi.js'in önbelleği: bu tarayıcıda değişiklik hemen görünsün
 
@@ -27,45 +63,53 @@ export function workerAnahtarKarti() {
     el("div", { class: "sy-eylemler" }, yenile));
 
   let sertDestek = false;
-  let sertSecili = false;
   let ownerMi = false;
+  const rozetler = new Map();   // servis adı -> {metin, sinif}: Cloudflare API onay rozeti (oturum boyunca)
 
   async function sertDurumu() {
     try { sertDestek = (await workerJson("/worker-sert/durum")).yapilandirildi === true; } catch { sertDestek = false; }
   }
 
   async function degistir(satir, acik, dugmeEl) {
-    const kapatiyor = !acik;
-    if (kapatiyor) {
-      const ok = await onayIste({
-        baslik: `${satir.etiket} kapatılsın mı?`,
-        metin: [
-          satir.tur === "pages_function"
-            ? "Gatekeeper kapalıyken pages.dev adresinde SUNUCU TARAFI KİLİT yoktur: kilitli rotalar herkese açık olur (tarayıcıdaki perde güvenlik sınırı değildir). Kota için bunu yalnızca geçici olarak kapat."
-            : "Kapatılınca bu servise dayanan özellikler (ör. dosya yükleme/indirme, listeler) çalışmaz; kullanıcılar “geçici olarak kapatıldı” görür.",
-          sertSecili && satir.tur === "worker" ? "Sert kapatma açık: workers.dev adresi de kapatılacak (istek kotaya sayılmaz)." : null,
-        ],
-        tamam: "Kapat", tehlike: true,
+    let mod = null;                                        // "standart" | "sert" (yalnızca kapatırken)
+    if (!acik) {
+      const sertUygun = satir.tur === "worker" && sertDestek;
+      mod = await kapatmaSecimiIste({
+        satir, sertKullanilabilir: sertUygun,
+        sertNeden: satir.tur !== "worker"
+          ? "Bu servis için sert kapatma yoktur (Cloudflare Pages Function'ı workers.dev adresiyle kapatılamaz)."
+          : "Sert kapatma yapılandırılmamış: sistem-yedek-worker'a CF_WORKERS_TOKEN (Workers Scripts › Edit) eklenmeli — rehber/04-cloudflare-secretlar.md § 4.10c.",
       });
-      if (!ok) return;
+      if (!mod) return;
     }
+    // Yükleniyor (spinner) — düğme ve satır kilitlenir
     dugmeEl.disabled = true;
+    dugmeEl.classList.add("wk-yukleniyor");
+    dugmeEl.replaceChildren(el("span", { class: "wk-donen", "aria-hidden": "true" }), el("span", { text: "İşleniyor…" }));
     try {
-      // Açarken sert katman yapılandırılmışsa önce workers.dev'i aç (önceden sert kapatılmış olabilir); kapatırken yalnızca seçiliyse kapat.
-      let sertUyari = null;
-      if (satir.tur === "worker" && sertDestek && (acik || sertSecili)) {
+      // Açarken sert katman yapılandırılmışsa önce workers.dev'i aç (önceden sert kapatılmış olabilir); kapatırken yalnızca "sert" seçildiyse kes.
+      let sertUyari = null, rozet = { metin: acik ? "Açıldı ✓" : "Kapatıldı ✓ (standart 503)", sinif: "iyi" };
+      if (satir.tur === "worker" && sertDestek && (acik || mod === "sert")) {
         try {
           const r = await workerJson("/worker-sert", { yontem: "POST", govde: { ad: satir.ad, acik } });
-          if (r?.dogrulandi === false) sertUyari = `Cloudflare isteği kabul etti ama workers.dev adresi beklenen durumda değil (şu an: ${r.workersDev ? "AÇIK" : "KAPALI"}). Birkaç saniye sonra Yenile'ye bas; sürerse Cloudflare panelinden kontrol et.`;
-        } catch (h) { sertUyari = `Sert katman uygulanamadı: ${h.message || h}`; }
+          if (r?.dogrulandi === true) rozet = { metin: `Cloudflare API doğruladı ✓ workers.dev ${r.workersDev ? "AÇIK" : "KAPALI"}`, sinif: "iyi" };
+          else if (r?.dogrulandi === false) {
+            rozet = { metin: `Cloudflare doğrulaması tutmadı (workers.dev şu an ${r.workersDev ? "AÇIK" : "KAPALI"})`, sinif: "uyari" };
+            sertUyari = `Cloudflare isteği kabul etti ama workers.dev adresi beklenen durumda değil (şu an: ${r.workersDev ? "AÇIK" : "KAPALI"}). Birkaç saniye sonra Yenile'ye bas; sürerse Cloudflare panelinden kontrol et.`;
+          } else rozet = { metin: "Cloudflare'e iletildi (durum geri okunamadı)", sinif: "uyari" };
+        } catch (h) {
+          rozet = { metin: "Sert katman uygulanamadı", sinif: "kritik" };
+          sertUyari = `Sert katman uygulanamadı: ${h.message || h}`;
+        }
       }
       const { error } = await supabase.rpc("worker_anahtari_ayarla", { p_ad: satir.ad, p_acik: acik });
       if (error) throw error;
+      rozetler.set(satir.ad, rozet);
       try { localStorage.removeItem(ONBELLEK_ANAHTARI); } catch { /* yok say */ }
       await yukle(sertUyari);
     } catch (h) {
       govde.prepend(el("p", { class: "auth-message error", text: `Değiştirilemedi: ${hataMetni(h)}` }));
-      dugmeEl.disabled = false;
+      await yukle();
     }
   }
 
@@ -79,7 +123,8 @@ export function workerAnahtarKarti() {
         el("code", { text: s.ad }),
         s.korumali ? el("span", { class: "muted sy-not", text: "Korumalı (her zaman açık)" }) : null),
       el("span", { class: `sy-rozet sy-rozet--${s.acik ? "iyi" : "kritik"}`, text: s.acik ? "Açık" : "Kapalı" }),
-      btn);
+      btn,
+      rozetler.has(s.ad) ? el("span", { class: `sy-rozet sy-rozet--${rozetler.get(s.ad).sinif} wk-onay`, text: rozetler.get(s.ad).metin, role: "status" }) : null);
   }
 
   async function yukle(uyari) {
@@ -90,8 +135,6 @@ export function workerAnahtarKarti() {
       const { data, error } = await supabase.from("worker_anahtarlari")
         .select("ad, etiket, tur, acik, korumali, guncelleme").order("tur", { ascending: false }).order("etiket");
       if (error) throw error;
-      const sertKutu = el("input", { type: "checkbox", id: "sy-wk-sert", checked: sertSecili, disabled: !sertDestek });
-      sertKutu.addEventListener("change", () => { sertSecili = sertKutu.checked; });
       const gunlukKok = el("div", {});
       const gunluk = el("details", { class: "sy-wk-gunluk" }, el("summary", { text: "Son değişiklikler" }), gunlukKok);
       async function gunlukCiz() {
@@ -133,22 +176,10 @@ export function workerAnahtarKarti() {
         if (!gunluk.open || gunlukYuklendi) return;
         gunlukYuklendi = true; await gunlukCiz();
       });
-      // Açılır-kapanır bilgi kartı: "Sert kapatma" ne yapar, ne zaman açılmalı?
-      const bilgi = el("details", { class: "sy-wk-bilgi" },
-        el("summary", { text: "ℹ️ Sert kapatma nedir? Ne zaman açılmalı?" }),
-        el("div", { class: "sy-wk-bilgi-icerik" },
-          el("p", {}, el("strong", { text: "Ne yapar? " }), "Cloudflare Workers'ın varsayılan *.workers.dev adresini kapatır. Adres kapalıyken gelen istek Worker'a hiç ulaşmaz ve günlük 100.000 ücretsiz istek kotasına SAYILMAZ; böylece yetkisiz istekler ve tarama botları kotayı bitiremez. (Normal “Kapat” yalnızca erken 503 döner; o istekler yine kotaya yazılır.)"),
-          el("p", {}, el("strong", { text: "Ne zaman açılmalı? " }), "Bakım/yedekleme sırasında dış trafiği tamamen kesmek ya da kota saldırısı altında olduğunda işaretle ve ilgili Worker'ı kapat. Normal yayında işaretsiz bırak; Worker'ı tekrar AÇARKEN adres otomatik yeniden açılır."),
-          el("p", { class: "muted", text: "Pages Function (Gatekeeper) için sert kapatma yoktur; sistem-yedek-worker kendini kapatamaz. İşlem sonrası adresin gerçek durumu Cloudflare'dan geri okunarak doğrulanır." })));
       govde.replaceChildren(
         uyari ? el("p", { class: "auth-message error", text: uyari }) : null,
         el("p", { class: "muted sy-not", text: "Kapalı bir servise tarayıcılar istek göndermez, Worker'lar gelen isteği hemen reddeder; Gatekeeper Function ise isteği işlemeden geçirir. Kota dolmadan önce yoğun/gereksiz servisleri buradan kapatabilirsin." }),
         el("ul", { class: "sy-wk-liste" }, (data || []).map(satirCiz)),
-        el("label", { class: "sy-wk-sert", for: "sy-wk-sert" }, sertKutu,
-          el("span", { text: sertDestek
-            ? "Sert kapatma: Worker'ı kapatırken workers.dev adresini de kapat (istek kotaya hiç sayılmaz)."
-            : "Sert kapatma kapalı: CF_WORKERS_TOKEN (Workers Scripts › Edit) tanımlı değil — rehber/04-cloudflare-secretlar.md § 4.10c." })),
-        bilgi,
         gunluk);
     } catch (h) {
       govde.replaceChildren(el("p", { class: "auth-message error", text: /does not exist|42P01|PGRST205|schema cache/i.test(h?.message || "")
