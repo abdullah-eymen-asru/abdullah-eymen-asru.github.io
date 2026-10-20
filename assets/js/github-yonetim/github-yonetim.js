@@ -343,7 +343,7 @@ const OZELLIK_KATALOGU = [
     // "kullanıcı bazlı erişim" bölümünden (assets/js/notlar/yetki-paneli.js).
     // Kapalıyken: modül menüden kalkar; RLS ve R2 worker'ı da reddeder. Notlar silinmez.
     anahtar: "notlar_modulu",
-    baslik: "Notlarım (Not Sistemi)",
+    baslik: "Notlarım (Kişisel Not Kasası)",
     aciklama: "Uçtan uca şifreli not modülü: not yazma/okuma ve ek yükleme/indirme. Kapatılan rolün notları SİLİNMEZ, yeniden açılınca aynen döner. Tek tek kişiye kapatmak için matrisin altındaki bölümü kullan.",
     rolSutunlari: ["editor", "manager", "admin"],
   },
@@ -361,8 +361,8 @@ const OZELLIK_KATALOGU = [
     // bkz. migration 0077 — Dönüştürücü, Belge Tarayıcı & Sıkıştırma (aynı can_use_converter anahtarı). Önceki ayrı "Dönüştürücü" sekmesi buraya taşındı.
     // VARSAYILAN KAPALI (diğer satırların tersi): anahtar açılana kadar yalnızca owner kullanır. Kaynak: donusturucu_yetkileri.
     anahtar: "donusturucu",
-    baslik: "Dönüştürücü, Belge Tarayıcı & Sıkıştırma",
-    aciklama: "Dosya biçimi dönüştürme, tarayıcı içi PDF/Word/metin düzenleme ve Belge Tarayıcı (çoklu birleştirme + boyut küçültme). TEK anahtar: üçü de buradan açılıp kapanır, araçların içinde ayrı bir yetki paneli yoktur. Varsayılan KAPALI; dosyalar tarayıcıdan çıkmaz. Kapalı rol menüde araçları görmez.",
+    baslik: "Gelişmiş Belge ve Gizlilik Araçları (İstemci Taraflı)",
+    aciklama: "Üç araç TEK satırda: Evrensel Metadata Temizleyici (görsel, Office, ODF, PDF, ZIP, MP4/MOV), Dönüştürücü & Belge Düzenleyici ve Belge Tarayıcı & Birleştirici (çoklu birleştirme + boyut küçültme). Hepsi buradan açılıp kapanır, araçların içinde ayrı bir yetki paneli yoktur. Varsayılan KAPALI; dosyalar tarayıcıdan çıkmaz. Kapalı rol menüde araçları görmez.",
     rolSutunlari: ["admin", "manager", "editor", "special_user", "user"],
     kaynak: "donusturucu",
   },
@@ -401,6 +401,22 @@ const OZELLIK_KATALOGU = [
     anahtar: "havastil_groq_kota",
     baslik: "HavaStil Groq Kota Takibini Görüntüleme",
     aciklama: "HavaStil › Veri Doğrulama içindeki “Groq AI Kota & İstek Takibi” kutusunu (günlük/aylık istek, kalan kota, token) görme. Varsayılan KAPALI; Site Sahibi her zaman görür. Normal kullanıcılar ve demo hesaplar göremez.",
+    rolSutunlari: ["admin"],
+    kaynak: "kapali",
+  },
+  {
+    // bkz. migration 0108 — "İzleme ve Okuma Yönetimi" (GitHub Project'e kayıt ekleme). Eskiden yalnızca owner. VARSAYILAN KAPALI.
+    anahtar: "izleme_okuma_yonetimi",
+    baslik: "İzleme ve Okuma Yönetimi",
+    aciklama: "İzleme (film/dizi) ve okuma (kitap) listelerine kayıt ekleme/düzenleme modülü. Varsayılan KAPALI; Site Sahibi her zaman kullanır, yalnızca Yönetici için açılabilir. Kapalıyken menü gizlenir ve Worker isteği 403 ile reddeder.",
+    rolSutunlari: ["admin"],
+    kaynak: "kapali",
+  },
+  {
+    // bkz. migration 0108 — parolası unutulup açılamayan not kasalarını (notlar + ekler + kasa anahtarı) kalıcı silme. Site Sahibi: AÇIK, Yönetici: KAPALI.
+    anahtar: "kilitli_kasa_temizleme",
+    baslik: "Kilitli Not Kasalarını Temizleme",
+    aciklama: "Parolası/kurtarma kodu kaybolup açılamayan kullanıcıların Notlarım kasasını, notlarını ve R2 eklerini KALICI siler (geri alınamaz; denetim günlüğüne yazılır). Site Sahibi her zaman yapabilir; Yönetici varsayılan KAPALI ve yalnızca Yönetici/Site Sahibi olmayan hesaplar için. Sistem Yedekleme › Artık dosyalar bölümünde kullanılır.",
     rolSutunlari: ["admin"],
     kaynak: "kapali",
   },
@@ -5679,13 +5695,22 @@ function wireYetkiAyarlari() {
   yetkiAyarlariTablosunuYukle();
 
   if (!sahip) {
-    // Yetkili admin YALNIZCA Özellikler sekmesini görür: diğer izin sekmeleri (Tezgâh, Dosya Yöneticisi, Erişim Kalkanı +
-    // Kilit İzinleri) güvenlik açısından Site Sahibi'ne özeldir; sekme şeridi paneli olmayan sekmeyi kendisi kaldırır.
-    ["ya-pane-tezgah", "ra-izin-bolumu", "gk-kalkan-bolumu"].forEach((id) => document.getElementById(id)?.remove());
+    // Yetkili Yönetici: sekmeler artık BOŞ KALMAZ. Notlarım (kişi bazlı) ve Dosya Yöneticisi izinleri gerçekten yüklenir; sunucu
+    // (migration 0108) yalnızca admin DIŞI roller/kişiler için yazmaya izin verir. Erişim Kalkanı site geneli kilit olduğu için
+    // Site Sahibi'ne özeldir: sekme durur ama içinde açık bir bilgilendirme gösterilir (boş ekran yok).
+    const kalkan = document.getElementById("gk-kalkan-bolumu");
+    if (kalkan) {
+      const not = document.createElement("p");
+      not.className = "muted";
+      not.textContent = "Alan Adı & Sayfa Erişim Kalkanı site genelini kilitler; bu yüzden yalnızca Site Sahibi tarafından değiştirilir. Yönetici olarak yalnızca etkisini görürsün (kilitliyken siteyi görmeye devam edersin).";
+      kalkan.replaceChildren(Object.assign(document.createElement("h2"), { textContent: "Alan Adı & Sayfa Erişim Kalkanı" }), not);
+    }
+    import("../notlar/yetki-paneli.js").then((m) => m.kur()).catch((err) => console.warn("Kullanıcı bazlı yetki paneli yüklenemedi:", err));
+    import("../r2-arsiv/izin-paneli.js").catch((err) => console.warn("Dosya Yöneticisi izin paneli yüklenemedi:", err));
     return;
   }
 
-  // Kullanıcı bazlı bölüm (Fikir & Araştırma Tezgâhı) — ayrı dosya, hata olsa matris etkilenmez.
+  // Kullanıcı bazlı bölüm (Notlarım — Kişisel Not Kasası) — ayrı dosya, hata olsa matris etkilenmez.
   import("../notlar/yetki-paneli.js")
     .then((m) => m.kur())
     .catch((err) => console.warn("Kullanıcı bazlı yetki paneli yüklenemedi:", err));
