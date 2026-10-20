@@ -585,6 +585,44 @@ async function kotaAnalitik(env, kimlik, cors) {
   return new Response(JSON.stringify(veri), { status: 200, headers: { ...cors, "Content-Type": "application/json", "Cache-Control": "no-store" } });
 }
 
+/**
+ * POST /kasa/temizle { hedef: <uuid> } — "Kilitli Not Kasalarını Temizleme" (migration 0108).
+ * Yetki ve hedef kuralları veritabanındadır (Site Sahibi: herkes; yetkili Yönetici: admin/owner olmayanlar; kendi kasan hariç).
+ * Sıra bilerek: (1) hazirla RPC'si yetkiyi doğrular + R2 anahtarlarını verir, (2) R2 nesneleri silinir (kayıtlı anahtarlar + notlar/<uid>/
+ * önekindeki kayıtsız artıklar), (3) ANCAK R2 temizse veritabanı satırları kalıcı silinir. R2'de hata olursa veritabanına dokunulmaz → tekrar denenebilir.
+ */
+async function kasaTemizle(env, kimlik, istek, cors) {
+  let g = null;
+  try { g = await istek.json(); } catch { /* boş */ }
+  const hedef = String(g?.hedef || "");
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(hedef)) return json({ error: "Geçersiz hedef." }, 400, cors);
+  const kova = env.NOT_EK_BUCKET;
+  if (!kova) return json({ error: "NOT_EK_BUCKET binding'i bağlı değil." }, 501, cors);
+
+  const h = await rpc(env, kimlik, "kilitli_kasa_temizleme_hazirla", { p_user: hedef });
+  if (h.hata) return json({ error: h.hata }, h.durum === 401 || h.durum === 403 ? 403 : 400, cors);
+  const onek = `notlar/${hedef.toLowerCase()}/`;
+  const kayitli = (Array.isArray(h.veri) ? h.veri : []).filter((k) => typeof k === "string" && k.toLowerCase().startsWith(onek));
+
+  let silinen = 0;
+  try {
+    for (let i = 0; i < kayitli.length; i += 1000) { await kova.delete(kayitli.slice(i, i + 1000)); silinen += Math.min(1000, kayitli.length - i); }
+    // Veritabanında kaydı olmayan artıklar (yarım kalmış yüklemeler): kullanıcının klasörü baştan sona süpürülür (en çok 5 sayfa = 5000 nesne).
+    let imlec;
+    for (let sayfa = 0; sayfa < 5; sayfa++) {
+      const l = await kova.list({ prefix: `notlar/${hedef}/`, limit: 1000, cursor: imlec });
+      if (l.objects.length) { await kova.delete(l.objects.map((o) => o.key)); silinen += l.objects.length; }
+      if (!l.truncated) break;
+      imlec = l.cursor;
+    }
+  } catch (hata) {
+    return json({ error: `R2 nesneleri silinemedi, veritabanına dokunulmadı: ${hata?.message || hata}` }, 502, cors);
+  }
+  const t = await rpc(env, kimlik, "kilitli_kasa_temizle", { p_user: hedef });
+  if (t.hata) return json({ error: `R2 temizlendi ama veritabanı satırları silinemedi: ${t.hata}` }, 500, cors);
+  return json({ ok: true, r2_silinen: silinen, ...(t.veri || {}) }, 200, cors);
+}
+
 /** Silme kuyruğundaki üyenin dosyası: yalnızca hesap_silme_dosya_izinli_mi() onaylarsa akıtılır.
  *  Önizleme güvenliği: yalnızca izinli türler (PDF/PNG/JPEG/WebP/GIF) "inline" sayılır; SVG/HTML asla. */
 async function uyeDosya(env, kimlik, url, cors) {
@@ -668,6 +706,21 @@ async function workerSert(env, kimlik, istek, cors) {
 
 /** R2 ÇÖP TOPLAYICI (owner): bir sayfa (500 nesne) tarar; veritabanında karşılığı OLMAYAN ve 24 saatten eski nesneleri döndürür. SİLMEZ.
  *  Silme, onaydan sonra mevcut POST /r2/sil akışıyla (anahtar biçimi beyaz listesi + denetim) yapılır. 24 sa koruma: yüklenmekte olan dosya silinmesin. */
+/** Artık (hayalet) R2 nesnesi için mantıksal tahmin: { kod, neden }. Tahmindir; silmeden önce kullanıcı listede görür ve onaylar. */
+function artikNeden(kaynak, k) {
+  if (kaynak === "notek") {
+    if (k && k.sahip_id && !k.sahip_var) return { kod: "sahip_silinmis", neden: "Sahibi silinmiş hesaptan kalan, çözülemeyen eski şifreli not eki. Veritabanı kaydı bulunmuyor." };
+    if (k && k.sahip_var && !k.kasa_var) return { kod: "kasa_yok", neden: "Not kasası sıfırlanmış/silinmiş hesaptan kalan, çözülemeyen şifreli ek. Veritabanı kaydı bulunmuyor." };
+    return { kod: "yetim_not_eki", neden: "Yetim not eki: silinen (ya da hiç kaydedilmeyen) nota ait şifreli dosya. Veritabanı kaydı bulunmuyor." };
+  }
+  if (kaynak === "arsiv") return { kod: "yarim_yukleme", neden: "Yarım kalmış ya da silinmiş Dosya Yöneticisi yüklemesi: R2'de nesne var ama arşiv kaydı yok." };
+  if (kaynak === "akademik") {
+    if (k && k.sahip_id && !k.sahip_var) return { kod: "sahip_silinmis", neden: "Sahibi silinmiş hesaptan kalan akademik kütüphane PDF'i. Kaynak kaydı bulunmuyor." };
+    return { kod: "yetim_akademik", neden: "Kaynak kaydı silinmiş ya da hiç oluşmamış akademik PDF. Veritabanı kaydı bulunmuyor." };
+  }
+  return { kod: "bilinmiyor", neden: "Veritabanında karşılığı yok." };
+}
+
 async function hayaletTara(env, kimlik, url, cors) {
   if (!(await ownerMi(env, kimlik))) return json({ error: "Yalnızca Site Sahibi." }, 403, cors);
   const kaynak = url.searchParams.get("b") || "";
@@ -682,7 +735,14 @@ async function hayaletTara(env, kimlik, url, cors) {
     const r = await rpc(env, kimlik, "sistem_r2_bilinmeyenleri", { p_kaynak: kaynak, p_anahtarlar: aday.map((o) => o.key) });
     if (r.hata) return json({ error: r.hata }, yetkisizMi(r.durum) ? 403 : 502, cors);
     const set = new Set(r.veri || []);
-    hayalet = aday.filter((o) => set.has(o.key)).map((o) => ({ anahtar: o.key, boyut: o.size, yuklenme: o.uploaded }));
+    const bilinmeyen = aday.filter((o) => set.has(o.key));
+    // "Neden artık dosya?" gerekçesi: sahibin hesabı/kasası var mı? (migration 0107; yoksa gerekçe genel kalır, tarama bozulmaz)
+    const kanit = new Map();
+    if (bilinmeyen.length) {
+      const k = await rpc(env, kimlik, "sistem_r2_artik_aciklama", { p_kaynak: kaynak, p_anahtarlar: bilinmeyen.map((o) => o.key) });
+      if (!k.hata && Array.isArray(k.veri)) for (const x of k.veri) kanit.set(x.anahtar, x);
+    }
+    hayalet = bilinmeyen.map((o) => ({ anahtar: o.key, boyut: o.size, yuklenme: o.uploaded, ...artikNeden(kaynak, kanit.get(o.key)) }));
   }
   return json({ taranan: l.objects.length, hayalet, sonraki: l.truncated ? l.cursor : null }, 200, cors);
 }
@@ -715,6 +775,7 @@ export default {
       try {
         if (istek.method === "POST" && yol === "/worker-sert") return await workerSert(env, k, istek, cors);
         if (istek.method === "POST" && yol === "/r2/sil") return await r2Sil(env, k, istek, cors);
+        if (istek.method === "POST" && yol === "/kasa/temizle") return await kasaTemizle(env, k, istek, cors);
         if (istek.method === "POST" && yol === "/r2/kuyruk-isle") return await r2KuyrukIsle(env, k, cors);
         if (istek.method === "PUT" && yol === "/r2/yukle") return await r2Yukle(env, k, istek, url, cors);
         if (istek.method === "PUT" && yol === "/uye/yukle") return await uyeYukle(env, k, istek, url, cors);
