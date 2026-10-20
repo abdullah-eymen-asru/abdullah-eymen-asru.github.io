@@ -670,7 +670,18 @@ async function init() {
   // SADECE owner — bkz. dosya başındaki mimari notu. requireAuth,
   // yetkisiz kullanıcıyı zaten /panel/panel.html?hata=yetkisiz adresine
   // yönlendirir, bu satırdan sonrası owner olmayan biri için hiç çalışmaz.
-  await requireAuthOrShowError({ role: "owner" });
+  // Site Sahibi her zaman; Yönetici yalnızca Yetki Ayarları › "İzleme ve Okuma Yönetimi" anahtarı açıksa (migration 0108).
+  // Gerçek sınır Worker + veritabanındadır; burası görünüm/yönlendirme kolaylığı.
+  await requireAuthOrShowError({ role: "admin" });
+  const { data: yetkili } = await supabase.rpc("izleme_okuma_yonetimi_yetkili");
+  if (yetkili !== true) {
+    document.getElementById("loading")?.remove();
+    const m = document.createElement("p");
+    m.className = "auth-message error";
+    m.textContent = "Bu modül için yetkin yok. Site Sahibi, Yetki Ayarları › Özellikler bölümünden “İzleme ve Okuma Yönetimi” anahtarını açabilir.";
+    document.body.prepend(m);
+    return;
+  }
 
   document.getElementById("loading").remove();
   document.getElementById("app").hidden = false;
