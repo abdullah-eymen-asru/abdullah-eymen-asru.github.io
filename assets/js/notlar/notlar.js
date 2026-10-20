@@ -1394,16 +1394,34 @@ function kaliciSilOnayli(m) {
   kaliciSil(m);
 }
 
-/** Satırları önce siler, sonra R2'deki ekleri (kalan olursa yetim süpürmesi temizler). */
+/**
+ * KALICI SİLME (sıfır iz): önce R2'deki ekler (+ not_ek_kayitlari satırı), SONRA not satırı DELETE edilir.
+ * Sıra bilerek böyle: ek silinemezse not çöpte KALIR ve tekrar denenebilir; aksi halde not gider, dosya R2'de yetim kalırdı.
+ * Başka bir notun (kopya vb.) hâlâ başvurduğu ek silinmez. Soft-delete izi yok: not_ satırı fiziksel olarak DELETE edilir.
+ */
 async function kayitlariKaliciSil(klasorler, notlar) {
-  const hepsi = [...klasorler, ...notlar];
+  const gidecekIdler = new Set([...klasorler, ...notlar].map((x) => x.id));
+  const baskaNottaKullanilan = new Set(
+    [...S.notlar.values()].filter((m) => !gidecekIdler.has(m.id)).flatMap((m) => m.ekler.map((e) => e.anahtar))
+  );
+  const silinecekNotlar = [];
+  let ekHatasi = 0;
+  for (const n of notlar) {
+    let tamam = true;
+    for (const e of n.ekler) {
+      if (baskaNottaKullanilan.has(e.anahtar)) continue;
+      if (!(await ekiTamamenSil(e.anahtar))) { tamam = false; break; }
+    }
+    if (tamam) silinecekNotlar.push(n); else ekHatasi += 1;
+  }
+  const hepsi = [...klasorler, ...silinecekNotlar];
   for (let i = 0; i < hepsi.length; i += 100) {
     const parca = hepsi.slice(i, i + 100);
     const { error } = await supabase.from("notlar").delete().in("id", parca.map((x) => x.id));
     if (error) throw error;
     for (const x of parca) (x.tur === "klasor" ? S.klasorler : S.notlar).delete(x.id);
   }
-  for (const n of notlar) for (const e of n.ekler) await ekiTamamenSil(e.anahtar);
+  if (ekHatasi) throw new Error(`${ekHatasi} notun eki R2'den silinemedi; bu notlar çöpte bırakıldı (yetim dosya oluşmaması için). Tekrar dene.`);
 }
 
 async function kaliciSil(m) {
@@ -1734,12 +1752,13 @@ function blobUrlleriniBirak() {
 
 async function ekiTamamenSil(anahtar) {
   try {
-    await ekIstegi("DELETE", anahtar);
+    await ekIstegi("DELETE", anahtar);                 // R2 silme idempotent: olmayan nesne de 200 döner
   } catch (h) {
     console.warn("R2 silme:", h);
-    return; // nesne silinemediyse kaydı tut: bir sonraki süpürmede tekrar denenir
+    return false;                                      // nesne silinemediyse kaydı tut: bir sonraki süpürmede tekrar denenir
   }
-  await supabase.from("not_ek_kayitlari").delete().eq("r2_key", anahtar);
+  const { error } = await supabase.from("not_ek_kayitlari").delete().eq("r2_key", anahtar);
+  return !error;
 }
 
 function eklerCiz() {
