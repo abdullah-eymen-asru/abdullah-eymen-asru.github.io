@@ -157,6 +157,7 @@ async function basla() {
 
   function ciz() {
     const roller = new Map(durum.satirlar.filter((s) => s.hedef_tur === "rol").map((s) => [s.hedef, s]));
+    const gorunurRoller = durum.sahip ? ROLLER : ROLLER.filter(([rol]) => rol !== "admin");   // Yönetici rolünü yalnızca Site Sahibi düzenler (0108)
     const tumKisiler = durum.satirlar.filter((s) => s.hedef_tur === "kullanici");
     sayiRozet.textContent = String(tumKisiler.length);
 
@@ -164,7 +165,7 @@ async function basla() {
     sekmeKisi.setAttribute("aria-selected", String(durum.sekme === "kisiler"));
     panelRol.hidden = durum.sekme !== "roller"; panelKisi.hidden = durum.sekme !== "kisiler";
 
-    rolListe.replaceChildren(...ROLLER.map(([rol, etiket]) => {
+    rolListe.replaceChildren(...gorunurRoller.map(([rol, etiket]) => {
       const kayit = roller.get(rol);
       return satirYap({ tur: "rol", hedef: rol, etiket, deger: kayit || VARSAYILAN(rol), kayitVar: !!kayit });
     }));
@@ -197,8 +198,13 @@ async function basla() {
   function sekmeSec(s) { durum.sekme = s; ciz(); }
 
   async function yukle() {
+    if (durum.sahip === undefined) {
+      const { data: u } = await supabase.auth.getUser();
+      const { data: pr } = u?.user ? await supabase.from("profiles").select("role").eq("id", u.user.id).maybeSingle() : { data: null };
+      durum.sahip = pr?.role === "owner";
+    }
     const { data, error } = await supabase.rpc("r2_arsiv_izinlerini_getir");
-    if (error) { kok.replaceChildren(el("p", "muted", "İzinler alınamadı (yalnızca Site Sahibi görebilir).")); return; }
+    if (error) { kok.replaceChildren(el("p", "muted", "İzinler alınamadı (yalnızca Site Sahibi ya da yetkili Yönetici görebilir; 0108 migration'ı uygulandı mı?).")); return; }
     durum.satirlar = data || [];
     ciz();
   }
@@ -209,6 +215,7 @@ async function basla() {
     haric: () => new Set(durum.satirlar.filter((s) => s.hedef_tur === "kullanici").map((s) => s.hedef)),
     sec: async (u) => {
       if (u.rol === "owner") return goster("Site Sahibi zaten tam yetkilidir; kısıtlanamaz.");
+      if (u.rol === "admin" && !durum.sahip) return goster("Yönetici için izni yalnızca Site Sahibi verebilir.");
       const { error } = await supabase.rpc("r2_arsiv_izin_ayarla", { p_tur: "kullanici", p_hedef: u.id, p_oku: true, p_yukle: false, p_sil: false });
       if (error) return goster(error.message || "Eklenemedi.");
       await yukle();
