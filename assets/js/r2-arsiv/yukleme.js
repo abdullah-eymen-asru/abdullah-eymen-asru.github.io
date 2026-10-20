@@ -6,7 +6,7 @@
  * R2 işlemleri: dosya başına 1 PUT (Class A) + 1 HEAD (Class B). Klasör oluşturma = yalnızca DB.
  */
 import { supabase } from "../core/supabase-client.js";
-import { E2EE_MAX_BAYT, anahtarlariHazirla, aliciAnahtarlariniGetir, sifreliBoyut, dosyaSifrele, anahtariZarfla } from "./e2ee.js";
+import { E2EE_MAX_BAYT, anahtarlariHazirla, aliciAnahtarlariniGetir, sifreliBoyut, dosyaSifrele, anahtariZarfla, zarflariKaydet, anahtariOlmayanlar } from "./e2ee.js";
 import { el, btn, boyutYaz, worker, adGecerli } from "./ortak.js";
 
 const ESZAMANLI = 2;
@@ -168,7 +168,13 @@ export function kuyrukKur({ liste, ozet, temizleBtn, baglam, bitti }) {
       const { uid, alicilar } = is.sifre;
       const hepsi = [...new Set([uid, ...alicilar])];
       const { harita, eksik } = await aliciAnahtarlariniGetir(hepsi);
-      if (eksik.length) throw new Error("Bazı alıcılar panele hiç girmediği için anahtarları yok. Onlar giriş yapınca tekrar dene.");
+      if (eksik.length) {
+        // R2'ye tek bayt gitmeden, KİMİN anahtarının olmadığını söyle (sessiz çökme yok).
+        const adlar = await anahtariOlmayanlar(eksik);
+        throw new Error(adlar.length === 1
+          ? `Alıcının (${adlar[0]}) henüz şifreleme anahtarı bulunmuyor, şifreli dosya gönderilemez. Alıcı panele bir kez giriş yaptıktan sonra tekrar dene.`
+          : `Şu alıcıların henüz şifreleme anahtarı bulunmuyor, şifreli dosya gönderilemez: ${adlar.join(", ")}.`);
+      }
       harita.set(uid, ben.acik);
       anahtarlar = { harita, uid };
     }
@@ -197,12 +203,11 @@ export function kuyrukKur({ liste, ozet, temizleBtn, baglam, bitti }) {
       is.durumYaz("Doğrulanıyor…");
       await worker("/yukle-bitir", { id: baslat.id });
       if (sifreli) {
-        const satirlar = [];
+        const zarflar = [];
         for (const [kid, acik] of anahtarlar.harita) {
-          satirlar.push({ dosya_id: baslat.id, alici_id: kid, sarili_dosya_anahtari: await anahtariZarfla(ham, acik) });
+          zarflar.push({ alici_id: kid, sarili_dosya_anahtari: await anahtariZarfla(ham, acik) });
         }
-        const { error } = await supabase.from("ozel_icerik_anahtarlar").insert(satirlar);
-        if (error) throw new Error("Şifre zarfları kaydedilemedi.");
+        await zarflariKaydet(baslat.id, zarflar);          // SECURITY DEFINER RPC (0105); gerçek hata metni yutulmaz
       }
       is.bitirYaz(sifreli ? "Şifrelendi ve yüklendi ✓" : (ad !== dosyaAdi ? `Yüklendi ✓ (adı "${ad}" oldu)` : "Yüklendi ✓"));
     } catch (e) {
