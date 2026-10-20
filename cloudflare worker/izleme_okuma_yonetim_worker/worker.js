@@ -514,7 +514,23 @@ const ASIL_ISLEYICI = {
       return jsonYanit({ message: "Rol bilgisi okunamadı." }, 500, corsHeaders);
     }
     if (rol !== "owner") {
-      return jsonYanit({ message: "Bu işlem sadece Site Sahibi (owner) tarafından yapılabilir." }, 403, corsHeaders);
+      // Yönetici: yalnızca askıda DEĞİLSE ve Yetki Ayarları › "izleme_okuma_yonetimi" (rol=admin) anahtarı AÇIKSA (migration 0108).
+      let izinli = false;
+      if (rol === "admin") {
+        try {
+          const basliklar = { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` };
+          const [pr, ay] = await Promise.all([
+            fetch(`${env.SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=is_suspended`, { headers: basliklar }),
+            fetch(`${env.SUPABASE_URL}/rest/v1/ozellik_varsayilan_kapali?ozellik_anahtari=eq.izleme_okuma_yonetimi&rol=eq.admin&select=acik`, { headers: basliklar }),
+          ]);
+          const askida = pr.ok ? (await pr.json())?.[0]?.is_suspended === true : true;
+          const acik = ay.ok ? (await ay.json())?.[0]?.acik === true : false;
+          izinli = !askida && acik;
+        } catch (_err) { izinli = false; }
+      }
+      if (!izinli) {
+        return jsonYanit({ message: "Bu işlem Site Sahibi (ya da yetkisi açılmış Yönetici) tarafından yapılabilir." }, 403, corsHeaders);
+      }
     }
 
     const url = new URL(request.url);
