@@ -11,7 +11,8 @@ import { yedekAl, dosyaAdi } from "./disa-aktar.js";
 import { aliciOlustur } from "./zip-yazici.js";
 import { zipAc } from "./zip-oku.js";
 import { icAktarCiz } from "./ice-aktar.js";
-import { mesajYedegiOlustur, mesajYedeginiIceAktar, mesajYedegiMi, MESAJ_YEDEK_YOLU, YEDEK_PAROLA_MIN } from "./mesaj-yedek.js";
+import { mesajYedegiOlustur, mesajKodunuDogrula, MESAJ_YEDEK_YOLU } from "./mesaj-yedek.js";
+import { kodBicimle } from "../kurtarma-kiti/kit.js";
 
 const kart = (id, baslik, aciklama, secili = true) => {
   const girdi = el("input", { type: "checkbox", id, checked: secili });
@@ -25,9 +26,10 @@ export function kisiselVeriCiz(kok, mesaj) {
   /* ---------------- dışa aktar ---------------- */
   const notlarK = kart("kv-notlar", "📝 Notlarım", "Kişisel notlar, alıntılar, kaynaklar (uçtan uca şifreli kalır).");
   const belgeK = kart("kv-belge", "📄 Yüklediğim belgeler", "Dosya yöneticisi ve kütüphanedeki kendi dosyaların.");
-  const mesajK = kart("kv-mesaj", "💬 Mesajlarım (parolalı)", "Sohbetlerin tarayıcıda çözülür ve senin belirleyeceğin parolayla yeniden şifrelenir; başka hesaba taşınabilir.");
-  const p1 = parolaAlani("kv-p1", `Yedekleme Güvenlik Parolası (en az ${YEDEK_PAROLA_MIN} karakter)`); const p2 = parolaAlani("kv-p2", "Parolayı tekrar yaz");
-  const parolaKutu = el("div", { class: "sy-alt" }, el("p", { class: "muted", text: "Bu parola yedek dosyasında YOKTUR. Unutursan mesajların kimse tarafından geri getirilemez; içe aktarırken sorulur." }), p1, p2);
+  const mesajK = kart("kv-mesaj", "💬 Mesajlarım (Yedek Kurtarma Koduyla şifreli)", "Sohbetlerin tarayıcıda çözülür ve 16 haneli Yedek Kurtarma Kodunla yeniden şifrelenir; başka hesaba taşınabilir.");
+  const kodGirdi = el("input", { type: "text", id: "kv-kod", class: "sy-girdi", autocomplete: "off", autocapitalize: "characters", spellcheck: "false", maxlength: "19", inputmode: "text", "aria-label": "Yedek Kurtarma Kodu", placeholder: "XXXX-XXXX-XXXX-XXXX" });
+  kodGirdi.addEventListener("input", () => { kodGirdi.value = kodBicimle(kodGirdi.value); });
+  const parolaKutu = el("div", { class: "sy-alt" }, el("p", { class: "muted", text: "Mesaj dosyası senin Yedek Kurtarma Kodunla şifrelenir (ayrı bir parola YOK). Kodu gir; hesabındaki kayıtla doğrulanır. Kod yedeğin içinde değildir; içe aktarırken yalnızca bu kod istenir." }), kodGirdi);
   const guncelle = () => { parolaKutu.hidden = !mesajK.girdi.checked; };
   mesajK.girdi.addEventListener("change", guncelle); guncelle();
   const ilerleme = el("p", { class: "muted sy-not", role: "status", "aria-live": "polite" });
@@ -37,19 +39,19 @@ export function kisiselVeriCiz(kok, mesaj) {
     const mesajlar = mesajK.girdi.checked;
     if (!bilesenler.length && !mesajlar) return mesaj("En az bir öğe seç.");
     if (mesajlar) {
-      if (p1.value.length < YEDEK_PAROLA_MIN) return mesaj(`Yedekleme güvenlik parolası en az ${YEDEK_PAROLA_MIN} karakter olmalı.`);
-      if (p1.value !== p2.value) return mesaj("Parolalar eşleşmiyor.");
+      if (kodGirdi.value.replace(/-/g, "").length !== 16) return mesaj("Yedek Kurtarma Kodu 16 karakter olmalı (XXXX-XXXX-XXXX-XXXX).");
     }
     indir.disabled = true; let alici = null;
     try {
+      const kod = mesajlar ? await mesajKodunuDogrula(kodGirdi.value) : null;
       alici = await aliciOlustur(dosyaAdi());
       const ek = [];
-      if (mesajlar) { ilerleme.textContent = "Mesajlar çözülüyor ve parolayla şifreleniyor…"; ek.push({ ad: MESAJ_YEDEK_YOLU, icerik: await mesajYedegiOlustur(p1.value, (m) => { ilerleme.textContent = m; }) }); }
+      if (mesajlar) { ilerleme.textContent = "Mesajlar çözülüyor ve kodunla şifreleniyor…"; ek.push({ ad: MESAJ_YEDEK_YOLU, icerik: await mesajYedegiOlustur(kod, (m) => { ilerleme.textContent = m; }, { kodlu: true }) }); }
       const sonuc = bilesenler.length
         ? await yedekAl({ bilesenler, kapsam: "kendi", hassas: false, bicimler: { json: true, sql: false }, alici, sinyal: undefined, ekDosyalar: ek, ilerleme: ({ asama }) => { ilerleme.textContent = asama || ""; } })
         : await yedekAl({ bilesenler: ["notlar"], kapsam: "kendi", hassas: false, bicimler: { json: true, sql: false }, alici, ekDosyalar: ek, sadeceEk: true, ilerleme: ({ asama }) => { ilerleme.textContent = asama || ""; } });
       if (sonuc.blob) { const u = URL.createObjectURL(sonuc.blob); const a = el("a", { href: u, download: dosyaAdi() }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 60000); }
-      p1.value = p2.value = "";
+      kodGirdi.value = "";
       mesaj(`Kişisel yedek hazır (${bayt(sonuc.boyut)}).`, "success");
     } catch (h) { try { await alici?.iptal?.(); } catch { /* yok say */ } mesaj(`Yedek alınamadı: ${hataMetni(h)}`); }
     finally { indir.disabled = false; ilerleme.textContent = ""; }
@@ -58,30 +60,8 @@ export function kisiselVeriCiz(kok, mesaj) {
 
   /* ---------------- içe aktar ---------------- */
   const icKok = el("div", { class: "sy-alt" });
-  const mdGirdi = el("input", { type: "file", accept: ".json,.zip,application/json,application/zip", "aria-label": "Mesaj yedeği seç" });
-  const mdParola = parolaAlani("kv-ip", "Yedekleme Güvenlik Parolası");
-  const mdBtn = dugme({ metin: "Mesajlarımı içe aktar", ikonAdi: "geri", tur: "ikincil" });
-  const mdDurum = el("p", { class: "muted sy-not", role: "status", "aria-live": "polite" });
-  mdBtn.addEventListener("click", async () => {
-    const f = mdGirdi.files?.[0]; if (!f) return mesaj("Önce mesaj yedeği dosyasını (.json) ya da yedek ZIP'ini seç.");
-    if (!mdParola.value) return mesaj("Yedekleme güvenlik parolasını gir.");
-    mdBtn.disabled = true;
-    try {
-      let metin;
-      if (/\.zip$/i.test(f.name)) { const z = await zipAc(f); const g = z.bul(MESAJ_YEDEK_YOLU); if (!g) throw new Error("Bu ZIP içinde parolalı mesaj yedeği yok."); metin = await z.metin(g); }
-      else metin = await f.text();
-      let nesne; try { nesne = JSON.parse(metin); } catch { throw new Error("Dosya geçerli bir JSON değil."); }
-      if (!mesajYedegiMi(nesne)) throw new Error("Bu dosya bir mesaj yedeği değil.");
-      const r = await mesajYedeginiIceAktar(nesne, mdParola.value, (m) => { mdDurum.textContent = m; });
-      mdParola.value = ""; mdGirdi.value = "";
-      mesaj(`${r.sohbet} sohbet (${r.mesaj} mesaj) bu hesabın anahtarıyla yeniden şifrelenip içe aktarıldı${r.atlanan ? `; ${r.atlanan} sohbet zaten içe aktarılmıştı` : ""}. Sohbet / Mesajlar'da arşiv sohbeti olarak görünür.`, "success");
-    } catch (h) { mesaj(hataMetni(h)); } finally { mdBtn.disabled = false; mdDurum.textContent = ""; }
-  });
-  const mesajIc = el("section", { class: "sy-bolum" }, el("h2", { text: "Mesaj yedeğini içe aktar" }),
-    el("p", { class: "muted", text: "Başka bir e-postayla açtığın yeni hesaba, sıfırlanmış bir veritabanına ya da farklı bir altyapıya da taşıyabilirsin: parola girilince yedek çözülür ve mesajlar BU hesabın anahtarına yeniden zarflanır." }),
-    mdGirdi, mdParola, el("div", { class: "sy-eylemler" }, mdBtn), mdDurum);
   const digerIc = el("section", { class: "sy-bolum" });
-  const icPanel = el("div", { class: "sy-sekme-panel", hidden: true }, el("h2", { text: "Kişisel verilerimi içe aktar" }), digerIc, mesajIc);
+  const icPanel = el("div", { class: "sy-sekme-panel", hidden: true }, el("h2", { text: "Kişisel verilerimi içe aktar" }), digerIc);
   let icKuruldu = false;
 
   /* ---------------- alt sekmeler ---------------- */
