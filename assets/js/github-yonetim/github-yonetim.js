@@ -4895,6 +4895,16 @@ init();
 // yakalar. Dosyanın sonuna kadar başka üst seviye anahtar yoksa dosya
 // sonuna kadar yakalar ($). "s" (dotAll) bayrağı YOK çünkü '.' zaten her
 // satırı [\s\S] ile kapsıyoruz; "m" ile ^ / $ satır başı/sonunu eşliyoruz.
+/* Anasayfa bağlantı kategorileri (index.md bu sırayla gruplar). Kategorisi olmayan eski girdiler anahtara göre tahmin edilir. */
+const BAGLANTI_KATEGORILERI = [
+  ["akademik", "Akademik & Araştırma"], ["sosyal", "Sosyal & İletişim"], ["yazilim", "Yazılım & Projeler"], ["okuma", "Okuma & Kültür"],
+];
+const BAGLANTI_KATEGORI_TAHMIN = {
+  github: "yazilim", playstore: "yazilim", linkedin: "sosyal", twitter: "sosyal", instagram: "sosyal", youtube: "sosyal", nsosyal: "sosyal",
+  orcid: "akademik", academia: "akademik", researchgate: "akademik", scholar: "akademik", kitap1000: "okuma", substack: "okuma",
+};
+const baglantiKategorisiGecerli = (k) => BAGLANTI_KATEGORILERI.some(([id]) => id === k);
+
 const SOCIAL_BLOK_REGEX = /^social:[ \t]*\r?\n((?:[ \t]+.*(?:\r?\n|$))*)/m;
 
 /** _config.yml içindeki "social:" bloğunu ayrıştırıp
@@ -4927,10 +4937,13 @@ function socialBlokunuAyristir(icerik) {
       }
       return v;
     };
+    const katM = altGovde.match(/^[ \t]+category:[ \t]*("(?:[^"\\]|\\.)*"|'[^']*'|[^#\r\n]*?)[ \t]*(#.*)?$/m);
+    const kat = temizle(katM ? katM[1] : "");
     sonuc.push({
       key,
       label: temizle(labelM ? labelM[1] : "") || key,
       url: temizle(urlM ? urlM[1] : ""),
+      category: baglantiKategorisiGecerli(kat) ? kat : (BAGLANTI_KATEGORI_TAHMIN[key] || "sosyal"),
       // Dosyadan okunan HER girdi "mevcut" sayılır — key'i SABİT kalır,
       // kullanıcı etiketi sonradan değiştirse bile (bkz. baglantiYeniEkle
       // ve baglantilariKaydet'teki "yeniMi" mantığı). Aksi hâlde her
@@ -4955,9 +4968,10 @@ function yamlCiftTirnakliYaz(deger) {
  * HARİÇ) üretir. socialBlokunuAyristir ile TAM SİMETRİK girinti kullanır. */
 function socialBlokuUret(girdiler) {
   const satirlar = ["social:"];
-  for (const { key, label, url } of girdiler) {
+  for (const { key, label, url, category } of girdiler) {
     satirlar.push(`  ${key}:`);
     satirlar.push(`    label: ${yamlCiftTirnakliYaz(label)}`);
+    satirlar.push(`    category: ${yamlCiftTirnakliYaz(baglantiKategorisiGecerli(category) ? category : "sosyal")}`);
     satirlar.push(`    url: ${yamlCiftTirnakliYaz(url)}`);
   }
   return satirlar.join("\n") + "\n";
@@ -5029,6 +5043,10 @@ function baglantiSatiriOlustur(girdi, index) {
       <input type="text" class="bg-label-input" value="${escapeHtml(girdi.label)}" placeholder="ör. Google Scholar">
     </div>
     <div class="form-field">
+      <label>Kategori</label>
+      <select class="bg-kategori-input">${BAGLANTI_KATEGORILERI.map(([id, ad]) => `<option value="${id}"${(girdi.category || "sosyal") === id ? " selected" : ""}>${ad}</option>`).join("")}</select>
+    </div>
+    <div class="form-field">
       <label>Bağlantı (URL)</label>
       <input type="url" class="bg-url-input" value="${escapeHtml(girdi.url)}" placeholder="https://...">
     </div>
@@ -5036,6 +5054,9 @@ function baglantiSatiriOlustur(girdi, index) {
   `;
   satir.querySelector(".bg-label-input").addEventListener("input", (e) => {
     BAGLANTILAR_LISTESI[index].label = e.target.value;
+  });
+  satir.querySelector(".bg-kategori-input").addEventListener("change", (e) => {
+    BAGLANTILAR_LISTESI[index].category = e.target.value;
   });
   satir.querySelector(".bg-url-input").addEventListener("input", (e) => {
     BAGLANTILAR_LISTESI[index].url = e.target.value;
@@ -5122,6 +5143,7 @@ function baglantiYeniEkle() {
     key: baglantiAnahtarUret("", mevcutAnahtarlar),
     label: "",
     url: "",
+    category: "sosyal",
     yeniMi: true,
   });
   baglantilarListesiniCiz();
@@ -5166,6 +5188,7 @@ async function baglantilariKaydet() {
       key,
       label: temizLabel || key,
       url: (g.url || "").trim(),
+      category: baglantiKategorisiGecerli(g.category) ? g.category : "sosyal",
     };
   });
 
