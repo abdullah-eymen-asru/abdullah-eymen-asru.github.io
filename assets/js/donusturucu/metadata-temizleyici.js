@@ -5,7 +5,6 @@
  * "Belleği Güvenli Sıfırla": nesne URL'leri, çıktı Blob'ları ve listeler bırakılır (donusturucu/bellek.js ile ortak).
  */
 import { el, dugme, bayt, indir, hataMetni } from "./ortak.js";
-import { kutuphaneYukle } from "./cdn.js";
 import { pdfLibAl } from "./pdf-yukle.js";
 import { sifirla as bellekSifirla } from "./bellek.js";
 import { metadataTemizle, turTespit, BELLEK_SINIRI, AKIS_SINIRI, CLI_YONERGESI } from "./metadata-motor.js";
@@ -15,7 +14,7 @@ export function metadataKartiYap() {
   const girdi = el("input", { type: "file", multiple: true, hidden: true, "aria-label": "Metadata temizlenecek dosyalar" });
   const birak = el("div", { class: "dn-dropzone", role: "button", tabindex: "0", "aria-label": "Dosya seç ya da buraya bırak" },
     el("strong", { text: "Dosya seç ya da buraya bırak" }),
-    el("span", { class: "dn-muted", text: `Görsel (JPEG/PNG/WebP) · video/ses (MP4/MOV/M4A) · Office (DOCX/XLSX/PPTX) · ODF · PDF · ZIP. Medya ${AKIS_SINIRI / 1024 ** 3} GB'a, belge/ZIP/PDF ${BELLEK_SINIRI / 1024 ** 2} MB'a kadar.` }));
+    el("span", { class: "dn-muted", text: `Görsel (JPEG/PNG/WebP) · video/ses (MP4/MOV/M4A) · Office (DOCX/XLSX/PPTX) · ODF · PDF · ZIP. Görsel, medya, Office/ODF ve ZIP ${AKIS_SINIRI / 1024 ** 3} GB'a, PDF ${BELLEK_SINIRI / 1024 ** 2} MB'a kadar.` }));
   const liste = el("ul", { class: "dn-md-liste" });
   const durum = el("p", { class: "dn-muted", role: "status", "aria-live": "polite" });
   const hepsi = dugme({ metin: "Hepsini temizle", ikon: "🧼", tur: "birincil", disabled: true });
@@ -45,7 +44,6 @@ export function metadataKartiYap() {
       const tur = turTespit(k.dosya.name, new Uint8Array(await k.dosya.slice(0, 16).arrayBuffer()));
       const lib = {};
       if (tur === "pdf") lib.PDFLib = await pdfLibAl();
-      else if (tur === "ooxml" || tur === "odf" || tur === "zip") lib.JSZip = await kutuphaneYukle("jszip");
       k.sonuc = await metadataTemizle(k.dosya, lib);
       k.durum = "bitti";
       indir(k.sonuc.blob, k.sonuc.ad);
