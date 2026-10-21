@@ -5719,15 +5719,9 @@ function wireYetkiAyarlari() {
 
   if (!sahip) {
     // Yetkili Yönetici: sekmeler artık BOŞ KALMAZ. Notlarım (kişi bazlı) ve Dosya Yöneticisi izinleri gerçekten yüklenir; sunucu
-    // (migration 0108) yalnızca admin DIŞI roller/kişiler için yazmaya izin verir. Erişim Kalkanı site geneli kilit olduğu için
-    // Site Sahibi'ne özeldir: sekme durur ama içinde açık bir bilgilendirme gösterilir (boş ekran yok).
-    const kalkan = document.getElementById("gk-kalkan-bolumu");
-    if (kalkan) {
-      const not = document.createElement("p");
-      not.className = "muted";
-      not.textContent = "Alan Adı & Sayfa Erişim Kalkanı site genelini kilitler; bu yüzden yalnızca Site Sahibi tarafından değiştirilir. Yönetici olarak yalnızca etkisini görürsün (kilitliyken siteyi görmeye devam edersin).";
-      kalkan.replaceChildren(Object.assign(document.createElement("h2"), { textContent: "Alan Adı & Sayfa Erişim Kalkanı" }), not);
-    }
+    // (migration 0108) yalnızca admin DIŞI roller/kişiler için yazmaya izin verir. Erişim Kalkanı: üye bazlı izin listesi Yöneticiye açık, site geneli ayarlar Site Sahibi'nde (boş ekran yok).
+    // Erişim Kalkanı: panel yüklenir; Yönetici için yalnızca üye bazlı "kilitli siteyi görme izni" listesi (migration 0109), site geneli ayarlar Site Sahibi'nde.
+    import("../gatekeeper/kalkan-paneli.js").catch((err) => console.warn("Erişim Kalkanı paneli yüklenemedi:", err));
     import("../notlar/yetki-paneli.js").then((m) => m.kur()).catch((err) => console.warn("Kullanıcı bazlı yetki paneli yüklenemedi:", err));
     import("../r2-arsiv/izin-paneli.js").catch((err) => console.warn("Dosya Yöneticisi izin paneli yüklenemedi:", err));
     return;
