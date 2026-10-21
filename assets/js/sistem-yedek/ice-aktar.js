@@ -18,6 +18,8 @@
  */
 import { supabase } from "../core/supabase-client.js";
 import { zipAc } from "./zip-oku.js";
+import { MESAJ_YEDEK_YOLU, mesajYedegiMi, mesajYedegiKodluMu, mesajYedeginiIceAktar } from "./mesaj-yedek.js";
+import { kodSor } from "../kurtarma-kiti/kit-arayuz.js";
 import * as Rewrap from "../kurtarma-kiti/yeniden-zarfla.js"; // farklı hesap/altyapı: Yedek Kurtarma Kodu + yeniden zarflama (2026-10)
 import { el, bayt, hataMetni, workerFetch, dugme, ikon, onayIste, r2AnahtarGecerli, R2_KAYNAK_ADLARI } from "./ortak.js";
 
@@ -179,6 +181,50 @@ async function analizEt(dosyalar, sema, ilerleme, ctx = {}) {
 
 /* ------------------------------ arayüz ------------------------------ */
 
+
+/* ------------------------------ mesaj yedeği (TEK yükleme alanı) ------------------------------ */
+/** Eski (parolalı) mesaj yedekleri için küçük parola penceresi. Yeni yedekler YALNIZCA 16 haneli Kurtarma Kodu ister. */
+function eskiParolaSor(dogrula) {
+  return new Promise((coz) => {
+    const d = el("dialog", { class: "sy-dialog" });
+    const girdi = el("input", { type: "password", class: "sy-girdi", autocomplete: "off", "aria-label": "Eski yedekleme parolası" });
+    const hata = el("p", { class: "auth-message error", hidden: true, role: "alert" });
+    const tamam = dugme({ metin: "İçe aktar", tur: "birincil" });
+    const vazgec = dugme({ metin: "Vazgeç", tur: "ikincil" });
+    let sonuc = null;
+    vazgec.addEventListener("click", () => d.close());
+    tamam.addEventListener("click", async () => {
+      hata.hidden = true; if (!girdi.value) { hata.textContent = "Parolayı gir."; hata.hidden = false; return; }
+      tamam.disabled = true;
+      try { sonuc = await dogrula(girdi.value); d.close(); } catch (h) { hata.textContent = hataMetni(h); hata.hidden = false; tamam.disabled = false; }
+    });
+    d.append(el("div", { class: "sy-dialog-govde" }, el("h3", { class: "sy-dialog-baslik", text: "Eski biçimli mesaj yedeği" }),
+      el("p", { class: "muted", text: "Bu yedek eski sürümde bir yedekleme parolasıyla şifrelenmiş. Parolayı gir; bundan sonraki yedekler yalnızca Yedek Kurtarma Kodu ister." }), girdi, hata, el("div", { class: "sy-dialog-eylem" }, vazgec, tamam)));
+    d.addEventListener("close", () => { girdi.value = ""; d.remove(); coz(sonuc); });
+    document.body.append(d); d.showModal(); girdi.focus();
+  });
+}
+
+/** Seçilen dosyalardan mesaj yedeklerini ayırır (tekil .json ya da ZIP içindeki mesajlar/mesajlarim.parolali.json). Dönüş: { kalan, yedekler } */
+async function mesajYedekleriniAyir(liste) {
+  const kalan = [], yedekler = [];
+  for (const f of liste) {
+    try {
+      if (/\.zip$/i.test(f.name)) {
+        const z = await zipAc(f); const g = z.bul(MESAJ_YEDEK_YOLU);
+        if (g) { const n = JSON.parse(await z.metin(g)); if (mesajYedegiMi(n)) yedekler.push({ ad: f.name, nesne: n }); }
+        kalan.push(f); continue;
+      }
+      if (/\.json$/i.test(f.name) && f.size < 256 * 1024 * 1024) {
+        const bas = await f.slice(0, 400).text();
+        if (bas.includes("aea-mesaj-yedegi")) { const n = JSON.parse(await f.text()); if (mesajYedegiMi(n)) { yedekler.push({ ad: f.name, nesne: n }); continue; } }
+      }
+    } catch { /* ayrıştırılamadı: normal dosya gibi davran */ }
+    kalan.push(f);
+  }
+  return { kalan, yedekler };
+}
+
 export async function icAktarCiz(kok, mesaj, { uye = false } = {}) {
   let uid = null;
   if (uye) {
@@ -194,8 +240,8 @@ export async function icAktarCiz(kok, mesaj, { uye = false } = {}) {
   let denetci = null;
   const girdi = el("input", { type: "file", multiple: true, hidden: true, "aria-label": "Yedek veya dosya seç" });
   const surukle = el("div", { class: "sy-ia-birak", role: "button", tabindex: "0", "aria-label": "Yedek dosyalarını seç ya da buraya bırak" },
-    ikon("yukle"), el("strong", { text: "Tam yedek (.zip) ya da tekil dosyalar seç / buraya bırak" }),
-    el("span", { class: "muted", text: "ZIP yedeği, tablo JSON'ları, PDF/görsel/.sifreli dosyalar. Dosyalar tarayıcında okunur; yalnızca onayladığın kayıtlar yazılır." }));
+    ikon("yukle"), el("strong", { text: "Tam yedek (.zip), mesaj yedeği (.json) ya da tekil dosyalar seç / buraya bırak" }),
+    el("span", { class: "muted", text: "Tek yükleme alanı: ZIP yedeği, mesaj yedeği JSON'ı, tablo JSON'ları, PDF/görsel/.sifreli dosyalar. Şifreli mesaj varsa yalnızca 16 haneli Yedek Kurtarma Kodu istenir. Dosyalar tarayıcında okunur; yalnızca onayladığın kayıtlar yazılır." }));
   const durum = el("p", { class: "muted sy-not", role: "status", "aria-live": "polite" });
   const planKutu = el("div", { class: "sy-ia-plan" });
   const sonucKutu = el("div", { class: "sy-ia-sonuc" });
@@ -207,10 +253,25 @@ export async function icAktarCiz(kok, mesaj, { uye = false } = {}) {
     return el("label", { class: "sy-secenek sy-secenek--kucuk" }, r, el("span", { class: "sy-secenek-metin" }, el("strong", { text: baslik }), el("small", { text: acik })));
   };
 
-  async function dosyaAl(liste) {
+  /** Mesaj yedeği: yeni biçim YALNIZCA 16 haneli Yedek Kurtarma Kodu ister; eski (parolalı) biçim küçük bir parola penceresi açar. */
+  async function mesajYedegiAkisi({ ad, nesne }) {
+    const bitti = (r) => mesaj(`${ad}: ${r.sohbet} sohbet (${r.mesaj} mesaj) bu hesabın anahtarıyla yeniden şifrelenip içe aktarıldı${r.atlanan ? `; ${r.atlanan} sohbet zaten içe aktarılmıştı` : ""}. Sohbet / Mesajlar'da arşiv sohbeti olarak görünür.`, "success");
+    const ilerle = (m) => { durum.textContent = m; };
+    try {
+      const r = mesajYedegiKodluMu(nesne)
+        ? await kodSor({ baslik: "Mesaj yedeği — Yedek Kurtarma Kodu", aciklama: `${ad} dosyasındaki ${nesne.sohbetler.length} sohbet şifreli. Yedeği alırken kullandığın 16 haneli Yedek Kurtarma Kodunu gir.`, tamamMetin: "Mesajları içe aktar", dogrula: (kod) => mesajYedeginiIceAktar(nesne, kod, ilerle) })
+        : await eskiParolaSor((parola) => mesajYedeginiIceAktar(nesne, parola, ilerle));
+      if (r) bitti(r);
+    } catch (h) { mesaj(hataMetni(h)); } finally { durum.textContent = ""; }
+  }
+
+  async function dosyaAl(liste0) {
     doldur(sonucKutu, );
     plan = null;
     doldur(planKutu, );
+    if (!liste0.length) return;
+    const { kalan: liste, yedekler } = await mesajYedekleriniAyir(liste0);
+    for (const y of yedekler) await mesajYedegiAkisi(y);
     if (!liste.length) return;
     try {
       plan = await analizEt(liste, sema, (m) => { durum.textContent = m; }, ctx);
