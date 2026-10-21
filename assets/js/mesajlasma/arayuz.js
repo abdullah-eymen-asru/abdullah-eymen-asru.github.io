@@ -23,6 +23,7 @@ import * as Kit from "../kurtarma-kiti/kit.js";
 import * as E from "../r2-arsiv/e2ee.js";
 import * as Kasa from "../notlar/kasa.js";
 import { bildirimDurumu, bildirimAc, bildirimKapat, acikSohbetAyarla, bildirimTiklamasiniDinle } from "./bildirim.js";
+import { bildirimEngelYardimiAc } from "./bildirim-yardim.js";
 
 let AKTIF_ORNEK = null; // SPA'da ikinci kurulumda eskisi temizlenir (çift dinleyici/zamanlayıcı yok)
 const SOHBET_GORUNUMU = "users-mesajlar";
@@ -78,15 +79,20 @@ export async function mesajlasmaKur(kok, { profile, adminMi, konuOnDolgu = "" })
   // ---------- bildirim anahtarı ----------
   function bildirimBtnCiz() {
     const d = bildirimDurumu();
-    bildirimBtn.disabled = d === "desteklenmiyor" || d === "reddedildi";
+    bildirimBtn.disabled = d === "desteklenmiyor";            // "reddedildi" artık TIKLANABİLİR: çözüm penceresini açar
     bildirimBtn.setAttribute("aria-pressed", String(d === "acik"));
-    bildirimBtn.textContent = d === "acik" ? "🔔 Bildirimler açık — kapat" : d === "reddedildi" ? "🔕 Tarayıcıda engelli" : d === "desteklenmiyor" ? "🔕 Bildirim desteklenmiyor" : "🔔 Bildirimleri Aç";
-    bildirimBtn.title = d === "reddedildi" ? "Tarayıcı ayarlarından bu site için bildirim iznini açman gerekir." : "";
+    bildirimBtn.textContent = d === "acik" ? "🔔 Bildirimler açık — kapat" : d === "reddedildi" ? "🔕 Tarayıcıda engelli — çözüm için dokun" : d === "desteklenmiyor" ? "🔕 Bildirim desteklenmiyor" : "🔔 Bildirimleri Aç";
+    bildirimBtn.title = d === "reddedildi" ? "Tarayıcı ayarlarından bu site için bildirim iznini açman gerekir; adımlar için dokun." : "";
   }
   bildirimBtn.addEventListener("click", async () => {
     bildirimBtn.disabled = true;
     try {
       const d = bildirimDurumu();
+      if (d === "reddedildi") {
+        const duzeldi = await bildirimEngelYardimiAc(async () => bildirimDurumu());
+        if (duzeldi) duyur("Engel kalktı. Bildirimleri açmak için düğmeye tekrar dokun.");
+        return;
+      }
       if (d === "acik") { await bildirimKapat(); duyur("Bildirimler kapatıldı."); }
       else { const s = await bildirimAc(); duyur(s === "acik" ? "Bildirimler açıldı. Bildirimde mesaj metni görünmez; tıklayınca sohbet açılır." : "Bildirim izni verilmedi.", s !== "acik"); }
     } finally { bildirimBtnCiz(); }
