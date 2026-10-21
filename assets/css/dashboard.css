@@ -895,3 +895,9 @@ body.dash-sayfa .site-header nav { min-width: 0; }
 @media (min-width: 981px) {
   .dash-sidebar { z-index: 2; } /* içerik kartlarının (transform/position) kenar çubuğunu örtmesini önler */
 }
+
+
+/* AKILLI ÜST MENÜ gizliyken yapışkan yan menü / üst şerit, boşalan yeri kullanır (assets/js/core/akilli-header.js). */
+html.header-gizli .dash-shell { --dash-header-h: 0px !important; }   /* .dash-shell değişkeni JS ile satır içi yazar: !important şart */
+.dash-sidebar, .dash-topbar { transition: top 0.28s cubic-bezier(0.4, 0, 0.2, 1); }
+@media (prefers-reduced-motion: reduce) { .dash-sidebar, .dash-topbar { transition: none; } }
