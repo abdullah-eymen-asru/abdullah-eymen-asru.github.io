@@ -72,39 +72,51 @@ giscus:
 social:
   github:
     label: "GitHub"
+    category: "yazilim"
     url: "https://github.com/abdullah-eymen-asru"
   linkedin:
     label: "LinkedIn"
+    category: "sosyal"
     url: "https://linkedin.com/in/abdullah-eymen-asru"
   twitter:
     label: "X (Twitter)"
+    category: "sosyal"
     url: "https://x.com/abdullaheymena"
   instagram:
     label: "Instagram"
+    category: "sosyal"
     url: "https://www.instagram.com/abdullah_eymen_asru/"
   youtube:
     label: "YouTube"
+    category: "sosyal"
     url: "https://www.youtube.com/@abdullah_eymen_asru"
   nsosyal:
     label: "NSosyal"
+    category: "sosyal"
     url: "https://nsosyal.com/abdullah_eymen_asru"
   orcid:
     label: "ORCID"
+    category: "akademik"
     url: "https://orcid.org/0009-0006-8670-4317"
   academia:
     label: "Academia.edu"
+    category: "akademik"
     url: "https://29mayis.academia.edu/AbdullahEymenAsru"
   researchgate:
     label: "ResearchGate"
+    category: "akademik"
     url: "https://www.researchgate.net/profile/Abdullah-Eymen-Asru"
   scholar:
     label: "Google Scholar"
+    category: "akademik"
     url: ""
   kitap1000:
     label: "1000Kitap"
+    category: "okuma"
     url: "https://1000kitap.com/Abdullah_Eymen_Asru"
   playstore:
     label: "Uygulama (Play Store)"
+    category: "yazilim"
     url: "https://play.google.com/store/apps/details?id=com.aeymena.blog"
 # ------------------------
 
