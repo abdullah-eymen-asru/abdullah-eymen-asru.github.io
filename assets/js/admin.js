@@ -705,7 +705,7 @@ async function icerikDetaylariniYukle(contentId, alan, btn) {
   }
 
   alan.innerHTML = `
-    <table class="erisim-detay-tablo">
+    <div class="tablo-kaydir"><table class="erisim-detay-tablo">
       <thead>
         <tr><th>Üye</th><th>Okundu mu?</th><th>Ne zaman açıldı</th><th>Erişim sonu</th><th></th></tr>
       </thead>
@@ -723,7 +723,7 @@ async function icerikDetaylariniYukle(contentId, alan, btn) {
           )
           .join("")}
       </tbody>
-    </table>`;
+    </table></div>`;
 
   alan.querySelectorAll(".erisim-kaldir-btn").forEach((kbtn) => {
     kbtn.addEventListener("click", async () => {
