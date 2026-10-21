@@ -19,6 +19,7 @@ import { kutuphaneListesi } from "./cdn.js";
 import { sifirla as bellekSifirla, kaydet as bellekKaydet, dugumKaydet } from "./bellek.js";
 import { ayrilmaKancasiKaydet } from "../core/gezinme-kilidi.js";
 import { metadataKartiYap } from "./metadata-temizleyici.js";
+import { UYARI_ESIGI, buyukDosyaUyarisi, yerelYonerge } from "./buyuk-dosya.js";
 
 const MAKS_TEK = 250 * 1024 * 1024;
 const MAKS_TOPLAM = 500 * 1024 * 1024;
@@ -47,17 +48,19 @@ function dosyalariAl(fl) {
   bildir("");
   const yeni = [];
   const reddedilen = [];
+  const uyarilar = [];
   for (const f of fl) {
     const t = turBul(f);
     if (!t.tur) reddedilen.push(f.name);
     else if (f.size === 0) reddedilen.push(`${f.name} (boş)`);
-    else if (f.size > MAKS_TEK) reddedilen.push(`${f.name} (${bayt(f.size)} > 250 MB sınırı)`);
-    else yeni.push({ file: f, ...t });
+    else if (f.size > MAKS_TEK) reddedilen.push(`${f.name} (${bayt(f.size)} > 250 MB sınırı) — ${yerelYonerge(f.name)}`);
+    else { yeni.push({ file: f, ...t }); if (f.size > UYARI_ESIGI) uyarilar.push(buyukDosyaUyarisi(f.name, bayt(f.size))); }
   }
   const toplam = [...dosyalar, ...yeni].reduce((a, d) => a + d.file.size, 0);
   if (toplam > MAKS_TOPLAM) { bildir("Toplam boyut 500 MB'ı aşıyor; tarayıcı belleği için dosyaları parçalara böl.", "error"); return; }
   dosyalar = [...dosyalar, ...yeni];
-  if (reddedilen.length) bildir(`Desteklenmeyen/uygunsuz dosya atlandı: ${reddedilen.join(", ")}`, "error");
+  if (reddedilen.length) bildir(`Desteklenmeyen/uygunsuz dosya atlandı: ${reddedilen.join(" · ")}`, "error");
+  else if (uyarilar.length) bildir(uyarilar.join(" "), "info");
   hedef = null;
   ciz();
 }
@@ -479,7 +482,7 @@ function tamEkranDugmesi() {
 }
 
 function sifirlaDugmesi() {
-  const b = dugme({ metin: "Oturumu Sıfırla", ikon: "🧹", class: "dn-sifirla", title: "Dosyayı Güvenli Sil: açık dosyaları, düzenleyiciyi ve önizlemeleri bellekten siler", "aria-label": "Oturumu sıfırla, dosyayı güvenli sil" });
+  const b = dugme({ metin: "Belleği Güvenli Sıfırla", ikon: "🧹", class: "dn-sifirla", title: "Dosyayı Güvenli Sil: açık dosyaları, düzenleyiciyi ve önizlemeleri bellekten siler", "aria-label": "Oturumu sıfırla, dosyayı güvenli sil" });
   b.addEventListener("click", async () => {
     if (!bellekteVeriVar()) { bildir("Bellekte silinecek belge yok.", "info"); return; }
     const kirli = duzenleyici?.nesne?.kirli?.();
