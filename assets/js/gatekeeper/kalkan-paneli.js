@@ -183,6 +183,17 @@ async function kur() {
   // çalışsın diye en başta kurulur. Eski HTML'de kök yoksa eskisi gibi ana kökün altına eklenir.
   const izinKok = document.getElementById("gk-izin-kok");
   const izinKurucu = () => izinBolumuKur(document.getElementById("gk-izin-mesaj") || mesaj);
+  // Yetkili YÖNETİCİ (migration 0109): yalnızca üye bazlı "kilitli siteyi görme izni" listesini yönetir. Değişiklik günlüğü (IP/cihaz içerir) ve
+  // site GENELİ kilit ayarları (alan adı kalkanı, rota matrisi, bakım mesajı) Site Sahibi'nde kalır; yönetici için o formlar hiç kurulmaz.
+  const { data: oturum } = await supabase.auth.getUser();
+  const { data: profil } = oturum?.user ? await supabase.from("profiles").select("role").eq("id", oturum.user.id).maybeSingle() : { data: null };
+  if (profil?.role !== "owner") {
+    if (izinKok) izinKok.replaceChildren(izinKurucu());
+    kok.replaceChildren(
+      el("h3", { text: "Alan Adı & Sayfa Erişim Kalkanı" }),
+      el("p", { class: "muted", text: "Site geneli kilit ayarları (alan adı kalkanı, rota matrisi, bakım mesajı) siteyi herkese kapatabildiği için yalnızca Site Sahibi tarafından değiştirilir. Yönetici olarak yukarıdaki “Kilitli siteyi görme izni” listesini yönetebilirsin." }));
+    return;
+  }
   const izinLog = logPaneliKur({ gecmis: false });
   logYenileyiciler.push(izinLog.yenile);
   if (izinKok) izinKok.replaceChildren(izinLog.kok, izinKurucu());
