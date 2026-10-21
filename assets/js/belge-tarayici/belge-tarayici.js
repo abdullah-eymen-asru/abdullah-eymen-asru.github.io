@@ -18,6 +18,7 @@ import { koseDuzenle } from "./perspektif-arayuz.js";
 import { PROFILLER, COZUNURLUKLER, varsayilanAyar, profilUygula, tahminiBoyut, tuvalBlob } from "./sikistir.js";
 import { uret, indir, paylas, paylasilabilir, toplamBayt } from "./disa-aktar.js";
 import { nesneUrl, urlBirak, bellekDurumu, hepsiniBirak, tuvalBirak } from "./bellek-kalkani.js";
+import { UYARI_ESIGI, buyukDosyaUyarisi, yerelYonerge } from "../donusturucu/buyuk-dosya.js";
 
 const MAKS_OGE = 300;
 const MAKS_DOSYA = 250 * 1024 * 1024;
@@ -118,12 +119,12 @@ function otoBelgeDegisti() {
 async function dosyalariAl(fl) {
   bildir("");
   if (ayikla) { bildir("Önceki yükleme sürüyor; bitmesini bekle ya da iptal et.", "info"); return; }
-  const adaylar = []; const red = [];
+  const adaylar = []; const red = []; const buyukUyari = [];
   for (const f of fl) {
     if (!girdiTuru(f)) red.push(`${f.name} (desteklenmeyen tür)`);
     else if (!f.size) red.push(`${f.name} (boş)`);
-    else if (f.size > MAKS_DOSYA) red.push(`${f.name} (250 MB sınırı)`);
-    else adaylar.push(f);
+    else if (f.size > MAKS_DOSYA) red.push(`${f.name} (250 MB sınırı) — ${yerelYonerge(f.name)}`);
+    else { adaylar.push(f); if (f.size > UYARI_ESIGI) buyukUyari.push(buyukDosyaUyarisi(f.name, `${Math.round(f.size / 1048576)} MB`)); }
   }
   const uyarilar = [];
   const ctx = isBaglami((o, m) => ilerleme.ayarla(o, m));
@@ -153,6 +154,7 @@ async function dosyalariAl(fl) {
   tahminiTetikle(); ciz();
   const parcalar = [];
   if (eklenen) parcalar.push(`${eklenen} sayfa eklendi.`);
+  if (buyukUyari.length) parcalar.push(buyukUyari.join(" "));
   if (uyarilar.length) parcalar.push(uyarilar.join(" "));
   if (red.length) parcalar.push(`Atlanan: ${red.join("; ")}`);
   if (parcalar.length) bildir(parcalar.join(" "), red.length && !eklenen ? "error" : "info");
@@ -436,7 +438,7 @@ async function kur() {
 
   const ekle = dugme({ metin: "Dosya ekle", ikon: "＋", tur: "birincil" });
   const kamera = dugme({ metin: "Kamera", ikon: "📷" });
-  const bosalt = dugme({ metin: "Boşalt", ikon: "🗑️", tur: "hayalet", title: "Tüm sayfaları, önizlemeleri ve tuvalleri bellekten siler" });
+  const bosalt = dugme({ metin: "Belleği Güvenli Sıfırla", ikon: "🗑️", tur: "hayalet", title: "Tüm sayfaları, önizlemeleri ve tuvalleri bellekten siler" });
   butonlar.ekle = ekle; butonlar.kamera = kamera; butonlar.bosalt = bosalt;
   ekle.addEventListener("click", () => girdiEl.click());
   kamera.addEventListener("click", () => kameraEl.click());
