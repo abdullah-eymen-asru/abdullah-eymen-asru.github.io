@@ -18,6 +18,7 @@ import { veriDonustur } from "./motor-veri.js";
 import { kutuphaneListesi } from "./cdn.js";
 import { sifirla as bellekSifirla, kaydet as bellekKaydet, dugumKaydet } from "./bellek.js";
 import { ayrilmaKancasiKaydet } from "../core/gezinme-kilidi.js";
+import { metadataKartiYap } from "./metadata-temizleyici.js";
 
 const MAKS_TEK = 250 * 1024 * 1024;
 const MAKS_TOPLAM = 500 * 1024 * 1024;
@@ -526,7 +527,7 @@ async function kur() {
   }
   kok.classList.add("dn-kok");
   const yonetim = await yonetimNotu().catch(() => null);
-  kok.replaceChildren(gizlilikRozeti(), el("div", { class: "dn-guvenli-serit" }, sifirlaDugmesi(), el("span", { class: "dn-muted", text: "Ortak cihazdaysan işin bitince belleği temizle." })), ana, calismaAlani, girdi, ...(yonetim ? [yonetim] : []), kutuphaneKarti());
+  kok.replaceChildren(gizlilikRozeti(), el("div", { class: "dn-guvenli-serit" }, sifirlaDugmesi(), el("span", { class: "dn-muted", text: "Ortak cihazdaysan işin bitince belleği temizle." })), ana, calismaAlani, girdi, metadataKartiYap(), ...(yonetim ? [yonetim] : []), kutuphaneKarti());
   await ciz();
   window.addEventListener("pagehide", () => { try { oturumuSifirla(); } catch { /* yok say */ } });
   // Panel sekmesinden ayrılma kalkanı (dashboard.js showView → gezinme-kilidi)
