@@ -135,9 +135,14 @@ a { color: var(--accent); }
   z-index: 50;
   background: var(--bg);   /* color-mix desteklemeyen eski tarayıcılar için düz renk */
   background: color-mix(in srgb, var(--bg) 88%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* AKILLI ÜST MENÜ (assets/js/core/akilli-header.js): aşağı kaydırınca yukarı gizlenir, yukarı en ufak harekette geri gelir. */
+.site-header--gizli { transform: translateY(-100%); }
+@media (prefers-reduced-motion: reduce) { .site-header { transition: none; } }
 
 .lang-notice {
   /* GÜVENLİK (CSP): önceden bu gizleme _layouts/default.html'de
@@ -669,20 +674,34 @@ h2 { font-size: 1.3rem; margin-top: 2em; }
 }
 .hero .subtitle { color: var(--muted); font-size: 1.05rem; }
 
+/* Anasayfa bağlantıları: kategorili, TAM GÖRÜNÜR mikro ızgara (açılır menü yok). Mobilde 2 sütun, kompakt. */
+.baglanti-gruplar { display: grid; gap: 14px; margin: 20px 0; }
+.baglanti-grup-baslik { margin: 0 0 8px; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
 .baglanti-listesi {
-  display: flex;
-  gap: 14px;
-  margin: 20px 0;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 0;
 }
 
 .baglanti-listesi a {
-  padding: 6px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px 12px;
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: 12px;
   text-decoration: none;
   color: var(--text);
-  font-size: 0.9rem;
+  font-size: 0.88rem;
+  min-width: 0;
+}
+.baglanti-listesi a span { overflow-wrap: anywhere; line-height: 1.2; }
+.baglanti-listesi .bg-ikon { flex: none; }
+@media (max-width: 480px) {
+  .baglanti-listesi { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .baglanti-listesi a { padding: 6px 8px; font-size: 0.82rem; }
 }
 
 .baglanti-listesi a:hover { border-color: var(--accent); color: var(--accent); }
@@ -1858,7 +1877,6 @@ th { color: var(--muted); font-weight: 600; }
   transform-origin: left;
   transform: scaleX(var(--ilerleme));
   background: var(--accent);
-  will-change: transform;
 }
 
 /* ============================================================
