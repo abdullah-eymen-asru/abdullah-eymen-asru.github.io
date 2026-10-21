@@ -1,23 +1,22 @@
 {%- comment -%}
   Platform simgesi (SVG, inline, harici istek YOK). Parametre: include.anahtar
-  NOT: Marka logolarının resmî yol verileri bu pakete gömülü değil; her platform için tutarlı bir monogram rozeti kullanılır.
-  Resmî logo istenirse yalnızca aşağıdaki <text> öğesi yerine ilgili <path> konabilir; düzen/boyut aynı kalır.
+  ÖNEMLİ: Bunlar marka logolarının RESMÎ dosyaları DEĞİL, bu site için çizilmiş SADELEŞTİRİLMİŞ, tek renkli (currentColor) glifleridir.
+  Resmî logo kullanmak istersen her <svg> gövdesini kendi lisanslı SVG'nle değiştir (viewBox 0 0 24 24 olsun); düzen/boyut aynı kalır.
+  Tanımsız anahtar → anahtarın ilk iki harfinden monogram rozeti.
 {%- endcomment -%}
 {%- assign k = include.anahtar -%}
+{%- capture ust -%}<svg class="bg-ikon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">{%- endcapture -%}
 {%- case k -%}
-  {%- when "github" -%}{%- assign m = "GH" -%}
-  {%- when "linkedin" -%}{%- assign m = "in" -%}
-  {%- when "twitter" -%}{%- assign m = "X" -%}
-  {%- when "instagram" -%}{%- assign m = "IG" -%}
-  {%- when "youtube" -%}{%- assign m = "YT" -%}
-  {%- when "nsosyal" -%}{%- assign m = "NS" -%}
-  {%- when "orcid" -%}{%- assign m = "iD" -%}
-  {%- when "academia" -%}{%- assign m = "Ac" -%}
-  {%- when "researchgate" -%}{%- assign m = "RG" -%}
-  {%- when "scholar" -%}{%- assign m = "GS" -%}
-  {%- when "kitap1000" -%}{%- assign m = "1K" -%}
-  {%- when "playstore" -%}{%- assign m = "▶" -%}
-  {%- when "substack" -%}{%- assign m = "Sb" -%}
-  {%- else -%}{%- assign m = k | slice: 0, 2 | upcase -%}
+  {%- when "github" -%}{{ ust }}<circle cx="12" cy="12" r="10"/><path fill="currentColor" stroke="none" d="M7.6 8.2l1.5 1.9c1.8-.5 4-.5 5.8 0l1.5-1.9.4 3.4c.8.8 1 1.8.8 2.8-.4 2-2.4 2.8-5.6 2.8s-5.2-.8-5.6-2.8c-.2-1 0-2 .8-2.8z"/></svg>
+  {%- when "linkedin" -%}{{ ust }}<rect x="2.5" y="2.5" width="19" height="19" rx="4.5"/><circle cx="8" cy="8.2" r="1.1" fill="currentColor" stroke="none"/><path fill="currentColor" stroke="none" d="M7 10.5h2V17H7zM11.5 10.5h1.9v1c.5-.8 1.4-1.2 2.4-1.1 1.6.2 1.9 1.4 1.9 2.8V17h-2v-3.5c0-.8-.3-1.3-1-1.3s-1.2.6-1.2 1.4V17h-2z"/></svg>
+  {%- when "twitter" -%}{{ ust }}<path stroke-width="2.4" d="M5 4.5l14 15"/><path d="M19 4.5L5 19.5"/></svg>
+  {%- when "instagram" -%}{{ ust }}<rect x="3" y="3" width="18" height="18" rx="5.5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg>
+  {%- when "youtube" -%}{{ ust }}<rect x="2" y="5" width="20" height="14" rx="4.5"/><path fill="currentColor" stroke="none" d="M10 9l5.5 3-5.5 3z"/></svg>
+  {%- when "orcid" -%}{{ ust }}<circle cx="12" cy="12" r="10"/><text x="12" y="15.2" text-anchor="middle" font-size="8.5" font-weight="700" fill="currentColor" stroke="none" font-family="system-ui,sans-serif">iD</text></svg>
+  {%- when "academia" -%}{{ ust }}<path d="M4 20L12 4l8 16M7.6 15h8.8"/></svg>
+  {%- when "scholar" -%}{{ ust }}<path fill="currentColor" stroke="none" d="M12 3L2 9l10 6 10-6z"/><path fill="currentColor" stroke="none" d="M6 12.5V17s3 3 6 3 6-3 6-3v-4.5L12 16z"/></svg>
+  {%- when "kitap1000" -%}{{ ust }}<path d="M3.5 5.5H11c.6 0 1 .4 1 1V19c0-.6-.4-1-1-1H3.5zM20.5 5.5H13c-.6 0-1 .4-1 1V19c0-.6.4-1 1-1h7.5z"/></svg>
+  {%- when "playstore" -%}{{ ust }}<path fill="currentColor" d="M5.5 3.5L19.5 12 5.5 20.5z"/></svg>
+  {%- when "substack" -%}{{ ust }}<path fill="currentColor" stroke="none" d="M5 4h14v2.4H5zM5 8.6h14V11H5zM5 13.2h14V21l-7-4-7 4z"/></svg>
+  {%- else -%}{%- assign m = k | slice: 0, 2 | upcase -%}<svg class="bg-ikon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><rect x="1.5" y="1.5" width="21" height="21" rx="6" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="16" text-anchor="middle" font-size="9.5" font-weight="700" fill="currentColor" font-family="system-ui,sans-serif">{{ m }}</text></svg>
 {%- endcase -%}
-<svg class="bg-ikon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><rect x="1" y="1" width="22" height="22" rx="6" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="16" text-anchor="middle" font-size="9.5" font-weight="700" fill="currentColor" font-family="system-ui,sans-serif">{{ m }}</text></svg>
