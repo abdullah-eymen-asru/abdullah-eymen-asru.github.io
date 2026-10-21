@@ -24,7 +24,8 @@ title: Anasayfa
           {% assign veri = baglanti[1] %}
           {% assign bk = veri.category | default: "sosyal" %}
           {% if veri.url and veri.url != "" and bk == kv[0] %}
-            <a href="{{ veri.url | escape }}" target="_blank" rel="noopener noreferrer">{% include baglanti-ikon.html anahtar=baglanti[0] %}<span>{{ veri.label | default: baglanti[0] | escape }}</span></a>
+            {% assign ikon_anahtar = baglanti[0] %}
+            <a href="{{ veri.url | escape }}" target="_blank" rel="noopener noreferrer">{% include baglanti-ikon.html anahtar=ikon_anahtar %}<span>{{ veri.label | default: baglanti[0] | escape }}</span></a>
           {% endif %}
         {% endfor %}
         {% if kv[0] == "okuma" and site.substack_url and site.substack_url != "" %}
