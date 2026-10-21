@@ -248,3 +248,14 @@
 .dn-editor.dn-tam .dn-pdf-alan { height: calc(100dvh - 190px); min-height: 300px; }
 .dn-tam-ekran-acik { overflow: hidden; }
 .dn-tam-cik { position: sticky; top: 0; z-index: 5; margin: 6px; align-self: flex-end; }
+
+/* Evrensel Metadata Temizleyici (metadata-temizleyici.js) */
+.dn-md-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.dn-md-satir { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--dn-cizgi); border-radius: 12px; }
+.dn-md-bilgi { display: grid; gap: 4px; min-width: 0; flex: 1 1 220px; }
+.dn-md-ad { overflow-wrap: anywhere; }
+.dn-md-ozet { margin: 0; padding-left: 1.1em; font-size: .85rem; color: var(--dn-soluk, var(--muted)); }
+.dn-md-eylem, .dn-md-araclar { display: flex; gap: 8px; flex-wrap: wrap; }
+.dn-md-cli summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+.dn-md-satir--bitti { border-color: var(--accent); }
+@media (max-width: 640px) { .dn-md-eylem, .dn-md-araclar { width: 100%; } .dn-md-eylem .dn-btn, .dn-md-araclar .dn-btn { flex: 1; min-height: 44px; } }
