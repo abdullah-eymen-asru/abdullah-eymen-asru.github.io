@@ -422,10 +422,10 @@ async function koleksiyonTablosuOlustur(config) {
     });
 
     container.innerHTML = `
-      <table>
+      <div class="tablo-kaydir"><table>
         <thead>${theadHtml}</thead>
         <tbody id="${config.containerId}-tbody">${rows}</tbody>
-      </table>
+      </table></div>
       <div id="${config.containerId}-pagination" class="pagination"></div>`;
 
     durumDuyuru.textContent = `${items.length.toLocaleString("tr-TR")} kayıt yüklendi.`;
