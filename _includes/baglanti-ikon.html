@@ -1,0 +1,23 @@
+{%- comment -%}
+  Platform simgesi (SVG, inline, harici istek YOK). Parametre: include.anahtar
+  NOT: Marka logolarının resmî yol verileri bu pakete gömülü değil; her platform için tutarlı bir monogram rozeti kullanılır.
+  Resmî logo istenirse yalnızca aşağıdaki <text> öğesi yerine ilgili <path> konabilir; düzen/boyut aynı kalır.
+{%- endcomment -%}
+{%- assign k = include.anahtar -%}
+{%- case k -%}
+  {%- when "github" -%}{%- assign m = "GH" -%}
+  {%- when "linkedin" -%}{%- assign m = "in" -%}
+  {%- when "twitter" -%}{%- assign m = "X" -%}
+  {%- when "instagram" -%}{%- assign m = "IG" -%}
+  {%- when "youtube" -%}{%- assign m = "YT" -%}
+  {%- when "nsosyal" -%}{%- assign m = "NS" -%}
+  {%- when "orcid" -%}{%- assign m = "iD" -%}
+  {%- when "academia" -%}{%- assign m = "Ac" -%}
+  {%- when "researchgate" -%}{%- assign m = "RG" -%}
+  {%- when "scholar" -%}{%- assign m = "GS" -%}
+  {%- when "kitap1000" -%}{%- assign m = "1K" -%}
+  {%- when "playstore" -%}{%- assign m = "▶" -%}
+  {%- when "substack" -%}{%- assign m = "Sb" -%}
+  {%- else -%}{%- assign m = k | slice: 0, 2 | upcase -%}
+{%- endcase -%}
+<svg class="bg-ikon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><rect x="1" y="1" width="22" height="22" rx="6" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="16" text-anchor="middle" font-size="9.5" font-weight="700" fill="currentColor" font-family="system-ui,sans-serif">{{ m }}</text></svg>
