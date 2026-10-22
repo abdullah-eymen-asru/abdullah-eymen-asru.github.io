@@ -384,15 +384,12 @@ async function yeniKasaKur(uid, baz, { parolaTur = "giris", kurtarma = true } = 
   const tuz = rastgele(16);
   const kek = await kekTuret(baz, tuz, KDF_TUR);
 
-  let kurtarmaMetni = null;
-  let dekKurtarma = null;
-  if (kurtarma) {
-    const kurtarmaBaytlari = rastgele(32);
-    kurtarmaMetni = kurtarmaMetniYap(kurtarmaBaytlari);
-    const kurtarmaKek = await kurtarmaKekiOlustur(kurtarmaBaytlari);
-    kurtarmaBaytlari.fill(0);
-    dekKurtarma = await dekSar(dekGecici, kurtarmaKek, uid, "dek-kurtarma");
-  }
+  // TEK KOD (migration 0096): yeni kasalara ESKİ 256-bit "kurtarma anahtarı" artık üretilmez. Kurtarma, Notlar + Mesajları birlikte kapsayan
+  // 16 haneli Yedek Kurtarma Koduyla yapılır (kurtarma-kiti/kit.js); çağıran `kitOner` görünce kod üretim penceresini açar.
+  // Eski kasalardaki dek_kurtarma (varsa) çalışmaya devam eder: kurtarmaIleAc() ve kurtarmaAnahtariniYenile() dokunulmadı.
+  const kurtarmaMetni = null;
+  const dekKurtarma = null;
+  const kitOner = !!kurtarma;
 
   const satir = {
     user_id: uid,
@@ -408,7 +405,7 @@ async function yeniKasaKur(uid, baz, { parolaTur = "giris", kurtarma = true } = 
   if (error) throw hataCevir(error);
 
   const dek = await dekAc(data.dek_parola, kek, uid, "dek-parola", false);
-  return { dek, kek, satir: data, kurtarmaMetni };
+  return { dek, kek, satir: data, kurtarmaMetni, kitOner };
 }
 
 /** 0082 migration'ı eksikse anlaşılır bir mesaj ver (sessiz çökme yerine). */
@@ -515,7 +512,7 @@ async function bazIleBaslat(uid, eposta, satir, baz) {
     const k = await yeniKasaKur(uid, baz);
     oturumKur({ uid, eposta, dek: k.dek, kek: k.kek, satir: k.satir });
     await kekiOnbellegeAl(uid, k.kek);
-    return { durum: "yeni-kasa", kurtarmaMetni: k.kurtarmaMetni };
+    return { durum: "yeni-kasa", kurtarmaMetni: null, kitOner: k.kitOner };
   }
   const kek = await kekTuret(baz, b64Coz(satir.kdf_salt), satir.kdf_iter);
   const dek = await kekIleDekAc(satir, kek, uid);
@@ -528,7 +525,7 @@ async function bazIleBaslat(uid, eposta, satir, baz) {
 /**
  * Google (OAuth) kullanıcısı için BAĞIMSIZ Kasa Parolası ile ilk kurulum.
  * Parola yerelde PBKDF2 ile türetilir; sunucuya yalnızca sarılmış DEK + tuz gider.
- * `kurtarmaIste`: true ise tek seferlik kurtarma anahtarı da üretilir (dönen kurtarmaMetni BİR KEZ gösterilmeli).
+ * `kurtarmaIste`: true ise dönüşte kitOner=true olur → arayüz Yedek Kurtarma Kodu (Notlar + Mesajlar, tek kod) üretim penceresini açmalıdır.
  */
 export async function kasaParolasiIleKur(session, parola, kurtarmaIste) {
   const uid = session.user.id;
@@ -543,7 +540,7 @@ export async function kasaParolasiIleKur(session, parola, kurtarmaIste) {
   const k = await yeniKasaKur(uid, baz, { parolaTur: "kasa", kurtarma: !!kurtarmaIste });
   oturumKur({ uid, eposta, dek: k.dek, kek: k.kek, satir: k.satir });
   await kekiOnbellegeAl(uid, k.kek);
-  return { durum: k.kurtarmaMetni ? "yeni-kasa" : "acik", kurtarmaMetni: k.kurtarmaMetni };
+  return { durum: k.kitOner ? "yeni-kasa" : "acik", kurtarmaMetni: null, kitOner: k.kitOner };
 }
 
 /**
