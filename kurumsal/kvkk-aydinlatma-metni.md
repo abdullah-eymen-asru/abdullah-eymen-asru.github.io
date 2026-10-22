@@ -224,7 +224,16 @@ permalink: "/kurumsal/kvkk-aydinlatma-metni.html"
   <li><strong>Bildirim saatleri:</strong> belirlediğiniz uyarı saatleri yalnızca cihazınızda tutulur.</li>
 </ul>
 
-<h2>8. Başvuru Usulü ve Kurul'a Şikâyet</h2>
+<h2>8. İletişim Formları ve İletişim Talepleri</h2>
+<p>
+  Sitede yer alan iletişim formu veya harici form servisleri (örn. Google Formlar) üzerinden tarafıma ilettiğiniz ad, soyad, e-posta adresi ve mesaj içeriği verileriniz; ilettiğiniz talep, soru ve önerilerin değerlendirilmesi, tarafınıza geri dönüş yapılması ve iletişim süreçlerinin yürütülmesi amacıyla, KVKK m.5/2-c (<em>"bir sözleşmenin kurulması veya ifası"</em>) ve m.5/2-f (<em>"veri sorumlusunun meşru menfaati"</em>) hukuki sebeplerine dayanarak işlenir.
+</p>
+<ul>
+  <li><strong>Ticari Elektronik İleti ve Bülten Onayı (İsteğe Bağlı):</strong> İletişim formunda yer alan pazarlama onay kutusunu kendi isteğinizle işaretlemeniz halinde (açık rıza - KVKK m.5/1); e-posta adresiniz tarafınıza yeni gelişmeler, e-bülten, duyuru ve bilgilendirmeler gönderilmesi amacıyla işlenebilir. Bu izin, formu doldurmanın zorunlu bir şartı değildir. Pazarlama izninizi, gelen iletilerdeki ayrılma bağlantısını kullanarak veya tarafımla iletişime geçerek dilediğiniz zaman geri alabilirsiniz.</li>
+  <li><strong>Saklama Süresi:</strong> İletişim formu üzerinden gelen mesajlar ve yanıt verileri talebiniz üzerine silinir. Pazarlama/bülten onayınız ise siz izninizi geri çekene kadar saklanır.</li>
+</ul>
+
+<h2>9. Başvuru Usulü ve Kurul'a Şikâyet</h2>
 <p>
   KVKK m.11 kapsamındaki taleplerinizi
   <a href="{{ '/kurumsal/iletisim.html' | relative_url }}">iletişim sayfası</a>
