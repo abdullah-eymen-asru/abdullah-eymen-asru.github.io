@@ -25,7 +25,7 @@ import { supabase, showMessage, kucukHarfeCevirTr, guvenliDisUrlMi } from "../co
 import { requireAuthOrShowError } from "../auth/auth-guard.js";
 import * as Kasa from "./kasa.js";
 import * as Kit from "../kurtarma-kiti/kit.js";
-import { kodSor } from "../kurtarma-kiti/kit-arayuz.js";
+import { kodSor, kitKartiAc, cssYukle as kitCssYukle } from "../kurtarma-kiti/kit-arayuz.js";
 import * as Bicim from "./bicim.js";
 
 /* ------------------------------------------------------------------ */
@@ -2547,7 +2547,8 @@ async function kilitKartiniHazirla({ kasaVar, kurtarmaGerekli = false, bagimsiz 
   const oauth = Kasa.oauthMu(S.session);
   // Girişte yakalanmış (hâlâ geçerli) parola varsa kurtarmada parola TEKRAR sorulmaz.
   const bekleyenVar = !!(kurtarmaGerekli && !bagimsiz && (await Kasa.bekleyenParolaVarMi(S.session)));
-  S.kilit = { kasaVar, kurtarmaGerekli, bagimsiz, kurtarmaVar, bekleyenVar };
+  const kitVar = await Kit.kitDurumu().then((d) => !!d.kitVar).catch(() => false);     // TEK KOD üretilmiş mi? (eski anahtar yoksa uyarı buna bakar)
+  S.kilit = { kasaVar, kurtarmaGerekli, bagimsiz, kurtarmaVar, bekleyenVar, kitVar };
 
   const aciklama = $("nt-kilit-aciklama");
   const uyari = $("nt-kilit-uyari");
@@ -2584,11 +2585,13 @@ async function kilitKartiniHazirla({ kasaVar, kurtarmaGerekli = false, bagimsiz 
       ? "Google ile oturum açtınız. Şifreli kasanızın kilidini açmak için belirlediğiniz Kasa Parolasını girin."
       : "Şifreli kasanın kilidini açmak için belirlediğin Kasa Parolasını gir.";
     if (!kurtarmaVar) {
-      uyari.textContent =
-        "Bu kasa için kurtarma anahtarı oluşturulmamış: Kasa Parolasını unutursan notlar açılamaz. " +
-        "Kasayı açtıktan sonra “Kasa ve yedek” bölümünden bir kurtarma anahtarı oluşturabilirsin.";
-      uyari.hidden = false;
-      toggle.hidden = true;
+      if (!kitVar) {
+        uyari.textContent =
+          "Bu kasa için Yedek Kurtarma Kodu üretilmemiş: Kasa Parolasını unutursan notlar açılamaz. " +
+          "Kasayı açtıktan sonra “Kasa ve yedek” bölümünden Yedek Kurtarma Kodu üretebilirsin.";
+        uyari.hidden = false;
+      }
+      toggle.hidden = true;                                   // eski tip kurtarma anahtarı yok; kod için "Yedek Kurtarma Koduyla aç" bağlantısı kullanılır
     }
   } else if (oauth) {
     aciklama.textContent =
@@ -2643,8 +2646,12 @@ async function kasaSonucunuUygula(sonuc) {
     case "acik":
       return anaEkraniAc();
     case "yeni-kasa":
-      // Kurtarma anahtarı istenmemişse (bağımsız Kasa Parolası) gösterilecek bir şey yok.
-      return sonuc.kurtarmaMetni ? kurtarmaKartiniGoster(sonuc.kurtarmaMetni, anaEkraniAc) : anaEkraniAc();
+      // Yeni kasa: eski 256-bit kurtarma anahtarı YOK. Kurtarma istendiyse (kitOner) ana ekran açılır ve TEK Yedek Kurtarma Kodu penceresi gösterilir.
+      // (Eski sürümden kalan kurtarmaMetni gelirse yine gösterilir.)
+      if (sonuc.kurtarmaMetni) return kurtarmaKartiniGoster(sonuc.kurtarmaMetni, anaEkraniAc);
+      await anaEkraniAc();
+      if (sonuc.kitOner) await yedekKurtarmaKoduUret();
+      return;
     case "kasa-parolasi-belirle":
       return kasaParolaDiyaloguAc("belirle");
     case "kurtarma-gerekli":
@@ -2670,7 +2677,7 @@ async function anaEkraniAc() {
 function kasaPenceresiniGuncelle() {
   // Giriş parolası olmayan (Google) kullanıcı ya da zaten bağımsız parolası olan: Kasa Parolası değiştirilebilir.
   $("nt-kasa-parola-btn").hidden = !(Kasa.bagimsizKasaMi() || Kasa.oauthMu(S.session));
-  $("nt-kurtarma-yenile-btn").textContent = Kasa.kurtarmaAnahtariVarMi() ? "Kurtarma anahtarını yenile" : "Kurtarma anahtarı oluştur";
+  $("nt-kurtarma-yenile-btn").textContent = "Yedek Kurtarma Kodu üret / yenile (Notlar + Mesajlar)";
 }
 
 /**
@@ -2837,16 +2844,18 @@ async function sifreliYedekIndir() {
   bildir("Şifreli yedek indirildi. Parolan ya da kurtarma anahtarın olmadan açılamaz.");
 }
 
-async function kurtarmaAnahtariniYenile() {
-  const varMi = Kasa.kurtarmaAnahtariVarMi();
-  if (varMi && !window.confirm("Yeni bir kurtarma anahtarı üretilecek; ESKİSİ GEÇERSİZ olacak (yalnızca Notlar kasası için).\n\nBilgi: Notlar + Mesajlar için ortak Yedek Kurtarma Kodu bundan etkilenmez; ancak o kod yenilenirse ya da mesaj şifreleme anahtarı sıfırlanırsa eski kod geçersiz olur ve Notlar için de yeni kod üretmen gerekir.\n\nDevam edilsin mi?")) return;
+/**
+ * TEK KOD: Notlar'dan da Yedek Kurtarma Kodu (XXXX-XXXX-XXXX-XXXX) üretilir/yenilenir. Kod Notlar kasasını VE mesajlaşma anahtarını aynı bloba sarar;
+ * yeni kod üretmek eski kodu hem Notlar hem Mesajlar için geçersiz kılar. (Mesaj anahtarı henüz yoksa kod şimdilik yalnızca Notlar'ı kapsar;
+ * mesajlar kurulunca kodu yenile — pencere bunu belirtir.)
+ */
+async function yedekKurtarmaKoduUret() {
+  kitCssYukle();
   try {
-    kurtarmaKartiniGoster(await Kasa.kurtarmaAnahtariniYenile(), () => {
-      ekranGoster("ana");
-      kasaPenceresiniGuncelle();
-    });
+    const uretildi = await kitKartiAc((m, hata) => bildir(m, hata ? "error" : "success"));
+    if (uretildi) { bildir("Yedek Kurtarma Kodu hazır: Notlar ve Mesajlar için aynı kod geçerli.", "success"); kasaPenceresiniGuncelle(); }
   } catch (h) {
-    bildir(h.message || "Kurtarma anahtarı yenilenemedi.", "error");
+    bildir(h.message || "Yedek Kurtarma Kodu üretilemedi.", "error");
   }
 }
 
@@ -3330,7 +3339,7 @@ function baglantilariKur() {
   $("nt-yedek-sifreli-btn").addEventListener("click", sifreliYedekIndir);
   $("nt-kurtarma-yenile-btn").addEventListener("click", () => {
     $("nt-kasa-dlg").close();
-    kurtarmaAnahtariniYenile();
+    yedekKurtarmaKoduUret();
   });
 
   // Zengin metin editörü
