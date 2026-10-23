@@ -2570,7 +2570,7 @@ async function kilitKartiniHazirla({ kasaVar, kurtarmaGerekli = false, bagimsiz 
       "Bu parola yalnızca bu tarayıcıda anahtara çevrilir; sunucuya asla gönderilmez.";
   } else if (kurtarmaGerekli) {
     aciklama.textContent = bagimsiz
-      ? "Kasa Parolası açılmadı. Kurtarma anahtarını ve kasan için YENİ bir Kasa Parolası yaz; notların korunur."
+      ? "Kasa Parolası açılmadı. Eski tip kurtarma anahtarını ve kasan için YENİ bir Kasa Parolası yaz; notların korunur. (Yedek Kurtarma Kodun varsa “Yedek Kurtarma Koduyla aç” bağlantısını kullan.)"
       : bekleyenVar
         ? "Giriş parolan bu kasanın zarfını açmıyor (parolan başka bir yerden değişmiş olabilir, ör. “şifremi unuttum”). " +
           "Kurtarma anahtarını yaz; kasa şu anki giriş parolanla yeniden kurulur, notların korunur."
@@ -2629,8 +2629,8 @@ function kurtarmaModunuAyarla(acik) {
   $("nt-kurtarma-toggle").textContent = acik
     ? "Vazgeç"
     : k.bagimsiz
-      ? "Kasa Parolamı unuttum, kurtarma anahtarı kullan"
-      : "Parolam değişti, kurtarma anahtarı kullan";
+      ? "Kasa Parolamı unuttum, eski tip kurtarma anahtarı kullan"
+      : "Parolam değişti, eski tip kurtarma anahtarı kullan";
 }
 
 function kurtarmaKartiniGoster(metin, sonra) {
@@ -2751,7 +2751,7 @@ async function kilitFormuGonderildi(olay) {
       return bildir(
         k.bagimsiz
           ? "Hatalı Kasa Parolası. Kontrol edip tekrar dene." + (k.kurtarmaVar === false ? "" : " Unuttuysan kurtarma anahtarını kullanabilirsin.")
-          : "Hatalı giriş parolası. Parolanı yakın zamanda sıfırladıysan “Parolam değişti, kurtarma anahtarı kullan” seçeneğine geç.",
+          : "Hatalı giriş parolası. Parolanı yakın zamanda sıfırladıysan “Parolam değişti, eski tip kurtarma anahtarı kullan” ya da “Yedek Kurtarma Koduyla aç” seçeneğine geç.",
         "error"
       );
     }
@@ -2841,7 +2841,7 @@ async function sifreliYedekIndir() {
     JSON.stringify({ sema: 1, kasa, notlar: data }, null, 1),
     "application/json"
   );
-  bildir("Şifreli yedek indirildi. Parolan ya da kurtarma anahtarın olmadan açılamaz.");
+  bildir("Şifreli yedek indirildi. Parolan ya da Yedek Kurtarma Kodun olmadan açılamaz.");
 }
 
 /**
