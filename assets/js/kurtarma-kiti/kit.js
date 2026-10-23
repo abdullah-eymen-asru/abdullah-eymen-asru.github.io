@@ -82,9 +82,24 @@ export async function kitOlustur() {
     const { data } = await supabase.auth.getSession();
     const uid = data.session?.user?.id;
     if (!uid) throw new KitHatasi("OTURUM", "Oturum bulunamadı.");
+    // TEK KOD İKİ KASAYI DA AÇMALI: kod nerede üretilirse üretilsin (Notlar ya da Mesajlar) Notlar DEK'ini VE mesaj anahtarını kapsar.
+    // 1) Notlar kasası: hesapta varsa ama bu oturumda kilitliyse sessizce açmayı dene (giriş parolası kasası). Açılamazsa ÜRETME —
+    //    sessizce "yalnızca mesajları açan" bir kod vermek kullanıcıyı yanıltır.
+    const ozet = await Kasa.kasaOzeti(uid).catch(() => ({ kasaVar: false }));
+    if (ozet.kasaVar && !Kasa.kasaAcikMi()) { try { await Kasa.kasaSessizAc(data.session); } catch { /* aşağıda denetlenir */ } }
+    if (ozet.kasaVar && !Kasa.kasaAcikMi()) {
+      throw new KitHatasi("NOTLAR_KILITLI", "Notlar kasan kilitli. Bu kod Notlar'ı da açacağı için önce Notlar sayfasında kasanı aç (Kasa Parolası kullanıyorsan onu gir), sonra kodu üret.");
+    }
     if (Kasa.kasaAcikMi()) dek = await Kasa.kitIcinDekHamAl();
-    try { rsa = await E.ozelAnahtarPkcs8(); } catch { rsa = null; }
-    if (!dek && !rsa) throw new KitHatasi("KILITLI", "Kod üretmek için Notlar kasanın ya da mesaj anahtarının açık olması gerekir. Önce giriş parolanla Notlar'ı aç.");
+    // 2) Mesaj anahtarı: sessizce hazırla (yoksa oluşturulur, varsa açılır). Hesapta anahtar kaydı varken açılamazsa yine ÜRETME.
+    try { await E.anahtarlariHazirla(); rsa = await E.ozelAnahtarPkcs8(); } catch { rsa = null; }
+    if (!rsa) {
+      const { data: kayit } = await supabase.from("e2ee_kullanici_anahtarlari").select("acik_anahtar").eq("kullanici_id", uid).maybeSingle();
+      if (kayit?.acik_anahtar) {
+        throw new KitHatasi("MESAJ_KILITLI", "Mesaj anahtarın bu oturumda açılamadı. Bu kod Mesajlar'ı da açacağı için önce Mesajlar sayfasında kilidi aç, sonra kodu üret.");
+      }
+    }
+    if (!dek && !rsa) throw new KitHatasi("KILITLI", "Kod üretmek için Notlar kasasının ya da mesaj anahtarının açık olması gerekir. Önce giriş parolanla Notlar'ı aç.");
     const kod = kodUret();
     const kodBayt = kodAyristir(kod);
     const tuz = crypto.getRandomValues(new Uint8Array(16));
