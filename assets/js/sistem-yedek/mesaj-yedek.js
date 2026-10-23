@@ -1,8 +1,9 @@
 /*
  * assets/js/sistem-yedek/mesaj-yedek.js — PAROLALI MESAJ YEDEĞİ (evrensel içe aktarma).   [2026-10, migration 0095]
- * DIŞA AKTARMA: kullanıcının erişebildiği şifreli sohbetler tarayıcıda çözülür; her sohbetin düz içeriği, kullanıcının belirlediği
- *   "Yedekleme Güvenlik Parolası"ndan (PBKDF2-SHA256 600k + AES-GCM-256) türetilen anahtarla YENİDEN şifrelenip tek JSON dosyasına yazılır
- *   (mesajlar/mesajlarim.parolali.json). Dosya sistem anahtarlarından BAĞIMSIZDIR → başka e-posta/hesap, sıfırlanmış veritabanı veya farklı altyapıya taşınabilir.
+ * DIŞA AKTARMA: kullanıcının erişebildiği şifreli sohbetler tarayıcıda çözülür; her sohbetin düz içeriği, kullanıcının 16 haneli YEDEK KURTARMA KODUNDAN
+ *   (Notlar + Mesajlar için TEK kod; PBKDF2-SHA256 600k + AES-GCM-256) türetilen anahtarla YENİDEN şifrelenip tek JSON dosyasına yazılır
+ *   (mesajlar/mesajlarim.parolali.json). AYRI "yedekleme parolası" YOKTUR; kod hesabın kayıtlı kit'ine karşı doğrulanır. (Eski sürümün parolalı
+ *   dosyaları hâlâ açılır.) Dosya sistem anahtarlarından BAĞIMSIZDIR → başka e-posta/hesap, sıfırlanmış veritabanı veya farklı altyapıya taşınabilir.
  * İÇE AKTARMA: parola girilir → çözülür → her sohbet için YENİ sohbet anahtarı üretilir, hedef hesabın AÇIK anahtarıyla YENİDEN ZARFLANIR
  *   (konusma_zarflari) ve mesajlar bu anahtarla yeniden şifrelenip mesaj_yedek_ice_aktar RPC'siyle yazılır (arşiv sohbeti; yinelenmez).
  * Parola yedek dosyasında YOK; unutulursa kimse çözemez (sıfır-bilgi).
