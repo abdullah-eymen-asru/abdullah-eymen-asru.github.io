@@ -9,7 +9,8 @@
  *   • saatlik  : sistem-yedek-worker GET /kota/analitik  (Cloudflare ücretsiz GraphQL Analytics, son ~31 gün, 5 dk edge cache)
  *   • günlük+  : aynı yanıttan türetilir; ayrıca Worker günlük toplamları worker_kota_gecmis tablosuna yazar → 31 günden eski
  *                aylık/yıllık görünüm bu küçük tablodan okunur (RPC worker_kota_gecmisi_getir, yalnızca Site Sahibi).
- * GÜN TANIMI: Cloudflare kotası UTC gününe göre sayılır (TR 03:00'te sıfırlanır). Saatlik görünüm YEREL saatle gösterilir.
+ * ZAMAN TANIMI: HER ŞEY UTC'dir (Cloudflare kotası UTC gününe göre sayılır; TR 03:00'te sıfırlanır) — saatlik görünüm de. Türkiye saati (UTC+3)
+ * yalnızca satır etiketinin yanında küçük bilgi olarak yazılır. Böylece "Bugün" toplamı genel Worker sayacıyla BİRE BİR aynıdır (aynı veri kaynağı).
  * Çubuk uzunluğu o dönemdeki en yüksek satıra göre ölçeklenir; yüzde, satırın ait olduğu dönemin KOTASINA orandır.
  */
 import { supabase } from "../core/supabase-client.js";
@@ -28,11 +29,19 @@ const p2 = (n) => String(n).padStart(2, "0");
 const gunAnahtari = (d) => `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())}`;       // UTC gün anahtarı
 const yerelGunAnahtari = (d) => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
 const utcGun = (y, a, g) => new Date(Date.UTC(y, a, g));
+const bugunUtcTarih = () => { const n = new Date(); return new Date(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate()); };   // takvim günü = UTC günü
+/** UTC anının Türkiye saati karşılığı ("TR 03:00"); gün değişirse "+1 g". */
+const trSaat = (utcAni) => {
+  const t = utcAni.toLocaleTimeString("tr-TR", { timeZone: "Europe/Istanbul", hour: "2-digit", minute: "2-digit", hour12: false });
+  const gun = (d) => d.toLocaleDateString("en-CA", { timeZone: "Europe/Istanbul" });
+  const ayniGun = gun(utcAni) === `${utcAni.getUTCFullYear()}-${String(utcAni.getUTCMonth() + 1).padStart(2, "0")}-${String(utcAni.getUTCDate()).padStart(2, "0")}`;
+  return `TR ${t}${ayniGun ? "" : " +1g"}`;
+};
 const ayGunSayisi = (y, a) => new Date(Date.UTC(y, a + 1, 0)).getUTCDate();
 
 /** @returns {{rozet:HTMLElement}} — kartın kendisi */
 export function kotaAnaliziKarti() {
-  const durum = { olcek: "saat", ref: new Date(), saatlik: [], gecmis: new Map(), limit: 100000, hazir: false, pagesOkunamadi: false, gecmisYazildi: null };
+  const durum = { olcek: "saat", ref: bugunUtcTarih(), saatlik: [], gecmis: new Map(), limit: 100000, hazir: false, pagesOkunamadi: false, gecmisYazildi: null };
 
   const govde = el("div", { class: "ka-govde" }, el("p", { class: "muted", text: "Analitik yükleniyor…" }));
   const yenile = dugme({ metin: "Yenile", ikonAdi: "yenile", tur: "ikincil", kucuk: true });
@@ -72,14 +81,14 @@ export function kotaAnaliziKarti() {
     const harita = gunHaritasi();
     const limit = durum.limit;
 
-    if (durum.olcek === "saat") {
+    if (durum.olcek === "saat") {                                   // seçili takvim günü = UTC günü; 24 UTC saati
       const saatHarita = new Map(durum.saatlik.map((s) => [s.t, s]));
       const rows = [];
       for (let h = 0; h < 24; h++) {
-        const bas = new Date(y, a, g, h, 0, 0, 0);
-        const kayit = saatHarita.get(new Date(Math.floor(bas.getTime() / 3600000) * 3600000).toISOString());
+        const bas = new Date(Date.UTC(y, a, g, h, 0, 0, 0));
+        const kayit = saatHarita.get(bas.toISOString());
         const gelecek = bas > simdi;
-        rows.push({ etiket: `${p2(h)}:00`, v: kayit ? { w: kayit.w, p: kayit.p } : (gelecek ? null : { w: 0, p: 0 }), kota: limit, gelecek, vurgu: !gelecek && simdi - bas < 3600000 });
+        rows.push({ etiket: `${p2(h)}:00`, ek: trSaat(bas), v: kayit ? { w: kayit.w, p: kayit.p } : (gelecek ? null : { w: 0, p: 0 }), kota: limit, gelecek, vurgu: !gelecek && simdi - bas < 3600000 });
       }
       return rows;
     }
@@ -121,7 +130,7 @@ export function kotaAnaliziKarti() {
 
   function donemEtiketi() {
     const y = durum.ref.getFullYear(), a = durum.ref.getMonth(), g = durum.ref.getDate();
-    if (durum.olcek === "saat") return `${g} ${AY_ADLARI[a]} ${y} · 00:00 – 23:00`;
+    if (durum.olcek === "saat") return `${g} ${AY_ADLARI[a]} ${y} · 00:00 – 23:00 UTC`;
     if (durum.olcek === "gun") {
       const pzt = new Date(y, a, g - ((durum.ref.getDay() + 6) % 7)), paz = new Date(pzt.getFullYear(), pzt.getMonth(), pzt.getDate() + 6);
       return `${pzt.getDate()} ${AY_ADLARI[pzt.getMonth()].slice(0, 3)} – ${paz.getDate()} ${AY_ADLARI[paz.getMonth()].slice(0, 3)} ${paz.getFullYear()}`;
@@ -140,7 +149,7 @@ export function kotaAnaliziKarti() {
   }
   const gelecegeGidilir = () => {
     const kopya = durum.ref, simdi = new Date();
-    if (durum.olcek === "saat") return new Date(kopya.getFullYear(), kopya.getMonth(), kopya.getDate() + 1) <= simdi;
+    if (durum.olcek === "saat") return Date.UTC(kopya.getFullYear(), kopya.getMonth(), kopya.getDate() + 1) <= simdi.getTime();
     if (durum.olcek === "gun") return new Date(kopya.getFullYear(), kopya.getMonth(), kopya.getDate() - ((kopya.getDay() + 6) % 7) + 7) <= simdi;
     if (durum.olcek === "yil") return kopya.getFullYear() < simdi.getFullYear();
     return kopya.getFullYear() * 12 + kopya.getMonth() < simdi.getFullYear() * 12 + simdi.getMonth();
@@ -168,14 +177,15 @@ export function kotaAnaliziKarti() {
     const bugun = dugme({ metin: "Bugün", tur: "ikincil", kucuk: true });
     onceki.addEventListener("click", () => kaydir(-1));
     sonraki.addEventListener("click", () => kaydir(1));
-    bugun.addEventListener("click", () => { durum.ref = new Date(); ciz(); });
+    bugun.addEventListener("click", () => { durum.ref = bugunUtcTarih(); ciz(); });
     sonraki.disabled = !gelecegeGidilir();
     const gezinti = el("div", { class: "ka-gezinti" }, onceki, el("strong", { class: "ka-donem", text: donemEtiketi(), "aria-live": "polite" }), sonraki, bugun);
 
     const ozet = el("p", { class: "ka-ozet" },
       el("span", {}, "Toplam: ", el("strong", { text: `${sayi(toplam)} istek` })),
       el("span", {}, "Ortalama: ", el("strong", { text: `${sayi(ort)}` })),
-      el("span", {}, "En yoğun: ", el("strong", { text: tepe ? `${tepe.etiket} (${sayi(Math.max(...dolu))})` : "—" })));
+      el("span", {}, "En yoğun: ", el("strong", { text: tepe ? `${tepe.etiket} (${sayi(Math.max(...dolu))})` : "—" })),
+      durum.guncelleme ? el("span", { class: "muted" }, `Veri zamanı: ${String(new Date(durum.guncelleme).getUTCHours()).padStart(2, "0")}:${String(new Date(durum.guncelleme).getUTCMinutes()).padStart(2, "0")} UTC`) : null);
 
     const liste = el("ol", { class: "ka-liste" }, rows.map((r, i) => {
       const t = toplamlar[i];
@@ -183,7 +193,7 @@ export function kotaAnaliziKarti() {
       const sev = oran >= 0.9 ? "kritik" : oran >= 0.7 ? "uyari" : "iyi";
       const deger = r.gelecek && t == null ? "—" : t == null ? "veri yok" : `${sayi(t)} istek`;
       return el("li", { class: `ka-satir${r.vurgu ? " ka-satir--simdi" : ""}${t == null ? " ka-satir--bos" : ""}` },
-        el("span", { class: "ka-etiket", text: r.etiket }),
+        el("span", { class: "ka-etiket" }, r.etiket, r.ek ? el("small", { class: "muted ka-tr", text: r.ek }) : null),
         el("progress", { class: `sy-cubuk sy-cubuk--ince sy-cubuk--${sev}`, max: String(enBuyuk), value: String(t ?? 0), "aria-label": `${r.etiket}: ${deger}` }),
         el("span", { class: "ka-deger" },
           el("strong", { text: deger }),
@@ -192,10 +202,11 @@ export function kotaAnaliziKarti() {
     }));
 
     const notlar = [
-      "W = Workers, P = Pages Functions (Gatekeeper). Çubuk, bu dönemin en yüksek satırına göre ölçeklenir; yüzde, satırın dönem kotasına (günlük 100.000 × gün sayısı) oranıdır.",
+      "Tüm saatler ve günler UTC'dir (Cloudflare kotası UTC gününe göre sayılır ve Türkiye saatiyle 03:00'te sıfırlanır). Saat satırlarındaki küçük “TR” yazısı yalnızca Türkiye saatidir (UTC+3).",
+      "W = Workers, P = Pages Functions (Gatekeeper). Çubuk, bu dönemin en yüksek satırına göre ölçeklenir; yüzde, satırın dönem kotasına (günlük 100.000 × gün sayısı) oranıdır. “Bugün” toplamı, yukarıdaki genel Worker sayacıyla aynı veriden gelir.",
       durum.olcek === "saat"
-        ? "Saatler yerel saatindir. Cloudflare kotası UTC gününe göre sayılır (TR saatiyle 03:00'te sıfırlanır). Saatlik döküm yalnızca son ~31 gün için vardır."
-        : "Günler UTC günüdür (Cloudflare kotasının sayıldığı gün). 31 günden eski veriler, analitik ekranı açıldıkça kaydedilen günlük toplamlardan gelir; kayıt yoksa “veri yok” yazar.",
+        ? "Saatlik döküm yalnızca son ~31 gün için vardır; veri 5 dakikaya kadar gecikmeli olabilir."
+        : "31 günden eski veriler, analitik ekranı açıldıkça kaydedilen günlük toplamlardan gelir; kayıt yoksa “veri yok” yazar.",
       durum.pagesOkunamadi ? "Pages Functions verisi Cloudflare'den okunamadı; yalnızca Workers sayıları gösteriliyor." : null,
       durum.gecmisYazildi === false ? "Günlük geçmiş tablosu yazılamadı (migration 0106 çalıştırılmamış olabilir): 31 günden eski görünümler boş kalır." : null,
     ].filter(Boolean);
@@ -216,6 +227,7 @@ export function kotaAnaliziKarti() {
       durum.limit = Number(g.limit) || 100000;
       durum.pagesOkunamadi = g.pages_okunamadi === true;
       durum.gecmisYazildi = g.gecmis_yazildi;
+      durum.guncelleme = g.guncelleme || null;
       durum.gecmis = new Map();
       try {                                                              // Cloudflare'in unuttuğu günler (0106); tablo yoksa sessizce atla
         const { data, error } = await supabase.rpc("worker_kota_gecmisi_getir", { p_bas: null, p_bit: null });
