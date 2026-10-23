@@ -459,7 +459,7 @@ async function kotaGetir(env, kimlik, cors) {
   if (!(await ownerMi(env, kimlik))) return json({ error: "Yalnızca Site Sahibi." }, 403, cors);
   const limit = parseInt(env.GUNLUK_ISTEK_LIMITI || "100000", 10) || 100000;
   if (!env.CF_ACCOUNT_ID || !env.CF_API_TOKEN) return json({ yapilandirilmadi: true, limit }, 200, cors);
-  const anahtar = new Request(`https://kota.invalid/v2/${env.CF_ACCOUNT_ID}`);
+  const anahtar = new Request(`https://kota.invalid/v3/${env.CF_ACCOUNT_ID}`);
   const onbellek = caches.default;
   const var_ = await onbellek.match(anahtar);
   if (var_) return new Response(var_.body, { status: 200, headers: { ...cors, "Content-Type": "application/json", "X-Onbellek": "hit" } });
@@ -505,9 +505,16 @@ async function kotaGetir(env, kimlik, cors) {
     if (pages > 0) perScript["Pages Functions (Gatekeeper)"] = pages;
   }
 
-  const istek = workers + (pages || 0);
+  // TUTARLILIK: üst düzey toplamlar (workers/pages/istek) saatlik analitikle AYNI kaynaktan (saatlikVeriAl) gelir → "Bugün (UTC)" iki ekranda aynıdır.
+  // Betik dağılımı (scriptler) ayrı, betik boyutlu sorgudan gelir ve örnekleme nedeniyle toplamdan birkaç istek sapabilir; arayüz bunu "yaklaşık" der.
+  let workersToplam = workers, pagesToplam = pages, ortakKaynak = false, veriZamani = null;
+  try {
+    const sv = await saatlikVeriAl(env);
+    if (!sv.hata) { const t = gunToplami(sv.saatlik, gun.slice(0, 10)); workersToplam = t.w; pagesToplam = sv.pages_okunamadi ? pages : t.p; ortakKaynak = true; veriZamani = sv.guncelleme; }
+  } catch { /* ayrı sorgudaki toplamlarla devam */ }
+  const istek = workersToplam + (pagesToplam || 0);
   const govde = JSON.stringify({
-    istek, workers, pages, hata: hataSayisi, subistek: alt, limit, gun: gun.slice(0, 10), guncelleme: simdi.toISOString(),
+    istek, workers: workersToplam, pages: pagesToplam, hata: hataSayisi, subistek: alt, limit, gun: gun.slice(0, 10), guncelleme: simdi.toISOString(), ortak_kaynak: ortakKaynak, veri_zamani: veriZamani,
     scriptler: Object.entries(perScript).map(([ad, n]) => ({ ad, istek: n })).sort((a, b) => b.istek - a.istek).slice(0, 12),
   });
   await onbellek.put(anahtar, new Response(govde, { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=60" } }));
@@ -521,59 +528,69 @@ async function kotaGetir(env, kimlik, cors) {
  * Ayrıca günlük toplamlar owner'ın KENDİ jetonuyla worker_kota_gecmisine_yaz() RPC'sine (migration 0106) upsert edilir → Cloudflare'in
  * ~31 günlük saklama süresinden sonra da aylık/yıllık geçmiş korunur. Yanıt: { saatlik:[{t,w,p}], limit, gecmis_yazildi, pages_okunamadi }.
  */
-async function kotaAnalitik(env, kimlik, cors) {
-  if (!(await ownerMi(env, kimlik))) return json({ error: "Yalnızca Site Sahibi." }, 403, cors);
-  const limit = parseInt(env.GUNLUK_ISTEK_LIMITI || "100000", 10) || 100000;
-  if (!env.CF_ACCOUNT_ID || !env.CF_API_TOKEN) return json({ yapilandirilmadi: true, limit }, 200, cors);
-
+/**
+ * TEK VERİ KAYNAĞI: saatlik seri (son ~31 gün, UTC saat başları) — hem /kota/analitik hem /kota (genel sayaç) BURADAN beslenir; böylece
+ * "bugünün toplamı" iki yerde de AYNI sayıdır (farklı sorgu/önbellek/gün tanımı kaynaklı sapma yok). 5 dk edge cache.
+ * Döner: { saatlik:[{t,w,p}], pages_okunamadi, guncelleme } ya da { hata, durum }.
+ */
+async function saatlikVeriAl(env) {
   const simdi = new Date();
   const kova = Math.floor(simdi.getTime() / 300000);               // 5 dk'lık edge cache kovası
   const anahtar = new Request(`https://kota.invalid/analitik/v1/${env.CF_ACCOUNT_ID}/${kova}`);
   const onbellek = caches.default;
-  let govdeMetni;
   const var_ = await onbellek.match(anahtar);
-  if (var_) govdeMetni = await var_.text();
-  else {
-    const bit = new Date(Math.floor(simdi.getTime() / 3600000) * 3600000 + 3600000);          // içinde bulunulan saati de kapsa
-    const bas = new Date(bit.getTime() - 31 * 86400000 + 3600000);                            // 31 günü AŞMA (Cloudflare sınırı)
-    const graphql = async (sorgu) => {
-      const r = await fetch("https://api.cloudflare.com/client/v4/graphql", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${env.CF_API_TOKEN}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ query: sorgu, variables: { acc: env.CF_ACCOUNT_ID, from: bas.toISOString(), to: bit.toISOString() } }),
-      });
-      const g = await r.json().catch(() => ({}));
-      return { ok: r.ok && !(Array.isArray(g.errors) && g.errors.length), g };
-    };
-    const wQ = `query($acc:String!,$from:Time!,$to:Time!){viewer{accounts(filter:{accountTag:$acc}){workersInvocationsAdaptive(limit:10000,filter:{datetime_geq:$from,datetime_leq:$to}){sum{requests}dimensions{datetimeHour}}}}}`;
-    const pQ = `query($acc:String!,$from:Time!,$to:Time!){viewer{accounts(filter:{accountTag:$acc}){pagesFunctionsInvocationsAdaptiveGroups(limit:10000,filter:{datetime_geq:$from,datetime_leq:$to}){sum{requests}dimensions{datetimeHour}}}}}`;
-    let w, p;
-    try { [w, p] = await Promise.all([graphql(wQ), graphql(pQ).catch(() => ({ ok: false, g: {} }))]); }
-    catch { return json({ error: "Cloudflare Analytics'e ulaşılamadı.", limit }, 502, cors); }
-    const wSatir = w.g?.data?.viewer?.accounts?.[0]?.workersInvocationsAdaptive;
-    if (!w.ok || !Array.isArray(wSatir)) return json({ error: "Analytics yanıtı alınamadı (token izni: Account Analytics › Read olmalı).", limit }, 502, cors);
-    const pSatir = p.g?.data?.viewer?.accounts?.[0]?.pagesFunctionsInvocationsAdaptiveGroups;
-    const pagesOkundu = p.ok && Array.isArray(pSatir);
-    const saat = new Map();
-    const topla = (satirlar, alan) => {
-      for (const s of satirlar) {
-        const t = s.dimensions?.datetimeHour; if (!t) continue;
-        const k = new Date(t).toISOString();
-        const o = saat.get(k) || { t: k, w: 0, p: 0 };
-        o[alan] += Number(s.sum?.requests) || 0;
-        saat.set(k, o);
-      }
-    };
-    topla(wSatir, "w"); if (pagesOkundu) topla(pSatir, "p");
-    govdeMetni = JSON.stringify({
-      saatlik: [...saat.values()].sort((a, b) => (a.t < b.t ? -1 : 1)), limit,
-      pages_okunamadi: !pagesOkundu, guncelleme: simdi.toISOString(),
+  if (var_) return JSON.parse(await var_.text());
+  const bit = new Date(Math.floor(simdi.getTime() / 3600000) * 3600000 + 3600000);          // içinde bulunulan saati de kapsa
+  const bas = new Date(bit.getTime() - 31 * 86400000 + 3600000);                            // 31 günü AŞMA (Cloudflare sınırı)
+  const graphql = async (sorgu) => {
+    const r = await fetch("https://api.cloudflare.com/client/v4/graphql", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${env.CF_API_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ query: sorgu, variables: { acc: env.CF_ACCOUNT_ID, from: bas.toISOString(), to: bit.toISOString() } }),
     });
-    await onbellek.put(anahtar, new Response(govdeMetni, { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300" } }));
-  }
+    const g = await r.json().catch(() => ({}));
+    return { ok: r.ok && !(Array.isArray(g.errors) && g.errors.length), g };
+  };
+  const wQ = `query($acc:String!,$from:Time!,$to:Time!){viewer{accounts(filter:{accountTag:$acc}){workersInvocationsAdaptive(limit:10000,filter:{datetime_geq:$from,datetime_leq:$to}){sum{requests}dimensions{datetimeHour}}}}}`;
+  const pQ = `query($acc:String!,$from:Time!,$to:Time!){viewer{accounts(filter:{accountTag:$acc}){pagesFunctionsInvocationsAdaptiveGroups(limit:10000,filter:{datetime_geq:$from,datetime_leq:$to}){sum{requests}dimensions{datetimeHour}}}}}`;
+  let w, p;
+  try { [w, p] = await Promise.all([graphql(wQ), graphql(pQ).catch(() => ({ ok: false, g: {} }))]); }
+  catch { return { hata: "Cloudflare Analytics'e ulaşılamadı.", durum: 502 }; }
+  const wSatir = w.g?.data?.viewer?.accounts?.[0]?.workersInvocationsAdaptive;
+  if (!w.ok || !Array.isArray(wSatir)) return { hata: "Analytics yanıtı alınamadı (token izni: Account Analytics › Read olmalı).", durum: 502 };
+  const pSatir = p.g?.data?.viewer?.accounts?.[0]?.pagesFunctionsInvocationsAdaptiveGroups;
+  const pagesOkundu = p.ok && Array.isArray(pSatir);
+  const saat = new Map();
+  const topla = (satirlar, alan) => {
+    for (const s of satirlar) {
+      const t = s.dimensions?.datetimeHour; if (!t) continue;
+      const k = new Date(t).toISOString();
+      const o = saat.get(k) || { t: k, w: 0, p: 0 };
+      o[alan] += Number(s.sum?.requests) || 0;
+      saat.set(k, o);
+    }
+  };
+  topla(wSatir, "w"); if (pagesOkundu) topla(pSatir, "p");
+  const veri = { saatlik: [...saat.values()].sort((a, b) => (a.t < b.t ? -1 : 1)), pages_okunamadi: !pagesOkundu, guncelleme: simdi.toISOString() };
+  await onbellek.put(anahtar, new Response(JSON.stringify(veri), { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300" } }));
+  return veri;
+}
 
+/** Saatlik seriden UTC gününün (YYYY-MM-DD) toplamı. */
+function gunToplami(saatlik, gunUtc) {
+  let w = 0, p = 0;
+  for (const s of saatlik) if (s.t.slice(0, 10) === gunUtc) { w += s.w; p += s.p; }
+  return { w, p };
+}
+
+async function kotaAnalitik(env, kimlik, cors) {
+  if (!(await ownerMi(env, kimlik))) return json({ error: "Yalnızca Site Sahibi." }, 403, cors);
+  const limit = parseInt(env.GUNLUK_ISTEK_LIMITI || "100000", 10) || 100000;
+  if (!env.CF_ACCOUNT_ID || !env.CF_API_TOKEN) return json({ yapilandirilmadi: true, limit }, 200, cors);
+  const veri = await saatlikVeriAl(env);
+  if (veri.hata) return json({ error: veri.hata, limit }, veri.durum || 502, cors);
+  veri.limit = limit;
   // Günlük (UTC) toplamlar → kalıcı geçmiş. Başarısız olursa analitik yine döner (migration 0106 henüz çalışmamış olabilir).
-  const veri = JSON.parse(govdeMetni);
   const gun = new Map();
   for (const s of veri.saatlik) {
     const g = s.t.slice(0, 10); const o = gun.get(g) || { gun: g, workers: 0, pages: 0 };
@@ -583,44 +600,6 @@ async function kotaAnalitik(env, kimlik, cors) {
   try { const r = await rpc(env, kimlik, "worker_kota_gecmisine_yaz", { p_satirlar: [...gun.values()] }); yazildi = !r.hata; } catch { /* geçmiş yazılamadı */ }
   veri.gecmis_yazildi = yazildi;
   return new Response(JSON.stringify(veri), { status: 200, headers: { ...cors, "Content-Type": "application/json", "Cache-Control": "no-store" } });
-}
-
-/**
- * POST /kasa/temizle { hedef: <uuid> } — "Kilitli Not Kasalarını Temizleme" (migration 0108).
- * Yetki ve hedef kuralları veritabanındadır (Site Sahibi: herkes; yetkili Yönetici: admin/owner olmayanlar; kendi kasan hariç).
- * Sıra bilerek: (1) hazirla RPC'si yetkiyi doğrular + R2 anahtarlarını verir, (2) R2 nesneleri silinir (kayıtlı anahtarlar + notlar/<uid>/
- * önekindeki kayıtsız artıklar), (3) ANCAK R2 temizse veritabanı satırları kalıcı silinir. R2'de hata olursa veritabanına dokunulmaz → tekrar denenebilir.
- */
-async function kasaTemizle(env, kimlik, istek, cors) {
-  let g = null;
-  try { g = await istek.json(); } catch { /* boş */ }
-  const hedef = String(g?.hedef || "");
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(hedef)) return json({ error: "Geçersiz hedef." }, 400, cors);
-  const kova = env.NOT_EK_BUCKET;
-  if (!kova) return json({ error: "NOT_EK_BUCKET binding'i bağlı değil." }, 501, cors);
-
-  const h = await rpc(env, kimlik, "kilitli_kasa_temizleme_hazirla", { p_user: hedef });
-  if (h.hata) return json({ error: h.hata }, h.durum === 401 || h.durum === 403 ? 403 : 400, cors);
-  const onek = `notlar/${hedef.toLowerCase()}/`;
-  const kayitli = (Array.isArray(h.veri) ? h.veri : []).filter((k) => typeof k === "string" && k.toLowerCase().startsWith(onek));
-
-  let silinen = 0;
-  try {
-    for (let i = 0; i < kayitli.length; i += 1000) { await kova.delete(kayitli.slice(i, i + 1000)); silinen += Math.min(1000, kayitli.length - i); }
-    // Veritabanında kaydı olmayan artıklar (yarım kalmış yüklemeler): kullanıcının klasörü baştan sona süpürülür (en çok 5 sayfa = 5000 nesne).
-    let imlec;
-    for (let sayfa = 0; sayfa < 5; sayfa++) {
-      const l = await kova.list({ prefix: `notlar/${hedef}/`, limit: 1000, cursor: imlec });
-      if (l.objects.length) { await kova.delete(l.objects.map((o) => o.key)); silinen += l.objects.length; }
-      if (!l.truncated) break;
-      imlec = l.cursor;
-    }
-  } catch (hata) {
-    return json({ error: `R2 nesneleri silinemedi, veritabanına dokunulmadı: ${hata?.message || hata}` }, 502, cors);
-  }
-  const t = await rpc(env, kimlik, "kilitli_kasa_temizle", { p_user: hedef });
-  if (t.hata) return json({ error: `R2 temizlendi ama veritabanı satırları silinemedi: ${t.hata}` }, 500, cors);
-  return json({ ok: true, r2_silinen: silinen, ...(t.veri || {}) }, 200, cors);
 }
 
 /** Silme kuyruğundaki üyenin dosyası: yalnızca hesap_silme_dosya_izinli_mi() onaylarsa akıtılır.
