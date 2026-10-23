@@ -128,13 +128,13 @@ export function sifreDegisimKancasiKur() {
         } else if (sonuc.sebep === "kilitli" || sonuc.sebep === "eski-anahtar-gecersiz") {
           bildir(
             "⚠️ Not Kasası bu cihazda kilitliydi, zarf yenilenemedi. Bir sonraki girişte Notlar sekmesi " +
-              "kurtarma anahtarını isteyecek — onu hazır tut.",
+              "Yedek Kurtarma Kodunu (ya da eski kurtarma anahtarını) isteyebilir — hazır tut.",
             "warning"
           );
         }
       } catch (hata) {
         console.error("Not Kasası zarf yenileme hatası:", hata);
-        bildir("⚠️ Not Kasası zarfı yenilenemedi. Kurtarma anahtarını sakla; sorun olursa onunla açarsın.", "warning");
+        bildir("⚠️ Not Kasası zarfı yenilenemedi. Yedek Kurtarma Kodunu sakla; sorun olursa onunla açarsın.", "warning");
       }
     }, 0);
   });
