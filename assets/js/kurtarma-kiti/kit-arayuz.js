@@ -18,12 +18,12 @@ export function cssYukle() {
 /** Kısa, net açıklama kartı: hangi kod neyi açar. */
 export function bilgiKarti() {
   return h("div", { class: "kk-bilgi", role: "note" },
-    h("strong", { class: "kk-bilgi-baslik", text: "🔑 Yedek Kurtarma Kodu — tek kod, iki kasa" }),
-    h("p", { class: "kk-bilgi-metin", text: "Bu kod hem Notlarını hem Mesajlaşma sohbetlerini açar. Normal girişte hiç gerekmez; yalnızca şu durumlarda lazım olur:" }),
+    h("strong", { class: "kk-bilgi-baslik", text: "🔑 Yedek Kurtarma Kodu — Notlar + Mesajlar + yedekler için TEK kod" }),
+    h("p", { class: "kk-bilgi-metin", text: "Bu tek kod Notlarını ve Mesajlaşma sohbetlerini BİRLİKTE açar. Kodu Notlar'da da Mesajlar'da da aynı pencereden üretirsin; hangisinden yenilersen yenile, yeni kod ikisini de açar ve eski kod ikisi için de geçersiz olur. Normal girişte hiç gerekmez; yalnızca şu durumlarda lazım olur:" }),
     h("ul", { class: "kk-bilgi-liste" },
       h("li", {}, h("b", { text: "Notlar: " }), "giriş parolanı sıfırlayıp eski kasan açılmıyorsa notlarını geri açar."),
-      h("li", {}, h("b", { text: "Mesajlaşma: " }), "yedeğini FARKLI bir e-posta/hesaba aktarırken ya da siteyi başka bir veritabanına taşırken sohbetlerini çözer."),
-      h("li", {}, h("b", { text: "Yedek içe aktarma: " }), "kod girilince eski notların ve sohbetlerin yeni hesabının anahtarlarına yeniden zarflanır; hiçbir şey kaybolmaz.")),
+      h("li", {}, h("b", { text: "Mesajlaşma: " }), "yedeğini FARKLI bir e-posta/hesaba aktarırken, siteyi başka bir veritabanına taşırken ya da mesaj yedeğini (Sistem Yedekleme › Kişisel verilerim) dışa/içe aktarırken sohbetlerini çözer; yedek dosyası için ayrı bir parola yoktur."),
+      h("li", {}, h("b", { text: "Yedek içe aktarma: " }), "Sistem/üye yedeğini geri yüklerken aynı kod istenir; eski notların ve sohbetlerin yeni hesabının anahtarlarına yeniden zarflanır, hiçbir şey kaybolmaz.")),
     h("p", { class: "kk-bilgi-uyari", text: "Kod sunucuya gönderilmez ve saklanmaz; kaybedersen ve parolanı da unutursan geri getirilemez. Güvenli bir yere (parola yöneticisi, kâğıt) yaz." }));
 }
 
@@ -66,7 +66,7 @@ export function kitKartiAc(duyur = () => {}) {
         catch (e) { hata.textContent = e.message || String(e); hata.hidden = false; uret.disabled = false; }
       });
       govde.replaceChildren(bilgiKarti(),
-        h("p", { class: "kk-durum", text: "ℹ️ Bu TEK kod hem Notlar'ı hem Mesajları kapsar. Mesaj şifreleme anahtarı sıfırlanırsa/yenilenirse bu kod geçersiz olur ve Notlar için de yeni kod üretmen gerekir; yeni kod üretmek de eskisini geçersiz kılar." }),
+        h("p", { class: "kk-durum", text: "ℹ️ Tek kod: Notlar + Mesajlar. Burada ya da Notlar'da yeni kod üretirsen eski kod ikisi için de geçersiz olur. Mesaj şifreleme anahtarını sıfırlarsan kod silinir; yeni kodu hemen üretirsen Notlar'ı da kapsar. Kod, Notlar kasan ve mesaj anahtarın ikisi de açılabiliyorsa üretilir."}),
         durum.kitVar
           ? h("p", { class: "kk-durum kk-durum--iyi", text: `✓ Bir kod üretilmiş (${new Date(durum.kitAt).toLocaleString("tr-TR")}). Kodu kaybettiysen yenisini üretebilirsin; eski kod çalışmaz.` })
           : h("p", { class: "kk-durum kk-durum--uyari", text: "Henüz kod üretilmedi. Yedeğini başka bir hesaba taşıyabilmek için bir kez oluştur." }),
@@ -86,8 +86,8 @@ export function kitKartiAc(duyur = () => {}) {
       govde.replaceChildren(
         h("p", { class: "kk-durum kk-durum--iyi", text: "Kodun hazır. Bu pencereyi kapatınca bir daha gösterilmez:" }),
         kodEl, h("div", { class: "kk-eylem kk-eylem--sol" }, kopyala, indir),
-        !r.notlar ? h("p", { class: "kk-durum kk-durum--uyari", text: "Not: Notlar kasan şu an kilitliydi; bu kod şimdilik yalnızca mesajlarını kapsıyor. Notlar'ı açtıktan sonra kodu yenile." }) : null,
-        !r.mesajlar ? h("p", { class: "kk-durum kk-durum--uyari", text: "Not: Mesaj anahtarın açılamadığı için kod şimdilik yalnızca notlarını kapsıyor." }) : null,
+        !r.notlar ? h("p", { class: "kk-durum kk-durum--uyari", text: "Not: Bu hesapta henüz bir Notlar kasası yok; kod şimdilik yalnızca mesajlarını kapsıyor. Notlar kasasını kurduktan sonra kodu yenile." }) : null,
+        !r.mesajlar ? h("p", { class: "kk-durum kk-durum--uyari", text: "Not: Mesaj anahtarı oluşturulamadığı için kod şimdilik yalnızca notlarını kapsıyor; Mesajlar'ı bir kez açıp kodu yenile." }) : null,
         h("label", { class: "kk-onay", for: "kk-onay" }, onay, h("span", { text: "Kodu güvenli bir yere kaydettim." })),
         h("div", { class: "kk-eylem" }, bitti));
     }
