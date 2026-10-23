@@ -130,10 +130,15 @@ export function kilitPaneli({ durum = {}, onAcildi }) {
   // 4) Son çare
   const sifirla = h("button", { type: "button", class: "msj-btn msj-btn--tehlike msj-kucuk", text: "Yedek kodum yok → yeni anahtar oluştur" });
   sifirla.addEventListener("click", async () => {
-    const o = await modalSor({ baslik: "Şifreleme anahtarı sıfırlansın mı?", metin: "Bu cihazda açılamayan eski anahtarın yerine yenisi oluşturulur ve parolana bağlanır; bundan sonra parolan yeterli olur. Eski sohbet anahtarların silinir; karşı taraf sohbeti açınca geçmişi sana otomatik yeniden paylaşır. Karşı tarafın da erişimi yoksa o eski sohbet geri getirilemez. DİKKAT: Notlar + Mesajlar için TEK olan Yedek Kurtarma Kodun da geçersiz olur (Notlar'ın kurtarması da dahil); kilit açıldıktan sonra yenisini üretip indirmelisin. Şifreli özel dosyaların için sana verilen anahtarlar da silinir.", secenekler: [{ metin: "Evet, sıfırla", deger: true, tur: "tehlike" }, { metin: "Vazgeç", deger: null }] });
+    const o = await modalSor({ baslik: "Şifreleme anahtarı sıfırlansın mı?", metin: "Bu cihazda açılamayan eski anahtarın yerine yenisi oluşturulur ve parolana bağlanır; bundan sonra parolan yeterli olur. Eski sohbet anahtarların silinir; karşı taraf sohbeti açınca geçmişi sana otomatik yeniden paylaşır. Karşı tarafın da erişimi yoksa o eski sohbet geri getirilemez. DİKKAT: Notlar + Mesajlar için TEK olan Yedek Kurtarma Kodun da geçersiz olur; sıfırlamadan hemen sonra yeni kod üretilmesi istenecek ve o yeni kod hem Notlar'ı hem Mesajlar'ı açacak. Şifreli özel dosyaların için sana verilen anahtarlar da silinir.", secenekler: [{ metin: "Evet, sıfırla", deger: true, tur: "tehlike" }, { metin: "Vazgeç", deger: null }] });
     if (!o) return;
     sifirla.disabled = true;
-    try { await E.anahtariSifirla(); onAcildi({ sifirlandi: true }); } catch (er) { hataYaz(er.message || String(er)); sifirla.disabled = false; }
+    try {
+      await E.anahtariSifirla();                               // sunucu eski Yedek Kurtarma Kodunu da siler (0096)
+      // Tek kod: yeni mesaj anahtarı oluştu → HEMEN yeni kod üret; bu kod Notlar'ı da açar (kod penceresi iki kasayı birlikte sarar).
+      try { cssYukle(); await kitKartiAc((m, hata) => hata && hataYaz(m)); } catch { /* kullanıcı sonra Yedek Kurtarma Kodu düğmesinden üretebilir */ }
+      onAcildi({ sifirlandi: true });
+    } catch (er) { hataYaz(er.message || String(er)); sifirla.disabled = false; }
   });
 
   const kodBolumu = h("details", { class: "msj-kilit-detay" },
