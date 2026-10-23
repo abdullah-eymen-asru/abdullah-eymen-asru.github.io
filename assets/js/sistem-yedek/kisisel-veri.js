@@ -3,7 +3,7 @@
  * Tüm üyeler (demo dahil) VE Site Sahibi için TAMAMEN AYNI çalışır. Yalnızca oturum açan kişinin kendi notları, belgeleri ve mesajları.
  * Buradan yapılan içe aktarma ASLA sistem yapılandırmasını bozmaz: sunucu tarafında uye_geri_yukle_tablo (beyaz listeli tablolar, kullanıcı
  * kimliği oturumdan ZORLANIR) ve mesaj_yedek_ice_aktar (yalnızca kendi arşiv sohbeti) kullanılır. Tüm sistem / felaket kurtarma AYRI sekmededir.
- * Mesajlar: "Yedekleme Güvenlik Parolası" ile yeniden şifrelenir (mesaj-yedek.js) → başka hesaba/altyapıya taşınabilir.
+ * Mesajlar: 16 haneli Yedek Kurtarma Koduyla (Notlar ile TEK kod) yeniden şifrelenir (mesaj-yedek.js); ayrı parola yok → başka hesaba/altyapıya taşınabilir.
  */
 import { supabase } from "../core/supabase-client.js";
 import { el, bayt, hataMetni, dugme, ikon } from "./ortak.js";
