@@ -228,10 +228,18 @@ function kota(baslik, ikonMetni, kullanilan, toplam, altSatirlar) {
  * (60 sn edge cache). CF_ACCOUNT_ID / CF_API_TOKEN tanımlı değilse kart nasıl yapılandırılacağını söyler; diğer hiçbir şey bozulmaz.
  */
 function workerKotaKarti() {
-  const sayiMetni = (n) => Number(n || 0).toLocaleString("tr-TR");
+  /** ISO anı → "14:35 UTC (TR 17:35)" — kota verisi UTC'dir, Türkiye saati yalnızca yardımcı bilgi. */
+function utcSaatMetni(iso) {
+  const d = new Date(iso);
+  const utc = `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")} UTC`;
+  const tr = d.toLocaleTimeString("tr-TR", { timeZone: "Europe/Istanbul", hour: "2-digit", minute: "2-digit" });
+  return `${utc} (TR ${tr})`;
+}
+
+const sayiMetni = (n) => Number(n || 0).toLocaleString("tr-TR");
   const govde = el("div", {}, el("p", { class: "muted", text: "Cloudflare'den bugünkü kullanım okunuyor…" }));
   const yenile = dugme({ metin: "Yenile", ikonAdi: "yenile", tur: "ikincil", kucuk: true });
-  const kart = el("article", { class: "sy-kart sy-kota" }, el("div", { class: "sy-kota-ust" }, el("h3", { text: "⚡ Worker İstekleri (bugün)" })), govde, el("div", { class: "sy-eylemler" }, yenile));
+  const kart = el("article", { class: "sy-kart sy-kota" }, el("div", { class: "sy-kota-ust" }, el("h3", { text: "⚡ Worker İstekleri (bugün · UTC)" })), govde, el("div", { class: "sy-eylemler" }, yenile));
   async function yukle() {
     yenile.disabled = true;
     try {
@@ -246,7 +254,7 @@ function workerKotaKarti() {
         el("p", { class: "sy-kota-deger" }, el("strong", { text: sayiMetni(g.istek) }), ` / ${sayiMetni(g.limit)}`, el("span", { class: "muted", text: `  (%${(oran * 100).toLocaleString("tr-TR", { maximumFractionDigits: 1 })})` }), el("span", { class: `sy-rozet sy-rozet--${sev.sinif}`, text: sev.etiket })),
         el("progress", { class: `sy-cubuk sy-cubuk--${sev.sinif}`, max: "100", value: String(Math.round(oran * 1000) / 10), "aria-label": "Günlük Worker isteği doluluk" }),
         el("p", { class: "muted sy-not", text: `Workers: ${sayiMetni(g.workers ?? g.istek)} · Pages Functions: ${g.pages == null ? "okunamadı (dahil değil)" : sayiMetni(g.pages)} — Cloudflare'in günlük kotası ikisini birlikte sayar.` }),
-        el("p", { class: "muted sy-not", text: `Gün: ${g.gun} (UTC) · hata: ${sayiMetni(g.hata)} · alt-istek: ${sayiMetni(g.subistek)} · veri 1 dk gecikmeli olabilir. Cloudflare panelindeki Worker kartları son 24 saati gösterir; burası UTC gününü.` }),
+        el("p", { class: "muted sy-not", text: `Gün: ${g.gun} (UTC · Türkiye saatiyle 03:00'te sıfırlanır) · hata: ${sayiMetni(g.hata)} · alt-istek: ${sayiMetni(g.subistek)}${g.veri_zamani ? ` · veri zamanı: ${utcSaatMetni(g.veri_zamani)}` : ""}. Üstteki toplam, “Worker Kota Analitiği”ndeki bugünün (UTC) toplamıyla aynı kaynaktan gelir; betik dağılımı ayrı sorgudur ve örnekleme nedeniyle yaklaşık olabilir. Cloudflare panelindeki Worker kartları son 24 saati gösterir; burası UTC gününü.` }),
         g.scriptler?.length ? el("ul", { class: "sy-kota-liste" }, g.scriptler.map((x) => el("li", {}, el("span", { text: x.ad }), el("span", { class: "muted", text: sayiMetni(x.istek) })))) : null);
     } catch (h) {
       govde.replaceChildren(el("p", { class: "auth-message error", text: `Kota okunamadı: ${h.message || h}` }));
