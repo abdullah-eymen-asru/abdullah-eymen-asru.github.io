@@ -261,7 +261,7 @@ function okubeni(o) {
     "ÖNEMLİ",
     "  * Kişisel Notlar bileşeni her zaman yalnızca paketi alan kişinin kendi notlarını içerir.",
     "  * Notlar ve .sifreli uzantılı dosyalar UÇTAN UCA ŞİFRELİDİR; bu pakette şifreli halleriyle durur.",
-    "    Açabilmek için kullanıcının parolası/kurtarma anahtarı gerekir (not_kasasi tablosundaki sarılı anahtarlar da pakettedir).",
+    "    Açabilmek için kullanıcının parolası ya da Yedek Kurtarma Kodu (Notlar + Mesajlar için TEK 16 haneli kod) gerekir; kod blobu (e2ee_kullanici_anahtarlari) ve not_kasasi sarılı anahtarları da pakettedir.",
     "  * Parolalar, 2FA yedek kodları ve servis anahtarları pakete HİÇBİR ZAMAN girmez.",
     "  * SQL geri yükleme: önce migration'ları uygula, sonra dosyayı Supabase SQL Editor'de çalıştır.",
     o.hatalar.length ? `\nUYARILAR (${o.hatalar.length}):\n  - ${o.hatalar.slice(0, 50).join("\n  - ")}` : "",
