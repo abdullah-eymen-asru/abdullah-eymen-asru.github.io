@@ -1737,10 +1737,10 @@ permalink: "/panel/dashboard.html"
       </div>
       <div class="nt-kilit-eylemler">
         <button type="submit" id="nt-kilit-btn" class="btn-primary csp-w-auto">Kasayı aç</button>
-        <button type="button" id="nt-kurtarma-toggle" class="btn-secondary csp-w-auto">Parolam değişti, kurtarma anahtarı kullan</button>
+        <button type="button" id="nt-kurtarma-toggle" class="btn-secondary csp-w-auto">Parolam değişti, eski tip kurtarma anahtarı kullan</button>
         <button type="button" id="nt-kit-toggle" class="btn-secondary csp-w-auto" hidden>🔑 Yedek Kurtarma Koduyla aç</button>
       </div>
-      <p class="muted">ℹ️ Yedek Kurtarma Kodu Notlar + Mesajlar için ortaktır; mesaj anahtarı sıfırlanırsa ya da kod yenilenirse eski kod çalışmaz.</p>
+      <p class="muted">ℹ️ Yedek Kurtarma Kodu Notlar + Mesajlar için TEK koddur: Notlar'dan ya da Mesajlar'dan yenilersen yeni kod ikisini de açar, eski kod ikisi için de geçersiz olur.</p>
     </form>
   </div>
 
@@ -1753,9 +1753,9 @@ permalink: "/panel/dashboard.html"
       Bir parola yöneticisine ya da çıktıya kaydet; bir daha gösterilmeyecek.
     </p>
     <p class="muted">
-      <strong>ℹ️ İki ayrı yedek var.</strong> (1) Bu <em>kurtarma anahtarı</em> yalnızca Notlar kasasını açar; yenilemek mesajları ve
-      Yedek Kurtarma Kodunu etkilemez. (2) <em>Yedek Kurtarma Kodu</em> (Mesajlar sayfasındaki 🔑) Notlar + Mesajlar için <strong>ortak tek koddur</strong>:
-      yenilenirse ya da mesaj şifreleme anahtarı sıfırlanırsa eski kod geçersiz olur ve Notlar için de yeni kod üretmen gerekir.
+      <strong>ℹ️ Bu, eski tip bir kurtarma anahtarıdır.</strong> Yeni kasalarda yerini <em>Yedek Kurtarma Kodu</em> aldı: Notlar + Mesajlar için
+      <strong>tek 16 haneli koddur</strong> ve Notlar › Kasa ve yedek ya da Mesajlar › 🔑 bölümünden üretilir. Eski kasanın bu anahtarı çalışmaya
+      devam eder; ama yeni bir kod üretmen önerilir, çünkü tek kod hem Notlarını hem mesajlarını açar.
     </p>
     <code id="nt-kurtarma-metin" class="nt-kurtarma-metin"></code>
     <div class="csp-flex-gap10-wrap">
@@ -1952,9 +1952,9 @@ permalink: "/panel/dashboard.html"
           <button type="button" id="nt-kurtarma-yenile-btn" class="nt-btn">Yedek Kurtarma Kodu üret / yenile (Notlar + Mesajlar)</button>
         </div>
         <p class="muted">
-          ℹ️ Kurtarma anahtarını yenilemek eskisini geçersiz kılar (yalnızca Notlar). Notlar + Mesajlar için ortak
-          <strong>Yedek Kurtarma Kodu</strong> ayrıdır: yenilenirse ya da mesaj şifreleme anahtarı sıfırlanırsa eski kod geçersiz olur;
-          Notlar için de yeni kod üretmen gerekir (Mesajlar › 🔑 Yedek Kurtarma Kodu).
+          ℹ️ <strong>Yedek Kurtarma Kodu</strong> Notlar + Mesajlar için TEK koddur. Burada ya da Mesajlar › 🔑 bölümünde yenilersen yeni kod
+          ikisini de açar, eski kod ikisi için de geçersiz olur. Mesaj şifreleme anahtarını sıfırlarsan kod silinir; yeni kod üretince Notlar'ı da
+          kapsar. Aynı kod, Sistem Yedekleme › Kişisel verilerim altındaki mesaj dışa/içe aktarmasında da tek doğrulamadır (ayrı parola yok).
         </p>
         <div class="nt-guvenlik-satir">
           <button type="button" id="nt-kasa-parola-btn" class="nt-btn" hidden>Kasa Parolasını değiştir</button>
