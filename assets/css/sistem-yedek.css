@@ -438,3 +438,4 @@
 }
 .ac-satir--kasa{grid-template-columns:32px minmax(0,1fr) auto}@media (max-width:640px){.ac-satir--kasa{grid-template-columns:32px minmax(0,1fr)}}
 .kk-kok{margin-top:24px}
+.ka-tr { display: inline-block; margin-left: 6px; font-size: .7rem; font-weight: 500; white-space: nowrap; }
