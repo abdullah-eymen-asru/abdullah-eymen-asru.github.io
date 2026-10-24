@@ -68,14 +68,14 @@ const MODULES = {
   // R2 Dosya Yöneticisi: sekme görünürlüğü role DEĞİL, r2_arsiv_yetkilerim() izinlerine bağlı
   // (bkz. NAV'daki izin:"arsiv" ve gorunurMu()). Gerçek yetki: RLS + r2_arsiv_worker.
   arsiv: { src: "./r2-arsiv/r2-arsiv.js", role: null },
-  arsivIzin: { src: "./r2-arsiv/izin-paneli.js", role: "owner" },
+  arsivIzin: { src: "./r2-arsiv/izin-paneli.js", role: "admin" },            // yalnızca Yetki Ayarları erişimi olan yönetici yükler (GIRIS_YETKILI_YONETIM); gerçek sınır SQL (0108)
   // Akademik Kütüphane: sekme görünürlüğü Yetki Ayarları matrisindeki "akademik_kutuphane" özelliğine bağlı
   // (NAV'daki ozellik alanı + izinleriYukle). role:null -> tüm roller; gerçek yetki: RLS (0072) + worker.
   // İki sekme aynı modülü paylaşır (assets/js/akademik/kutuphane.js); modül #ak-kok / #ak-owner-kok'u kurar.
   kutuphane: { src: "./akademik/kutuphane.js", role: null },
   // Yetki Ayarları > "Alan Adı & Sayfa Erişim Kalkanı" (gatekeeper; migration 0061).
   // Gerçek yetki: site_ayarlari UPDATE politikası + owner RPC'leri is_owner() ister.
-  kalkan: { src: "./gatekeeper/kalkan-paneli.js", role: "owner" },
+  kalkan: { src: "./gatekeeper/kalkan-paneli.js", role: "admin" },             // yönetici: yalnızca "kilitli siteyi görme izni" listesi (0109); site geneli ayarlar owner'da
   // "KVKK Sürümü" (site_ayarlari.guncel_kvkk_surumu; migration 0064/0065). Owner her zaman,
   // admin yalnızca owner anahtarı açıksa görür (NAV'daki izin:"kvkk"). Gerçek yetki:
   // kvkk_surum_yetkisi_var_mi() -> kvkk_surumunu_degistir() / kvkk_onay_ozeti().
@@ -84,7 +84,7 @@ const MODULES = {
   // sıradan üye de, owner da aynı sekmeyi görür.
   panelim: { src: "./panel.js", role: null },
   // Üye verisi dışa aktarma izinleri (migration 0069) — SADECE Site Sahibi: hangi yönetici hangi üyelerin verisini indirebilir.
-  uyeAktarimYetki: { src: "./uye-disa-aktar/yetki-paneli.js", role: "owner" },
+  uyeAktarimYetki: { src: "./uye-disa-aktar/yetki-paneli.js", role: "admin" },  // yönetici: güvenli devir kuralıyla (0110)
   // Sistem Yedekleme & Depolama Yönetimi (migration 0074). Sekme görünürlüğü role DEĞİL, can_export_system
   // anahtarına bağlı (NAV'daki izin:"sistemyedek" + izinleriYukle). Gerçek yetki: RPC'ler + sistem-yedek-worker.
   sistemYedek: { src: "./sistem-yedek/sistem-yedek.js", role: null },
@@ -444,6 +444,8 @@ async function ensureModuleLoaded(key) {
 
 let activeViewId = null;
 let GIRIS_PROFIL_ROLU = null;
+/** Site Sahibi ya da Yetki Ayarları erişimi AÇIK yönetici: tüm Yetki Ayarları sekmeleri bunlar için yüklenir (gerçek sınır SQL'dedir). */
+let GIRIS_YETKILI_YONETIM = false;
 
 function buildSidebar(profile) {
   const nav = document.getElementById("dash-nav");
@@ -607,11 +609,12 @@ async function showView(viewId, moduleKey) {
   await ensureModuleLoaded(moduleKey);
   // Yetki Ayarları: owner için "R2 Erişim İzni" bölümü (ayrı modül; gy modülüne dokunmaz)
   // Bu iki modül yalnızca Site Sahibi'nin sekmelerini doldurur (yetkili admin yalnızca Özellikler'i görür).
-  if (viewId === "sys-yetki" && GIRIS_PROFIL_ROLU === "owner") await ensureModuleLoaded("arsivIzin");
-  if (viewId === "sys-yetki" && GIRIS_PROFIL_ROLU === "owner") await ensureModuleLoaded("kalkan");
-  // Birleşik panel: Demo Görünürlük (admin salt-okunur / owner yazar) + Üye Verisi İndirme (yalnızca owner)
-  if (viewId === "sys-yetki") await ensureModuleLoaded("demoYetki");
-  if (viewId === "sys-yetki" && GIRIS_PROFIL_ROLU === "owner") await ensureModuleLoaded("uyeAktarimYetki");
+  // Yetki Ayarları alt sekmeleri: Site Sahibi VE Yetki Ayarları erişimi açık yönetici için HEPSİ yüklenir. Biri hata verse diğerleri etkilenmez.
+  if (viewId === "sys-yetki" && GIRIS_YETKILI_YONETIM) {
+    for (const m of ["arsivIzin", "kalkan", "demoYetki", "uyeAktarimYetki"]) {
+      try { await ensureModuleLoaded(m); } catch (err) { console.warn(`Yetki Ayarları paneli yüklenemedi (${m}):`, err); }
+    }
+  }
 }
 
 function hubuCiz() {
@@ -804,7 +807,7 @@ const YA_ALTSEKME_ANAHTARI = "aea_yetki_altsekme";
 function wireYetkiAltSekmeler() {
   const serit = document.getElementById("ya-altsekmeler");
   if (!serit) return;
-  if (GIRIS_PROFIL_ROLU !== "owner") { document.getElementById("ya-pane-uye")?.remove(); } // üye verisi indirme izinleri yalnızca Site Sahibi
+  if (!GIRIS_YETKILI_YONETIM) { document.getElementById("ya-pane-uye")?.remove(); } // üye verisi indirme izinleri: Site Sahibi + yetkili Yönetici
   // Owner değilse github-yonetim.js ilgili paneli DOM'dan silebilir; paneli olmayan sekmeyi at.
   const sekmeler = [...serit.querySelectorAll("[data-ya-pane]")].filter((s) => {
     if (document.getElementById(s.dataset.yaPane)) return true;
@@ -884,6 +887,7 @@ async function init() {
 
   GIRIS_PROFIL_ROLU = profile.role;
   profile.izinler = await izinleriYukle(profile.role);
+  GIRIS_YETKILI_YONETIM = profile.role === "owner" || (profile.role === "admin" && !!profile.izinler?.yetkiAyarlari);
 
   // Notlarım: erişimi owner belirler (migration 0059/0060, Yetki Ayarları).
   // Karar TEK yerden gelir: veritabanındaki not_modulu_yetkili(). Menüyü kuran mevcut kurala
