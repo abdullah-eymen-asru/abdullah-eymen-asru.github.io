@@ -4,6 +4,8 @@
  * Pencere + indirme. Veri YALNIZCA uye_verisi_disa_aktar() RPC'sinden gelir; hangi üyelerin gelebileceğini
  * veritabanı belirler (migration 0069: Site Sahibi tümünü; yönetici ise Site Sahibi'nin verdiği kapsam kadarını).
  * Bu dosya yalnızca arayüzdür: butonu gizlemek/göstermek güvenlik DEĞİL, kolaylıktır.
+ * ÜYE ARAMA (migration 0110): ad/e-posta ile kapsamındaki üyeler sunucu tarafında aranır (sayfalı; indirme günlüğüne yazmaz); seçilen üyeler
+ * tek tek indirilebilir. Seçim yoksa rol/KVKK süzgeçli toplu indirme eskisi gibi çalışır.
  * innerHTML YOK, inline stil YOK (CSP).
  * -----------------------------------------------------------------------
  */
@@ -70,6 +72,55 @@ export function uyeDisaAktarAc({ bildir = () => {}, yazar = "" } = {}) {
   };
   bicimCiz();
 
+
+  /* ---- Üye bul (ad / e-posta) + tek tek seç ---- */
+  const secilenler = new Map();                              // id -> {id, ad, email, role}
+  const rolAd = new Map(ROLLER.filter(([v]) => v).map(([v, a]) => [v, a]));
+  const araGirdi = el("input", { type: "search", class: "uya-dlg-ara", placeholder: "Üye ara: ad ya da e-posta…", autocomplete: "off", "aria-label": "Üye ara (ad veya e-posta)" });
+  const sonucListe = el("ul", { class: "uya-dlg-sonuc", "aria-live": "polite" });
+  const daha = el("button", { type: "button", class: "btn-secondary csp-w-auto", text: "Daha fazla göster", hidden: true });
+  const secimOzet = el("p", { class: "muted uya-dlg-not" });
+  const secimCipler = el("div", { class: "uya-yp-cipler" });
+  let aramaSayfa = 0, aramaMetin = "", aramaZamani = null, aramaSayac = 0;
+  const secimCiz = () => {
+    secimCipler.replaceChildren(...[...secilenler.values()].map((u) => el("span", { class: "uya-yp-cip" }, `${u.ad}${u.email ? ` <${u.email}>` : ""}`,
+      el("button", { type: "button", "aria-label": `${u.ad} seçimini kaldır`, text: "×", onclick: () => { secilenler.delete(u.id); secimCiz(); sonucCiz(); } }))));
+    secimOzet.textContent = secilenler.size
+      ? `${secilenler.size} üye seçili: yalnızca bunlar indirilir (aşağıdaki rol süzgeci uygulanmaz).`
+      : "Üye seçmezsen aşağıdaki kapsam (rol / KVKK) kadar üye toplu indirilir.";
+  };
+  let sonSonuclar = [];
+  const sonucCiz = () => {
+    sonucListe.replaceChildren(...sonSonuclar.map((u) => {
+      const secili = secilenler.has(u.id);
+      const b = el("button", { type: "button", class: secili ? "btn-secondary csp-w-auto" : "btn-primary csp-w-auto", text: secili ? "Seçildi ✓" : "Seç" });
+      b.addEventListener("click", () => { if (secilenler.has(u.id)) secilenler.delete(u.id); else secilenler.set(u.id, u); secimCiz(); sonucCiz(); });
+      return el("li", { class: "uya-dlg-sonuc-satir" }, el("div", { class: "uya-dlg-sonuc-bilgi" }, el("strong", { text: u.ad }), el("small", { class: "muted", text: `${u.email || "e-posta yok"} · ${rolAd.get(u.role) || u.role}` })), b);
+    }));
+  };
+  const ara = async (sifirla) => {
+    const sira = ++aramaSayac;
+    if (sifirla) { aramaSayfa = 0; sonSonuclar = []; }
+    try {
+      const { data, error } = await supabase.rpc("uye_aktarim_kapsamim", { p_ara: aramaMetin, p_limit: 20, p_sayfa: aramaSayfa });
+      if (sira !== aramaSayac) return;                      // eski yanıt
+      if (error) throw error;
+      const yeni = (data || []).map((r) => ({ id: r.id, ad: r.ad, email: r.email, role: r.role }));
+      sonSonuclar = sifirla ? yeni : [...sonSonuclar, ...yeni];
+      const toplam = Number(data?.[0]?.toplam ?? sonSonuclar.length);
+      daha.hidden = sonSonuclar.length >= toplam;
+      sonucCiz();
+      if (!sonSonuclar.length) sonucListe.replaceChildren(el("li", { class: "muted", text: aramaMetin ? "Eşleşen üye yok (yetki kapsamın dışındakiler görünmez)." : "Kapsamında üye yok." }));
+    } catch (h) {
+      sonucListe.replaceChildren(el("li", { class: "muted", text: /does not exist|42883|PGRST202|schema cache/i.test(h?.message || "") ? "Üye araması için 0110 migration'ı çalıştırılmalı; toplu indirme yine çalışır." : `Arama yapılamadı: ${h?.message || h}` }));
+      daha.hidden = true;
+    }
+  };
+  araGirdi.addEventListener("input", () => { clearTimeout(aramaZamani); aramaZamani = setTimeout(() => { aramaMetin = araGirdi.value.trim(); ara(true); }, 300); });
+  daha.addEventListener("click", () => { aramaSayfa += 1; ara(false); });
+  const aramaGrubu = el("fieldset", { class: "uya-dlg-grup" }, el("legend", { text: "Üye bul (isteğe bağlı)" }), araGirdi, sonucListe, daha, secimCipler, secimOzet);
+  secimCiz();
+
   const form = el(
     "form",
     { class: "uya-dlg-form", novalidate: true },
@@ -78,6 +129,7 @@ export function uyeDisaAktarAc({ bildir = () => {}, yazar = "" } = {}) {
       "div",
       { class: "uya-dlg-govde" },
       el("fieldset", { class: "uya-dlg-grup" }, el("legend", { text: "Biçim" }), bicimGrubu, ayracAlan),
+      aramaGrubu,
       el("fieldset", { class: "uya-dlg-grup" }, el("legend", { text: "Kapsam" }), el("div", { class: "form-field uya-dlg-alan" }, rolSec),
         el("label", { class: "uya-dlg-secenek" }, kvkkKutu, el("span", { text: "Yalnızca KVKK aydınlatma onayı olan üyeler (toplu e-posta için)" })),
         el("label", { class: "uya-dlg-secenek" }, epostaKutu, el("span", { text: "Yalnızca e-posta adresleri (diğer alanlar dosyaya girmez)" }))),
@@ -97,7 +149,8 @@ export function uyeDisaAktarAc({ bildir = () => {}, yazar = "" } = {}) {
       const { data, error } = await supabase.rpc("uye_verisi_disa_aktar", { p_bicim: bicim });
       if (error) throw error;
       let uyeler = data || [];
-      if (rolSec.value) uyeler = uyeler.filter((u) => u.role === rolSec.value);
+      if (secilenler.size) uyeler = uyeler.filter((u) => secilenler.has(u.id));      // tek tek seçilenler
+      else if (rolSec.value) uyeler = uyeler.filter((u) => u.role === rolSec.value);
       if (kvkkKutu.checked) uyeler = uyeler.filter((u) => u.kvkk_onay_verildi);
       if (!uyeler.length) throw new Error("Seçtiğin kapsamda üye bulunamadı (yetki kapsamın ya da süzgeçler sonucu boş).");
 
@@ -127,4 +180,5 @@ export function uyeDisaAktarAc({ bildir = () => {}, yazar = "" } = {}) {
   document.body.append(d);
   ayracAlan.hidden = bicim !== "csv";
   d.showModal();
+  ara(true);                                                  // ilk sayfa: kapsamımdaki üyeler (ada göre)
 }
