@@ -901,3 +901,13 @@ body.dash-sayfa .site-header nav { min-width: 0; }
 html.header-gizli .dash-shell { --dash-header-h: 0px !important; }   /* .dash-shell değişkeni JS ile satır içi yazar: !important şart */
 .dash-sidebar, .dash-topbar { transition: top 0.28s cubic-bezier(0.4, 0, 0.2, 1); }
 @media (prefers-reduced-motion: reduce) { .dash-sidebar, .dash-topbar { transition: none; } }
+
+/* Bağlantı kategorileri yönetimi (github-yonetim.js › kategoriPaneliniCiz) */
+.bg-kat-kutu { margin: 0 0 18px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; }
+.bg-kat-kutu h3 { margin: 0 0 6px; }
+.bg-kat-liste { list-style: none; margin: 10px 0; padding: 0; display: grid; gap: 8px; }
+.bg-kat-satir, .bg-kat-yeni { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bg-kat-satir input, .bg-kat-yeni input { flex: 1 1 220px; min-height: 44px; padding: 8px 12px; font: inherit; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg, var(--bg)); color: var(--text); box-sizing: border-box; }
+.bg-kat-sayi { white-space: nowrap; font-size: .85rem; }
+.bg-kat-sil, .bg-kat-yeni button { min-height: 44px; }
+@media (max-width: 480px) { .bg-kat-satir input, .bg-kat-yeni input { flex-basis: 100%; } .bg-kat-sil, .bg-kat-yeni button { flex: 1; } }
