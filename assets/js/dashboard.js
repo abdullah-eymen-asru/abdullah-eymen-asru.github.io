@@ -94,6 +94,8 @@ const MODULES = {
   // Belge Tarayıcı & Çoklu Birleştirici (assets/js/belge-tarayici/): %100 istemci, sıfır sunucu isteği. Yetki Dönüştürücü ile AYNI
   // (can_use_converter → NAV'daki izin:"donusturucu"); modül kendi içinde donusturucu_yetkisi_var_mi() ile tekrar doğrular (Guard).
   belgeTarayici: { src: "./belge-tarayici/belge-tarayici.js", role: null },
+  // Evrensel Metadata Temizleyici (assets/js/metadata-temizleyici/): Araçlar altında kendi sekmesi; yetki Dönüştürücü ile AYNI (can_use_converter).
+  metadata: { src: "./metadata-temizleyici/metadata-temizleyici.js", role: null },
   // HavaStil (migration 0099): hava durumuna göre katman/giyim danışmanı. Görünürlük role DEĞİL, Yetki Ayarları › Özellikler'deki
   // "havastil" anahtarına bağlı (VARSAYILAN KAPALI; owner her zaman). NAV'daki izin:"havastil" + izinleriYukle. Modül kendi içinde RPC ile tekrar doğrular.
   havastil: { src: "./havastil/panel.js", role: null },
@@ -178,6 +180,7 @@ const NAV = [
       // Menüde görünmeyen rol, #tool-donusturucu adresine gitse bile hash Guard'ına (gorunurMu) takılır.
       { id: "tool-donusturucu", icon: "🔄", label: "Dönüştürücü & Editör", module: "donusturucu", role: null, izin: "donusturucu", defaultAcilis: false },
       { id: "tool-belge-tarayici", icon: "📑", label: "Belge Tarayıcı & Birleştirici", module: "belgeTarayici", role: null, izin: "donusturucu", defaultAcilis: false },
+      { id: "tool-metadata", icon: "🧼", label: "Metadata Temizleyici", module: "metadata", role: null, izin: "donusturucu", defaultAcilis: false },
       // role:null + izin:"havastil": owner her zaman görür; diğer roller yalnızca Yetki Ayarları'nda HavaStil açıldıysa.
       { id: "tool-havastil", icon: "🌦️", label: "HavaStil (Giyim Danışmanı)", module: "havastil", role: null, izin: "havastil", defaultAcilis: false },
     ],
