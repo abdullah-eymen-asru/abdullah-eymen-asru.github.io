@@ -15,6 +15,9 @@
  */
 import { supabase, showMessage } from "../core/supabase-client.js";
 import { el, bayt, hataMetni, BILESENLER, dugme, ikon, onayIste } from "./ortak.js";
+import { mesajKodunuDogrula } from "./mesaj-yedek.js";
+import { kodBicimle } from "../kurtarma-kiti/kit.js";
+import { kitKartiAc, cssYukle as kitCssYukle } from "../kurtarma-kiti/kit-arayuz.js";
 import { depolamaCiz } from "./depolama.js";
 import { gunlukCiz } from "./gunluk.js";
 import { yedekAl, dosyaAdi } from "./disa-aktar.js";
@@ -207,6 +210,17 @@ async function kur() {
 
   const notlarK = kutular.get("notlar");
 
+  // TEK KOD: Notlar (kendi notların) yedeğe giriyorsa Yedek Kurtarma Kodu doğrulanır — Notlar ve Mesajlar aynı kodla açıldığı için tek kutu yeter.
+  // Kod pakette YOKTUR; yalnızca "kodu bilen biri bu yedeği açabilsin" garantisi için hesabındaki kayıtla doğrulanır.
+  const kodGirdi = el("input", { type: "text", id: "sy-kod", class: "sy-girdi", autocomplete: "off", autocapitalize: "characters", spellcheck: "false", maxlength: "19", "aria-label": "Yedek Kurtarma Kodu", placeholder: "XXXX-XXXX-XXXX-XXXX" });
+  kodGirdi.addEventListener("input", () => { kodGirdi.value = kodBicimle(kodGirdi.value); });
+  const kodUret = dugme({ metin: "Kod yok mu? Şimdi üret", ikonAdi: "anahtar", tur: "ikincil", kucuk: true });
+  kodUret.addEventListener("click", async () => { kitCssYukle(); try { await kitKartiAc((m, hata) => mesaj(m, hata ? "error" : "success")); } catch (h) { mesaj(hataMetni(h)); } });
+  const kodKutu = el("div", { class: "sy-alt", hidden: true },
+    el("strong", { text: "Yedek Kurtarma Kodu (Notlar + Mesajlar için tek kod)" }),
+    el("p", { class: "muted", text: "Notların yedeğe girdiği için kodunu gir: hesabındaki kayıtla doğrulanır; böylece kimsenin açamayacağı bir yedek almazsın. Yedek, başka hesapta/altyapıda AYNI kodla açılır (Sistem Yedekleme › İçe aktar). Kod pakete YAZILMAZ." }),
+    kodGirdi, kodUret);
+
   function durumGuncelle() {
     if (ownerMi) {
       const tum = tumK.girdi.checked;
@@ -225,6 +239,7 @@ async function kur() {
         : "Üyeleri arayıp işaretle; yalnızca onların kayıtları ve dosyaları pakete girer (notlar hariç).";
     }
     bicimKutu.hidden = !kutular.get("veritabani").girdi.checked;
+    kodKutu.hidden = !(notlarK.girdi.checked || (ownerMi && tumK.girdi.checked && kutular.get("veritabani").girdi.checked));
     tumuDugme.querySelector("span").textContent = [...kutular.values()].every((k) => k.girdi.checked || k.girdi.disabled) ? "Seçimi kaldır" : "Tümünü seç";
   }
   for (const k of kutular.values()) k.girdi.addEventListener("change", durumGuncelle);
@@ -241,6 +256,13 @@ async function kur() {
     if (!secili.length) return mesaj("En az bir bileşen seç.");
     const bicimler = { json: jsonK.girdi.checked, sql: sqlK.girdi.checked };
     if (secili.includes("veritabani") && !bicimler.json && !bicimler.sql) return mesaj("Veritabanı için JSON ve/veya SQL seç.");
+
+    // Notlar yedeğe giriyorsa (ya da tüm sistem + veritabanı: kendi notların da dahil) ortak kodu doğrula.
+    const kodGerekli = !kodKutu.hidden;
+    if (kodGerekli) {
+      if (kodGirdi.value.replace(/-/g, "").length !== 16) return mesaj("Notlar yedeğe girdiği için 16 haneli Yedek Kurtarma Kodunu gir (XXXX-XXXX-XXXX-XXXX).");
+      try { await mesajKodunuDogrula(kodGirdi.value); } catch (h) { return mesaj(hataMetni(h)); }
+    }
 
     // Kapsamı çöz
     let kapsam = "kendi";
@@ -313,6 +335,7 @@ async function kur() {
       else mesaj(`Dışa aktarma başarısız: ${hataMetni(h)}`);
       if (ownerMi) gunlukYukle();
     } finally {
+      kodGirdi.value = "";
       indir.disabled = false;
       iptalDugme.hidden = true;
       ilerleme.hidden = true;
@@ -341,7 +364,8 @@ async function kur() {
       adim(++no, "Neler pakete girsin?", null,
         el("div", { class: "sy-ustarac" }, el("span", { class: "muted", text: "İstediklerini işaretle." }), tumuDugme),
         el("div", { class: "sy-secenekler" }, bilesenKartlari),
-        bicimKutu
+        bicimKutu,
+        kodKutu
       ),
       bellekUyarisi,
       el("div", { class: "sy-eylemler" }, indir, iptalDugme),
