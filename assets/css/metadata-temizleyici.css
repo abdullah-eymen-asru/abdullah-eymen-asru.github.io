@@ -1,0 +1,10 @@
+/* Araçlar › Metadata Temizleyici (assets/js/metadata-temizleyici/arayuz.js). Taban sınıflar (dn-kart, dn-dropzone, dn-btn…) donusturucu.css'ten gelir. */
+.mt-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.mt-satir { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--dn-cizgi); border-radius: 12px; }
+.mt-bilgi { display: grid; gap: 4px; min-width: 0; flex: 1 1 220px; }
+.mt-ad { overflow-wrap: anywhere; }
+.mt-ozet { margin: 0; padding-left: 1.1em; font-size: .85rem; color: var(--dn-soluk, var(--muted)); }
+.mt-eylem, .mt-araclar { display: flex; gap: 8px; flex-wrap: wrap; }
+.mt-cli summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+.mt-satir--bitti { border-color: var(--accent); }
+@media (max-width: 640px) { .mt-eylem, .mt-araclar { width: 100%; } .mt-eylem .dn-btn, .mt-araclar .dn-btn { flex: 1; min-height: 44px; } }
