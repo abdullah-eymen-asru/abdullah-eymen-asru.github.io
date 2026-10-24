@@ -1220,7 +1220,10 @@ const ASIL_ISLEYICI = {
                   // satırının kendisini, boş bir satırı okurdu) — bu yüzden
                   // configBlokunuOku ile TÜM bloğun ham metnini alıp
                   // karşılaştırıyoruz (bkz. o fonksiyonun yorum notu).
-                  if (configBlokunuOku(yeniIcerik, "social") !== configBlokunuOku(eskiIcerik, "social")) {
+                  // "social_categories:" (anasayfa bağlantı kategorileri) da AYNI özelliğe bağlıdır: ayrı blok olduğu için ayrıca karşılaştırılır,
+                  // aksi hâlde baglanti_yonetimi kapalı bir admin kategori adlarını/silmeyi bu yoldan değiştirebilirdi.
+                  if (configBlokunuOku(yeniIcerik, "social") !== configBlokunuOku(eskiIcerik, "social")
+                      || configBlokunuOku(yeniIcerik, "social_categories") !== configBlokunuOku(eskiIcerik, "social_categories")) {
                     ozellikAnahtarlari.push("baglanti_yonetimi");
                   }
                 }
