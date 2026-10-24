@@ -24,6 +24,7 @@ const ACIKLAMA = {
   "users-mesajlar": "Sohbet ve mesajlar.",
   "tool-donusturucu": "PDF/Word/görsel dönüştür, tarayıcıda düzenle.",
   "tool-belge-tarayici": "Belgeleri tara, birleştir, boyutunu küçült; PDF/ZIP olarak indir.",
+  "tool-metadata": "Fotoğraf, video, Office, PDF ve ZIP dosyalarındaki gizli üst veriyi (konum, yazar, tarih) temizle.",
   "tool-havastil": "Hava durumuna göre katman, ayakkabı ve renk önerisi (CLO motoru) + doğrulanmış haber taktiği.",
   "sys-guvenlik": "Admin güvenliği, denetim ve onaylar.",
   "sys-yetki": "Rol bazlı yetkiler ve erişim kalkanı.",
