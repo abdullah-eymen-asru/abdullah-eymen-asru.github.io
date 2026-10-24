@@ -1,5 +1,6 @@
 /*
- * assets/js/uye-disa-aktar/yetki-paneli.js — "Üye Verisi İndirme" sekmesi (sys-uye-aktarim, SADECE Site Sahibi)
+ * assets/js/uye-disa-aktar/yetki-paneli.js — "Üye Verisi İndirme" sekmesi (Site Sahibi + Yetki Ayarları erişimi açık Yönetici; migration 0110)
+ * Yönetici için güvenli devir: kendi iznini değiştiremez, kendi kapsamından geniş izin veremez, indirme geçmişini silemez (kurallar SQL'dedir).
  * -----------------------------------------------------------------------
  * Sade akış: her yönetici için tek satır → "Düzenle" → üç seçenek (Erişim yok · Tüm üyeler · Belirli roller),
  * isteğe bağlı gelişmiş kısım (tek tek üye ekle / hariç tut). Altında indirme geçmişi (tam ad, seç, sil).
@@ -25,19 +26,21 @@ function el(etiket, ozellikler = {}, ...cocuklar) {
 
 const HEDEF_ROLLER = ["user", "special_user", "editor", "manager", "admin"];
 const hataMetni = (h) => (/does not exist|42883|PGRST202|schema cache/i.test(h?.message || h?.code || "") ? "Gerekli migration (0069 ve 0071) henüz çalıştırılmamış görünüyor: dosyaları SQL Editor'de sırayla çalıştır." : h?.message || String(h));
+const eposta = (u) => (u?.email || "").trim();
+const aramaMetni = (u) => `${(u?.full_name || "")} ${[u?.first_name, u?.last_name].filter(Boolean).join(" ")} ${eposta(u)}`.toLocaleLowerCase("tr");
 const tamAd = (u) => (u?.full_name || "").trim() || [u?.first_name, u?.last_name].filter(Boolean).join(" ").trim() || "İsimsiz üye";
 const bas = (ad) => (ad.trim()[0] || "?").toLocaleUpperCase("tr");
 
 /** Arama kutulu üye seçici: seçilenler çip olarak listelenir. */
 function uyeSecici(baslik, tumUyeler, baslangic) {
   const secili = new Map(baslangic.map((id) => [id, tumUyeler.find((u) => u.id === id)]));
-  const ara = el("input", { type: "search", placeholder: "Ad ara…", "aria-label": `${baslik}: üye ara` });
+  const ara = el("input", { type: "search", placeholder: "Ad ya da e-posta ara…", "aria-label": `${baslik}: üye ara (ad / e-posta)` });
   const sec = el("select", { "aria-label": `${baslik}: üye seç` });
   const cipler = el("div", { class: "uya-yp-cipler" });
-  const etiket = (u) => `${tamAd(u)} · ${ROL_ETIKETLERI[u?.role] || "?"}`;
+  const etiket = (u) => `${tamAd(u)}${eposta(u) ? ` <${eposta(u)}>` : ""} · ${ROL_ETIKETLERI[u?.role] || "?"}`;
   const ciz = () => {
     const q = ara.value.trim().toLocaleLowerCase("tr");
-    sec.replaceChildren(el("option", { value: "", text: "Üye seç…" }), ...tumUyeler.filter((u) => !secili.has(u.id) && (!q || tamAd(u).toLocaleLowerCase("tr").includes(q))).slice(0, 80).map((u) => el("option", { value: u.id, text: etiket(u) })));
+    sec.replaceChildren(el("option", { value: "", text: "Üye seç…" }), ...tumUyeler.filter((u) => !secili.has(u.id) && (!q || aramaMetni(u).includes(q))).slice(0, 80).map((u) => el("option", { value: u.id, text: etiket(u) })));
     cipler.replaceChildren(...[...secili.entries()].map(([id, u]) => el("span", { class: "uya-yp-cip" }, etiket(u), el("button", { type: "button", "aria-label": "Kaldır", text: "×", onclick: () => (secili.delete(id), ciz()) }))));
   };
   ara.addEventListener("input", ciz);
@@ -67,18 +70,24 @@ async function kur() {
   if (!kok || kok.dataset.hazir) return;
   kok.dataset.hazir = "1";
 
-  const [yon, uye] = await Promise.all([supabase.rpc("owner_uye_aktarim_yoneticileri"), supabase.from("profiles").select("id, full_name, first_name, last_name, role").order("full_name")]);
+  const [yon, uye] = await Promise.all([supabase.rpc("owner_uye_aktarim_yoneticileri"), supabase.from("profiles").select("id, full_name, first_name, last_name, email, role").order("full_name")]);
   if (yon.error || uye.error) {
     kok.replaceChildren(el("p", { class: "muted", text: hataMetni(yon.error || uye.error) }));
     return;
   }
+  const { data: oturum } = await supabase.auth.getUser();
+  const { data: benProfil } = oturum?.user ? await supabase.from("profiles").select("role").eq("id", oturum.user.id).maybeSingle() : { data: null };
+  const sahip = benProfil?.role === "owner";                 // yönetici: kendi satırı kilitli, geçmiş silme yok (SQL de reddeder)
   const yoneticiler = yon.data || [];
+  let yoneticiAra = "";
   const tumUyeler = (uye.data || []).filter((u) => u.role !== "owner");
 
   /* ---------------- 1) Yöneticiler ---------------- */
   const liste = el("div", { class: "uya-yp-liste" });
   const listeBaslik = el("div", { class: "uya-yp-liste-baslik" });
-  const listeKutu = el("div", { class: "uya-yp-kaydirma" }, listeBaslik, liste);
+  const yoneticiAraGirdi = el("input", { type: "search", class: "uya-yp-ara", placeholder: "Yönetici ara (ad ya da e-posta)…", "aria-label": "Yönetici ara" });
+  yoneticiAraGirdi.addEventListener("input", () => { yoneticiAra = yoneticiAraGirdi.value.trim().toLocaleLowerCase("tr"); listeCiz(); });
+  const listeKutu = el("div", { class: "uya-yp-kaydirma" }, yoneticiAraGirdi, listeBaslik, liste);
   const yenile = async () => {
     const { data, error } = await supabase.rpc("owner_uye_aktarim_yoneticileri");
     if (error) return showMessage(mesaj, "Liste yenilenemedi: " + hataMetni(error), "error");
@@ -131,13 +140,15 @@ async function kur() {
   };
 
   const listeCiz = () => {
-    listeBaslik.textContent = yoneticiler.length ? `${yoneticiler.length} yönetici` : "";
+    const gorunen = yoneticiAra ? yoneticiler.filter((y) => `${y.yetkili_ad} ${y.yetkili_email || ""}`.toLocaleLowerCase("tr").includes(yoneticiAra)) : yoneticiler;
+    listeBaslik.textContent = yoneticiler.length ? (yoneticiAra ? `${gorunen.length} / ${yoneticiler.length} yönetici` : `${yoneticiler.length} yönetici`) : "";
     listeBaslik.hidden = !yoneticiler.length;
     liste.replaceChildren(
-      ...(yoneticiler.length
-        ? yoneticiler.map((y) => {
+      ...(gorunen.length
+        ? gorunen.map((y) => {
             const alan = el("div", { class: "uya-yp-duzen-alani", hidden: true });
-            const btn = el("button", { type: "button", class: "btn-secondary csp-w-auto", text: "Düzenle", "aria-expanded": "false" });
+            const kilitli = !sahip && y.kendisi;                  // yönetici kendi iznini değiştiremez
+            const btn = el("button", { type: "button", class: "btn-secondary csp-w-auto", text: kilitli ? "Yalnızca Site Sahibi" : "Düzenle", "aria-expanded": "false", disabled: kilitli || null });
             btn.addEventListener("click", () => {
               const acik = !alan.hidden;
               if (acik) {
@@ -149,9 +160,9 @@ async function kur() {
               }
               btn.setAttribute("aria-expanded", String(!acik));
             });
-            return el("div", { class: "uya-yp-satir" }, el("div", { class: "uya-yp-ust" }, el("span", { class: "uya-yp-avatar", text: bas(y.yetkili_ad) }), el("div", { class: "uya-yp-kimlik" }, el("strong", { text: y.yetkili_ad }), durumRozeti(y)), btn), alan);
+            return el("div", { class: "uya-yp-satir" }, el("div", { class: "uya-yp-ust" }, el("span", { class: "uya-yp-avatar", text: bas(y.yetkili_ad) }), el("div", { class: "uya-yp-kimlik" }, el("strong", { text: y.yetkili_ad }), y.yetkili_email ? el("small", { class: "muted", text: y.yetkili_email }) : null, durumRozeti(y)), btn), alan);
           })
-        : [el("p", { class: "muted", text: "Henüz yönetici rolünde üye yok. İzin yalnızca Yönetici rolündeki üyelere verilebilir." })])
+        : [el("p", { class: "muted", text: yoneticiAra ? "Aramayla eşleşen yönetici yok." : "Henüz yönetici rolünde üye yok. İzin yalnızca Yönetici rolündeki üyelere verilebilir." })])
     );
   };
   listeCiz();
@@ -199,14 +210,14 @@ async function kur() {
     gecmisKutu.replaceChildren(
       el("div", { class: "uya-yp-gecmis-ust" },
         el("h3", { text: "İndirme geçmişi" }),
-        kayitlar.length
+        kayitlar.length && sahip
           ? el("div", { class: "uya-yp-gecmis-eylem" },
               el("button", { type: "button", class: "btn-secondary csp-w-auto", text: secimSayisi ? `Seçilenleri sil (${secimSayisi})` : "Seçilenleri sil", disabled: !secimSayisi, onclick: () => sil([...secili], false) }),
               el("button", { type: "button", class: "btn-danger csp-w-auto", text: "Tümünü temizle", onclick: () => sil([], true) }))
           : null),
       kayitlar.length
         ? el("div", { class: "uya-yp-tablo", role: "table" },
-            el("div", { class: "uya-yp-tr uya-yp-tr--baslik", role: "row" }, el("label", { class: "uya-yp-hucre-kutu" }, hepsi), el("span", { text: "Kim indirdi" }), el("span", { text: "Biçim" }), el("span", { text: "Üye" }), el("span", { text: "Tarih" })),
+            el("div", { class: "uya-yp-tr uya-yp-tr--baslik", role: "row" }, sahip ? el("label", { class: "uya-yp-hucre-kutu" }, hepsi) : el("span"), el("span", { text: "Kim indirdi" }), el("span", { text: "Biçim" }), el("span", { text: "Üye" }), el("span", { text: "Tarih" })),
             kayitlar.map((k) => {
               const kutu = el("input", { type: "checkbox", "aria-label": `${k.yetkili_ad} kaydını seç` });
               kutu.checked = secili.has(k.id);
@@ -215,7 +226,7 @@ async function kur() {
                 gecmisCiz();
               });
               return el("div", { class: "uya-yp-tr", role: "row" },
-                el("label", { class: "uya-yp-hucre-kutu" }, kutu),
+                sahip ? el("label", { class: "uya-yp-hucre-kutu" }, kutu) : el("span"),
                 el("span", { class: "uya-yp-kim" }, el("strong", { text: k.yetkili_ad }), el("small", { class: "muted", text: ROL_ETIKETLERI[k.yetkili_rol] || "" })),
                 el("span", { text: (k.bicim || "—").toUpperCase() }),
                 el("span", { text: `${k.adet}` }),
@@ -235,7 +246,7 @@ async function kur() {
   };
 
   kok.replaceChildren(
-    el("section", { class: "uya-yp-kart" }, el("h3", { text: "Yöneticiler" }), el("p", { class: "muted uya-yp-aciklama", text: "Bir yöneticinin üye bilgilerini indirmesine izin ver. Sen her zaman tüm üyeleri indirebilirsin; Site Sahibi'nin verisini kimse indiremez." }), listeKutu),
+    el("section", { class: "uya-yp-kart" }, el("h3", { text: "Yöneticiler" }), el("p", { class: "muted uya-yp-aciklama", text: (sahip ? "Bir yöneticinin üye bilgilerini indirmesine izin ver. Sen her zaman tüm üyeleri indirebilirsin; Site Sahibi'nin verisini kimse indiremez." : "Yönetici olarak yalnızca KENDİ kapsamının içinde, başka yöneticilere izin verebilirsin; kendi iznini ve kapsamını aşan izinleri yalnızca Site Sahibi değiştirir. İndirme geçmişini görebilirsin, silemezsin.") }), listeKutu),
     el("section", { class: "uya-yp-kart" }, gecmisKutu)
   );
   await gecmisYukle();
