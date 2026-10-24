@@ -2,7 +2,7 @@
  * assets/js/sistem-yedek/ice-aktar.js — Akıllı Geri Yükleme / İçe Aktarma (yalnızca Site Sahibi).  Migration 0081.
  * -----------------------------------------------------------------------
  *  Girdi: sistemin indirdiği TAM .zip yedeği (ZIP64 dahil) ve/veya tekil/birkaç dosya.
- *   • .zip      → veritabani/json/*.json (+ notlar/json/*.json), r2/MANIFEST.json + r2 dosyaları otomatik ayrıştırılır.
+ *   • .zip      → veritabani/json/*.json (+ notlar/json/*.json, akademik/json/*.json), r2/MANIFEST.json + r2 dosyaları otomatik ayrıştırılır.
  *                 Yedek olmayan ZIP'ler "tekil dosya yığını" gibi işlenir.
  *   • .json     → dosya adı tablo adıysa o tablo; değilse KOLON İMZASI (anahtarların tablo kolonlarıyla örtüşmesi).
  *   • PDF/görsel/.sifreli → ad+boyut ve anahtar adıyla veritabanındaki kayıtlarla eşleştirilir (sistem_r2_dosya_esle).
@@ -94,13 +94,13 @@ async function analizEt(dosyalar, sema, ilerleme, ctx = {}) {
     let satirlar;
     try { satirlar = await jsonSatirlari(blob); } catch (h) { notlar.push(`${etiket}: atlandı — ${h.message}`); return; }
     const kokAd = ad.split("/").pop().replace(/\.json$/i, "");
-    if (Rewrap.OZEL_TABLOLAR.includes(kokAd) && /(^|\/)veritabani\/json\//.test(ad)) (ozel[kokAd] ||= []).push(...satirlar);
+    if (Rewrap.OZEL_TABLOLAR.includes(kokAd) && /(^|\/)(veritabani|akademik)\/json\//.test(ad)) (ozel[kokAd] ||= []).push(...satirlar);
     if (!satirlar.length) { bosTablolar.push(kokAd); return; }
     const t = tabloTespit(ad, satirlar, sema);
     if (!t) {
       // ÜYE geri yüklemesi yalnızca kendi notlarını/kaynaklarını/dosyalarını yazar; hesap, rol, yetki, anahtar, onay ve
       // mesajlaşma kayıtları kasıtlı olarak yazılmaz. Bunlar "belirlenemedi" DEĞİL, bilinçli kapsam dışıdır.
-      if (ctx.uye && /(^|\/)veritabani\/json\//.test(ad)) { kapsamDisi.push(kokAd); return; }
+      if (ctx.uye && /(^|\/)veritabani\/json\//.test(ad)) { kapsamDisi.push(kokAd); return; }   // üye: akademik/json ve notlar/json izinlidir
       notlar.push(`${etiket}: hangi tabloya ait olduğu belirlenemedi — atlanacak.`); return;
     }
     tabloEkle(t.tablo, satirlar, etiket, t.yontem);
@@ -113,7 +113,7 @@ async function analizEt(dosyalar, sema, ilerleme, ctx = {}) {
       let z;
       try { z = await zipAc(f); } catch (h) { notlar.push(`${ad}: ${h.message}`); continue; }
       const manifestG = z.bul("r2/MANIFEST.json");
-      const yedekMi = !!z.bul("manifest.json") || !!manifestG || z.girisler.some((g) => /^(veritabani|notlar)\/json\//.test(g.ad));
+      const yedekMi = !!z.bul("manifest.json") || !!manifestG || z.girisler.some((g) => /^(veritabani|notlar|akademik)\/json\//.test(g.ad));
       const manifestYollari = new Set();
       if (manifestG) {
         try {
@@ -136,7 +136,7 @@ async function analizEt(dosyalar, sema, ilerleme, ctx = {}) {
         if (/^(manifest\.json|OKUBENI\.txt)$/.test(g.ad)) continue;
         if (/\.json$/i.test(g.ad)) {
           if (/^notlar\/ekler\//.test(g.ad)) continue;
-          if (yedekMi && !/^(veritabani|notlar)\/json\//.test(g.ad)) continue;
+          if (yedekMi && !/^(veritabani|notlar|akademik)\/json\//.test(g.ad)) continue;
           await jsonIsle(g.ad, await z.oku(g), `${ad} › ${g.ad}`);
         } else if (!yedekMi) {
           gevsek.push({ ad: g.ad.split("/").pop(), boyut: g.usize, al: () => z.oku(g), etiket: `${ad} › ${g.ad}` });
