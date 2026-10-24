@@ -95,8 +95,14 @@ body {
      belirmesine) neden oluyordu. overflow-x:hidden bu taşmayı sayfa
      seviyesinde güvenli bir şekilde keser. (Yukarıdaki <html> kuralıyla
      birlikte, taşmanın kaynağı ister <body>'in kendi çocukları ister
-     daha üstteki bir katman olsun, ikisi de kesilir.) */
-  overflow-x: hidden;
+     daha üstteki bir katman olsun, ikisi de kesilir.)
+
+     ÖNEMLİ (sticky üst menü): <html> zaten overflow-x:hidden iken <body>'e de "hidden" vermek <body>'yi KENDİ kaydırma kapsayıcısı
+     yapar (kök overflow'u görünür değilse body'ninki viewport'a taşınmaz). Sayfayı kaydıran artık body olmadığı için, body'nin
+     çocuğu olan "position: sticky" .site-header HİÇ yapışmaz ve akıllı üst menü (akilli-header.js) geri gelemez. "clip" aynı yatay
+     taşma kesmesini kaydırma kapsayıcısı OLUŞTURMADAN yapar (Chrome 90+, Firefox 81+, Safari 16+); eski tarayıcıda yok sayılır ve
+     yatay taşmayı yine <html>'deki hidden keser. */
+  overflow-x: clip;
   width: 100%;
 }
 
