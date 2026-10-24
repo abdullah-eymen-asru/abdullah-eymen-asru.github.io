@@ -4895,15 +4895,50 @@ init();
 // yakalar. Dosyanın sonuna kadar başka üst seviye anahtar yoksa dosya
 // sonuna kadar yakalar ($). "s" (dotAll) bayrağı YOK çünkü '.' zaten her
 // satırı [\s\S] ile kapsıyoruz; "m" ile ^ / $ satır başı/sonunu eşliyoruz.
-/* Anasayfa bağlantı kategorileri (index.md bu sırayla gruplar). Kategorisi olmayan eski girdiler anahtara göre tahmin edilir. */
-const BAGLANTI_KATEGORILERI = [
-  ["akademik", "Akademik & Araştırma"], ["sosyal", "Sosyal & İletişim"], ["yazilim", "Yazılım & Projeler"], ["okuma", "Okuma & Kültür"],
+/* Anasayfa bağlantı KATEGORİLERİ: artık sabit değil — panelden eklenir/silinir/yeniden adlandırılır. _config.yml'de "social_categories:" bloğunda
+ * { id: "Görünen Ad" } olarak tutulur ve HER kayıtta Türkçe alfabetik (tr) sırayla yazılır; index.md dosyadaki sırayı olduğu gibi kullanır.
+ * Kategorisi olmayan / silinmiş kategoriye bağlı bağlantılar anasayfada en altta "Diğer" başlığı altında görünür (hiçbir bağlantı kaybolmaz). */
+const VARSAYILAN_KATEGORILER = [
+  { id: "akademik", ad: "Akademik & Araştırma" }, { id: "okuma", ad: "Okuma & Kültür" },
+  { id: "sosyal", ad: "Sosyal & İletişim" }, { id: "yazilim", ad: "Yazılım & Projeler" },
 ];
+const trKarsilastir = new Intl.Collator("tr", { sensitivity: "base", numeric: true }).compare;
+const kategorileriSirala = (liste) => [...liste].sort((x, y) => trKarsilastir(x.ad, y.ad) || x.id.localeCompare(y.id));
+let BAGLANTI_KATEGORILERI = kategorileriSirala(VARSAYILAN_KATEGORILER);
 const BAGLANTI_KATEGORI_TAHMIN = {
   github: "yazilim", playstore: "yazilim", linkedin: "sosyal", twitter: "sosyal", instagram: "sosyal", youtube: "sosyal", nsosyal: "sosyal",
   orcid: "akademik", academia: "akademik", researchgate: "akademik", scholar: "akademik", kitap1000: "okuma", substack: "okuma",
 };
-const baglantiKategorisiGecerli = (k) => BAGLANTI_KATEGORILERI.some(([id]) => id === k);
+const baglantiKategorisiGecerli = (k) => !!k && BAGLANTI_KATEGORILERI.some((c) => c.id === k);
+
+const SOCIAL_KATEGORI_REGEX = /^social_categories:[ \t]*\r?\n((?:[ \t]+.*(?:\r?\n|$))*)/m;
+/** "social_categories:" bloğunu [{id, ad}] olarak okur; blok yoksa null (varsayılanlar kullanılır). */
+function socialKategorileriniAyristir(icerik) {
+  const m = icerik.match(SOCIAL_KATEGORI_REGEX);
+  if (!m) return null;
+  const sonuc = [];
+  for (const satir of m[1].split(/\r?\n/)) {
+    const e = satir.match(/^[ \t]+([A-Za-z0-9_-]+):[ \t]*("(?:[^"\\]|\\.)*"|'[^']*'|[^#\r\n]*?)[ \t]*(#.*)?$/);
+    if (!e) continue;
+    let v = e[2].trim();
+    if (v.startsWith('"') && v.endsWith('"') && v.length >= 2) v = v.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+    else if (v.startsWith("'") && v.endsWith("'") && v.length >= 2) v = v.slice(1, -1).replace(/''/g, "'");
+    sonuc.push({ id: e[1], ad: v || e[1] });
+  }
+  return kategorileriSirala(sonuc);
+}
+function socialKategoriBlokuUret(kategoriler) {
+  const satirlar = ["social_categories:"];
+  for (const { id, ad } of kategorileriSirala(kategoriler)) satirlar.push(`  ${id}: ${yamlCiftTirnakliYaz(ad)}`);
+  return satirlar.join("\n") + "\n";
+}
+function configIcindeKategorileriYaz(icerik, kategoriler) {
+  const blok = socialKategoriBlokuUret(kategoriler);
+  if (SOCIAL_KATEGORI_REGEX.test(icerik)) return icerik.replace(SOCIAL_KATEGORI_REGEX, blok);
+  // Blok yoksa "social:" bloğunun hemen ÖNÜNE ekle (index.md ikisini birlikte okur); o da yoksa dosya sonuna.
+  if (SOCIAL_BLOK_REGEX.test(icerik)) return icerik.replace(/^social:[ \t]*\r?\n/m, (m0) => `${blok}\n${m0}`);
+  return `${icerik}${icerik.endsWith("\n") ? "" : "\n"}${blok}`;
+}
 
 const SOCIAL_BLOK_REGEX = /^social:[ \t]*\r?\n((?:[ \t]+.*(?:\r?\n|$))*)/m;
 
@@ -4943,7 +4978,8 @@ function socialBlokunuAyristir(icerik) {
       key,
       label: temizle(labelM ? labelM[1] : "") || key,
       url: temizle(urlM ? urlM[1] : ""),
-      category: baglantiKategorisiGecerli(kat) ? kat : (BAGLANTI_KATEGORI_TAHMIN[key] || "sosyal"),
+      // Açıkça yazılmış kategori geçerliyse o; yazılmamışsa (eski girdi) anahtardan tahmin; ikisi de yoksa "" (kategorisiz → "Diğer").
+      category: katM ? (baglantiKategorisiGecerli(kat) ? kat : "") : (baglantiKategorisiGecerli(BAGLANTI_KATEGORI_TAHMIN[key]) ? BAGLANTI_KATEGORI_TAHMIN[key] : ""),
       // Dosyadan okunan HER girdi "mevcut" sayılır — key'i SABİT kalır,
       // kullanıcı etiketi sonradan değiştirse bile (bkz. baglantiYeniEkle
       // ve baglantilariKaydet'teki "yeniMi" mantığı). Aksi hâlde her
@@ -4971,7 +5007,7 @@ function socialBlokuUret(girdiler) {
   for (const { key, label, url, category } of girdiler) {
     satirlar.push(`  ${key}:`);
     satirlar.push(`    label: ${yamlCiftTirnakliYaz(label)}`);
-    satirlar.push(`    category: ${yamlCiftTirnakliYaz(baglantiKategorisiGecerli(category) ? category : "sosyal")}`);
+    satirlar.push(`    category: ${yamlCiftTirnakliYaz(baglantiKategorisiGecerli(category) ? category : "")}`);
     satirlar.push(`    url: ${yamlCiftTirnakliYaz(url)}`);
   }
   return satirlar.join("\n") + "\n";
@@ -5044,7 +5080,7 @@ function baglantiSatiriOlustur(girdi, index) {
     </div>
     <div class="form-field">
       <label>Kategori</label>
-      <select class="bg-kategori-input">${BAGLANTI_KATEGORILERI.map(([id, ad]) => `<option value="${id}"${(girdi.category || "sosyal") === id ? " selected" : ""}>${ad}</option>`).join("")}</select>
+      <select class="bg-kategori-input"><option value=""${!girdi.category ? " selected" : ""}>— Kategorisiz (Diğer) —</option>${BAGLANTI_KATEGORILERI.map((c) => `<option value="${escapeHtml(c.id)}"${girdi.category === c.id ? " selected" : ""}>${escapeHtml(c.ad)}</option>`).join("")}</select>
     </div>
     <div class="form-field">
       <label>Bağlantı (URL)</label>
@@ -5081,6 +5117,94 @@ function baglantiSatiriOlustur(girdi, index) {
   return satir;
 }
 
+
+/* ---- Kategori yönetimi paneli (ekle / yeniden adlandır / sil; her zaman alfabetik) ---- */
+function kategoriPaneliniCiz() {
+  let kutu = document.getElementById("bg-kategori-kutu");
+  if (!kutu) {
+    kutu = document.createElement("section");
+    kutu.id = "bg-kategori-kutu";
+    kutu.className = "bg-kat-kutu";
+    document.getElementById("bg-liste").before(kutu);
+  }
+  kutu.replaceChildren();
+  const baslik = document.createElement("h3");
+  baslik.textContent = "Kategoriler";
+  const bilgi = document.createElement("p");
+  bilgi.className = "muted";
+  bilgi.textContent = "İstediğin zaman yeni kategori ekleyebilir, adını değiştirebilir ya da silebilirsin. Kategoriler anasayfada ve burada her zaman Türkçe alfabetik sırada görünür. Silinen kategorideki bağlantılar silinmez; anasayfada en altta “Diğer” başlığında kalır.";
+  const liste = document.createElement("ul");
+  liste.className = "bg-kat-liste";
+  const kullanimSayisi = (id) => BAGLANTILAR_LISTESI.filter((g) => g.category === id).length;
+  for (const kat of BAGLANTI_KATEGORILERI) {
+    const li = document.createElement("li");
+    li.className = "bg-kat-satir";
+    const girdi = document.createElement("input");
+    girdi.type = "text";
+    girdi.value = kat.ad;
+    girdi.maxLength = 60;
+    girdi.setAttribute("aria-label", `${kat.ad} kategorisinin adı`);
+    girdi.addEventListener("change", () => {
+      const yeniAd = girdi.value.trim();
+      const cakisma = BAGLANTI_KATEGORILERI.some((c) => c.id !== kat.id && trKarsilastir(c.ad, yeniAd) === 0);
+      if (!yeniAd || cakisma) { girdi.value = kat.ad; return; }
+      kat.ad = yeniAd;
+      BAGLANTI_KATEGORILERI = kategorileriSirala(BAGLANTI_KATEGORILERI);
+      kategoriPaneliniCiz();
+      baglantilarListesiniCiz();
+    });
+    const sayi = document.createElement("span");
+    sayi.className = "muted bg-kat-sayi";
+    sayi.textContent = `${kullanimSayisi(kat.id)} bağlantı`;
+    const sil = document.createElement("button");
+    sil.type = "button";
+    sil.className = "btn-danger bg-kat-sil";
+    sil.textContent = "Sil";
+    sil.addEventListener("click", () => {
+      const n = kullanimSayisi(kat.id);
+      const ek = n ? ` Bu kategorideki ${n} bağlantı silinmez; “Kategorisiz” kalır ve anasayfada en altta “Diğer” başlığında görünür.` : "";
+      if (!confirm(`“${kat.ad}” kategorisi silinsin mi?${ek}`)) return;
+      for (const g of BAGLANTILAR_LISTESI) if (g.category === kat.id) g.category = "";
+      BAGLANTI_KATEGORILERI = BAGLANTI_KATEGORILERI.filter((c) => c.id !== kat.id);
+      kategoriPaneliniCiz();
+      baglantilarListesiniCiz();
+    });
+    li.append(girdi, sayi, sil);
+    liste.append(li);
+  }
+  if (!BAGLANTI_KATEGORILERI.length) {
+    const bos = document.createElement("li");
+    bos.className = "muted";
+    bos.textContent = "Hiç kategori yok: tüm bağlantılar anasayfada “Diğer” başlığında görünür. Aşağıdan yeni kategori ekleyebilirsin.";
+    liste.append(bos);
+  }
+  const yeni = document.createElement("div");
+  yeni.className = "bg-kat-yeni";
+  const yeniGirdi = document.createElement("input");
+  yeniGirdi.type = "text";
+  yeniGirdi.maxLength = 60;
+  yeniGirdi.placeholder = "Yeni kategori adı (ör. Sanat & Müzik)";
+  yeniGirdi.setAttribute("aria-label", "Yeni kategori adı");
+  const ekle = document.createElement("button");
+  ekle.type = "button";
+  ekle.className = "btn-secondary";
+  ekle.textContent = "Kategori Ekle";
+  const ekleIsle = () => {
+    const ad = yeniGirdi.value.trim();
+    if (!ad) return;
+    if (BAGLANTI_KATEGORILERI.some((c) => trKarsilastir(c.ad, ad) === 0)) { yeniGirdi.setCustomValidity("Bu kategori zaten var."); yeniGirdi.reportValidity(); yeniGirdi.setCustomValidity(""); return; }
+    const id = baglantiAnahtarUret(ad, BAGLANTI_KATEGORILERI.map((c) => c.id));
+    BAGLANTI_KATEGORILERI = kategorileriSirala([...BAGLANTI_KATEGORILERI, { id, ad }]);
+    kategoriPaneliniCiz();
+    baglantilarListesiniCiz();
+    document.getElementById("bg-kategori-kutu")?.querySelector(".bg-kat-yeni input")?.focus();
+  };
+  ekle.addEventListener("click", ekleIsle);
+  yeniGirdi.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); ekleIsle(); } });
+  yeni.append(yeniGirdi, ekle);
+  kutu.append(baslik, bilgi, liste, yeni);
+}
+
 function baglantilarListesiniCiz() {
   const liste = document.getElementById("bg-liste");
   liste.innerHTML = "";
@@ -5111,7 +5235,9 @@ async function baglantilariYukle() {
     if (!dosya) throw new Error("_config.yml repoda bulunamadı.");
     BAGLANTILAR_SHA = dosya.sha;
     const icerik = b64Decode(dosya.content.replace(/\n/g, ""));
+    BAGLANTI_KATEGORILERI = socialKategorileriniAyristir(icerik) || kategorileriSirala(VARSAYILAN_KATEGORILER);
     BAGLANTILAR_LISTESI = socialBlokunuAyristir(icerik);
+    kategoriPaneliniCiz();
     baglantilarListesiniCiz();
 
     document.getElementById("bg-form-alani").hidden = false;
@@ -5143,7 +5269,7 @@ function baglantiYeniEkle() {
     key: baglantiAnahtarUret("", mevcutAnahtarlar),
     label: "",
     url: "",
-    category: "sosyal",
+    category: "",
     yeniMi: true,
   });
   baglantilarListesiniCiz();
@@ -5188,7 +5314,7 @@ async function baglantilariKaydet() {
       key,
       label: temizLabel || key,
       url: (g.url || "").trim(),
-      category: baglantiKategorisiGecerli(g.category) ? g.category : "sosyal",
+      category: baglantiKategorisiGecerli(g.category) ? g.category : "",
     };
   });
 
@@ -5210,7 +5336,7 @@ async function baglantilariKaydet() {
     const dosya = await ghGetContents(CONFIG_YOLU);
     if (!dosya) throw new Error("_config.yml repoda bulunamadı.");
     const icerik = b64Decode(dosya.content.replace(/\n/g, ""));
-    const guncel = configIcindeSocialBlokunuYaz(icerik, gonderilecek);
+    const guncel = configIcindeKategorileriYaz(configIcindeSocialBlokunuYaz(icerik, gonderilecek), BAGLANTI_KATEGORILERI);
     await ghPutFile(CONFIG_YOLU, b64Encode(guncel), "_config.yml: bağlantılar (social) güncellendi", dosya.sha);
 
     showMessage(msgEl, "Kaydedildi ve GitHub'a commit edildi — 1-2 dakika içinde anasayfada güncellenecektir.", "success");
