@@ -2,7 +2,7 @@
  * assets/js/donusturucu/buyuk-dosya.js — Büyük dosya eşikleri ve YEREL KOMUT SATIRI yönergeleri (Dönüştürücü + Belge Tarayıcı).
  * DÜRÜST MİMARİ NOTU: PDF/Word/görsel kütüphaneleri (pdf-lib, mammoth, canvas) belgenin TAMAMINI bellekte işler; bu yüzden bu iki araçta
  * sınır 250 MB'tır ve akış (Streams/OPFS) ile aşılamaz. Akışlı, belleğe okumayan işlem yalnızca Metadata Temizleyici'dedir
- * (metadata-motor.js). Bu dosya, sınırı aşan dosya için kullanıcıya doğru yerel aracı söyler; sessizce reddetmez.
+ * (metadata-temizleyici/motor.js). Bu dosya, sınırı aşan dosya için kullanıcıya doğru yerel aracı söyler; sessizce reddetmez.
  */
 export const UYARI_ESIGI = 100 * 1024 * 1024;   // bu boyuttan büyük dosya: "tek tek işle" uyarısı
 
