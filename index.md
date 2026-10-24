@@ -11,35 +11,60 @@ title: Anasayfa
   {% include hakkimda-kutusu.md %}
 
   {% comment %}
-    TÜM bağlantılar doğrudan görünür (açılır menü/pop-up YOK). _config.yml -> social: her girdinin "category" alanı (akademik | sosyal |
-    yazilim | okuma) gruplamayı belirler; panelden eklenen yeni girdiler de otomatik gelir. url boş girdiler atlanır.
-    Kategorisi yazılmamış eski girdiler "sosyal" grubuna düşer.
+    TÜM bağlantılar doğrudan görünür (açılır menü/pop-up YOK). Gruplar _config.yml -> social_categories (Yönetim Paneli'nden eklenir/silinir; dosyaya
+    HER ZAMAN Türkçe alfabetik sırada yazılır, burada o sıra aynen kullanılır). Her social girdisinin "category" alanı bir kategori kimliğidir.
+    Kategorisi olmayan / silinmiş kategoriye bağlı girdiler en altta "Diğer" grubunda görünür. url boş girdiler atlanır.
   {% endcomment %}
-  {% assign kategoriler = "akademik|Akademik & Araştırma,sosyal|Sosyal & İletişim,yazilim|Yazılım & Projeler,okuma|Okuma & Kültür" | split: "," %}
+  {% assign kat_haritasi = site.social_categories %}
   <div class="baglanti-gruplar">
-    {% for kat in kategoriler %}
-      {% assign kv = kat | split: "|" %}
+    {% for kat in kat_haritasi %}
+      {% assign kat_id = kat[0] %}
+      {% assign kat_ad = kat[1] %}
       {% capture grup_html %}
         {% for baglanti in site.social %}
           {% assign veri = baglanti[1] %}
-          {% assign bk = veri.category | default: "sosyal" %}
-          {% if veri.url and veri.url != "" and bk == kv[0] %}
+          {% if veri.url and veri.url != "" and veri.category == kat_id %}
             {% assign ikon_anahtar = baglanti[0] %}
             <a href="{{ veri.url | escape }}" target="_blank" rel="noopener noreferrer">{% include baglanti-ikon.html anahtar=ikon_anahtar %}<span>{{ veri.label | default: ikon_anahtar | escape }}</span></a>
           {% endif %}
         {% endfor %}
-        {% if kv[0] == "okuma" and site.substack_url and site.substack_url != "" %}
+        {% if kat_id == "okuma" and site.substack_url and site.substack_url != "" %}
           <a href="{{ site.substack_url }}" target="_blank" rel="noopener noreferrer">{% include baglanti-ikon.html anahtar="substack" %}<span>Substack</span></a>
         {% endif %}
       {% endcapture %}
       {% assign grup_temiz = grup_html | strip %}
       {% if grup_temiz != "" %}
-      <section class="baglanti-grup" aria-label="{{ kv[1] }}">
-        <h2 class="baglanti-grup-baslik">{{ kv[1] }}</h2>
+      <section class="baglanti-grup" aria-label="{{ kat_ad }}">
+        <h2 class="baglanti-grup-baslik">{{ kat_ad }}</h2>
         <div class="baglanti-listesi">{{ grup_temiz }}</div>
       </section>
       {% endif %}
     {% endfor %}
+    {% comment %} DİĞER: kategorisiz ya da kategorisi silinmiş bağlantılar (+ "okuma" kategorisi yoksa Substack). Hiçbir bağlantı kaybolmaz. {% endcomment %}
+    {% capture diger_html %}
+      {% for baglanti in site.social %}
+        {% assign veri = baglanti[1] %}
+        {% assign bilinen = kat_haritasi[veri.category] %}
+        {% unless bilinen %}
+          {% if veri.url and veri.url != "" %}
+            {% assign ikon_anahtar = baglanti[0] %}
+            <a href="{{ veri.url | escape }}" target="_blank" rel="noopener noreferrer">{% include baglanti-ikon.html anahtar=ikon_anahtar %}<span>{{ veri.label | default: ikon_anahtar | escape }}</span></a>
+          {% endif %}
+        {% endunless %}
+      {% endfor %}
+      {% unless kat_haritasi["okuma"] %}
+        {% if site.substack_url and site.substack_url != "" %}
+          <a href="{{ site.substack_url }}" target="_blank" rel="noopener noreferrer">{% include baglanti-ikon.html anahtar="substack" %}<span>Substack</span></a>
+        {% endif %}
+      {% endunless %}
+    {% endcapture %}
+    {% assign diger_temiz = diger_html | strip %}
+    {% if diger_temiz != "" %}
+    <section class="baglanti-grup" aria-label="Diğer">
+      <h2 class="baglanti-grup-baslik">Diğer</h2>
+      <div class="baglanti-listesi">{{ diger_temiz }}</div>
+    </section>
+    {% endif %}
   </div>
 
   {% if site.cv_url and site.cv_url != "" %}
