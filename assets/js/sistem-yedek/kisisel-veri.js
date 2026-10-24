@@ -25,6 +25,7 @@ export function kisiselVeriCiz(kok, mesaj) {
 
   /* ---------------- dışa aktar ---------------- */
   const notlarK = kart("kv-notlar", "📝 Notlarım", "Kişisel notlar, alıntılar, kaynaklar (uçtan uca şifreli kalır).");
+  const akademikK = kart("kv-akademik", "📚 Akademik Kütüphanem", "Kaynak künyeleri, vurgu ve notların + PDF dosyaların (klasör yapısıyla).");
   const belgeK = kart("kv-belge", "📄 Yüklediğim belgeler", "Dosya yöneticisi ve kütüphanedeki kendi dosyaların.");
   const mesajK = kart("kv-mesaj", "💬 Mesajlarım (Yedek Kurtarma Koduyla şifreli)", "Sohbetlerin tarayıcıda çözülür ve 16 haneli Yedek Kurtarma Kodunla yeniden şifrelenir; başka hesaba taşınabilir.");
   const kodGirdi = el("input", { type: "text", id: "kv-kod", class: "sy-girdi", autocomplete: "off", autocapitalize: "characters", spellcheck: "false", maxlength: "19", inputmode: "text", "aria-label": "Yedek Kurtarma Kodu", placeholder: "XXXX-XXXX-XXXX-XXXX" });
@@ -35,7 +36,7 @@ export function kisiselVeriCiz(kok, mesaj) {
   const ilerleme = el("p", { class: "muted sy-not", role: "status", "aria-live": "polite" });
   const indir = dugme({ metin: "Kişisel yedeği oluştur ve indir", ikonAdi: "indir", tur: "birincil" });
   indir.addEventListener("click", async () => {
-    const bilesenler = []; if (notlarK.girdi.checked) bilesenler.push("notlar"); if (belgeK.girdi.checked) bilesenler.push("r2");
+    const bilesenler = []; if (notlarK.girdi.checked) bilesenler.push("notlar"); if (belgeK.girdi.checked) bilesenler.push("r2"); if (akademikK.girdi.checked) bilesenler.push("akademik");
     const mesajlar = mesajK.girdi.checked;
     if (!bilesenler.length && !mesajlar) return mesaj("En az bir öğe seç.");
     if (mesajlar) {
@@ -56,7 +57,7 @@ export function kisiselVeriCiz(kok, mesaj) {
     } catch (h) { try { await alici?.iptal?.(); } catch { /* yok say */ } mesaj(`Yedek alınamadı: ${hataMetni(h)}`); }
     finally { indir.disabled = false; ilerleme.textContent = ""; }
   });
-  const disaPanel = el("div", { class: "sy-sekme-panel" }, el("h2", { text: "Kişisel verilerimi dışa aktar" }), notlarK.etiket, belgeK.etiket, mesajK.etiket, parolaKutu, el("div", { class: "sy-eylemler" }, indir), ilerleme);
+  const disaPanel = el("div", { class: "sy-sekme-panel" }, el("h2", { text: "Kişisel verilerimi dışa aktar" }), notlarK.etiket, akademikK.etiket, belgeK.etiket, mesajK.etiket, parolaKutu, el("div", { class: "sy-eylemler" }, indir), ilerleme);
 
   /* ---------------- içe aktar ---------------- */
   const icKok = el("div", { class: "sy-alt" });
