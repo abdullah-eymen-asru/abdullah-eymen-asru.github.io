@@ -17,6 +17,7 @@ permalink: "/panel/dashboard.html"
 <link rel="stylesheet" href="{{ '/assets/css/sistem-yedek.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/donusturucu.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/belge-tarayici.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/css/metadata-temizleyici.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/havastil.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/demo.css' | relative_url }}">
 
@@ -1067,6 +1068,13 @@ permalink: "/panel/dashboard.html"
       <h1>Belge Tarayıcı &amp; Birleştirici</h1>
       <div id="bt-kok" class="bt-kok"><p class="muted">Yükleniyor...</p></div>
       <div id="bt-mesaj" class="auth-message" hidden role="status"></div>
+    </section>
+
+    <!-- Evrensel Metadata Temizleyici (assets/js/metadata-temizleyici/): Araçlar altında KENDİ sekmesi. %100 istemci. Yetki: Dönüştürücü ile aynı (can_use_converter). -->
+    <section class="dash-view" id="view-tool-metadata" hidden data-view="tool-metadata">
+      <h1>Metadata Temizleyici</h1>
+      <div id="mt-kok" class="mt-kok"><p class="muted">Yükleniyor...</p></div>
+      <div id="mt-mesaj" class="auth-message" hidden role="status"></div>
     </section>
 
     <!-- HavaStil (assets/js/havastil/panel.js): hava durumuna göre katman/giyim danışmanı. Yetki: Yetki Ayarları › Özellikler › HavaStil (varsayılan KAPALI; owner her zaman).
