@@ -5721,9 +5721,7 @@ function wireYetkiAyarlari() {
     // Yetkili Yönetici: sekmeler artık BOŞ KALMAZ. Notlarım (kişi bazlı) ve Dosya Yöneticisi izinleri gerçekten yüklenir; sunucu
     // (migration 0108) yalnızca admin DIŞI roller/kişiler için yazmaya izin verir. Erişim Kalkanı: üye bazlı izin listesi Yöneticiye açık, site geneli ayarlar Site Sahibi'nde (boş ekran yok).
     // Erişim Kalkanı: panel yüklenir; Yönetici için yalnızca üye bazlı "kilitli siteyi görme izni" listesi (migration 0109), site geneli ayarlar Site Sahibi'nde.
-    import("../gatekeeper/kalkan-paneli.js").catch((err) => console.warn("Erişim Kalkanı paneli yüklenemedi:", err));
     import("../notlar/yetki-paneli.js").then((m) => m.kur()).catch((err) => console.warn("Kullanıcı bazlı yetki paneli yüklenemedi:", err));
-    import("../r2-arsiv/izin-paneli.js").catch((err) => console.warn("Dosya Yöneticisi izin paneli yüklenemedi:", err));
     return;
   }
 
