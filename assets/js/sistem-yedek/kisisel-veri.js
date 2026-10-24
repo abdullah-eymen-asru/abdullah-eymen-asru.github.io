@@ -24,29 +24,42 @@ export function kisiselVeriCiz(kok, mesaj) {
   const uyari = el("p", { class: "sy-bilgi" }, ikon("kalkan"), el("span", { text: "Bu bölüm yalnızca SENİN verilerin içindir: notların, yüklediğin belgeler ve mesajların. Buradan yapılan içe aktarma site ayarlarını, rolleri ve yetkileri ASLA değiştirmez." }));
 
   /* ---------------- dışa aktar ---------------- */
-  const notlarK = kart("kv-notlar", "📝 Notlarım", "Kişisel notlar, alıntılar, kaynaklar (uçtan uca şifreli kalır).");
+  const notlarK = kart("kv-notlar", "📝 Notlarım", "Notların, alıntıların, kaynakların ve şifreli ekleri + Yedek Kurtarma Kodu bilgisi (kod olmadan açılamaz). Başka hesapta içe aktarırken AYNI kodla açılır.");
   const akademikK = kart("kv-akademik", "📚 Akademik Kütüphanem", "Kaynak künyeleri, vurgu ve notların + PDF dosyaların (klasör yapısıyla).");
   const belgeK = kart("kv-belge", "📄 Yüklediğim belgeler", "Dosya yöneticisi ve kütüphanedeki kendi dosyaların.");
   const mesajK = kart("kv-mesaj", "💬 Mesajlarım (Yedek Kurtarma Koduyla şifreli)", "Sohbetlerin tarayıcıda çözülür ve 16 haneli Yedek Kurtarma Kodunla yeniden şifrelenir; başka hesaba taşınabilir.");
   const kodGirdi = el("input", { type: "text", id: "kv-kod", class: "sy-girdi", autocomplete: "off", autocapitalize: "characters", spellcheck: "false", maxlength: "19", inputmode: "text", "aria-label": "Yedek Kurtarma Kodu", placeholder: "XXXX-XXXX-XXXX-XXXX" });
   kodGirdi.addEventListener("input", () => { kodGirdi.value = kodBicimle(kodGirdi.value); });
-  const parolaKutu = el("div", { class: "sy-alt" }, el("p", { class: "muted", text: "Mesaj dosyası senin Yedek Kurtarma Kodunla şifrelenir (ayrı bir parola YOK). Kodu gir; hesabındaki kayıtla doğrulanır. Kod yedeğin içinde değildir; içe aktarırken yalnızca bu kod istenir." }), kodGirdi);
-  const guncelle = () => { parolaKutu.hidden = !mesajK.girdi.checked; };
-  mesajK.girdi.addEventListener("change", guncelle); guncelle();
+  const parolaKutu = el("div", { class: "sy-alt" }, el("p", { class: "muted", text: "Notlar ve Mesajlar için TEK Yedek Kurtarma Kodun: mesaj dosyası bununla şifrelenir, notların kod bilgisi de pakete girer; ayrı parola YOK. Kodu gir; hesabındaki kayıtla doğrulanır, böylece kimsenin açamayacağı bir yedek almazsın. Kod yedeğin içinde değildir; içe aktarırken yalnızca bu kod istenir." }), kodGirdi);
+  const guncelle = () => { parolaKutu.hidden = !(mesajK.girdi.checked || notlarK.girdi.checked); };
+  mesajK.girdi.addEventListener("change", guncelle); notlarK.girdi.addEventListener("change", guncelle); guncelle();
   const ilerleme = el("p", { class: "muted sy-not", role: "status", "aria-live": "polite" });
   const indir = dugme({ metin: "Kişisel yedeği oluştur ve indir", ikonAdi: "indir", tur: "birincil" });
   indir.addEventListener("click", async () => {
     const bilesenler = []; if (notlarK.girdi.checked) bilesenler.push("notlar"); if (belgeK.girdi.checked) bilesenler.push("r2"); if (akademikK.girdi.checked) bilesenler.push("akademik");
     const mesajlar = mesajK.girdi.checked;
     if (!bilesenler.length && !mesajlar) return mesaj("En az bir öğe seç.");
-    if (mesajlar) {
+    const kodGerekli = mesajlar || notlarK.girdi.checked;          // Notlar da Mesajlar da AYNI kodla açılır → tek doğrulama kutusu
+    if (kodGerekli) {
       if (kodGirdi.value.replace(/-/g, "").length !== 16) return mesaj("Yedek Kurtarma Kodu 16 karakter olmalı (XXXX-XXXX-XXXX-XXXX).");
     }
     indir.disabled = true; let alici = null;
     try {
-      const kod = mesajlar ? await mesajKodunuDogrula(kodGirdi.value) : null;
+      const kod = kodGerekli ? await mesajKodunuDogrula(kodGirdi.value) : null;
       alici = await aliciOlustur(dosyaAdi());
       const ek = [];
+      if (notlarK.girdi.checked) {
+        ek.push({ ad: "notlar/KOD-BILGISI.txt", icerik: [
+          "NOTLARIM YEDEĞİ — Yedek Kurtarma Kodu ile açılır",
+          "",
+          "Bu pakettaki notlar uçtan uca ŞİFRELİDİR. Notlarını ve Mesajlarını birlikte açan TEK anahtar, 16 haneli Yedek Kurtarma Kodundur (XXXX-XXXX-XXXX-XXXX).",
+          "Kodun kendisi pakette YOKTUR; paket yalnızca kodla açılabilen sarılı anahtar bilgisini (e2ee_kullanici_anahtarlari) içerir.",
+          "",
+          "Geri yükleme: Sistem Yedekleme › Kişisel verilerim › İçe aktar bölümüne bu ZIP'i bırak; Yedek Kurtarma Kodu istenir. Kodu girince notların,",
+          "şifreli ekleri ve (varsa) mesajların yeni hesabın anahtarlarıyla yeniden şifrelenip eklenir. Başka e-posta/hesap ya da sıfırlanmış veritabanı olabilir.",
+          "Kodu kaybettiysen bu yedeği KİMSE açamaz (Site Sahibi dahil).",
+        ].join("\n") });
+      }
       if (mesajlar) { ilerleme.textContent = "Mesajlar çözülüyor ve kodunla şifreleniyor…"; ek.push({ ad: MESAJ_YEDEK_YOLU, icerik: await mesajYedegiOlustur(kod, (m) => { ilerleme.textContent = m; }, { kodlu: true }) }); }
       const sonuc = bilesenler.length
         ? await yedekAl({ bilesenler, kapsam: "kendi", hassas: false, bicimler: { json: true, sql: false }, alici, sinyal: undefined, ekDosyalar: ek, ilerleme: ({ asama }) => { ilerleme.textContent = asama || ""; } })
