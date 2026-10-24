@@ -172,7 +172,7 @@ async function kur() {
   const paketTam = dugme({ metin: "🛟 Tam sistem & felaket kurtarma", tur: "ikincil", kucuk: true });
   const paketSec = (tam) => {
     tumK.girdi.checked = tam; seciliK.girdi.checked = false; benim.girdi.checked = !tam;
-    for (const [id, k] of kutular) { if (k.girdi.disabled) continue; k.girdi.checked = tam ? id !== "github" || tamMi : ["veritabani", "r2", "notlar"].includes(id); }
+    for (const [id, k] of kutular) { if (k.girdi.disabled) continue; k.girdi.checked = tam ? id !== "github" || tamMi : ["veritabani", "r2", "notlar", "akademik"].includes(id); }
     durumGuncelle();
   };
   paketKisisel.addEventListener("click", () => paketSec(false));
