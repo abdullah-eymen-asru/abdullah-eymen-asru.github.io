@@ -69,6 +69,14 @@ giscus:
 # Panelden eklenen YENİ bir platform da (anahtarı burada önceden
 # tanımlı olmasa dahi) otomatik olarak listeye eklenir ve anasayfada
 # görünür — anahtar sadece dahili bir kimliktir, ekranda "label" görünür.
+# Anasayfa bağlantı kategorileri: Yönetim Paneli › Bağlantılar'dan eklenir/silinir/yeniden adlandırılır; HER kayıtta Türkçe alfabetik yazılır.
+# index.md bu sıralamayı olduğu gibi kullanır. Kategorisi olmayan bağlantılar en altta "Diğer" başlığında görünür.
+social_categories:
+  akademik: "Akademik & Araştırma"
+  okuma: "Okuma & Kültür"
+  sosyal: "Sosyal & İletişim"
+  yazilim: "Yazılım & Projeler"
+
 social:
   github:
     label: "GitHub"
