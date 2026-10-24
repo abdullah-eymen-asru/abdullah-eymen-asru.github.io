@@ -215,14 +215,14 @@ export async function yedekAl({ bilesenler, kapsam, hedefler = [], hedefAdlari =
   };
 
   try {
-    if (!sadeceEk && (secili.has("veritabani") || secili.has("notlar"))) {
+    if (!sadeceEk && (secili.has("veritabani") || secili.has("notlar") || secili.has("akademik"))) {
       ilerleme({ asama: "Tablo listesi alınıyor…" });
       const { data: tablolar, error: te } = await supabase.rpc("sistem_export_tablo_listesi", { p_id: oturum });
       if (te) throw new Error(hataMetni(te));
       if (!bicimler.json && !bicimler.sql) throw new Error("Veritabanı için en az bir biçim (JSON / SQL) seç.");
       await veritabaniYaz(zip, oturum, tablolar || [], bicimler, ilerleme, sinyal, ozet);
     }
-    if (!sadeceEk && (secili.has("r2") || secili.has("notlar"))) {
+    if (!sadeceEk && (secili.has("r2") || secili.has("notlar") || secili.has("akademik"))) {
       await r2Yaz(zip, oturum, ilerleme, sinyal, ozet);
     }
     if (secili.has("github") || secili.has("icerik_md")) {
@@ -254,7 +254,9 @@ function okubeni(o) {
     "  veritabani/json/<tablo>.json   Tablo başına JSON (to_jsonb çıktısı)",
     "  veritabani/yedek-*.sql         INSERT ... ON CONFLICT DO NOTHING (bağımlılık sırasıyla)",
     "  notlar/                        Kişisel notlar, alıntılar, kaynaklar (+ ekler/)",
+    "  akademik/json/<tablo>.json     Akademik Kütüphane: kaynak künyeleri, vurgular, notlar (PDF'ler r2/akademik-kutuphane/users/<kullanıcı>/ altında)",
     "  r2/                            R2 dosyaları + MANIFEST.json (anahtar ↔ paket yolu eşlemesi)",
+    "  notlar/ekler/                  Şifreli not ekleri (TÜM SİSTEM yedeğinde notlar/ekler/<kullanıcı-id>/<ek-id>.bin); notların ve klasör ağacının kendisi şifrelidir",
     "  icerik-md/                     Depodaki tüm .md dosyaları (klasör yapısı korunur)",
     "  github/                        Kaynak kod zip'i",
     "",
