@@ -242,8 +242,9 @@ export function silOnayiIste({ baslik, ozet = [], uyari = [], onayMetni = "SİL"
 
 export const BILESENLER = [
   { id: "veritabani", ikon: "🗃️", ad: "Supabase Veritabanı", aciklama: "Tablolar JSON ve/veya SQL dump olarak. Yetki kapsamına göre filtrelenir." },
-  { id: "r2", ikon: "☁️", ad: "R2 Arşiv Dosyaları", aciklama: "Kütüphane PDF'leri ve Dosya Yöneticisi belgeleri. Yönetici yalnızca kendi dosyalarını alır." },
+  { id: "r2", ikon: "☁️", ad: "R2 Arşiv Dosyaları", aciklama: "Kütüphane PDF'leri ve Dosya Yöneticisi belgeleri. Yönetici yalnızca kendi dosyalarını alır. TÜM SİSTEM yedeğinde (Site Sahibi) herkesin şifreli not ekleri de gelir." },
   { id: "icerik_md", ikon: "📝", ad: "İçerik & Markdown (.md)", aciklama: "Deponun tüm .md yazıları, sayfaları ve araştırma içerikleri (klasör yapısıyla)." },
-  { id: "notlar", ikon: "🗒️", ad: "Kişisel Notlar & Alıntılar", aciklama: "Yalnızca SENİN notların, alıntıların, kaynakların ve not ekleri (not metinleri uçtan uca şifreli kalır)." },
+  { id: "notlar", ikon: "🗒️", ad: "Kişisel Notlar & Alıntılar", aciklama: "Yalnızca SENİN notların, alıntıların, kaynakların ve not eklerin (uçtan uca şifreli kalır; klasör ağacı da şifreli verinin içindedir). Eklerin R2'den notlar/ekler/ klasörüne iner." },
+  { id: "akademik", ikon: "📚", ad: "Akademik Kütüphane", aciklama: "Kaynak künyeleri, vurgu/notlar (akademik_kaynaklar, akademik_notlar) ve PDF dosyaları; kullanıcı klasörüyle. Yönetici/üye yalnızca KENDİ kütüphanesini, Site Sahibi seçili üyeleri ya da tüm sistemi alır." },
   { id: "github", ikon: "🐙", ad: "GitHub Kaynak Kodu (.zip)", aciklama: "Site deposunun güncel kodu, tek zip olarak." },
 ];
