@@ -20,6 +20,7 @@ export const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 import { isDemoMode, configiBaslat, demoUyeMi, gercekAgFetch } from "../demo/demo-durum.js";
 import { demoSupabase, demoUyeSupabaseKur } from "../demo/demo-supabase.js";
 import { workerKapisiKur } from "./worker-kapi.js";
+import { oturumKoruyucuKur } from "./oturum-koruyucu.js";
 
 // Supabase JS SDK — artık CDN'den (esm.sh) ESM import DEĞİL, YEREL vendor
 // dosyasından (assets/js/vendor/supabase.js, Supabase'in resmi UMD build'i)
@@ -135,6 +136,10 @@ export const supabase = !isDemoMode
 
 // KOTA KORUMASI: panelden kapatılan Worker'lara tarayıcıdan hiç istek gitmesin (bkz. worker-kapi.js). Demo'da kalkan zaten engelliyor.
 if (!isDemoMode) workerKapisiKur(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// OTURUM KORUYUCU (bkz. oturum-koruyucu.js): beklenmedik oturum düşüşlerini (sekme yarışı, depo kaybı) sessizce kurtarır; bilinçli çıkış ve
+// sunucu kararları (zorla çıkış, askıya alma) AYNEN geçerlidir. Demo'da çalışmaz.
+if (!isDemoMode) { try { oturumKoruyucuKur(supabase, SUPABASE_URL); } catch (h) { console.warn("oturum-koruyucu kurulamadı:", h); } }
 
 // Demo görünürlük yapılandırması (demo_config_getir RPC'si; demo modunda Supabase'e giden TEK istek). Demo değilse no-op.
 if (isDemoMode) configiBaslat(SUPABASE_URL, SUPABASE_ANON_KEY);
