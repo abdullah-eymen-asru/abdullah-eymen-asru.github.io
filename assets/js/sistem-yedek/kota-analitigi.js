@@ -45,9 +45,23 @@ export function kotaAnaliziKarti() {
 
   const govde = el("div", { class: "ka-govde" }, el("p", { class: "muted", text: "Analitik yükleniyor…" }));
   const yenile = dugme({ metin: "Yenile", ikonAdi: "yenile", tur: "ikincil", kucuk: true });
+  // v8: kart AÇILIR-KAPANIR (varsayılan kapalı). Saatlik tablo çok uzundu; artık başlığa tıklayınca açılır, ilk açılışta veri yüklenir (gereksiz RPC yok).
+  const ACIK_ANAHTAR = "sy_kota_analitik_acik";
+  let acik = false; try { acik = localStorage.getItem(ACIK_ANAHTAR) === "1"; } catch { /* yok say */ }
+  const icerik = el("div", { class: "ka-acilir-icerik", id: "ka-acilir-icerik", hidden: !acik }, govde, el("div", { class: "sy-eylemler" }, yenile));
+  const anahtar = el("button", { type: "button", class: "ka-anahtar", "aria-controls": "ka-acilir-icerik", "aria-expanded": String(acik) },
+    el("span", { class: "ka-ok", "aria-hidden": "true", text: acik ? "▾" : "▸" }), el("span", { class: "ka-anahtar-metin", text: acik ? "Kapat" : "Aç" }));
   const kart = el("article", { class: "sy-kart sy-kota ka-kart" },
-    el("div", { class: "sy-kota-ust" }, el("h3", { text: "📊 Worker Kota Analitiği & Harcama Dökümü" })),
-    govde, el("div", { class: "sy-eylemler" }, yenile));
+    el("div", { class: "sy-kota-ust ka-acilir-ust" }, el("h3", { text: "📊 Worker Kota Analitiği & Harcama Dökümü" }), anahtar),
+    icerik);
+  let yuklendi = false;
+  function acKapat(yeni) {
+    acik = yeni; icerik.hidden = !acik; anahtar.setAttribute("aria-expanded", String(acik));
+    anahtar.querySelector(".ka-ok").textContent = acik ? "▾" : "▸"; anahtar.querySelector(".ka-anahtar-metin").textContent = acik ? "Kapat" : "Aç";
+    try { localStorage.setItem(ACIK_ANAHTAR, acik ? "1" : "0"); } catch { /* yok say */ }
+    if (acik && !yuklendi) { yuklendi = true; yukle(); }
+  }
+  anahtar.addEventListener("click", () => acKapat(!acik));
 
   /* ------------------------------- veri kurma ------------------------------- */
   /** UTC gün anahtarı → {w,p}. Geçmiş tablosu + saatlik türetme (saatlik varsa o kazanır; ikisinde de en büyük değer). */
@@ -241,6 +255,6 @@ export function kotaAnaliziKarti() {
   }
 
   yenile.addEventListener("click", yukle);
-  yukle();
+  if (acik) { yuklendi = true; yukle(); }
   return kart;
 }
