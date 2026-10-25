@@ -1,6 +1,6 @@
 /**
  * assets/js/duyuru/duyuru-panel.js — Panelde (dashboard) ÜYELERE gösterilen kalıcı ama rahatsız etmeyen duyuru şeridi (migration 0113).
- * • Aktif duyurular panelin en üstünde ince şerit olarak durur; üye ✕ ile kapatana kadar kalır (sticky DEĞİL, içeriği örtmez; mobil uyumlu).
+ * • Aktif duyurular panelin en üstünde ince şerit olarak durur; üye "Okudum" ile kapatana kadar kalır (sticky DEĞİL, içeriği örtmez; mobil uyumlu).
  * • Kapatma, oturum açık üye için DB'ye "okundu" olarak yazılır (kim, ne zaman → site sahibi görür). Oturumsuz/demo ziyaretçide yalnızca bu tarayıcıya.
  * • Duyuru içeriği düzenlenirse (sürüm artar) daha önce kapatanlara yeniden görünür.
  * • Ucuz RPC; 5 dk'da bir ve sekme öne gelince yenilenir (gizli sekmede istek yok). innerHTML YOK.
@@ -18,10 +18,11 @@ function seritCiz(d) {
   const metin = document.createElement("p"); metin.className = "dy-serit-metin"; metin.textContent = d.metin;
   const uzun = d.metin.length > 160 || d.metin.includes("\n");
   const baslik = document.createElement("strong"); baslik.className = "dy-serit-baslik"; baslik.textContent = d.baslik;
-  const kapat = document.createElement("button"); kapat.type = "button"; kapat.className = "dy-serit-kapat"; kapat.setAttribute("aria-label", `Duyuruyu kapat: ${d.baslik}`); kapat.textContent = "✕";
+  // ✕ yerine açık etiketli "Okudum" düğmesi (ne işe yaradığı belli; bağlantıdan ayrı bir eylem sütununda durur).
+  const kapat = document.createElement("button"); kapat.type = "button"; kapat.className = "dy-serit-okudum"; kapat.setAttribute("aria-label", `Okudum, duyuruyu kapat: ${d.baslik}`); kapat.textContent = "Okudum";
   const govde = document.createElement("div"); govde.className = "dy-serit-govde"; govde.append(baslik, metin);
   const href = d.baglanti_url ? guvenliBaglanti(d.baglanti_url) : null;
-  if (href) { const a = document.createElement("a"); a.href = href; a.target = "_blank"; a.rel = "noopener noreferrer"; a.className = "dy-serit-baglanti"; a.textContent = d.baglanti_metin || "Ayrıntılar"; govde.append(a); }
+  if (href) { const a = document.createElement("a"); a.href = href; a.target = "_blank"; a.rel = "noopener noreferrer"; a.className = "dy-serit-baglanti"; a.textContent = `${d.baglanti_metin || "Ayrıntılar"} ↗`; govde.append(a); }
   const kutu = document.createElement("section");
   kutu.className = `dy-serit dy-tur-${d.tur}${uzun ? " dy-kisa" : ""}`; kutu.setAttribute("role", d.tur === "kritik" ? "alert" : "status"); kutu.dataset.id = d.id;
   if (uzun) {
@@ -31,13 +32,13 @@ function seritCiz(d) {
   }
   kutu.append(govde, kapat);
   kapat.addEventListener("click", async () => {
-    kapat.disabled = true;
+    kapat.disabled = true; kapat.textContent = "Kaydediliyor…";
     try {
       if (oturumVar) { const { error } = await supabase.rpc("duyuru_okundu_isaretle", { p_id: d.id, p_surum: d.surum }); if (error) throw error; }
       else { try { localStorage.setItem(yerelAnahtar(d), "1"); } catch { /* yok say */ } }
       kutu.remove();
     } catch {
-      kapat.disabled = false; kapat.textContent = "!"; kapat.title = "Kapatma kaydedilemedi, tekrar dene";
+      kapat.disabled = false; kapat.textContent = "Tekrar dene"; kapat.title = "Okundu olarak kaydedilemedi, tekrar dene";
     }
   });
   return kutu;
