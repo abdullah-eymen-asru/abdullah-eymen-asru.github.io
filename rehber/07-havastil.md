@@ -121,3 +121,22 @@ Amaç hava + CLO ile giyim kararıdır; **konum toplamak amaç değildir**. GPS,
 - **Geçmiş gün (Saatlik plan › 🕘 Geçmiş bir günü incele):** tarih seçici (1940’tan düne) + Dün / 7 / 30 gün / Geçen yıl bugün. Seçilen gün **≤ 92 gün** ise `api.open-meteo.com/v1/forecast?past_days=N`, **daha eskiyse** `archive-api.open-meteo.com/v1/archive` (ERA5). Arşivde PoP, UV, sıfır izotermi ve sağanak yoktur; `cape` ve 0–7 cm toprak sıcaklığı ayrı istenir, 400 dönerse onlarsız yeniden denenir. Geçmişte yağış olasılığı yerine gerçekleşen değer kullanılır (≥ 0,1 mm → %100). Ekranda *“Geçmiş Hava Durumu (Ölçülen / Gerçekleşen Değerler)”* rozeti ve **Kıyafet retrospektifi** görünür. Sonuç `hv_gecmis1_*` anahtarlarıyla önbelleğe alınır (forecast 3 sa, arşiv 24 sa).
 - **Bulut öncelikli konumlar (migration `0104_havastil_bulut_oncelikli_rls.sql`):** oturum açıkken ve kullanıcı onayladıysa (ilk kullanımda tek dokunuşluk davet; bulutta zaten kayıt varsa başka cihazdaki rıza sayılır) açılışta ve sekmeye dönünce bulut doğruluk kaynağıdır; ekle/sil/düzenle anında INSERT/DELETE/UPDATE gider, yerel önbellek sonuçtan sonra yazılır. Ağ/RLS hatasında konum yerelde beklemede kalır ve sonraki eşitlemede yüklenir; silmeler kuyruğa alınır. Vitrin/misafirde buluta hiç istek gitmez (RLS hatası oluşmaz). **0104’ü Supabase SQL Editor’de çalıştır.**
 
+
+## v8 — Sade dil, hızlı cevaplar, veri paketi, kendi anahtarınla yapay zekâ
+
+**UX denetiminin uygulanması (karar motoruna DOKUNULMADI; yalnızca anlatım):**
+- **Bugün sekmesi:** hüküm kartında 4 hızlı cevap — ☂️ şemsiye · 💧 ıslanır mıyım · ⛈️ fırtına var mı · 🧥 ne giymeli (`hikaye.js › hizliCevaplar`, mevcut fizik/karar çıktısından türetilir).
+- **Derin analiz:** en üstte “Bu gün özetle” kartı: *“Yağmur olası ve yaygın, fakat fırtınalı değil.”* + rozetler. CAPE düşük/yağış yüksek durumunda “bu bir çelişki değil” notu.
+- **Sahte alarm engelleyici → “Çisenti filtresi”:** saat bazlı kural günün tamamına “tetiklendi” diye yansıtılmıyor; gün genelinde yağış önemliyse “yalnızca N hafif saatte devreye girdi, uyarı DEĞİŞMEDİ” yazar. Rozetler “Etkin / Gerekmedi”.
+- **Terimler:** CAPE → *Fırtına enerjisi (CAPE)* · konvektif → *Ani sağanak* · geniş cephe → *Yaygın, düzenli yağmur* · Güven → *Model uyumu* · Kapsam → *Yayılım* · efektif yağış → *Beklenen yağış miktarı*. Teknik ad parantezde/ipucunda durur.
+- **%100 model uyumu:** “Modellerin tamamı yağış görüyor” + “bu bir tahmindir, garanti etmez” uyarısı.
+
+**Günün Veri Paketi (Derin analiz › altta):** seçili günün tüm sayısal verisi (saatlik 40’a yakın alan) + 16 günlük özet + karar kuralları + okuma kılavuzu. **Markdown (.md) önerilir** (yapay zekâ tabloyu/başlıkları en iyi bu biçimde okur); JSON ve .txt de var; “Kopyala” doğrudan sohbete yapıştırılır. İsteğe bağlı +1/+2 gün saatlik döküm.
+
+**Yapay zekâ analizi (kendi anahtarınla):** Gemini · OpenAI (ChatGPT API) · Claude (Anthropic API) · OpenRouter. Ayarlar › “Sağlayıcıları yönet” penceresi.
+- **Güvenlik:** anahtar tarayıcıda *kasa parolası*yla AES-GCM-256 ile şifrelenir (PBKDF2-SHA256, 600.000 tur); hesabına yalnızca şifreli metin yazılır (`havastil_ai_kasasi`, RLS: sahibi). Parola ve düz anahtar hiçbir sunucuya/Worker’a/yedeğe gitmez; Site Sahibi dâhil kimse okuyamaz. Parola unutulursa kurtarma yoktur (kasa sıfırlanır). Çözülmüş anahtar yalnızca sekme belleğinde; 20 dk kullanılmazsa kilitlenir.
+- **Kota güvencesi:** hiçbir istek kendiliğinden yapılmaz. Eski Mod B (Groq) otomatik tetikleniyordu (her konum/tercih/kombin/yenileme değişiminde) → artık yalnızca **“✨ Yapay zekâya yorumlat”** düğmesiyle. Yeni analiz: aynı veri + model için önbellek, çift tıklama engeli, gönderilecek boyut önceden gösterilir.
+- **Yansız analiz:** sistem talimatı yalnızca pakettaki sayılara dayanır, lehte+aleyhte işaretleri birlikte ister, kesinlik yasaktır, saatlere sayıyla atıf zorunludur, HavaStil kombinini onaylama zorunluluğu yoktur, veri içindeki talimatlar yok sayılır.
+- **Geçici sohbet:** analizden sonra belirli saat/konu sorulur; kaydedilmez (sayfa belleği), her soru bağımsız gönderilir.
+
+Kurulum: Supabase’de `0113_site_duyurulari_ve_havastil_ai_kasasi.sql` (kasa tablosu bu dosyadadır). Service worker `havastil-v9`.
