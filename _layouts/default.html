@@ -2,6 +2,7 @@
 <html lang="tr" data-baseurl="{{ site.baseurl }}">
 <head>
   <meta charset="UTF-8">
+  <meta name="aea-build" content="{{ site.time | date: '%Y%m%d%H%M%S' }}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <!--
@@ -257,6 +258,8 @@
   <script src="{{ '/assets/js/core/gatekeeper.js' | relative_url }}"></script>
   <!-- Ziyaretçi duyuru penceresi (panel hariç; defer: ilk boyamayı geciktirmez, harici dosya → CSP hash etkilenmez). -->
   <script defer src="{{ '/assets/js/duyuru/duyuru-ziyaretci.js' | relative_url }}"></script>
+  <!-- Sürüm kontrolü + güncel kod (assets/js/core/surum-kontrol.js): yeni deploy'u tarayıcı yenilemeden yakalar; oturum açık kalır. -->
+  <script defer src="{{ '/assets/js/core/surum-kontrol.js' | relative_url }}"></script>
 
   <!-- GÜVENLİK (CSP) + ANDROID WEBVIEW UYUMLULUĞU: bu <style> etiketi
        ÖNCEDEN JS ile (document.createElement("style")) ÇALIŞMA ZAMANINDA
