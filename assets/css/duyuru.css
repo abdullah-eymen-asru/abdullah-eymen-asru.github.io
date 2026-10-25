@@ -7,9 +7,10 @@
 .dy-pencere-ust { display: flex; align-items: center; gap: .6rem; padding: 1rem 1.1rem .4rem; } .dy-pencere-ust h2 { margin: 0; font-size: 1.15rem; line-height: 1.3; }
 .dy-pencere-ikon { font-size: 1.5rem; }
 .dy-pencere-govde { padding: .2rem 1.1rem; line-height: 1.55; } .dy-pencere-govde p { margin: .4rem 0; overflow-wrap: anywhere; }
-.dy-pencere-alt { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .7rem; padding: .8rem 1.1rem 1rem; }
-.dy-pencere-baglanti { color: var(--accent, #2f6fed); font-weight: 600; }
-.dy-pencere-tamam { min-height: 2.75rem; padding: .5rem 1.4rem; border-radius: 999px; border: 0; background: var(--dy-renk); color: #111; font: inherit; font-weight: 700; cursor: pointer; }
+.dy-pencere-alt { display: flex; justify-content: flex-end; padding: 1rem 1.1rem 1.1rem; margin-top: .6rem; border-top: 1px solid var(--border, #ddd); }
+.dy-pencere-baglanti-satir { margin: .7rem 0 .2rem; }
+.dy-pencere-baglanti { display: inline-block; padding: .35rem .2rem; color: var(--accent, #2f6fed); font-weight: 600; text-decoration: underline; }
+.dy-pencere-tamam { min-height: 2.75rem; min-width: 8rem; padding: .5rem 1.4rem; border-radius: 999px; border: 0; background: var(--dy-renk); color: #111; font: inherit; font-weight: 700; cursor: pointer; }
 .dy-pencere-tamam:focus-visible, .dy-pencere-baglanti:focus-visible { outline: 3px solid var(--text, #111); outline-offset: 2px; }
 
 /* ---------- panel üye şeridi (sticky DEĞİL: içeriği örtmez) ---------- */
@@ -44,3 +45,12 @@
 .dy-okuyan { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .4rem; padding: .45rem .6rem; border: 1px solid var(--border, #ccc); border-radius: 10px; } .dy-okuyan-bilgi { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
 .dy-sil { background: none; border: 0; color: #e5584a; font: inherit; font-size: .8rem; cursor: pointer; text-decoration: underline; }
 @media (prefers-reduced-motion: no-preference) { .dy-pencere[open] { animation: dy-giris .18s ease-out; } @keyframes dy-giris { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } } }
+
+/* v114 — üye şeridi: ✕ yerine "Okudum" düğmesi; bağlantı ile düğme birbirinden ayrı (bağlantı metnin altında, düğme sağ sütunda) */
+.dy-serit { align-items: center; gap: 1rem; }
+.dy-serit-baglanti { flex-basis: 100%; margin-top: .35rem; display: inline-block; }
+.dy-serit-okudum { flex: none; align-self: center; min-height: 2.5rem; padding: .4rem 1.1rem; border-radius: 999px; border: 0; background: var(--dy-renk); color: #111; font: inherit; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.dy-serit-okudum:disabled { opacity: .65; cursor: progress; }
+.dy-serit-okudum:focus-visible { outline: 3px solid var(--text, #111); outline-offset: 2px; }
+@media (max-width: 520px) { .dy-serit { flex-direction: column; align-items: stretch; } .dy-serit-okudum { width: 100%; } }
+.dy-seridi { margin-bottom: 1rem; } .dy-seridi:empty { margin: 0; }
