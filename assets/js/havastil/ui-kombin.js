@@ -118,7 +118,7 @@ function krizKarti(d, kb) {
     ipucu("Planına göre en çok çelişkinin olduğu an: sıcak ortamdan çıkış, ani soğuma, hamle veya yağışın başlaması."),
     metin, alt, hata,
     el("label", { class: "hv-onay hv-ai-anahtar", for: "hv-ai-modu" }, kutu, el("span", { text: "Yapay zekâ stilist (isteğe bağlı): kritik anı yorumlasın. Kapalıyken hiçbir yapay zekâ isteği yapılmaz." })),
-    d.aiModu ? olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "↻ Yeniden yorumla" }), "click", () => kb.aiYorumIste(true)) : null);
+    d.aiModu ? olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "✨ Yapay zekâya yorumlat (istek yapar)" }), "click", () => kb.aiYorumIste(true)) : null);
 }
 
 /** Sabah/öğle/akşam: şunu çıkar / şunu ekle. */
