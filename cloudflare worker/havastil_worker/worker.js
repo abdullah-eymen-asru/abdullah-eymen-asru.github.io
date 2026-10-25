@@ -369,7 +369,33 @@ async function groqZincir(env, mesajlar, maxTokens = 400, sayac = null) {
     denemeler.push({ model, durum: s.durum, kod: s.kod || "", mesaj: s.hata });
     if ([401, 403, 429, 0].includes(s.durum)) break;
   }
+  // Zincirdeki HİÇBİR model kabul edilmediyse (hepsi kaldırılmış): Groq'un CANLI model listesinden güncel bir sohbet modeli seç (sabit adlara bağımlı kalma).
+  if (denemeler.length && denemeler.every((d) => [400, 404].includes(d.durum)) && env.GROQ_API_KEY) {
+    const aday = await groqGuncelModel(env, denemeler.map((d) => d.model));
+    if (aday) {
+      const s = await groqTek(env, aday, mesajlar, maxTokens);
+      if (sayac) sayacYaz(env, sayac.ctx, sayac.kim, aday, s);
+      if (s.ok) return { ok: true, metin: s.metin, model: s.model, denemeler: [...denemeler, { model: aday, durum: 200, kod: "otomatik", mesaj: "canlı listeden seçildi" }] };
+      denemeler.push({ model: aday, durum: s.durum, kod: s.kod || "", mesaj: s.hata });
+    }
+  }
   return { ok: false, denemeler };
+}
+/** Groq /models listesinden (5 dk bellek önbelleği) metin-sohbet için en uygun güncel modeli seçer: gpt-oss > llama > qwen; ses/güvenlik/embedding hariç. */
+let _groqModelOnbellek = { t: 0, liste: [] };
+async function groqGuncelModel(env, denendi) {
+  try {
+    if (Date.now() - _groqModelOnbellek.t > 5 * 60 * 1000) {
+      const r = await fetch("https://api.groq.com/openai/v1/models", { headers: { Authorization: `Bearer ${env.GROQ_API_KEY}` } });
+      if (!r.ok) return null;
+      const j = await r.json();
+      _groqModelOnbellek = { t: Date.now(), liste: (j.data || []).filter((m) => m.active !== false).map((m) => m.id) };
+    }
+    const uygun = _groqModelOnbellek.liste.filter((id) => !/(whisper|tts|guard|embed|moderation|vision-preview|distil)/i.test(id) && !denendi.includes(id) && !KALDIRILMIS.test(id));
+    const sira = [/gpt-oss.*120b/i, /gpt-oss/i, /llama.*(70b|maverick|scout)/i, /llama/i, /qwen/i];
+    for (const re of sira) { const b = uygun.filter((id) => re.test(id)).sort().reverse()[0]; if (b) return b; }
+    return uygun[0] || null;
+  } catch { return null; }
 }
 function groqNeden(denemeler) {
   const s = denemeler[denemeler.length - 1] || {};
