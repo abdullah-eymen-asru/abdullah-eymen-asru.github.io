@@ -15,7 +15,7 @@
  */
 import { supabase, showMessage } from "../core/supabase-client.js";
 import { el, bayt, hataMetni, BILESENLER, dugme, ikon, onayIste } from "./ortak.js";
-import { mesajKodunuDogrula } from "./mesaj-yedek.js";
+import { mesajKodunuDogrula, mesajYedegiOlustur, MESAJ_YEDEK_YOLU } from "./mesaj-yedek.js";
 import { kodBicimle } from "../kurtarma-kiti/kit.js";
 import { kitKartiAc, cssYukle as kitCssYukle } from "../kurtarma-kiti/kit-arayuz.js";
 import { depolamaCiz } from "./depolama.js";
@@ -175,7 +175,7 @@ async function kur() {
   const paketTam = dugme({ metin: "🛟 Tam sistem & felaket kurtarma", tur: "ikincil", kucuk: true });
   const paketSec = (tam) => {
     tumK.girdi.checked = tam; seciliK.girdi.checked = false; benim.girdi.checked = !tam;
-    for (const [id, k] of kutular) { if (k.girdi.disabled) continue; k.girdi.checked = tam ? id !== "github" || tamMi : ["veritabani", "r2", "notlar", "akademik"].includes(id); }
+    for (const [id, k] of kutular) { if (k.girdi.disabled) continue; k.girdi.checked = tam ? id !== "github" || tamMi : ["veritabani", "r2", "notlar", "mesajlar", "akademik"].includes(id); }
     durumGuncelle();
   };
   paketKisisel.addEventListener("click", () => paketSec(false));
@@ -209,6 +209,7 @@ async function kur() {
   const bicimKutu = el("div", { class: "sy-alt", hidden: true }, el("strong", { text: "Veritabanı biçimi" }), jsonK.etiket, sqlK.etiket);
 
   const notlarK = kutular.get("notlar");
+  const mesajlarK = kutular.get("mesajlar");          // v8: Notlarım ile aynı mantık, ayrı bileşen (kendi sohbetlerin; yalnızca "benim" kapsamıyla)
 
   // TEK KOD: Notlar (kendi notların) yedeğe giriyorsa Yedek Kurtarma Kodu doğrulanır — Notlar ve Mesajlar aynı kodla açıldığı için tek kutu yeter.
   // Kod pakette YOKTUR; yalnızca "kodu bilen biri bu yedeği açabilsin" garantisi için hesabındaki kayıtla doğrulanır.
@@ -234,12 +235,14 @@ async function kur() {
       const notlarMumkun = tum || benim.girdi.checked;
       notlarK.girdi.disabled = !notlarMumkun;
       if (!notlarMumkun) notlarK.girdi.checked = false;
+      mesajlarK.girdi.disabled = !notlarMumkun;
+      if (!notlarMumkun) mesajlarK.girdi.checked = false;
       seciliK.etiket.querySelector("small").textContent = secilenler.size
         ? `${secilenler.size} üye seçili. Yalnızca onların kayıtları ve dosyaları pakete girer (notlar hariç).`
         : "Üyeleri arayıp işaretle; yalnızca onların kayıtları ve dosyaları pakete girer (notlar hariç).";
     }
     bicimKutu.hidden = !kutular.get("veritabani").girdi.checked;
-    kodKutu.hidden = !(notlarK.girdi.checked || (ownerMi && tumK.girdi.checked && kutular.get("veritabani").girdi.checked));
+    kodKutu.hidden = !(notlarK.girdi.checked || mesajlarK.girdi.checked || (ownerMi && tumK.girdi.checked && kutular.get("veritabani").girdi.checked));
     tumuDugme.querySelector("span").textContent = [...kutular.values()].every((k) => k.girdi.checked || k.girdi.disabled) ? "Seçimi kaldır" : "Tümünü seç";
   }
   for (const k of kutular.values()) k.girdi.addEventListener("change", durumGuncelle);
@@ -254,14 +257,17 @@ async function kur() {
   indir.addEventListener("click", async () => {
     const secili = [...kutular.entries()].filter(([, k]) => k.girdi.checked).map(([id]) => id);
     if (!secili.length) return mesaj("En az bir bileşen seç.");
+    const mesajlarSecili = secili.includes("mesajlar");                       // sunucu RPC'sine gitmez: tarayıcıda çözülüp kodla şifrelenir (kisisel-veri.js ile aynı yol)
+    const sunucuBilesenleri = secili.filter((x) => x !== "mesajlar");
     const bicimler = { json: jsonK.girdi.checked, sql: sqlK.girdi.checked };
     if (secili.includes("veritabani") && !bicimler.json && !bicimler.sql) return mesaj("Veritabanı için JSON ve/veya SQL seç.");
 
     // Notlar yedeğe giriyorsa (ya da tüm sistem + veritabanı: kendi notların da dahil) ortak kodu doğrula.
     const kodGerekli = !kodKutu.hidden;
+    let kodDogru = null;
     if (kodGerekli) {
-      if (kodGirdi.value.replace(/-/g, "").length !== 16) return mesaj("Notlar yedeğe girdiği için 16 haneli Yedek Kurtarma Kodunu gir (XXXX-XXXX-XXXX-XXXX).");
-      try { await mesajKodunuDogrula(kodGirdi.value); } catch (h) { return mesaj(hataMetni(h)); }
+      if (kodGirdi.value.replace(/-/g, "").length !== 16) return mesaj("Notlar/Mesajlar yedeğe girdiği için 16 haneli Yedek Kurtarma Kodunu gir (XXXX-XXXX-XXXX-XXXX).");
+      try { kodDogru = await mesajKodunuDogrula(kodGirdi.value); } catch (h) { return mesaj(hataMetni(h)); }
     }
 
     // Kapsamı çöz
@@ -279,8 +285,8 @@ async function kur() {
       } else if (!benim.girdi.checked) {
         return mesaj("Kapsam için en az bir seçenek işaretle (Benim verilerim, Seçili üyeler ya da Tüm sistem).");
       }
-      if (kapsam === "secili" && secili.includes("notlar") && !hedefler.includes(benimId)) {
-        return mesaj("Kişisel Notlar yalnızca kendi notlarını içerir: 'Benim verilerim'i işaretle ya da bu bileşeni kaldır.");
+      if (kapsam === "secili" && (secili.includes("notlar") || mesajlarSecili) && !hedefler.includes(benimId)) {
+        return mesaj("Kişisel Notlar ve Mesajlar yalnızca kendi verilerini içerir: 'Benim verilerim'i işaretle ya da bu bileşeni kaldır.");
       }
     }
 
@@ -314,8 +320,11 @@ async function kur() {
     try {
       // Dosya seçici, tıklama hareketinin hemen ardından açılmalı (kullanıcı hareketi geçerliliği).
       alici = await aliciOlustur(dosyaAdi());
+      const ek = [];
+      if (mesajlarSecili) { asama.textContent = "Mesajlar çözülüyor ve kodunla şifreleniyor…"; ek.push({ ad: MESAJ_YEDEK_YOLU, icerik: await mesajYedegiOlustur(kodDogru, (m) => { ayrinti.textContent = m || ""; }, { kodlu: true }) }); }
       const sonuc = await yedekAl({
-        bilesenler: secili, kapsam, hassas: hassasK.girdi.checked, bicimler, alici, sinyal: denetci.signal, hedefler, hedefAdlari,
+        bilesenler: sunucuBilesenleri.length ? sunucuBilesenleri : ["notlar"], kapsam: sunucuBilesenleri.length ? kapsam : "kendi", hassas: hassasK.girdi.checked, bicimler, alici, sinyal: denetci.signal, hedefler, hedefAdlari,
+        ekDosyalar: ek, sadeceEk: !sunucuBilesenleri.length,
         ilerleme: ({ asama: a, ayrinti: d }) => { asama.textContent = a || ""; ayrinti.textContent = d || ""; },
       });
       if (sonuc.blob) {
