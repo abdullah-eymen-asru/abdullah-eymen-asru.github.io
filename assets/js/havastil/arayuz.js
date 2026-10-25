@@ -211,7 +211,7 @@ export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAkti
 
   /* ---------------- gün içi kritik an: Mod A (yerel, deterministik) · Mod B (Groq, yalnızca sayılar) ---------------- */
   let aiZaman = 0;
-  kb.aiModu = (v) => { if (d.vitrin) return; d.aiModu = v; lsYaz(LS.aiModu, v); d.ai = { metin: "", etiket: "", hata: "" }; kb.aiYorumIste(true); ciz(); };
+  kb.aiModu = (v) => { if (d.vitrin) return; d.aiModu = v; lsYaz(LS.aiModu, v); d.ai = { metin: "", etiket: "", hata: "" }; kb.aiYorumIste(false); ciz(); };
   kb.aiYorumIste = (zorla = false) => {
     const s = d.sonuc, h = d.hava, k = d.kriz, f = d.fizik;
     if (!s || !h || !k || !f) return;
@@ -221,21 +221,24 @@ export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAkti
     if (d.vitrin) return yerel("Vitrin modu · ücretsiz kural tabanlı stilist (Mod A). Yapay zekâ (Mod B) bu hesapta kilitli; Worker ve Groq kotasına istek gitmez.");
     if (!d.aiModu) return yerel("Yerel kural motoru · yapay zekâ kapalı, hiçbir yapay zekâ isteği yapılmaz.");
     if (!k.var) return yerel("Gün içinde kritik an yok; yapay zekâya sorulmadı.");
+    const haberId = d.haberAcik && d.haber?.durum === "ok" ? d.haber.uygulananlar[0]?.id : undefined;
+    // YALNIZCA sayılar, sabit kelimeler (enum) ve katalog id'leri gider; serbest metin, konum ve kimlik gitmez.
+    const govde = {
+      v: 3, sicaklik: h.apparent, delta: h.delta, hamle: f.hamleMax, cape: f.capeMax, yagisSeviye: f.seviye, yagisTur: f.tur, beklenenMm: Math.round(f.beklenenMm * 10) / 10, pop: f.enYuksekPop, uv: h.uv,
+      senaryo: d.tercih.sen, tolerans: d.tercih.tol, canta: d.tercih.canta,
+      kodlar: { b: p.b?.id ?? null, m: p.m?.id ?? null, o: p.o?.id ?? null, p: p.p?.id ?? null, a: p.a?.id ?? null },
+      bayraklar: { semsiyeYasak: f.semsiyeYasak, zararsiz: f.zararsiz, surpriz: f.surpriz },
+      kriz: { saat: k.saat, tur: k.tur, sicaklikOnce: k.sicaklikOnce, sicaklikSonra: k.sicaklikSonra, hamle: k.hamle, mm: k.mm, cape: k.cape },
+      ...(haberId ? { haberId } : {}),
+    };
+    const anahtar = LS.ai + JSON.stringify(govde);
+    const onbellek = lsOku(anahtar, null);
+    if (!zorla && onbellek && Date.now() - onbellek.t < 30 * 60 * 1000) { d.ai = { metin: onbellek.metin, etiket: `Yapay zekâ yorumu${haberId ? " · haber başlığıyla" : ""}`, hata: "" }; kb.aiYenileEkran?.(); return; }
+    // v8 KOTA GÜVENCESİ: Mod B (Worker/Groq) ARTIK KENDİLİĞİNDEN ÇALIŞMAZ. Eskiden her hesapla() (konum, tercih, kombin, yenileme, sekme) 600 ms sonra
+    // otomatik istek atıyordu → kullanıcı hiçbir şey istemeden kota yeniyordu. Şimdi yalnızca önbellek varsa gösterilir; yeni istek için düğmeye basılır.
+    if (!zorla) return yerel("Yapay zekâ yorumu hazır değil: istersen “✨ Yapay zekâya yorumlat” düğmesine bas (yalnızca o zaman istek yapılır).");
     d.ai = { ...d.ai, etiket: "Yapay zekâ kritik anı yorumluyor…", hata: "" }; kb.aiYenileEkran?.();
     aiZaman = setTimeout(async () => {
-      const haberId = d.haberAcik && d.haber?.durum === "ok" ? d.haber.uygulananlar[0]?.id : undefined;
-      // YALNIZCA sayılar, sabit kelimeler (enum) ve katalog id'leri gider; serbest metin, konum ve kimlik gitmez.
-      const govde = {
-        v: 3, sicaklik: h.apparent, delta: h.delta, hamle: f.hamleMax, cape: f.capeMax, yagisSeviye: f.seviye, yagisTur: f.tur, beklenenMm: Math.round(f.beklenenMm * 10) / 10, pop: f.enYuksekPop, uv: h.uv,
-        senaryo: d.tercih.sen, tolerans: d.tercih.tol, canta: d.tercih.canta,
-        kodlar: { b: p.b?.id ?? null, m: p.m?.id ?? null, o: p.o?.id ?? null, p: p.p?.id ?? null, a: p.a?.id ?? null },
-        bayraklar: { semsiyeYasak: f.semsiyeYasak, zararsiz: f.zararsiz, surpriz: f.surpriz },
-        kriz: { saat: k.saat, tur: k.tur, sicaklikOnce: k.sicaklikOnce, sicaklikSonra: k.sicaklikSonra, hamle: k.hamle, mm: k.mm, cape: k.cape },
-        ...(haberId ? { haberId } : {}),
-      };
-      const anahtar = LS.ai + JSON.stringify(govde);
-      const onbellek = lsOku(anahtar, null);
-      if (!zorla && onbellek && Date.now() - onbellek.t < 30 * 60 * 1000) { d.ai = { metin: onbellek.metin, etiket: `Yapay zekâ yorumu${haberId ? " · haber başlığıyla" : ""}`, hata: "" }; kb.aiYenileEkran?.(); return; }
       try {
         const { data } = await supabase.auth.getSession();
         const jeton = data?.session?.access_token;
