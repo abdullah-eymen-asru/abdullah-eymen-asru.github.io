@@ -413,6 +413,14 @@ const OZELLIK_KATALOGU = [
     kaynak: "kapali",
   },
   {
+    // bkz. migration 0113 — Site Duyuruları (bakım/yedekleme/felaket uyarı ekranı). Yönetici oluşturur/düzenler/yayına alır/okuyanları görür ve arar; SİLME (duyuru + okuma kaydı) yalnızca Site Sahibi. VARSAYILAN KAPALI.
+    anahtar: "duyuru_yonetimi",
+    baslik: "Site Duyuruları",
+    aciklama: "Ziyaretçilere uyarı penceresi, üyelere panelde kalıcı şerit olarak gösterilen duyuruları yönetme (bakım, yedekleme, felaket). Yönetici açıksa: yazar, düzenler, yayına alır/kaldırır, okuyanları görür ve arar. Duyuru ve okuma kaydı SİLME yetkisi yalnızca Site Sahibindedir. Varsayılan KAPALI.",
+    rolSutunlari: ["admin"],
+    kaynak: "kapali",
+  },
+  {
     // bkz. migration 0108 — parolası unutulup açılamayan not kasalarını (notlar + ekler + kasa anahtarı) kalıcı silme. Site Sahibi: AÇIK, Yönetici: KAPALI.
     anahtar: "kilitli_kasa_temizleme",
     baslik: "Kilitli Not Kasalarını Temizleme",
