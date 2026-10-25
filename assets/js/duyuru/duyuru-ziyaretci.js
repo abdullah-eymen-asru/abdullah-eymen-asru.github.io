@@ -39,8 +39,9 @@
     var govde = document.createElement("div"); govde.className = "dy-pencere-govde";
     String(d.metin).split("\n").forEach(function (s) { var p = document.createElement("p"); p.textContent = s; govde.append(p); });
     var alt = document.createElement("div"); alt.className = "dy-pencere-alt";
+    // Bağlantı mesajın ALTINDA kendi satırında (eski hata: "Anladım" düğmesine bitişikti, yanlışlıkla tıklanıyordu). Düğme altta tek başına.
     var href = d.baglanti_url ? guvenliUrl(d.baglanti_url) : null;
-    if (href) { var a = document.createElement("a"); a.href = href; a.target = "_blank"; a.rel = "noopener noreferrer"; a.className = "dy-pencere-baglanti"; a.textContent = d.baglanti_metin || "Ayrıntılar"; alt.append(a); }
+    if (href) { var a = document.createElement("a"); a.href = href; a.target = "_blank"; a.rel = "noopener noreferrer"; a.className = "dy-pencere-baglanti"; a.textContent = (d.baglanti_metin || "Ayrıntılar") + " ↗"; var satir = document.createElement("div"); satir.className = "dy-pencere-baglanti-satir"; satir.append(a); govde.append(satir); }
     var tamam = document.createElement("button"); tamam.type = "button"; tamam.className = "dy-pencere-tamam"; tamam.textContent = "Anladım"; alt.append(tamam);
     dlg.append(ust, govde, alt);
     function bitir() { kapat(d); dlg.close(); }
