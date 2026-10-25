@@ -682,3 +682,4 @@
 .hv-dlg-govde { display: flex; flex-direction: column; gap: .7rem; padding: 1rem; overflow-y: auto; max-height: calc(100dvh - 7rem); }
 .hv-kasa-durum { display: flex; flex-direction: column; gap: .4rem; padding: .7rem; border: 1px solid var(--hv-cizgi); border-radius: 14px; background: var(--bg); } .hv-kasa-durum.acik { border-color: var(--hv-yesil); }
 .hv-ai-saglayici { display: flex; flex-direction: column; gap: .4rem; padding: .7rem; border: 1px solid var(--hv-cizgi); border-radius: 14px; } .hv-ai-saglayici.kayitli { border-color: var(--hv-yesil); }
+.hv-sohbet-girdi { max-height: 60vh; overflow-y: auto; }
