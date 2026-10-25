@@ -1048,6 +1048,13 @@ permalink: "/panel/dashboard.html"
       <div id="demo-metrik-kok"><p class="muted">Yükleniyor...</p></div>
     </section>
 
+    <!-- Site Duyuruları (assets/js/duyuru/duyuru-yonetim.js; migration 0113): bakım/yedekleme/felaket uyarı ekranı. Owner her zaman; yönetici yalnızca Yetki Ayarları › "Site Duyuruları" açıksa.
+         Silme (duyuru + okuma kayıtları) yalnızca Site Sahibi (SQL'de is_owner()). -->
+    <section class="dash-view" id="view-sys-duyuru" hidden data-view="sys-duyuru">
+      <h1>Site Duyuruları</h1>
+      <div id="dy-kok" class="dy-kok"><p class="muted">Yükleniyor...</p></div>
+    </section>
+
     <section class="dash-view" id="view-sys-yedek" hidden data-view="sys-yedek">
       <h1>Sistem Yedekleme &amp; Depolama Yönetimi</h1>
       <div id="sy-kok" class="sy-kok"><p class="muted">Yükleniyor...</p></div>
