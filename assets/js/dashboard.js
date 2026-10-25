@@ -438,7 +438,7 @@ function ensureContentSlots(viewId, moduleKey) {
 
 const loadedModules = new Set();
 
-async function ensureModuleLoaded(key) {
+async function ensureModuleLoaded(key, viewId) {
   if (!MODULES[key]?.src) return; // yerleşik görünüm (hub): yüklenecek script yok
   if (loadedModules.has(key)) return;
   loadedModules.add(key);
@@ -447,6 +447,15 @@ async function ensureModuleLoaded(key) {
   } catch (err) {
     loadedModules.delete(key);
     console.error(`dashboard.js: "${key}" modülü yüklenemedi:`, err);
+    // Sessizce "Yükleniyor..." ekranında kalma: nedeni ve yeniden deneme düğmesini görünür yap.
+    const hedef = (viewId && document.getElementById(viewId)) || document.querySelector("#dash-main, main");
+    if (hedef && !hedef.querySelector(".dash-modul-hata")) {
+      const kutu = document.createElement("div"); kutu.className = "auth-message error dash-modul-hata"; kutu.setAttribute("role", "alert");
+      const metin = document.createElement("p"); metin.textContent = `Bu bölüm yüklenemedi: ${err?.message || err}`;
+      const dugme = document.createElement("button"); dugme.type = "button"; dugme.className = "btn"; dugme.textContent = "Yeniden dene";
+      dugme.addEventListener("click", () => window.location.reload());
+      kutu.append(metin, dugme); hedef.prepend(kutu);
+    }
   }
 }
 
@@ -565,6 +574,22 @@ let gecisSuruyor = false;
 let hubNesnesi = null;
 let hubVerisi = null; // { gruplar, profil }
 
+/** Yeni derleme varsa hedef sekmeyle sayfayı yeniler (true döner → çağıran geçişi bırakır). Kaydedilmemiş iş sorusu bundan ÖNCE sorulmuştur. */
+async function yeniSurumVarsaYenile(hedefViewId) {
+  try {
+    if (typeof window.aeaSurumKontrol !== "function") return false;
+    const yeni = (await window.aeaSurumKontrol(false)) || (window.aeaYeniSurumVarMi && window.aeaYeniSurumVarMi());
+    if (!yeni) return false;
+    const not = document.createElement("div");
+    not.className = "aea-guncelleme-notu"; not.setAttribute("role", "status");
+    not.textContent = "Yeni sürüm bulundu, sayfa güncelleniyor…";
+    document.body.append(not);
+    history.replaceState(null, "", `#${hedefViewId}`);
+    setTimeout(() => window.location.reload(), 350);
+    return true;
+  } catch { return false; }
+}
+
 async function showView(viewId, moduleKey) {
   if (viewId === "sys-uye-aktarim" || viewId === "sys-demo") { // eski adresler → birleşik Yetki Ayarları
     try { sessionStorage.setItem(YA_ALTSEKME_ANAHTARI, viewId === "sys-demo" ? "ya-pane-demo" : "ya-pane-uye"); } catch { /* depo kapalı */ }
@@ -581,6 +606,9 @@ async function showView(viewId, moduleKey) {
     let izin = true;
     try { izin = await ayrilmayaIzinVarMi(activeViewId, viewId); } finally { gecisSuruyor = false; }
     if (!izin) { history.replaceState(null, "", `#${activeViewId}`); return; }
+    // YENİ SÜRÜM KONTROLÜ (assets/js/core/surum-kontrol.js): her sekme geçişinde (en çok 30 sn'de bir, ucuz no-store istek) sunucudaki
+    // derleme kimliğine bakılır; yeni deploy varsa sayfa HEDEF SEKMEYLE yenilenir — elle yenilemeye gerek kalmaz. Oturum korunur (çıkış yok).
+    if (await yeniSurumVarsaYenile(viewId)) return;
   }
 
   ensureContentSlots(viewId, moduleKey);
@@ -618,7 +646,7 @@ async function showView(viewId, moduleKey) {
   if (viewId !== "me-hub") sonKullanilanKaydet(viewId);
   if (viewId === "me-hub") hubuCiz();
 
-  await ensureModuleLoaded(moduleKey);
+  await ensureModuleLoaded(moduleKey, viewId);
   // Yetki Ayarları: owner için "R2 Erişim İzni" bölümü (ayrı modül; gy modülüne dokunmaz)
   // Bu iki modül yalnızca Site Sahibi'nin sekmelerini doldurur (yetkili admin yalnızca Özellikler'i görür).
   // Yetki Ayarları alt sekmeleri: Site Sahibi VE Yetki Ayarları erişimi açık yönetici için HEPSİ yüklenir. Biri hata verse diğerleri etkilenmez.
