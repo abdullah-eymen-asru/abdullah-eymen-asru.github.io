@@ -1,12 +1,15 @@
 {
   "version": 1,
-  "include": ["/*"],
+  "include": [
+    "/*"
+  ],
   "exclude": [
     "/assets/css/*",
     "/assets/js/*",
     "/assets/fonts/*",
     "/assets/style.css",
     "/favicon.ico",
-    "/robots.txt"
+    "/robots.txt",
+    "/surum.json"
   ]
 }
