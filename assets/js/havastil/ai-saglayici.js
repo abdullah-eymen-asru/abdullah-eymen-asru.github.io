@@ -6,7 +6,7 @@
  * Her istek yalnızca kullanıcı bir düğmeye bastığında yapılır; burada otomatik/arka plan çağrı YOKTUR.
  */
 export const SAGLAYICILAR = Object.freeze({
-  gemini: { ad: "Google Gemini", kisa: "Gemini", oneri: ["gemini-2.5-flash", "gemini-2.5-pro"], varsayilan: "gemini-2.5-flash", anahtarIpucu: "AIza… ile başlar (Google AI Studio)", yardim: "https://aistudio.google.com/apikey" },
+  gemini: { ad: "Google Gemini", kisa: "Gemini", oneri: ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-pro-latest"], varsayilan: "gemini-flash-latest", anahtarIpucu: "AIza… ile başlar (Google AI Studio)", yardim: "https://aistudio.google.com/apikey" },
   openai: { ad: "OpenAI (ChatGPT API)", kisa: "OpenAI", oneri: ["gpt-4o-mini", "gpt-4o"], varsayilan: "gpt-4o-mini", anahtarIpucu: "sk-… ile başlar", yardim: "https://platform.openai.com/api-keys" },
   anthropic: { ad: "Anthropic (Claude API)", kisa: "Claude", oneri: ["claude-sonnet-5-5", "claude-haiku-5-5", "claude-opus-5-5"], varsayilan: "claude-sonnet-5-5", anahtarIpucu: "sk-ant-… ile başlar", yardim: "https://console.anthropic.com/settings/keys" },
   openrouter: { ad: "OpenRouter (yüzlerce model)", kisa: "OpenRouter", oneri: ["openrouter/auto"], varsayilan: "openrouter/auto", anahtarIpucu: "sk-or-… ile başlar", yardim: "https://openrouter.ai/keys" },
@@ -23,7 +23,7 @@ function hataMetni(durum, govde, sag) {
   try { const j = JSON.parse(govde); ayrinti = String(j?.error?.message || j?.error || j?.message || "").slice(0, 200); } catch { /* json değil */ }
   ayrinti = ayrinti.replace(/(sk-[\w-]{6})[\w-]+/gi, "$1…").replace(/AIza[\w-]{6}[\w-]+/g, "AIza…");     // olası sızıntıyı kırp
   if (durum === 401 || durum === 403) return `${ad} anahtarı geçersiz ya da bu modele yetkisi yok. Anahtarı kontrol et.${ayrinti ? ` (${ayrinti})` : ""}`;
-  if (durum === 404) return `${ad}: model bulunamadı. Model adını listeden seç ya da yaz.${ayrinti ? ` (${ayrinti})` : ""}`;
+  if (durum === 404) return `${ad}: seçili model artık kullanılamıyor ve güncel bir model otomatik bulunamadı. “Doğrula / modelleri getir” ile listeden yeni bir model seç.${ayrinti ? ` (${ayrinti})` : ""}`;
   if (durum === 429) return `${ad} istek/kota sınırına ulaştın (sağlayıcı tarafı). Biraz bekleyip tekrar dene ya da hesabındaki kotayı kontrol et.${ayrinti ? ` (${ayrinti})` : ""}`;
   if (durum === 400) return `${ad} isteği reddetti: ${ayrinti || "geçersiz istek"}`;
   if (durum >= 500) return `${ad} geçici olarak yanıt vermiyor (${durum}). Sonra tekrar dene.`;
@@ -48,7 +48,52 @@ async function istek(sag, url, init, sinyal) {
  * @param {{saglayici:string, model:string, anahtar:string, sistem:string, kullanici:string, sinyal?:AbortSignal, maksToken?:number}} o
  * @returns {Promise<{metin:string, model:string, kullanim:object|null}>}
  */
-export async function yorumIste({ saglayici, model, anahtar, sistem, kullanici, sinyal, maksToken = 2500 }) {
+/* ---------------------------- OTOMATİK GÜNCEL MODEL SEÇİMİ ---------------------------- */
+// Sağlayıcılar eski modelleri sık kaldırır ("no longer available to new users"). Böyle bir hata gelirse sağlayıcının CANLI model listesi
+// çekilir, istenen modelle AYNI sınıftan (flash / flash-lite / pro, mini, sonnet…) en yeni kararlı model seçilir ve istek bir kez yinelenir.
+const SURUM_RE = /(\d+(?:[.-]\d+)*)/;
+function surumDizisi(ad) { const m = String(ad).match(SURUM_RE); return m ? m[1].split(/[.-]/).map(Number) : [0]; }
+function surumKarsilastir(a, b) { const x = surumDizisi(a), y = surumDizisi(b); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (y[i] || 0) - (x[i] || 0); if (d) return d; } return 0; }   // büyük sürüm önce
+const KARARSIZ = /(preview|exp|experimental|tts|image|live|embedding|robotics|computer|audio|vision|thinking|latest|\d{4}-\d{2}-\d{2}|-\d{3,}$)/i;
+
+/** İstenen modelin sınıfına göre listeden en iyi (en yeni kararlı) modeli seçer; uygun yoksa null. */
+export function enIyiModel(saglayici, liste, istenen = "") {
+  const ad = String(istenen).toLowerCase();
+  let aday = [];
+  if (saglayici === "gemini") {
+    const sinif = /lite/.test(ad) ? "flash-lite" : /pro/.test(ad) ? "pro" : "flash";
+    aday = liste.filter((n) => new RegExp(`^gemini-\\d+(?:\\.\\d+)?-${sinif}$`, "i").test(n));
+    if (!aday.length) aday = liste.filter((n) => n.toLowerCase().includes(sinif) && !KARARSIZ.test(n) && (sinif !== "flash" || !/lite/i.test(n)));
+    if (!aday.length) aday = liste.filter((n) => /^gemini-\d/i.test(n) && !KARARSIZ.test(n));
+  } else if (saglayici === "openai") {
+    const sinif = /nano/.test(ad) ? "nano" : /mini/.test(ad) ? "mini" : "";
+    aday = liste.filter((n) => new RegExp(`^gpt-\\d+(?:\\.\\d+)?${sinif ? `-${sinif}` : ""}$`, "i").test(n));
+    if (!aday.length) aday = liste.filter((n) => /^gpt-\d/i.test(n) && !KARARSIZ.test(n));
+  } else if (saglayici === "anthropic") {
+    const sinif = /haiku/.test(ad) ? "haiku" : /opus/.test(ad) ? "opus" : "sonnet";
+    aday = liste.filter((n) => new RegExp(`^claude-${sinif}-\\d`, "i").test(n) || new RegExp(`^claude-\\d.*${sinif}`, "i").test(n));
+    if (!aday.length) aday = liste.filter((n) => /^claude-/i.test(n));
+  } else return null;
+  const tarihsiz = aday.filter((n) => !/-\d{8}$/.test(n)); if (tarihsiz.length) aday = tarihsiz;   // "…-20260101" gibi tarihli takma adlardan çok sade ad
+  aday.sort((a, b) => surumKarsilastir(a, b) || a.length - b.length);
+  return aday[0] || null;
+}
+const MODEL_YOK_RE = /(no longer available|not found|is not supported|not available|deprecated|does not exist|decommission|model_not_found|unsupported model|invalid model)/i;
+const modelHatasiMi = (h) => h instanceof AiHatasi && (h.durum === 404 || ((h.durum === 400 || h.durum === 403) && MODEL_YOK_RE.test(h.message)));
+
+export async function yorumIste(o) {
+  try { return await yorumIsteTek(o); }
+  catch (h) {
+    if (!modelHatasiMi(h) || o.model_denendi || o.saglayici === "openrouter") throw h;
+    const l = await modelleriListele({ saglayici: o.saglayici, anahtar: o.anahtar, sinyal: o.sinyal });
+    const yeni = l.canli ? enIyiModel(o.saglayici, l.liste, o.model) : null;
+    if (!yeni || yeni === String(o.model || "").replace(/^models\//, "")) throw h;
+    const r = await yorumIsteTek({ ...o, model: yeni, model_denendi: true });
+    return { ...r, modelDegisti: { eski: o.model, yeni } };
+  }
+}
+
+async function yorumIsteTek({ saglayici, model, anahtar, sistem, kullanici, sinyal, maksToken = 2500 }) {
   if (!SAGLAYICILAR[saglayici]) throw new AiHatasi("Bilinmeyen sağlayıcı.");
   if (!anahtar) throw new AiHatasi("API anahtarı yok.");
   model = (model || SAGLAYICILAR[saglayici].varsayilan).trim();
