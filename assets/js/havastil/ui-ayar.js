@@ -5,6 +5,7 @@
 import { el, rozet, etiket, ipucu, kart, bolumBasligi, cipGrubu, olay, izinYardimKarti, zamanOnce, bosalt, ekle, doldur } from "./ui-temel.js";
 import { uyarilariOku, uyarilariKaydet, yeniUyari, bildirimDestegi, izinIste, bildirimGoster, sonrakiUyari, zamanEtiketi, GUN_ADLARI } from "./bildirim.js";
 import { tarayiciTespit } from "./izin-yardim.js";
+import { aiAyarKarti } from "./ui-ai.js";
 
 function opsiyonel(ikon, ad, metin, sinif = "") {
   return el("div", { class: "hv-gizlilik-satir" }, el("span", { class: "hv-gizlilik-ikon", "aria-hidden": "true", text: ikon }), el("div", {}, el("strong", { text: ad }), el("small", { class: "hv-ipucu", text: metin })), rozet("Opsiyonel", sinif || "hv-rozet-ok"));
@@ -69,7 +70,7 @@ export function ayarSekmesi(d, kb) {
     doldur(taniKutu, ...(r.adimlar || []).map((a) => el("div", { class: `hv-tani-satir ${a.ok ? "ok" : "hata"}` }, el("span", { text: a.ok ? "✅" : "❌" }), el("div", {}, el("strong", { text: a.ad }), el("small", { class: "hv-ipucu", text: a.ayrinti })))), r.hata ? el("p", { class: "hv-uyari", text: r.hata }) : null);
   });
   const aiKart = kart("", bolumBasligi("✨ Yapay zekâ yorumu"),
-    el("label", { class: "hv-onay", for: "hv-ai-modu2" }, aiKutu, el("span", { text: d.vitrin ? "Yapay zekâ destekli kısa yorum (Groq) — vitrin modunda kilitli 🔒" : "Yapay zekâ destekli kısa yorum (Groq)" })),
+    el("label", { class: "hv-onay", for: "hv-ai-modu2" }, aiKutu, el("span", { text: d.vitrin ? "Yapay zekâ destekli kısa yorum (Groq) — vitrin modunda kilitli 🔒" : "Yapay zekâ destekli kısa yorum (Groq) — yalnızca “Yapay zekâya yorumlat” düğmesine basınca istek yapar" })),
     d.vitrin ? el("p", { class: "hv-uyari", text: "Vitrin/demo hesaplarında Mod B (Groq Worker) kesinlikle tetiklenmez; Cloudflare Worker ve Groq kotası korunur. Yalnızca ücretsiz kural tabanlı (Mod A) stilist cümlesi gösterilir." }) : null,
     ipucu("Kapalıyken (varsayılan) hiçbir yapay zekâ isteği yapılmaz; kombin kararını zaten yerel CLO motoru verir. Açıkken yalnızca sıcaklık/rüzgâr gibi sayılar, kıyafet parçaları ve (varsa) doğrulanmış bir haber başlığı gönderilir; konum gönderilmez."),
     taniBtn, taniKutu);
@@ -108,5 +109,5 @@ export function ayarSekmesi(d, kb) {
       el("p", { class: "hv-ipucu", text: `Ayıklanan: ${tz.elenen.clickbait} sansasyonel · ${tz.elenen.zaman} eski/gelecek · ${tz.elenen.konum} başka yer.` }))
       : ipucu("Haber verisi henüz yok."));
 
-  return el("div", { class: "hv-sekme-govde" }, uyariKart, aiKart, haberKart, bulutKart, gizlilik, teshis);
+  return el("div", { class: "hv-sekme-govde" }, uyariKart, aiKart, aiAyarKarti(d, kb), haberKart, bulutKart, gizlilik, teshis);
 }
