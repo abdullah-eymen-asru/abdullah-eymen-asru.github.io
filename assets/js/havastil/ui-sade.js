@@ -7,6 +7,7 @@ import { el, rozet, ipucu, kart, bolumBasligi, olay, zamanOnce } from "./ui-teme
 import { havaKodu } from "./hava-kodlari.js";
 import { YAGIS_SEVIYELERI, gunParcasi, saatAnaliz } from "./yagis-fizigi.js";
 import { yagisOzeti } from "./ui-hava.js";
+import { hizliCevaplar } from "./hikaye.js";
 
 /** Sabah/öğle/akşam planından tek cümlelik "gün içi değişim" notu (hepsi aynıysa not yok: sabit bir gün). */
 function degisimNotu(s) {
@@ -37,6 +38,14 @@ function sicaklikSatiri(d) {
     kutu("Rüzgâr / hamle", `${h.wind} / ${s0?.hamle ?? h.gust ?? "—"} km/s`));
 }
 
+/** 4 temel sorunun cevabı ilk bakışta (şemsiye · ıslanma · fırtına · giyim). Karar motoru çıktısından türetilir; yeni hesap yoktur. */
+function hizliBant(d) {
+  const c = hizliCevaplar(d);
+  if (!c.length) return null;
+  return el("ul", { class: "hv-hizli", "aria-label": "Hızlı cevaplar" }, ...c.map((x) => el("li", { class: `hv-hizli-oge ton-${x.ton}` },
+    el("span", { class: "hv-hizli-soru", text: `${x.ikon} ${x.soru}` }), el("strong", { class: "hv-hizli-cevap", text: x.cevap }))));
+}
+
 function hukumKarti(d, kb) {
   const h = d.hava, s = d.sonuc, f = d.fizik;
   const hk = havaKodu(h.kod, h.isDay);
@@ -48,6 +57,7 @@ function hukumKarti(d, kb) {
     sicaklikSatiri(d),
     el("p", { class: "hv-hukum-baslik", "aria-live": "polite", text: f.baslik }),
     el("p", { class: "hv-hukum-alt", text: [f.alt, not].filter(Boolean).join(" ") }),
+    hizliBant(d),
     yagisCubugu(f),
     simdiYagis ? el("p", { class: "hv-ipucu", text: `Şu an: ${simdiYagis}` }) : null,
     el("small", { class: "hv-ipucu", text: `${h.onbellek ? "önbellek · " : ""}${zamanOnce(h.alinma || Date.now())}${h.eski ? " · ÇEVRİMDIŞI son bilinen veri" : ""}` }));
