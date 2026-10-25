@@ -1,0 +1,6 @@
+---
+layout: null
+permalink: /surum.json
+sitemap: false
+---
+{"build":"{{ site.time | date: '%Y%m%d%H%M%S' }}"}
