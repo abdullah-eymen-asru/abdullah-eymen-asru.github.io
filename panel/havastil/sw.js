@@ -2,7 +2,7 @@
    ÖNBELLEĞE ALINANLAR: bu sayfanın kabuğu + havastil JS/CSS + site stilleri (aynı kaynaklı GET). 
    ÖNBELLEĞE ALINMAYANLAR: Supabase, Worker, Open-Meteo, Nominatim (çapraz kaynak: hiç dokunulmaz) ve oturum/kişisel veri.
    Hava verisi çevrimdışı desteği sayfanın kendi 30 dk localStorage önbelleğindedir. */
-const SURUM = "havastil-v9";
+const SURUM = "havastil-v10";
 const KABUK = ["/panel/havastil/", "/assets/css/havastil.css", "/assets/js/havastil/arayuz.js", "/assets/js/havastil/bildirim.js", "/assets/js/havastil/bulut.js", "/assets/js/havastil/cekirdek.js", "/assets/js/havastil/haber-filtre.js", "/assets/js/havastil/haber.js", "/assets/js/havastil/hava-kodlari.js", "/assets/js/havastil/iller.js", "/assets/js/havastil/izin-yardim.js", "/assets/js/havastil/katalog.js", "/assets/js/havastil/konumlar.js", "/assets/js/havastil/sayfa.js", "/assets/js/havastil/taktik.js", "/assets/js/havastil/ui-ayar.js", "/assets/js/havastil/ui-haber.js", "/assets/js/havastil/ui-hava.js", "/assets/js/havastil/ui-kombin.js", "/assets/js/havastil/ui-konum.js", "/assets/js/havastil/ui-temel.js", "/assets/js/havastil/veri.js", "/assets/js/havastil/yagis-fizigi.js", "/assets/js/havastil/tetikleyici.js", "/assets/js/havastil/ui-sade.js", "/assets/js/havastil/ui-uzman.js", "/assets/js/havastil/ui-plan.js", "/assets/js/havastil/ui-lab.js", "/assets/js/havastil/ui-kar.js", "/assets/js/havastil/ui-mevsim.js", "/assets/js/havastil/iklim.js", "/assets/js/havastil/panel.js", "/assets/js/havastil/hikaye.js", "/assets/js/havastil/veri-paketi.js", "/assets/js/havastil/ai-saglayici.js", "/assets/js/havastil/ai-istem.js", "/assets/js/havastil/ai-kasa.js", "/assets/js/havastil/ui-ai.js", "/panel/havastil/ikon-192.png"];
 
 self.addEventListener("install", (e) => {
@@ -20,7 +20,7 @@ self.addEventListener("fetch", (e) => {
   e.respondWith((async () => {
     const c = await caches.open(SURUM);
     try {
-      const taze = await fetch(r);                                              // ağ-öncelikli (güncel kod), düşerse önbellek
+      const taze = await fetch(r.mode === "navigate" ? r : new Request(r, { cache: "no-cache" }), r.mode === "navigate" ? { cache: "no-cache" } : undefined);                                              // ağ-öncelikli (güncel kod), düşerse önbellek
       if (taze.ok && taze.type === "basic") c.put(kabukSayfasi ? "/panel/havastil/" : r, taze.clone());
       return taze;
     } catch {
