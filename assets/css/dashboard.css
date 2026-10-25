@@ -911,3 +911,6 @@ html.header-gizli .dash-shell { --dash-header-h: 0px !important; }   /* .dash-sh
 .bg-kat-sayi { white-space: nowrap; font-size: .85rem; }
 .bg-kat-sil, .bg-kat-yeni button { min-height: 44px; }
 @media (max-width: 480px) { .bg-kat-satir input, .bg-kat-yeni input { flex-basis: 100%; } .bg-kat-sil, .bg-kat-yeni button { flex: 1; } }
+
+/* v114 — yeni sürüm bulununca kısa bilgi notu (panel kendini yeniler; oturum korunur) */
+.aea-guncelleme-notu { position: fixed; left: 50%; bottom: 1.2rem; transform: translateX(-50%); z-index: 2000; max-width: calc(100vw - 2rem); padding: .7rem 1.1rem; border-radius: 999px; background: var(--card-bg, #222); color: var(--text, #fff); border: 1px solid var(--accent, #4aa3ff); box-shadow: 0 8px 30px rgba(0, 0, 0, .35); font-size: .9rem; }
