@@ -61,6 +61,8 @@ const MODULES = {
   guvenlik: { src: "./admin-guvenlik.js", role: "admin" },
   // İzleme ve Okuma Yönetimi (migration 0108): görünürlük role DEĞİL, Yetki Ayarları › "izleme_okuma_yonetimi" anahtarına bağlı (VARSAYILAN KAPALI; owner her zaman).
   izleme: { src: "./izleme-okuma-yonetim/izleme-okuma-yonetim.js", role: null },
+  // Site Duyuruları (migration 0113): görünürlük role DEĞİL, Yetki Ayarları › "duyuru_yonetimi" anahtarına bağlı (VARSAYILAN KAPALI; owner her zaman).
+  duyuru: { src: "./duyuru/duyuru-yonetim.js", role: null },
   mesajlar: { src: "./mesajlar.js", role: null },
   // Notlarım (uçtan uca şifreli not sistemi) — yayıncılık akışındaki
   // roller (editor/manager; admin ve owner otomatik geçer). SQL: not_modulu_yetkili().
@@ -197,6 +199,7 @@ const NAV = [
       // -> wireYetkiAyarlari() zaten owner değilse bölümü DOM'dan siliyor,
       // burada da sidebar linkini hiç çizmiyoruz (item.role override'ı).
       { id: "sys-yetki", icon: "🔐", label: "Yetki Ayarları", module: "gy", role: "admin", izin: "yetkiayarlari", defaultAcilis: false },
+      { id: "sys-duyuru", icon: "📢", label: "Site Duyuruları", module: "duyuru", role: null, izin: "duyuru", defaultAcilis: false },
       // role:"admin" + izin:"kvkk": owner her zaman görür; admin sadece owner "adminler KVKK
       // sürümünü değiştirebilsin" anahtarını açtıysa (bkz. gorunurMu / izinleriYukle).
       { id: "sys-kvkk", icon: "📜", label: "Hukuki Metinler", module: "kvkkSurum", role: "admin", izin: "kvkk" },
@@ -255,6 +258,9 @@ function gorunurMu(item, profile) {
   if (item.izin === "izleme") {
     return profile.role === "owner" || (profile.role === "admin" && !!profile.izinler?.izleme);
   }
+  if (item.izin === "duyuru") {
+    return profile.role === "owner" || (profile.role === "admin" && !!profile.izinler?.duyuru);
+  }
   if (item.izin === "silmeonayi") {
     return profile.role === "owner" || (profile.role === "admin" && !!profile.izinler?.silmeOnayi);
   }
@@ -282,7 +288,7 @@ async function izinleriYukle(rol) {
       .rpc("ozellik_erisimi_var_mi", { p_ozellik: anahtar, p_rol: rol })
       .then((r) => (r.error ? true : r.data !== false))
       .catch(() => true);
-  const [arsiv, kvkk, ozelIcerik, dosyaPaylasimi, akademikKutuphane, sistemYedek, donusturucu, silmeOnayi, yetkiAyarlari, havastil, izleme] = await Promise.all([
+  const [arsiv, kvkk, ozelIcerik, dosyaPaylasimi, akademikKutuphane, sistemYedek, donusturucu, silmeOnayi, yetkiAyarlari, havastil, izleme, duyuru] = await Promise.all([
     supabase.rpc("r2_arsiv_yetkilerim").then((r) => (r.error ? undefined : r.data)).catch(() => undefined),
     supabase.rpc("hukuki_metin_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
     ozellikSor("ozel_icerik_yonetimi"),
@@ -300,6 +306,8 @@ async function izinleriYukle(rol) {
     supabase.rpc("havastil_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
     // izleme_okuma_yonetimi (migration 0108): varsayılan KAPALI → hata/migration yoksa false.
     supabase.rpc("izleme_okuma_yonetimi_yetkili").then((r) => (r.error ? false : !!r.data)).catch(() => false),
+    // duyuru_yonetimi (migration 0113): varsayılan KAPALI → hata/migration yoksa false.
+    supabase.rpc("duyuru_yonetim_yetkili").then((r) => (r.error ? false : !!r.data)).catch(() => false),
   ]);
   return {
     arsiv,
@@ -310,6 +318,7 @@ async function izinleriYukle(rol) {
     yetkiAyarlari,
     havastil,
     izleme,
+    duyuru,
     ozellikler: { ozel_icerik_yonetimi: ozelIcerik, dosya_paylasimi_yonetimi: dosyaPaylasimi, akademik_kutuphane: akademikKutuphane },
   };
 }
@@ -923,6 +932,8 @@ async function init() {
   // (Demo'da atlanır: Worker'a hiç istek gitmesin.)
   // 2026-10: önce anahtar kaydı, sonra GİRİŞE BAĞLAMA — Notlar kasası (giriş parolası / Google'da cihazdaki KEK) sessizce açılır, mesajlaşma
   // anahtarı aynı DEK'e bağlanır. Kullanıcıya hiçbir şey sorulmaz; kasa yoksa yeni kasa KURULMAZ (kurulum Notlar'da, kurtarma metniyle).
+  // Site duyuruları: üyeye kalıcı ama rahatsız etmeyen şerit (kapatınca okundu kaydı). Hata/migration yoksa sessizce hiçbir şey gösterilmez.
+  import("./duyuru/duyuru-panel.js").then((m) => m.duyuruSeridiKur()).catch(() => {});
   if (!isDemoMode) import("./r2-arsiv/e2ee.js").then(async (m) => { await m.anahtarKaydiniSessizHazirla(); await m.girisOturumunaBagla(); }).catch(() => {}); // kayıt varsa Worker'a istek ATILMAZ (kota)
 
   buildSidebar(profile);
