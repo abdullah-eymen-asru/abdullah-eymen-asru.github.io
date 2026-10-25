@@ -10,7 +10,7 @@
 import { el, rozet, ipucu, kart, bolumBasligi, olay, doldur, ekle, lsOku, lsYaz } from "./ui-temel.js";
 import { SAGLAYICILAR, SAGLAYICI_SIRASI, yorumIste, modelleriListele } from "./ai-saglayici.js";
 import * as Kasa from "./ai-kasa.js";
-import { ANALIZ_SISTEM, SOHBET_SISTEM, analizKullanici, sohbetKullanici, ozet } from "./ai-istem.js";
+import { analizSistem, sohbetSistem, analizKullanici, sohbetKullanici, ozet } from "./ai-istem.js";
 import { gunVeriPaketi, paketMetni, paketJson, dosyaAdi, indir, panoyaKopyala } from "./veri-paketi.js";
 
 /* ------------------------------ güvenli mini Markdown → DOM ------------------------------ */
@@ -70,32 +70,54 @@ export function aiAyarDialogu(d, { onKapat } = {}) {
   olay(dlg, "close", () => { dlg.remove(); onKapat?.(); });
   olay(dlg, "click", (e) => { if (e.target === dlg) dlg.close(); });
 
+  let kasaBilgi = { kayitSayisi: 0, eskiVar: false, hesapKasasi: false };
   async function yenile() {
-    try { kayitli = await Kasa.kayitliSaglayicilar(); } catch (h) { hata(h.message); kayitli = {}; }
+    try {
+      kayitli = await Kasa.kayitliSaglayicilar();
+      kasaBilgi = await Kasa.kasaDurumu();
+      if (!Kasa.kasaAcikMi()) await Kasa.otomatikAc().catch(() => false);          // hesap kasası hazırsa PAROLA SORMADAN açılır
+    } catch (h) { hata(h.message); kayitli = {}; }
     yukleniyor = false; ciz();
   }
   function kasaBolumu() {
-    const kayitSayisi = Object.keys(kayitli).length;
-    if (Kasa.kasaAcikMi()) return el("div", { class: "hv-kasa-durum acik" }, el("strong", { text: "🔓 Kasa açık" }), el("small", { class: "hv-ipucu", text: "Çözülmüş anahtarlar yalnızca bu sekmenin belleğinde. Sekme kapanınca ya da 20 dk kullanılmazsa kilitlenir." }),
+    const { kayitSayisi, eskiVar, hesapKasasi } = kasaBilgi;
+    if (Kasa.kasaAcikMi()) return el("div", { class: "hv-kasa-durum acik" }, el("strong", { text: "🔓 Kasa açık" }),
+      el("small", { class: "hv-ipucu", text: "Anahtarların hesabının ana parolasına bağlı kasayla şifrelenir; ayrı parola gerekmez. Çözülmüş anahtarlar yalnızca bu sekmenin belleğinde durur; sekme kapanınca ya da 20 dk kullanılmazsa kilitlenir." }),
       olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "Kasayı kilitle" }), "click", () => { Kasa.kilitle(); ciz(); }));
-    const parola = el("input", { type: "password", class: "hv-girdi", autocomplete: kayitSayisi ? "current-password" : "new-password", "aria-label": "Kasa parolası", placeholder: kayitSayisi ? "Kasa parolan" : "Yeni kasa parolası (en az 8 karakter)" });
-    const parola2 = kayitSayisi ? null : el("input", { type: "password", class: "hv-girdi", autocomplete: "new-password", "aria-label": "Kasa parolası (tekrar)", placeholder: "Parolayı tekrar yaz" });
-    const git = olay(el("button", { type: "button", class: "hv-btn hv-btn-birincil", text: kayitSayisi ? "🔓 Kasayı aç" : "🔐 Kasayı oluştur" }), "click", async () => {
+    // 1) Hesap kasası hazır ve eski parolalı kayıt yok → tek tıkla, parolasız aç
+    if (hesapKasasi && !eskiVar) {
+      const ac = olay(el("button", { type: "button", class: "hv-btn hv-btn-birincil", text: "🔓 Kasayı aç" }), "click", async () => {
+        ac.disabled = true; hata("");
+        try { if (!(await Kasa.otomatikAc())) throw new Error("Kasa açılamadı: kayıtlar başka bir kasa anahtarıyla şifrelenmiş olabilir. Aşağıdan kasayı sıfırlayıp anahtarları yeniden gir."); ciz(); }
+        catch (h) { hata(h.message); ac.disabled = false; }
+      });
+      return el("div", { class: "hv-kasa-durum" }, el("strong", { text: "🔒 Kasa kilitli" }),
+        el("small", { class: "hv-ipucu", text: "Parola gerekmez: kasa hesabının ana parolasına bağlıdır. Giriş yaptığında kendiliğinden açılır; elle kilitlediysen buradan tek tıkla açarsın." }), ac,
+        kayitSayisi ? olay(el("button", { type: "button", class: "hv-baglanti", text: "Kasa açılmıyor mu? → kasayı sıfırla" }), "click", sifirlaTikla) : null);
+    }
+    // 2) Eski (kasa parolalı) kayıtlar → bir kereye mahsus eski parola; hesap kasası hazırsa sonra otomatik taşınır
+    // 3) Hesap kasası yok (Not Kasası kurulu değil) → yedek yol: bağımsız kasa parolası
+    const parola = el("input", { type: "password", class: "hv-girdi", autocomplete: eskiVar ? "current-password" : "new-password", "aria-label": "Kasa parolası", placeholder: eskiVar ? "Eski kasa parolan (bir kez)" : "Yeni kasa parolası (en az 8 karakter)" });
+    const parola2 = eskiVar ? null : el("input", { type: "password", class: "hv-girdi", autocomplete: "new-password", "aria-label": "Kasa parolası (tekrar)", placeholder: "Parolayı tekrar yaz" });
+    const git = olay(el("button", { type: "button", class: "hv-btn hv-btn-birincil", text: eskiVar ? "🔓 Eski kasayı aç ve taşı" : "🔐 Kasayı oluştur" }), "click", async () => {
       git.disabled = true; hata("");
       try {
-        if (kayitSayisi) await Kasa.kasaAc(parola.value);
+        if (eskiVar) await Kasa.kasaAc(parola.value);
         else { if (parola.value !== parola2.value) throw new Error("Parolalar aynı değil."); await Kasa.kasaKur(parola.value); }
-        parola.value = ""; if (parola2) parola2.value = ""; ciz();
+        parola.value = ""; if (parola2) parola2.value = ""; await yenile();
       } catch (h) { hata(h.message); } finally { git.disabled = false; }
     });
     return el("div", { class: "hv-kasa-durum" },
-      el("strong", { text: kayitSayisi ? "🔒 Kasa kilitli" : "Önce bir kasa parolası belirle" }),
-      el("small", { class: "hv-ipucu", text: kayitSayisi ? "Kayıtlı anahtarlarını kullanmak için kasa parolanı gir." : "Bu parola yalnızca bu tarayıcıda anahtarlarını şifrelemek için kullanılır; sunucuya GİTMEZ ve kurtarılamaz (unutursan kasayı sıfırlayıp anahtarları yeniden girersin)." }),
+      el("strong", { text: eskiVar ? "🔒 Eski kasa parolası gerekli (bir kereye mahsus)" : "Hesap kasası bulunamadı" }),
+      el("small", { class: "hv-ipucu", text: eskiVar
+        ? (hesapKasasi ? "Anahtarların eski kasa parolasıyla şifrelenmiş. Bir kez açtığında hesabının ana parolasına bağlı kasaya taşınır; sonra parola gerekmez." : "Anahtarların eski kasa parolasıyla şifrelenmiş. Açmak için o parolayı gir.")
+        : "Hesabının ana parolasına bağlı kasa (Not Kasası) bu hesapta kurulu/açık değil. Önce Notlarım'da kasayı kurarsan ayrı parola gerekmez; şimdilik yalnızca bu tarayıcıda anahtarlarını şifrelemek için bir parola belirle (sunucuya GİTMEZ, kurtarılamaz)." }),
       parola, parola2, git,
-      kayitSayisi ? olay(el("button", { type: "button", class: "hv-baglanti", text: "Parolayı unuttum → kasayı sıfırla" }), "click", async () => {
-        if (!window.confirm("Kayıtlı TÜM yapay zekâ anahtarların silinecek. Devam edilsin mi?")) return;
-        try { await Kasa.kasayiSifirla(); hata("Kasa sıfırlandı.", true); await yenile(); } catch (h) { hata(h.message); }
-      }) : null);
+      kayitSayisi ? olay(el("button", { type: "button", class: "hv-baglanti", text: "Parolayı unuttum → kasayı sıfırla" }), "click", sifirlaTikla) : null);
+  }
+  async function sifirlaTikla() {
+    if (!window.confirm("Kayıtlı TÜM yapay zekâ anahtarların silinecek. Devam edilsin mi?")) return;
+    try { await Kasa.kasayiSifirla(); hata("Kasa sıfırlandı.", true); await yenile(); } catch (h) { hata(h.message); }
   }
   function saglayiciKarti(id) {
     const S = SAGLAYICILAR[id], kayit = kayitli[id], acik = Kasa.kasaAcikMi();
@@ -134,7 +156,7 @@ export function aiAyarDialogu(d, { onKapat } = {}) {
   }
   function ciz() {
     doldur(govde,
-      el("p", { class: "hv-ipucu", text: "Kendi API anahtarınla yorum alırsın. Anahtarın bu tarayıcıda kasa parolanla ŞİFRELENİR; hesabına yalnızca şifreli hâli kaydedilir (Site Sahibi dâhil kimse okuyamaz, yedeklere girmez). İstekler tarayıcından doğrudan sağlayıcıya gider; HavaStil sunucusundan geçmez. Kota ve ücret senin sağlayıcı hesabından düşer — bu yüzden hiçbir istek kendiliğinden yapılmaz." }),
+      el("p", { class: "hv-ipucu", text: "Kendi API anahtarınla yorum alırsın. Anahtarın hesabının ana parolasına bağlı kasayla ŞİFRELENİR (ayrı parola yok); hesabına yalnızca şifreli hâli kaydedilir (Site Sahibi dâhil kimse okuyamaz, yedeklere girmez). İstekler tarayıcından doğrudan sağlayıcıya gider; HavaStil sunucusundan geçmez. Kota ve ücret senin sağlayıcı hesabından düşer — bu yüzden hiçbir istek kendiliğinden yapılmaz." }),
       yukleniyor ? ipucu("Yükleniyor…") : kasaBolumu(), mesaj,
       ...SAGLAYICI_SIRASI.map(saglayiciKarti));
   }
@@ -171,7 +193,7 @@ export function aiPaneli(d, kb) {
   if (d.vitrin || d.misafir) { kok.append(el("p", { class: "hv-uyari", text: KILITLI_MESAJ })); return kok; }
 
   const ekSecim = el("select", { class: "hv-girdi hv-girdi-kucuk", "aria-label": "Pakete dâhil edilecek gün sayısı" },
-    el("option", { value: "0", text: "Yalnızca seçili gün (saatlik)" }), el("option", { value: "1", text: "Seçili gün + sonraki gün (saatlik)" }), el("option", { value: "2", text: "Seçili gün + sonraki 2 gün (saatlik)" }));
+    el("option", { value: "0", text: "Yalnızca seçili gün (saatlik)" }), el("option", { value: "1", text: "Seçili gün + sonraki gün (saatlik)" }), el("option", { value: "2", text: "Seçili gün + sonraki 2 gün (saatlik)" }), el("option", { value: "4", text: "Seçili gün + sonraki 4 gün (saatlik)" }), el("option", { value: "9", text: "Mevcut TÜM günler (saatlik, ≈10 gün; uzun)" }));
   ekSecim.value = String(st.ekGun);
   const paketUret = () => { const p = gunVeriPaketi(d, gi, { ekGun: Number(ekSecim.value) }); return { p, metin: paketMetni(p) }; };
   const boyutYazi = el("small", { class: "hv-ipucu" });
@@ -202,7 +224,8 @@ export function aiPaneli(d, kb) {
     const adlar = Object.keys(kayit);
     if (!adlar.length) return { ac: true, neden: "Önce bir yapay zekâ sağlayıcısı ekle." };
     let s = aktif(); if (!s || !kayit[s.saglayici]) { s = { saglayici: adlar[0], model: kayit[adlar[0]].model || SAGLAYICILAR[adlar[0]].varsayilan }; Kasa.secimYaz(s.saglayici, s.model); }
-    if (!Kasa.kasaAcikMi()) return { ac: true, neden: "Kasa kilitli: parolanı gir." };
+    if (!Kasa.kasaAcikMi()) await Kasa.otomatikAc().catch(() => false);                 // hesap kasası hazırsa parola sorulmaz
+    if (!Kasa.kasaAcikMi()) return { ac: true, neden: "Kasa kilitli: aç ya da kasa parolanı gir." };
     const anahtar = Kasa.anahtarAl(s.saglayici);
     if (!anahtar) return { ac: true, neden: `${SAGLAYICILAR[s.saglayici].kisa} için anahtar kasada yok.` };
     return { s, anahtar, kayit };
@@ -222,6 +245,19 @@ export function aiPaneli(d, kb) {
     }).catch((h) => doldur(secimAlani, el("p", { class: "hv-uyari", text: h.message })));
   }
 
+  const seviyeOku = () => { try { return localStorage.getItem("hv_ai_seviye") === "uzman" ? "uzman" : "sade"; } catch { return "sade"; } };
+  const seviyeSec = el("select", { class: "hv-girdi hv-girdi-kucuk", "aria-label": "Anlatım düzeyi" }, el("option", { value: "sade", text: "Sade anlatım (herkes için)" }), el("option", { value: "uzman", text: "Uzman anlatım (teknik)" }));
+  seviyeSec.value = seviyeOku();
+  olay(seviyeSec, "change", () => { try { localStorage.setItem("hv_ai_seviye", seviyeSec.value); } catch { /* yok say */ } });
+  /** Sağlayıcı eski modeli kaldırdıysa yorumIste yenisini bulur; seçimi kalıcı güncelle ve kullanıcıya bildir. */
+  function modelDegistiyse(r, s) {
+    if (!r.modelDegisti) return "";
+    Kasa.secimYaz(s.saglayici, r.modelDegisti.yeni);
+    Kasa.modelKaydet(s.saglayici, r.modelDegisti.yeni).catch(() => {});
+    s.model = r.modelDegisti.yeni;
+    secimCiz();
+    return `ℹ️ “${r.modelDegisti.eski}” modeli artık kullanılamıyor; güncel model “${r.modelDegisti.yeni}” otomatik seçildi.`;
+  }
   const analizBtn = olay(el("button", { type: "button", class: "hv-btn hv-btn-birincil", text: "✨ Analiz et" }), "click", () => calistir(false));
   const yenidenBtn = olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "↻ Yeniden analiz et", hidden: true }), "click", () => calistir(true));
   const iptalBtn = olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "İptal", hidden: true }), "click", () => iptal?.abort());
@@ -243,27 +279,30 @@ export function aiPaneli(d, kb) {
     const { s, anahtar } = h;
     const { p, metin } = paketUret();
     const model = (s.model || SAGLAYICILAR[s.saglayici].varsayilan).trim();
-    const anahtarOz = `${ozet(metin)}|${s.saglayici}|${model}`;
+    const seviye = seviyeOku();
+    const anahtarOz = `${ozet(metin)}|${s.saglayici}|${model}|${seviye}`;
     if (st.paketAnahtar !== ozet(metin)) { st.sohbet = []; st.paketAnahtar = ozet(metin); sohbetCiz(); }
     if (!zorla && st.onbellek.has(anahtarOz)) { st.analiz = { ...st.onbellek.get(anahtarOz), onbellek: true }; sonucGoster(); return; }
     istekte = true; analizBtn.disabled = true; yenidenBtn.disabled = true; iptalBtn.hidden = false; iptal = new AbortController();
     analizDurum.textContent = `${SAGLAYICILAR[s.saglayici].kisa} analiz ediyor… (≈ ${tokenTahmin(metin).toLocaleString("tr-TR")} token gönderiliyor)`;
     try {
-      const r = await yorumIste({ saglayici: s.saglayici, model, anahtar, sistem: ANALIZ_SISTEM, kullanici: analizKullanici(metin), sinyal: iptal.signal });
+      const r = await yorumIste({ saglayici: s.saglayici, model, anahtar, sistem: analizSistem(seviye), kullanici: analizKullanici(metin), sinyal: iptal.signal, maksToken: 4000 });
       st.analiz = { metin: r.metin, saglayici: s.saglayici, model: r.model, kullanim: r.kullanim, zaman: new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }), onbellek: false, tarih: p.secili_gun.tarih };
       st.onbellek.set(anahtarOz, st.analiz); if (st.onbellek.size > 8) st.onbellek.delete(st.onbellek.keys().next().value);
-      analizDurum.textContent = ""; sonucGoster();
+      analizDurum.textContent = modelDegistiyse(r, s); sonucGoster();
     } catch (hh) { analizDurum.textContent = hh.message; }
     finally { istekte = false; analizBtn.disabled = false; yenidenBtn.disabled = false; iptalBtn.hidden = true; iptal = null; }
   }
 
   kok.append(el("h3", { class: "hv-alt-baslik", text: "Yapay zekâ analizi" }),
     ipucu("Tıklamadan hiçbir istek gitmez. Aynı veri için ikinci tıklama yeni istek yapmaz. Yorum yalnızca pakettaki sayılara dayanır; lehte ve aleyhte işaretleri birlikte verir, kesinlik iddia etmez."),
-    secimAlani, el("div", { class: "hv-btn-satir" }, analizBtn, yenidenBtn, iptalBtn), analizDurum, analizKutu);
+    secimAlani, el("label", { class: "hv-etiket", text: "Anlatım düzeyi" }), seviyeSec, el("div", { class: "hv-btn-satir" }, analizBtn, yenidenBtn, iptalBtn), analizDurum, analizKutu);
 
   /* --- 3) geçici sohbet --- */
   const sohbetKutu = el("div", { class: "hv-sohbet", "aria-live": "polite" });
-  const soruGirdi = el("textarea", { class: "hv-girdi hv-sohbet-girdi", rows: "2", maxlength: "600", "aria-label": "Sorun", placeholder: "Örn. 08:00–10:00 arası yağmur olur mu? / Akşam 18'de ne giymeliyim?" });
+  const soruGirdi = el("textarea", { class: "hv-girdi hv-sohbet-girdi", rows: "3", "aria-label": "Sorun", placeholder: "Örn. 08:00–10:00 arası yağmur olur mu? / Akşam 18'de ne giymeliyim?" });
+  const boyutla = () => { soruGirdi.style.height = "auto"; soruGirdi.style.height = `${Math.min(soruGirdi.scrollHeight + 2, Math.round(window.innerHeight * 0.6))}px`; };   // sınırsız yazı: kutu uzar, çok uzarsa kendi içinde kayar
+  soruGirdi.addEventListener("input", boyutla);
   const gonder = olay(el("button", { type: "button", class: "hv-btn hv-btn-birincil", text: "Gönder" }), "click", () => soruSor(soruGirdi.value));
   const temizle = olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "Sohbeti temizle" }), "click", () => { st.sohbet = []; sohbetCiz(); });
   const hizli = ["Sabah 07–10 arası nasıl?", "Öğleden sonra yağmur riski?", "Akşam eve dönüşte ne giymeliyim?", "En riskli saat hangisi, neden?", "Rüzgâr ne zaman en sert?"];
@@ -281,10 +320,11 @@ export function aiPaneli(d, kb) {
     if (h.ac) { analizDurum.textContent = h.neden; aiAyarDialogu(d, { onKapat: () => { secimCiz(); } }); return; }
     const { s, anahtar } = h; const { metin } = paketUret();
     st.paketAnahtar = ozet(metin);
-    istekte = true; gonder.disabled = true; st.sohbet.push({ rol: "ben", metin: soru }); st.sohbet.push({ rol: "ai", metin: "…" }); sohbetCiz(); soruGirdi.value = "";
+    istekte = true; gonder.disabled = true; st.sohbet.push({ rol: "ben", metin: soru }); st.sohbet.push({ rol: "ai", metin: "…" }); sohbetCiz(); soruGirdi.value = ""; boyutla();
     try {
-      const r = await yorumIste({ saglayici: s.saglayici, model: (s.model || SAGLAYICILAR[s.saglayici].varsayilan).trim(), anahtar, sistem: SOHBET_SISTEM, kullanici: sohbetKullanici(metin, st.analiz?.metin || "", soru), maksToken: 1200 });
+      const r = await yorumIste({ saglayici: s.saglayici, model: (s.model || SAGLAYICILAR[s.saglayici].varsayilan).trim(), anahtar, sistem: sohbetSistem(seviyeOku()), kullanici: sohbetKullanici(metin, st.analiz?.metin || "", soru), maksToken: 3000 });
       st.sohbet[st.sohbet.length - 1] = { rol: "ai", metin: r.metin };
+      const not = modelDegistiyse(r, s); if (not) analizDurum.textContent = not;
     } catch (hh) { st.sohbet[st.sohbet.length - 1] = { rol: "ai", metin: `⚠️ ${hh.message}` }; }
     finally { istekte = false; gonder.disabled = false; sohbetCiz(); }
   }
