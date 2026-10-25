@@ -244,6 +244,8 @@
   <script src="{{ '/assets/js/auth/nav-auth-hint.js' | relative_url }}"></script>
 
   <link rel="stylesheet" href="{{ '/assets/style.css' | relative_url }}">
+  <!-- Site duyuruları (migration 0113): ziyaretçi uyarı penceresi + panel üye şeridi stilleri. Duyuru yoksa hiçbir şey çizilmez. -->
+  <link rel="stylesheet" href="{{ '/assets/css/duyuru.css' | relative_url }}">
 
   <!-- ALAN ADI & SAYFA ERİŞİM KALKANI (Gatekeeper) — bkz. assets/js/core/gatekeeper.js
        başındaki tasarım notu. Bilerek: (1) style.css'ten HEMEN SONRA — kilit kartının
@@ -253,6 +255,8 @@
        hash eklentisini (_plugins/csp_hash_enjekte.rb) etkilemez. /hesap/, /panel/ ve
        gizlilik politikası hiçbir koşulda kilitlenmez. -->
   <script src="{{ '/assets/js/core/gatekeeper.js' | relative_url }}"></script>
+  <!-- Ziyaretçi duyuru penceresi (panel hariç; defer: ilk boyamayı geciktirmez, harici dosya → CSP hash etkilenmez). -->
+  <script defer src="{{ '/assets/js/duyuru/duyuru-ziyaretci.js' | relative_url }}"></script>
 
   <!-- GÜVENLİK (CSP) + ANDROID WEBVIEW UYUMLULUĞU: bu <style> etiketi
        ÖNCEDEN JS ile (document.createElement("style")) ÇALIŞMA ZAMANINDA
