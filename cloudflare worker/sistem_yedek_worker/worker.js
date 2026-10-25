@@ -38,10 +38,10 @@
  * v3 (migration 0084):
  *   PUT  /uye/yukle?b=&k=&m=eksikleri|uzerine      → HER ÜYE: kendi yedeğini geri yüklerken R2'ye dosya yazar. Yalnızca üyenin KENDİ
  *                                                    kaydının işaret ettiği anahtara izin verilir (uye_r2_yukleme_izinli_mi RPC).
- *   GET  /kota                                     → (owner) Cloudflare ücretsiz GraphQL Analytics: bugünkü (UTC) Worker istek sayısı.
+ *   GET  /kota                                     → (owner/yönetici, 0114) Cloudflare ücretsiz GraphQL Analytics: bugünkü (UTC) Worker istek sayısı.
  *                                                    Secret'lar: CF_ACCOUNT_ID, CF_API_TOKEN (izin: Account › Account Analytics › Read).
  *                                                    Sonuç 60 sn edge cache'te tutulur (Analytics API'yi yormaz).
- *   GET  /kota/analitik                            → (owner) SAATLİK dökümü (son ~31 gün, Workers + Pages Functions); günlük toplamlar worker_kota_gecmis'e (0106) yazılır.
+ *   GET  /kota/analitik                            → (owner/yönetici, 0114) SAATLİK dökümü (son ~31 gün, Workers + Pages Functions); günlük toplamlar worker_kota_gecmis'e (0106) yazılır.
  *
  * Ortam değişkenleri (Worker > Settings > Variables and Secrets):
  *   SUPABASE_URL        https://<proje-ref>.supabase.co          (Text)
@@ -279,6 +279,14 @@ async function uyeTemizle(env, kimlik, istek, cors) {
 
 /* ------------------------- v2: owner uç noktaları (migration 0081) ------------------------- */
 
+/** Worker istatistikleri (kota sayacı + analitik): Site Sahibi, askıda olmayan yönetici veya sistem yedekleme yetkisi olan roller (migration 0114). Yalnızca OKUMA. */
+async function istatistikYetkiliMi(env, kimlik) {
+  const s = await rpc(env, kimlik, "worker_istatistik_yetkili", {});
+  if (!s.hata && s.veri === true) return true;
+  // 0114 henüz çalıştırılmamışsa (RPC yok) eski kurala düş: yalnızca Site Sahibi.
+  return s.hata ? await ownerMi(env, kimlik) : false;
+}
+
 async function ownerMi(env, kimlik) {
   const s = await rpc(env, kimlik, "is_owner", {});
   return !s.hata && s.veri === true;
@@ -456,7 +464,7 @@ async function uyeYukle(env, kimlik, istek, url, cors) {
  * Not: Cloudflare panelindeki Worker kartlarındaki sayılar SON 24 SAAT'tir; burası UTC günüdür (gün başı 03:00 TR).
  */
 async function kotaGetir(env, kimlik, cors) {
-  if (!(await ownerMi(env, kimlik))) return json({ error: "Yalnızca Site Sahibi." }, 403, cors);
+  if (!(await istatistikYetkiliMi(env, kimlik))) return json({ error: "Bu istatistikleri görme yetkin yok." }, 403, cors);
   const limit = parseInt(env.GUNLUK_ISTEK_LIMITI || "100000", 10) || 100000;
   if (!env.CF_ACCOUNT_ID || !env.CF_API_TOKEN) return json({ yapilandirilmadi: true, limit }, 200, cors);
   const anahtar = new Request(`https://kota.invalid/v3/${env.CF_ACCOUNT_ID}`);
@@ -584,7 +592,7 @@ function gunToplami(saatlik, gunUtc) {
 }
 
 async function kotaAnalitik(env, kimlik, cors) {
-  if (!(await ownerMi(env, kimlik))) return json({ error: "Yalnızca Site Sahibi." }, 403, cors);
+  if (!(await istatistikYetkiliMi(env, kimlik))) return json({ error: "Bu istatistikleri görme yetkin yok." }, 403, cors);
   const limit = parseInt(env.GUNLUK_ISTEK_LIMITI || "100000", 10) || 100000;
   if (!env.CF_ACCOUNT_ID || !env.CF_API_TOKEN) return json({ yapilandirilmadi: true, limit }, 200, cors);
   const veri = await saatlikVeriAl(env);
