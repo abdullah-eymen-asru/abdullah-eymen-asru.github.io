@@ -444,3 +444,16 @@
 .ka-anahtar { display: inline-flex; align-items: center; gap: .4rem; min-height: 2.4rem; padding: .3rem .8rem; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--text); font: inherit; font-size: .82rem; font-weight: 600; cursor: pointer; }
 .ka-anahtar:hover { border-color: var(--accent); } .ka-anahtar:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ka-acilir-icerik[hidden] { display: none; } .ka-acilir-icerik { display: flex; flex-direction: column; gap: 10px; }
+
+
+/* v114 — Worker anahtarları: açılır/kapanır kart + arama + sınırlı yükseklik (sekme uzamasın) */
+.sy-wk-kapsayici > summary { cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; list-style: none; }
+.sy-wk-kapsayici > summary::-webkit-details-marker { display: none; }
+.sy-wk-kapsayici > summary h3 { margin: 0; }
+.sy-wk-kapsayici > summary::after { content: "▾"; margin-left: auto; transition: transform .15s; }
+.sy-wk-kapsayici[open] > summary::after { transform: rotate(180deg); }
+.sy-wk-sayac { font-size: .85rem; }
+.sy-wk-arama { width: 100%; box-sizing: border-box; margin-top: 10px; padding: 10px 12px; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 10px; }
+.sy-wk-arama:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.sy-wk-kaydir { max-height: min(46vh, 420px); overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+.sy-wk-satir[hidden] { display: none; }
