@@ -57,10 +57,16 @@ const ONBELLEK_ANAHTARI = "aea_wk_v1"; // worker-kapi.js'in önbelleği: bu tara
 export function workerAnahtarKarti() {
   const govde = el("div", {}, el("p", { class: "muted", text: "Anahtarlar okunuyor…" }));
   const yenile = dugme({ metin: "Yenile", ikonAdi: "yenile", tur: "ikincil", kucuk: true });
-  const kart = el("article", { class: "sy-kart sy-kota sy-wk-kart" },
-    el("div", { class: "sy-kota-ust" }, el("h3", { text: "🔌 Worker anahtarları (kota koruması)" })),
+  // Açılır/kapanır kart: varsayılan KAPALI → sekme aşağı doğru uzamaz. Özet satırında "N servis · M kapalı" sayacı görünür.
+  const ozetSayac = el("span", { class: "muted sy-wk-sayac", text: "" });
+  const kapsayici = el("details", { class: "sy-wk-kapsayici" },
+    el("summary", { class: "sy-wk-ozet" }, el("h3", { text: "🔌 Worker anahtarları (kota koruması)" }), ozetSayac),
     govde,
     el("div", { class: "sy-eylemler" }, yenile));
+  const kart = el("article", { class: "sy-kart sy-kota sy-wk-kart" }, kapsayici);
+  const aramaTr = (s) => String(s || "").toLocaleLowerCase("tr");
+  let aramaMetni = "";                                    // yenilemeler (yukle) arasında korunur
+  let listeAnahtarlar = [];
 
   let sertDestek = false;
   let ownerMi = false;
@@ -127,6 +133,25 @@ export function workerAnahtarKarti() {
       rozetler.has(s.ad) ? el("span", { class: `sy-rozet sy-rozet--${rozetler.get(s.ad).sinif} wk-onay`, text: rozetler.get(s.ad).metin, role: "status" }) : null);
   }
 
+  /** Arama kutusu + sabit yükseklikli kaydırılabilir liste (ad, etiket veya durum "açık/kapalı" ile süzer). */
+  function aramaVeListe(veri, satirCizici) {
+    const arama = el("input", { type: "search", class: "sy-wk-arama", placeholder: "Servis ara… (ad, etiket, açık/kapalı)", "aria-label": "Worker anahtarlarında ara", autocomplete: "off" });
+    arama.value = aramaMetni;
+    const liste = el("ul", { class: "sy-wk-liste sy-wk-kaydir" });
+    const bos = el("p", { class: "muted sy-not", role: "status", hidden: true, text: "Aramayla eşleşen servis yok." });
+    const satirlar = veri.map((s) => ({ s, li: satirCizici(s), metin: aramaTr(`${s.etiket} ${s.ad} ${s.tur} ${s.acik ? "açık" : "kapalı"}${s.korumali ? " korumalı" : ""}`) }));
+    liste.append(...satirlar.map((x) => x.li));
+    function sirala() {
+      const q = aramaTr(arama.value).trim(); aramaMetni = arama.value;
+      let gorunen = 0;
+      for (const x of satirlar) { const g = !q || q.split(/\s+/).every((k) => x.metin.includes(k)); x.li.hidden = !g; if (g) gorunen++; }
+      bos.hidden = gorunen !== 0;
+    }
+    arama.addEventListener("input", sirala);
+    sirala();
+    return el("div", { class: "sy-wk-alan" }, arama, liste, bos);
+  }
+
   async function yukle(uyari) {
     yenile.disabled = true;
     try {
@@ -179,8 +204,10 @@ export function workerAnahtarKarti() {
       govde.replaceChildren(
         uyari ? el("p", { class: "auth-message error", text: uyari }) : null,
         el("p", { class: "muted sy-not", text: "Kapalı bir servise tarayıcılar istek göndermez, Worker'lar gelen isteği hemen reddeder; Gatekeeper Function ise isteği işlemeden geçirir. Kota dolmadan önce yoğun/gereksiz servisleri buradan kapatabilirsin." }),
-        el("ul", { class: "sy-wk-liste" }, (data || []).map(satirCiz)),
+        aramaVeListe((data || []), satirCiz),
         gunluk);
+      const kapali = (data || []).filter((x) => !x.acik).length;
+      ozetSayac.textContent = `${(data || []).length} servis · ${kapali} kapalı`;
     } catch (h) {
       govde.replaceChildren(el("p", { class: "auth-message error", text: /does not exist|42P01|PGRST205|schema cache/i.test(h?.message || "")
         ? "Gerekli migration (0088) henüz çalıştırılmamış."
