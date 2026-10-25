@@ -34,7 +34,7 @@ function saatSatiri(x, d) {
 /**
  * @param {object} d   havastil durum nesnesi (hava, konum, tercih, sonuc, fizik, haber)
  * @param {number} gi  seçili günün indeksi (0 = bugün)
- * @param {{ekGun?:number}} o  ekGun: seçili günden sonra saatlik tam dökümü eklenecek gün sayısı (0–2)
+ * @param {{ekGun?:number}} o  ekGun: seçili günden sonra saatlik tam dökümü eklenecek gün sayısı (0–9; mevcut tüm saatlik günler)
  */
 export function gunVeriPaketi(d, gi = 0, { ekGun = 0 } = {}) {
   const gunler = gunAnalizleri(d.hava.tumSaatler, { canta: d.tercih.canta, rakim: d.hava.rakim });
@@ -58,24 +58,45 @@ export function gunVeriPaketi(d, gi = 0, { ekGun = 0 } = {}) {
     };
   };
   const secili = gunPaket(G, true);
-  const ekler = gunler.slice(i + 1, i + 1 + Math.min(2, Math.max(0, ekGun))).map((g) => gunPaket(g, true));
-  const gunlukTablo = (d.hava.gunluk || []).map((g) => ({ tarih: g.tarih, min_c: g.min, max_c: g.max, hissedilen_min_c: g.appMin, hissedilen_max_c: g.appMax, yagis_ihtimali_max_yuzde: g.yagisOlasi, yagis_toplam_mm: g.yagisToplam, kar_toplam_cm: g.karToplam, ruzgar_max_kmh: g.ruzgar, hamle_max_kmh: g.hamle, uv_max: g.uv }));
+  const ekler = gunler.slice(i + 1, i + 1 + Math.min(9, Math.max(0, ekGun))).map((g) => gunPaket(g, true));
+  const gunlukTablo = (d.hava.gunluk || []).map((g) => ({ tarih: g.tarih, min_c: g.min, max_c: g.max, hissedilen_min_c: g.appMin, hissedilen_max_c: g.appMax, yagis_ihtimali_max_yuzde: g.yagisOlasi, yagis_toplam_mm: g.yagisToplam, kar_toplam_cm: g.karToplam, ruzgar_max_kmh: g.ruzgar, hamle_max_kmh: g.hamle, uv_max: g.uv, hava_kodu_wmo: g.kod, gun_dogumu: g.dogus ? String(g.dogus).slice(11, 16) : null, gun_batimi: g.batis ? String(g.batis).slice(11, 16) : null, gun_uzunlugu_saat: g.gunUzunlugu != null ? r1(g.gunUzunlugu / 3600) : null }));
   const kombin = d.sonuc?.kombinler?.[Math.min(d.kombinNo || 0, (d.sonuc?.kombinler?.length || 1) - 1)]?.parcalar || {};
   const modelAnahtar = Object.keys(d.hava.modelDizi || {});
+  const H = d.hava || {};
+  // Anlık durum (ölçülenler + basınç eğilimi + görüş + hava kalitesi + önümüzdeki 15 dk'lık yağış)
+  const anlik = {
+    alinan_zaman: H.ham?.alinan || null,
+    olcumler: (H.ham?.simdi || []).filter(([, v]) => v != null).map(([ad, deger, birim]) => ({ olcum: ad, deger, birim: birim || "" })),
+    basinc_egilimi: H.basincEgilim ?? null, basinc_fark_3_saat_hpa: H.basincFark3 ?? null, basinc_fark_12_saat_hpa: H.basincFark12 ?? null,
+    gorus_m: H.gorus ?? null,
+    hava_kalitesi: H.kalite ? { avrupa_aqi: H.kalite.aqi, pm10: H.kalite.pm10, pm2_5: H.kalite.pm25, ozon: H.kalite.ozon, toz: H.kalite.dust } : null,
+    onumuzdeki_15_dakikalik_yagis_mm: (H.dakikalik || []).map((x) => ({ zaman: x.t, mm: x.mm })),
+  };
+  // Seçili gün için model karşılaştırması: her modelin saatlik ham yağış (mm) değeri (modeller arası uyumsuzluğu görmek için)
+  const modelZaman = H.modelZaman || [];
+  const modelKarsi = modelAnahtar.length ? modelZaman.map((z, k) => ({ z, k })).filter(({ z }) => String(z).slice(0, 10) === G.tarih)
+    .map(({ z, k }) => ({ saat: String(z).slice(11, 16), ...Object.fromEntries(modelAnahtar.map((m) => [`${m}_mm`, H.modelDizi[m]?.[k] ?? null])) })) : [];
+  const gunDetay = (H.gunluk || []).find((g) => g.tarih === G.tarih) || null;
+  const gunBilgisi = gunDetay ? { gun_dogumu: gunDetay.dogus ? String(gunDetay.dogus).slice(11, 16) : null, gun_batimi: gunDetay.batis ? String(gunDetay.batis).slice(11, 16) : null, gun_uzunlugu_saat: gunDetay.gunUzunlugu != null ? r1(gunDetay.gunUzunlugu / 3600) : null, hava_kodu_wmo: gunDetay.kod, en_dusuk_c: gunDetay.min, en_yuksek_c: gunDetay.max } : null;
+  const tercihTam = Object.fromEntries(Object.entries(d.tercih || {}).filter(([, v]) => v == null || ["string", "number", "boolean"].includes(typeof v)));
   return {
-    belge: "HavaStil Günlük Veri Paketi", surum: 2, olusturma: new Date().toISOString(),
+    belge: "HavaStil Günlük Veri Paketi", surum: 3, olusturma: new Date().toISOString(),
     konum: { ad: d.konum.etiket || d.konum.ad, enlem: d.konum.lat, boylam: d.konum.lon, rakim_m: d.hava.rakim ?? null },
     kaynak: `Open-Meteo (ana tahmin${modelAnahtar.length ? " + " + modelAnahtar.map((m) => m.toUpperCase()).join(", ") + " model karşılaştırması" : ""}). Veri zamanı: ${d.hava.alinma ? new Date(d.hava.alinma).toISOString() : "bilinmiyor"}.`,
-    secili_gun: secili, sonraki_gunler_saatlik: ekler, on_alti_gun_ozeti: gunlukTablo,
+    anlik_durum: anlik, gun_bilgisi: gunBilgisi, secili_gun: secili, model_karsilastirma_secili_gun: modelKarsi, sonraki_gunler_saatlik: ekler, on_alti_gun_ozeti: gunlukTablo,
     onerilen_kombin: Object.fromEntries(["b", "m", "o", "p", "a"].filter((x) => kombin[x]).map((x) => [{ b: "ic_kat", m: "orta_kat", o: "dis_kat", p: "alt_giyim", a: "ayakkabi" }[x], kombin[x].ad])),
-    kullanici_tercihi: { senaryo: d.tercih.sen, sicaklik_toleransi: d.tercih.tol, canta: d.tercih.canta },
-    dogrulanmis_hava_haberleri: (d.haber?.uygulananlar || []).slice(0, 3).map((u) => ({ baslik: u.baslik, kaynak: u.kurum || u.kaynakAd })),
+    kullanici_tercihi: { senaryo: d.tercih.sen, sicaklik_toleransi: d.tercih.tol, canta: d.tercih.canta, stil: d.tercih.stil ?? null, tum_tercihler: tercihTam },
+    onerilen_kombin_alternatifleri: (d.sonuc?.kombinler || []).slice(0, 4).map((k) => Object.fromEntries(["b", "m", "o", "p", "a"].filter((x) => k.parcalar?.[x]).map((x) => [{ b: "ic_kat", m: "orta_kat", o: "dis_kat", p: "alt_giyim", a: "ayakkabi" }[x], k.parcalar[x].ad]))),
+    dogrulanmis_hava_haberleri: (d.haber?.uygulananlar || []).slice(0, 10).map((u) => ({ baslik: u.baslik, kaynak: u.kurum || u.kaynakAd, ozet: u.ozet || null, tarih: u.tarih || u.yayin || null })),
+    haber_durumu: d.haber?.durum ?? null,
     okuma_kilavuzu: [
       "Yağış ihtimali (PoP) = Model uyumu × Yayılım. Open-Meteo yalnızca PoP verir; model uyumu = yağış gören model oranı, yayılım = PoP ÷ model uyumu. Bu TAHMİNİ bir ayrıştırmadır; ayrisma_tahmini=true ise yayılım üst sınırdır.",
       "Beklenen yağış (E) = saatlik PoP × saatlik yağış mm; günün beklenen yağışı saatlik E'lerin toplamıdır. Garanti edilen miktar değil, olasılıkla tartılmış beklentidir.",
       "CAPE (J/kg) fırtına enerjisidir: düşük CAPE yağmur olmayacağı anlamına GELMEZ; yalnızca gök gürültüsü/dolu/ani sağanak ihtimalini ölçer. Yaygın düzenli yağmur düşük CAPE ile de yağar.",
       "yagis_seviyesi_0_3: 0 kurak · 1 hafif çisenti (zararsız) · 2 sürekli yağmur · 3 tehlikeli/ani sağanak. Çisenti filtresi yalnızca 'ihtimal ≥ %70 ve beklenen hacim < 0,8 mm' saatleri zararsız sayar.",
       "Yalıtım ihtiyacı (CLO): büyük sayı = daha kalın giyim; hissedilen sıcaklık ve kullanıcı tercihlerinden hesaplanır.",
+      "Model karşılaştırması: her modelin (ECMWF, ICON, GFS…) o saat için ham yağış miktarı (mm). Modeller birbirinden çok farklıysa belirsizlik yüksektir; hepsi 0 ise kuru, hepsi yüksekse güçlü uyum vardır.",
+      "Anlık durum: ölçümler şimdiki saate aittir; basınç düşüyorsa hava genelde bozulma eğilimindedir, yükseliyorsa düzelme eğilimindedir (kesin kural değil).",
       "Tüm saatler konumun yerel saatidir. Modeller tahmindir; kesin değildir.",
     ],
   };
@@ -103,18 +124,37 @@ function gunMetni(g, baslikSeviye = "###") {
   return s.join("\n");
 }
 
+function anlikMetni(p) {
+  const a = p.anlik_durum; if (!a) return [];
+  const s = ["", "## Anlık durum", a.alinan_zaman ? `- Ölçüm zamanı: ${a.alinan_zaman}` : null];
+  for (const o of a.olcumler) s.push(`- ${o.olcum}: ${o.deger}${o.birim ? ` ${o.birim}` : ""}`);
+  if (a.basinc_egilimi) s.push(`- Basınç eğilimi: ${a.basinc_egilimi}${a.basinc_fark_3_saat_hpa != null ? ` (son 3 saat ${a.basinc_fark_3_saat_hpa} hPa` : ""}${a.basinc_fark_12_saat_hpa != null ? `, son 12 saat ${a.basinc_fark_12_saat_hpa} hPa)` : a.basinc_fark_3_saat_hpa != null ? ")" : ""}`);
+  if (a.gorus_m != null) s.push(`- Görüş mesafesi: ${a.gorus_m} m`);
+  if (a.hava_kalitesi) s.push(`- Hava kalitesi: Avrupa AQI ${a.hava_kalitesi.avrupa_aqi} · PM10 ${a.hava_kalitesi.pm10} · PM2.5 ${a.hava_kalitesi.pm2_5} · ozon ${a.hava_kalitesi.ozon} · toz ${a.hava_kalitesi.toz}`);
+  if (a.onumuzdeki_15_dakikalik_yagis_mm?.length) s.push(`- Önümüzdeki 15 dakikalık yağış (mm): ${a.onumuzdeki_15_dakikalik_yagis_mm.map((x) => `${String(x.zaman).slice(11, 16)}=${x.mm}`).join(" · ")}`);
+  return s.filter((x) => x !== null);
+}
+
 /** Markdown / düz metin gövdesi (yapay zekâya yapıştırılabilir). */
 export function paketMetni(p) {
   const L = [`# ${p.belge}`, "", `- Konum: **${p.konum.ad}** (${p.konum.enlem}, ${p.konum.boylam}${p.konum.rakim_m != null ? `, ${p.konum.rakim_m} m` : ""})`, `- Oluşturma: ${p.olusturma}`, `- Kaynak: ${p.kaynak}`, "",
     "## Nasıl okunur", ...p.okuma_kilavuzu.map((x) => `- ${x}`), "",
-    "## Seçili gün", gunMetni(p.secili_gun)];
+    ...anlikMetni(p), "", "## Seçili gün", ...(p.gun_bilgisi ? [`- Gün doğumu ${p.gun_bilgisi.gun_dogumu} · gün batımı ${p.gun_bilgisi.gun_batimi} · gün uzunluğu ${p.gun_bilgisi.gun_uzunlugu_saat} saat · en düşük ${p.gun_bilgisi.en_dusuk_c}°C · en yüksek ${p.gun_bilgisi.en_yuksek_c}°C`, ""] : []), gunMetni(p.secili_gun)];
+  if (p.model_karsilastirma_secili_gun?.length) {
+    const ks = Object.keys(p.model_karsilastirma_secili_gun[0]);
+    L.push("", "### Model karşılaştırması (saatlik ham yağış, mm)", "", `| ${ks.map((k) => (k === "saat" ? "Saat" : k.replace(/_mm$/, "").toUpperCase())).join(" | ")} |`, `|${ks.map(() => "---").join("|")}|`,
+      ...p.model_karsilastirma_secili_gun.map((r) => `| ${ks.map((k) => hucre(r[k])).join(" | ")} |`));
+  }
   for (const g of p.sonraki_gunler_saatlik) L.push("", gunMetni(g));
-  L.push("", "## 16 günlük özet", "", "| Tarih | Min | Maks | His.min | His.maks | PoP maks% | Yağış mm | Kar cm | Rüzgâr | Hamle | UV |", "|---|---|---|---|---|---|---|---|---|---|---|",
-    ...p.on_alti_gun_ozeti.map((g) => `| ${g.tarih} | ${g.min_c} | ${g.max_c} | ${g.hissedilen_min_c} | ${g.hissedilen_max_c} | ${g.yagis_ihtimali_max_yuzde} | ${g.yagis_toplam_mm} | ${g.kar_toplam_cm} | ${g.ruzgar_max_kmh} | ${g.hamle_max_kmh} | ${g.uv_max} |`));
+  L.push("", "## 16 günlük özet", "", "| Tarih | Min | Maks | His.min | His.maks | PoP maks% | Yağış mm | Kar cm | Rüzgâr | Hamle | UV | Doğuş | Batış | Gün sa | WMO |", "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
+    ...p.on_alti_gun_ozeti.map((g) => `| ${g.tarih} | ${g.min_c} | ${g.max_c} | ${g.hissedilen_min_c} | ${g.hissedilen_max_c} | ${g.yagis_ihtimali_max_yuzde} | ${g.yagis_toplam_mm} | ${g.kar_toplam_cm} | ${g.ruzgar_max_kmh} | ${g.hamle_max_kmh} | ${g.uv_max} | ${hucre(g.gun_dogumu)} | ${hucre(g.gun_batimi)} | ${hucre(g.gun_uzunlugu_saat)} | ${hucre(g.hava_kodu_wmo)} |`));
   L.push("", "## HavaStil'in önerdiği kombin", ...Object.entries(p.onerilen_kombin).map(([k, v]) => `- ${k.replace(/_/g, " ")}: ${v}`),
     `- Tercihler: senaryo ${p.kullanici_tercihi.senaryo}, sıcaklık toleransı ${p.kullanici_tercihi.sicaklik_toleransi}, çanta ${p.kullanici_tercihi.canta}`);
-  if (p.dogrulanmis_hava_haberleri.length) L.push("", "## Doğrulanmış hava uyarıları (haber)", ...p.dogrulanmis_hava_haberleri.map((h) => `- ${h.baslik} (${h.kaynak})`));
-  L.push("", "## Yapay zekâya önerilen talimat", "Aşağıdaki veriyi yalnızca bu dosyadaki sayılara dayanarak yorumla. Tahmin belirsizliğini (model uyumu, ayrıştırmanın tahmini olması) açıkça belirt, kesinlik iddia etme; sayısal çelişki görürsen göster. Soruma saat aralığı vererek cevap ver.");
+  if (p.onerilen_kombin_alternatifleri?.length > 1) L.push("", "### Diğer kombin seçenekleri", ...p.onerilen_kombin_alternatifleri.slice(1).map((k, n) => `- Seçenek ${n + 2}: ${Object.entries(k).map(([a, b]) => `${a.replace(/_/g, " ")}: ${b}`).join(" · ")}`));
+  if (p.dogrulanmis_hava_haberleri.length) L.push("", "## Doğrulanmış hava uyarıları (haber)", ...p.dogrulanmis_hava_haberleri.map((h) => `- ${h.baslik} (${h.kaynak})${h.tarih ? ` · ${h.tarih}` : ""}${h.ozet ? ` — ${String(h.ozet).slice(0, 240)}` : ""}`));
+  else if (p.haber_durumu) L.push("", "## Doğrulanmış hava uyarıları (haber)", `- Durum: ${p.haber_durumu} (doğrulanmış uyarı yok ya da alınamadı)`);
+  L.push("", "## Yapay zekâya önerilen talimat",
+    "Bu dosyadaki verileri ANALİZ et; yalnızca sayıları sıralama. Sadece bu dosyadaki sayılara dayan, olmayanı uydurma. Hava durumunu bilmeyen birine anlatır gibi, sade Türkçe ile şunları yaz: (1) Bugün/seçtiğim gün nasıl geçecek, kısaca; (2) Saat dilimlerine göre ne bekleniyor ve ne yapmalıyım (giyim, şemsiye, zamanlama); (3) Dikkat etmem gereken riskler ve nedenleri; (4) Tahminin ne kadar güvenilir olduğu (model uyumu, modeller arası fark). Teknik terimleri (PoP, CAPE, CLO gibi) kullanırsan bir cümleyle açıkla. Hem destekleyen hem zayıflatan işaretleri söyle, kesinlik iddia etme, olasılığı yüzdeyle ver. Sorularıma saat aralığı vererek cevap ver; önce net öneriyi, sonra gerekçeyi yaz.");
   return L.join("\n");
 }
 
