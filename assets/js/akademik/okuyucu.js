@@ -15,6 +15,7 @@ import { esc, el, toast, supabase, workerJson, pdfIndirBayt, pdfYukle, dosyaIndi
 import { motoruYukle, pdfLibAl } from "./motor.js";
 import { acikla, uygula, satirlaraBol, NOT_BOYUTU } from "./pdf-yaz.js";
 import { alintiMarkdown } from "./atif.js";
+import { eklentilerAcikMi, ayarYukle, acikEklentiler, eklentiCalistir as eklentiYurut } from "./eklentiler.js";
 
 const SVGNS = "http://www.w3.org/2000/svg";
 const svgEl = (tag, ozellik = {}) => {
@@ -512,7 +513,73 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
   }
 
   /* ---------- metin seçiminden açıklama ---------- */
+  /* Seçim anlık görüntüsü: dokunmatikte balon düğmesine dokunmak tarayıcının seçimini çökertir (mobilde "seçim geri kayboluyor"
+     sorununun kök nedeni). Seçim yapıldığı anda aralık KOPYALANIR; eylem anında seçim boşsa kopya geri yüklenir. */
+  let sonSecim = null;               // { aralik: Range, metin: string }
+  let balonDokunuyor = false;
+  const dokunmatik = window.matchMedia?.("(pointer: coarse)").matches || "ontouchstart" in window;
+  function secimYakala() {
+    const s = window.getSelection();
+    if (!s || s.isCollapsed || !s.rangeCount || !kap.contains(s.anchorNode)) return false;
+    const a = s.getRangeAt(0);
+    const metin = aralikMetni(a);
+    if (!metin) return false;
+    sonSecim = { aralik: a.cloneRange(), metin };
+    return true;
+  }
+  function secimiGeriYukle() {
+    const s = window.getSelection();
+    if (s && s.isCollapsed && sonSecim) { try { s.removeAllRanges(); s.addRange(sonSecim.aralik); } catch { /* düğüm DOM'dan gitmiş olabilir */ } }
+    return !!s && !s.isCollapsed;
+  }
+  /* ---------- eklentiler (çeviri, sözlük, Vikipedi, Crossref, arama bağlantıları) ---------- */
+  let ekAyar = null, ekListe = [];                         // yetki + ayar yüklenince dolar; yüklenene kadar balonda eklenti yok
+  eklentilerAcikMi().then((acik) => (acik ? ayarYukle() : null)).then((a) => { if (a) { ekAyar = a; ekListe = acikEklentiler(a); } }).catch(() => {});
+  function eklentiDugmeleri() {
+    return ekListe.map((x) => el("button", { type: "button", class: "ak-btn", "data-eklenti": x.id, title: x.ad, "aria-label": x.ad }, x.simge));
+  }
+  async function eklentiCalistir(id) {
+    const metin = sonSecim?.metin;
+    if (!metin) { toast("Önce metin seç.", "uyari"); return; }
+    const govde = q(".ak-ok-govde");
+    govde.querySelector(".ak-eklenti-sonuc")?.remove();
+    const kutu = el("aside", { class: "ak-eklenti-sonuc", role: "dialog", "aria-label": "Eklenti sonucu" });
+    const bas = el("strong", {}, "…"), icerik = el("p", { class: "ak-eklenti-metin" }, "Çalışıyor…"), alt = el("small", { class: "ak-eklenti-not" });
+    const kapat = el("button", { type: "button", class: "ak-btn", "aria-label": "Kapat" }, "✕");
+    const kopya = el("button", { type: "button", class: "ak-btn", hidden: true }, "⧉ Kopyala");
+    kapat.addEventListener("click", () => kutu.remove());
+    kutu.append(el("div", { class: "ak-eklenti-ust" }, bas, kapat), icerik, alt, el("div", { class: "ak-eklenti-eylem" }, kopya));
+    // Sonuç kutusuna dokunmak seçimi bozmasın
+    ["mousedown", "pointerdown"].forEach((o) => kutu.addEventListener(o, (e) => { if (!e.target.closest("button, a")) return; e.preventDefault(); }));
+    govde.append(kutu);
+    balonGizle();
+    try {
+      const s = await eklentiYurut(id, metin, ekAyar);
+      bas.textContent = s.baslik || "Sonuç";
+      if (s.ac) { window.open(s.ac, "_blank", "noopener,noreferrer"); icerik.textContent = "Sonuç yeni sekmede açıldı."; }
+      else icerik.textContent = s.metin || "";
+      if (s.not) alt.textContent = s.not;
+      if (s.baglanti) { const a = el("a", { href: s.baglanti, target: "_blank", rel: "noopener noreferrer" }, "Kaynağı aç ↗"); alt.append(alt.textContent ? " · " : "", a); }
+      if (s.metin) { kopya.hidden = false; kopya.addEventListener("click", async () => { await panoyaKopyala(s.metin); toast("Kopyalandı.", "basari"); }); }
+    } catch (h) { bas.textContent = "Eklenti çalışmadı"; icerik.textContent = h.message || String(h); }
+  }
+
+  /** Alıntı metni: “seçim” (Yazar, Yıl, s. N) — kaynaktaki yazar/yıl bilgisinden. */
+  function metniAlintiYap(metin, sayfaNo) {
+    const ys = (kaynak.yazarlar || []).map((y) => y.kurum || y.soyadi).filter(Boolean);
+    const yazar = ys.length === 0 ? "" : ys.length === 1 ? ys[0] : ys.length === 2 ? `${ys[0]} ve ${ys[1]}` : `${ys[0]} vd.`;
+    const yil = kaynak.yayin_yili || "t.y.";
+    const kunye = [yazar, yil, sayfaNo ? `s. ${sayfaNo}` : ""].filter(Boolean).join(", ");
+    return `“${metin.replace(/\s+/g, " ").trim()}” (${kunye})`;
+  }
+  function secimSayfasi() {
+    const dugum = sonSecim?.aralik?.startContainer;
+    const sayfa = (dugum?.nodeType === 1 ? dugum : dugum?.parentElement)?.closest?.(".page");
+    return sayfa ? Number(sayfa.dataset.pageNumber) : null;
+  }
+
   function secimdenOlustur(tur, renk = d.renk) {
+    secimiGeriYukle();
     const s = window.getSelection();
     if (!s || s.isCollapsed || !s.rangeCount) return false;
     const aralik = s.getRangeAt(0);
@@ -535,7 +602,7 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
       ekleModel({ tur, sayfa: no, kutular, renk, metin });
       olustu++;
     });
-    if (olustu) s.removeAllRanges();
+    if (olustu) { s.removeAllRanges(); sonSecim = null; }
     balonGizle();
     return olustu > 0;
   }
@@ -545,32 +612,43 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
   function balonGizle() { balon?.remove(); balon = null; }
   function balonGoster() {
     balonGizle();
-    if (salt) return;
     const s = window.getSelection();
     if (!s || s.isCollapsed || !s.rangeCount || !kap.contains(s.anchorNode)) return;
+    secimYakala();
     const rs = s.getRangeAt(0).getClientRects();
     if (!rs.length) return;
     const son = rs[rs.length - 1];
     const govde = q(".ak-ok-govde").getBoundingClientRect();
     balon = el("div", { class: "ak-balon", role: "toolbar", "aria-label": "Seçim araçları" });
-    for (const r of RENKLER) {
+    for (const r of (salt ? [] : RENKLER)) {
       const n = el("button", { type: "button", class: "ak-renk", title: `${r.ad} vurgu`, "aria-label": `${r.ad} vurgu`, "data-hex": r.hex });
       n.style.background = r.hex;
       balon.append(n);
     }
-    balon.append(el("button", { type: "button", class: "ak-btn", "data-b": "altcizgi", title: "Altını çiz" }, "U̲"), el("button", { type: "button", class: "ak-btn", "data-b": "ustcizgi", title: "Üstünü çiz" }, "S̶"), el("button", { type: "button", class: "ak-btn", "data-b": "yorum", title: "Vurgula ve yorum ekle" }, "💬"), el("button", { type: "button", class: "ak-btn", "data-b": "kopya", title: "Seçili metni kopyala" }, "⧉"));
-    balon.addEventListener("mousedown", (e) => e.preventDefault()); // seçim bozulmasın
+    if (!salt) balon.append(el("button", { type: "button", class: "ak-btn", "data-b": "altcizgi", title: "Altını çiz" }, "U̲"), el("button", { type: "button", class: "ak-btn", "data-b": "ustcizgi", title: "Üstünü çiz" }, "S̶"), el("button", { type: "button", class: "ak-btn", "data-b": "yorum", title: "Vurgula ve yorum ekle" }, "💬"));
+    balon.append(el("button", { type: "button", class: "ak-btn", "data-b": "alinti", title: "Alıntı olarak kopyala (yazar, yıl, sayfa ile)" }, "❝"), el("button", { type: "button", class: "ak-btn", "data-b": "kopya", title: "Seçili metni kopyala" }, "⧉"), ...eklentiDugmeleri());
+    // Seçim bozulmasın: fare, dokunma ve işaretçi olaylarının hepsinde odak/seçim çalmayı engelle
+    const seciliTut = (e) => { balonDokunuyor = true; if (e.cancelable) e.preventDefault(); setTimeout(() => { balonDokunuyor = false; }, 800); };
+    balon.addEventListener("mousedown", seciliTut);
+    balon.addEventListener("pointerdown", seciliTut);
+    balon.addEventListener("touchstart", seciliTut, { passive: false });
+    balon.classList.toggle("ak-balon-alt", dokunmatik);
     balon.addEventListener("click", async (e) => {
       const b = e.target.closest("button");
       if (!b) return;
+      secimiGeriYukle();                                   // dokunma seçimi çökerttiyse kopyadan geri getir
+      if (b.dataset.eklenti) { await eklentiCalistir(b.dataset.eklenti); return; }
       if (b.dataset.hex) { d.renk = b.dataset.hex; renkleriCiz(); secimdenOlustur("vurgu", b.dataset.hex); }
       else if (b.dataset.b === "altcizgi" || b.dataset.b === "ustcizgi") secimdenOlustur(b.dataset.b);
       else if (b.dataset.b === "yorum") { const n0 = d.model.size; if (secimdenOlustur("vurgu")) { const yeni = [...d.model.values()].slice(-1)[0]; if (d.model.size > n0) sec(yeni.id, true); } }
-      else if (b.dataset.b === "kopya") { await panoyaKopyala(aralikMetni(window.getSelection().getRangeAt(0))); toast("Seçili metin kopyalandı.", "basari"); balonGizle(); }
+      else if (b.dataset.b === "kopya") { const m = sonSecim?.metin || (window.getSelection().rangeCount ? aralikMetni(window.getSelection().getRangeAt(0)) : ""); if (!m) { toast("Önce metin seç.", "uyari"); return; } await panoyaKopyala(m); toast("Seçili metin kopyalandı.", "basari"); balonGizle(); }
+      else if (b.dataset.b === "alinti") { const m = sonSecim?.metin; if (!m) { toast("Önce metin seç.", "uyari"); return; } await panoyaKopyala(metniAlintiYap(m, secimSayfasi())); toast("Alıntı (yazar, yıl, sayfa ile) kopyalandı.", "basari"); balonGizle(); }
     });
     q(".ak-ok-govde").append(balon);
-    balon.style.left = `${Math.max(8, Math.min(govde.width - 330, son.right - govde.left - 20))}px`;
-    balon.style.top = `${Math.min(govde.height - 50, son.bottom - govde.top + 8)}px`;
+    if (!dokunmatik) {
+      balon.style.left = `${Math.max(8, Math.min(govde.width - 330, son.right - govde.left - 20))}px`;
+      balon.style.top = `${Math.min(govde.height - 50, son.bottom - govde.top + 8)}px`;
+    }
   }
 
   /* ---------- araç / renk durumu ---------- */
@@ -668,11 +746,11 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
 
   // Metin seçimi bittiğinde: işaretleme aracı açıksa uygula, değilse balonu göster
   kap.addEventListener("mouseup", (e) => {
-    if (salt || CIZIM_ARACLARI.has(d.arac) || e.target.closest(".ak-balon")) return;
+    if (CIZIM_ARACLARI.has(d.arac) || e.target.closest(".ak-balon")) return;
     setTimeout(() => {
       const s = window.getSelection();
       if (s && !s.isCollapsed) {
-        if (METIN_TURLERI.has(d.arac)) secimdenOlustur(d.arac);
+        if (!salt && METIN_TURLERI.has(d.arac)) secimdenOlustur(d.arac);
         else balonGoster();
       }
     }, 0);
@@ -699,7 +777,29 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
     });
     sec(bulundu ? bulundu.id : null);
   });
-  document.addEventListener("selectionchange", () => { if (!window.getSelection()?.isCollapsed) return; balonGizle(); });
+  // DOKUNMATİK: seçim "mouseup" olmadan biter (uzun basma + tutamaçlar). Bu yüzden selectionchange dinlenir; seçim DURULANA kadar
+  // (400 ms) beklenip balon gösterilir/araç uygulanır. Boşalma, balona dokunma sırasında yok sayılır → seçim "kaybolmaz".
+  let seciliZaman = null, bosZaman = null, isaretci = false;
+  kap.addEventListener("pointerdown", () => { isaretci = true; });
+  document.addEventListener("pointerup", () => { isaretci = false; });
+  document.addEventListener("pointercancel", () => { isaretci = false; });
+  document.addEventListener("selectionchange", () => {
+    const s = window.getSelection();
+    if (!s || s.isCollapsed) {
+      if (balonDokunuyor) return;
+      clearTimeout(bosZaman);
+      bosZaman = setTimeout(() => { const x = window.getSelection(); if (!balonDokunuyor && (!x || x.isCollapsed)) { balonGizle(); sonSecim = null; } }, dokunmatik ? 600 : 0);
+      return;
+    }
+    if (CIZIM_ARACLARI.has(d.arac) || !kap.contains(s.anchorNode)) return;
+    clearTimeout(bosZaman); clearTimeout(seciliZaman);
+    seciliZaman = setTimeout(() => {
+      if (balonDokunuyor || (isaretci && !dokunmatik)) return;      // masaüstünde sürükleme bitince mouseup halleder
+      const x = window.getSelection();
+      if (!x || x.isCollapsed || !secimYakala()) return;
+      if (!salt && METIN_TURLERI.has(d.arac)) secimdenOlustur(d.arac); else balonGoster();
+    }, dokunmatik ? 400 : 200);
+  });
 
   /* ---------- üst çubuk / yan panel olayları ---------- */
   kok.addEventListener("click", async (e) => {
