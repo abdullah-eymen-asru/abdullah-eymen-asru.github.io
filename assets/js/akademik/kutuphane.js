@@ -11,6 +11,7 @@ import { kunyeGetir } from "./kunye.js";
 import { okuyucuAc } from "./okuyucu.js";
 import { motorPaneliKur } from "./motor-paneli.js";
 import { eklentiPaneliKur } from "./eklenti-paneli.js";
+import { aciklamalariIceAl } from "./aciklama-ice.js";
 
 const GORUNURLUK = { ozel: "Özel", ekip: "Ekip", herkese_acik: "Herkese açık" };
 const KAP_ETIKET = { makale: "Dergi adı", kitap: "Yayınevi", kitap_bolumu: "Yayınevi", bildiri: "Bildiri / kongre adı", tez: "Üniversite", rapor: "Kurum / yayıncı", web: "Site adı", diger: "Yayıncı / kaynak" };
@@ -35,58 +36,100 @@ function kutuphaneKur(kok, profil, owner) {
   const d = {
     kayitlar: [], kapsam: "benim", gorunum: "kart", bicim: "apa", dil: "tr",
     f: { ara: "", tur: "", etiket: "", yazar: "", yilBas: "", yilSon: "", gorunurluk: "", pdfli: false, sira: "guncel" },
-    uye: "", uyeler: [],
+    uye: "", uyeler: [], uyelerYuklu: "",
+    klasorler: [], ogeler: new Map(), klasor: "", acik: new Set(), klasorHata: "", notlar: new Map(),
   };
+  try { d.bicim = localStorage.getItem("aea_ak_bicim") || d.bicim; d.dil = localStorage.getItem("aea_ak_dil") || d.dil; } catch { /* yok say */ }
 
   kok.innerHTML = `
     <div class="ak-kutu">
       <header class="ak-ust">
         <div><h2>${owner ? "🛡️ Tüm Kullanıcıların Kaynakları" : "📚 Akademik Kütüphane"}</h2>
-          <p class="ak-alt">${owner ? "Önce bir üye seç; kaynakları o üyenin kendi düzenine (etiket/klasör) göre görürsün. Her şey <strong>salt okunurdur</strong>." : "Kaynaklarını, PDF'lerini, vurgularını ve atıflarını tek yerde yönet."}</p></div>
+          <p class="ak-alt">${owner ? "Önce bir üye seç; kaynakları o üyenin kendi klasör düzeniyle görürsün. Her şey <strong>salt okunurdur</strong>." : "Kaynaklarını, PDF'lerini, vurgularını ve atıflarını klasörlerle düzenle. Değişiklikler otomatik kaydedilir."}</p></div>
         <div class="ak-ust-sag">
-          ${owner ? "" : `<button type="button" class="ak-btn ak-btn-birincil" data-act="ekle">＋ Kaynak ekle</button>
-          <button type="button" class="ak-btn" data-act="ice-aktar">⇪ İçe aktar (.bib / .ris)</button>
-          <input type="file" class="ak-gizli-alan" data-ak-ice accept=".bib,.bibtex,.ris,.txt" aria-label="BibTeX / RIS dosyası">`}
-          <span class="ak-menu"><button type="button" class="ak-btn" data-act="disa-aktar" aria-haspopup="true">⇩ Dışa aktar</button></span>
+          ${owner ? `<button type="button" class="ak-btn" data-act="disa-aktar">⇩ Dışa aktar</button>` : `
+          <span class="ak-menu">
+            <button type="button" class="ak-btn ak-btn-birincil" data-act="menu-ekle" aria-haspopup="true" aria-expanded="false">＋ Ekle ▾</button>
+            <div class="ak-menu-liste" data-ak-menu-ekle role="menu" hidden>
+              <button type="button" role="menuitem" data-act="pdf-sec">📄 PDF yükle <small>(açıklamalarıyla birlikte)</small></button>
+              <button type="button" role="menuitem" data-act="ekle">✍ Kaynağı elle / DOI ile ekle</button>
+              <button type="button" role="menuitem" data-act="ice-aktar">⇪ BibTeX / RIS dosyasından</button>
+              <button type="button" role="menuitem" data-act="klasor-yeni">📁 Yeni klasör</button>
+            </div>
+          </span>
+          <button type="button" class="ak-btn" data-act="disa-aktar">⇩ Dışa aktar</button>
+          <input type="file" class="ak-gizli-alan" data-ak-ice accept=".bib,.bibtex,.ris,.txt" aria-label="BibTeX / RIS dosyası">
+          <input type="file" class="ak-gizli-alan" data-ak-pdf accept="application/pdf,.pdf" multiple aria-label="PDF dosyaları">`}
         </div>
       </header>
-      ${owner ? `<div class="ak-owner-bar" data-ak-uyeler>
+      ${owner ? "" : `
+      <nav class="ak-sekmeler" role="tablist" aria-label="Bölümler">
+        <button type="button" role="tab" class="aktif" data-kapsam="benim" aria-selected="true">Kütüphanem</button>
+        <button type="button" role="tab" data-kapsam="paylasilan" aria-selected="false">Benimle paylaşılanlar</button>
+        <button type="button" role="tab" data-kapsam="ayarlar" aria-selected="false">⚙ Ayarlar</button>
+      </nav>`}
+      <div class="ak-owner-bar" data-ak-uyeler hidden>
         <div class="ak-uye-ust">
-          <input type="search" class="ak-uye-ara" data-uye-ara placeholder="Üye adı veya e-posta ara…" aria-label="Üye ara" autocomplete="off">
+          <input type="search" class="ak-uye-ara" data-uye-ara placeholder="${owner ? "Üye adı veya e-posta ara…" : "Üye adı ara…"}" aria-label="Üye ara" autocomplete="off">
           <button type="button" class="ak-btn" data-act="uye-geri" hidden>← Tüm üyeler</button>
           <strong class="ak-uye-secili" data-ak-secili-uye></strong>
         </div>
         <ul class="ak-uye-liste" data-ak-uye-liste></ul>
-      </div>` : `
-      <nav class="ak-sekmeler" role="tablist" aria-label="Kapsam">
-        <button type="button" role="tab" class="aktif" data-kapsam="benim" aria-selected="true">Kütüphanem</button>
-        <button type="button" role="tab" data-kapsam="paylasilan" aria-selected="false">Benimle paylaşılanlar</button>
-      </nav>
-      <div class="ak-motor" data-ak-motor></div>
-      <div class="ak-motor ak-eklentiler" data-ak-eklentiler></div>
-      <div class="ak-dropzone" data-ak-dz tabindex="0" role="button" aria-label="PDF yüklemek için tıkla ya da sürükle">
-        <strong>PDF'leri buraya sürükle</strong> <span>ya da seçmek için tıkla — her PDF için bir kaynak oluşturulur. Boyut sınırı yok.</span>
-        <input type="file" class="ak-gizli-alan" data-ak-pdf accept="application/pdf,.pdf" multiple aria-label="PDF dosyaları">
-        <ul class="ak-yukleme" data-ak-yukleme></ul>
-      </div>`}
-      <section class="ak-filtre" aria-label="Süzgeçler">
-        <input type="search" data-f="ara" placeholder="Başlık, yazar, etiket, DOI, özet ara…" aria-label="Ara">
-        <select data-f="tur" aria-label="Tür"><option value="">Tüm türler</option>${Object.entries(TURLER).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select>
-        <select data-f="etiket" aria-label="Etiket"><option value="">Tüm etiketler</option></select>
-        <select data-f="yazar" aria-label="Yazar"><option value="">Tüm yazarlar</option></select>
-        <input type="number" data-f="yilBas" placeholder="Yıl ≥" min="0" max="3000" aria-label="Başlangıç yılı">
-        <input type="number" data-f="yilSon" placeholder="Yıl ≤" min="0" max="3000" aria-label="Bitiş yılı">
-        <select data-f="gorunurluk" aria-label="Görünürlük"><option value="">Tüm görünürlükler</option>${Object.entries(GORUNURLUK).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select>
-        <label class="ak-onay"><input type="checkbox" data-f="pdfli"> Yalnız PDF'li</label>
-        <select data-f="sira" aria-label="Sırala"><option value="guncel">Son güncellenen</option><option value="baslik">Başlık (A–Z)</option><option value="yil-yeni">Yıl (yeni → eski)</option><option value="yil-eski">Yıl (eski → yeni)</option><option value="yazar">Yazar (A–Z)</option></select>
-        <span class="ak-gorunum" role="group" aria-label="Görünüm"><button type="button" data-gorunum="kart" class="aktif" title="Kart görünümü" aria-label="Kart görünümü">▦</button><button type="button" data-gorunum="liste" title="Liste görünümü" aria-label="Liste görünümü">☰</button></span>
-        <span class="ak-bicim"><select data-ak-bicim aria-label="Atıf biçimi">${BICIMLER.map((b) => `<option value="${b.anahtar}">${b.etiket}</option>`).join("")}</select><select data-ak-dil aria-label="Atıf dili"><option value="tr">TR</option><option value="en">EN</option></select></span>
-      </section>
-      <p class="ak-ozet" data-ak-ozet aria-live="polite"></p>
-      <div class="ak-liste ak-kart-gorunum" data-ak-liste></div>
+      </div>
+
+      <div class="ak-ayarlar" data-ak-ayarlar hidden>
+        <section class="ak-ayar-kart">
+          <h3>Atıf</h3>
+          <div class="ak-ayar-satir"><label>Varsayılan biçim <select data-ak-bicim aria-label="Atıf biçimi">${BICIMLER.map((b) => `<option value="${b.anahtar}">${b.etiket}</option>`).join("")}</select></label>
+          <label>Dil <select data-ak-dil aria-label="Atıf dili"><option value="tr">Türkçe</option><option value="en">English</option></select></label></div>
+          <p class="ak-alt">Kaynak kartındaki “❝ Atıf” bu biçimde panoya kopyalar.</p>
+        </section>
+        <section class="ak-ayar-kart">
+          <h3>Kayıt</h3>
+          <p class="ak-alt">Vurgu, yorum ve çizimlerin her değişiklikte <strong>otomatik</strong> hesabına kaydedilir (Kaydet'e basmana gerek yok). PDF dosyasının kendisi ise okuyucuyu kapatırken tek seferde güncellenir; böylece depolama (R2) işlem kotası boşa harcanmaz.</p>
+        </section>
+        <div class="ak-motor" data-ak-motor></div>
+        <div class="ak-motor ak-eklentiler" data-ak-eklentiler></div>
+      </div>
+
+      <div class="ak-zot" data-ak-zot>
+        <aside class="ak-agac" aria-label="Klasörler">
+          <button type="button" class="ak-agac-ac" data-act="agac-ac" aria-expanded="false">📁 <span data-ak-agac-ad>Tüm kaynaklar</span> <span aria-hidden="true">▾</span></button>
+          <div class="ak-agac-ic" data-ak-agac></div>
+        </aside>
+        <section class="ak-orta">
+          <div class="ak-arama-satiri">
+            <div class="ak-arama">
+              <span aria-hidden="true">🔍</span>
+              <input type="search" data-f="ara" placeholder="Başlık, yazar, etiket, DOI, özet ve notlarda ara…" aria-label="Ara" autocomplete="off">
+              <button type="button" class="ak-btn ak-filtre-dugme" data-act="filtre-ac" aria-expanded="false" aria-controls="ak-filtre-pop">Filtreler <span class="ak-say" data-ak-filtre-say hidden></span></button>
+            </div>
+            <select data-f="sira" aria-label="Sırala"><option value="guncel">Son güncellenen</option><option value="baslik">Başlık (A–Z)</option><option value="yil-yeni">Yıl (yeni → eski)</option><option value="yil-eski">Yıl (eski → yeni)</option><option value="yazar">Yazar (A–Z)</option></select>
+            <span class="ak-gorunum" role="group" aria-label="Görünüm"><button type="button" data-gorunum="kart" class="aktif" title="Kart görünümü" aria-label="Kart görünümü">▦</button><button type="button" data-gorunum="liste" title="Liste görünümü" aria-label="Liste görünümü">≡</button></span>
+          </div>
+          <section class="ak-filtre-pop" id="ak-filtre-pop" data-ak-filtre aria-label="Filtreler" hidden>
+            <label>Tür <select data-f="tur"><option value="">Tümü</option>${Object.entries(TURLER).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></label>
+            <label>Etiket <select data-f="etiket"><option value="">Tümü</option></select></label>
+            <label>Yazar <select data-f="yazar"><option value="">Tümü</option></select></label>
+            <label>Yıl (başlangıç) <input type="number" data-f="yilBas" min="0" max="3000" inputmode="numeric"></label>
+            <label>Yıl (bitiş) <input type="number" data-f="yilSon" min="0" max="3000" inputmode="numeric"></label>
+            <label>Görünürlük <select data-f="gorunurluk"><option value="">Tümü</option>${Object.entries(GORUNURLUK).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></label>
+            <label class="ak-onay"><input type="checkbox" data-f="pdfli"> Yalnız PDF'li</label>
+            <button type="button" class="ak-btn" data-act="filtre-temizle">Filtreleri temizle</button>
+          </section>
+          <div class="ak-cipler" data-ak-cipler></div>
+          <p class="ak-ozet" data-ak-ozet aria-live="polite"></p>
+          <div class="ak-liste ak-kart-gorunum" data-ak-liste></div>
+          ${owner ? "" : `<div class="ak-dropzone ak-dropzone-ince" data-ak-dz tabindex="0" role="button" aria-label="PDF yüklemek için tıkla ya da sürükle">
+            <strong>PDF'leri buraya sürükle</strong> <span>ya da tıkla — içindeki vurgu ve yorumlar aynen gelir${"" }.</span>
+            <ul class="ak-yukleme" data-ak-yukleme></ul>
+          </div>`}
+        </section>
+      </div>
       <dialog class="ak-dlg" data-dlg="detay" aria-label="Kaynak ayrıntısı"></dialog>
       <dialog class="ak-dlg ak-dlg-genis" data-dlg="form" aria-label="Kaynak formu"></dialog>
       <dialog class="ak-dlg" data-dlg="disa" aria-label="Dışa aktar"></dialog>
+      <dialog class="ak-dlg" data-dlg="klasor" aria-label="Klasörlere ekle"></dialog>
     </div>`;
 
   const q = (s) => kok.querySelector(s);
@@ -96,26 +139,30 @@ function kutuphaneKur(kok, profil, owner) {
 
   /* ------------------------------ veri ------------------------------ */
   async function yukle() {
+    if (d.kapsam === "ayarlar") return;
     q("[data-ak-ozet]").textContent = "Yükleniyor…";
+    uyeGorunumu();
+    if (uyeModu() && !d.uye) { d.kayitlar = []; d.klasorler = []; d.ogeler = new Map(); return; }   // önce üye seçilir; kaynaklar topluca çekilmez
+    const hedef = uyeModu() ? d.uye : profil.id;
     let veri = [], hata = null;
-    if (owner && !d.uye) { d.kayitlar = []; uyeGorunumu(); return; }                 // önce üye seçilir; tüm kaynaklar topluca çekilmez
     if (owner) {
       const r = await supabase.rpc("owner_akademik_kaynaklari_getir", { p_user_id: d.uye || null });
       veri = r.data || []; hata = r.error;
     } else {
-      let s = supabase.from("akademik_kaynaklar").select("*").order("guncelleme_tarihi", { ascending: false });
-      s = d.kapsam === "benim" ? s.eq("user_id", profil.id) : s.neq("user_id", profil.id);
-      const r = await s;
-      veri = r.data || []; hata = r.error;
+      const r = await hepsiniAl(() => supabase.from("akademik_kaynaklar").select("*").eq("user_id", hedef).order("guncelleme_tarihi", { ascending: false }));
+      veri = r.data; hata = r.error;
     }
     if (hata) {
       q("[data-ak-ozet]").textContent = "";
       q("[data-ak-liste]").innerHTML = `<p class="ak-bos ak-hata">Kaynaklar yüklenemedi: ${esc(hata.message)}. Migration 0072'nin uygulandığından ve bu özelliğin rolün için açık olduğundan emin ol.</p>`;
       return;
     }
+    await klasorYukle(hedef);
     d.kayitlar = veri;
     facetleriDoldur();
+    agacCiz();
     ciz();
+    aramaNotlariniYukle().catch(() => {});
   }
 
   function facetleriDoldur() {
@@ -132,8 +179,13 @@ function kutuphaneKur(kok, profil, owner) {
 
   function suzulmus() {
     const f = d.f;
-    const ara = f.ara.trim().toLocaleLowerCase("tr");
+    const belirtec = tokenlar(f.ara);
+    const kume = d.klasor && d.klasor !== "__yok" ? klasorKumesi(d.klasor) : null;
+    const dosyali = d.klasor === "__yok" ? dosyaliKume() : null;
     let s = d.kayitlar.filter((k) => {
+      k._notEslesme = false;
+      if (kume && !kume.has(k.id)) return false;
+      if (dosyali && dosyali.has(k.id)) return false;
       if (f.tur && k.tur !== f.tur) return false;
       if (f.etiket && !(k.etiketler || []).includes(f.etiket)) return false;
       if (f.yazar && !(k.yazarlar || []).some((y) => (y.kurum || y.soyadi) === f.yazar)) return false;
@@ -141,9 +193,12 @@ function kutuphaneKur(kok, profil, owner) {
       if (f.yilSon && !(k.yayin_yili <= Number(f.yilSon))) return false;
       if (f.gorunurluk && k.gorunurluk !== f.gorunurluk) return false;
       if (f.pdfli && !k.pdf_r2_yolu) return false;
-      if (ara) {
-        const havuz = [k.baslik, k.doi, k.isbn, k.dergi_veya_yayinevi, k.ozet, (k.etiketler || []).join(" "), (k.yazarlar || []).map((y) => `${y.adi || ""} ${y.soyadi || ""} ${y.kurum || ""}`).join(" "), k.sahip_ad, k.sahip_eposta].join(" ").toLocaleLowerCase("tr");
-        if (!havuz.includes(ara)) return false;
+      if (belirtec.length) {
+        const havuz = [k.baslik, k.doi, k.isbn, k.dergi_veya_yayinevi, k.ozet, (k.etiketler || []).join(" "), (k.yazarlar || []).map((y) => `${y.adi || ""} ${y.soyadi || ""} ${y.kurum || ""}`).join(" "), k.yayin_yili].join(" ").toLocaleLowerCase("tr");
+        const notMetni = d.notlar.get(k.id) || "";
+        // Her sözcük künyede YA DA vurgu/yorum metinlerinde geçmeli (tüm sözcükler birlikte aranır)
+        if (!belirtec.every((b) => havuz.includes(b) || notMetni.includes(b))) return false;
+        k._notEslesme = !belirtec.every((b) => havuz.includes(b));
       }
       return true;
     });
@@ -154,55 +209,200 @@ function kutuphaneKur(kok, profil, owner) {
 
   /* ----------------------------- liste çizimi ----------------------------- */
   function ciz() {
+    cipCiz();
     const s = suzulmus();
-    q("[data-ak-ozet]").textContent = `${s.length} / ${d.kayitlar.length} kaynak${d.kayitlar.length ? ` · toplam PDF: ${bayt(d.kayitlar.reduce((t, k) => t + Number(k.pdf_boyut_bayt || 0), 0))}` : ""}`;
+    const topPdf = d.kayitlar.reduce((x, k) => x + Number(k.pdf_boyut_bayt || 0), 0);
+    q("[data-ak-ozet]").textContent = `${s.length === d.kayitlar.length ? `${s.length} kaynak` : `${s.length} / ${d.kayitlar.length} kaynak`}${d.kayitlar.length ? ` · toplam PDF: ${bayt(topPdf)}` : ""}`;
     const liste = q("[data-ak-liste]");
     liste.className = `ak-liste ak-${d.gorunum}-gorunum`;
-    if (!s.length) { liste.innerHTML = `<p class="ak-bos">${d.kayitlar.length ? "Süzgeçlere uyan kaynak yok." : owner ? "Henüz hiçbir üye kaynak eklememiş." : d.kapsam === "benim" ? "Henüz kaynak yok. PDF sürükle, “Kaynak ekle” de ya da .bib/.ris içe aktar." : "Seninle paylaşılmış kaynak yok."}</p>`; return; }
-    const kartHtml = (k) => {
+    const bosMetin = d.kayitlar.length ? "Aramaya / filtrelere / klasöre uyan kaynak yok." : owner ? "Bu üyenin kaynağı yok." : d.kapsam === "benim" ? "Henüz kaynak yok. “＋ Ekle” menüsünden PDF yükle ya da PDF'leri aşağıdaki alana sürükle." : "Bu üyenin sana görünen kaynağı yok.";
+    if (!s.length) { liste.innerHTML = `<p class="ak-bos">${bosMetin}</p>`; return; }
+    const surukle = duzenlenebilir();
+    liste.innerHTML = s.map((k) => {
       const yazarMeta = [kisaYazar(k.yazarlar), k.yayin_yili, k.dergi_veya_yayinevi].filter(Boolean).map(esc).join(" · ");
-      return `<article class="ak-kart" data-id="${esc(k.id)}">
-        <div class="ak-kart-ust"><span class="ak-rozet">${esc(TURLER[k.tur] || k.tur)}</span><span class="ak-rozet ak-g-${esc(k.gorunurluk)}">${esc(GORUNURLUK[k.gorunurluk])}</span>${k.pdf_r2_yolu ? `<span class="ak-rozet ak-pdf">PDF · ${bayt(k.pdf_boyut_bayt)}</span>` : ""}${owner ? `<span class="ak-rozet ak-sahip" title="${esc(k.sahip_eposta)}">${esc(k.sahip_ad || k.sahip_eposta)}${k.not_sayisi ? ` · ${k.not_sayisi} not` : ""}</span>` : ""}${!owner && d.kapsam === "paylasilan" ? '<span class="ak-rozet">Salt okunur</span>' : ""}</div>
+      const kl = duzenlenebilir() ? d.klasorler.filter((x) => d.ogeler.get(x.id)?.has(k.id)).map((x) => x.ad) : [];
+      return `<article class="ak-kart" data-id="${esc(k.id)}"${surukle ? ' draggable="true"' : ""}>
+        <div class="ak-kart-ust"><span class="ak-rozet">${esc(TURLER[k.tur] || k.tur)}</span>${benim(k) && !owner ? `<span class="ak-rozet ak-g-${esc(k.gorunurluk)}">${esc(GORUNURLUK[k.gorunurluk])}</span>` : ""}${k.pdf_r2_yolu ? `<span class="ak-rozet ak-pdf">PDF · ${bayt(k.pdf_boyut_bayt)}</span>` : ""}${owner && k.not_sayisi ? `<span class="ak-rozet">${k.not_sayisi} not</span>` : ""}${k._notEslesme ? '<span class="ak-rozet ak-notta" title="Aradığın sözcükler bu kaynağın vurgu/yorumlarında geçiyor">💬 notlarda geçiyor</span>' : ""}</div>
         <h3 class="ak-kart-baslik">${esc(kayitBaslik(k))}</h3>
         <p class="ak-kart-yazar">${yazarMeta || "—"}</p>
         ${(k.etiketler || []).length ? `<div class="ak-etiketler">${k.etiketler.map((e) => `<button type="button" class="ak-etiket" data-etiket="${esc(e)}">${esc(e)}</button>`).join("")}</div>` : ""}
+        ${kl.length ? `<p class="ak-kart-klasor">📁 ${kl.map(esc).join(" · ")}</p>` : ""}
         <div class="ak-kart-eylem">
           ${k.pdf_r2_yolu ? `<button type="button" class="ak-btn ak-btn-birincil" data-act="ac">📖 Oku</button>` : ""}
-          <button type="button" class="ak-btn" data-act="atif" title="Seçili biçimde atıfı panoya kopyala">❝ Atıf</button>
+          <button type="button" class="ak-btn" data-act="atif" title="Atıfı panoya kopyala (biçim: Ayarlar)">❝ Atıf</button>
           <button type="button" class="ak-btn" data-act="detay">Ayrıntı</button>
-          ${benim(k) ? `<button type="button" class="ak-btn" data-act="duzenle">Düzenle</button>` : ""}
+          ${benim(k) && !owner && d.kapsam === "benim" ? `<button type="button" class="ak-btn" data-act="klasor-ata" title="Klasörlere ekle / çıkar">📁</button><button type="button" class="ak-btn" data-act="duzenle">Düzenle</button>` : ""}
         </div>
       </article>`;
-    };
-    if (!owner) { liste.innerHTML = s.map(kartHtml).join(""); return; }
-    // Owner: üyenin kendi düzeni — ilk etiket = klasör ("Tez/Bölüm 1" gibi / içeren etiketler yol olarak gösterilir). Etiketsizler "Klasörsüz".
-    const gruplar = new Map();
-    for (const k of s) { const ad = (k.etiketler || [])[0] || ""; if (!gruplar.has(ad)) gruplar.set(ad, []); gruplar.get(ad).push(k); }
-    const tr2 = (a, b) => a.localeCompare(b, "tr");
-    const adlar = [...gruplar.keys()].sort((a, b) => (a === "") - (b === "") || tr2(a, b));
-    liste.className = "ak-liste ak-klasorler";
-    liste.innerHTML = adlar.map((ad) => `<details class="ak-klasor" open><summary><span aria-hidden="true">📁</span> ${esc(ad || "Klasörsüz")} <span class="ak-klasor-say">${gruplar.get(ad).length}</span></summary>
-      <div class="ak-liste ak-${d.gorunum}-gorunum">${gruplar.get(ad).map(kartHtml).join("")}</div></details>`).join("");
+    }).join("");
   }
 
-  /* --------------------- owner: üye listesi (önce kullanıcılar, sonra onların klasörleri) --------------------- */
+  /* ------------------------------ yardımcılar ------------------------------ */
+  const uyeModu = () => owner || d.kapsam === "paylasilan";
+  const duzenlenebilir = () => !owner && d.kapsam === "benim";
+  const tokenlar = (s) => String(s || "").toLocaleLowerCase("tr").split(/\s+/).filter(Boolean);
+
+  /** PostgREST sayfa sınırını (≈1000) aşan tabloları sayfa sayfa toplar. */
+  async function hepsiniAl(kur) {
+    const hepsi = [];
+    for (let bas = 0; bas < 50000; bas += 1000) {
+      const { data, error } = await kur().range(bas, bas + 999);
+      if (error) return { data: hepsi, error };
+      hepsi.push(...(data || []));
+      if (!data || data.length < 1000) break;
+    }
+    return { data: hepsi, error: null };
+  }
+
+  /* ------------------------------ klasörler (Zotero koleksiyonları) ------------------------------ */
+  async function klasorYukle(uid) {
+    d.klasorHata = "";
+    const [k, o] = await Promise.all([
+      hepsiniAl(() => supabase.from("akademik_koleksiyonlar").select("id,ust_id,ad,sira,user_id").eq("user_id", uid).order("ad")),
+      hepsiniAl(() => supabase.from("akademik_koleksiyon_ogeleri").select("koleksiyon_id,kaynak_id").eq("user_id", uid)),
+    ]);
+    if (k.error || o.error) { d.klasorler = []; d.ogeler = new Map(); d.klasorHata = (k.error || o.error).message; return; }
+    d.klasorler = k.data;
+    d.ogeler = new Map();
+    for (const r of o.data) { if (!d.ogeler.has(r.koleksiyon_id)) d.ogeler.set(r.koleksiyon_id, new Set()); d.ogeler.get(r.koleksiyon_id).add(r.kaynak_id); }
+    if (d.klasor && d.klasor !== "__yok" && !d.klasorler.some((x) => x.id === d.klasor)) d.klasor = "";
+  }
+  const altKlasorler = (id) => { const s = [id]; for (const k of d.klasorler) if (k.ust_id === id) s.push(...altKlasorler(k.id)); return s; };
+  const klasorKumesi = (id) => { const kume = new Set(); for (const kid of altKlasorler(id)) for (const s of d.ogeler.get(kid) || []) kume.add(s); return kume; };
+  const dosyaliKume = () => { const kume = new Set(); for (const s of d.ogeler.values()) for (const x of s) kume.add(x); return kume; };
+  const klasorYolu = (id) => { const p = []; let k = d.klasorler.find((x) => x.id === id), n = 0; while (k && n++ < 20) { p.unshift(k.ad); k = d.klasorler.find((x) => x.id === k.ust_id); } return p.join(" › "); };
+
+  function agacCiz() {
+    const alan = q("[data-ak-agac]"); if (!alan) return;
+    const edit = duzenlenebilir();
+    const mevcut = new Set(d.kayitlar.map((k) => k.id));
+    const sayi = (id) => { let n = 0; for (const s of klasorKumesi(id)) if (mevcut.has(s)) n++; return n; };
+    const dosyali = dosyaliKume();
+    const yok = d.kayitlar.filter((k) => !dosyali.has(k.id)).length;
+    const cocuklar = (ust) => d.klasorler.filter((k) => (k.ust_id || null) === ust).sort((a, b) => a.ad.localeCompare(b.ad, "tr"));
+    const dal = (ust, seviye) => cocuklar(ust).map((k) => {
+      const alt = cocuklar(k.id).length, acik = d.acik.has(k.id);
+      return `<li role="treeitem" aria-expanded="${alt ? acik : "false"}"><div class="ak-kl${d.klasor === k.id ? " aktif" : ""}" data-kl="${esc(k.id)}" style="--sev:${seviye}">
+        ${alt ? `<button type="button" class="ak-kl-ok${acik ? " acik" : ""}" data-kl-ac="${esc(k.id)}" aria-label="${esc(k.ad)} klasörünü ${acik ? "kapat" : "aç"}">▸</button>` : `<span class="ak-kl-ok bos"></span>`}
+        <button type="button" class="ak-kl-ad" data-klasor="${esc(k.id)}" title="${esc(klasorYolu(k.id))}"><span aria-hidden="true">${acik && alt ? "📂" : "📁"}</span> <span class="ak-kl-metin">${esc(k.ad)}</span> <span class="ak-kl-say">${sayi(k.id)}</span></button>
+        ${edit ? `<span class="ak-kl-islem"><button type="button" data-kl-islem="alt" data-id="${esc(k.id)}" title="Alt klasör ekle" aria-label="Alt klasör ekle">＋</button><button type="button" data-kl-islem="ad" data-id="${esc(k.id)}" title="Yeniden adlandır" aria-label="Yeniden adlandır">✎</button><button type="button" data-kl-islem="sil" data-id="${esc(k.id)}" title="Klasörü sil (kaynaklar silinmez)" aria-label="Klasörü sil">🗑</button></span>` : ""}
+      </div>${alt && acik ? `<ul role="group">${dal(k.id, seviye + 1)}</ul>` : ""}</li>`;
+    }).join("");
+    alan.innerHTML = `<ul role="tree" class="ak-agac-liste">
+      <li role="treeitem"><div class="ak-kl${d.klasor === "" ? " aktif" : ""}" style="--sev:0"><span class="ak-kl-ok bos"></span><button type="button" class="ak-kl-ad" data-klasor=""><span aria-hidden="true">🗂</span> <span class="ak-kl-metin">Tüm kaynaklar</span> <span class="ak-kl-say">${d.kayitlar.length}</span></button></div></li>
+      ${dal(null, 0)}
+      <li role="treeitem"><div class="ak-kl${d.klasor === "__yok" ? " aktif" : ""}" data-kl="__yok" style="--sev:0"><span class="ak-kl-ok bos"></span><button type="button" class="ak-kl-ad" data-klasor="__yok"><span aria-hidden="true">📥</span> <span class="ak-kl-metin">Klasörsüz</span> <span class="ak-kl-say">${yok}</span></button></div></li>
+    </ul>
+    ${edit ? `<button type="button" class="ak-btn ak-agac-yeni" data-act="klasor-yeni">＋ Yeni klasör</button>` : ""}
+    ${d.klasorHata ? `<p class="ak-bos ak-hata">Klasörler yüklenemedi: ${esc(d.klasorHata)}. Migration 0117'nin uygulandığından emin ol.</p>` : ""}`;
+    const ad = d.klasor === "" ? "Tüm kaynaklar" : d.klasor === "__yok" ? "Klasörsüz" : klasorYolu(d.klasor) || "Tüm kaynaklar";
+    q("[data-ak-agac-ad]").textContent = ad;
+  }
+  async function klasorIslem(islem, id) {
+    try {
+      if (islem === "yeni" || islem === "alt") {
+        const ad = (prompt(islem === "alt" ? `“${d.klasorler.find((k) => k.id === id)?.ad}” içine yeni klasör adı:` : "Yeni klasör adı:") || "").trim();
+        if (!ad) return;
+        const { data, error } = await supabase.from("akademik_koleksiyonlar").insert({ ad: ad.slice(0, 120), ust_id: islem === "alt" ? id : null, user_id: profil.id }).select().single();
+        if (error) throw new Error(error.message);
+        if (islem === "alt") d.acik.add(id);
+        d.klasorler.push(data); d.klasor = data.id;
+      } else if (islem === "ad") {
+        const k = d.klasorler.find((x) => x.id === id); const ad = (prompt("Klasör adı:", k?.ad || "") || "").trim();
+        if (!ad || ad === k?.ad) return;
+        const { error } = await supabase.from("akademik_koleksiyonlar").update({ ad: ad.slice(0, 120) }).eq("id", id);
+        if (error) throw new Error(error.message);
+        k.ad = ad.slice(0, 120);
+      } else if (islem === "sil") {
+        const k = d.klasorler.find((x) => x.id === id);
+        if (!confirm(`“${k?.ad}” klasörü ve alt klasörleri silinsin mi?\nİçindeki kaynaklar SİLİNMEZ; yalnızca klasörden çıkarılır.`)) return;
+        const { error } = await supabase.from("akademik_koleksiyonlar").delete().eq("id", id);
+        if (error) throw new Error(error.message);
+        await klasorYukle(profil.id); if (d.klasor === id) d.klasor = "";
+      }
+      agacCiz(); ciz();
+    } catch (h) { toast(`Klasör işlemi başarısız: ${h.message}`, "hata"); }
+  }
+  async function klasoreEkleCikar(kaynakId, klasorId, ekle) {
+    const { error } = ekle
+      ? await supabase.from("akademik_koleksiyon_ogeleri").upsert({ koleksiyon_id: klasorId, kaynak_id: kaynakId, user_id: profil.id }, { onConflict: "koleksiyon_id,kaynak_id", ignoreDuplicates: true })
+      : await supabase.from("akademik_koleksiyon_ogeleri").delete().eq("koleksiyon_id", klasorId).eq("kaynak_id", kaynakId);
+    if (error) throw new Error(error.message);
+    if (!d.ogeler.has(klasorId)) d.ogeler.set(klasorId, new Set());
+    if (ekle) d.ogeler.get(klasorId).add(kaynakId); else d.ogeler.get(klasorId).delete(kaynakId);
+  }
+  function klasorDialogu(kaynakId) {
+    const k = kayit(kaynakId); const dl = dlg("klasor");
+    const dalCiz = (ust, sev) => d.klasorler.filter((x) => (x.ust_id || null) === ust).sort((a, b) => a.ad.localeCompare(b.ad, "tr")).map((x) => `<label class="ak-kd-satir" style="--sev:${sev}"><input type="checkbox" data-kd="${esc(x.id)}" ${d.ogeler.get(x.id)?.has(kaynakId) ? "checked" : ""}> <span>📁 ${esc(x.ad)}</span></label>${dalCiz(x.id, sev + 1)}`).join("");
+    dl.innerHTML = `<form method="dialog" class="ak-dlg-ic"><h3>Klasörlere ekle</h3><p class="ak-alt">${esc(k?.baslik || "")}</p>
+      <div class="ak-kd-liste">${dalCiz(null, 0) || '<p class="ak-bos">Henüz klasör yok. Önce “＋ Yeni klasör” ile oluştur.</p>'}</div>
+      <p class="ak-alt">Bir kaynak birden çok klasörde olabilir. Değişiklikler anında kaydedilir.</p>
+      <div class="ak-dlg-eylem"><button class="ak-btn ak-btn-birincil" value="kapat">Tamam</button></div></form>`;
+    dl.onchange = async (e) => {
+      const kd = e.target.dataset?.kd; if (!kd) return;
+      try { await klasoreEkleCikar(kaynakId, kd, e.target.checked); agacCiz(); ciz(); } catch (h) { e.target.checked = !e.target.checked; toast(`Kaydedilemedi: ${h.message}`, "hata"); }
+    };
+    dl.showModal();
+  }
+
+  /* ------------------------------ notlarda arama ------------------------------ */
+  // Vurgu metinleri ve yorumlar da aramaya katılır (kaynak kartında "notlarda geçiyor" etiketi çıkar). Tek seferde, küçük sütunlarla yüklenir.
+  async function aramaNotlariniYukle() {
+    const idler = d.kayitlar.map((k) => k.id); d.notlar = new Map();
+    for (let i = 0; i < idler.length; i += 150) {
+      const { data } = await supabase.from("akademik_notlar").select("kaynak_id,metin,yorum").in("kaynak_id", idler.slice(i, i + 150)).limit(5000);
+      for (const r of data || []) d.notlar.set(r.kaynak_id, `${d.notlar.get(r.kaynak_id) || ""} ${r.metin || ""} ${r.yorum || ""}`.toLocaleLowerCase("tr"));
+    }
+    if (tokenlar(d.f.ara).length) ciz();
+  }
+
+  /* ------------------------------ filtre çipleri ------------------------------ */
+  function filtreSay() { const f = d.f; return [f.tur, f.etiket, f.yazar, f.yilBas, f.yilSon, f.gorunurluk, f.pdfli].filter(Boolean).length; }
+  function cipCiz() {
+    const f = d.f, c = [];
+    if (d.klasor === "__yok") c.push(["klasor", "📥 Klasörsüz"]); else if (d.klasor) c.push(["klasor", `📁 ${klasorYolu(d.klasor)}`]);
+    if (f.tur) c.push(["tur", TURLER[f.tur]]); if (f.etiket) c.push(["etiket", `# ${f.etiket}`]); if (f.yazar) c.push(["yazar", `✍ ${f.yazar}`]);
+    if (f.yilBas) c.push(["yilBas", `≥ ${f.yilBas}`]); if (f.yilSon) c.push(["yilSon", `≤ ${f.yilSon}`]);
+    if (f.gorunurluk) c.push(["gorunurluk", GORUNURLUK[f.gorunurluk]]); if (f.pdfli) c.push(["pdfli", "PDF'li"]);
+    q("[data-ak-cipler]").innerHTML = c.map(([k, m]) => `<button type="button" class="ak-cip" data-cip="${k}" title="Kaldır">${esc(m)} <span aria-hidden="true">✕</span></button>`).join("");
+    const n = filtreSay(), s = q("[data-ak-filtre-say]"); s.hidden = !n; s.textContent = n;
+  }
+
+  /* --------------------------- üye listesi (owner + paylaşılan) --------------------------- */
   const trKucuk = (s) => String(s || "").toLocaleLowerCase("tr");
   function uyeGorunumu() {
-    if (!owner) return;
+    const kapali = !uyeModu();
+    q("[data-ak-uyeler]").hidden = kapali;
+    const zot = q("[data-ak-zot]"); if (d.kapsam === "ayarlar") { zot.hidden = true; return; }
+    const icerikGizle = uyeModu() && !d.uye;
+    zot.hidden = icerikGizle;
+    if (kapali) return;
     const secili = d.uyeler.find((u) => u.user_id === d.uye);
-    const icerikGizle = !d.uye;
-    kok.querySelectorAll(".ak-filtre, [data-ak-ozet], [data-ak-liste]").forEach((n) => { n.hidden = icerikGizle; });
     q("[data-uye-ara]").hidden = !!d.uye; q("[data-ak-uye-liste]").hidden = !!d.uye; q('[data-act="uye-geri"]').hidden = !d.uye;
-    q("[data-ak-secili-uye]").textContent = secili ? `${secili.ad || secili.eposta} · ${secili.kaynak_sayisi} kaynak · ${bayt(secili.toplam_bayt)}` : "";
+    q("[data-ak-secili-uye]").textContent = secili ? `${secili.ad || secili.eposta} · ${secili.kaynak_sayisi} kaynak${secili.toplam_bayt != null ? ` · ${bayt(secili.toplam_bayt)}` : ""}` : "";
     if (d.uye) return;
-    const a = trKucuk(q("[data-uye-ara]").value).trim();
-    const uyeler = d.uyeler.filter((u) => !a || trKucuk(`${u.ad} ${u.eposta}`).includes(a));
+    const a = tokenlar(q("[data-uye-ara]").value);
+    const uyeler = d.uyeler.filter((u) => { const h = trKucuk(`${u.ad} ${owner ? u.eposta : ""}`); return a.every((t) => h.includes(t)); });
     q("[data-ak-uye-liste]").innerHTML = uyeler.length
-      ? uyeler.map((u) => `<li><button type="button" class="ak-uye-kart" data-uye-sec="${esc(u.user_id)}"><strong>${esc(u.ad || u.eposta)}</strong><small>${esc(u.ad ? u.eposta : "")}${u.ad && u.eposta ? " · " : ""}${esc(u.rol)}</small><span>${u.kaynak_sayisi} kaynak · ${bayt(u.toplam_bayt)}</span></button></li>`).join("")
-      : `<li class="ak-bos">${d.uyeler.length ? "Aramaya uyan üye yok." : "Henüz hiçbir üye kaynak eklememiş."}</li>`;
+      ? uyeler.map((u) => `<li><button type="button" class="ak-uye-kart" data-uye-sec="${esc(u.user_id)}"><strong>${esc(u.ad || u.eposta || "Üye")}</strong>${owner ? `<small>${esc(u.ad ? u.eposta : "")}${u.ad && u.eposta ? " · " : ""}${esc(u.rol)}</small>` : ""}<span>${u.kaynak_sayisi} kaynak${u.toplam_bayt != null ? ` · ${bayt(u.toplam_bayt)}` : ""}</span></button></li>`).join("")
+      : `<li class="ak-bos">${d.uyeler.length ? "Aramaya uyan üye yok." : owner ? "Henüz hiçbir üye kaynak eklememiş." : "Seninle paylaşılmış kaynak yok."}</li>`;
+  }
+  async function uyeleriYukle() {
+    if (!uyeModu() || d.uyelerYuklu === d.kapsam) return;
+    const { data, error } = await supabase.rpc(owner ? "owner_akademik_uyeleri_getir" : "akademik_paylasilan_uyeler");
+    d.uyeler = data || []; d.uyelerYuklu = d.kapsam;
+    if (error) q("[data-ak-uye-liste]").innerHTML = `<li class="ak-bos ak-hata">Üyeler yüklenemedi: ${esc(error.message)}${owner ? "" : ". Migration 0117 uygulanmış olmalı."}</li>`;
+    else uyeGorunumu();
   }
 
-  /* ------------------------------- eylemler ------------------------------- */
+  /* --------------------------- PDF yüklendikten sonra --------------------------- */
+  async function yuklemeSonrasi(kaynakId, dosya) {
+    let ice = 0;
+    try { ice = await aciklamalariIceAl(kaynakId, dosya); } catch { /* PDF yine de eklendi */ }
+    if (d.klasor && d.klasor !== "__yok") { try { await klasoreEkleCikar(kaynakId, d.klasor, true); } catch { /* klasör atanamadı: kaynak yine de eklendi */ } }
+    return ice;
+  }
+
   async function pdfAc(k) {
     if (!k.pdf_r2_yolu) { toast("Bu kaynağın PDF'i yok.", "uyari"); return; }
     await okuyucuAc({ kaynak: { ...k }, salt: !benim(k), kullaniciAdi: profil.ad, kapaninca: () => yukle() });
@@ -470,6 +670,7 @@ function kutuphaneKur(kok, profil, owner) {
         if (pdf) {
           durum.textContent = "PDF yükleniyor… %0";
           await pdfYukle(sonuc.data.id, pdf, { dosyaAdi: pdf.name, ilerleme: (o) => { durum.textContent = `PDF yükleniyor… %${Math.round(o * 100)}`; } });
+          { const ice = await yuklemeSonrasi(sonuc.data.id, pdf); if (ice) toast(`PDF içindeki ${ice} açıklama (vurgu/yorum) aynen içe alındı.`, "basari"); }
         }
         dl.close();
         toast(k ? "Kaynak güncellendi." : "Kaynak eklendi.", "basari");
@@ -496,7 +697,8 @@ function kutuphaneKur(kok, profil, owner) {
         const { data, error } = await supabase.from("akademik_kaynaklar").insert({ baslik, tur: "makale" }).select().single();
         if (error) throw new Error(error.message);
         await pdfYukle(data.id, dosya, { dosyaAdi: dosya.name, ilerleme: (o) => { li.textContent = `${dosya.name} — %${Math.round(o * 100)}`; } });
-        li.textContent = `✓ ${dosya.name}`;
+        const ice = await yuklemeSonrasi(data.id, dosya);
+        li.textContent = `✓ ${dosya.name}${ice ? ` — ${ice} açıklama içe alındı` : ""}`;
         basarili++;
       } catch (h) { li.textContent = `✗ ${dosya.name}: ${h.message}`; li.classList.add("ak-hata"); }
     }
@@ -540,11 +742,17 @@ function kutuphaneKur(kok, profil, owner) {
   function disaAktarAc() {
     const s = suzulmus();
     const dl = dlg("disa");
+    const konum = d.klasor === "__yok" ? "Klasörsüz" : d.klasor ? klasorYolu(d.klasor) : "Tüm kaynaklar";
+    const bic = BICIMLER.find((b) => b.anahtar === d.bicim).etiket;
     dl.innerHTML = `<form method="dialog" class="ak-dlg-ic"><header class="ak-dlg-ust"><h3>Dışa aktar</h3><button class="ak-btn" value="x" aria-label="Kapat">✕</button></header>
-      <div class="ak-dlg-govde"><p>${s.length} kaynak (şu anki süzgece göre).</p>
-        <div class="ak-atif-eylem"><button type="button" class="ak-btn ak-btn-birincil" data-o="bib">BibTeX (.bib) indir</button><button type="button" class="ak-btn ak-btn-birincil" data-o="ris">RIS (.ris) indir</button></div>
-        <h4>Kaynakça (${BICIMLER.find((b) => b.anahtar === d.bicim).etiket}, ${d.dil.toUpperCase()})</h4>
-        <div class="ak-atif-eylem"><button type="button" class="ak-btn" data-o="md">Markdown olarak kopyala</button><button type="button" class="ak-btn" data-o="html">HTML (atıf kutusu) olarak kopyala</button><button type="button" class="ak-btn" data-o="txt">Düz metin kopyala</button></div></div></form>`;
+      <div class="ak-dlg-govde"><p><strong>${s.length} kaynak</strong> · ${esc(konum)}${filtreSay() || tokenlar(d.f.ara).length ? " · arama/filtre uygulanmış" : ""}</p>
+        <h4>Başka bir programa taşı</h4>
+        <p class="ak-alt">Zotero, Mendeley, EndNote gibi programlara aktarmak için.</p>
+        <div class="ak-atif-eylem"><button type="button" class="ak-btn ak-btn-birincil" data-o="bib">BibTeX (.bib)</button><button type="button" class="ak-btn ak-btn-birincil" data-o="ris">RIS (.ris)</button></div>
+        <h4>Kaynakça olarak yapıştır</h4>
+        <p class="ak-alt">Biçim: <strong>${esc(bic)}</strong> (${d.dil.toUpperCase()}) — Ayarlar sekmesinden değiştirilir.</p>
+        <div class="ak-atif-eylem"><button type="button" class="ak-btn" data-o="metin">Düz metin kopyala</button><button type="button" class="ak-btn" data-o="md">Markdown kopyala</button><button type="button" class="ak-btn" data-o="html">HTML kopyala</button></div>
+      </div></form>`;
     dl.onclick = async (e) => {
       const o = e.target.closest("[data-o]")?.dataset.o;
       if (!o) return;
@@ -574,29 +782,59 @@ function kutuphaneKur(kok, profil, owner) {
   }
 
   /* ------------------------------- olay bağlama ------------------------------- */
+  const menuKapat = () => { const m = q("[data-ak-menu-ekle]"); if (m) { m.hidden = true; q('[data-act="menu-ekle"]')?.setAttribute("aria-expanded", "false"); } };
+  function kapsamDegistir(ks) {
+    d.kapsam = ks; d.uye = ""; d.klasor = ""; d.f.ara = ""; q('[data-f="ara"]').value = "";
+    kok.querySelectorAll("[data-kapsam]").forEach((b) => { b.classList.toggle("aktif", b.dataset.kapsam === ks); b.setAttribute("aria-selected", String(b.dataset.kapsam === ks)); });
+    q("[data-ak-ayarlar]").hidden = ks !== "ayarlar";
+    const dz = q("[data-ak-dz]"); if (dz) dz.hidden = ks !== "benim";
+    q("[data-ak-zot]").hidden = ks === "ayarlar";
+    uyeGorunumu();
+    if (ks === "ayarlar") return;
+    uyeleriYukle().then(() => uyeGorunumu());
+    yukle();
+  }
   kok.addEventListener("click", (e) => {
+    if (!e.target.closest(".ak-menu")) menuKapat();
     const kart = e.target.closest(".ak-kart");
     const uyeSec = e.target.closest("[data-uye-sec]")?.dataset.uyeSec;
-    if (owner && uyeSec) { d.uye = uyeSec; d.f.etiket = ""; uyeGorunumu(); yukle(); return; }
+    if (uyeModu() && uyeSec) { d.uye = uyeSec; d.klasor = ""; d.f.etiket = ""; uyeGorunumu(); yukle(); return; }
     const act = e.target.closest("[data-act]")?.dataset.act;
-    if (owner && act === "uye-geri") { d.uye = ""; d.kayitlar = []; uyeGorunumu(); return; }
+    if (uyeModu() && act === "uye-geri") { d.uye = ""; d.kayitlar = []; d.klasor = ""; uyeGorunumu(); return; }
     const k = kart ? kayit(kart.dataset.id) : null;
-    if (e.target.closest("[data-etiket]")) { const t = e.target.closest("[data-etiket]").dataset.etiket; q('[data-f="etiket"]').value = t; d.f.etiket = t; ciz(); return; }
+    // --- klasör ağacı ---
+    const klSec = e.target.closest("[data-klasor]");
+    if (klSec) { d.klasor = klSec.dataset.klasor; agacCiz(); ciz(); q(".ak-agac").classList.remove("ak-agac-acik"); q('[data-act="agac-ac"]').setAttribute("aria-expanded", "false"); return; }
+    const klAc = e.target.closest("[data-kl-ac]")?.dataset.klAc;
+    if (klAc) { if (d.acik.has(klAc)) d.acik.delete(klAc); else d.acik.add(klAc); agacCiz(); return; }
+    const klIslem = e.target.closest("[data-kl-islem]");
+    if (klIslem) { klasorIslem(klIslem.dataset.klIslem, klIslem.dataset.id); return; }
+    const cip = e.target.closest("[data-cip]")?.dataset.cip;
+    if (cip) { if (cip === "klasor") d.klasor = ""; else { d.f[cip] = cip === "pdfli" ? false : ""; const el0 = q(`[data-f="${cip}"]`); if (el0) { if (el0.type === "checkbox") el0.checked = false; else el0.value = ""; } } agacCiz(); ciz(); return; }
+    if (e.target.closest("[data-etiket]")) { const tg = e.target.closest("[data-etiket]").dataset.etiket; q('[data-f="etiket"]').value = tg; d.f.etiket = tg; ciz(); return; }
     if (act === "ac" && k) pdfAc(k);
     else if (act === "atif" && k) atifKopyala(k);
     else if (act === "detay" && k) detayAc(k.id);
     else if (act === "duzenle" && k) formAc(k);
-    else if (act === "ekle") formAc();
-    else if (act === "ice-aktar") q("[data-ak-ice]").click();
+    else if (act === "klasor-ata" && k) klasorDialogu(k.id);
+    else if (act === "ekle") { menuKapat(); formAc(); }
+    else if (act === "menu-ekle") { const m = q("[data-ak-menu-ekle]"); m.hidden = !m.hidden; e.target.closest("[data-act]").setAttribute("aria-expanded", String(!m.hidden)); }
+    else if (act === "pdf-sec") { menuKapat(); q("[data-ak-pdf]").click(); }
+    else if (act === "klasor-yeni") { menuKapat(); klasorIslem("yeni"); }
+    else if (act === "ice-aktar") { menuKapat(); q("[data-ak-ice]").click(); }
     else if (act === "disa-aktar") disaAktarAc();
+    else if (act === "agac-ac") { const a = q(".ak-agac"); a.classList.toggle("ak-agac-acik"); e.target.closest("[data-act]").setAttribute("aria-expanded", String(a.classList.contains("ak-agac-acik"))); }
+    else if (act === "filtre-ac") { const f = q("[data-ak-filtre]"); f.hidden = !f.hidden; e.target.closest("[data-act]").setAttribute("aria-expanded", String(!f.hidden)); }
+    else if (act === "filtre-temizle") { Object.assign(d.f, { tur: "", etiket: "", yazar: "", yilBas: "", yilSon: "", gorunurluk: "", pdfli: false }); q("[data-ak-filtre]").querySelectorAll("[data-f]").forEach((x) => { if (x.type === "checkbox") x.checked = false; else x.value = ""; }); ciz(); }
     else if (kart && !e.target.closest("button, a")) detayAc(kart.dataset.id);
     const g = e.target.closest("[data-gorunum]")?.dataset.gorunum;
     if (g) { d.gorunum = g; kok.querySelectorAll("[data-gorunum]").forEach((b) => b.classList.toggle("aktif", b.dataset.gorunum === g)); ciz(); }
     const ks = e.target.closest("[data-kapsam]")?.dataset.kapsam;
-    if (ks) { d.kapsam = ks; kok.querySelectorAll("[data-kapsam]").forEach((b) => { b.classList.toggle("aktif", b.dataset.kapsam === ks); b.setAttribute("aria-selected", String(b.dataset.kapsam === ks)); }); q("[data-ak-dz]").hidden = ks !== "benim"; yukle(); }
+    if (ks && ks !== d.kapsam) kapsamDegistir(ks);
     if (e.target.closest("[data-ak-dz]") && !e.target.closest("input, li")) q("[data-ak-pdf]").click();
   });
-  if (owner) q("[data-uye-ara]").addEventListener("input", debounce(() => uyeGorunumu(), 120));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") menuKapat(); });
+  q("[data-uye-ara]").addEventListener("input", debounce(() => uyeGorunumu(), 120));
   const filtreDegisti = (e) => {
     const ad = e.target.dataset?.f;
     if (!ad) return;
@@ -604,9 +842,11 @@ function kutuphaneKur(kok, profil, owner) {
     ciz();
   };
   kok.addEventListener("change", filtreDegisti);
-  kok.addEventListener("input", debounce((e) => { if (e.target.dataset?.f === "ara" || e.target.dataset?.f === "yilBas" || e.target.dataset?.f === "yilSon") filtreDegisti(e); }, 180));
-  q("[data-ak-bicim]").addEventListener("change", (e) => { d.bicim = e.target.value; });
-  q("[data-ak-dil]").addEventListener("change", (e) => { d.dil = e.target.value; });
+  kok.addEventListener("input", debounce((e) => { if (e.target.dataset?.f === "ara" || e.target.dataset?.f === "yilBas" || e.target.dataset?.f === "yilSon") filtreDegisti(e); }, 160));
+  const bicimSel = q("[data-ak-bicim]"), dilSel = q("[data-ak-dil]");
+  bicimSel.value = d.bicim; dilSel.value = d.dil;
+  bicimSel.addEventListener("change", (e) => { d.bicim = e.target.value; try { localStorage.setItem("aea_ak_bicim", d.bicim); } catch { /* yok say */ } });
+  dilSel.addEventListener("change", (e) => { d.dil = e.target.value; try { localStorage.setItem("aea_ak_dil", d.dil); } catch { /* yok say */ } });
   q("[data-ak-ice]")?.addEventListener("change", (e) => { const f0 = e.target.files[0]; e.target.value = ""; if (f0) iceAktar(f0); });
   q("[data-ak-pdf]")?.addEventListener("change", (e) => { const fl = [...e.target.files]; e.target.value = ""; if (fl.length) pdfDosyalariniYukle(fl); });
   const dz = q("[data-ak-dz]");
@@ -616,16 +856,24 @@ function kutuphaneKur(kok, profil, owner) {
     ["dragleave", "drop"].forEach((ad) => dz.addEventListener(ad, (e) => { e.preventDefault(); dz.classList.remove("surukle"); }));
     dz.addEventListener("drop", (e) => { if (e.dataTransfer?.files?.length) pdfDosyalariniYukle(e.dataTransfer.files); });
   }
+  // Kartı klasöre sürükle-bırak (masaüstü). Dokunmatikte kart üzerindeki 📁 düğmesi aynı işi yapar.
+  kok.addEventListener("dragstart", (e) => { const kart = e.target.closest?.(".ak-kart[draggable]"); if (!kart) return; e.dataTransfer.setData("text/x-ak-kaynak", kart.dataset.id); e.dataTransfer.effectAllowed = "copyMove"; });
+  kok.addEventListener("dragover", (e) => { const h = e.target.closest?.("[data-kl]"); if (h && e.dataTransfer?.types?.includes("text/x-ak-kaynak")) { e.preventDefault(); h.classList.add("hedef"); } });
+  kok.addEventListener("dragleave", (e) => e.target.closest?.("[data-kl]")?.classList.remove("hedef"));
+  kok.addEventListener("drop", async (e) => {
+    const h = e.target.closest?.("[data-kl]"); const id = e.dataTransfer?.getData("text/x-ak-kaynak");
+    if (!h || !id) return;
+    e.preventDefault(); h.classList.remove("hedef");
+    try {
+      if (h.dataset.kl === "__yok") { for (const [kid, s] of d.ogeler) if (s.has(id)) await klasoreEkleCikar(id, kid, false); toast("Kaynak klasörlerden çıkarıldı.", "bilgi"); }
+      else { await klasoreEkleCikar(id, h.dataset.kl, true); toast(`“${klasorYolu(h.dataset.kl)}” klasörüne eklendi.`, "basari"); }
+      agacCiz(); ciz();
+    } catch (x) { toast(`Taşınamadı: ${x.message}`, "hata"); }
+  });
   kok.querySelectorAll("dialog").forEach((dl) => dl.addEventListener("click", (e) => { if (e.target === dl) dl.close(); }));
 
-  if (owner) {
-    supabase.rpc("owner_akademik_uyeleri_getir").then(({ data, error }) => {
-      d.uyeler = data || [];
-      if (error) q("[data-ak-uye-liste]").innerHTML = `<li class="ak-bos ak-hata">Üyeler yüklenemedi: ${esc(error.message)}</li>`;
-      else uyeGorunumu();
-    });
-    uyeGorunumu();
-  }
+  uyeGorunumu();
+  if (owner) uyeleriYukle();
   motorKarti();
   if (!owner) eklentiPaneliKur(q("[data-ak-eklentiler]")).catch((h) => console.error("eklenti-paneli.js:", h));
   return { yukle };
