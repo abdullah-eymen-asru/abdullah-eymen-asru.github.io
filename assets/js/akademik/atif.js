@@ -34,6 +34,11 @@ export const BICIMLER = [
   { anahtar: "apa", etiket: "APA 7" },
   { anahtar: "mla", etiket: "MLA 9" },
   { anahtar: "chicago", etiket: "Chicago 17" },
+  { anahtar: "harvard", etiket: "Harvard" },
+  { anahtar: "ieee", etiket: "IEEE" },
+  { anahtar: "vancouver", etiket: "Vancouver (tıp)" },
+  { anahtar: "ama", etiket: "AMA 11" },
+  { anahtar: "isnad", etiket: "İSNAD 2" },
 ];
 
 const I1 = "\u0001";
@@ -339,10 +344,92 @@ function chicago(r, dil, bugun) {
   return sonlandir(s);
 }
 
+/* ===================== HARVARD · IEEE · VANCOUVER · AMA · İSNAD ===================== */
+// Ortak iskelet: yazar biçimi + künye sırası stile göre değişir. Kaynak türleri: makale, kitap, kitap_bolumu, bildiri, tez, rapor, web.
+
+const soyadBas = (y, dil) => (y.kurum ? y.kurum : `${y.soyadi}${y.adi ? `, ${basHarfler(y.adi, dil)}` : ""}`);
+const bas1Soyad = (y, dil) => (y.kurum ? y.kurum : `${y.adi ? `${basHarfler(y.adi, dil)} ` : ""}${y.soyadi}`);
+const bitisik = (y) => (y.kurum ? y.kurum : `${y.soyadi}${y.adi ? ` ${[...y.adi.split(/[\s-]+/).filter(Boolean)].map((p) => [...p][0].toLocaleUpperCase("en")).join("")}` : ""}`);
+const liste = (a, son) => (a.length <= 1 ? a.join("") : `${a.slice(0, -1).join(", ")} ${son} ${a[a.length - 1]}`);
+
+function harvard(r, dil, bugun) {
+  const L = etiketler(dil);
+  const ad = r.yazarlar.map((y) => soyadBas(y, dil));
+  const yz = ad.length > 3 ? `${ad[0]} ${L.vd}` : liste(ad, L.ve);
+  const dUrl = doiUrl(r.doi) || r.url;
+  const bas = `${yz ? `${yz} ` : ""}(${r.yil || L.yok})`;
+  const erisim = dUrl && r.tur === "web" ? ` (${L.erisim}: ${tarihYazi(bugun, dil)})` : "";
+  let s;
+  switch (r.tur) {
+    case "makale": s = `${bas} '${nokta(r.baslik).replace(/\.$/, "")}', ${it(r.kap)}${r.cilt ? `, ${r.cilt}` : ""}${r.sayi ? `(${r.sayi})` : ""}${r.sayfa ? `, ${L.sayfalar} ${aralik(r.sayfa, "–")}` : ""}. ${dUrl}`; break;
+    case "kitap": s = `${bas} ${it(r.baslik)}.${r.baski ? ` ${r.baski}. ${L.baski}` : ""} ${r.sehir ? `${r.sehir}: ` : ""}${r.kap || r.yayinevi}. ${dUrl}`; break;
+    case "kitap_bolumu": s = `${bas} '${r.baslik}', ${dil === "tr" ? "içinde" : "in"} ${r.editor.length ? `${r.editor.map((y) => bas1Soyad(y, dil)).join(", ")} (${L.editor}) ` : ""}${it(r.kitapAdi)}. ${r.sehir ? `${r.sehir}: ` : ""}${r.kap || r.yayinevi}${r.sayfa ? `, ${L.sayfalar} ${aralik(r.sayfa, "–")}` : ""}. ${dUrl}`; break;
+    case "bildiri": s = `${bas} '${r.baslik}', ${it(r.kap)}${r.sayfa ? `, ${L.sayfalar} ${aralik(r.sayfa, "–")}` : ""}. ${dUrl}`; break;
+    case "tez": s = `${bas} ${it(r.baslik)}. ${r.tezTuru || L.tez.doktora}. ${r.kap}. ${dUrl}`; break;
+    default: s = `${bas} ${it(r.baslik)}. ${r.kap ? nokta(r.kap) : ""} ${dUrl ? `${dil === "tr" ? "Erişim" : "Available at"}: ${dUrl}` : ""}${erisim}`;
+  }
+  return sonlandir(s);
+}
+
+function ieee(r, dil) {
+  const ad = r.yazarlar.map((y) => bas1Soyad(y, "en"));
+  const yz = ad.length > 6 ? `${ad[0]} et al.` : liste(ad, "and");
+  const dUrl = doiUrl(r.doi) || r.url;
+  const sf = r.sayfa ? `, ${r.sayfa.includes("-") || r.sayfa.includes("–") ? "pp." : "p."} ${aralik(r.sayfa, "–")}` : "";
+  let s;
+  switch (r.tur) {
+    case "makale": s = `${yz ? `${yz}, ` : ""}"${r.baslik}," ${it(r.kap)}${r.cilt ? `, vol. ${r.cilt}` : ""}${r.sayi ? `, no. ${r.sayi}` : ""}${sf}${r.yil ? `, ${r.yil}` : ""}${r.doi ? `, doi: ${r.doi}` : ""}.`; break;
+    case "kitap": s = `${yz ? `${yz}, ` : ""}${it(r.baslik)}${r.baski ? `, ${r.baski} ed` : ""}. ${r.sehir ? `${r.sehir}: ` : ""}${r.kap || r.yayinevi}, ${r.yil || "n.d."}.`; break;
+    case "kitap_bolumu": s = `${yz ? `${yz}, ` : ""}"${r.baslik}," in ${it(r.kitapAdi)}${r.editor.length ? `, ${r.editor.map((y) => bas1Soyad(y, "en")).join(", ")}, Ed${r.editor.length > 1 ? "s" : ""}.` : ""} ${r.sehir ? `${r.sehir}: ` : ""}${r.kap || r.yayinevi}, ${r.yil || "n.d."}${sf}.`; break;
+    case "bildiri": s = `${yz ? `${yz}, ` : ""}"${r.baslik}," in ${it(r.kap)}, ${r.yil || "n.d."}${sf}.`; break;
+    case "tez": s = `${yz ? `${yz}, ` : ""}"${r.baslik}," ${r.tezTuru || "Ph.D. dissertation"}, ${r.kap}, ${r.yil || "n.d."}.`; break;
+    default: s = `${yz ? `${yz}, ` : ""}"${r.baslik}." ${r.kap ? `${r.kap}. ` : ""}${dUrl ? `[Online]. Available: ${dUrl}` : ""}`;
+  }
+  return sonlandir(s);
+}
+
+function vancouver(r, ama) {
+  const ad = r.yazarlar.map(bitisik);
+  const yz = ad.length > (ama ? 6 : 6) ? `${ad.slice(0, 6).join(", ")}, et al` : ad.join(", ");
+  const sf = r.sayfa ? aralik(r.sayfa, "-") : "";
+  const dUrl = doiUrl(r.doi) || r.url;
+  const ilk = yz ? `${yz}. ` : "";
+  let s;
+  switch (r.tur) {
+    case "makale": s = ama
+      ? `${ilk}${nokta(r.baslik)} ${it(r.kap)}. ${r.yil}${r.cilt ? `;${r.cilt}` : ""}${r.sayi ? `(${r.sayi})` : ""}${sf ? `:${sf}` : ""}.${r.doi ? ` doi:${r.doi}` : ""}`
+      : `${ilk}${nokta(r.baslik)} ${r.kap}. ${r.yil}${r.cilt ? `;${r.cilt}` : ""}${r.sayi ? `(${r.sayi})` : ""}${sf ? `:${sf}` : ""}.${r.doi ? ` doi:${r.doi}` : ""}`; break;
+    case "kitap": s = `${ilk}${ama ? it(r.baslik) : r.baslik}.${r.baski ? ` ${r.baski} ed.` : ""} ${r.sehir ? `${r.sehir}: ` : ""}${r.kap || r.yayinevi}; ${r.yil}.`; break;
+    case "kitap_bolumu": s = `${ilk}${nokta(r.baslik)} In: ${r.editor.length ? `${r.editor.map(bitisik).join(", ")}, ed${r.editor.length > 1 ? "s" : ""}. ` : ""}${ama ? it(r.kitapAdi) : r.kitapAdi}. ${r.sehir ? `${r.sehir}: ` : ""}${r.kap || r.yayinevi}; ${r.yil}${sf ? `:${sf}` : ""}.`; break;
+    case "bildiri": s = `${ilk}${nokta(r.baslik)} In: ${r.kap}. ${r.yil}${sf ? `:${sf}` : ""}.`; break;
+    case "tez": s = `${ilk}${r.baslik} [${r.tezTuru || "dissertation"}]. ${r.kap}; ${r.yil}.`; break;
+    default: s = `${ilk}${r.baslik} [Internet]. ${r.kap ? `${r.kap}; ` : ""}${r.yil || "n.d."}${dUrl ? ` [cited ${new Date().getFullYear()}]. Available from: ${dUrl}` : ""}`;
+  }
+  return sonlandir(s);
+}
+
+/** İSNAD 2 (Türkiye; dipnot + kaynakça). Kaynakça biçimi: Soyad, Ad. "Başlık". Dergi cilt/sayı (Yıl): sayfa. */
+function isnad(r, dil) {
+  const ad = r.yazarlar.map((y, i) => (y.kurum ? y.kurum : i === 0 ? `${y.soyadi}${y.adi ? `, ${y.adi}` : ""}` : `${y.adi ? `${y.adi} ` : ""}${y.soyadi}`));
+  const yz = ad.length > 3 ? `${ad[0]} vd.` : liste(ad, "ve");
+  const dUrl = doiUrl(r.doi) || r.url;
+  const ilk = yz ? `${nokta(yz)} ` : "";
+  let s;
+  switch (r.tur) {
+    case "makale": s = `${ilk}“${nokta(r.baslik).replace(/\.$/, "")}”. ${it(r.kap)}${r.cilt ? ` ${r.cilt}` : ""}${r.sayi ? `/${r.sayi}` : ""} (${r.yil || "t.y."})${r.sayfa ? `: ${aralik(r.sayfa, "-")}` : ""}. ${dUrl}`; break;
+    case "kitap": s = `${ilk}${it(r.baslik)}.${r.baski ? ` ${r.baski}. Bs.` : ""} ${r.sehir ? `${r.sehir}: ` : ""}${r.kap || r.yayinevi}, ${r.yil || "t.y."}. ${dUrl}`; break;
+    case "kitap_bolumu": s = `${ilk}“${nokta(r.baslik).replace(/\.$/, "")}”. ${it(r.kitapAdi)}. ${r.editor.length ? `haz. ${r.editor.map(tamAd).join(", ")}. ` : ""}${r.sehir ? `${r.sehir}: ` : ""}${r.kap || r.yayinevi}, ${r.yil || "t.y."}${r.sayfa ? `, ${aralik(r.sayfa, "-")}` : ""}. ${dUrl}`; break;
+    case "bildiri": s = `${ilk}“${nokta(r.baslik).replace(/\.$/, "")}”. ${it(r.kap)}. ${r.yil || "t.y."}${r.sayfa ? `, ${aralik(r.sayfa, "-")}` : ""}. ${dUrl}`; break;
+    case "tez": s = `${ilk}${it(r.baslik)}. ${r.tezTuru || "Doktora Tezi"}. ${r.kap}, ${r.yil || "t.y."}. ${dUrl}`; break;
+    default: s = `${ilk}“${nokta(r.baslik).replace(/\.$/, "")}”. ${r.kap ? `${r.kap}. ` : ""}${dUrl ? `${dUrl} (Erişim ${tarihYazi(new Date(), "tr")})` : ""}`;
+  }
+  return sonlandir(s);
+}
+
 /**
  * Tek kaynak için atıf üretir.
  * @param {object} kayit   veritabanı satırı biçiminde kayıt
- * @param {'apa'|'mla'|'chicago'} bicim
+ * @param {'apa'|'mla'|'chicago'|'harvard'|'ieee'|'vancouver'|'ama'|'isnad'} bicim
  * @param {{dil?:'tr'|'en', bugun?:Date}} [secenek]
  * @returns {{text:string, md:string, html:string}}
  */
@@ -350,6 +437,11 @@ export function atifUret(kayit, bicim = "apa", { dil = "tr", bugun = new Date() 
   const r = normalize(kayit);
   if (bicim === "mla") return mla(r, dil, bugun);
   if (bicim === "chicago") return chicago(r, dil, bugun);
+  if (bicim === "harvard") return harvard(r, dil, bugun);
+  if (bicim === "ieee") return ieee(r, dil);
+  if (bicim === "vancouver") return vancouver(r, false);
+  if (bicim === "ama") return vancouver(r, true);
+  if (bicim === "isnad") return isnad(r, dil);
   return apa(r, dil, bugun);
 }
 
