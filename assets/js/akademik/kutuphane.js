@@ -10,6 +10,7 @@ import { TURLER, BICIMLER, atifUret, atifKutusuHtml, markdownKaynakca, alintiMar
 import { kunyeGetir } from "./kunye.js";
 import { okuyucuAc } from "./okuyucu.js";
 import { motorPaneliKur } from "./motor-paneli.js";
+import { eklentiPaneliKur } from "./eklenti-paneli.js";
 
 const GORUNURLUK = { ozel: "Özel", ekip: "Ekip", herkese_acik: "Herkese açık" };
 const KAP_ETIKET = { makale: "Dergi adı", kitap: "Yayınevi", kitap_bolumu: "Yayınevi", bildiri: "Bildiri / kongre adı", tez: "Üniversite", rapor: "Kurum / yayıncı", web: "Site adı", diger: "Yayıncı / kaynak" };
@@ -41,7 +42,7 @@ function kutuphaneKur(kok, profil, owner) {
     <div class="ak-kutu">
       <header class="ak-ust">
         <div><h2>${owner ? "🛡️ Tüm Kullanıcıların Kaynakları" : "📚 Akademik Kütüphane"}</h2>
-          <p class="ak-alt">${owner ? "Üyelerin eklediği kaynakları, PDF'leri ve notları <strong>salt okunur</strong> incele." : "Kaynaklarını, PDF'lerini, vurgularını ve atıflarını tek yerde yönet."}</p></div>
+          <p class="ak-alt">${owner ? "Önce bir üye seç; kaynakları o üyenin kendi düzenine (etiket/klasör) göre görürsün. Her şey <strong>salt okunurdur</strong>." : "Kaynaklarını, PDF'lerini, vurgularını ve atıflarını tek yerde yönet."}</p></div>
         <div class="ak-ust-sag">
           ${owner ? "" : `<button type="button" class="ak-btn ak-btn-birincil" data-act="ekle">＋ Kaynak ekle</button>
           <button type="button" class="ak-btn" data-act="ice-aktar">⇪ İçe aktar (.bib / .ris)</button>
@@ -49,12 +50,20 @@ function kutuphaneKur(kok, profil, owner) {
           <span class="ak-menu"><button type="button" class="ak-btn" data-act="disa-aktar" aria-haspopup="true">⇩ Dışa aktar</button></span>
         </div>
       </header>
-      ${owner ? `<div class="ak-owner-bar"><label>Üye: <select data-f="uye" aria-label="Üyeye göre süz"><option value="">Tüm üyeler</option></select></label></div><div class="ak-motor" data-ak-motor></div>` : `
+      ${owner ? `<div class="ak-owner-bar" data-ak-uyeler>
+        <div class="ak-uye-ust">
+          <input type="search" class="ak-uye-ara" data-uye-ara placeholder="Üye adı veya e-posta ara…" aria-label="Üye ara" autocomplete="off">
+          <button type="button" class="ak-btn" data-act="uye-geri" hidden>← Tüm üyeler</button>
+          <strong class="ak-uye-secili" data-ak-secili-uye></strong>
+        </div>
+        <ul class="ak-uye-liste" data-ak-uye-liste></ul>
+      </div>` : `
       <nav class="ak-sekmeler" role="tablist" aria-label="Kapsam">
         <button type="button" role="tab" class="aktif" data-kapsam="benim" aria-selected="true">Kütüphanem</button>
         <button type="button" role="tab" data-kapsam="paylasilan" aria-selected="false">Benimle paylaşılanlar</button>
       </nav>
       <div class="ak-motor" data-ak-motor></div>
+      <div class="ak-motor ak-eklentiler" data-ak-eklentiler></div>
       <div class="ak-dropzone" data-ak-dz tabindex="0" role="button" aria-label="PDF yüklemek için tıkla ya da sürükle">
         <strong>PDF'leri buraya sürükle</strong> <span>ya da seçmek için tıkla — her PDF için bir kaynak oluşturulur. Boyut sınırı yok.</span>
         <input type="file" class="ak-gizli-alan" data-ak-pdf accept="application/pdf,.pdf" multiple aria-label="PDF dosyaları">
@@ -89,6 +98,7 @@ function kutuphaneKur(kok, profil, owner) {
   async function yukle() {
     q("[data-ak-ozet]").textContent = "Yükleniyor…";
     let veri = [], hata = null;
+    if (owner && !d.uye) { d.kayitlar = []; uyeGorunumu(); return; }                 // önce üye seçilir; tüm kaynaklar topluca çekilmez
     if (owner) {
       const r = await supabase.rpc("owner_akademik_kaynaklari_getir", { p_user_id: d.uye || null });
       veri = r.data || []; hata = r.error;
@@ -149,7 +159,7 @@ function kutuphaneKur(kok, profil, owner) {
     const liste = q("[data-ak-liste]");
     liste.className = `ak-liste ak-${d.gorunum}-gorunum`;
     if (!s.length) { liste.innerHTML = `<p class="ak-bos">${d.kayitlar.length ? "Süzgeçlere uyan kaynak yok." : owner ? "Henüz hiçbir üye kaynak eklememiş." : d.kapsam === "benim" ? "Henüz kaynak yok. PDF sürükle, “Kaynak ekle” de ya da .bib/.ris içe aktar." : "Seninle paylaşılmış kaynak yok."}</p>`; return; }
-    liste.innerHTML = s.map((k) => {
+    const kartHtml = (k) => {
       const yazarMeta = [kisaYazar(k.yazarlar), k.yayin_yili, k.dergi_veya_yayinevi].filter(Boolean).map(esc).join(" · ");
       return `<article class="ak-kart" data-id="${esc(k.id)}">
         <div class="ak-kart-ust"><span class="ak-rozet">${esc(TURLER[k.tur] || k.tur)}</span><span class="ak-rozet ak-g-${esc(k.gorunurluk)}">${esc(GORUNURLUK[k.gorunurluk])}</span>${k.pdf_r2_yolu ? `<span class="ak-rozet ak-pdf">PDF · ${bayt(k.pdf_boyut_bayt)}</span>` : ""}${owner ? `<span class="ak-rozet ak-sahip" title="${esc(k.sahip_eposta)}">${esc(k.sahip_ad || k.sahip_eposta)}${k.not_sayisi ? ` · ${k.not_sayisi} not` : ""}</span>` : ""}${!owner && d.kapsam === "paylasilan" ? '<span class="ak-rozet">Salt okunur</span>' : ""}</div>
@@ -163,7 +173,33 @@ function kutuphaneKur(kok, profil, owner) {
           ${benim(k) ? `<button type="button" class="ak-btn" data-act="duzenle">Düzenle</button>` : ""}
         </div>
       </article>`;
-    }).join("");
+    };
+    if (!owner) { liste.innerHTML = s.map(kartHtml).join(""); return; }
+    // Owner: üyenin kendi düzeni — ilk etiket = klasör ("Tez/Bölüm 1" gibi / içeren etiketler yol olarak gösterilir). Etiketsizler "Klasörsüz".
+    const gruplar = new Map();
+    for (const k of s) { const ad = (k.etiketler || [])[0] || ""; if (!gruplar.has(ad)) gruplar.set(ad, []); gruplar.get(ad).push(k); }
+    const tr2 = (a, b) => a.localeCompare(b, "tr");
+    const adlar = [...gruplar.keys()].sort((a, b) => (a === "") - (b === "") || tr2(a, b));
+    liste.className = "ak-liste ak-klasorler";
+    liste.innerHTML = adlar.map((ad) => `<details class="ak-klasor" open><summary><span aria-hidden="true">📁</span> ${esc(ad || "Klasörsüz")} <span class="ak-klasor-say">${gruplar.get(ad).length}</span></summary>
+      <div class="ak-liste ak-${d.gorunum}-gorunum">${gruplar.get(ad).map(kartHtml).join("")}</div></details>`).join("");
+  }
+
+  /* --------------------- owner: üye listesi (önce kullanıcılar, sonra onların klasörleri) --------------------- */
+  const trKucuk = (s) => String(s || "").toLocaleLowerCase("tr");
+  function uyeGorunumu() {
+    if (!owner) return;
+    const secili = d.uyeler.find((u) => u.user_id === d.uye);
+    const icerikGizle = !d.uye;
+    kok.querySelectorAll(".ak-filtre, [data-ak-ozet], [data-ak-liste]").forEach((n) => { n.hidden = icerikGizle; });
+    q("[data-uye-ara]").hidden = !!d.uye; q("[data-ak-uye-liste]").hidden = !!d.uye; q('[data-act="uye-geri"]').hidden = !d.uye;
+    q("[data-ak-secili-uye]").textContent = secili ? `${secili.ad || secili.eposta} · ${secili.kaynak_sayisi} kaynak · ${bayt(secili.toplam_bayt)}` : "";
+    if (d.uye) return;
+    const a = trKucuk(q("[data-uye-ara]").value).trim();
+    const uyeler = d.uyeler.filter((u) => !a || trKucuk(`${u.ad} ${u.eposta}`).includes(a));
+    q("[data-ak-uye-liste]").innerHTML = uyeler.length
+      ? uyeler.map((u) => `<li><button type="button" class="ak-uye-kart" data-uye-sec="${esc(u.user_id)}"><strong>${esc(u.ad || u.eposta)}</strong><small>${esc(u.ad ? u.eposta : "")}${u.ad && u.eposta ? " · " : ""}${esc(u.rol)}</small><span>${u.kaynak_sayisi} kaynak · ${bayt(u.toplam_bayt)}</span></button></li>`).join("")
+      : `<li class="ak-bos">${d.uyeler.length ? "Aramaya uyan üye yok." : "Henüz hiçbir üye kaynak eklememiş."}</li>`;
   }
 
   /* ------------------------------- eylemler ------------------------------- */
@@ -529,7 +565,8 @@ function kutuphaneKur(kok, profil, owner) {
   /* ------------------------ okuyucu motoru paneli (herkes: kişisel tercih; owner: + site varsayılanı) ------------------------ */
   // Panelin kendisi motor-paneli.js'tedir; burada yalnızca kutusuna bağlanır. Hata olursa kütüphane yine çalışır.
   function motorKarti() {
-    return motorPaneliKur(q("[data-ak-motor]"), { owner }).catch((h) => {
+    if (owner) return null;                                   // "Tüm Kullanıcıların Kaynakları"nda motor paneli YOK: tek motor, yalnızca Kütüphanem'de
+    return motorPaneliKur(q("[data-ak-motor]"), { owner: profil.role === "owner" }).catch((h) => {
       console.error("motor-paneli.js:", h);
       const yer = q("[data-ak-motor]");
       if (yer) yer.replaceChildren(el("p", { class: "ak-bos" }, "Okuyucu motoru paneli yüklenemedi."));
@@ -539,7 +576,10 @@ function kutuphaneKur(kok, profil, owner) {
   /* ------------------------------- olay bağlama ------------------------------- */
   kok.addEventListener("click", (e) => {
     const kart = e.target.closest(".ak-kart");
+    const uyeSec = e.target.closest("[data-uye-sec]")?.dataset.uyeSec;
+    if (owner && uyeSec) { d.uye = uyeSec; d.f.etiket = ""; uyeGorunumu(); yukle(); return; }
     const act = e.target.closest("[data-act]")?.dataset.act;
+    if (owner && act === "uye-geri") { d.uye = ""; d.kayitlar = []; uyeGorunumu(); return; }
     const k = kart ? kayit(kart.dataset.id) : null;
     if (e.target.closest("[data-etiket]")) { const t = e.target.closest("[data-etiket]").dataset.etiket; q('[data-f="etiket"]').value = t; d.f.etiket = t; ciz(); return; }
     if (act === "ac" && k) pdfAc(k);
@@ -556,10 +596,10 @@ function kutuphaneKur(kok, profil, owner) {
     if (ks) { d.kapsam = ks; kok.querySelectorAll("[data-kapsam]").forEach((b) => { b.classList.toggle("aktif", b.dataset.kapsam === ks); b.setAttribute("aria-selected", String(b.dataset.kapsam === ks)); }); q("[data-ak-dz]").hidden = ks !== "benim"; yukle(); }
     if (e.target.closest("[data-ak-dz]") && !e.target.closest("input, li")) q("[data-ak-pdf]").click();
   });
+  if (owner) q("[data-uye-ara]").addEventListener("input", debounce(() => uyeGorunumu(), 120));
   const filtreDegisti = (e) => {
     const ad = e.target.dataset?.f;
     if (!ad) return;
-    if (ad === "uye") { d.uye = e.target.value; yukle(); return; }
     d.f[ad] = e.target.type === "checkbox" ? e.target.checked : e.target.value;
     ciz();
   };
@@ -579,12 +619,15 @@ function kutuphaneKur(kok, profil, owner) {
   kok.querySelectorAll("dialog").forEach((dl) => dl.addEventListener("click", (e) => { if (e.target === dl) dl.close(); }));
 
   if (owner) {
-    supabase.rpc("owner_akademik_uyeleri_getir").then(({ data }) => {
+    supabase.rpc("owner_akademik_uyeleri_getir").then(({ data, error }) => {
       d.uyeler = data || [];
-      q('[data-f="uye"]').innerHTML = `<option value="">Tüm üyeler (${d.uyeler.length})</option>` + d.uyeler.map((u) => `<option value="${esc(u.user_id)}">${esc(u.ad || u.eposta)} — ${u.kaynak_sayisi} kaynak · ${bayt(u.toplam_bayt)}</option>`).join("");
+      if (error) q("[data-ak-uye-liste]").innerHTML = `<li class="ak-bos ak-hata">Üyeler yüklenemedi: ${esc(error.message)}</li>`;
+      else uyeGorunumu();
     });
+    uyeGorunumu();
   }
   motorKarti();
+  if (!owner) eklentiPaneliKur(q("[data-ak-eklentiler]")).catch((h) => console.error("eklenti-paneli.js:", h));
   return { yukle };
 }
 
