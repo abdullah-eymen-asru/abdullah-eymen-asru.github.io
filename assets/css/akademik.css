@@ -245,3 +245,73 @@ body.ak-okuyucu-acik { overflow: hidden; }
   .ak-ok-ust .ak-btn, .ak-ok-ust .ak-arac { min-height: 2.5rem; min-width: 2.5rem; }
   .ak-ok-ara { width: 7rem; }
 }
+
+/* v117 — okuyucu: otomatik kayıt durumu, net indir düğmesi, alt sayfa yorum balonu, dokunmatik/masaüstü yakınlaştırma */
+.ak-ok-oto { min-height: 1.1rem; padding: 0 .8rem; font-size: .8rem; color: var(--muted); }
+.ak-btn-indir { display: inline-flex; align-items: center; gap: .35rem; font-weight: 600; }
+.ak-btn-indir svg { flex: none; }
+@media (max-width: 520px) { .ak-indir-yazi { display: none; } }          /* çok dar ekranda yalnızca ok-tepsi simgesi (aria-label dolu) */
+.ak-ok-kap { overscroll-behavior: contain; touch-action: pan-x pan-y; }
+.ak-pop.ak-pop-alt { position: fixed; left: 0; right: 0; top: auto; width: auto !important; max-height: 62vh; overflow: auto; border-radius: 16px 16px 0 0; padding-bottom: calc(.8rem + env(safe-area-inset-bottom, 0px)); z-index: 60; box-shadow: 0 -8px 28px rgba(0,0,0,.35); }
+.ak-pop.ak-pop-alt .ak-pop-metin { font-size: 16px; }               /* iOS: <16px yazı alanına odaklanınca sayfa kendiliğinden yakınlaşır */
+.ak-pop-metin { width: 100%; box-sizing: border-box; resize: vertical; }
+
+/* v117 — Zotero tarzı Akademik Kütüphane: klasör ağacı + tek arama kutusu + filtre paneli + Ayarlar */
+.ak-zot { display: grid; grid-template-columns: minmax(200px, 270px) minmax(0, 1fr); gap: 1rem; align-items: start; }
+.ak-agac { position: sticky; top: .5rem; max-height: calc(100vh - 2rem); overflow: auto; padding: .5rem; border: 1px solid var(--border); border-radius: 12px; background: var(--card-bg, var(--bg)); }
+.ak-agac-ac { display: none; width: 100%; text-align: left; padding: .65rem .8rem; font: inherit; color: var(--text); background: transparent; border: 0; cursor: pointer; min-height: 2.75rem; }
+.ak-agac-liste, .ak-agac-liste ul { list-style: none; margin: 0; padding: 0; }
+.ak-kl { display: flex; align-items: center; gap: .1rem; padding-left: calc(var(--sev, 0) * .9rem); border-radius: 8px; min-height: 2.2rem; }
+.ak-kl:hover, .ak-kl.hedef { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.ak-kl.aktif { background: color-mix(in srgb, var(--accent) 22%, transparent); font-weight: 600; }
+.ak-kl.hedef { outline: 2px dashed var(--accent); }
+.ak-kl-ok { flex: none; width: 1.5rem; height: 1.5rem; display: inline-grid; place-items: center; padding: 0; font: inherit; color: var(--muted); background: transparent; border: 0; cursor: pointer; transition: transform .12s; }
+.ak-kl-ok.acik { transform: rotate(90deg); } .ak-kl-ok.bos { cursor: default; visibility: hidden; }
+.ak-kl-ad { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: .35rem; text-align: left; padding: .35rem .3rem; font: inherit; color: var(--text); background: transparent; border: 0; cursor: pointer; }
+.ak-kl-metin { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ak-kl-say { flex: none; font-size: .78rem; color: var(--muted); }
+.ak-kl-islem { display: none; flex: none; gap: 0; }
+.ak-kl:hover .ak-kl-islem, .ak-kl:focus-within .ak-kl-islem { display: inline-flex; }
+.ak-kl-islem button { width: 1.8rem; height: 1.8rem; padding: 0; font-size: .85rem; color: var(--text); background: transparent; border: 0; border-radius: 6px; cursor: pointer; }
+.ak-kl-islem button:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+@media (pointer: coarse) { .ak-kl-islem { display: inline-flex; } .ak-kl-islem button { width: 2.2rem; height: 2.2rem; } .ak-kl { min-height: 2.75rem; } }
+.ak-agac-yeni { width: 100%; margin-top: .5rem; }
+.ak-orta { min-width: 0; display: grid; gap: .6rem; }
+.ak-arama-satiri { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.ak-arama { flex: 1 1 18rem; min-width: 0; display: flex; align-items: center; gap: .5rem; padding: .25rem .3rem .25rem .8rem; border: 1px solid var(--border); border-radius: 999px; background: var(--bg); }
+.ak-arama:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+.ak-arama input { flex: 1 1 auto; min-width: 0; padding: .55rem 0; font: inherit; font-size: 16px; color: var(--text); background: transparent; border: 0; outline: none; }
+.ak-filtre-dugme { border-radius: 999px; white-space: nowrap; }
+.ak-say { display: inline-grid; place-items: center; min-width: 1.2rem; height: 1.2rem; padding: 0 .3rem; font-size: .75rem; color: #111; background: var(--accent); border-radius: 999px; }
+.ak-filtre-pop { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: .6rem .8rem; align-items: end; padding: .8rem; border: 1px solid var(--border); border-radius: 12px; background: var(--card-bg, var(--bg)); }
+.ak-filtre-pop label { display: grid; gap: .25rem; font-size: .85rem; color: var(--muted); }
+.ak-filtre-pop select, .ak-filtre-pop input[type="number"] { padding: .5rem .6rem; font: inherit; font-size: 16px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; min-width: 0; }
+.ak-filtre-pop .ak-onay { display: flex; align-items: center; gap: .5rem; color: var(--text); font-size: .95rem; min-height: 2.4rem; }
+.ak-cipler { display: flex; flex-wrap: wrap; gap: .4rem; } .ak-cipler:empty { display: none; }
+.ak-cip { display: inline-flex; align-items: center; gap: .35rem; padding: .25rem .7rem; font: inherit; font-size: .85rem; color: var(--text); background: color-mix(in srgb, var(--accent) 18%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 999px; cursor: pointer; }
+.ak-notta { color: var(--accent); } .ak-kart-klasor { margin: .1rem 0 .3rem; font-size: .82rem; color: var(--muted); }
+.ak-kart[draggable="true"] { cursor: grab; } .ak-kart.suruklenen { opacity: .5; }
+.ak-dropzone-ince { padding: .7rem 1rem; }
+.ak-menu { position: relative; display: inline-block; }
+.ak-menu-liste { position: absolute; right: 0; top: calc(100% + .3rem); z-index: 50; min-width: 17rem; display: grid; padding: .3rem; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+.ak-menu-liste button { display: flex; flex-wrap: wrap; gap: .3rem; align-items: baseline; text-align: left; padding: .65rem .8rem; font: inherit; color: var(--text); background: transparent; border: 0; border-radius: 8px; cursor: pointer; min-height: 2.75rem; }
+.ak-menu-liste button:hover, .ak-menu-liste button:focus-visible { background: color-mix(in srgb, var(--accent) 16%, transparent); outline: none; }
+.ak-menu-liste small { color: var(--muted); }
+.ak-ayarlar { display: grid; gap: 1rem; }
+.ak-ayar-kart { padding: .9rem 1rem; border: 1px solid var(--border); border-radius: 12px; background: var(--card-bg, var(--bg)); }
+.ak-ayar-kart h3 { margin: 0 0 .5rem; font-size: 1.05rem; }
+.ak-ayar-satir { display: flex; flex-wrap: wrap; gap: .8rem 1.2rem; } .ak-ayar-satir label { display: grid; gap: .25rem; font-size: .85rem; color: var(--muted); }
+.ak-ayar-satir select { padding: .5rem .6rem; font: inherit; font-size: 16px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
+.ak-kd-liste { display: grid; gap: .1rem; max-height: 50vh; overflow: auto; margin: .6rem 0; }
+.ak-kd-satir { display: flex; align-items: center; gap: .5rem; padding: .5rem .4rem .5rem calc(.4rem + var(--sev, 0) * 1rem); min-height: 2.6rem; cursor: pointer; border-radius: 8px; }
+.ak-kd-satir:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); } .ak-kd-satir input { width: 1.2rem; height: 1.2rem; }
+
+@media (max-width: 860px) {
+  .ak-zot { grid-template-columns: minmax(0, 1fr); }
+  .ak-agac { position: static; max-height: none; padding: 0; }
+  .ak-agac-ac { display: block; }
+  .ak-agac-ic { display: none; padding: .3rem .5rem .6rem; max-height: 55vh; overflow: auto; border-top: 1px solid var(--border); }
+  .ak-agac.ak-agac-acik .ak-agac-ic { display: block; }
+  .ak-menu-liste { right: auto; left: 0; }
+  .ak-ust-sag { flex-wrap: wrap; }
+}
