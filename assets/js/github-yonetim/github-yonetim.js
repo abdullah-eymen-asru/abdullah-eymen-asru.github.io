@@ -358,6 +358,14 @@ const OZELLIK_KATALOGU = [
     rolSutunlari: ["user", "special_user", "editor", "manager", "admin"],
   },
   {
+    // bkz. migration 0116 — Akademik okuyucu eklentileri (çeviri, sözlük, Vikipedi, Crossref, arama bağlantıları). VARSAYILAN AÇIK; rol bazında kapatılır.
+    // Kod çalıştırmaz, depolama kotası kullanmaz (kullanıcı başına küçük ayar satırı). Kapalıyken okuyucu balonunda eklenti düğmesi ve Kütüphane'de ayar paneli görünmez.
+    anahtar: "akademik_eklentiler",
+    baslik: "Akademik Okuyucu Eklentileri",
+    aciklama: "PDF okuyucuda metin seçince çıkan eklentiler (çeviri, sözlük, Vikipedi özeti, künye bulma, arama bağlantıları) ve kullanıcının kendi eklenti ayarları. Kota kullanmaz; dış kod çalıştırmaz. Kapatılan rolde eklentiler gizlenir, kullanıcının ayarları silinmez.",
+    rolSutunlari: ["user", "special_user", "editor", "manager", "admin"],
+  },
+  {
     // bkz. migration 0077 — Dönüştürücü, Belge Tarayıcı & Sıkıştırma (aynı can_use_converter anahtarı). Önceki ayrı "Dönüştürücü" sekmesi buraya taşındı.
     // VARSAYILAN KAPALI (diğer satırların tersi): anahtar açılana kadar yalnızca owner kullanır. Kaynak: donusturucu_yetkileri.
     anahtar: "donusturucu",
