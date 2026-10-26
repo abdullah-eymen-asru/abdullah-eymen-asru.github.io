@@ -10,8 +10,8 @@ import { supabase } from "../core/supabase-client.js";
 import { AkisliZip, zipGirisleri, zipGirisOku } from "./zip-yazici.js";
 import { workerFetch, hataMetni, bugunDamga } from "./ortak.js";
 
-const SIRA = ["profiles", "e2ee_kullanici_anahtarlari", "not_kasasi", "notlar", "not_ek_kayitlari", "akademik_kaynaklar", "akademik_notlar", "r2_arsiv", "taslak_icerikler", "special_content", "content_access"];
-const SAYFA = { notlar: 25, akademik_kaynaklar: 100, akademik_notlar: 100, special_content: 50, taslak_icerikler: 50, messages: 200 };
+const SIRA = ["profiles", "e2ee_kullanici_anahtarlari", "not_kasasi", "notlar", "not_ek_kayitlari", "akademik_kaynaklar", "akademik_koleksiyonlar", "akademik_koleksiyon_ogeleri", "akademik_notlar", "akademik_eklenti_ayarlari", "r2_arsiv", "taslak_icerikler", "special_content", "content_access"];
+const SAYFA = { notlar: 25, akademik_kaynaklar: 100, akademik_notlar: 100, akademik_koleksiyonlar: 200, akademik_koleksiyon_ogeleri: 500, special_content: 50, taslak_icerikler: 50, messages: 200 };
 const kodla = new TextEncoder();
 
 const siraNo = (t) => { const i = SIRA.indexOf(t); return i < 0 ? 999 : i; };
@@ -66,7 +66,57 @@ async function sayfalar(oturum, tablo, kolonSayisi, sinyal, her) {
   return toplam;
 }
 
+/* Akademik yedek düzeni: PDF'ler "akademik/dosyalar/<Kullanıcı Adı>/<Klasör yolu>/<Başlık>.pdf" altına konur (kullanıcının kendi klasörleme düzeniyle).
+   Bunun için ilgili tablolar JSON/SQL yazılırken bellekte (yalnızca küçük künye alanları) toplanır. */
+const AK = { kaynak: [], klasor: [], oge: [], uye: new Map() };
+const AK_TABLO = new Set(["akademik_kaynaklar", "akademik_koleksiyonlar", "akademik_koleksiyon_ogeleri", "profiles"]);
+function akTopla(tablo, satirlar) {
+  if (!AK_TABLO.has(tablo)) return;
+  for (const s of satirlar) {
+    if (tablo === "akademik_kaynaklar") AK.kaynak.push({ id: s.id, user_id: s.user_id, baslik: s.baslik, yil: s.yayin_yili, yazarlar: s.yazarlar, pdf: s.pdf_r2_yolu, dosya: s.pdf_dosya_adi });
+    else if (tablo === "akademik_koleksiyonlar") AK.klasor.push({ id: s.id, user_id: s.user_id, ust_id: s.ust_id, ad: s.ad });
+    else if (tablo === "akademik_koleksiyon_ogeleri") AK.oge.push({ k: s.koleksiyon_id, s: s.kaynak_id });
+    else if (tablo === "profiles") AK.uye.set(s.id, s.full_name || s.email || "");
+  }
+}
+const guvenliAd = (s, yedek = "adsiz") => String(s || "").replace(/[\\/:*?"<>|\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 90) || yedek;
+function akKlasorYolu(id) {
+  const harita = new Map(AK.klasor.map((k) => [k.id, k])); const parca = []; let k = harita.get(id), n = 0;
+  while (k && n++ < 20) { parca.unshift(guvenliAd(k.ad, "klasor")); k = k.ust_id ? harita.get(k.ust_id) : null; }
+  return parca;
+}
+function akPdfYolu(anahtar) {
+  const k = AK.kaynak.find((x) => x.pdf === anahtar);
+  if (!k) return null;
+  const uye = guvenliAd(AK.uye.get(k.user_id) || String(k.user_id).slice(0, 8), "uye");
+  const og = AK.oge.find((o) => o.s === k.id);
+  const yol = og ? akKlasorYolu(og.k) : [];
+  const ad = `${guvenliAd(k.baslik)} [${String(k.id).slice(0, 8)}].pdf`;
+  return ["akademik", "dosyalar", uye, ...(yol.length ? yol : ["Klasörsüz"]), ad].join("/");
+}
+function akAgacMetni() {
+  const satir = ["AKADEMİK KÜTÜPHANE — KLASÖR AĞACI (kullanıcıların kendi düzeniyle)", ""];
+  const uyeler = [...new Set(AK.kaynak.map((k) => k.user_id).concat(AK.klasor.map((k) => k.user_id)))];
+  for (const u of uyeler) {
+    satir.push(`■ ${AK.uye.get(u) || u}`);
+    const kl = AK.klasor.filter((k) => k.user_id === u);
+    const yaz = (ust, girinti) => {
+      for (const k of kl.filter((x) => (x.ust_id || null) === ust).sort((a, b) => a.ad.localeCompare(b.ad, "tr"))) {
+        satir.push(`${girinti}📁 ${k.ad}`);
+        for (const o of AK.oge.filter((x) => x.k === k.id)) { const s = AK.kaynak.find((x) => x.id === o.s); if (s) satir.push(`${girinti}   • ${s.baslik}${s.yil ? ` (${s.yil})` : ""}`); }
+        yaz(k.id, `${girinti}   `);
+      }
+    };
+    yaz(null, "  ");
+    const dosyalanmamis = AK.kaynak.filter((s) => s.user_id === u && !AK.oge.some((o) => o.s === s.id));
+    if (dosyalanmamis.length) { satir.push("  📁 Klasörsüz"); for (const s of dosyalanmamis) satir.push(`     • ${s.baslik}${s.yil ? ` (${s.yil})` : ""}`); }
+    satir.push("");
+  }
+  return satir.join("\n");
+}
+
 async function veritabaniYaz(zip, oturum, tablolar, bicimler, ilerleme, sinyal, ozet) {
+  AK.kaynak.length = 0; AK.klasor.length = 0; AK.oge.length = 0; AK.uye.clear();
   const gruplar = new Map();
   for (const t of tablolar) {
     if (!gruplar.has(t.hedef)) gruplar.set(t.hedef, []);
@@ -83,6 +133,7 @@ async function veritabaniYaz(zip, oturum, tablolar, bicimler, ilerleme, sinyal, 
         let ilk = true;
         await giris.yaz(kodla.encode("[\n"));
         const n = await sayfalar(oturum, t.tablo, t.kolonlar.length, sinyal, async (satirlar) => {
+          akTopla(t.tablo, satirlar);
           const metin = satirlar.map((s) => JSON.stringify(s)).join(",\n");
           await giris.yaz(kodla.encode((ilk ? "" : ",\n") + metin));
           ilk = false;
@@ -103,7 +154,7 @@ async function veritabaniYaz(zip, oturum, tablolar, bicimler, ilerleme, sinyal, 
         ilerleme({ asama: `Veritabanı (SQL): ${t.tablo}` });
         await giris.yaz(kodla.encode(`-- Tablo: ${t.tablo}\n`));
         const n = await sayfalar(oturum, t.tablo, t.kolonlar.length, sinyal, (satirlar) =>
-          giris.yaz(kodla.encode(insertSatirlari(t.tablo, t.kolonlar, satirlar)))
+          { if (!bicimler.json) akTopla(t.tablo, satirlar); return giris.yaz(kodla.encode(insertSatirlari(t.tablo, t.kolonlar, satirlar))); }
         );
         await giris.yaz(kodla.encode(`-- ${n} satır\n\n`));
         say[t.tablo] = n;
@@ -118,7 +169,7 @@ async function veritabaniYaz(zip, oturum, tablolar, bicimler, ilerleme, sinyal, 
 /* ------------------------------------- R2 dosyaları ------------------------------------- */
 
 function r2Yolu(d) {
-  if (d.kaynak === "akademik") return `r2/${d.anahtar}`;
+  if (d.kaynak === "akademik") return akPdfYolu(d.anahtar) || `r2/${d.anahtar}`;
   if (d.kaynak === "arsiv") return `r2/dosya-yoneticisi/${d.ad}${d.sifreli ? ".sifreli" : ""}`;
   return `notlar/ekler/${d.ad}`;
 }
@@ -159,6 +210,7 @@ async function r2Yaz(zip, oturum, ilerleme, sinyal, ozet) {
     manifest.push(kayit);
   }
   await zip.dosyaEkle("r2/MANIFEST.json", JSON.stringify(manifest, null, 2));
+  if (AK.kaynak.length || AK.klasor.length) await zip.dosyaEkle("akademik/KLASOR-AGACI.txt", akAgacMetni());
 }
 
 /* ------------------------------ GitHub zip + .md içerik ------------------------------ */
@@ -254,7 +306,8 @@ function okubeni(o) {
     "  veritabani/json/<tablo>.json   Tablo başına JSON (to_jsonb çıktısı)",
     "  veritabani/yedek-*.sql         INSERT ... ON CONFLICT DO NOTHING (bağımlılık sırasıyla)",
     "  notlar/                        Kişisel notlar, alıntılar, kaynaklar (+ ekler/)",
-    "  akademik/json/<tablo>.json     Akademik Kütüphane: kaynak künyeleri, vurgular, notlar (PDF'ler r2/akademik-kutuphane/users/<kullanıcı>/ altında)",
+    "  akademik/json/<tablo>.json     Akademik Kütüphane: künyeler, klasörler, vurgu/yorumlar (konum dahil), notlar",
+    "  akademik/dosyalar/<Kullanıcı Adı>/<Klasör>/…pdf   PDF'ler kullanıcının kendi klasör düzeniyle · akademik/KLASOR-AGACI.txt okunabilir ağaç (r2/MANIFEST.json yine anahtar↔yol eşlemesini tutar)",
     "  r2/                            R2 dosyaları + MANIFEST.json (anahtar ↔ paket yolu eşlemesi)",
     "  notlar/ekler/                  Şifreli not ekleri (TÜM SİSTEM yedeğinde notlar/ekler/<kullanıcı-id>/<ek-id>.bin); notların ve klasör ağacının kendisi şifrelidir",
     "  icerik-md/                     Depodaki tüm .md dosyaları (klasör yapısı korunur)",
