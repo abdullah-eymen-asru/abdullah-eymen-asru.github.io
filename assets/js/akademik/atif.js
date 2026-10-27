@@ -524,6 +524,7 @@ export function bibtexUret(kayitlar) {
       const yazar = (k.yazarlar || []).map((y) => (y.kurum ? `{${bibKacis(y.kurum)}}` : y.adi ? `${bibKacis(y.soyadi)}, ${bibKacis(y.adi)}` : bibKacis(y.soyadi))).join(" and ");
       ekle("author", yazar);
       ekle("title", `{${bibKacis(k.baslik)}}`);
+      if (S(k._klasor)) ekle("klasor", bibKacis(k._klasor));          // klasör yolu (Zotero/Mendeley/bu site içe aktarırken okur)
       const kap = bibKacis(k.dergi_veya_yayinevi);
       if (tur === "article") ekle("journal", kap);
       else if (tur === "book" || tur === "techreport") ekle(tur === "book" ? "publisher" : "institution", kap);
@@ -734,7 +735,19 @@ function bibKaydiniKayda({ tur, alanlar: a }) {
     etiketler: al("keywords").split(/\s*[,;]\s*/).filter(Boolean),
     tur: t,
     ek_alanlar: ek,
+    // Klasör bilgisi (içe aktarma sırasında kolonlara yazılmaz): Zotero/Better BibTeX "collections", JabRef "groups", Mendeley "mendeley-groups", bu site "klasor"
+    _klasor: klasorYollari(a.klasor || a.collections || a.collection || a["mendeley-groups"] || a.groups || ""),
+    _dosya: pdfYollari(a.file || a.files || ""),
   };
+}
+
+/** "Tez/Bölüm 1; Okuma" → [["Tez","Bölüm 1"],["Okuma"]] (ayırıcılar: ; | ve yol ayırıcılar / > \\) */
+export function klasorYollari(ham) {
+  return String(ham || "").split(/\s*[;|]\s*/).map((y) => y.split(/\s*[\/>\\]\s*/).map((p) => p.trim()).filter(Boolean)).filter((y) => y.length);
+}
+/** "Full Text PDF:files/12/a.pdf:application/pdf;Snapshot:…" → ["files/12/a.pdf"] */
+export function pdfYollari(ham) {
+  return [...String(ham || "").matchAll(/([^:;{}|]+?\.pdf)(?=:|;|$|\}|\|)/gi)].map((m) => m[1].trim().replace(/^:+/, "")).filter(Boolean);
 }
 
 /* ======================================= RIS ======================================= */
@@ -810,6 +823,8 @@ export function risAyristir(metin) {
       etiketler: (a.KW || []).flatMap((k) => k.split(/\s*;\s*/)).filter(Boolean),
       tur: t,
       ek_alanlar: ek,
+      _klasor: klasorYollari([...(a.C1 || []), ...(a.DB || [])].join(";")),
+      _dosya: (a.L1 || []).flatMap((x) => pdfYollari(x)),
     };
   });
 }
@@ -842,6 +857,7 @@ export function risUret(kayitlar) {
       ekle("AB", k.ozet);
       ekle("LA", ek.dil);
       (k.etiketler || []).forEach((e) => ekle("KW", e));
+      if (S(k._klasor)) ekle("C1", k._klasor);
       s.push("ER  - ");
       return s.join("\r\n");
     })
@@ -852,8 +868,10 @@ export function risUret(kayitlar) {
 export function icerikBicimiTahmin(ad, metin) {
   if (/\.bib(tex)?$/i.test(ad)) return "bib";
   if (/\.ris$/i.test(ad)) return "ris";
+  if (/\.rdf$/i.test(ad)) return "rdf";
   const bas = String(metin || "").slice(0, 2000);
   if (/^\s*@\w+\s*[{(]/m.test(bas)) return "bib";
   if (/^TY\s{1,2}-/m.test(bas)) return "ris";
+  if (/<rdf:RDF/i.test(bas)) return "rdf";
   return null;
 }
