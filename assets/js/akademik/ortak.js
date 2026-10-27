@@ -175,8 +175,13 @@ export async function pdfYukle(kaynakId, govde, { dosyaAdi, beklenenRev, ilerlem
 }
 
 /** PDF baytlarını ilerleme bildirerek indirir. @returns {{bayt:Uint8Array, rev:number}} */
-export async function pdfIndirBayt(kaynakId, ilerleme) {
-  const r = await workerFetch(`/pdf/${kaynakId}`);
+export async function pdfIndirBayt(kaynakId, ilerleme, { paylasimToken = null } = {}) {
+  let r;
+  if (paylasimToken) {
+    // Paylaşılan kütüphane: giriş gerekmez ('uyeler' paylaşımında oturum varsa jeton eklenir).
+    const { data } = await supabase.auth.getSession();
+    r = await fetch(`${AKADEMIK_WORKER_URL}/paylasim/pdf/${kaynakId}?t=${encodeURIComponent(paylasimToken)}`, { headers: data?.session ? { Authorization: `Bearer ${data.session.access_token}` } : {} });
+  } else r = await workerFetch(`/pdf/${kaynakId}`);
   if (!r.ok) {
     let j = null;
     try { j = await r.json(); } catch { /* */ }
