@@ -550,6 +550,27 @@ const ASIL_ISLEYICI = {
       return urlKunyesi(env, istek, cors);
     }
 
+    // PAYLAŞILAN KÜTÜPHANE: /paylasim/pdf/<kaynak-id>?t=<paylasim-tokeni> — giriş gerekmez ('uyeler' paylaşımında Authorization başlığı gerekir).
+    // İzin tamamen veritabanındaki akademik_paylasim_pdf_yolu() işlevinde karara bağlanır (token geçerli + PDF okuma açık + kaynak kapsamda).
+    const paylasimEsl = /^\/paylasim\/pdf\/([0-9a-f-]{36})$/i.exec(url.pathname);
+    if (paylasimEsl) {
+      if (istek.method !== "GET") return json({ error: "Desteklenmeyen yöntem." }, 405, cors);
+      const token = url.searchParams.get("t") || "";
+      if (!UUID_DESENI.test(paylasimEsl[1]) || !/^[0-9a-f]{40}$/.test(token)) return json({ error: "Bulunamadı." }, 404, cors);
+      let satir = null;
+      try {
+        const r = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/akademik_paylasim_pdf_yolu`, {
+          method: "POST",
+          headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: istek.headers.get("Authorization") || `Bearer ${env.SUPABASE_ANON_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ p_token: token, p_kaynak_id: paylasimEsl[1].toLowerCase() }),
+        });
+        if (r.ok) satir = (await r.json())?.[0] || null;
+      } catch { return json({ error: "Yetki doğrulanamadı." }, 502, cors); }
+      if (!satir) return json({ error: "Bu paylaşımda bu PDF'e erişim yok." }, 404, cors);
+      try { return await pdfOku(env, istek, null, { ...satir, id: paylasimEsl[1].toLowerCase() }, cors); }
+      catch (hata) { return json({ error: "Depolama hatası: " + (hata?.message || "bilinmiyor") }, 500, cors); }
+    }
+
     const eslesme = /^\/pdf\/([0-9a-f-]{36})(?:\/(onceki-surum|yukleme-imzasi|yukleme-tamam))?$/i.exec(url.pathname);
     if (!eslesme || !UUID_DESENI.test(eslesme[1])) return json({ error: "Bulunamadı." }, 404, cors);
     const kaynakId = eslesme[1].toLowerCase();
