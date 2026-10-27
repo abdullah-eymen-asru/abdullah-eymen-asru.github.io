@@ -315,3 +315,8 @@ body.ak-okuyucu-acik { overflow: hidden; }
   .ak-menu-liste { right: auto; left: 0; }
   .ak-ust-sag { flex-wrap: wrap; }
 }
+.ak-ek-rozet { font-size: .75rem; padding: .1rem .5rem; border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; }
+.ak-ek-rozet.yerel { color: #2f9e5b; border-color: #2f9e5b66; } .ak-ek-rozet.dis { color: #d69a1e; border-color: #d69a1e66; }
+.ak-ek-ust { flex-wrap: wrap; }
+.ak-balon.ak-balon-alt { flex-wrap: wrap; row-gap: .25rem; max-height: 40vh; overflow-y: auto; }
+.ak-balon.ak-balon-alt button { flex: 0 0 auto; }
