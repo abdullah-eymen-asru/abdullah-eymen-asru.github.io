@@ -195,11 +195,13 @@ permalink: "/kurumsal/gizlilik-politikasi.html"
   <li><strong>Google</strong> — Google Analytics, Google AdSense ve Google
     Forms (bkz. § 1 ve § 4).</li>
   <li><strong>Umami Cloud</strong> — çerezsiz istatistik (bkz. § 1).</li>
-  <li><strong>Akademik okuyucu eklentileri (isteğe bağlı, kullanıcı açarsa)</strong> — PDF okuyucuda bir eklentiye (çeviri, sözlük, Vikipedi özeti,
-    künye bulma) basıldığında <em>yalnızca o anda seçili kısa metin</em> tarayıcıdan doğrudan ilgili genel servise gönderilir:
-    <strong>MyMemory</strong> (çeviri), <strong>dictionaryapi.dev</strong> (sözlük), <strong>Wikimedia/Vikipedi</strong>, <strong>Crossref</strong>.
-    “Arama” eklentileri seçili metinle Google Akademik / Semantic Scholar gibi bir sayfayı yeni sekmede açar. PDF dosyanız ve seçim sitemizde
-    saklanmaz; hesabınıza yalnızca hangi eklentileri açtığınıza dair küçük bir ayar kaydedilir. Gizli belgelerde eklentileri kapatabilirsiniz.</li>
+  <li><strong>Akademik okuyucu eklentileri</strong> — Varsayılan eklentiler (cihaz içi çeviri, metin bilgisi, temiz kopyalama, DOI bulma) tamamen tarayıcınızda çalışır;
+    seçili metin sitemizden hiçbir üçüncü tarafa gönderilmez. “Dış site” eklentileri (Google Çeviri, DeepL, Google Akademik, Semantic Scholar, Vikipedi/Vikisözlük)
+    yalnızca siz tıkladığınızda seçili metinle yeni bir sekmede ilgili siteyi açar; metni o sitede siz göndermiş olursunuz ve varsayılan olarak kapalıdır.
+    Hesabınıza yalnızca hangi eklentileri açtığınıza dair küçük bir ayar kaydedilir.</li>
+  <li><strong>Paylaşılan akademik kütüphane</strong> — Bir kütüphane/klasörü paylaşırsanız, seçtiğiniz erişim düzeyine göre (site üyeleri, bağlantıya sahip olanlar ya da herkes)
+    kaynak künyeleri (yazar, yıl, DOI, özet, etiketler), klasör ağacı ve (izin verdiyseniz) PDF’ler görüntülenebilir. Paylaşımı istediğiniz an durdurabilir ya da silebilirsiniz.</li>
+
   <li><strong>Substack</strong> — blog yazılarının bir kısmı Substack
     üzerinde yayımlanır; sitedeki ilgili bölüm bu yazıların herkese açık
     akışını (RSS) Cloudflare Worker üzerinden getirir. Substack sayfalarını
