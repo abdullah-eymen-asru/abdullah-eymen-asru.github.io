@@ -15,6 +15,7 @@ import { esc, el, toast, supabase, workerJson, pdfIndirBayt, pdfYukle, dosyaIndi
 import { motoruYukle, pdfLibAl } from "./motor.js";
 import { acikla, uygula, satirlaraBol, NOT_BOYUTU } from "./pdf-yaz.js";
 import { alintiMarkdown } from "./atif.js";
+import { taslakYaz, taslakOku, taslakSil } from "./taslak.js";
 import { eklentilerAcikMi, ayarYukle, acikEklentiler, eklentiCalistir as eklentiYurut } from "./eklentiler.js";
 
 const SVGNS = "http://www.w3.org/2000/svg";
@@ -102,7 +103,7 @@ function aralikMetni(aralik) {
 
 /* ------------------------------- ana giriş ------------------------------- */
 
-export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapaninca = null }) {
+export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapaninca = null, paylasimToken = null }) {
   const d = {
     kaynak, salt, kullaniciAdi,
     arac: "gez", renk: RENKLER[0].hex, kalinlik: 2,
@@ -173,7 +174,7 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
   let belge;
   try {
     durumYaz("PDF indiriliyor… %0");
-    const { bayt, rev } = await pdfIndirBayt(kaynak.id, (o) => durumYaz(`PDF indiriliyor… %${Math.round(o * 100)}`));
+    const { bayt, rev } = await pdfIndirBayt(kaynak.id, (o) => durumYaz(`PDF indiriliyor… %${Math.round(o * 100)}`), { paylasimToken });
     d.bytes = bayt;
     d.rev = rev;
     if (bayt.byteLength > BUYUK_PDF_OKUMA_SINIRI) durumYaz("Büyük dosya: açıklamaları okumak biraz sürebilir…");
@@ -195,10 +196,11 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
     const pdflib = await pdfLibAl();
     const { aciklamalar, sifreli } = await acikla(pdflib, d.bytes);
     d.sifreli = sifreli;
-    const { data: satirlar } = await supabase.from("akademik_notlar").select("ek_id,tur,sayfa,metin,yorum,renk,konum").eq("kaynak_id", kaynak.id).not("ek_id", "is", null);
+    const { data: satirlar } = paylasimToken ? { data: [] } : await supabase.from("akademik_notlar").select("ek_id,tur,sayfa,metin,yorum,renk,konum").eq("kaynak_id", kaynak.id).not("ek_id", "is", null);
     const dbHarita = new Map((satirlar || []).map((s) => [s.ek_id, s]));
     let dbOtorite = kaynak.aciklama_db_otorite;
-    if (dbOtorite === undefined) { const { data: kr } = await supabase.from("akademik_kaynaklar").select("aciklama_db_otorite").eq("id", kaynak.id).maybeSingle(); dbOtorite = !!kr?.aciklama_db_otorite; }
+    if (paylasimToken) dbOtorite = false;
+    else if (dbOtorite === undefined) { const { data: kr } = await supabase.from("akademik_kaynaklar").select("aciklama_db_otorite").eq("id", kaynak.id).maybeSingle(); dbOtorite = !!kr?.aciklama_db_otorite; }
     const konumAyni = (a, k) => ["kutular", "cizgiler", "rect"].every((x) => JSON.stringify(a[x] ?? null) === JSON.stringify(k?.[x] ?? null));
     for (const a of aciklamalar) {
       const s = a.nm ? dbHarita.get(a.nm) : null;
@@ -223,6 +225,28 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
         const id = s.ek_id.replace(/^ae-/, "");
         d.model.set(id, { id, nm: s.ek_id, tur: s.tur, sayfa: s.sayfa, renk: s.renk || "#ffd400", yorum: s.yorum || "", metin: s.metin || "", durum: "yeni", ...s.konum });
         d.pdfKirli = true;
+      }
+    }
+    // Cihazda bekleyen taslak varsa (internet/elektrik kesilmiş, değişiklik veritabanına gidememiş) en yeni durum odur: geri yükle ve gönder.
+    if (!salt && !paylasimToken) {
+      const tas = await taslakOku(kaynak.id);
+      if (tas?.ozet) {
+        const hepsi = new Map(tas.ozet.map((s) => [s.ek_id, s]));
+        for (const a of [...d.model.values()]) {
+          const s = hepsi.get(a.nm || `ae-${a.id}`);
+          if (!s) { if (a.ref) d.silinenler.push({ nm: a.nm, ref: a.ref, sayfa: a.sayfa, _a: a }); d.model.delete(a.id); continue; }
+          Object.assign(a, { yorum: s.yorum || "", renk: s.renk || a.renk, metin: s.metin || a.metin, ...(s.konum || {}) });
+          if (a.durum === "ayni") a.durum = "degisti";
+          hepsi.delete(s.ek_id);
+        }
+        for (const s of hepsi.values()) {
+          if (!s.konum || !s.tur) continue;
+          const id = s.ek_id.replace(/^ae-/, "");
+          d.model.set(id, { id, nm: s.ek_id, tur: s.tur, sayfa: s.sayfa, renk: s.renk || "#ffd400", yorum: s.yorum || "", metin: s.metin || "", durum: "yeni", ...s.konum });
+        }
+        d.kirli = true; d.pdfKirli = true;
+        toast("Önceki oturumdan kaydedilememiş değişikliklerin cihazda bulundu; geri yüklendi ve gönderiliyor.", "bilgi", 6000);
+        setTimeout(() => otoPlanla(300), 600);
       }
     }
     if (sifreli) {
@@ -288,7 +312,7 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
   }
 
   /* ---------- model işlemleri ---------- */
-  function degisti() { d.kirli = true; d.pdfKirli = true; listeCiz(); kaydetDurumu(); otoPlanla(); }
+  function degisti() { d.kirli = true; d.pdfKirli = true; listeCiz(); kaydetDurumu(); taslagaYaz(); otoPlanla(); }
   function kaydetDurumu() {
     const b = q('[data-ak="kaydet"]');
     if (b) { b.textContent = "PDF'e işle"; b.classList.toggle("kirli", d.pdfKirli); b.title = d.pdfKirli ? "PDF dosyasına henüz işlenmemiş değişiklikler var (açıklamaların hesabında zaten kayıtlı). Kapatırken otomatik işlenir." : "PDF dosyası güncel."; }
@@ -304,6 +328,9 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
     for (const k of ["kutular", "cizgiler", "rect", "kalinlik", "yaziPt"]) if (a[k] !== undefined) konum[k] = a[k];
     return { ek_id: a.nm || `ae-${a.id}`, tur: a.tur, sayfa: a.sayfa, metin: a.metin || null, yorum: a.yorum || null, renk: a.renk, konum };
   });
+  /** Her değişiklik ÖNCE bu cihazın kalıcı deposuna (IndexedDB) yazılır: internet/elektrik giderse kayıp olmaz (bkz. taslak.js). */
+  let taslakT = 0;
+  function taslagaYaz() { if (salt || paylasimToken) return; taslakT = Date.now(); taslakYaz(kaynak.id, ozetOlustur()); }
   function otoPlanla(ms = 1200) { if (salt) return; clearTimeout(d.otoZaman); d.otoZaman = setTimeout(() => dbKaydet(), ms); }
   async function dbKaydet() {
     if (salt || !d.kirli) return true;
@@ -315,6 +342,7 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
       if (error) throw new Error(error.message);
       for (const a of d.model.values()) a.nm = a.nm || `ae-${a.id}`;
       kaynak.aciklama_db_otorite = true;
+      if (JSON.stringify(anlik) === JSON.stringify(ozetOlustur())) taslakSil(kaynak.id, taslakT || Date.now()); else taslagaYaz();
       d.sonOto = new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
       d.kirli = JSON.stringify(anlik) !== JSON.stringify(ozetOlustur());       // kayıt sırasında yeni değişiklik olduysa yeniden planla
       if (d.kirli) otoPlanla(300);
@@ -322,7 +350,7 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
       return true;
     } catch (h) {
       console.error("Otomatik kayıt:", h);
-      durumYaz(`Otomatik kayıt başarısız: ${h.message || h} — yeniden denenecek.`, "uyari");
+      durumYaz(`Bağlantı sorunu: değişiklikler bu cihazda güvende, bağlantı gelince otomatik gönderilecek.`, "uyari");
       otoPlanla(5000);
       return false;
     } finally { d.otoCalisiyor = false; }
@@ -330,7 +358,9 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
   // Sekme gizlenirken/kapanırken bekleyen kaydı hemen gönder (en iyi çaba).
   const gizlenince = () => { if (document.visibilityState === "hidden" && d.kirli) dbKaydet(); };
   document.addEventListener("visibilitychange", gizlenince);
-  window.addEventListener("pagehide", () => { if (d.kirli) dbKaydet(); });
+  window.addEventListener("pagehide", () => { if (d.kirli) { taslagaYaz(); dbKaydet(); } });
+  const cevrimici = () => { if (d.kirli) dbKaydet(); };
+  window.addEventListener("online", cevrimici);
   function ekleModel(a, geriAlinabilir = true) {
     a.id = a.id || uuid();
     a.durum = "yeni";
@@ -506,7 +536,7 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
     const alan = el("textarea", { class: "ak-pop-metin", rows: a.tur === "metin" ? 4 : 3, placeholder: a.tur === "metin" ? "Metin kutusu içeriği" : "Yorum ekle…", "aria-label": "Yorum" });
     alan.value = a.yorum || "";
     alan.readOnly = salt;
-    alan.addEventListener("input", () => { a.yorum = alan.value; if (a.durum === "ayni") a.durum = "degisti"; d.kirli = true; d.pdfKirli = true; kaydetDurumu(); otoPlanla(1500); });
+    alan.addEventListener("input", () => { a.yorum = alan.value; if (a.durum === "ayni") a.durum = "degisti"; d.kirli = true; d.pdfKirli = true; kaydetDurumu(); taslagaYaz(); otoPlanla(1500); });
     alan.addEventListener("change", () => { listeCiz(); sayfaCiz(a.sayfa); otoPlanla(300); });
     alan.addEventListener("blur", () => { if (d.kirli) otoPlanla(200); });
     const eylem = el("div", { class: "ak-pop-eylem" },
@@ -604,7 +634,7 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
     const a = s.getRangeAt(0);
     const metin = aralikMetni(a);
     if (!metin) return false;
-    sonSecim = { aralik: a.cloneRange(), metin };
+    sonSecim = { aralik: a.cloneRange(), metin, t: Date.now() };
     return true;
   }
   function secimiGeriYukle() {
@@ -713,17 +743,24 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
     balon.addEventListener("pointerdown", seciliTut);
     balon.addEventListener("touchstart", seciliTut, { passive: false });
     balon.classList.toggle("ak-balon-alt", dokunmatik);
-    balon.addEventListener("click", async (e) => {
-      const b = e.target.closest("button");
-      if (!b) return;
-      secimiGeriYukle();                                   // dokunma seçimi çökerttiyse kopyadan geri getir
-      if (b.dataset.eklenti) { await eklentiCalistir(b.dataset.eklenti); return; }
-      if (b.dataset.hex) { d.renk = b.dataset.hex; renkleriCiz(); secimdenOlustur("vurgu", b.dataset.hex); }
-      else if (b.dataset.b === "altcizgi" || b.dataset.b === "ustcizgi") secimdenOlustur(b.dataset.b);
-      else if (b.dataset.b === "yorum") { const n0 = d.model.size; if (secimdenOlustur("vurgu")) { const yeni = [...d.model.values()].slice(-1)[0]; if (d.model.size > n0) sec(yeni.id, true); } }
-      else if (b.dataset.b === "kopya") { const m = sonSecim?.metin || (window.getSelection().rangeCount ? aralikMetni(window.getSelection().getRangeAt(0)) : ""); if (!m) { toast("Önce metin seç.", "uyari"); return; } await panoyaKopyala(m); toast("Seçili metin kopyalandı.", "basari"); balonGizle(); }
-      else if (b.dataset.b === "alinti") { const m = sonSecim?.metin; if (!m) { toast("Önce metin seç.", "uyari"); return; } await panoyaKopyala(metniAlintiYap(m, secimSayfasi())); toast("Alıntı (yazar, yıl, sayfa ile) kopyalandı.", "basari"); balonGizle(); }
-    });
+    // Eylem tek yerde. DOKUNMATİK: touchstart'ta preventDefault (seçim bozulmasın) tarayıcının "click" üretmesini de engeller → eylemi
+    // touchend'de tetikliyoruz; fare/klavye click ile çalışır. İkisi çift tetiklenmesin diye zaman damgasıyla ayrılır.
+    const secimiBitir = () => { try { window.getSelection()?.removeAllRanges(); } catch { /* yok say */ } sonSecim = null; balonGizle(); };
+    async function balonEylem(b) {
+      try {
+        secimiGeriYukle();                                   // dokunma seçimi çökerttiyse kopyadan geri getir
+        if (!sonSecim && !window.getSelection()?.rangeCount) { toast("Önce metin seç.", "uyari"); return; }
+        if (b.dataset.eklenti) { await eklentiCalistir(b.dataset.eklenti); secimiBitir(); return; }
+        if (b.dataset.hex) { d.renk = b.dataset.hex; renkleriCiz(); secimdenOlustur("vurgu", b.dataset.hex); }
+        else if (b.dataset.b === "altcizgi" || b.dataset.b === "ustcizgi") secimdenOlustur(b.dataset.b);
+        else if (b.dataset.b === "yorum") { const n0 = d.model.size; if (secimdenOlustur("vurgu")) { const yeni = [...d.model.values()].slice(-1)[0]; if (d.model.size > n0) sec(yeni.id, true); } }
+        else if (b.dataset.b === "kopya") { const m = sonSecim?.metin || ""; if (!m) { toast("Önce metin seç.", "uyari"); return; } await panoyaKopyala(m); toast("Seçili metin kopyalandı.", "basari"); secimiBitir(); }
+        else if (b.dataset.b === "alinti") { const m = sonSecim?.metin; if (!m) { toast("Önce metin seç.", "uyari"); return; } await panoyaKopyala(metniAlintiYap(m, secimSayfasi())); toast("Alıntı (yazar, yıl, sayfa ile) kopyalandı.", "basari"); secimiBitir(); }
+      } catch (h) { console.error(h); durumYaz(`İşlem yapılamadı: ${h.message || h}`, "hata"); toast(`İşlem yapılamadı: ${h.message || h}`, "hata"); }
+    }
+    let sonDokunus = 0;
+    balon.addEventListener("touchend", (e) => { const b = e.target.closest("button"); if (!b) return; e.preventDefault(); sonDokunus = Date.now(); balonEylem(b); }, { passive: false });
+    balon.addEventListener("click", (e) => { if (Date.now() - sonDokunus < 700) return; const b = e.target.closest("button"); if (b) balonEylem(b); });
     q(".ak-ok-govde").append(balon);
     if (!dokunmatik) {
       balon.style.left = `${Math.max(8, Math.min(govde.width - 330, son.right - govde.left - 20))}px`;
@@ -872,14 +909,21 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
       return;
     }
     if (CIZIM_ARACLARI.has(d.arac) || !kap.contains(s.anchorNode)) return;
+    secimYakala();                                                   // ANINDA kopya: seçim hemen çökse bile elimizde
     clearTimeout(bosZaman); clearTimeout(seciliZaman);
-    seciliZaman = setTimeout(() => {
+    seciliZaman = setTimeout(secimiIsle, dokunmatik ? 350 : 200);
+  });
+  function secimiIsle() {
+    try {
       if (balonDokunuyor || (isaretci && !dokunmatik)) return;      // masaüstünde sürükleme bitince mouseup halleder
       const x = window.getSelection();
-      if (!x || x.isCollapsed || !secimYakala()) return;
+      if (!x || x.isCollapsed) { if (!sonSecim || Date.now() - sonSecim.t > 700) return; } else if (!secimYakala()) return;   // iOS seçimi hemen çökertirse son 0,7 sn içindeki anlık kopya kullanılır
+      if (!sonSecim) return;
       if (!salt && METIN_TURLERI.has(d.arac)) secimdenOlustur(d.arac); else balonGoster();
-    }, dokunmatik ? 400 : 200);
-  });
+    } catch (h) { console.error(h); durumYaz(`Seçim işlenemedi: ${h.message || h}`, "hata"); }
+  }
+  // iOS/Android: tutamaç sürüklemesi bitince (parmak kalkınca) seçimi kesin işle
+  kap.addEventListener("touchend", () => { clearTimeout(seciliZaman); seciliZaman = setTimeout(secimiIsle, 260); }, { passive: true });
 
   /* ---------- üst çubuk / yan panel olayları ---------- */
   kok.addEventListener("click", async (e) => {
@@ -947,47 +991,64 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
   }
   document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement) kok.classList.remove("ak-tam"); });
 
-  /* ---------- yakınlaştırma: fare + dokunmatik yüzey + dokunmatik ekran ---------- */
-  // Ctrl/⌘ + tekerlek (Chrome/Firefox'ta trackpad pinch de böyle gelir), Safari gesture olayları, iki parmakla sıkıştırma ve +/−/0 tuşları.
+  /* ---------- yakınlaştırma: fare + dokunmatik yüzey + dokunmatik ekran (HIZLI) ----------
+     Hareket sürerken sayfalar YENİDEN ÇİZİLMEZ: görünüm GPU ile CSS dönüşümüyle (transform: scale) anında büyür/küçülür; hareket
+     durunca (≈140 ms) gerçek ölçek tek seferde uygulanır ve PDF.js yalnızca bir kez yeniden çizer. Böylece trackpad/parmak akıcı olur. */
   const OLCEK_MIN = 0.25, OLCEK_MAX = 5;
-  let olcekBekleyen = null, olcekZamani = 0;
-  function olcekUygula(yeni, odak) {
-    const hedef = Math.max(OLCEK_MIN, Math.min(OLCEK_MAX, yeni));
-    olcekBekleyen = hedef;
-    const simdi = performance.now();
-    if (simdi - olcekZamani < 60) { clearTimeout(olcekUygula.z); olcekUygula.z = setTimeout(() => olcekUygula(olcekBekleyen, odak), 70); return; }
-    olcekZamani = simdi;
-    const onceki = viewer.currentScale;
-    const ust = kap.scrollTop, sol = kap.scrollLeft;
+  const pdfKap = kap.querySelector(".pdfViewer");
+  let canli = null, bitirZ = null;                      // canli: { taban, f, ox, oy } — taban: son kesin ölçek, f: bekleyen çarpan, (ox,oy): odak (kap içi px)
+  function canliBaslat(odak) {
     const kr = kap.getBoundingClientRect();
     const ox = odak ? odak.x - kr.left : kr.width / 2, oy = odak ? odak.y - kr.top : kr.height / 2;
-    viewer.currentScale = hedef;
-    const oran = viewer.currentScale / onceki;
-    kap.scrollLeft = (sol + ox) * oran - ox;           // imlecin / parmakların altındaki nokta yerinde kalsın
-    kap.scrollTop = (ust + oy) * oran - oy;
+    if (!canli) {
+      canli = { taban: viewer.currentScale, f: 1, ox, oy, cx: kap.scrollLeft + ox, cy: kap.scrollTop + oy };
+      pdfKap.style.willChange = "transform";
+      // dönüşüm başlangıcı: odak noktasının içerik koordinatı (kaydırma dahil) — pdfViewer kap içinde sol-üstten başlar
+      pdfKap.style.transformOrigin = `${canli.cx - pdfKap.offsetLeft}px ${canli.cy - pdfKap.offsetTop}px`;
+    }
+    return canli;
   }
+  function olcekCarpan(carpan, odak) {
+    const c = canliBaslat(odak);
+    const hedef = Math.max(OLCEK_MIN, Math.min(OLCEK_MAX, c.taban * c.f * carpan));
+    c.f = hedef / c.taban;
+    pdfKap.style.transform = `scale(${c.f})`;
+    clearTimeout(bitirZ); bitirZ = setTimeout(olcekKesinle, 140);
+  }
+  function olcekKesinle() {
+    if (!canli) return;
+    const c = canli; canli = null;
+    pdfKap.style.transform = ""; pdfKap.style.transformOrigin = ""; pdfKap.style.willChange = "";
+    if (Math.abs(c.f - 1) < 0.004) return;
+    viewer.currentScale = c.taban * c.f;
+    const oran = viewer.currentScale / c.taban;
+    kap.scrollLeft = c.cx * oran - c.ox;                // odak noktası yerinde kalsın
+    kap.scrollTop = c.cy * oran - c.oy;
+  }
+  function olcekUygula(yeni, odak) { olcekCarpan(Math.max(OLCEK_MIN, Math.min(OLCEK_MAX, yeni)) / (canli ? canli.taban * canli.f : viewer.currentScale), odak); }
   kap.addEventListener("wheel", (e) => {
     if (!(e.ctrlKey || e.metaKey)) return;               // normal kaydırma etkilenmez
     e.preventDefault();
-    const adim = Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0105));
-    olcekUygula(viewer.currentScale * adim, { x: e.clientX, y: e.clientY });
+    olcekCarpan(Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.01)), { x: e.clientX, y: e.clientY });
   }, { passive: false });
-  let gestureBaslangic = 1;
-  kap.addEventListener("gesturestart", (e) => { e.preventDefault(); gestureBaslangic = viewer.currentScale; });   // Safari (macOS) trackpad
-  kap.addEventListener("gesturechange", (e) => { e.preventDefault(); olcekUygula(gestureBaslangic * e.scale, { x: e.clientX, y: e.clientY }); });
-  kap.addEventListener("gestureend", (e) => e.preventDefault());
-  // İki parmakla sıkıştırma: touch olayları (passive:false) — 2 parmakta tarayıcının kendi sayfa yakınlaştırması/kaydırması engellenir, tek parmak kaydırma ve metin seçimi etkilenmez.
+  let gestureTaban = 1;
+  kap.addEventListener("gesturestart", (e) => { e.preventDefault(); gestureTaban = canli ? canli.taban * canli.f : viewer.currentScale; });   // Safari (macOS) trackpad
+  kap.addEventListener("gesturechange", (e) => { e.preventDefault(); olcekUygula(gestureTaban * e.scale, { x: e.clientX, y: e.clientY }); });
+  kap.addEventListener("gestureend", (e) => { e.preventDefault(); olcekKesinle(); });
+  // İki parmakla sıkıştırma (touch olayları, passive:false): 2 parmakta tarayıcının kendi yakınlaştırması engellenir; tek parmak kaydırma/seçim etkilenmez.
   let sikistirBas = null;
-  const mesafe = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
-  const orta = (t) => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 });
-  kap.addEventListener("touchstart", (e) => { if (e.touches.length === 2) { sikistirBas = { m: mesafe(e.touches), olcek: viewer.currentScale }; e.preventDefault(); } }, { passive: false });
+  const mesafe = (tt) => Math.hypot(tt[0].clientX - tt[1].clientX, tt[0].clientY - tt[1].clientY);
+  const orta = (tt) => ({ x: (tt[0].clientX + tt[1].clientX) / 2, y: (tt[0].clientY + tt[1].clientY) / 2 });
+  kap.addEventListener("touchstart", (e) => { if (e.touches.length === 2) { olcekKesinle(); sikistirBas = { m: mesafe(e.touches), son: 1 }; e.preventDefault(); } }, { passive: false });
   kap.addEventListener("touchmove", (e) => {
     if (e.touches.length !== 2 || !sikistirBas) return;
     e.preventDefault();
-    if (sikistirBas.m > 10) olcekUygula(sikistirBas.olcek * (mesafe(e.touches) / sikistirBas.m), orta(e.touches));
+    if (sikistirBas.m < 10) return;
+    const oran = mesafe(e.touches) / sikistirBas.m;
+    olcekCarpan(oran / sikistirBas.son, orta(e.touches)); sikistirBas.son = oran;
   }, { passive: false });
-  kap.addEventListener("touchend", (e) => { if (e.touches.length < 2) sikistirBas = null; });
-  kap.addEventListener("touchcancel", () => { sikistirBas = null; });
+  kap.addEventListener("touchend", (e) => { if (e.touches.length < 2 && sikistirBas) { sikistirBas = null; clearTimeout(bitirZ); bitirZ = setTimeout(olcekKesinle, 60); } });
+  kap.addEventListener("touchcancel", () => { sikistirBas = null; olcekKesinle(); });
   // Çift dokunma / çift tıklama boş alanda: genişliğe sığdır ↔ %150 arasında geçiş (metin seçimini bozmamak için yalnızca boşlukta)
   let sonTik = 0;
   kap.addEventListener("dblclick", (e) => {
@@ -1050,10 +1111,27 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
       if (error) throw new Error(`Özet kaydedilemedi: ${error.message}`);
       for (const a of aktif) { a.durum = "ayni"; a.nm = a.nm || `ae-${a.id}`; }
       d.silinenler = [];
+      taslakSil(kaynak.id);
+      // R2'ye yazıldı → DOĞRULA (PDF'i geri oku, tüm açıklamalar dosyada mı?) → ancak o zaman veritabanındaki açıklama satırlarını sil.
+      // Doğrulama başarısız olursa satırlar KALIR (veri kaybı olmaz); yalnızca aramaya yarayan küçük özet metin saklanır.
+      let temizlendi = false;
+      if (pdfeGomuldu) {
+        try {
+          durumYaz("R2'ye yazılan PDF doğrulanıyor…");
+          const { bayt: okunan } = await pdfIndirBayt(kaynak.id);
+          const { aciklamalar: dosyadaki } = await acikla(pdflib, okunan);
+          const dosyada = new Set(dosyadaki.map((x) => x.nm).filter(Boolean));
+          if (ozet.every((o) => dosyada.has(o.ek_id))) {
+            const { data: sil, error: e2 } = await supabase.rpc("akademik_aciklamalari_r2ye_islendi", { p_kaynak_id: kaynak.id, p_adet: ozet.length });
+            temizlendi = !e2 && Number(sil) >= 0;
+            if (temizlendi) kaynak.aciklama_db_otorite = false;
+          }
+        } catch (h) { console.warn("R2 doğrulaması/temizlik atlandı (satırlar korunuyor):", h); }
+      }
       d.kirli = false; d.pdfKirli = !pdfeGomuldu && d.pdfKirli;
       d.sonOto = new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
       kaydetDurumu();
-      durumYaz(pdfeGomuldu ? "PDF güncellendi: açıklamalar dosyanın içine işlendi." : "Kaydedildi (yalnızca veritabanına; PDF şifreli/bozuk olduğundan dosyaya gömülemedi).", pdfeGomuldu ? "basari" : "uyari");
+      durumYaz(pdfeGomuldu ? `PDF güncellendi: açıklamalar dosyaya işlendi${temizlendi ? " ve doğrulandı; veritabanı kopyası temizlendi." : "."}` : "Kaydedildi (yalnızca veritabanına; PDF şifreli/bozuk olduğundan dosyaya gömülemedi).", pdfeGomuldu ? "basari" : "uyari");
       toast(pdfeGomuldu ? "Açıklamalar PDF'e işlendi." : "Açıklamalar veritabanına kaydedildi.", pdfeGomuldu ? "basari" : "uyari");
       return true;
     } catch (h) {
@@ -1100,6 +1178,7 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
     }
     document.removeEventListener("keydown", tus);
     document.removeEventListener("visibilitychange", gizlenince);
+    window.removeEventListener("online", cevrimici);
     window.removeEventListener("beforeunload", oncesi);
     if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
     try { viewer.setDocument(null); belge?.destroy(); } catch { /* */ }
