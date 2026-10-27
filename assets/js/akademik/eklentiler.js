@@ -18,24 +18,21 @@ const YEREL_ANAHTAR = "aea_ak_eklenti_v1";
 const ZAMAN_ASIMI = 12000;
 const DILLER = { tr: "Türkçe", en: "İngilizce", de: "Almanca", fr: "Fransızca", es: "İspanyolca", ar: "Arapça", ru: "Rusça" };
 
-/* ------------------------------ ağ yardımcısı ------------------------------ */
-async function getJson(url) {
-  const k = new AbortController(); const z = setTimeout(() => k.abort(), ZAMAN_ASIMI);
-  try {
-    const r = await fetch(url, { signal: k.signal, credentials: "omit", referrerPolicy: "no-referrer", headers: { Accept: "application/json" } });
-    if (!r.ok) { const e = new Error(`Servis ${r.status} döndürdü.`); e.durum = r.status; throw e; }
-    return await r.json();
-  } catch (h) {
-    if (h.name === "AbortError") throw new Error("Servis zamanında yanıt vermedi.");
-    if (h.durum) throw h;
-    throw new Error("Servise ulaşılamadı (ağ ya da tarayıcı engeli).");
-  } finally { clearTimeout(z); }
-}
+/* ------------------------------ yardımcılar ------------------------------ */
 const kisalt = (s, n) => (String(s).length > n ? `${String(s).slice(0, n - 1)}…` : String(s));
 
-/* ------------------------------ eklentiler ------------------------------ */
+/* ------------------------------ GİZLİLİK İLKESİ ------------------------------
+ * Bu sürümde hiçbir eklenti seçili metni sitemizden bir üçüncü tarafa GÖNDERMEZ. İki tür eklenti vardır:
+ *  • "yerel": her şey tarayıcında çalışır (veri cihazından çıkmaz).
+ *  • "bağlantı": yalnızca SEN tıklayınca, seçili metinle yeni sekmede bir adres açar (Google/DeepL gibi). Metni o sitede sen gönderirsin;
+ *    sitemiz hiçbir isteği kendisi yapmaz. Bu eklentiler varsayılan KAPALIDIR (kullanıcı tercihi).
+ * Önceki sürümdeki MyMemory/dictionaryapi/Vikipedi/Crossref API çağrıları gizlilik nedeniyle KALDIRILDI. */
+
+/** Cihaz içi çeviri: Chrome/Edge'in yerleşik Translator API'si (model tarayıcıda çalışır; metin hiçbir sunucuya gitmez). */
 async function cihazCeviri(metin, kaynak, hedef) {
-  if (!("Translator" in self)) return null;
+  if (!("Translator" in self)) {
+    throw new Error("Bu tarayıcıda cihaz-içi çeviri yok (Chrome/Edge 138+ gerekir). Safari/Mac/iPhone'da: metni seçip sistem menüsünden “Çevir”i kullan (o da cihazda çalışır); ya da Ayarlar'dan Google/DeepL bağlantı eklentisini aç.");
+  }
   let src = kaynak;
   if (src === "auto" && "LanguageDetector" in self) {
     try { const det = await self.LanguageDetector.create(); src = (await det.detect(metin))?.[0]?.detectedLanguage || "en"; } catch { src = "en"; }
@@ -43,82 +40,72 @@ async function cihazCeviri(metin, kaynak, hedef) {
   if (src === "auto") src = "en";
   if (src === hedef) return { metin, yontem: "Kaynak ve hedef dil aynı" };
   const durum = await self.Translator.availability({ sourceLanguage: src, targetLanguage: hedef });
-  if (durum === "unavailable") return null;
+  if (durum === "unavailable") throw new Error(`Bu dil çifti (${src}→${hedef}) cihazda desteklenmiyor.`);
   const tr = await self.Translator.create({ sourceLanguage: src, targetLanguage: hedef });
-  return { metin: await tr.translate(metin), yontem: `Cihaz içi (${src}→${hedef})` };
+  return { metin: await tr.translate(metin), yontem: `Cihaz içi (${src}→${hedef}) — veri cihazdan çıkmadı` };
 }
-async function bulutCeviri(metin, kaynak, hedef) {
-  // MyMemory: ücretsiz, anahtarsız (günlük anonim sınır var). İstek başına ≈500 bayt → cümle cümle parçala.
-  const parcalar = []; let sira = "";
-  for (const c of metin.replace(/\s+/g, " ").split(/(?<=[.!?;:])\s+/)) {
-    if ((sira + " " + c).length > 420 && sira) { parcalar.push(sira); sira = c; } else sira = sira ? `${sira} ${c}` : c;
-  }
-  if (sira) parcalar.push(sira);
-  const cikti = [];
-  for (const p of parcalar.slice(0, 6)) {
-    const j = await getJson(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(p.slice(0, 450))}&langpair=${encodeURIComponent(`${kaynak === "auto" ? "Autodetect" : kaynak}|${hedef}`)}`);
-    const t = j?.responseData?.translatedText;
-    if (!t || /MYMEMORY WARNING|QUERY LENGTH LIMIT/i.test(t)) throw new Error(/WARNING/i.test(t || "") ? "Ücretsiz çeviri servisinin günlük sınırı doldu. Yarın tekrar dene ya da Ayarlar'dan cihaz-içi çeviriyi aç." : "Çeviri alınamadı.");
-    cikti.push(t);
-  }
-  return { metin: cikti.join(" ") + (parcalar.length > 6 ? " …(uzun seçim: ilk bölüm çevrildi)" : ""), yontem: "İnternet servisi (MyMemory)" };
-}
+
+const DILLER_URL = { tr: "tr", en: "en", de: "de", fr: "fr", es: "es", ar: "ar", ru: "ru" };
 
 export const KATALOG = Object.freeze({
   ceviri: {
-    ad: "Çeviri", simge: "🌐", aciklama: "Seçili metni istediğin dile çevirir. Varsayılan: ücretsiz internet servisi (hiçbir şey depolanmaz).",
+    ad: "Çeviri (cihaz içi · özel)", simge: "🌐", gizlilik: "yerel",
+    aciklama: "Seçili metni tarayıcının yerleşik çeviri motoruyla çevirir. Metin cihazından ÇIKMAZ. (Chrome/Edge 138+; ilk kullanımda dil paketi tarayıcı tarafından indirilebilir.)",
     ayarlar: [
-      { anahtar: "hedef", etiket: "Hedef dil", tur: "secim", secenekler: DILLER, varsayilan: "tr" },
-      { anahtar: "kaynak", etiket: "Kaynak dil", tur: "secim", secenekler: { auto: "Otomatik algıla", ...DILLER }, varsayilan: "auto" },
-      { anahtar: "yontem", etiket: "Yöntem", tur: "secim", secenekler: { bulut: "İnternet servisi (önerilen · depolama kullanmaz)", cihaz: "Cihaz içi (Chrome · dil paketi indirir, tarayıcı depolamasını kullanır)" }, varsayilan: "bulut" },
+      { anahtar: "hedef", etiket: "Hedef dil", tur: "secim", secenekler: { tr: "Türkçe", en: "İngilizce", de: "Almanca", fr: "Fransızca", es: "İspanyolca", ar: "Arapça", ru: "Rusça" }, varsayilan: "tr" },
+      { anahtar: "kaynak", etiket: "Kaynak dil", tur: "secim", secenekler: { auto: "Otomatik algıla", tr: "Türkçe", en: "İngilizce", de: "Almanca", fr: "Fransızca", es: "İspanyolca", ar: "Arapça", ru: "Rusça" }, varsayilan: "auto" },
     ],
     async calistir({ metin, ayar }) {
-      const hedef = ayar.hedef || "tr", kaynak = ayar.kaynak || "auto";
-      if (ayar.yontem === "cihaz") {
-        const c = await cihazCeviri(metin, kaynak, hedef).catch(() => null);
-        if (c) return { baslik: "Çeviri", metin: c.metin, not: c.yontem };
-      }
-      const b = await bulutCeviri(metin, kaynak, hedef);
-      return { baslik: "Çeviri", metin: b.metin, not: ayar.yontem === "cihaz" ? `${b.yontem} · bu tarayıcıda cihaz-içi çeviri yok` : b.yontem };
+      const c = await cihazCeviri(metin, ayar.kaynak || "auto", ayar.hedef || "tr");
+      return { baslik: "Çeviri", metin: c.metin, not: c.yontem };
     },
   },
-  sozluk: {
-    ad: "Sözlük (İngilizce)", simge: "📖", aciklama: "Seçili İngilizce kelimenin anlamlarını ve okunuşunu gösterir (dictionaryapi.dev).",
-    ayarlar: [],
+  ceviri_google: {
+    ad: "Google Çeviri'de aç", simge: "🔤", gizlilik: "baglanti", varsayilanKapali: true,
+    aciklama: "Seçili metni Google Çeviri'de yeni sekmede açar. UYARI: metni o sitede sen göndermiş olursun (Google'a gider). Yalnızca tercih edersen aç.",
+    ayarlar: [{ anahtar: "hedef", etiket: "Hedef dil", tur: "secim", secenekler: { tr: "Türkçe", en: "İngilizce", de: "Almanca", fr: "Fransızca", es: "İspanyolca", ar: "Arapça", ru: "Rusça" }, varsayilan: "tr" }],
+    baglanti: ({ metin, ayar }) => `https://translate.google.com/?sl=auto&tl=${DILLER_URL[ayar.hedef] || "tr"}&text=${encodeURIComponent(kisalt(metin, 1500))}&op=translate`,
+  },
+  ceviri_deepl: {
+    ad: "DeepL'de aç", simge: "🅳", gizlilik: "baglanti", varsayilanKapali: true,
+    aciklama: "Seçili metni DeepL'de yeni sekmede açar (genelde en iyi çeviri kalitesi). UYARI: metin DeepL'e gider. Yalnızca tercih edersen aç.",
+    ayarlar: [{ anahtar: "hedef", etiket: "Hedef dil", tur: "secim", secenekler: { tr: "Türkçe", en: "İngilizce", de: "Almanca", fr: "Fransızca", es: "İspanyolca", ru: "Rusça" }, varsayilan: "tr" }],
+    baglanti: ({ metin, ayar }) => `https://www.deepl.com/translator#auto/${DILLER_URL[ayar.hedef] || "tr"}/${encodeURIComponent(kisalt(metin, 1500))}`,
+  },
+  istatistik: {
+    ad: "Metin bilgisi", simge: "🔢", gizlilik: "yerel",
+    aciklama: "Seçilen metnin kelime/karakter sayısını ve tahmini okuma süresini gösterir. Tamamen yerel.", ayarlar: [],
     async calistir({ metin }) {
-      const kelime = metin.trim().split(/\s+/)[0].replace(/[^\p{L}'-]/gu, "").toLowerCase();
-      if (!kelime) throw new Error("Bir kelime seç.");
-      let j; try { j = await getJson(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(kelime)}`); } catch (h) { if (h.durum === 404) throw new Error(`“${kelime}” İngilizce sözlükte bulunamadı.`); throw h; }
-      const e = j[0]; const satirlar = [];
-      for (const m of (e.meanings || []).slice(0, 3)) for (const d of (m.definitions || []).slice(0, 2)) satirlar.push(`(${m.partOfSpeech}) ${d.definition}`);
-      return { baslik: `${e.word}${e.phonetic ? `  ${e.phonetic}` : ""}`, metin: satirlar.join("\n") || "Tanım bulunamadı." };
+      const k = metin.split(/\s+/).filter(Boolean).length;
+      return { baslik: "Metin bilgisi", metin: `${k} kelime · ${metin.length} karakter · ≈ ${Math.max(1, Math.round(k / 220 * 60))} sn okuma` };
     },
   },
-  vikipedi: {
-    ad: "Vikipedi özeti", simge: "🧭", aciklama: "Seçili terimin Vikipedi özetini getirir.",
-    ayarlar: [{ anahtar: "dil", etiket: "Vikipedi dili", tur: "secim", secenekler: { tr: "Türkçe", en: "İngilizce", de: "Almanca", fr: "Fransızca" }, varsayilan: "tr" }],
-    async calistir({ metin, ayar }) {
-      const dil = ayar.dil || "tr", q = kisalt(metin.replace(/\s+/g, " ").trim(), 80);
-      const ara = await getJson(`https://${dil}.wikipedia.org/w/rest.php/v1/search/title?q=${encodeURIComponent(q)}&limit=1`);
-      const s = ara?.pages?.[0]; if (!s) throw new Error("Vikipedi'de eşleşen madde yok.");
-      const o = await getJson(`https://${dil}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(s.key)}`);
-      return { baslik: o.title || s.title, metin: o.extract || "Özet yok.", baglanti: o.content_urls?.desktop?.page };
-    },
-  },
-  crossref: {
-    ad: "Künye bul (Crossref)", simge: "🔎", aciklama: "Seçili kaynakça satırından/başlıktan DOI ve künye bulur (Crossref).",
-    ayarlar: [],
+  temizle: {
+    ad: "Temiz kopyala", simge: "🧹", gizlilik: "yerel",
+    aciklama: "PDF'ten gelen satır sonu tirelerini ve kopuk satırları düzelterek metni tek paragraf halinde panoya kopyalar. Yerel.", ayarlar: [],
     async calistir({ metin }) {
-      const j = await getJson(`https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(kisalt(metin.replace(/\s+/g, " ").trim(), 300))}&rows=3&select=DOI,title,author,issued,container-title`);
-      const o = j?.message?.items || []; if (!o.length) throw new Error("Eşleşen kayıt bulunamadı.");
-      return { baslik: "Olası eşleşmeler", metin: o.map((x) => `• ${(x.title || ["(başlıksız)"])[0]}\n  ${(x.author || []).slice(0, 3).map((a) => a.family).filter(Boolean).join(", ")} · ${x["issued"]?.["date-parts"]?.[0]?.[0] || "t.y."} · ${(x["container-title"] || [""])[0]}\n  DOI: ${x.DOI}`).join("\n\n"), baglanti: `https://doi.org/${o[0].DOI}` };
+      const temiz = metin.replace(/-\s*\n?\s*(?=\p{Ll})/gu, "").replace(/\s*\n\s*/g, " ").replace(/\s{2,}/g, " ").trim();
+      try { await navigator.clipboard.writeText(temiz); } catch { /* pano izni yok */ }
+      return { baslik: "Temiz metin (panoya kopyalandı)", metin: temiz };
     },
   },
-  akademik: { ad: "Google Akademik'te ara", simge: "🎓", aciklama: "Seçili metni Google Akademik'te yeni sekmede arar.", ayarlar: [], baglanti: "https://scholar.google.com/scholar?q={metin}" },
-  semantic: { ad: "Semantic Scholar'da ara", simge: "🧠", aciklama: "Seçili metni Semantic Scholar'da arar.", ayarlar: [], baglanti: "https://www.semanticscholar.org/search?q={metin}" },
+  doi_cikar: {
+    ad: "DOI / adres bul", simge: "🔗", gizlilik: "yerel",
+    aciklama: "Seçili metindeki DOI ve web adreslerini bulur ve tıklanabilir yapar. Yerel — hiçbir istek yapılmaz.", ayarlar: [],
+    async calistir({ metin }) {
+      const doi = [...metin.matchAll(/\b10\.\d{4,9}\/[^\s"<>]+/g)].map((m) => m[0].replace(/[.,;)\]]+$/, ""));
+      const url = [...metin.matchAll(/https?:\/\/[^\s"<>]+/g)].map((m) => m[0].replace(/[.,;)\]]+$/, ""));
+      if (!doi.length && !url.length) throw new Error("Seçili metinde DOI ya da adres bulunamadı.");
+      return { baslik: "Bulunanlar", metin: [...doi.map((x) => `DOI: ${x}`), ...url].join("\n"), baglanti: doi.length ? `https://doi.org/${doi[0]}` : url[0] };
+    },
+  },
+  akademik: { ad: "Google Akademik'te ara", simge: "🎓", gizlilik: "baglanti", varsayilanKapali: true, aciklama: "Seçili metinle Google Akademik'i yeni sekmede açar (arama metni Google'a gider). Tercihe bağlı.", ayarlar: [], baglanti: ({ metin }) => `https://scholar.google.com/scholar?q=${encodeURIComponent(kisalt(metin, 300))}` },
+  semantic: { ad: "Semantic Scholar'da ara", simge: "🧠", gizlilik: "baglanti", varsayilanKapali: true, aciklama: "Seçili metinle Semantic Scholar'ı yeni sekmede açar. Tercihe bağlı.", ayarlar: [], baglanti: ({ metin }) => `https://www.semanticscholar.org/search?q=${encodeURIComponent(kisalt(metin, 300))}` },
+  vikipedi: { ad: "Vikipedi'de ara", simge: "🧭", gizlilik: "baglanti", varsayilanKapali: true, aciklama: "Seçili terimi Vikipedi'de yeni sekmede arar (kâr amacı gütmeyen, açık kaynak). Tercihe bağlı.", ayarlar: [], baglanti: ({ metin }) => `https://tr.wikipedia.org/w/index.php?search=${encodeURIComponent(kisalt(metin, 100))}` },
+  wiktionary: { ad: "Vikisözlük'te ara", simge: "📖", gizlilik: "baglanti", varsayilanKapali: true, aciklama: "Seçili kelimeyi Vikisözlük'te yeni sekmede arar. Tercihe bağlı.", ayarlar: [], baglanti: ({ metin }) => `https://tr.wiktionary.org/w/index.php?search=${encodeURIComponent(kisalt(metin, 60))}` },
 });
 
-export const VARSAYILAN_AYAR = Object.freeze({ v: 1, acik: ["ceviri", "sozluk"], ayar: {}, ozel: [] });
+export const VARSAYILAN_AYAR = Object.freeze({ v: 1, acik: ["ceviri", "istatistik", "temizle", "doi_cikar"], ayar: {}, ozel: [] });
 
 /* ------------------------------ ayar saklama (yerel + küçük bulut satırı) ------------------------------ */
 function temizle(a) {
@@ -190,8 +177,10 @@ export async function eklentiCalistir(id, metin, a) {
   const temiz = String(metin || "").replace(/\s+/g, " ").trim();
   if (!temiz) throw new Error("Önce metin seç.");
   const kat = KATALOG[id];
-  if (kat?.baglanti) return { baslik: kat.ad, ac: kat.baglanti.replace("{metin}", encodeURIComponent(kisalt(temiz, 300))) };
-  if (kat?.calistir) return kat.calistir({ metin: temiz.slice(0, 2000), ayar: a.ayar[id] || {} });
+  const ayar = (a.ayar && a.ayar[id]) || {};
+  const tam = Object.fromEntries((kat?.ayarlar || []).map((s) => [s.anahtar, ayar[s.anahtar] || s.varsayilan]));
+  if (kat?.baglanti) return { baslik: kat.ad, ac: kat.baglanti({ metin: temiz, ayar: tam }) };
+  if (kat?.calistir) return kat.calistir({ metin: id === "temizle" ? String(metin).slice(0, 6000) : temiz.slice(0, 4000), ayar: tam });
   const o = a.ozel.find((x) => x.id === id);
   if (o) return { baslik: o.ad, ac: o.url.replace(/\{metin\}/g, encodeURIComponent(kisalt(temiz, 300))) };
   throw new Error("Bu eklenti bulunamadı.");
