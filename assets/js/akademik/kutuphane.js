@@ -12,6 +12,8 @@ import { okuyucuAc } from "./okuyucu.js";
 import { motorPaneliKur } from "./motor-paneli.js";
 import { eklentiPaneliKur } from "./eklenti-paneli.js";
 import { aciklamalariIceAl } from "./aciklama-ice.js";
+import { rdfAyristir, dosyaBul } from "./ice-zotero.js";
+import { bekleyenleriGonder } from "./taslak.js";
 
 const GORUNURLUK = { ozel: "Özel", ekip: "Ekip", herkese_acik: "Herkese açık" };
 const KAP_ETIKET = { makale: "Dergi adı", kitap: "Yayınevi", kitap_bolumu: "Yayınevi", bildiri: "Bildiri / kongre adı", tez: "Üniversite", rapor: "Kurum / yayıncı", web: "Site adı", diger: "Yayıncı / kaynak" };
@@ -53,12 +55,14 @@ function kutuphaneKur(kok, profil, owner) {
             <div class="ak-menu-liste" data-ak-menu-ekle role="menu" hidden>
               <button type="button" role="menuitem" data-act="pdf-sec">📄 PDF yükle <small>(açıklamalarıyla birlikte)</small></button>
               <button type="button" role="menuitem" data-act="ekle">✍ Kaynağı elle / DOI ile ekle</button>
-              <button type="button" role="menuitem" data-act="ice-aktar">⇪ BibTeX / RIS dosyasından</button>
+              <button type="button" role="menuitem" data-act="ice-aktar">⇪ BibTeX / RIS / Zotero RDF dosyası</button>
+              <button type="button" role="menuitem" data-act="zotero-klasor">🗂 Zotero dışa aktarma klasörü <small>(klasörler + PDF'ler)</small></button>
               <button type="button" role="menuitem" data-act="klasor-yeni">📁 Yeni klasör</button>
             </div>
           </span>
           <button type="button" class="ak-btn" data-act="disa-aktar">⇩ Dışa aktar</button>
-          <input type="file" class="ak-gizli-alan" data-ak-ice accept=".bib,.bibtex,.ris,.txt" aria-label="BibTeX / RIS dosyası">
+          <input type="file" class="ak-gizli-alan" data-ak-ice accept=".bib,.bibtex,.ris,.rdf,.txt" aria-label="BibTeX / RIS / RDF dosyası">
+          <input type="file" class="ak-gizli-alan" data-ak-zotero webkitdirectory multiple aria-label="Zotero dışa aktarma klasörü">
           <input type="file" class="ak-gizli-alan" data-ak-pdf accept="application/pdf,.pdf" multiple aria-label="PDF dosyaları">`}
         </div>
       </header>
@@ -66,6 +70,7 @@ function kutuphaneKur(kok, profil, owner) {
       <nav class="ak-sekmeler" role="tablist" aria-label="Bölümler">
         <button type="button" role="tab" class="aktif" data-kapsam="benim" aria-selected="true">Kütüphanem</button>
         <button type="button" role="tab" data-kapsam="paylasilan" aria-selected="false">Benimle paylaşılanlar</button>
+        <button type="button" role="tab" data-kapsam="paylasim" aria-selected="false">🔗 Paylaş</button>
         <button type="button" role="tab" data-kapsam="ayarlar" aria-selected="false">⚙ Ayarlar</button>
       </nav>`}
       <div class="ak-owner-bar" data-ak-uyeler hidden>
@@ -77,6 +82,7 @@ function kutuphaneKur(kok, profil, owner) {
         <ul class="ak-uye-liste" data-ak-uye-liste></ul>
       </div>
 
+      <div class="ak-paylasim" data-ak-paylasim hidden></div>
       <div class="ak-ayarlar" data-ak-ayarlar hidden>
         <section class="ak-ayar-kart">
           <h3>Atıf</h3>
@@ -194,7 +200,7 @@ function kutuphaneKur(kok, profil, owner) {
       if (f.gorunurluk && k.gorunurluk !== f.gorunurluk) return false;
       if (f.pdfli && !k.pdf_r2_yolu) return false;
       if (belirtec.length) {
-        const havuz = [k.baslik, k.doi, k.isbn, k.dergi_veya_yayinevi, k.ozet, (k.etiketler || []).join(" "), (k.yazarlar || []).map((y) => `${y.adi || ""} ${y.soyadi || ""} ${y.kurum || ""}`).join(" "), k.yayin_yili].join(" ").toLocaleLowerCase("tr");
+        const havuz = [k.baslik, k.doi, k.isbn, k.dergi_veya_yayinevi, k.ozet, (k.etiketler || []).join(" "), (k.yazarlar || []).map((y) => `${y.adi || ""} ${y.soyadi || ""} ${y.kurum || ""}`).join(" "), k.yayin_yili, k.aciklama_metni].join(" ").toLocaleLowerCase("tr");
         const notMetni = d.notlar.get(k.id) || "";
         // Her sözcük künyede YA DA vurgu/yorum metinlerinde geçmeli (tüm sözcükler birlikte aranır)
         if (!belirtec.every((b) => havuz.includes(b) || notMetni.includes(b))) return false;
@@ -285,7 +291,7 @@ function kutuphaneKur(kok, profil, owner) {
       return `<li role="treeitem" aria-expanded="${alt ? acik : "false"}"><div class="ak-kl${d.klasor === k.id ? " aktif" : ""}" data-kl="${esc(k.id)}" style="--sev:${seviye}">
         ${alt ? `<button type="button" class="ak-kl-ok${acik ? " acik" : ""}" data-kl-ac="${esc(k.id)}" aria-label="${esc(k.ad)} klasörünü ${acik ? "kapat" : "aç"}">▸</button>` : `<span class="ak-kl-ok bos"></span>`}
         <button type="button" class="ak-kl-ad" data-klasor="${esc(k.id)}" title="${esc(klasorYolu(k.id))}"><span aria-hidden="true">${acik && alt ? "📂" : "📁"}</span> <span class="ak-kl-metin">${esc(k.ad)}</span> <span class="ak-kl-say">${sayi(k.id)}</span></button>
-        ${edit ? `<span class="ak-kl-islem"><button type="button" data-kl-islem="alt" data-id="${esc(k.id)}" title="Alt klasör ekle" aria-label="Alt klasör ekle">＋</button><button type="button" data-kl-islem="ad" data-id="${esc(k.id)}" title="Yeniden adlandır" aria-label="Yeniden adlandır">✎</button><button type="button" data-kl-islem="sil" data-id="${esc(k.id)}" title="Klasörü sil (kaynaklar silinmez)" aria-label="Klasörü sil">🗑</button></span>` : ""}
+        ${edit ? `<span class="ak-kl-islem"><button type="button" data-kl-islem="alt" data-id="${esc(k.id)}" title="Alt klasör ekle" aria-label="Alt klasör ekle">＋</button><button type="button" data-kl-islem="ad" data-id="${esc(k.id)}" title="Yeniden adlandır" aria-label="Yeniden adlandır">✎</button><button type="button" data-kl-islem="tasi" data-id="${esc(k.id)}" title="Başka klasörün içine taşı" aria-label="Taşı">↳</button><button type="button" data-kl-islem="paylas" data-id="${esc(k.id)}" title="Bu klasörü paylaş" aria-label="Paylaş">🔗</button><button type="button" data-kl-islem="sil" data-id="${esc(k.id)}" title="Klasörü sil (kaynaklar silinmez)" aria-label="Klasörü sil">🗑</button></span>` : ""}
       </div>${alt && acik ? `<ul role="group">${dal(k.id, seviye + 1)}</ul>` : ""}</li>`;
     }).join("");
     alan.innerHTML = `<ul role="tree" class="ak-agac-liste">
@@ -373,7 +379,7 @@ function kutuphaneKur(kok, profil, owner) {
   function uyeGorunumu() {
     const kapali = !uyeModu();
     q("[data-ak-uyeler]").hidden = kapali;
-    const zot = q("[data-ak-zot]"); if (d.kapsam === "ayarlar") { zot.hidden = true; return; }
+    const zot = q("[data-ak-zot]"); if (d.kapsam === "ayarlar" || d.kapsam === "paylasim") { zot.hidden = true; q("[data-ak-uyeler]").hidden = true; return; }
     const icerikGizle = uyeModu() && !d.uye;
     zot.hidden = icerikGizle;
     if (kapali) return;
@@ -383,6 +389,7 @@ function kutuphaneKur(kok, profil, owner) {
     if (d.uye) return;
     const a = tokenlar(q("[data-uye-ara]").value);
     const uyeler = d.uyeler.filter((u) => { const h = trKucuk(`${u.ad} ${owner ? u.eposta : ""}`); return a.every((t) => h.includes(t)); });
+    if (!owner && !q("[data-ak-acik]")) acikKutuphaneleriYukle();
     q("[data-ak-uye-liste]").innerHTML = uyeler.length
       ? uyeler.map((u) => `<li><button type="button" class="ak-uye-kart" data-uye-sec="${esc(u.user_id)}"><strong>${esc(u.ad || u.eposta || "Üye")}</strong>${owner ? `<small>${esc(u.ad ? u.eposta : "")}${u.ad && u.eposta ? " · " : ""}${esc(u.rol)}</small>` : ""}<span>${u.kaynak_sayisi} kaynak${u.toplam_bayt != null ? ` · ${bayt(u.toplam_bayt)}` : ""}</span></button></li>`).join("")
       : `<li class="ak-bos">${d.uyeler.length ? "Aramaya uyan üye yok." : owner ? "Henüz hiçbir üye kaynak eklememiş." : "Seninle paylaşılmış kaynak yok."}</li>`;
@@ -707,36 +714,170 @@ function kutuphaneKur(kok, profil, owner) {
   }
 
   /* --------------------------- içe / dışa aktarma --------------------------- */
-  async function iceAktar(dosya) {
-    const metin = await dosya.text();
-    const bicim = icerikBicimiTahmin(dosya.name, metin);
-    if (!bicim) { toast("Dosya BibTeX ya da RIS olarak tanınmadı.", "hata"); return; }
-    let kayitlar;
-    try { kayitlar = bicim === "bib" ? bibtexAyristir(metin) : risAyristir(metin); } catch (h) { toast(`Dosya çözümlenemedi: ${h.message}`, "hata"); return; }
+  /** Klasör yolunu (["Tez","Bölüm 1"]) oluşturur/bulur; son klasörün kimliğini döndürür. Aynı ad+üst klasör varsa yenisi açılmaz. */
+  async function klasorYoluGarantile(yol, onbellek) {
+    let ust = null;
+    for (const ad of yol) {
+      const anahtar = `${ust || ""}\u0001${ad.toLocaleLowerCase("tr")}`;
+      let id = onbellek.get(anahtar) || d.klasorler.find((k) => (k.ust_id || null) === ust && k.ad.toLocaleLowerCase("tr") === ad.toLocaleLowerCase("tr"))?.id;
+      if (!id) {
+        const { data, error } = await supabase.from("akademik_koleksiyonlar").insert({ ad: ad.slice(0, 120), ust_id: ust, user_id: profil.id }).select().single();
+        if (error) throw new Error(error.message);
+        d.klasorler.push(data); id = data.id;
+      }
+      onbellek.set(anahtar, id); ust = id;
+    }
+    return ust;
+  }
+
+  /** İçe aktarma: BibTeX / RIS / Zotero RDF (+ Zotero dışa aktarma klasörü: PDF'ler ve klasör ağacı). */
+  async function iceAktar(dosyalar) {
+    const liste = Array.isArray(dosyalar) ? dosyalar : [dosyalar];
+    const ana = liste.find((f) => /\.rdf$/i.test(f.name)) || liste.find((f) => /\.(bib|bibtex|ris|txt)$/i.test(f.name)) || liste[0];
+    const metin = await ana.text();
+    const bicim = icerikBicimiTahmin(ana.name, metin);
+    if (!bicim) { toast("Dosya BibTeX, RIS ya da Zotero RDF olarak tanınmadı.", "hata"); return; }
+    let kayitlar, rdfKlasor = 0;
+    try {
+      if (bicim === "rdf") { const r = rdfAyristir(metin); kayitlar = r.kayitlar; rdfKlasor = r.klasorSayisi; }
+      else kayitlar = bicim === "bib" ? bibtexAyristir(metin) : risAyristir(metin);
+    } catch (h) { toast(`Dosya çözümlenemedi: ${h.message}`, "hata"); return; }
     if (!kayitlar.length) { toast("Dosyada kaynak bulunamadı.", "uyari"); return; }
-    if (!confirm(`${kayitlar.length} kaynak bulundu (${bicim === "bib" ? "BibTeX" : "RIS"}). Kütüphaneye eklensin mi?`)) return;
+    const yoluDizi = (k) => (bicim === "rdf" ? k._klasor : k._klasor) || [];
+    const pdfler = new Map();
+    for (const k of kayitlar) for (const g of k._dosya || []) { const f = dosyaBul(liste, g); if (f && !pdfler.has(g)) pdfler.set(g, f); }
+    const klasorYolSayisi = new Set(kayitlar.flatMap((k) => yoluDizi(k).map((y) => y.join("\u0001")))).size;
+    if (!confirm(`${kayitlar.length} kaynak bulundu (${bicim === "bib" ? "BibTeX" : bicim === "ris" ? "RIS" : "Zotero RDF"}).\n${klasorYolSayisi ? `${klasorYolSayisi} klasör yolu${rdfKlasor ? ` (Zotero'da ${rdfKlasor} koleksiyon)` : ""} aynen kurulacak.\n` : ""}${pdfler.size ? `${pdfler.size} PDF dosyası yüklenecek.\n` : ""}Kütüphaneye eklensin mi?`)) return;
+
     const mevcutDoi = new Set(d.kayitlar.filter(benim).map((k) => (k.doi || "").toLowerCase()).filter(Boolean));
     const goruldu = new Set();
-    const yeni = kayitlar.filter((k) => {
-      if (!k.doi) return true;
-      const x = k.doi.toLowerCase();
-      if (mevcutDoi.has(x) || goruldu.has(x)) return false;
-      goruldu.add(x);
-      return true;
-    });
+    const yeni = kayitlar.filter((k) => { if (!k.doi) return true; const x = k.doi.toLowerCase(); if (mevcutDoi.has(x) || goruldu.has(x)) return false; goruldu.add(x); return true; });
     const atlanan = kayitlar.length - yeni.length;
-    let eklenen = 0, hatali = 0;
+    const temiz = (k) => { const { _klasor, _dosya, ...kalan } = k; return kalan; };
+    const ozetYaz = (m) => { q("[data-ak-ozet]").textContent = m; };
+    const eklenenler = []; let hatali = 0;
     for (let i = 0; i < yeni.length; i += 50) {
+      ozetYaz(`Künyeler ekleniyor… ${Math.min(i + 50, yeni.length)}/${yeni.length}`);
       const parca = yeni.slice(i, i + 50);
-      const { error } = await supabase.from("akademik_kaynaklar").insert(parca);
-      if (!error) { eklenen += parca.length; continue; }
-      for (const k of parca) { // toplu eklemede hata → tek tek dene, sorunluyu atla
-        const r = await supabase.from("akademik_kaynaklar").insert(k);
-        if (r.error) hatali++; else eklenen++;
+      const { data, error } = await supabase.from("akademik_kaynaklar").insert(parca.map(temiz)).select("id");
+      if (!error && data?.length === parca.length) { parca.forEach((k, n) => eklenenler.push({ k, id: data[n].id })); continue; }
+      for (const k of parca) { const r = await supabase.from("akademik_kaynaklar").insert(temiz(k)).select("id").single(); if (r.error) hatali++; else eklenenler.push({ k, id: r.data.id }); }
+    }
+    // klasörler + ilişkiler
+    let klasorHata = 0; const onbellek = new Map(); const bag = [];
+    for (const { k, id } of eklenenler) {
+      for (const yol of yoluDizi(k)) {
+        try { const kid = await klasorYoluGarantile(yol, onbellek); if (kid) bag.push({ koleksiyon_id: kid, kaynak_id: id, user_id: profil.id }); } catch { klasorHata++; }
       }
     }
-    toast(`${eklenen} kaynak eklendi${atlanan ? `, ${atlanan} yinelenen DOI atlandı` : ""}${hatali ? `, ${hatali} kayıt eklenemedi` : ""}.`, hatali ? "uyari" : "basari", 7000);
-    yukle();
+    for (let i = 0; i < bag.length; i += 200) await supabase.from("akademik_koleksiyon_ogeleri").upsert(bag.slice(i, i + 200), { onConflict: "koleksiyon_id,kaynak_id", ignoreDuplicates: true });
+    // PDF'ler (+ içlerindeki açıklamalar)
+    let pdfOk = 0, pdfHata = 0, aciklama = 0, sira = 0;
+    const toplamPdf = eklenenler.reduce((n, { k }) => n + ((k._dosya || []).some((g) => pdfler.has(g)) ? 1 : 0), 0);
+    for (const { k, id } of eklenenler) {
+      const g = (k._dosya || []).find((x) => pdfler.has(x)); if (!g) continue;
+      const f = pdfler.get(g); sira++;
+      try {
+        ozetYaz(`PDF yükleniyor (${sira}/${toplamPdf}): ${f.name}`);
+        await pdfYukle(id, f, { dosyaAdi: f.name });
+        aciklama += await aciklamalariIceAl(id, f); pdfOk++;
+      } catch { pdfHata++; }
+    }
+    toast(`${eklenenler.length} kaynak eklendi${atlanan ? `, ${atlanan} yinelenen DOI atlandı` : ""}${klasorYolSayisi ? `, klasör yapısı kuruldu` : ""}${pdfOk ? `, ${pdfOk} PDF yüklendi${aciklama ? ` (${aciklama} açıklama)` : ""}` : ""}${hatali || pdfHata || klasorHata ? ` · sorunlu: ${hatali} kaynak, ${pdfHata} PDF, ${klasorHata} klasör` : ""}.`, hatali || pdfHata || klasorHata ? "uyari" : "basari", 9000);
+    await yukle();
+  }
+
+  /* --------------------------- klasörü taşı --------------------------- */
+  function klasorTasiDialogu(id) {
+    const k = d.klasorler.find((x) => x.id === id); if (!k) return;
+    const yasak = new Set(altKlasorler(id)); const dl = dlg("klasor");
+    const dalCiz = (ust, sev) => d.klasorler.filter((x) => (x.ust_id || null) === ust && !yasak.has(x.id)).sort((a, b) => a.ad.localeCompare(b.ad, "tr")).map((x) => `<label class="ak-kd-satir" style="--sev:${sev}"><input type="radio" name="yeniust" value="${esc(x.id)}" ${k.ust_id === x.id ? "checked" : ""}> <span>📁 ${esc(x.ad)}</span></label>${dalCiz(x.id, sev + 1)}`).join("");
+    dl.innerHTML = `<form method="dialog" class="ak-dlg-ic"><h3>“${esc(k.ad)}” klasörünü taşı</h3>
+      <div class="ak-kd-liste"><label class="ak-kd-satir"><input type="radio" name="yeniust" value="" ${!k.ust_id ? "checked" : ""}> <span>🗂 En üst düzey</span></label>${dalCiz(null, 0)}</div>
+      <div class="ak-dlg-eylem"><button class="ak-btn" value="iptal">Vazgeç</button><button class="ak-btn ak-btn-birincil" value="tamam" data-tasi>Taşı</button></div></form>`;
+    dl.onchange = null;
+    dl.onclick = async (e) => {
+      if (!e.target.closest("[data-tasi]")) return;
+      e.preventDefault();
+      const yeni = dl.querySelector('input[name="yeniust"]:checked')?.value || null;
+      try {
+        const { error } = await supabase.from("akademik_koleksiyonlar").update({ ust_id: yeni }).eq("id", id);
+        if (error) throw new Error(error.message);
+        k.ust_id = yeni; if (yeni) d.acik.add(yeni);
+        dl.close(); agacCiz(); ciz();
+      } catch (h) { toast(`Taşınamadı: ${h.message}`, "hata"); }
+    };
+    dl.showModal();
+  }
+
+  /* --------------------------- paylaşım (Zotero grup kütüphanesi benzeri) --------------------------- */
+  const paylasimAdresi = (token) => `${location.origin}/kutuphane/?t=${token}`;
+  const ERISIM = { uyeler: "👥 Yalnızca site üyeleri (giriş gerekir)", link: "🔗 Bağlantıya sahip olan herkes", herkes: "🌍 Herkese açık (üyelere listelenir)" };
+  async function paylasimCiz(onSecilenKlasor = null) {
+    const alan = q("[data-ak-paylasim]");
+    alan.innerHTML = '<p class="ak-alt">Yükleniyor…</p>';
+    const { data, error } = await supabase.from("akademik_paylasimlari").select("*").order("created_at", { ascending: false });
+    if (error) { alan.innerHTML = `<p class="ak-bos ak-hata">Paylaşımlar yüklenemedi: ${esc(error.message)}. Migration 0118 uygulanmış olmalı.</p>`; return; }
+    const klasorSecenek = d.klasorler.slice().sort((a, b) => klasorYolu(a.id).localeCompare(klasorYolu(b.id), "tr")).map((k) => `<option value="${esc(k.id)}" ${k.id === onSecilenKlasor ? "selected" : ""}>${esc(klasorYolu(k.id))}</option>`).join("");
+    alan.innerHTML = `
+      <section class="ak-ayar-kart"><h3>Yeni paylaşım</h3>
+        <p class="ak-alt">Kütüphanenin tamamını ya da tek bir klasörü (alt klasörleriyle) paylaş. Alıcı künyeleri (DOI, yazar, özet, etiket), klasör ağacını görür; PDF okuma iznini sen belirlersin. İstediğin an kapatabilir veya silebilirsin.</p>
+        <form class="ak-paylasim-form" data-pz-form>
+          <label>Ne paylaşılsın? <select name="kapsam"><option value="kutuphane">Tüm kütüphanem ("özel" işaretli kaynaklar hariç)</option>${klasorSecenek ? `<option value="klasor" ${onSecilenKlasor ? "selected" : ""}>Yalnızca bir klasör…</option>` : ""}</select></label>
+          <label data-pz-klasor-satir ${onSecilenKlasor ? "" : "hidden"}>Klasör <select name="klasor">${klasorSecenek}</select></label>
+          <label>Kim görebilsin? <select name="erisim">${Object.entries(ERISIM).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></label>
+          <label>Başlık <input name="baslik" maxlength="120" value="${esc(profil.ad ? `${profil.ad} — Akademik Kütüphane` : "Akademik kütüphanem")}"></label>
+          <label>Açıklama (isteğe bağlı) <textarea name="aciklama" maxlength="600" rows="2" placeholder="Bu koleksiyon ne hakkında?"></textarea></label>
+          <label class="ak-onay"><input type="checkbox" name="pdf" checked> Alıcılar PDF'leri okuyabilsin (vurgularım PDF'e işliyse onlar da görünür)</label>
+          <label>Bitiş tarihi (isteğe bağlı) <input type="date" name="bitis"></label>
+          <button type="submit" class="ak-btn ak-btn-birincil">Paylaşımı oluştur</button>
+        </form>
+      </section>
+      <section class="ak-ayar-kart"><h3>Paylaşımlarım (${data.length})</h3>
+        ${data.length ? `<ul class="ak-pz-liste">${data.map((p) => `<li class="ak-pz${p.aktif ? "" : " pasif"}" data-pz="${esc(p.id)}">
+          <div><strong>${esc(p.baslik)}</strong> <span class="ak-rozet">${esc(p.kapsam === "klasor" ? `Klasör: ${klasorYolu(p.klasor_id) || "—"}` : "Tüm kütüphane")}</span> <span class="ak-rozet">${esc(ERISIM[p.erisim])}</span> ${p.pdf_okuma ? '<span class="ak-rozet ak-pdf">PDF okunabilir</span>' : '<span class="ak-rozet">Yalnız künye</span>'} ${p.aktif ? "" : '<span class="ak-rozet">Kapalı</span>'}${p.bitis ? ` <span class="ak-rozet">Bitiş: ${esc(new Date(p.bitis).toLocaleDateString("tr-TR"))}</span>` : ""}</div>
+          <input class="ak-pz-adres" readonly value="${esc(paylasimAdresi(p.token))}" aria-label="Paylaşım bağlantısı">
+          <div class="ak-pz-eylem"><button type="button" class="ak-btn ak-btn-birincil" data-pz-islem="kopya">Bağlantıyı kopyala</button><a class="ak-btn" href="${esc(paylasimAdresi(p.token))}" target="_blank" rel="noopener">Önizle ↗</a>
+            <select data-pz-islem="erisim" aria-label="Erişim">${Object.entries(ERISIM).map(([k, v]) => `<option value="${k}" ${k === p.erisim ? "selected" : ""}>${v}</option>`).join("")}</select>
+            <button type="button" class="ak-btn" data-pz-islem="pdf">${p.pdf_okuma ? "PDF okumayı kapat" : "PDF okumayı aç"}</button>
+            <button type="button" class="ak-btn" data-pz-islem="aktif">${p.aktif ? "Paylaşımı durdur" : "Yeniden aç"}</button>
+            <button type="button" class="ak-btn" data-pz-islem="yenile" title="Eski bağlantı çalışmaz olur">Bağlantıyı yenile</button>
+            <button type="button" class="ak-btn" data-pz-islem="sil">Sil</button></div></li>`).join("")}</ul>` : '<p class="ak-bos">Henüz paylaşım yok.</p>'}
+      </section>`;
+    const form = alan.querySelector("[data-pz-form]");
+    form.kapsam.addEventListener("change", () => { alan.querySelector("[data-pz-klasor-satir]").hidden = form.kapsam.value !== "klasor"; });
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const f = form; const klasor = f.kapsam.value === "klasor" ? f.klasor.value : null;
+      if (f.kapsam.value === "klasor" && !klasor) { toast("Bir klasör seç.", "uyari"); return; }
+      const { error: e2 } = await supabase.from("akademik_paylasimlari").insert({ user_id: profil.id, kapsam: f.kapsam.value, klasor_id: klasor, erisim: f.erisim.value, baslik: f.baslik.value.trim() || "Akademik kütüphanem", aciklama: f.aciklama.value.trim() || null, pdf_okuma: f.pdf.checked, bitis: f.bitis.value ? new Date(`${f.bitis.value}T23:59:59`).toISOString() : null });
+      if (e2) { toast(`Oluşturulamadı: ${e2.message}`, "hata"); return; }
+      toast("Paylaşım oluşturuldu. Bağlantıyı aşağıdan kopyalayabilirsin.", "basari"); paylasimCiz();
+    });
+    alan.onclick = async (e) => {
+      const b = e.target.closest("[data-pz-islem]"); if (!b || b.tagName === "SELECT") return;
+      const li = b.closest("[data-pz]"); const p = data.find((x) => x.id === li.dataset.pz); const islem = b.dataset.pzIslem;
+      try {
+        if (islem === "kopya") { await panoyaKopyala(paylasimAdresi(p.token)); toast("Bağlantı kopyalandı.", "basari"); return; }
+        if (islem === "sil") { if (!confirm("Bu paylaşım silinsin mi? Bağlantı çalışmaz olur.")) return; const { error: e3 } = await supabase.from("akademik_paylasimlari").delete().eq("id", p.id); if (e3) throw new Error(e3.message); }
+        else if (islem === "aktif") { const { error: e3 } = await supabase.from("akademik_paylasimlari").update({ aktif: !p.aktif }).eq("id", p.id); if (e3) throw new Error(e3.message); }
+        else if (islem === "pdf") { const { error: e3 } = await supabase.from("akademik_paylasimlari").update({ pdf_okuma: !p.pdf_okuma }).eq("id", p.id); if (e3) throw new Error(e3.message); }
+        else if (islem === "yenile") { if (!confirm("Bağlantı yenilensin mi? Eski bağlantıyı kullananlar erişimi kaybeder.")) return; const yeniToken = (crypto.randomUUID() + crypto.randomUUID()).replace(/-/g, "").slice(0, 40); const { error: e3 } = await supabase.from("akademik_paylasimlari").update({ token: yeniToken }).eq("id", p.id); if (e3) throw new Error(e3.message); }
+        paylasimCiz();
+      } catch (h) { toast(`İşlem başarısız: ${h.message}`, "hata"); }
+    };
+    alan.onchange = async (e) => {
+      const s = e.target.closest('select[data-pz-islem="erisim"]'); if (!s) return;
+      const id = s.closest("[data-pz]").dataset.pz;
+      const { error: e3 } = await supabase.from("akademik_paylasimlari").update({ erisim: s.value }).eq("id", id);
+      if (e3) toast(`Güncellenemedi: ${e3.message}`, "hata"); else { toast("Erişim düzeyi güncellendi.", "basari"); paylasimCiz(); }
+    };
+  }
+  /** "Benimle paylaşılanlar": herkese açık (listelenen) kütüphaneler */
+  async function acikKutuphaneleriYukle() {
+    const { data, error } = await supabase.rpc("akademik_acik_kutuphaneler");
+    const yer = q("[data-ak-uye-liste]"); if (!yer || error || !data?.length) return;
+    yer.insertAdjacentHTML("afterend", `<div class="ak-acik-kut" data-ak-acik><h4>🌍 Herkese açık kütüphaneler</h4><ul class="ak-uye-liste">${data.map((x) => `<li><a class="ak-uye-kart" href="${esc(paylasimAdresi(x.token))}" target="_blank" rel="noopener"><strong>${esc(x.baslik)}</strong><small>${esc(x.sahip)}</small><span>${x.kaynak_sayisi} kaynak ↗</span></a></li>`).join("")}</ul></div>`);
   }
 
   function disaAktarAc() {
@@ -758,8 +899,10 @@ function kutuphaneKur(kok, profil, owner) {
       if (!o) return;
       if (!s.length) { toast("Aktarılacak kaynak yok.", "uyari"); return; }
       const adBase = `akademik-kutuphane-${bugunDamga()}`;
-      if (o === "bib") dosyaIndir(`${adBase}.bib`, bibtexUret(s), "application/x-bibtex;charset=utf-8");
-      else if (o === "ris") dosyaIndir(`${adBase}.ris`, risUret(s), "application/x-research-info-systems;charset=utf-8");
+      // Klasör bilgisi dosyaya yazılır (BibTeX: klasor = {Tez/Bölüm 1; Okuma} · RIS: C1) → bu site ve Zotero/Mendeley içe aktarırken klasörleri kurar.
+      const klasorlu = s.map((k) => ({ ...k, _klasor: d.klasorler.filter((x) => d.ogeler.get(x.id)?.has(k.id)).map((x) => klasorYolu(x.id).replaceAll(" › ", "/")).join("; ") }));
+      if (o === "bib") dosyaIndir(`${adBase}.bib`, bibtexUret(klasorlu), "application/x-bibtex;charset=utf-8");
+      else if (o === "ris") dosyaIndir(`${adBase}.ris`, risUret(klasorlu), "application/x-research-info-systems;charset=utf-8");
       else {
         const sec = { dil: d.dil };
         const metin = o === "md" ? markdownKaynakca(s, d.bicim, sec) : o === "html" ? s.map((k) => atifKutusuHtml(k, d.bicim, sec)).join("\n") : s.map((k) => atifUret(k, d.bicim, sec).text).sort((a, b) => a.localeCompare(b, d.dil)).join("\n\n");
@@ -787,9 +930,11 @@ function kutuphaneKur(kok, profil, owner) {
     d.kapsam = ks; d.uye = ""; d.klasor = ""; d.f.ara = ""; q('[data-f="ara"]').value = "";
     kok.querySelectorAll("[data-kapsam]").forEach((b) => { b.classList.toggle("aktif", b.dataset.kapsam === ks); b.setAttribute("aria-selected", String(b.dataset.kapsam === ks)); });
     q("[data-ak-ayarlar]").hidden = ks !== "ayarlar";
+    q("[data-ak-paylasim]").hidden = ks !== "paylasim";
     const dz = q("[data-ak-dz]"); if (dz) dz.hidden = ks !== "benim";
-    q("[data-ak-zot]").hidden = ks === "ayarlar";
+    q("[data-ak-zot]").hidden = ks === "ayarlar" || ks === "paylasim";
     uyeGorunumu();
+    if (ks === "paylasim") { paylasimCiz(); return; }
     if (ks === "ayarlar") return;
     uyeleriYukle().then(() => uyeGorunumu());
     yukle();
@@ -808,7 +953,7 @@ function kutuphaneKur(kok, profil, owner) {
     const klAc = e.target.closest("[data-kl-ac]")?.dataset.klAc;
     if (klAc) { if (d.acik.has(klAc)) d.acik.delete(klAc); else d.acik.add(klAc); agacCiz(); return; }
     const klIslem = e.target.closest("[data-kl-islem]");
-    if (klIslem) { klasorIslem(klIslem.dataset.klIslem, klIslem.dataset.id); return; }
+    if (klIslem) { if (klIslem.dataset.klIslem === "tasi") klasorTasiDialogu(klIslem.dataset.id); else if (klIslem.dataset.klIslem === "paylas") { kapsamDegistir("paylasim"); paylasimCiz(klIslem.dataset.id); } else klasorIslem(klIslem.dataset.klIslem, klIslem.dataset.id); return; }
     const cip = e.target.closest("[data-cip]")?.dataset.cip;
     if (cip) { if (cip === "klasor") d.klasor = ""; else { d.f[cip] = cip === "pdfli" ? false : ""; const el0 = q(`[data-f="${cip}"]`); if (el0) { if (el0.type === "checkbox") el0.checked = false; else el0.value = ""; } } agacCiz(); ciz(); return; }
     if (e.target.closest("[data-etiket]")) { const tg = e.target.closest("[data-etiket]").dataset.etiket; q('[data-f="etiket"]').value = tg; d.f.etiket = tg; ciz(); return; }
@@ -822,6 +967,7 @@ function kutuphaneKur(kok, profil, owner) {
     else if (act === "pdf-sec") { menuKapat(); q("[data-ak-pdf]").click(); }
     else if (act === "klasor-yeni") { menuKapat(); klasorIslem("yeni"); }
     else if (act === "ice-aktar") { menuKapat(); q("[data-ak-ice]").click(); }
+    else if (act === "zotero-klasor") { menuKapat(); q("[data-ak-zotero]").click(); }
     else if (act === "disa-aktar") disaAktarAc();
     else if (act === "agac-ac") { const a = q(".ak-agac"); a.classList.toggle("ak-agac-acik"); e.target.closest("[data-act]").setAttribute("aria-expanded", String(a.classList.contains("ak-agac-acik"))); }
     else if (act === "filtre-ac") { const f = q("[data-ak-filtre]"); f.hidden = !f.hidden; e.target.closest("[data-act]").setAttribute("aria-expanded", String(!f.hidden)); }
@@ -847,7 +993,8 @@ function kutuphaneKur(kok, profil, owner) {
   bicimSel.value = d.bicim; dilSel.value = d.dil;
   bicimSel.addEventListener("change", (e) => { d.bicim = e.target.value; try { localStorage.setItem("aea_ak_bicim", d.bicim); } catch { /* yok say */ } });
   dilSel.addEventListener("change", (e) => { d.dil = e.target.value; try { localStorage.setItem("aea_ak_dil", d.dil); } catch { /* yok say */ } });
-  q("[data-ak-ice]")?.addEventListener("change", (e) => { const f0 = e.target.files[0]; e.target.value = ""; if (f0) iceAktar(f0); });
+  q("[data-ak-ice]")?.addEventListener("change", (e) => { const fl = [...e.target.files]; e.target.value = ""; if (fl.length) iceAktar(fl); });
+  q("[data-ak-zotero]")?.addEventListener("change", (e) => { const fl = [...e.target.files]; e.target.value = ""; if (fl.length) iceAktar(fl); });
   q("[data-ak-pdf]")?.addEventListener("change", (e) => { const fl = [...e.target.files]; e.target.value = ""; if (fl.length) pdfDosyalariniYukle(fl); });
   const dz = q("[data-ak-dz]");
   if (dz) {
@@ -873,6 +1020,7 @@ function kutuphaneKur(kok, profil, owner) {
   kok.querySelectorAll("dialog").forEach((dl) => dl.addEventListener("click", (e) => { if (e.target === dl) dl.close(); }));
 
   uyeGorunumu();
+  if (!owner) { bekleyenleriGonder(supabase).then((n) => { if (n) toast(`Çevrimdışıyken kalan ${n} kaynağın açıklamaları kaydedildi.`, "basari"); }); window.addEventListener("online", () => bekleyenleriGonder(supabase)); }
   if (owner) uyeleriYukle();
   motorKarti();
   if (!owner) eklentiPaneliKur(q("[data-ak-eklentiler]")).catch((h) => console.error("eklenti-paneli.js:", h));
