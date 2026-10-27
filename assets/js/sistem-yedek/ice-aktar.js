@@ -25,7 +25,7 @@ import { el, bayt, hataMetni, workerFetch, dugme, ikon, onayIste, r2AnahtarGecer
 
 // FK BAĞIMLILIK SIRASI (ebeveyn → çocuk). Sunucu RPC'si her satırı UPSERT eder (INSERT … ON CONFLICT (pk) DO UPDATE | DO NOTHING):
 // yeniden çalıştırma / kısmi yedek çakışmada patlamaz. Listede olmayan tablolar en sona (999) gider; FK hatası alanlar sonraki turda yeniden denenir.
-const SIRA = ["profiles", "e2ee_kullanici_anahtarlari", "conversations", "konusma_uyeleri", "konusma_zarflari", "messages", "mesaj_sabitleri", "mesaj_yildizlari", "konusma_gizlemeleri", "mesaj_gizlemeleri", "konusma_durumlari", "not_kasasi", "notlar", "not_ek_kayitlari", "akademik_kaynaklar", "akademik_notlar", "r2_arsiv", "ozel_icerik_anahtarlar", "taslak_icerikler", "special_content", "content_access"];
+const SIRA = ["profiles", "e2ee_kullanici_anahtarlari", "conversations", "konusma_uyeleri", "konusma_zarflari", "messages", "mesaj_sabitleri", "mesaj_yildizlari", "konusma_gizlemeleri", "mesaj_gizlemeleri", "konusma_durumlari", "not_kasasi", "notlar", "not_ek_kayitlari", "akademik_kaynaklar", "akademik_koleksiyonlar", "akademik_koleksiyon_ogeleri", "akademik_notlar", "akademik_eklenti_ayarlari", "akademik_paylasimlari", "r2_arsiv", "ozel_icerik_anahtarlar", "taslak_icerikler", "special_content", "content_access"];
 const SAYFA = 200;
 /** replaceChildren(null) ekrana "null" yazıyordu (ekran görüntüsündeki "null"/"nullnull"): boş çocukları ayıklar. */
 const doldur = (kap, ...c) => kap.replaceChildren(...c.flat(Infinity).filter((x) => x != null && x !== false));
