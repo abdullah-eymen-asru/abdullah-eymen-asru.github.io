@@ -21,7 +21,7 @@ export async function eklentiPaneliKur(yer) {
   };
   const ciz = () => {
     const liste = el("div", { class: "ak-ek-liste" });
-    const satir = (id, ad, simge, aciklama, ayarlar, ozel) => {
+    const satir = (id, ad, simge, aciklama, ayarlar, ozel, gizlilik) => {
       const kutu = el("input", { type: "checkbox", id: `ak-ek-${id}`, checked: a.acik.includes(id) });
       kutu.addEventListener("change", () => { a.acik = kutu.checked ? [...new Set([...a.acik, id])] : a.acik.filter((x) => x !== id); kaydet(); });
       const ayarAlan = el("div", { class: "ak-ek-ayar" });
@@ -34,11 +34,11 @@ export async function eklentiPaneliKur(yer) {
       const sil = ozel ? el("button", { type: "button", class: "ak-btn" }, "Sil") : null;
       sil?.addEventListener("click", () => { a.ozel = a.ozel.filter((x) => x.id !== id); a.acik = a.acik.filter((x) => x !== id); kaydet(); ciz(); });
       return el("div", { class: "ak-ek-satir" },
-        el("label", { class: "ak-ek-ust", for: `ak-ek-${id}` }, kutu, el("span", { class: "ak-ek-simge", "aria-hidden": "true" }, simge), el("strong", {}, ad)),
+        el("label", { class: "ak-ek-ust", for: `ak-ek-${id}` }, kutu, el("span", { class: "ak-ek-simge", "aria-hidden": "true" }, simge), el("strong", {}, ad), el("span", { class: `ak-ek-rozet ${gizlilik === "yerel" ? "yerel" : "dis"}` }, gizlilik === "yerel" ? "🔒 Yerel — veri cihazdan çıkmaz" : "↗ Dış site — tıklayınca yeni sekmede açar")),
         el("small", { class: "ak-alt" }, aciklama), ayarAlan, sil);
     };
-    for (const [id, k] of Object.entries(KATALOG)) liste.append(satir(id, k.ad, k.simge, k.aciklama, k.ayarlar, false));
-    for (const o of a.ozel) liste.append(satir(o.id, o.ad, o.simge, `Özel arama bağlantısı: ${o.url}`, [], true));
+    for (const [id, k] of Object.entries(KATALOG)) liste.append(satir(id, k.ad, k.simge, k.aciklama, k.ayarlar, false, k.gizlilik));
+    for (const o of a.ozel) liste.append(satir(o.id, o.ad, o.simge, `Özel arama bağlantısı: ${o.url}`, [], true, "baglanti"));
 
     const ad = el("input", { type: "text", maxlength: "40", placeholder: "Ad (örn. Dergipark)", "aria-label": "Eklenti adı" });
     const url = el("input", { type: "url", maxlength: "500", placeholder: "https://…?q={metin}", "aria-label": "Arama adresi ({metin} içermeli)" });
@@ -52,7 +52,7 @@ export async function eklentiPaneliKur(yer) {
     });
     yer.replaceChildren(el("details", { class: "ak-motor-kart ak-ek-kart" },
       el("summary", {}, "🧩 Okuyucu eklentileri", el("small", { class: "ak-alt" }, " — PDF'te metin seçince balonda çıkar (çeviri, sözlük, Vikipedi, künye bulma…)")),
-      el("p", { class: "ak-alt" }, "Eklentiler depolama kotanı kullanmaz: PDF'in ve sonuçlar hiçbir yere kaydedilmez; yalnızca hangi eklentileri açtığın küçük bir ayar olarak saklanır. Dış kod çalıştırılmaz; “arama eklentisi” yalnızca seçili metinle yeni sekmede bir adres açar."),
+      el("p", { class: "ak-alt" }, "Gizlilik: hiçbir eklenti seçili metni sitemizden bir üçüncü tarafa göndermez. “Yerel” eklentiler tamamen cihazında çalışır; “Dış site” eklentileri yalnızca SEN tıklayınca yeni sekmede bir adres açar (Google/DeepL gibi servisler varsayılan KAPALIDIR, tercih sende). Depolama kotanı kullanmaz; dış kod çalıştırılmaz."),
       liste,
       el("div", { class: "ak-ek-ekle" }, el("strong", {}, "Özel arama eklentisi"), ad, url, ekle, el("small", { class: "ak-alt" }, "Örnek: https://dergipark.org.tr/tr/search?q={metin}")),
       durum));
