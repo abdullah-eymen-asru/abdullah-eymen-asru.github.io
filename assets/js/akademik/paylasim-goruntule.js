@@ -28,7 +28,7 @@ async function baslat() {
   kok.innerHTML = `
     <header class="ak-ust"><div><h2>📚 ${esc(d.baslik)}</h2><p class="ak-alt">${esc(d.sahip)} · ${d.kaynaklar.length} kaynak${d.klasorler.length ? ` · ${d.klasorler.length} klasör` : ""} · ${d.erisim === "uyeler" ? "yalnızca site üyeleri" : d.erisim === "herkes" ? "herkese açık" : "bağlantıyla paylaşıldı"}</p>
       ${d.aciklama ? `<p>${esc(d.aciklama)}</p>` : ""}</div>
-      <div class="ak-ust-sag"><button type="button" class="ak-btn" data-bib>⇩ BibTeX</button><button type="button" class="ak-btn" data-ris>⇩ RIS</button></div></header>
+      <div class="ak-ust-sag"><button type="button" class="ak-btn ak-btn-birincil" data-ekle hidden>＋ Kütüphaneme ekle</button><button type="button" class="ak-btn" data-bib>⇩ BibTeX</button><button type="button" class="ak-btn" data-ris>⇩ RIS</button></div></header>
     <div class="ak-zot">
       <aside class="ak-agac" aria-label="Klasörler"><button type="button" class="ak-agac-ac" data-agac-ac aria-expanded="false">📁 <span data-agac-ad>Tüm kaynaklar</span> ▾</button><div class="ak-agac-ic" data-agac></div></aside>
       <section class="ak-orta">
@@ -39,6 +39,8 @@ async function baslat() {
       </section></div>`;
   const q = (s) => kok.querySelector(s);
   q("[data-bicim]").value = d.bicim;
+  // Giriş yapmış üye: künyeleri + klasör ağacını kendi kütüphanesine kopyalayabilir (PDF kopyalanmaz → depolama kotası harcanmaz)
+  supabase.auth.getSession().then(({ data: o }) => { if (o?.session) q("[data-ekle]").hidden = false; });
 
   const altlar = (id) => [id, ...d.klasorler.filter((k) => k.ust_id === id).flatMap((k) => altlar(k.id))];
   const kume = (id) => { const s = new Set(); for (const kid of altlar(id)) for (const o of d.ogeler) if (o.k === kid) s.add(o.s); return s; };
@@ -86,6 +88,14 @@ async function baslat() {
     const ac = e.target.closest("[data-ac]")?.dataset.ac; if (ac) { d.acik.has(ac) ? d.acik.delete(ac) : d.acik.add(ac); agacCiz(); return; }
     if (e.target.closest("[data-agac-ac]")) { q(".ak-agac").classList.toggle("ak-agac-acik"); return; }
     const et = e.target.closest("[data-etiket]")?.dataset.etiket; if (et) { q("[data-ara]").value = et; d.ara = et; ciz(); return; }
+    if (e.target.closest("[data-ekle]")) {
+      const b = e.target.closest("[data-ekle]"); b.disabled = true;
+      const { data: s, error: h } = await supabase.rpc("akademik_paylasimi_kutuphaneme_ekle", { p_token: token });
+      b.disabled = false;
+      if (h) { alert(`Eklenemedi: ${h.message}`); return; }
+      b.textContent = `✓ ${s.eklenen} kaynak eklendi`; if (confirm(`${s.eklenen} kaynak eklendi${s.atlanan ? ` (${s.atlanan} yinelenen DOI atlandı)` : ""}. Kütüphaneni açmak ister misin?`)) location.href = "/panel/dashboard.html#lib-kutuphane";
+      return;
+    }
     if (e.target.closest("[data-bib]")) { indir("kutuphane.bib", bibtexUret(klasorlu()), "application/x-bibtex;charset=utf-8"); return; }
     if (e.target.closest("[data-ris]")) { indir("kutuphane.ris", risUret(klasorlu()), "application/x-research-info-systems;charset=utf-8"); return; }
     const kart = e.target.closest(".ak-kart"); const k = kart && d.kaynaklar.find((x) => x.id === kart.dataset.id); const act = e.target.closest("[data-act]")?.dataset.act;
