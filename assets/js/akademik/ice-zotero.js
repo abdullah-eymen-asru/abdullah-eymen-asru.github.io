@@ -51,6 +51,14 @@ export function rdfAyristir(xml) {
   for (const [id, k] of kolek) for (const p of k.parcalar) { if (kolek.has(p)) ustu.set(p, id); else { if (!ogeKlasor.has(p)) ogeKlasor.set(p, []); ogeKlasor.get(p).push(id); } }
   const yolu = (id) => { const y = []; let c = id, n = 0; while (c && n++ < 30) { y.unshift(kolek.get(c)?.ad || "?"); c = ustu.get(c); } return y; };
 
+  // Notlar: bib:Memo / z:itemType=note → ana kaynağa dcterms:isReferencedBy ile bağlanır
+  const notlar = new Map();
+  for (const el of hepsi) {
+    if (el.namespaceURI === NS.bib && el.localName === "Memo") {
+      const govde = metin(ilk(el, "rdf", "value")) || metin(el);
+      if (govde) notlar.set(kaynakAdi(el), govde.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
+    }
+  }
   const kayitlar = [];
   for (const el of hepsi) {
     if (el.namespaceURI === NS.z && (el.localName === "Attachment" || el.localName === "Collection")) continue;
@@ -96,6 +104,7 @@ export function rdfAyristir(xml) {
       doi: doi || null, isbn: isbn || null, url: url || null, ozet: metin(ilk(el, "dcterms", "abstract")) || null,
       etiketler, tur: t, ek_alanlar: ek,
       _klasor: (ogeKlasor.get(adres) || []).map(yolu), _dosya: dosyalar,
+      _notlar: cocuklar(el, "dcterms", "isReferencedBy").map((r) => notlar.get(r.getAttributeNS(NS.rdf, "resource"))).filter(Boolean),
     });
   }
   return { kayitlar, klasorSayisi: kolek.size };
