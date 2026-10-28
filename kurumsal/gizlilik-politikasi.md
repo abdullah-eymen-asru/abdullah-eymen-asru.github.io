@@ -199,6 +199,9 @@ permalink: "/kurumsal/gizlilik-politikasi.html"
     seçili metin sitemizden hiçbir üçüncü tarafa gönderilmez. “Dış site” eklentileri (Google Çeviri, DeepL, Google Akademik, Semantic Scholar, Vikipedi/Vikisözlük)
     yalnızca siz tıkladığınızda seçili metinle yeni bir sekmede ilgili siteyi açar; metni o sitede siz göndermiş olursunuz ve varsayılan olarak kapalıdır.
     Hesabınıza yalnızca hangi eklentileri açtığınıza dair küçük bir ayar kaydedilir.</li>
+  <li><strong>HavaStil Radar</strong> — Radar sekmesi haritayı ve verileri doğrudan tarayıcınızdan şu servislerden alır: <strong>CARTO / OpenStreetMap</strong> (harita karoları),
+    <strong>RainViewer</strong> (radar ve uydu görüntüsü), <strong>Open-Meteo</strong> (tahmin ızgarası) ve <strong>cdnjs</strong> (Leaflet harita kütüphanesi). Bu servisler IP adresinizi ve haritada
+    görüntülediğiniz bölgeyi görebilir; sitemiz bu isteklere hesabınıza ait bir bilgi eklemez ve kaydetmez. “Konumum (GPS)” düğmesi yalnızca siz basarsanız tarayıcı konum iznini kullanır.</li>
   <li><strong>Paylaşılan akademik kütüphane</strong> — Bir kütüphane/klasörü paylaşırsanız, seçtiğiniz erişim düzeyine göre (site üyeleri, bağlantıya sahip olanlar ya da herkes)
     kaynak künyeleri (yazar, yıl, DOI, özet, etiketler), klasör ağacı ve (izin verdiyseniz) PDF’ler görüntülenebilir. Paylaşımı istediğiniz an durdurabilir ya da silebilirsiniz.</li>
 
