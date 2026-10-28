@@ -25,6 +25,7 @@ import { demoModuAktifMi } from "../demo/demo-durum.js";
 import { haberSekmesi } from "./ui-haber.js";
 import { ayarSekmesi } from "./ui-ayar.js";
 import { mevsimSekmesi } from "./ui-mevsim.js";
+import { radarSekmesi, radarDurdur } from "./ui-radar.js";
 import { zamanlayiciBaslat } from "./bildirim.js";
 import * as K from "./konumlar.js";
 import { bulutEsitle, bulutVarMi, bulutSiraYaz, bulutHataMetni, bulutKonumEkle, bulutKonumGuncelle, bulutKonumSil, bulutTumunuSil, bulutTercihOku, bulutTercihYaz } from "./bulut.js";
@@ -32,7 +33,7 @@ import { bulutEsitle, bulutVarMi, bulutSiraYaz, bulutHataMetni, bulutKonumEkle, 
 export { HAVASTIL_WORKER_URL };
 const VARSAYILAN_KONUM = { id: "41.008,28.978", ad: "İstanbul", lat: 41.008, lon: 28.978, ulke: "TR", ulkeAd: "Türkiye", ulkeAdEn: "Turkey", admin1: "İstanbul", il: "İstanbul", ikon: "diger" };
 const LS = { tercih: "hv_tercih2", eskiTercih: "hv_tercih", bulut: "hv_bulut", silKuyrugu: "hv_bulut_sil", aiModu: "hv_ai_modu", haberAcik: "hv_haber_acik", sekme: "hv_sekme", ai: "hv_ai3_" };
-const SEKMELER = [["bugun", "Bugün", "🏠"], ["kombin", "Kombin", "🧥"], ["plan", "Saatlik plan", "🗓️"], ["derin", "Derin analiz", "🔬"], ["gunluk", "16 gün", "📅"], ["mevsim", "Mevsimlik eğilim", "🌍"], ["haber", "Uyarılar", "🛰️"], ["dogrula", "Veri doğrulama", "🔍"], ["ayar", "Ayarlar", "⚙️"]];
+const SEKMELER = [["bugun", "Bugün", "🏠"], ["kombin", "Kombin", "🧥"], ["plan", "Saatlik plan", "🗓️"], ["derin", "Derin analiz", "🔬"], ["gunluk", "16 gün", "📅"], ["radar", "Radar", "🛰️"], ["mevsim", "Mevsimlik eğilim", "🌍"], ["haber", "Uyarılar", "🛰️"], ["dogrula", "Veri doğrulama", "🔍"], ["ayar", "Ayarlar", "⚙️"]];
 const ESKI_SEKME = { ozet: "bugun", saatlik: "derin" };      // v2'de kaydedilmiş sekme adları
 const HAVA_TTL_MS = 30 * 60 * 1000, HABER_TTL_MS = 15 * 60 * 1000;
 
@@ -74,10 +75,22 @@ export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAkti
       return olay(b, "click", () => kb.sekmeGit(id));
     }));
   }
-  const CIZICI = { bugun: bugunSekmesi, kombin: kombinSekmesi, plan: planSekmesi, derin: derinSekmesi, gunluk: gunlukSekmesi, mevsim: mevsimSekmesi, haber: haberSekmesi, dogrula: dogrulaSekmesi, ayar: ayarSekmesi };
+  const CIZICI = { bugun: bugunSekmesi, kombin: kombinSekmesi, plan: planSekmesi, derin: derinSekmesi, gunluk: gunlukSekmesi, mevsim: mevsimSekmesi, haber: haberSekmesi, dogrula: dogrulaSekmesi, ayar: ayarSekmesi, radar: radarSekmesi };
+  /** Her sekmenin başında: HANGİ KONUM için olduğu + son güncelleme + Yenile (kafa karışıklığı ve eski veri hatalarını azaltır). */
+  function bilgiSeridi() {
+    const ad = K.gorunenAd?.(d.konum) || "Konum";
+    const t = d.hava?.alinma;
+    const dk = t ? Math.max(0, Math.round((Date.now() - t) / 60000)) : null;
+    const yazi = t ? `Son güncelleme: ${new Date(t).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })} (${dk < 1 ? "az önce" : `${dk} dk önce`})${d.hava?.eski ? " · ÇEVRİMDIŞI/ESKİ VERİ" : ""}` : "Veri yükleniyor…";
+    const dugme = el("button", { type: "button", class: "hv-btn hv-btn-ince", "aria-label": "Verileri yenile", text: "⟳ Yenile" });
+    olay(dugme, "click", async () => { dugme.disabled = true; dugme.textContent = "Yenileniyor…"; try { await kb.yenile(true); } finally { if (dugme.isConnected) { dugme.disabled = false; dugme.textContent = "⟳ Yenile"; } } });
+    return el("div", { class: `hv-bilgi-serit${d.hava?.eski ? " eski" : ""}`, role: "status" },
+      el("span", { class: "hv-bilgi-konum", text: `📍 ${ad}` }), el("span", { class: "hv-bilgi-zaman muted", text: yazi }), dugme);
+  }
   function ciz() {
     sekmeBarCiz();
-    try { icerik.replaceChildren(CIZICI[d.sekme](d, kb)); }
+    if (d.sekme !== "radar") radarDurdur();                                  // harita/animasyon yalnızca radar sekmesindeyken yaşar
+    try { icerik.replaceChildren(bilgiSeridi(), CIZICI[d.sekme](d, kb)); }
     catch (h) { console.warn("HavaStil çizim hatası:", h); icerik.replaceChildren(el("p", { class: "hv-uyari", text: "Bu bölüm çizilemedi. Sayfayı yenile; sürerse Ayarlar › Teşhis'e bak." })); }
   }
   kb.ciz = ciz;
