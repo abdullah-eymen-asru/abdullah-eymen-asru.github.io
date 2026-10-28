@@ -105,16 +105,19 @@ export const KATALOG = Object.freeze({
   wiktionary: { ad: "Vikisözlük'te ara", simge: "📖", gizlilik: "baglanti", varsayilanKapali: true, aciklama: "Seçili kelimeyi Vikisözlük'te yeni sekmede arar. Tercihe bağlı.", ayarlar: [], baglanti: ({ metin }) => `https://tr.wiktionary.org/w/index.php?search=${encodeURIComponent(kisalt(metin, 60))}` },
 });
 
-export const VARSAYILAN_AYAR = Object.freeze({ v: 1, acik: ["ceviri", "istatistik", "temizle", "doi_cikar"], ayar: {}, ozel: [] });
+export const VARSAYILAN_AYAR = Object.freeze({ v: 1, acik: ["ceviri", "istatistik", "temizle", "doi_cikar"], ayar: {}, ozel: [], aramalar: [] });
 
 /* ------------------------------ ayar saklama (yerel + küçük bulut satırı) ------------------------------ */
 function temizle(a) {
-  const o = { v: 1, acik: [], ayar: {}, ozel: [] };
+  const o = { v: 1, acik: [], ayar: {}, ozel: [], aramalar: [] };
   if (!a || typeof a !== "object") return { ...VARSAYILAN_AYAR, acik: [...VARSAYILAN_AYAR.acik] };
   const ozel = (Array.isArray(a.ozel) ? a.ozel : []).filter((x) => x && typeof x.id === "string" && ozelUrlGecerli(x.url)).slice(0, 10)
     .map((x) => ({ id: String(x.id).slice(0, 40), ad: kisalt(String(x.ad || "Arama"), 40), simge: kisalt(String(x.simge || "🔗"), 4), url: String(x.url).slice(0, 500) }));
   const gecerli = new Set([...Object.keys(KATALOG), ...ozel.map((x) => x.id)]);
   o.acik = (Array.isArray(a.acik) ? a.acik : []).filter((x) => gecerli.has(x)).slice(0, 30);
+  // Kayıtlı aramalar (Zotero "Kayıtlı Aramalar"): ad + arama metni + filtreler + klasör; en fazla 30
+  o.aramalar = (Array.isArray(a.aramalar) ? a.aramalar : []).filter((x) => x && typeof x.ad === "string").slice(-30)
+    .map((x) => ({ ad: x.ad.slice(0, 60), ara: String(x.ara || "").slice(0, 200), klasor: typeof x.klasor === "string" ? x.klasor.slice(0, 40) : "", f: Object.fromEntries(Object.entries(x.f && typeof x.f === "object" ? x.f : {}).filter(([k, v]) => ["tur", "etiket", "yazar", "yilBas", "yilSon", "gorunurluk", "pdfli"].includes(k) && ["string", "number", "boolean"].includes(typeof v)).map(([k, v]) => [k, typeof v === "string" ? v.slice(0, 120) : v])) }));
   o.ozel = ozel;
   for (const [id, v] of Object.entries(a.ayar && typeof a.ayar === "object" ? a.ayar : {})) {
     if (!KATALOG[id]) continue;
