@@ -30,6 +30,13 @@ permalink: "/hesap/giris.html"
         <span>Oturumumu hatırla</span>
       </label>
     </div>
+    <div class="form-field">
+      <label class="csp-flex-gap8-center-row">
+        <input id="offline-kasa" name="offline_kasa" type="checkbox" checked>
+        <span>Sunucu kesintisinde bu cihazdan girebileyim</span>
+      </label>
+      <small class="muted">Parolanla şifrelenmiş bir kopya yalnızca bu cihazda tutulur; sunucu kapalıyken e-posta + parolanla kısıtlı moda girersin. Ortak/paylaşılan cihazlarda işaretleme. 2FA açık hesaplarda uygulanmaz.</small>
+    </div>
     <button type="submit" class="btn-primary">Giriş Yap</button>
   </form>
 
