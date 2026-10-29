@@ -546,6 +546,9 @@ async function basla() {
     dlgOnizleme: q("ra-dlg-onizleme"), onizlemeBaslik: q("ra-dlg-onizleme-baslik"), onizlemeImg: q("ra-onizleme-img"), onizlemeHata: q("ra-onizleme-hata"), onizlemeIndir: q("ra-onizleme-indir"),
   };
 
+  // R2 kota kartı (yalnızca site sahibi/yetkili yönetici görür; Akademik Kütüphane ve Sistem Durumu ile AYNI eş zamanlı kaynak)
+  { const kotaYer = document.createElement("div"); kotaYer.hidden = true; k.kok.prepend(kotaYer); import("../sistem-yedek/r2-kota.js").then((m) => m.r2KotaKartiKur(kotaYer, { baslik: "R2 kullanımı — Dosya Yöneticisi (bu ay)" })).catch(() => {}); }
+
   const { data: oturum } = await supabase.auth.getSession();
   durum.uid = oturum.session?.user.id;
   const { data: yetki } = await supabase.rpc("r2_arsiv_yetkilerim");
