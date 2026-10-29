@@ -31,6 +31,7 @@ const ACIKLAMA = {
   "sys-kvkk": "KVKK ve açık rıza metinleri / sürümleri.",
   "sys-uye-aktarim": "Üye verisi indirme izinleri.",
   "sys-silme-onayi": "Silinen hesapların verileri, dosyaları, kalıcı silme.",
+  "sys-durum": "Supabase, site ve bağlı servislerin anlık durumu; kesintide ne yapman gerektiği; R2 kotaları.",
   "sys-duyuru": "Bakım/yedekleme/felaket duyurusu yaz; ziyaretçilere pencere, üyelere şerit; kimlerin okuduğunu gör.",
   "sys-yedek": "Kendi verini yedekle ve geri yükle (Site Sahibi: tam sistem, depolama gezgini).",
   "sys-github": "GitHub / Worker bağlantı durumu.",
