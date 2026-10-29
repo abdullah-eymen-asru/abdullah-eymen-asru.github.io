@@ -30,9 +30,7 @@ const kisalt = (s, n) => (String(s).length > n ? `${String(s).slice(0, n - 1)}�
 
 /** Cihaz içi çeviri: Chrome/Edge'in yerleşik Translator API'si (model tarayıcıda çalışır; metin hiçbir sunucuya gitmez). */
 async function cihazCeviri(metin, kaynak, hedef) {
-  if (!("Translator" in self)) {
-    throw new Error("Bu tarayıcıda cihaz-içi çeviri yok (Chrome/Edge 138+ gerekir). Safari/Mac/iPhone'da: metni seçip sistem menüsünden “Çevir”i kullan (o da cihazda çalışır); ya da Ayarlar'dan Google/DeepL bağlantı eklentisini aç.");
-  }
+  if (!("Translator" in self)) throw new Error("Bu tarayıcıda cihaz-içi çeviri yok (Chrome/Edge 138+ gerekir).");
   let src = kaynak;
   if (src === "auto" && "LanguageDetector" in self) {
     try { const det = await self.LanguageDetector.create(); src = (await det.detect(metin))?.[0]?.detectedLanguage || "en"; } catch { src = "en"; }
@@ -45,32 +43,124 @@ async function cihazCeviri(metin, kaynak, hedef) {
   return { metin: await tr.translate(metin), yontem: `Cihaz içi (${src}→${hedef}) — veri cihazdan çıkmadı` };
 }
 
+/* ------------------------------ SİTE İÇİ ÇEVİRİ (çevrimiçi sağlayıcılar, açık rıza ile) ------------------------------
+ * Hiçbir yeni sunucu/Worker/anahtar gerekmez: tarayıcı doğrudan genel çeviri uçlarına gider (Cloudflare kotası harcanmaz).
+ * GİDEN VERİ: yalnızca seçtiğin metin (en çok 1500 karakter) + dil çifti + (her web isteğinde olduğu gibi) IP adresin. Hesap/kaynak bilgisi GİTMEZ.
+ * Sağlayıcılar: Google Çeviri (gayriresmî genel uç; en iyi kalite) · MyMemory (açık, ücretsiz çeviri belleği; kalite orta, 500 karakter parça sınırı).
+ * "Otomatik": önce cihaz içi (varsa; veri çıkmaz) → Google → MyMemory. Rıza tarayıcıda saklanır (localStorage), Ayarlar'dan geri alınır. */
+const RIZA_ANAHTARI = "aea_ak_ceviri_riza_v1";
+export const cevirRizasiVarMi = () => { try { return localStorage.getItem(RIZA_ANAHTARI) === "1"; } catch { return false; } };
+export const cevirRizasiVer = () => { try { localStorage.setItem(RIZA_ANAHTARI, "1"); } catch { /* yok say */ } };
+export const cevirRizasiGeriAl = () => { try { localStorage.removeItem(RIZA_ANAHTARI); } catch { /* yok say */ } };
+export const RIZA_METNI = "Çevrimiçi çeviri için seçtiğin metin (en çok 1500 karakter), kaynak/hedef dil ve IP adresin çeviri servisine (Google Çeviri veya MyMemory) gönderilir. Hesabın, kütüphane bilgilerin ve PDF'in kendisi GÖNDERİLMEZ. Servis metni kendi gizlilik koşullarına göre işleyebilir. Cihaz-içi çeviri (Chrome/Edge) kullanılabiliyorsa önce o denenir ve hiçbir şey gönderilmez. Onaylıyor musun? (Ayarlar'dan istediğin an geri alabilirsin.)";
+async function zamanAsimliFetch(url, secenek = {}, ms = ZAMAN_ASIMI) {
+  const k = new AbortController(), z = setTimeout(() => k.abort(), ms);
+  try { const r = await fetch(url, { credentials: "omit", referrerPolicy: "no-referrer", signal: k.signal, ...secenek }); if (!r.ok) throw new Error(`HTTP ${r.status}`); return r; }
+  finally { clearTimeout(z); }
+}
+async function googleCeviri(metin, kaynak, hedef) {
+  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(kaynak)}&tl=${encodeURIComponent(hedef)}&dt=t&q=${encodeURIComponent(metin)}`;
+  const j = await (await zamanAsimliFetch(url)).json();
+  const parcalar = Array.isArray(j?.[0]) ? j[0].map((x) => x?.[0] || "").join("") : "";
+  if (!parcalar) throw new Error("Google boş yanıt verdi.");
+  return { metin: parcalar, algilanan: j?.[2] || "", yontem: `Google Çeviri (${j?.[2] || kaynak}→${hedef}) — metin Google'a gönderildi` };
+}
+function parcala(metin, n) {
+  const cumleler = metin.match(/[^.!?;:。]+[.!?;:。]?\s*/g) || [metin], cikti = [];
+  let cur = "";
+  for (const c of cumleler) {
+    if ((cur + c).length > n && cur) { cikti.push(cur.trim()); cur = ""; }
+    if (c.length > n) { for (let i = 0; i < c.length; i += n) cikti.push(c.slice(i, i + n).trim()); } else cur += c;
+  }
+  if (cur.trim()) cikti.push(cur.trim());
+  return cikti;
+}
+async function myMemoryCeviri(metin, kaynak, hedef) {
+  const cift = `${kaynak === "auto" ? "Autodetect" : kaynak}|${hedef}`;
+  const sonuc = [];
+  for (const p of parcala(metin, 450)) {
+    const j = await (await zamanAsimliFetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(p)}&langpair=${encodeURIComponent(cift)}`)).json();
+    if (j?.responseStatus && Number(j.responseStatus) !== 200) throw new Error(j.responseDetails || "MyMemory hata verdi.");
+    sonuc.push(j?.responseData?.translatedText || "");
+  }
+  const m = sonuc.join(" ").trim();
+  if (!m) throw new Error("MyMemory boş yanıt verdi.");
+  return { metin: m, yontem: `MyMemory (açık çeviri belleği, ${cift}) — metin MyMemory'ye gönderildi` };
+}
+/** Motor sırasıyla dener; çevrimiçi motorlar için rıza ister. */
+export async function ceviriYap(metin, { kaynak = "auto", hedef = "tr", motor = "auto" } = {}) {
+  const hatalar = [];
+  const dene = async (ad, fn) => { try { return await fn(); } catch (h) { hatalar.push(`${ad}: ${h.message}`); return null; } };
+  const onayAl = () => {
+    if (cevirRizasiVarMi()) return true;
+    if (typeof window.confirm === "function" && window.confirm(RIZA_METNI)) { cevirRizasiVer(); return true; }
+    return false;
+  };
+  if (motor === "auto" || motor === "cihaz") {
+    const c = await dene("Cihaz içi", () => cihazCeviri(metin, kaynak, hedef));
+    if (c) return c;
+    if (motor === "cihaz") throw new Error(`Cihaz içi çeviri yapılamadı. ${hatalar.join(" · ")} Ayarlar'dan çevrimiçi motoru seç.`);
+  }
+  if (!onayAl()) throw new Error("Çevrimiçi çeviri için onay vermedin; hiçbir veri gönderilmedi. Cihaz içi çeviri bu tarayıcıda yoksa onay vermen gerekir.");
+  if (motor === "auto" || motor === "google") { const g = await dene("Google", () => googleCeviri(metin, kaynak, hedef)); if (g) return g; }
+  if (motor === "auto" || motor === "mymemory") { const m = await dene("MyMemory", () => myMemoryCeviri(metin, kaynak, hedef)); if (m) return m; }
+  throw new Error(`Çeviri servislerine ulaşılamadı. ${hatalar.join(" · ")}`);
+}
+
+/* ------------------------------ DOI bulma (satır sonu/tire/boşluk bozulmalarına dayanıklı) ------------------------------ */
+const DOI_BASLANGIC = /10\.\d{4,9}\//g;
+export function doiBul(ham) {
+  const t = String(ham || "").normalize("NFKC").replace(/[\u00AD\u200B-\u200D\uFEFF]/g, "").replace(/[\u2010-\u2015\u2212]/g, "-").replace(/\s*\n\s*/g, " ");
+  const bulunan = [];
+  for (const m of t.matchAll(DOI_BASLANGIC)) {
+    const bas = m.index + m[0].length;
+    const jetonlar = t.slice(bas).split(/\s+/);
+    let govde = jetonlar.shift() || "";
+    while (jetonlar.length) {
+      const son = govde.slice(-1), sonraki = jetonlar[0];
+      if (!sonraki || /^(https?:|doi:|10\.\d{4,9}\/|www\.)/i.test(sonraki)) break;
+      // satır kırılması: önceki parça - / _ ile ya da (nokta ile bitip sonraki küçük harf/rakamla başlıyorsa) ve sonraki parça kısa/DOI benzeri ise birleştir
+      if (/[-/_]$/.test(govde) || (son === "." && /^[a-z0-9]/.test(sonraki) && sonraki.length < 25 && !/[a-z]{4,}\b[^a-z0-9.-]/i.test(sonraki))) { govde += jetonlar.shift(); continue; }
+      if (/^[A-Za-z0-9._()\-/]{1,12}$/.test(sonraki) && /\d$/.test(govde) && /^\d/.test(sonraki) && govde.length < 14) { govde += jetonlar.shift(); continue; }   // "10.1016/j.x.2020. 1234" gibi bölünmüş sayı
+      break;
+    }
+    govde = govde.replace(/[,;:"'’”]+$/g, "");
+    while (/[.)\]>}]$/.test(govde)) {                                  // dengesiz kapanış/cümle sonu noktası at
+      const k = govde.slice(-1);
+      if (k === ".") govde = govde.slice(0, -1);
+      else { const acik = { ")": "(", "]": "[", ">": "<", "}": "{" }[k]; if ((govde.split(acik).length) >= (govde.split(k).length)) break; govde = govde.slice(0, -1); }
+    }
+    const doi = `${m[0]}${govde}`;
+    if (/^10\.\d{4,9}\/[-._;()/:A-Za-z0-9<>+#%]+$/.test(doi) && govde.length >= 2) bulunan.push(doi);
+  }
+  return [...new Set(bulunan)];
+}
+async function crossrefDogrula(doi) {
+  try {
+    const j = await (await zamanAsimliFetch(`https://api.crossref.org/works/${encodeURIComponent(doi)}`, { headers: { Accept: "application/json" } })).json();
+    const m = j?.message, baslik = (m?.title || [])[0] || "(başlıksız)", yil = m?.issued?.["date-parts"]?.[0]?.[0] || m?.created?.["date-parts"]?.[0]?.[0] || "";
+    return { ok: true, metin: `✓ Doğrulandı: ${baslik}${yil ? ` (${yil})` : ""}${m?.["container-title"]?.[0] ? ` — ${m["container-title"][0]}` : ""}` };
+  } catch (h) {
+    return { ok: false, metin: /404/.test(h.message) ? "✗ Crossref'te bu DOI yok. Hatalı kopyalanmış olabilir ya da DOI başka bir kayıt kurumunda (örn. DataCite) kayıtlıdır." : `Doğrulanamadı: ${h.message}` };
+  }
+}
+
+const DIL_SECENEKLERI = { tr: "Türkçe", en: "İngilizce", de: "Almanca", fr: "Fransızca", es: "İspanyolca", ar: "Arapça", ru: "Rusça" };
 const DILLER_URL = { tr: "tr", en: "en", de: "de", fr: "fr", es: "es", ar: "ar", ru: "ru" };
 
 export const KATALOG = Object.freeze({
   ceviri: {
-    ad: "Çeviri (cihaz içi · özel)", simge: "🌐", gizlilik: "yerel",
-    aciklama: "Seçili metni tarayıcının yerleşik çeviri motoruyla çevirir. Metin cihazından ÇIKMAZ. (Chrome/Edge 138+; ilk kullanımda dil paketi tarayıcı tarafından indirilebilir.)",
+    ad: "Çeviri (site içinde)", simge: "🌐", gizlilik: "karma", grup: "ceviri",
+    aciklama: "Seçili metni bu pencerede çevirir (yeni sekme açmaz). Otomatik modda önce cihaz içi çeviri denenir (veri çıkmaz); olmazsa onayınla Google Çeviri, sonra MyMemory kullanılır. Giden veri: yalnızca seçtiğin metin ve dil çifti.",
     ayarlar: [
-      { anahtar: "hedef", etiket: "Hedef dil", tur: "secim", secenekler: { tr: "Türkçe", en: "İngilizce", de: "Almanca", fr: "Fransızca", es: "İspanyolca", ar: "Arapça", ru: "Rusça" }, varsayilan: "tr" },
-      { anahtar: "kaynak", etiket: "Kaynak dil", tur: "secim", secenekler: { auto: "Otomatik algıla", tr: "Türkçe", en: "İngilizce", de: "Almanca", fr: "Fransızca", es: "İspanyolca", ar: "Arapça", ru: "Rusça" }, varsayilan: "auto" },
+      { anahtar: "hedef", etiket: "Hedef dil", tur: "secim", secenekler: DIL_SECENEKLERI, varsayilan: "tr" },
+      { anahtar: "kaynak", etiket: "Kaynak dil", tur: "secim", secenekler: { auto: "Otomatik algıla", ...DIL_SECENEKLERI }, varsayilan: "auto" },
+      { anahtar: "motor", etiket: "Çeviri motoru", tur: "secim", secenekler: { auto: "Otomatik (önerilen)", cihaz: "Yalnızca cihaz içi (veri çıkmaz)", google: "Google Çeviri (en iyi kalite)", mymemory: "MyMemory (açık kaynaklı bellek)" }, varsayilan: "auto" },
     ],
     async calistir({ metin, ayar }) {
-      const c = await cihazCeviri(metin, ayar.kaynak || "auto", ayar.hedef || "tr");
+      const c = await ceviriYap(metin.slice(0, 1500), { kaynak: ayar.kaynak || "auto", hedef: ayar.hedef || "tr", motor: ayar.motor || "auto" });
       return { baslik: "Çeviri", metin: c.metin, not: c.yontem };
     },
-  },
-  ceviri_google: {
-    ad: "Google Çeviri'de aç", simge: "🔤", gizlilik: "baglanti", varsayilanKapali: true,
-    aciklama: "Seçili metni Google Çeviri'de yeni sekmede açar. UYARI: metni o sitede sen göndermiş olursun (Google'a gider). Yalnızca tercih edersen aç.",
-    ayarlar: [{ anahtar: "hedef", etiket: "Hedef dil", tur: "secim", secenekler: { tr: "Türkçe", en: "İngilizce", de: "Almanca", fr: "Fransızca", es: "İspanyolca", ar: "Arapça", ru: "Rusça" }, varsayilan: "tr" }],
-    baglanti: ({ metin, ayar }) => `https://translate.google.com/?sl=auto&tl=${DILLER_URL[ayar.hedef] || "tr"}&text=${encodeURIComponent(kisalt(metin, 1500))}&op=translate`,
-  },
-  ceviri_deepl: {
-    ad: "DeepL'de aç", simge: "🅳", gizlilik: "baglanti", varsayilanKapali: true,
-    aciklama: "Seçili metni DeepL'de yeni sekmede açar (genelde en iyi çeviri kalitesi). UYARI: metin DeepL'e gider. Yalnızca tercih edersen aç.",
-    ayarlar: [{ anahtar: "hedef", etiket: "Hedef dil", tur: "secim", secenekler: { tr: "Türkçe", en: "İngilizce", de: "Almanca", fr: "Fransızca", es: "İspanyolca", ru: "Rusça" }, varsayilan: "tr" }],
-    baglanti: ({ metin, ayar }) => `https://www.deepl.com/translator#auto/${DILLER_URL[ayar.hedef] || "tr"}/${encodeURIComponent(kisalt(metin, 1500))}`,
   },
   istatistik: {
     ad: "Metin bilgisi", simge: "🔢", gizlilik: "yerel",
@@ -90,18 +180,27 @@ export const KATALOG = Object.freeze({
     },
   },
   doi_cikar: {
-    ad: "DOI / adres bul", simge: "🔗", gizlilik: "yerel",
-    aciklama: "Seçili metindeki DOI ve web adreslerini bulur ve tıklanabilir yapar. Yerel — hiçbir istek yapılmaz.", ayarlar: [],
+    ad: "DOI bul", simge: "🔗", gizlilik: "yerel", grup: "metin",
+    aciklama: "Seçili metindeki DOI'yi (satır sonu/tire bozulmalarını düzelterek) bulur, kopyalanmaya hazır verir ve panoya alır. “Doğrula” düğmesi isteğe bağlıdır (yalnızca DOI Crossref'e gider).",
+    ayarlar: [],
     async calistir({ metin }) {
-      const doi = [...metin.matchAll(/\b10\.\d{4,9}\/[^\s"<>]+/g)].map((m) => m[0].replace(/[.,;)\]]+$/, ""));
-      const url = [...metin.matchAll(/https?:\/\/[^\s"<>]+/g)].map((m) => m[0].replace(/[.,;)\]]+$/, ""));
-      if (!doi.length && !url.length) throw new Error("Seçili metinde DOI ya da adres bulunamadı.");
-      return { baslik: "Bulunanlar", metin: [...doi.map((x) => `DOI: ${x}`), ...url].join("\n"), baglanti: doi.length ? `https://doi.org/${doi[0]}` : url[0] };
+      const doi = doiBul(metin);
+      const url = [...metin.matchAll(/https?:\/\/[^\s"<>]+/g)].map((m) => m[0].replace(/[.,;)\]]+$/, "")).filter((u) => !/doi\.org\//i.test(u));
+      if (!doi.length && !url.length) throw new Error("Seçili metinde DOI ya da adres bulunamadı. DOI “10.xxxx/…” biçimindedir; tüm satırı birlikte seç.");
+      const duz = doi.length ? doi.join("\n") : url.join("\n");
+      try { await navigator.clipboard.writeText(duz); } catch { /* pano izni yok */ }
+      return {
+        baslik: doi.length ? `DOI bulundu${doi.length > 1 ? ` (${doi.length})` : ""} — panoya kopyalandı` : "Adres bulundu — panoya kopyalandı",
+        metin: duz, baglanti: doi.length ? `https://doi.org/${doi[0]}` : url[0],
+        eylemler: doi.length ? [{ ad: "Doğrula (Crossref'e DOI gider)", calistir: () => crossrefDogrula(doi[0]) }, { ad: "doi.org adresi olarak kopyala", kopyala: doi.map((d) => `https://doi.org/${d}`).join("\n") }] : [],
+      };
     },
   },
   akademik: { ad: "Google Akademik'te ara", simge: "🎓", gizlilik: "baglanti", varsayilanKapali: true, aciklama: "Seçili metinle Google Akademik'i yeni sekmede açar (arama metni Google'a gider). Tercihe bağlı.", ayarlar: [], baglanti: ({ metin }) => `https://scholar.google.com/scholar?q=${encodeURIComponent(kisalt(metin, 300))}` },
   semantic: { ad: "Semantic Scholar'da ara", simge: "🧠", gizlilik: "baglanti", varsayilanKapali: true, aciklama: "Seçili metinle Semantic Scholar'ı yeni sekmede açar. Tercihe bağlı.", ayarlar: [], baglanti: ({ metin }) => `https://www.semanticscholar.org/search?q=${encodeURIComponent(kisalt(metin, 300))}` },
   vikipedi: { ad: "Vikipedi'de ara", simge: "🧭", gizlilik: "baglanti", varsayilanKapali: true, aciklama: "Seçili terimi Vikipedi'de yeni sekmede arar (kâr amacı gütmeyen, açık kaynak). Tercihe bağlı.", ayarlar: [], baglanti: ({ metin }) => `https://tr.wikipedia.org/w/index.php?search=${encodeURIComponent(kisalt(metin, 100))}` },
+  dergipark: { ad: "DergiPark'ta ara", simge: "📰", gizlilik: "baglanti", grup: "arama", varsayilanKapali: true, aciklama: "Seçili metinle DergiPark'ı yeni sekmede açar (Türkçe akademik dergiler).", ayarlar: [], baglanti: ({ metin }) => `https://dergipark.org.tr/tr/search?q=${encodeURIComponent(kisalt(metin, 200))}` },
+  crossref: { ad: "Crossref'te ara", simge: "🔎", gizlilik: "baglanti", grup: "arama", varsayilanKapali: true, aciklama: "Seçili metinle Crossref arama sayfasını yeni sekmede açar (DOI/künye bulmak için).", ayarlar: [], baglanti: ({ metin }) => `https://search.crossref.org/?q=${encodeURIComponent(kisalt(metin, 250))}` },
   wiktionary: { ad: "Vikisözlük'te ara", simge: "📖", gizlilik: "baglanti", varsayilanKapali: true, aciklama: "Seçili kelimeyi Vikisözlük'te yeni sekmede arar. Tercihe bağlı.", ayarlar: [], baglanti: ({ metin }) => `https://tr.wiktionary.org/w/index.php?search=${encodeURIComponent(kisalt(metin, 60))}` },
 });
 
@@ -114,7 +213,9 @@ function temizle(a) {
   const ozel = (Array.isArray(a.ozel) ? a.ozel : []).filter((x) => x && typeof x.id === "string" && ozelUrlGecerli(x.url)).slice(0, 10)
     .map((x) => ({ id: String(x.id).slice(0, 40), ad: kisalt(String(x.ad || "Arama"), 40), simge: kisalt(String(x.simge || "🔗"), 4), url: String(x.url).slice(0, 500) }));
   const gecerli = new Set([...Object.keys(KATALOG), ...ozel.map((x) => x.id)]);
-  o.acik = (Array.isArray(a.acik) ? a.acik : []).filter((x) => gecerli.has(x)).slice(0, 30);
+  // Eski dış-bağlantılı çeviri eklentileri (Google/DeepL sekmede açılan) artık site içi "ceviri" eklentisine taşınır.
+  const eskiCeviri = (Array.isArray(a.acik) ? a.acik : []).some((x) => x === "ceviri_google" || x === "ceviri_deepl");
+  o.acik = [...new Set([...(eskiCeviri ? ["ceviri"] : []), ...(Array.isArray(a.acik) ? a.acik : [])])].filter((x) => gecerli.has(x)).slice(0, 30);
   // Kayıtlı aramalar (Zotero "Kayıtlı Aramalar"): ad + arama metni + filtreler + klasör; en fazla 30
   o.aramalar = (Array.isArray(a.aramalar) ? a.aramalar : []).filter((x) => x && typeof x.ad === "string").slice(-30)
     .map((x) => ({ ad: x.ad.slice(0, 60), ara: String(x.ara || "").slice(0, 200), klasor: typeof x.klasor === "string" ? x.klasor.slice(0, 40) : "", f: Object.fromEntries(Object.entries(x.f && typeof x.f === "object" ? x.f : {}).filter(([k, v]) => ["tur", "etiket", "yazar", "yilBas", "yilSon", "gorunurluk", "pdfli"].includes(k) && ["string", "number", "boolean"].includes(typeof v)).map(([k, v]) => [k, typeof v === "string" ? v.slice(0, 120) : v])) }));
@@ -125,6 +226,14 @@ function temizle(a) {
     for (const s of KATALOG[id].ayarlar) if (v && typeof v[s.anahtar] === "string" && s.secenekler[v[s.anahtar]]) o.ayar[id][s.anahtar] = v[s.anahtar];
   }
   return o;
+}
+/** Kullanıcı sitede "test" kelimesini aratıp çıkan adresi yapıştırır → {metin} yer tutucusuna çevrilir. */
+export function aramaAdresiniCevir(adres) {
+  const u = String(adres || "").trim();
+  if (u.includes("{metin}")) return u;
+  if (!/^https:\/\//i.test(u)) return null;
+  const yeni = u.replace(/test/i, "{metin}");
+  return yeni !== u ? yeni : null;
 }
 export function ozelUrlGecerli(u) {
   try { const x = new URL(String(u).replace(/\{metin\}/g, "x")); return x.protocol === "https:" && String(u).includes("{metin}") && String(u).length <= 500; } catch { return false; }
