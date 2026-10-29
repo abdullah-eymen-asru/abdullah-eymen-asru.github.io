@@ -623,6 +623,7 @@ function kutuphaneKur(kok, profil, owner) {
             <label class="ak-tam">Etiketler <small>(virgülle ayır)</small><input type="text" name="etiketler" value="${v((k?.etiketler || []).join(", "))}"></label>
             <label>Görünürlük<select name="gorunurluk">${Object.entries(GORUNURLUK).map(([a, b]) => `<option value="${a}"${(k?.gorunurluk || "ozel") === a ? " selected" : ""}>${b}</option>`).join("")}</select>
               <small>Özel: sadece sen · Ekip: editör/yönetici rolleri okuyabilir · Herkese açık: kütüphane kullanan her üye okuyabilir. (Site sahibi her zaman inceleyebilir.)</small></label>
+            ${d.klasorler.length && !owner ? `<fieldset class="ak-tam ak-form-klasor"><legend>Klasörler <small>(birden çok seçilebilir; hiçbiri seçilmezse “Klasörsüz” olur)</small></legend>${(function dal(ust, sev) { return d.klasorler.filter((x) => (x.ust_id || null) === ust).sort((a, b) => a.ad.localeCompare(b.ad, "tr")).map((x) => `<label class="ak-kd-satir ak-fk-satir" data-sev="${sev}"><input type="checkbox" data-fk="${esc(x.id)}" ${k && d.ogeler.get(x.id)?.has(k.id) ? "checked" : ""}> <span>${"— ".repeat(sev)}${esc(x.ad)}</span></label>${dal(x.id, sev + 1)}`).join(""); })(null, 0)}</fieldset>` : ""}
             <label>${k?.pdf_r2_yolu ? "PDF'i değiştir" : "PDF ekle"}<input type="file" name="pdf" accept="application/pdf,.pdf"></label>
           </div>
         </div>
@@ -690,6 +691,15 @@ function kutuphaneKur(kok, profil, owner) {
       try {
         const sonuc = k ? await supabase.from("akademik_kaynaklar").update(satir).eq("id", k.id).select().single() : await supabase.from("akademik_kaynaklar").insert(satir).select().single();
         if (sonuc.error) throw new Error(sonuc.error.code === "23505" ? "Bu DOI kütüphanende zaten kayıtlı." : sonuc.error.message);
+        // klasör seçimi (yalnızca değişenler yazılır)
+        if (f.querySelector("[data-fk]")) {
+          const kid = sonuc.data.id, secili = new Set([...f.querySelectorAll("[data-fk]:checked")].map((x) => x.dataset.fk));
+          for (const kl of d.klasorler) {
+            const var_ = !!d.ogeler.get(kl.id)?.has(kid);
+            if (secili.has(kl.id) !== var_) { try { await klasoreEkleCikar(kid, kl.id, secili.has(kl.id)); } catch (h) { toast(`Klasör kaydedilemedi: ${h.message}`, "uyari"); } }
+          }
+          agacCiz?.();
+        }
         const pdf = f.pdf.files[0];
         if (pdf) {
           durum.textContent = "PDF yükleniyor… %0";
@@ -841,7 +851,8 @@ function kutuphaneKur(kok, profil, owner) {
   function paylasilacakSayisi(kapsam, klasorId, ozelDahil) {
     const benimkiler = d.kayitlar.filter(benim);
     const kume = kapsam === "klasor" && klasorId ? klasorKumesi(klasorId) : null;
-    return benimkiler.filter((k) => (!kume || kume.has(k.id)) && (ozelDahil || k.gorunurluk !== "ozel")).length;
+    const klasorsuzMu = (k) => !d.klasorler.some((x) => d.ogeler.get(x.id)?.has(k.id));
+    return benimkiler.filter((k) => (!kume || kume.has(k.id)) && (kapsam !== "klasorsuz" || klasorsuzMu(k)) && (ozelDahil || k.gorunurluk !== "ozel")).length;
   }
   async function paylasimCiz(onSecilenKlasor = null) {
     const alan = q("[data-ak-paylasim]");
@@ -855,7 +866,7 @@ function kutuphaneKur(kok, profil, owner) {
         <h3>Bağlantı ile paylaş</h3>
         <p class="ak-alt">Bağlantıyı sosyal medyada bile paylaşabilirsin; açan kişi üye olmak zorunda değil. Alıcılar kaynak bilgilerini (başlık, yazar, DOI, özet, atıf) ve klasör ağacını görür.</p>
         <div class="ak-pz-adim"><span class="ak-pz-no">1</span><div><strong>Ne paylaşılsın?</strong>
-          <div class="ak-segment" role="group" aria-label="Paylaşılacak kapsam"><button type="button" data-pz-kapsam="kutuphane">Tüm kütüphanem</button><button type="button" data-pz-kapsam="klasor">Bir klasör</button></div>
+          <div class="ak-segment" role="group" aria-label="Paylaşılacak kapsam"><button type="button" data-pz-kapsam="kutuphane">Tüm kütüphanem</button><button type="button" data-pz-kapsam="klasor">Bir klasör</button><button type="button" data-pz-kapsam="klasorsuz">Klasörsüz kaynaklar</button></div>
           <button type="button" class="ak-btn ak-pz-klasor-sec" data-pz-klasor hidden></button>
           <p class="ak-pz-sayi" data-pz-sayi role="status"></p></div></div>
         <div class="ak-pz-adim"><span class="ak-pz-no">2</span><div><strong>Kim açabilsin?</strong>
@@ -871,7 +882,7 @@ function kutuphaneKur(kok, profil, owner) {
       <section class="ak-pz-listebolum"><h3>Paylaşımlarım <span class="ak-say">${data.length}</span></h3>
         ${data.length ? `<ul class="ak-pz-liste">${data.map((p) => `<li class="ak-pz${p.aktif ? "" : " pasif"}" data-pz="${esc(p.id)}">
           <div class="ak-pz-ust"><div><strong>${esc(p.baslik)}</strong>
-            <div class="ak-pz-chip">${p.kapsam === "klasor" ? `📁 ${esc(klasorYolu(p.klasor_id) || "silinmiş klasör")}` : "🗂 Tüm kütüphane"} · ${ERISIM[p.erisim][0]} ${esc(ERISIM[p.erisim][1])} · ${p.pdf_okuma ? "PDF okunabilir" : "yalnız künye"}${p.aktif ? "" : " · <b>durduruldu</b>"}${p.bitis ? ` · bitiş ${esc(new Date(p.bitis).toLocaleDateString("tr-TR"))}` : ""}</div></div></div>
+            <div class="ak-pz-chip">${p.kapsam === "klasor" ? `📁 ${esc(klasorYolu(p.klasor_id) || "silinmiş klasör")}` : p.kapsam === "klasorsuz" ? "📥 Klasörsüz kaynaklar" : "🗂 Tüm kütüphane"} · ${ERISIM[p.erisim][0]} ${esc(ERISIM[p.erisim][1])} · ${p.pdf_okuma ? "PDF okunabilir" : "yalnız künye"}${p.aktif ? "" : " · <b>durduruldu</b>"}${p.bitis ? ` · bitiş ${esc(new Date(p.bitis).toLocaleDateString("tr-TR"))}` : ""}</div></div></div>
           <div class="ak-pz-link"><input class="ak-pz-adres" readonly value="${esc(paylasimAdresi(p.token))}" aria-label="Paylaşım bağlantısı"><button type="button" class="ak-btn ak-btn-birincil" data-pz-islem="kopya">Kopyala</button><a class="ak-btn" href="${esc(paylasimAdresi(p.token))}" target="_blank" rel="noopener">Aç ↗</a></div>
           <details class="ak-pz-ayar"><summary>Ayarlar</summary><div class="ak-pz-ayar-ic">
             <label>Kim açabilir? <select data-pz-islem="erisim">${Object.entries(ERISIM).map(([k, [ik, b]]) => `<option value="${k}" ${k === p.erisim ? "selected" : ""}>${ik} ${b}</option>`).join("")}</select></label>
@@ -1298,6 +1309,7 @@ function kutuphaneKur(kok, profil, owner) {
   if (!owner) { aramalariYukle(); ekleParametresiniIsle(); }
   if (!owner) { bekleyenleriGonder(supabase).then((n) => { if (n) toast(`Çevrimdışıyken kalan ${n} kaynağın açıklamaları kaydedildi.`, "basari"); }); window.addEventListener("online", () => bekleyenleriGonder(supabase)); }
   if (owner) uyeleriYukle();
+  { const kotaYer = document.createElement("div"); kotaYer.hidden = true; q(".ak-kutu")?.prepend(kotaYer); import("../sistem-yedek/r2-kota.js").then((m) => m.r2KotaKartiKur(kotaYer, { baslik: "R2 kullanımı — Akademik Kütüphane (bu ay)" })).catch(() => {}); }
   motorKarti();
   if (!owner) eklentiPaneliKur(q("[data-ak-eklentiler]")).catch((h) => console.error("eklenti-paneli.js:", h));
   return { yukle };
