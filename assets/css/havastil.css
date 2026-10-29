@@ -711,3 +711,15 @@
 .hv-radar-isaret span { display: block; width: 14px; height: 14px; border-radius: 50%; background: #2f7bff; border: 3px solid #fff; box-shadow: 0 0 0 2px #2f7bff66, 0 2px 6px rgba(0,0,0,.4); }
 .hv-radar-popup .leaflet-popup-content { font-size: .85rem; line-height: 1.5; margin: .6rem .8rem; }
 @media (max-width: 600px) { .hv-radar-harita { height: 62vh; } .hv-radar-zamanyazi { min-width: 7rem; font-size: .8rem; } .hv-ef-bar { width: 4.5rem; } }
+
+/* v118 — radar: geçmiş/gelecek + altlık anahtarı, doğrulama kutusu, OSM koyu görünüm */
+.hv-radar-modlar { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; margin: .4rem 0; }
+.hv-radar-mod { font: inherit; font-size: .85rem; min-height: 2.5rem; padding: .3rem .8rem; border-radius: 999px; border: 1px solid var(--border, #ccc); background: var(--card-bg, var(--bg, #fff)); color: var(--text, #111); cursor: pointer; touch-action: manipulation; }
+.hv-radar-mod.aktif { background: var(--accent, #1d5fd1); border-color: var(--accent, #1d5fd1); color: #fff; }
+.hv-radar-ayrac { width: 1px; height: 1.5rem; background: var(--border, #ccc); }
+.hv-radar-dogrula { margin: .5rem 0; border: 1px solid var(--border, #ccc); border-radius: 12px; padding: .5rem .8rem; background: var(--card-bg, var(--bg, #fff)); }
+.hv-radar-dogrula summary { cursor: pointer; font-weight: 600; min-height: 2.2rem; display: flex; align-items: center; }
+.hv-dogrula-liste { margin: .4rem 0; padding-left: 1.1rem; display: grid; gap: .35rem; font-size: .9rem; }
+.hv-rozet { display: inline-block; padding: .05rem .5rem; border-radius: 999px; font-size: .75rem; font-weight: 700; color: #fff; background: #777; }
+.hv-rozet.iyi { background: #1f9d55; } .hv-rozet.orta { background: #c98a00; } .hv-rozet.kotu { background: #c0392b; }
+.hv-osm-koyu .leaflet-tile-pane .leaflet-layer:first-child { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9); }
