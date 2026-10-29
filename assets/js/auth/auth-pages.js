@@ -15,6 +15,7 @@ import {
   turkceOtpHatasi,
   oturumHatirlamaTercihiniKaydet,
 } from "../core/supabase-client.js";
+import { girisSonrasi, cevrimdisiGiris, kasaVarMi } from "../core/kesinti.js";
 
 // PANEL BİRLEŞTİRİLDİ: giriş sonrası varış noktası birleşik panelin
 // "Panelim" sekmesi (eski /panel/panel.html artık sadece yönlendirme).
@@ -450,14 +451,35 @@ export function initGirisPage() {
     // durumda "submitBtn.disabled = false" satırı hiç çalışmaz ve buton
     // hiçbir hata mesajı olmadan SONSUZA DEK devre dışı kalırdı.
     let data, error;
+    // KESİNTİ: sunucuya ulaşılamıyorsa (ağ hatası/5xx) ve bu cihazda şifreli çevrimdışı kasa varsa, e-posta+parola YEREL doğrulanır.
+    const cevrimdisiDene = async () => {
+      if (!(await kasaVarMi(email))) return false;
+      showMessage(msg, "Sunucuya ulaşılamıyor; bu cihazdaki şifreli kasayla doğrulanıyor…", "info");
+      const s = await cevrimdisiGiris(email, password);
+      if (s.ok) {
+        const hedefC = guvenliDonusHedefi(new URLSearchParams(window.location.search).get("donus"));
+        window.location.replace(hedefC);
+        return true;
+      }
+      showMessage(msg, s.neden === "kilit" ? `Çok fazla hatalı deneme. ${s.saniye} sn sonra tekrar dene.` : s.neden === "suresi-doldu" ? "Çevrimdışı kasanın süresi doldu (30 gün). Sunucu çalışırken normal giriş yap." : "E-posta veya şifre hatalı.");
+      return true;
+    };
     try {
       ({ data, error } = await supabase.auth.signInWithPassword({ email, password }));
     } catch (err) {
       console.error("signInWithPassword() beklenmedik hata:", err);
-      showMessage(msg, "Giriş yapılamadı: bağlantı sorunu olabilir, tekrar dene.");
+      if (!(await cevrimdisiDene())) showMessage(msg, "Giriş yapılamadı: bağlantı sorunu olabilir, tekrar dene.");
       return;
     } finally {
       submitBtn.disabled = false;
+    }
+
+    if (error && (error.status === 0 || error.status >= 500 || /fetch|network|retryable|timeout/i.test(`${error.name} ${error.message}`))) {
+      if (await cevrimdisiDene()) return;
+    }
+
+    if (!error && data?.user) {
+      try { await girisSonrasi({ eposta: email, parola: password, uid: data.user.id, kasaIste: document.getElementById("offline-kasa")?.checked ?? false }); } catch (h) { console.warn("çevrimdışı kasa:", h); }
     }
 
     if (error) {
