@@ -734,6 +734,66 @@ async function hayaletTara(env, kimlik, url, cors) {
   return json({ taranan: l.objects.length, hayalet, sonraki: l.truncated ? l.cursor : null }, 200, cors);
 }
 
+/**
+ * R2 KOTALARI (aylik, UTC ay basi -> simdi): Class A (yazma/liste), Class B (okuma), ucretsiz islemler (silme) ve depolama.
+ * Cloudflare ucretsiz GraphQL Analytics (r2OperationsAdaptiveGroups / r2StorageAdaptiveGroups). 60 sn edge cache -> tum sekmeler ayni sayiyi gorur.
+ * Ucretsiz katman: 10 GB depolama, 1.000.000 Class A, 10.000.000 Class B / ay; cikis (egress) UCRETSIZ. Yalnizca yetkili yonetici/owner.
+ */
+const R2_SINIF_A = new Set(["ListBuckets", "PutBucket", "ListObjects", "ListObjectsV2", "PutObject", "CopyObject", "CompleteMultipartUpload", "CreateMultipartUpload", "ListMultipartUploads", "UploadPart", "UploadPartCopy", "ListParts", "PutBucketEncryption", "PutBucketCors", "PutBucketLifecycleConfiguration", "DeleteBucketCors", "DeleteBucketLifecycle"]);
+const R2_UCRETSIZ = new Set(["DeleteObject", "DeleteBucket", "AbortMultipartUpload", "DeleteObjects"]);
+async function r2Kota(env, kimlik, cors) {
+  if (!(await istatistikYetkiliMi(env, kimlik))) return json({ error: "Bu istatistikleri gorme yetkin yok." }, 403, cors);
+  const sinirlar = { a: 1000000, b: 10000000, depolamaBayt: 10 * 1024 * 1024 * 1024 };
+  if (!env.CF_ACCOUNT_ID || !env.CF_API_TOKEN) return json({ yapilandirilmadi: true, sinirlar }, 200, cors);
+  const anahtar = new Request(`https://r2kota.invalid/v1/${env.CF_ACCOUNT_ID}`);
+  const onb = caches.default;
+  const var_ = await onb.match(anahtar);
+  if (var_) return new Response(var_.body, { status: 200, headers: { ...cors, "Content-Type": "application/json", "X-Onbellek": "hit" } });
+  const simdi = new Date();
+  const ayBasi = new Date(Date.UTC(simdi.getUTCFullYear(), simdi.getUTCMonth(), 1)).toISOString();
+  const gunBasi = new Date(Date.UTC(simdi.getUTCFullYear(), simdi.getUTCMonth(), simdi.getUTCDate())).toISOString();
+  const gql = async (sorgu, degiskenler) => {
+    const r = await fetch("https://api.cloudflare.com/client/v4/graphql", { method: "POST", headers: { Authorization: `Bearer ${env.CF_API_TOKEN}`, "Content-Type": "application/json" }, body: JSON.stringify({ query: sorgu, variables: { acc: env.CF_ACCOUNT_ID, ...degiskenler } }) });
+    const g = await r.json().catch(() => ({}));
+    return { ok: r.ok && !(Array.isArray(g.errors) && g.errors.length), g };
+  };
+  const opQ = `query($acc:String!,$from:Time!,$to:Time!){viewer{accounts(filter:{accountTag:$acc}){r2OperationsAdaptiveGroups(limit:1000,filter:{datetime_geq:$from,datetime_leq:$to}){sum{requests}dimensions{actionType}}}}}`;
+  const stQ = `query($acc:String!,$from:Time!,$to:Time!){viewer{accounts(filter:{accountTag:$acc}){r2StorageAdaptiveGroups(limit:100,orderBy:[datetime_DESC],filter:{datetime_geq:$from,datetime_leq:$to}){max{payloadSize metadataSize objectCount}dimensions{bucketName}}}}}`;
+  let ay, gun, st;
+  try {
+    [ay, gun, st] = await Promise.all([
+      gql(opQ, { from: ayBasi, to: simdi.toISOString() }),
+      gql(opQ, { from: gunBasi, to: simdi.toISOString() }),
+      gql(stQ, { from: new Date(simdi.getTime() - 48 * 3600 * 1000).toISOString(), to: simdi.toISOString() }).catch(() => ({ ok: false, g: {} })),
+    ]);
+  } catch { return json({ error: "Cloudflare Analytics'e ulasilamadi.", sinirlar }, 502, cors); }
+  const topla = (r) => {
+    const satirlar = r.g?.data?.viewer?.accounts?.[0]?.r2OperationsAdaptiveGroups;
+    if (!r.ok || !Array.isArray(satirlar)) return null;
+    const o = { a: 0, b: 0, ucretsiz: 0, ayrinti: {} };
+    for (const x of satirlar) {
+      const ad = x.dimensions?.actionType || "?", n = Number(x.sum?.requests) || 0;
+      o.ayrinti[ad] = (o.ayrinti[ad] || 0) + n;
+      if (R2_UCRETSIZ.has(ad)) o.ucretsiz += n; else if (R2_SINIF_A.has(ad)) o.a += n; else o.b += n;
+    }
+    return o;
+  };
+  const aylik = topla(ay), gunluk = topla(gun);
+  if (!aylik) return json({ error: "R2 analitigi alinamadi (token izni: Account Analytics - Read olmali).", sinirlar }, 502, cors);
+  let depolama = null;
+  const sr = st.g?.data?.viewer?.accounts?.[0]?.r2StorageAdaptiveGroups;
+  if (st.ok && Array.isArray(sr) && sr.length) {
+    const son = {};
+    for (const x of sr) { const b = x.dimensions?.bucketName || "?"; if (!son[b]) son[b] = x.max; }
+    depolama = { bayt: 0, nesne: 0, kovalar: {} };
+    for (const [b, m] of Object.entries(son)) { const by = (Number(m.payloadSize) || 0) + (Number(m.metadataSize) || 0); depolama.bayt += by; depolama.nesne += Number(m.objectCount) || 0; depolama.kovalar[b] = { bayt: by, nesne: Number(m.objectCount) || 0 }; }
+  }
+  const govde = JSON.stringify({ sinirlar, aylik, gunluk, depolama, ayBasi, gunBasi, olusturuldu: simdi.toISOString() });
+  const yanit = new Response(govde, { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "max-age=60" } });
+  await onb.put(anahtar, yanit.clone());
+  return new Response(govde, { status: 200, headers: { ...cors, "Content-Type": "application/json" } });
+}
+
 export default {
   async fetch(istek, env) {
     const cors = corsBasliklari(istek);
@@ -787,6 +847,7 @@ export default {
       if (yol === "/depolama") return await depolamaTara(env, kimlik, cors);
       if (yol === "/kota") return await kotaGetir(env, kimlik, cors);
       if (yol === "/kota/analitik") return await kotaAnalitik(env, kimlik, cors);
+      if (yol === "/r2/kota") return await r2Kota(env, kimlik, cors);
       if (yol === "/worker-sert/durum") return json({ yapilandirildi: !!(env.CF_ACCOUNT_ID && env.CF_WORKERS_TOKEN) }, 200, cors);
       if (yol === "/r2/gezgin") return await r2Gezgin(env, kimlik, url, cors);
       if (yol === "/r2/hayalet-tara") return await hayaletTara(env, kimlik, url, cors);
