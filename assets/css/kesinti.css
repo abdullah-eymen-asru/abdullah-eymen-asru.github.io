@@ -1,0 +1,62 @@
+/* kesinti.css — kesinti çubuğu, bekleyen işlem penceresi, Sistem Durumu sekmesi ve R2 kota kartları. İnline stil yok (CSP). */
+.kst-bar { position: sticky; top: 0; z-index: 9000; padding: calc(.55rem + env(safe-area-inset-top, 0px)) max(.9rem, env(safe-area-inset-right, 0px)) .55rem max(.9rem, env(safe-area-inset-left, 0px)); border-bottom: 1px solid rgba(0,0,0,.18); font-size: .92rem; line-height: 1.4; color: #1b1b1b; }
+.kst-kirmizi { background: #ffd9d6; border-bottom-color: #d64538; }
+.kst-sari { background: #fff1c2; border-bottom-color: #c99a00; }
+[data-theme="dark"] .kst-kirmizi { background: #4a1f1c; color: #ffe3e0; border-bottom-color: #d64538; }
+[data-theme="dark"] .kst-sari { background: #4a3a0a; color: #ffefb8; border-bottom-color: #c99a00; }
+.kst-ust { display: flex; flex-wrap: wrap; gap: .5rem .9rem; align-items: center; justify-content: space-between; }
+.kst-metin { flex: 1 1 18rem; min-width: 0; overflow-wrap: anywhere; }
+.kst-eylem { display: flex; flex-wrap: wrap; gap: .4rem; }
+.kst-dugme { font: inherit; font-weight: 600; min-height: 2.5rem; padding: .35rem .85rem; border-radius: 10px; border: 1px solid currentColor; background: rgba(255,255,255,.55); color: inherit; cursor: pointer; touch-action: manipulation; }
+[data-theme="dark"] .kst-dugme { background: rgba(255,255,255,.1); }
+.kst-dugme:hover:not(:disabled) { filter: brightness(.95); }
+.kst-dugme:disabled { opacity: .6; cursor: default; }
+.kst-birincil { background: #1d5fd1; border-color: #1d5fd1; color: #fff; }
+.kst-tehlike { color: #b3261e; }
+[data-theme="dark"] .kst-tehlike { color: #ffb4ab; }
+.kst-detay { margin-top: .5rem; padding: .6rem .8rem; border-radius: 10px; background: rgba(255,255,255,.6); }
+[data-theme="dark"] .kst-detay { background: rgba(0,0,0,.28); }
+.kst-detay ul { margin: 0 0 .4rem; padding-left: 1.2rem; display: grid; gap: .3rem; }
+.kst-alt { margin: 0; font-size: .8rem; opacity: .85; }
+.kst-rozet { position: fixed; z-index: 9001; left: max(.8rem, env(safe-area-inset-left, 0px)); bottom: calc(.8rem + env(safe-area-inset-bottom, 0px)); font: inherit; font-weight: 600; min-height: 2.75rem; padding: .4rem 1rem; border-radius: 999px; border: 1px solid #c99a00; background: #fff1c2; color: #3d2f00; box-shadow: 0 4px 16px rgba(0,0,0,.25); cursor: pointer; }
+.kst-modal { position: fixed; inset: 0; z-index: 9100; background: rgba(0,0,0,.5); display: grid; place-items: center; padding: 1rem; }
+.kst-kutu { width: min(34rem, 100%); max-height: 88vh; overflow: auto; background: var(--bg, #fff); color: var(--text, #111); border: 1px solid var(--border, #ccc); border-radius: 16px; padding: 1rem 1.1rem; display: grid; gap: .7rem; }
+.kst-kutu h2 { margin: 0; font-size: 1.15rem; }
+.kst-kuyruk-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
+.kst-kuyruk-liste li { display: flex; gap: .6rem; align-items: center; justify-content: space-between; padding: .5rem .6rem; border: 1px solid var(--border, #ccc); border-radius: 10px; }
+.kst-kuyruk-liste .kst-dugme { background: transparent; }
+.kst-toast { position: fixed; z-index: 9200; left: 50%; transform: translateX(-50%); bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); width: min(30rem, calc(100% - 1.6rem)); padding: .75rem 1rem; border-radius: 12px; background: #263238; color: #fff; box-shadow: 0 6px 24px rgba(0,0,0,.35); font-size: .9rem; }
+.kst-toast.kst-ok { background: #1b6e3c; }
+.kst-toast.kst-uyari { background: #8a5a00; }
+
+/* ---------- Sistem Durumu sekmesi ---------- */
+.sd-kok { display: grid; gap: 1rem; }
+.sd-ozet { display: flex; flex-wrap: wrap; gap: .8rem; align-items: center; padding: 1rem 1.1rem; border: 1px solid var(--border, #ccc); border-radius: 14px; background: var(--card-bg, var(--bg, #fff)); }
+.sd-ozet h2 { margin: 0; font-size: 1.15rem; flex: 1 1 14rem; }
+.sd-nokta { display: inline-block; width: .8rem; height: .8rem; border-radius: 50%; background: #999; margin-right: .45rem; vertical-align: middle; }
+.sd-ok .sd-nokta { background: #1f9d55; } .sd-uyari .sd-nokta { background: #e0a800; } .sd-hata .sd-nokta { background: #d64538; } .sd-yok .sd-nokta { background: #8a8a8a; }
+.sd-izgara { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(17rem, 100%), 1fr)); gap: .8rem; }
+.sd-kart { padding: .85rem 1rem; border: 1px solid var(--border, #ccc); border-radius: 14px; background: var(--card-bg, var(--bg, #fff)); display: grid; gap: .3rem; align-content: start; min-width: 0; }
+.sd-kart h3 { margin: 0; font-size: 1rem; display: flex; align-items: center; }
+.sd-kart p { margin: 0; font-size: .86rem; color: var(--muted, #666); overflow-wrap: anywhere; }
+.sd-kart .sd-deger { font-weight: 600; color: var(--text, #111); font-size: .95rem; }
+.sd-bolum-baslik { margin: .4rem 0 0; font-size: 1rem; }
+.sd-eylemler { display: flex; flex-wrap: wrap; gap: .5rem; }
+.sd-btn { font: inherit; min-height: 2.6rem; padding: .4rem 1rem; border-radius: 10px; border: 1px solid var(--border, #ccc); background: var(--card-bg, var(--bg, #fff)); color: var(--text, #111); cursor: pointer; font-weight: 600; touch-action: manipulation; }
+.sd-btn:hover:not(:disabled) { border-color: var(--accent, #1d5fd1); }
+.sd-btn:disabled { opacity: .6; }
+.sd-liste { margin: 0; padding-left: 1.1rem; font-size: .88rem; display: grid; gap: .25rem; }
+
+/* ---------- R2 kota kartı (Akademik Kütüphane + Dosya Yöneticisi + Sistem Durumu; aynı kaynak, eş zamanlı) ---------- */
+.rk-kart { display: grid; gap: .6rem; padding: .85rem 1rem; border: 1px solid var(--border, #ccc); border-radius: 14px; background: var(--card-bg, var(--bg, #fff)); margin: .6rem 0; }
+.rk-kart h3 { margin: 0; font-size: 1rem; display: flex; flex-wrap: wrap; gap: .4rem; align-items: baseline; justify-content: space-between; }
+.rk-kart h3 small { font-weight: 400; color: var(--muted, #666); font-size: .78rem; }
+.rk-satirlar { display: grid; gap: .55rem; }
+.rk-satir { display: grid; gap: .2rem; }
+.rk-ust { display: flex; justify-content: space-between; gap: .6rem; font-size: .88rem; flex-wrap: wrap; }
+.rk-ust span:last-child { color: var(--muted, #666); }
+.rk-satir progress { width: 100%; height: .6rem; accent-color: var(--accent, #1d5fd1); }
+.rk-satir.rk-uyari progress { accent-color: #e0a800; } .rk-satir.rk-tehlike progress { accent-color: #d64538; }
+.rk-not { margin: 0; font-size: .78rem; color: var(--muted, #666); }
+.rk-hata { color: #b3261e; }
+@media (max-width: 520px) { .kst-eylem { width: 100%; } .kst-dugme { flex: 1 1 auto; } }
