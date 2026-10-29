@@ -35,6 +35,7 @@ const ARACLAR = [
   { id: "yapiskan", simge: "🗒", ad: "Yapışkan not (tıkla)", yazma: true },
   { id: "metin", simge: "T", ad: "Metin kutusu (tıkla ya da sürükle)", yazma: true },
 ];
+const ARAC_KISA = { gez: "Seç", vurgu: "Vurgu", altcizgi: "Altı çiz", ustcizgi: "Üstü çiz", cizim: "Kalem", sekil: "Şekil", yapiskan: "Not", metin: "Metin" };
 const TUR_ADI = { vurgu: "Vurgu", altcizgi: "Altı çizili", ustcizgi: "Üstü çizili", cizim: "Çizim", sekil: "Şekil", yapiskan: "Not", metin: "Metin" };
 const METIN_TURLERI = new Set(["vurgu", "altcizgi", "ustcizgi"]);
 const CIZIM_ARACLARI = new Set(["cizim", "sekil", "yapiskan", "metin"]);
@@ -114,28 +115,34 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
   };
 
   /* ---------- iskelet ---------- */
-  const araclarHtml = salt ? "" : ARACLAR.map((a) => `<button type="button" class="ak-arac${a.id === "gez" ? " aktif" : ""}" data-ak-arac="${a.id}" title="${esc(a.ad)}" aria-label="${esc(a.ad)}">${a.simge}</button>`).join("");
+  const aracDugme = (a) => `<button type="button" class="ak-arac${a.id === "gez" ? " aktif" : ""}" data-ak-arac="${a.id}" title="${esc(a.ad)}" aria-label="${esc(a.ad)}"><span class="ak-arac-simge" aria-hidden="true">${a.simge}</span><span class="ak-arac-yazi">${esc(ARAC_KISA[a.id] || a.ad)}</span></button>`;
+  const ANA_ARACLAR = new Set(["gez", "vurgu", "altcizgi", "ustcizgi"]);
+  const araclarHtml = salt ? "" : `${ARACLAR.filter((a) => ANA_ARACLAR.has(a.id)).map(aracDugme).join("")}<details class="ak-ok-diger"><summary class="ak-arac" title="Çizim, şekil, not, metin kutusu"><span class="ak-arac-simge" aria-hidden="true">✎</span><span class="ak-arac-yazi">Çiz / Not</span></summary><div class="ak-ok-diger-ic">${ARACLAR.filter((a) => !ANA_ARACLAR.has(a.id)).map(aracDugme).join("")}</div></details>`;
   const kok = el("div", { class: "ak-okuyucu", role: "dialog", "aria-modal": "true", "aria-label": `PDF okuyucu: ${kaynak.baslik}` });
   kok.innerHTML = `
     <header class="ak-ok-ust">
       <button type="button" class="ak-btn ak-ok-kapat" data-ak="kapat" title="Kapat" aria-label="Kapat">✕</button>
       <div class="ak-ok-baslik" title="${esc(kaynak.baslik)}">${esc(kaynak.baslik)}${salt ? ' <span class="ak-etiket">salt okunur</span>' : ""}</div>
-      <div class="ak-ok-araclar" role="toolbar" aria-label="Açıklama araçları">${araclarHtml}
-        ${salt ? "" : `<span class="ak-ok-renkler" data-ak-renkler></span>
-        <select class="ak-ok-sec" data-ak="kalinlik" title="Çizgi kalınlığı" aria-label="Çizgi kalınlığı"><option value="1">İnce</option><option value="2" selected>Orta</option><option value="4">Kalın</option><option value="7">Çok kalın</option></select>`}
-      </div>
-      <div class="ak-ok-sag">
-        <input type="search" class="ak-ok-ara" data-ak="ara" placeholder="PDF'te ara" aria-label="PDF'te ara"><span class="ak-ok-say" data-ak-bul></span>
-        <button type="button" class="ak-btn" data-ak="uzaklas" title="Uzaklaştır" aria-label="Uzaklaştır">−</button>
-        <select class="ak-ok-sec" data-ak="olcek" aria-label="Yakınlaştırma"><option value="page-width">Genişliğe sığdır</option><option value="page-fit">Sayfaya sığdır</option><option value="auto">Otomatik</option><option value="0.75">75%</option><option value="1">100%</option><option value="1.25">125%</option><option value="1.5">150%</option><option value="2">200%</option></select>
-        <button type="button" class="ak-btn" data-ak="yaklas" title="Yakınlaştır" aria-label="Yakınlaştır">+</button>
+      <div class="ak-ok-ust-sag">
         <span class="ak-ok-sayfa"><input type="number" min="1" value="1" data-ak="sayfa" aria-label="Sayfa"> / <span data-ak-toplam>–</span></span>
         <button type="button" class="ak-btn" data-ak="yan" title="Açıklama paneli" aria-label="Açıklama paneli">☰</button>
-        <button type="button" class="ak-btn" data-ak="tam" title="Tam ekran" aria-label="Tam ekran">⛶</button>
-        <button type="button" class="ak-btn ak-btn-indir" data-ak="indir" title="PDF dosyasını bilgisayarına indir (açıklamalarınla birlikte)" aria-label="PDF dosyasını indir"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M12 3v11m0 0l-4-4m4 4l4-4M5 17v3h14v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="ak-indir-yazi">PDF indir</span></button>
-        ${salt ? "" : `<button type="button" class="ak-btn" data-ak="onceki" title="Önceki sürüme dön" aria-label="Önceki sürüme dön">↶</button><button type="button" class="ak-btn" data-ak="kaydet" title="Değişiklikler zaten otomatik kaydedilir. Bu düğme açıklamaları PDF dosyasının içine de işler (Ctrl+S). Okuyucuyu kapatırken bu da kendiliğinden yapılır.">PDF'e işle</button>`}
+        <details class="ak-ok-menu"><summary class="ak-btn" aria-label="Diğer işlemler" title="Ara, yakınlaştır, indir…">⋯</summary>
+          <div class="ak-ok-menu-ic">
+            <label class="ak-ok-menu-satir"><span>Ara</span><input type="search" class="ak-ok-ara" data-ak="ara" placeholder="PDF'te ara" aria-label="PDF'te ara"><span class="ak-ok-say" data-ak-bul></span></label>
+            <div class="ak-ok-menu-satir"><span>Yakınlık</span>
+              <button type="button" class="ak-btn" data-ak="uzaklas" title="Uzaklaştır" aria-label="Uzaklaştır">−</button>
+              <select class="ak-ok-sec" data-ak="olcek" aria-label="Yakınlaştırma"><option value="page-width">Genişliğe sığdır</option><option value="page-fit">Sayfaya sığdır</option><option value="auto">Otomatik</option><option value="0.75">75%</option><option value="1">100%</option><option value="1.25">125%</option><option value="1.5">150%</option><option value="2">200%</option></select>
+              <button type="button" class="ak-btn" data-ak="yaklas" title="Yakınlaştır" aria-label="Yakınlaştır">+</button></div>
+            <button type="button" class="ak-btn" data-ak="tam" title="Tam ekran">⛶ Tam ekran</button>
+            <button type="button" class="ak-btn ak-btn-indir" data-ak="indir" title="PDF dosyasını indir (açıklamalarınla birlikte)" aria-label="PDF dosyasını indir"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M12 3v11m0 0l-4-4m4 4l4-4M5 17v3h14v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="ak-indir-yazi">PDF indir</span></button>
+            ${salt ? "" : `<button type="button" class="ak-btn" data-ak="onceki" title="Önceki sürüme dön">↶ Önceki sürüm</button><button type="button" class="ak-btn" data-ak="kaydet" title="Değişiklikler zaten otomatik kaydedilir. Bu düğme açıklamaları PDF dosyasının içine de işler (Ctrl+S). Okuyucuyu kapatırken bu da kendiliğinden yapılır.">PDF'e işle</button>`}
+          </div>
+        </details>
       </div>
     </header>
+    ${salt ? "" : `<div class="ak-ok-dock" role="toolbar" aria-label="Açıklama araçları"><div class="ak-ok-araclar">${araclarHtml}</div>
+      <div class="ak-ok-stil"><span class="ak-ok-renkler" data-ak-renkler></span>
+        <select class="ak-ok-sec" data-ak="kalinlik" title="Çizgi kalınlığı" aria-label="Çizgi kalınlığı"><option value="1">İnce</option><option value="2" selected>Orta</option><option value="4">Kalın</option><option value="7">Çok kalın</option></select></div></div>`}
     <div class="ak-ok-durum" data-ak-durum aria-live="polite"></div><div class="ak-ok-oto" data-ak-oto aria-live="polite"></div>
     <div class="ak-ok-govde">
       <div class="ak-ok-kap" data-ak-kap tabindex="0"><div class="pdfViewer"></div></div>
@@ -281,7 +288,7 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
 
   eventBus.on("pagesinit", () => {
     viewer.currentScaleValue = "page-width";
-    durumYaz(salt ? "Salt okunur." : "Hazır. Metin seçip vurgula ya da soldaki araçlardan birini seç.");
+    durumYaz(salt ? "Salt okunur." : "Hazır. Metin seçip vurgula ya da alttaki araçlardan birini seç.");
     metinDoldur();
   });
   eventBus.on("pagerendered", (e) => sayfaCiz(e.pageNumber));
@@ -671,6 +678,14 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
       if (s.not) alt.textContent = s.not;
       if (s.baglanti) { const a = el("a", { href: s.baglanti, target: "_blank", rel: "noopener noreferrer" }, "Kaynağı aç ↗"); alt.append(alt.textContent ? " · " : "", a); }
       if (s.metin) { kopya.hidden = false; kopya.addEventListener("click", async () => { await panoyaKopyala(s.metin); toast("Kopyalandı.", "basari"); }); }
+      for (const ey of s.eylemler || []) {
+        const b = el("button", { type: "button", class: "ak-btn" }, ey.ad);
+        b.addEventListener("click", async () => {
+          if (ey.kopyala) { await panoyaKopyala(ey.kopyala); toast("Kopyalandı.", "basari"); return; }
+          b.disabled = true; try { const r = await ey.calistir(); icerik.textContent = `${s.metin}\n\n${r.metin}`; } catch (h) { icerik.textContent = `${s.metin}\n\n${h.message}`; } b.disabled = false;
+        });
+        kutu.querySelector(".ak-eklenti-eylem").append(b);
+      }
     } catch (h) { bas.textContent = "Eklenti çalışmadı"; icerik.textContent = h.message || String(h); }
   }
 
@@ -688,12 +703,34 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
     return sayfa ? Number(sayfa.dataset.pageNumber) : null;
   }
 
+  /** Aralığın METİN düğümlerinden satır kutuları (endOfContent/kapsayıcı kutuları DEĞİL → "çift katman" ve dev kutular oluşmaz). */
+  function metinKutulari(aralik) {
+    const kok0 = aralik.commonAncestorContainer.nodeType === 1 ? aralik.commonAncestorContainer : aralik.commonAncestorContainer.parentElement;
+    if (!kok0) return [];
+    const yurume = document.createTreeWalker(kok0, NodeFilter.SHOW_TEXT);
+    const cikti = [];
+    for (let n = yurume.nextNode(); n; n = yurume.nextNode()) {
+      if (!aralik.intersectsNode(n) || !n.nodeValue?.trim() || n.parentElement?.closest(".endOfContent")) continue;
+      const r = document.createRange();
+      r.selectNodeContents(n);
+      if (n === aralik.startContainer) r.setStart(n, aralik.startOffset);
+      if (n === aralik.endContainer) r.setEnd(n, aralik.endOffset);
+      if (r.collapsed) continue;
+      for (const c of r.getClientRects()) if (c.width > 0.5 && c.height > 0.5) cikti.push(c);
+    }
+    if (cikti.length > 3) {                                            // satır yüksekliğinin çok üstündeki aykırı kutuları ele
+      const yuk = cikti.map((c) => c.height).sort((x, y) => x - y), med = yuk[Math.floor(yuk.length / 2)];
+      return cikti.filter((c) => c.height <= med * 2.2);
+    }
+    return cikti;
+  }
+  const kutuOrtusme = (x, y) => { const ox = Math.min(x[2], y[2]) - Math.max(x[0], y[0]), oy = Math.min(x[3], y[3]) - Math.max(x[1], y[1]); if (ox <= 0 || oy <= 0) return 0; return (ox * oy) / Math.min((x[2] - x[0]) * (x[3] - x[1]), (y[2] - y[0]) * (y[3] - y[1])); };
   function secimdenOlustur(tur, renk = d.renk) {
-    secimiGeriYukle();
+    // Canlı seçim yoksa (iOS balona dokununca seçimi çökertir) saklı aralık kullanılır; seçim DOM'a GERİ YÜKLENMEZ (çift menü/seçim önlenir).
     const s = window.getSelection();
-    if (!s || s.isCollapsed || !s.rangeCount) return false;
-    const aralik = s.getRangeAt(0);
-    let olustu = 0;
+    const aralik = s && !s.isCollapsed && s.rangeCount ? s.getRangeAt(0) : sonSecim?.aralik;
+    if (!aralik) return false;
+    let olustu = 0, tekrar = 0;
     kap.querySelectorAll(".page").forEach((sayfaDiv) => {
       const tl = sayfaDiv.querySelector(".textLayer");
       if (!tl || !aralik.intersectsNode(tl)) return;
@@ -707,12 +744,16 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
       const pv = sayfaGorunumu(no);
       const kat = katman(pv);
       if (!pv || !kat) return;
-      const kutular = kutulariBirlestir([...r.getClientRects()].map((c) => istemciRectPdf(pv, kat, c.left, c.top, c.right, c.bottom)));
+      const kutular = kutulariBirlestir(metinKutulari(r).map((c) => istemciRectPdf(pv, kat, c.left, c.top, c.right, c.bottom)));
       if (!kutular.length) return;
+      // aynı türde, aynı yeri kaplayan açıklama zaten varsa ikinci kez ekleme (üst üste binen "çift kat" çizgiler)
+      const ayni = [...d.model.values()].some((a) => a.tur === tur && a.sayfa === no && a.kutular && kutular.every((k) => a.kutular.some((x) => kutuOrtusme(k, x) > 0.85)));
+      if (ayni) { tekrar++; return; }
       ekleModel({ tur, sayfa: no, kutular, renk, metin });
       olustu++;
     });
-    if (olustu) { s.removeAllRanges(); sonSecim = null; }
+    if (olustu || tekrar) { try { s?.removeAllRanges(); } catch { /* yok say */ } sonSecim = null; }
+    if (tekrar && !olustu) toast("Bu metne zaten aynı işaretleme yapılmış.", "uyari");
     balonGizle();
     return olustu > 0;
   }
@@ -730,13 +771,23 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
     const son = rs[rs.length - 1];
     const govde = q(".ak-ok-govde").getBoundingClientRect();
     balon = el("div", { class: "ak-balon", role: "toolbar", "aria-label": "Seçim araçları" });
-    for (const r of (salt ? [] : RENKLER)) {
-      const n = el("button", { type: "button", class: "ak-renk", title: `${r.ad} vurgu`, "aria-label": `${r.ad} vurgu`, "data-hex": r.hex });
+    // Sade balon: 4 renk + Altını çiz / Üstünü çiz / Yorum + Kopyala + Çevir; geri kalanı ("Daha fazla") ikinci satırda.
+    const ana = el("div", { class: "ak-balon-sira" }), fazla = el("div", { class: "ak-balon-sira ak-balon-fazla", hidden: true });
+    for (const r of (salt ? [] : RENKLER.slice(0, 4))) {
+      const n = el("button", { type: "button", class: "ak-renk ak-renk-buyuk", title: `${r.ad} vurgu`, "aria-label": `${r.ad} vurgu`, "data-hex": r.hex });
       n.style.background = r.hex;
-      balon.append(n);
+      ana.append(n);
     }
-    if (!salt) balon.append(el("button", { type: "button", class: "ak-btn", "data-b": "altcizgi", title: "Altını çiz" }, "U̲"), el("button", { type: "button", class: "ak-btn", "data-b": "ustcizgi", title: "Üstünü çiz" }, "S̶"), el("button", { type: "button", class: "ak-btn", "data-b": "yorum", title: "Vurgula ve yorum ekle" }, "💬"));
-    balon.append(el("button", { type: "button", class: "ak-btn", "data-b": "alinti", title: "Alıntı olarak kopyala (yazar, yıl, sayfa ile)" }, "❝"), el("button", { type: "button", class: "ak-btn", "data-b": "kopya", title: "Seçili metni kopyala" }, "⧉"), ...eklentiDugmeleri());
+    const yaziDugme = (b, simge, yazi, baslik) => el("button", { type: "button", class: "ak-btn ak-balon-dugme", "data-b": b, title: baslik || yazi }, el("span", { "aria-hidden": "true" }, simge), el("span", { class: "ak-balon-yazi" }, yazi));
+    if (!salt) ana.append(yaziDugme("altcizgi", "U̲", "Altı", "Altını çiz"), yaziDugme("ustcizgi", "S̶", "Üstü", "Üstünü çiz"), yaziDugme("yorum", "💬", "Yorum", "Vurgula ve yorum ekle"));
+    ana.append(yaziDugme("kopya", "⧉", "Kopyala", "Seçili metni kopyala"));
+    const ekler = eklentiDugmeleri();
+    const cevir = ekler.find((x) => x.dataset.eklenti === "ceviri");
+    if (cevir) { cevir.classList.add("ak-balon-dugme"); cevir.append(el("span", { class: "ak-balon-yazi" }, "Çevir")); ana.append(cevir); }
+    if (!salt) fazla.append(...RENKLER.slice(4).map((r) => { const n = el("button", { type: "button", class: "ak-renk ak-renk-buyuk", title: `${r.ad} vurgu`, "aria-label": `${r.ad} vurgu`, "data-hex": r.hex }); n.style.background = r.hex; return n; }));
+    fazla.append(yaziDugme("alinti", "❝", "Alıntı", "Alıntı olarak kopyala (yazar, yıl, sayfa ile)"), ...ekler.filter((x) => x !== cevir));
+    ana.append(yaziDugme("fazla", "⋯", "Daha fazla", "Diğer renkler ve araçlar"));
+    balon.append(ana, fazla);
     // Seçim bozulmasın: fare, dokunma ve işaretçi olaylarının hepsinde odak/seçim çalmayı engelle
     const seciliTut = (e) => { balonDokunuyor = true; if (e.cancelable) e.preventDefault(); setTimeout(() => { balonDokunuyor = false; }, 800); };
     balon.addEventListener("mousedown", seciliTut);
@@ -748,7 +799,7 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
     const secimiBitir = () => { try { window.getSelection()?.removeAllRanges(); } catch { /* yok say */ } sonSecim = null; balonGizle(); };
     async function balonEylem(b) {
       try {
-        secimiGeriYukle();                                   // dokunma seçimi çökerttiyse kopyadan geri getir
+        if (b.dataset.b === "fazla") { const f = balon.querySelector(".ak-balon-fazla"); f.hidden = !f.hidden; return; }
         if (!sonSecim && !window.getSelection()?.rangeCount) { toast("Önce metin seç.", "uyari"); return; }
         if (b.dataset.eklenti) { await eklentiCalistir(b.dataset.eklenti); secimiBitir(); return; }
         if (b.dataset.hex) { d.renk = b.dataset.hex; renkleriCiz(); secimdenOlustur("vurgu", b.dataset.hex); }
@@ -773,6 +824,8 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
     d.arac = id;
     kok.classList.toggle("ak-cizim-modu", CIZIM_ARACLARI.has(id));
     kok.classList.toggle("ak-metin-modu", METIN_TURLERI.has(id));
+    kok.classList.toggle("ak-arac-aktif", id !== "gez");
+    if (CIZIM_ARACLARI.has(id) || id === "gez") kok.querySelector(".ak-ok-diger")?.removeAttribute("open");
     kok.querySelectorAll("[data-ak-arac]").forEach((b) => b.classList.toggle("aktif", b.dataset.akArac === id));
     sec(null);
     balonGizle();
