@@ -2,7 +2,8 @@
  * ui-radar.js — HAVASTİL RADAR (harita tabanlı; Windy / Zoom Earth / MGM benzeri).
  * -----------------------------------------------------------------------------------------------------------------
  * Katmanlar
- *   GÖZLEM (RainViewer, anahtarsız): 🌧️ Radar (son ~2 saat + 30 dk tahmin) · 🛰️ Uydu (kızılötesi bulut)
+ *   GÖZLEM: 🌧️ Radar (RainViewer, son ~2 sa; RainViewer 2026'da nowcast'i kaldırdı → "Gelecek" düğmesi model tahminine geçer) · 🛰️ Uydu (EUMETSAT MTG bulut görüntüsü; olmazsa NASA GIBS)
+ *   ALTLIK HARİTA: Esri Gray Canvas / World Imagery (anahtarsız; CARTO artık anahtar istiyor → "API KEY REQUIRED" filigranı), olmazsa OpenStreetMap
  *   TAHMİN (Open-Meteo ızgara, anahtarsız; saatlik, 10 güne kadar): 🌧️ Yağış · ☁️ Bulut · 🌬️ Rüzgâr (hareketli parçacıklar) · 💨 Hamle · 🌡️ Sıcaklık · 🧭 Basınç · 💧 Nem
  * Harita: Leaflet (cdnjs, sürüm sabit). Fare tekerleği, trackpad (Ctrl+tekerlek / sıkıştırma), dokunmatik sıkıştırma, çift tıklama, +/−, tam ekran, bölge kısayolları.
  * Kota/gizlilik: tahmin ızgarası YALNIZCA düğmeyle / bölge değişince / ilk açılışta TEK istekle çekilir (kaydırınca otomatik istek YOK) ve bellekte tutulur.
@@ -11,6 +12,7 @@
  */
 import { el, olay } from "./ui-temel.js";
 import { gorunenAd } from "./konumlar.js";
+import { dogrulamaKutusu } from "./ui-radar-dogrula.js";
 
 const LEAFLET_SURUM = "1.9.4";
 const CDN = `https://cdnjs.cloudflare.com/ajax/libs/leaflet/${LEAFLET_SURUM}`;
@@ -194,10 +196,17 @@ export function radarSekmesi(d, kb) {
   detaySec.value = "70";
   const yukleDugme = el("button", { type: "button", class: "hv-btn hv-btn-birincil", text: "⟳ Bu görünüm için tahmini yükle", hidden: true });
   zaman.append(geri, oynatDugme, ileri, cubuk, zamanYazi, suan, hizSec);
-  kok.append(baslik, katmanSerit, el("div", { class: "hv-radar-kap" }, harita, efsane), zaman, el("div", { class: "hv-radar-alt" }, detaySec, yukleDugme, durumSatir),
-    el("p", { class: "muted hv-radar-kaynak", text: "Veri: RainViewer (radar/uydu) · Open-Meteo (tahmin) · harita © OpenStreetMap, © CARTO. Radar kapsaması bölgeye göre değişir; tahmin katmanları model çıktısıdır, kesin değildir." }));
+  // Geçmiş (gözlem) / Gelecek (tahmin) anahtarı: radar ↔ yağış tahmini; altlık: harita ↔ uydu görüntüsü
+  const modGecmis = el("button", { type: "button", class: "hv-radar-mod", "data-mod": "gecmis", text: "⏪ Geçmiş (gözlem)" });
+  const modGelecek = el("button", { type: "button", class: "hv-radar-mod", "data-mod": "gelecek", text: "⏩ Gelecek saatler (tahmin)" });
+  const taban1 = el("button", { type: "button", class: "hv-radar-mod", "data-taban": "harita", text: "🗺 Harita" });
+  const taban2 = el("button", { type: "button", class: "hv-radar-mod", "data-taban": "uydu", text: "🛰 Uydu görüntüsü" });
+  const modKutu = el("div", { class: "hv-radar-modlar", role: "group", "aria-label": "Zaman ve altlık" }, modGecmis, modGelecek, el("span", { class: "hv-radar-ayrac", "aria-hidden": "true" }), taban1, taban2);
+  const dogrula = dogrulamaKutusu({ konum, oku: () => ({ gozlem: durum.gozlem, izgara: durum.izgara }) });
+  kok.append(baslik, katmanSerit, modKutu, el("div", { class: "hv-radar-kap" }, harita, efsane), zaman, dogrula, el("div", { class: "hv-radar-alt" }, detaySec, yukleDugme, durumSatir),
+    el("p", { class: "muted hv-radar-kaynak", text: "Veri: RainViewer (radar) · EUMETSAT / NASA GIBS (uydu) · Open-Meteo (tahmin) · harita: Esri, © OpenStreetMap katkıcıları. Radar kapsaması bölgeye göre değişir; tahmin katmanları model çıktısıdır, kesin değildir." }));
 
-  let L, map, tabanKat, alanKat, parcKat, isaret, sonYuklenenSinir = null, yukluSinyal = null, zamanlayici = null, kapali = false;
+  let L, map, tabanKat, tabanEtiket, uyduKat, tabanMod = "harita", alanKat, parcKat, isaret, sonYuklenenSinir = null, yukluSinyal = null, zamanlayici = null, kapali = false;
   const koyu = () => document.documentElement.dataset.theme === "dark" || window.matchMedia?.("(prefers-color-scheme: dark)").matches && document.documentElement.dataset.theme !== "light";
 
   /* --- katman düğmeleri --- */
@@ -297,15 +306,60 @@ export function radarSekmesi(d, kb) {
     if (alanKat) { map.removeLayer(alanKat); alanKat = null; }
     if (parcKat) { map.removeLayer(parcKat); parcKat = null; }
     efsaneCiz();
+    uyduKat?.remove(); uyduKat = null;
+    modGecmis.classList.toggle("aktif", id === "radar" || id === "uydu"); modGelecek.classList.toggle("aktif", id === "yagis");
+    modKutu.querySelectorAll("[data-taban]").forEach((b) => b.classList.toggle("aktif", b.dataset.taban === tabanMod));
+    if (id === "uydu") { yukleDugme.hidden = true; durum.gozlem.kareler = []; uyduGoster(); zamanYazi.textContent = "son görüntü"; return; }
     if (tur === "gozlem") {
       yukleDugme.hidden = true; durumYaz("Radar verisi alınıyor…");
-      try { await gozlemYukle(); if (durum.katman !== id) return; gozlemKareleriKur(); gozlemKareGoster(); zamanKur(); durumYaz(id === "radar" ? "Canlı radar · son ~2 saat ve 30 dk tahmin" : "Kızılötesi uydu görüntüsü"); }
+      try { await gozlemYukle(); if (durum.katman !== id) return; gozlemKareleriKur(); gozlemKareGoster(); zamanKur(); durumYaz("Canlı radar · son ~2 saat (gözlem). Gelecek saatler için “Gelecek saatler” düğmesi."); }
       catch (h) { durumYaz(`${h.message} (RainViewer erişilemiyor olabilir)`, true); }
     } else {
       alanKat = alanKatmani(L, map, durum); alanKat.addTo(map);
       if (id === "ruzgar" || id === "hamle") { parcKat = parcacikKatmani(L, map, durum); parcKat.addTo(map); }
       if (!durum.izgara) await tahminYukle(); else { zamanKur(); alanKat.planla(); yukleDugme.hidden = !gorunumDisindaMi(); }
     }
+  }
+  /* --- UYDU: EUMETSAT MTG (Avrupa/Afrika/Orta Doğu) → olmazsa NASA GIBS günlük gerçek renk (dünya) --- */
+  function uyduGoster() {
+    uyduKat?.remove(); uyduKat = null;
+    const eum = L.tileLayer.wms("https://view.eumetsat.int/geoserver/wms", { layers: "mtg_fd:rgb_cloudtype", format: "image/png", transparent: true, version: "1.3.0", opacity: Math.max(durum.opaklik, 0.85), zIndex: 400, attribution: "© EUMETSAT (MTG)", crossOrigin: true });
+    let hata = 0, basari = 0, yedekte = false;
+    const yedege = () => {
+      if (yedekte || kapali || durum.katman !== "uydu") return; yedekte = true; eum.remove();
+      const d = new Date(Date.now() - 36 * 3600 * 1000), tarih = d.toISOString().slice(0, 10);
+      uyduKat = L.tileLayer(`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/${tarih}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`, { maxNativeZoom: 9, maxZoom: 12, opacity: 0.95, zIndex: 400, attribution: "NASA GIBS / MODIS Terra", crossOrigin: true }).addTo(map);
+      durumYaz(`EUMETSAT şu an yanıt vermedi → yedek: NASA GIBS günlük uydu görüntüsü (${tarih}, dünya geneli; canlı değil, günde bir kez).`);
+    };
+    eum.on("tileerror", () => { hata++; if (hata >= 4 && basari === 0) yedege(); });
+    eum.on("tileload", () => { basari++; });
+    eum.addTo(map); uyduKat = eum;
+    durumYaz("Uydu: EUMETSAT Meteosat (MTG) bulut tipi görüntüsü — Avrupa, Afrika, Orta Doğu; genellikle 10-20 dk gecikmeli. Dünyanın diğer yerlerinde yedek olarak NASA görüntüsü açılır.");
+    setTimeout(() => { if (basari === 0 && !yedekte) yedege(); }, 9000);
+  }
+  /* --- ALTLIK HARİTA (anahtarsız): Esri Gray Canvas / World Imagery; olmazsa OSM --- */
+  const ESRI = "https://services.arcgisonline.com/ArcGIS/rest/services";
+  function tabanKur(mod = tabanMod, zorunluOsm = false) {
+    if (!map) return; tabanMod = mod;
+    tabanKat?.remove(); tabanEtiket?.remove(); tabanEtiket = null;
+    harita.classList.toggle("hv-osm-koyu", false);
+    let hata = 0, basari = 0;
+    const izle = (kat) => { kat.on("tileload", () => { basari++; }); kat.on("tileerror", () => { hata++; if (hata >= 6 && basari < 3 && !zorunluOsm) { durumYaz("Altlık harita servisi yanıt vermedi; OpenStreetMap'e geçildi."); tabanKur(mod, true); } }); };
+    if (zorunluOsm) {
+      tabanKat = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> katkıcıları' }).addTo(map);
+      harita.classList.toggle("hv-osm-koyu", koyu() && mod === "harita");
+    } else if (mod === "uydu") {
+      tabanKat = L.tileLayer(`${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`, { maxNativeZoom: 17, maxZoom: 19, attribution: "Esri, Maxar, Earthstar Geographics, USDA, USGS" }).addTo(map);
+      tabanEtiket = L.tileLayer(`${ESRI}/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}`, { maxNativeZoom: 17, maxZoom: 19, zIndex: 450, attribution: "Esri" }).addTo(map);
+      izle(tabanKat);
+    } else {
+      const ad = koyu() ? "Dark" : "Light";
+      tabanKat = L.tileLayer(`${ESRI}/Canvas/World_${ad}_Gray_Base/MapServer/tile/{z}/{y}/{x}`, { maxNativeZoom: 16, maxZoom: 19, attribution: "Esri, HERE, Garmin, © OpenStreetMap katkıcıları" }).addTo(map);
+      tabanEtiket = L.tileLayer(`${ESRI}/Canvas/World_${ad}_Gray_Reference/MapServer/tile/{z}/{y}/{x}`, { maxNativeZoom: 16, maxZoom: 19, zIndex: 450 }).addTo(map);
+      izle(tabanKat);
+    }
+    tabanKat.setZIndex?.(1);
+    modKutu.querySelectorAll("[data-taban]").forEach((b) => b.classList.toggle("aktif", b.dataset.taban === mod));
   }
   function bolgeGit(id) {
     durum.bolge = id; bolgeKutu.querySelectorAll("button[data-id]").forEach((b) => b.classList.toggle("aktif", b.dataset.id === id));
@@ -339,13 +393,15 @@ export function radarSekmesi(d, kb) {
   olay(hizSec, "change", () => { durum.hiz = Number(hizSec.value); if (durum.oynat) oynat(true); });
   olay(detaySec, "change", () => { durum.izgara = null; sonYuklenenSinir = null; if (KATMANLAR.find((x) => x[0] === durum.katman)[3] === "tahmin") tahminYukle(); });
   olay(yukleDugme, "click", () => tahminYukle("koru"));
+  olay(modGecmis, "click", () => { if (durum.katman !== "radar" && durum.katman !== "uydu") katmanDegis("radar"); });
+  olay(modGelecek, "click", () => { if (durum.katman !== "yagis") katmanDegis("yagis"); });
+  olay(taban1, "click", () => tabanKur("harita")); olay(taban2, "click", () => tabanKur("uydu"));
 
   /* --- harita --- */
   leafletYukle().then((Lib) => {
     if (kapali) return; L = Lib;
     map = L.map(harita, { center: [konum.lat, konum.lon], zoom: 7, minZoom: 2, maxZoom: 12, zoomSnap: 0.25, zoomDelta: 0.5, wheelPxPerZoomLevel: 100, scrollWheelZoom: true, touchZoom: true, doubleClickZoom: true, worldCopyJump: true, zoomControl: true, attributionControl: true, inertia: true });
-    const tema = koyu() ? "dark_all" : "light_all";
-    tabanKat = L.tileLayer(`https://{s}.basemaps.cartocdn.com/${tema}/{z}/{x}/{y}{r}.png`, { subdomains: "abcd", maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>' }).addTo(map);
+    tabanKur("harita");
     isaretKoy(konum.lat, konum.lon, gorunenAd(konum));
     // etiketler (şehir adları) üstte: CARTO "only_labels" yerine taban zaten etiket içerir.
     map.on("moveend", () => { if (KATMANLAR.find((x) => x[0] === durum.katman)[3] === "tahmin") yukleDugme.hidden = !gorunumDisindaMi(); });
