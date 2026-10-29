@@ -4,7 +4,7 @@
  * Depolama: kullanıcı başına tek küçük satır (≤ 8 KB) + yerel yedek. PDF/çeviri içeriği HİÇBİR yere kaydedilmez. CSP: satır içi stil/olay yok.
  */
 import { el, toast } from "./ortak.js";
-import { KATALOG, eklentilerAcikMi, ayarYukle, ayarKaydet, ozelUrlGecerli } from "./eklentiler.js";
+import { KATALOG, eklentilerAcikMi, ayarYukle, ayarKaydet, ozelUrlGecerli, aramaAdresiniCevir, cevirRizasiVarMi, cevirRizasiVer, cevirRizasiGeriAl, RIZA_METNI } from "./eklentiler.js";
 
 export async function eklentiPaneliKur(yer) {
   if (!yer) return;
@@ -34,28 +34,41 @@ export async function eklentiPaneliKur(yer) {
       const sil = ozel ? el("button", { type: "button", class: "ak-btn" }, "Sil") : null;
       sil?.addEventListener("click", () => { a.ozel = a.ozel.filter((x) => x.id !== id); a.acik = a.acik.filter((x) => x !== id); kaydet(); ciz(); });
       return el("div", { class: "ak-ek-satir" },
-        el("label", { class: "ak-ek-ust", for: `ak-ek-${id}` }, kutu, el("span", { class: "ak-ek-simge", "aria-hidden": "true" }, simge), el("strong", {}, ad), el("span", { class: `ak-ek-rozet ${gizlilik === "yerel" ? "yerel" : "dis"}` }, gizlilik === "yerel" ? "🔒 Yerel — veri cihazdan çıkmaz" : "↗ Dış site — tıklayınca yeni sekmede açar")),
+        el("label", { class: "ak-ek-ust", for: `ak-ek-${id}` }, kutu, el("span", { class: "ak-ek-simge", "aria-hidden": "true" }, simge), el("strong", {}, ad), el("span", { class: `ak-ek-rozet ${gizlilik === "yerel" ? "yerel" : "dis"}` }, gizlilik === "yerel" ? "🔒 Yerel — veri cihazdan çıkmaz" : gizlilik === "karma" ? "🌐 Önce cihazda; olmazsa onayınla çevrimiçi" : "↗ Yeni sekmede açar")),
         el("small", { class: "ak-alt" }, aciklama), ayarAlan, sil);
     };
-    for (const [id, k] of Object.entries(KATALOG)) liste.append(satir(id, k.ad, k.simge, k.aciklama, k.ayarlar, false, k.gizlilik));
-    for (const o of a.ozel) liste.append(satir(o.id, o.ad, o.simge, `Özel arama bağlantısı: ${o.url}`, [], true, "baglanti"));
+    const GRUPLAR = [["ceviri", "🌐 Çeviri"], ["metin", "🧰 Metin araçları"], ["arama", "🔎 Arama kaynakları (yeni sekmede açılır)"]];
+    for (const [g, baslik] of GRUPLAR) {
+      const ogeler = Object.entries(KATALOG).filter(([, k]) => (k.grup || "arama") === g);
+      if (!ogeler.length) continue;
+      const kutu = el("div", { class: "ak-ek-grup" }, el("h4", { text: baslik }));
+      for (const [id, k] of ogeler) kutu.append(satir(id, k.ad, k.simge, k.aciklama, k.ayarlar, false, k.gizlilik));
+      if (g === "arama") for (const o of a.ozel) kutu.append(satir(o.id, o.ad, o.simge, `Senin eklediğin arama sitesi`, [], true, "baglanti"));
+      liste.append(kutu);
+    }
+    // Çevrimiçi çeviri rızası (tek yerden aç/kapat)
+    const riza = el("input", { type: "checkbox", id: "ak-ek-riza", checked: cevirRizasiVarMi() });
+    riza.addEventListener("change", () => { if (riza.checked) { if (window.confirm(RIZA_METNI)) cevirRizasiVer(); else riza.checked = false; } else cevirRizasiGeriAl(); });
+    liste.prepend(el("label", { class: "ak-ek-satir ak-ek-riza", for: "ak-ek-riza" }, el("span", { class: "ak-ek-ust" }, riza, el("strong", { text: "Çevrimiçi çeviriye izin ver" })), el("small", { class: "ak-alt", text: "Açıkken seçtiğin metin (en çok 1500 karakter) ve dil çifti çeviri servisine (Google Çeviri / MyMemory) gönderilir; başka hiçbir bilgin gönderilmez. Kapalıyken yalnızca cihaz içi çeviri (Chrome/Edge) çalışır." })));
 
-    const ad = el("input", { type: "text", maxlength: "40", placeholder: "Ad (örn. Dergipark)", "aria-label": "Eklenti adı" });
-    const url = el("input", { type: "url", maxlength: "500", placeholder: "https://…?q={metin}", "aria-label": "Arama adresi ({metin} içermeli)" });
-    const ekle = el("button", { type: "button", class: "ak-btn" }, "＋ Arama eklentisi ekle");
+    const ad = el("input", { type: "text", maxlength: "40", placeholder: "Sitenin adı (örn. Dergipark)", "aria-label": "Arama sitesinin adı" });
+    const url = el("input", { type: "url", maxlength: "500", placeholder: "Sonuç sayfasının adresini buraya yapıştır", "aria-label": "Sonuç sayfası adresi" });
+    const ekle = el("button", { type: "button", class: "ak-btn" }, "＋ Ekle");
     ekle.addEventListener("click", () => {
-      if (!ad.value.trim()) { toast("Bir ad yaz.", "uyari"); return; }
-      if (!ozelUrlGecerli(url.value.trim())) { toast("Adres https:// ile başlamalı ve {metin} içermeli.", "uyari"); return; }
-      if (a.ozel.length >= 10) { toast("En fazla 10 özel eklenti eklenebilir.", "uyari"); return; }
+      if (!ad.value.trim()) { toast("Sitenin adını yaz.", "uyari"); return; }
+      const cevrilen = aramaAdresiniCevir(url.value);
+      if (!cevrilen || !ozelUrlGecerli(cevrilen)) { toast("Adreste “test” kelimesi bulunamadı. O sitede tam olarak test kelimesini arat, çıkan sayfanın adresini yapıştır.", "uyari"); return; }
+      if (a.ozel.length >= 10) { toast("En fazla 10 arama sitesi eklenebilir.", "uyari"); return; }
       const id = `ozel-${Date.now().toString(36)}`;
-      a.ozel.push({ id, ad: ad.value.trim(), simge: "🔗", url: url.value.trim() }); a.acik.push(id); kaydet(); ciz();
+      a.ozel.push({ id, ad: ad.value.trim(), simge: "🔗", url: cevrilen }); a.acik.push(id); kaydet(); ciz();
     });
+    const ekleKutu = el("details", { class: "ak-ek-ekle" }, el("summary", { text: "Başka bir arama sitesi eklemek ister misin? (isteğe bağlı)" }),
+      el("ol", { class: "ak-alt" }, el("li", { text: "Eklemek istediğin sitede (ör. kendi üniversiten, bir dergi) “test” kelimesini arat." }), el("li", { text: "Çıkan sonuç sayfasının adresini aşağıya yapıştır." }), el("li", { text: "PDF'te metin seçince bu site o metni arar." })),
+      ad, url, ekle);
     yer.replaceChildren(el("details", { class: "ak-motor-kart ak-ek-kart" },
       el("summary", {}, "🧩 Okuyucu eklentileri", el("small", { class: "ak-alt" }, " — PDF'te metin seçince balonda çıkar (çeviri, sözlük, Vikipedi, künye bulma…)")),
-      el("p", { class: "ak-alt" }, "Gizlilik: hiçbir eklenti seçili metni sitemizden bir üçüncü tarafa göndermez. “Yerel” eklentiler tamamen cihazında çalışır; “Dış site” eklentileri yalnızca SEN tıklayınca yeni sekmede bir adres açar (Google/DeepL gibi servisler varsayılan KAPALIDIR, tercih sende). Depolama kotanı kullanmaz; dış kod çalıştırılmaz."),
-      liste,
-      el("div", { class: "ak-ek-ekle" }, el("strong", {}, "Özel arama eklentisi"), ad, url, ekle, el("small", { class: "ak-alt" }, "Örnek: https://dergipark.org.tr/tr/search?q={metin}")),
-      durum));
+      el("p", { class: "ak-alt" }, "PDF'te bir metin seçince çıkan balonda hangi araçların görüneceğini buradan seçersin. İşaretli olanlar balonda görünür. Depolama kotanı kullanmaz; dış kod çalıştırılmaz."),
+      liste, ekleKutu, durum));
   };
   ciz();
 }
