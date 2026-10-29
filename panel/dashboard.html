@@ -15,6 +15,7 @@ permalink: "/panel/dashboard.html"
 <link rel="stylesheet" href="{{ '/assets/css/r2-arsiv.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/akademik.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/sistem-yedek.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/css/kesinti.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/donusturucu.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/belge-tarayici.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/metadata-temizleyici.css' | relative_url }}">
@@ -1053,6 +1054,12 @@ permalink: "/panel/dashboard.html"
     <section class="dash-view" id="view-sys-duyuru" hidden data-view="sys-duyuru">
       <h1>Site Duyuruları</h1>
       <div id="dy-kok" class="dy-kok"><p class="muted">Yükleniyor...</p></div>
+    </section>
+
+    <section class="dash-view" id="view-sys-durum" hidden data-view="sys-durum">
+      <h1>Sistem Durumu</h1>
+      <p class="muted">Sitenin ve bağlı servislerin anlık durumu. Kontroller doğrudan tarayıcından yapılır; Cloudflare kotası harcanmaz.</p>
+      <div id="sd-kok" class="sd-kok"><p class="muted">Kontrol ediliyor…</p></div>
     </section>
 
     <section class="dash-view" id="view-sys-yedek" hidden data-view="sys-yedek">
