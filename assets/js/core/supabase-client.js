@@ -21,6 +21,8 @@ import { isDemoMode, configiBaslat, demoUyeMi, gercekAgFetch } from "../demo/dem
 import { demoSupabase, demoUyeSupabaseKur } from "../demo/demo-supabase.js";
 import { workerKapisiKur } from "./worker-kapi.js";
 import { oturumKoruyucuKur } from "./oturum-koruyucu.js";
+// KESİNTİ DAYANIKLILIĞI (bkz. kesinti.js): Supabase erişilemezse okuma önbelleği + yazma kuyruğu + anlık (Cloudflare kotasız) sağlık izleme.
+import { kesintiFetchOlustur, kesintiKur } from "./kesinti.js";
 
 // Supabase JS SDK — artık CDN'den (esm.sh) ESM import DEĞİL, YEREL vendor
 // dosyasından (assets/js/vendor/supabase.js, Supabase'in resmi UMD build'i)
@@ -118,6 +120,8 @@ const dinamikOturumDeposu = {
   },
 };
 
+// global.fetch: yalnızca /rest/v1/ isteklerini önbellek/kuyruk için sarar; auth/storage/functions aynen geçer. Demo'da kullanılmaz.
+const kesintiFetch = !isDemoMode ? kesintiFetchOlustur(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 const gercekIstemciSecenekleri = {
   auth: {
     persistSession: true,
@@ -125,6 +129,7 @@ const gercekIstemciSecenekleri = {
     detectSessionInUrl: true, // OAuth / e-posta linki dönüşünde token'ı otomatik yakalar
     storage: dinamikOturumDeposu,
   },
+  ...(kesintiFetch ? { global: { fetch: kesintiFetch } } : {}),
 };
 
 export const supabase = !isDemoMode
@@ -133,6 +138,9 @@ export const supabase = !isDemoMode
     // global.fetch: ağ kalkanından ÖNCE yakalanmış gerçek fetch — yalnızca Supabase'e (Auth/PostgREST) gider.
     ? demoUyeSupabaseKur(createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { ...gercekIstemciSecenekleri, global: { fetch: gercekAgFetch } }))
     : demoSupabase;
+
+// KESİNTİ MODÜLÜ: auth yamaları + sağlık izleme + çubuk arayüzü. oturumKoruyucuKur'dan ÖNCE kurulur (signOut sarmalı sırası: koruyucu → kesinti).
+if (!isDemoMode) { try { kesintiKur(supabase); } catch (h) { console.warn("kesinti kurulamadı:", h); } }
 
 // KOTA KORUMASI: panelden kapatılan Worker'lara tarayıcıdan hiç istek gitmesin (bkz. worker-kapi.js). Demo'da kalkan zaten engelliyor.
 if (!isDemoMode) workerKapisiKur(SUPABASE_URL, SUPABASE_ANON_KEY);
