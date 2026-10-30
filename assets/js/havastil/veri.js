@@ -10,6 +10,7 @@
  * KOTA: Open-Meteo sınırı IP başınadır (kullanıcının kendi IP'si). Yanıtlar 30 dk localStorage'da önbelleklenir; çevrimdışıyken
  * son bilinen veri "eski" etiketiyle gösterilir. Nominatim politikası gereği otomatik tamamlama YAPILMAZ (yalnız kullanıcı isterse, 1 sn aralıkla).
  */
+import { omOmMi, omJson } from "./openmeteo.js";
 const HAVA_URL = "https://api.open-meteo.com/v1/forecast";
 const HAVA_KALITESI_URL = "https://air-quality-api.open-meteo.com/v1/air-quality";
 const GEO_URL = "https://geocoding-api.open-meteo.com/v1/search";
@@ -25,6 +26,8 @@ const sayi = (x, v = 0) => (Number.isFinite(x) ? x : v);
 const enBuyuk = (d, v = 0) => { const a = d.filter(Number.isFinite); return a.length ? Math.max(...a) : v; };
 
 export async function jsonAl(url, zamanAsimiMs = 9000, disSinyal = null) {
+  // Open-Meteo hava/arşiv/hava kalitesi/iklim istekleri: kota + API anahtarı kaynağı (openmeteo.js). Diğer adresler (Nominatim, Photon, geocoding) eskisi gibi.
+  if (omOmMi(url)) return omJson(url, { sinyal: disSinyal, zamanAsimiMs });
   const kontrol = new AbortController();
   const z = setTimeout(() => kontrol.abort(), zamanAsimiMs);
   if (disSinyal) { if (disSinyal.aborted) kontrol.abort(); else disSinyal.addEventListener("abort", () => kontrol.abort(), { once: true }); }
