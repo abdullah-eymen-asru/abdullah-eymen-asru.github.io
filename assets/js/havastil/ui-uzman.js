@@ -268,9 +268,13 @@ export function derinSekmesi(d, kb) {
   const otomatik = G.fizik.faz === "kar" || G.fizik.faz === "karisik" || G.fizik.karZorunlu ? "kar" : "yagmur";
   const gorunum = d.derinGorunum || otomatik;
   const H = { uzmanKart, okunus, anlam, saatGrafigi, metrik, saatAnaliz };
-  const sekmeBtn = (id, ad) => olay(el("button", { type: "button", class: "hv-altsekme", role: "tab", "aria-selected": String(gorunum === id), text: ad }), "click", () => { d.derinGorunum = id; kb.ciz(); });
-  const altSekmeler = el("div", { class: "hv-altsekmeler", role: "tablist", "aria-label": "Yağış fiziği görünümü" }, sekmeBtn("yagmur", "🌧️ Yağmur Fiziği"), sekmeBtn("kar", "❄️ Kar & Don Dinamiği"),
-    d.derinGorunum ? olay(el("button", { type: "button", class: "hv-baglanti", text: "Otomatik" }), "click", () => { d.derinGorunum = null; kb.ciz(); }) : el("small", { class: "hv-ipucu", text: `Otomatik: ${otomatik === "kar" ? "kar/don" : "yağmur"}` }));
+  // Üç net seçenek: Otomatik (günün yağış tipine göre kendisi seçer) · Yağmur · Kar & Don. Seçili olan her zaman işaretli; mobilde alt alta/tam genişlik.
+  const secBtn = (id, ad, secili, alt) => olay(el("button", { type: "button", class: "hv-altsekme hv-segment", role: "tab", "aria-selected": String(secili), title: alt || "" },
+    el("span", { class: "hv-segment-ad", text: ad }), alt ? el("small", { class: "hv-segment-alt", text: alt }) : null), "click", () => { d.derinGorunum = id; kb.ciz(); });
+  const otoAd = otomatik === "kar" ? "❄️ Kar & Don" : "🌧️ Yağmur";
+  const altSekmeler = el("div", { class: "hv-altsekmeler hv-segmentler", role: "tablist", "aria-label": "Yağış fiziği görünümü" },
+    secBtn(null, "🤖 Otomatik", d.derinGorunum == null, `şu an: ${otoAd}`), secBtn("yagmur", "🌧️ Yağmur Fiziği", d.derinGorunum === "yagmur"), secBtn("kar", "❄️ Kar & Don", d.derinGorunum === "kar"),
+    el("small", { class: "hv-ipucu hv-segment-aciklama", text: d.derinGorunum == null ? "Otomatik: seçili günün yağış tipine bakar; kar/karışık ise Kar & Don, değilse Yağmur Fiziği gösterir." : "Elle seçtin. Günün tipine göre kendisi seçmesi için “Otomatik”e dokun." }));
   const govde = gorunum === "kar"
     ? [...karGorunumu(G, { simdiT, H }), mikroKarti(G, gi, d), matrisKarti(G, simdiT, d)]
     : [popKarti(G, simdiT, d.hava), capeKarti(G, gunler, gi, d, kb), fizikKarti(G, simdiT), beklenenKarti(G), mikroKarti(G, gi, d), matrisKarti(G, simdiT, d)];
