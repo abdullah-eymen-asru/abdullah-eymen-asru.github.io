@@ -10,6 +10,7 @@
  *   POST /yukle-baslat    -> yetki + MIME/boyut doğrulama + kota rezervi + presigned PUT
  *   POST /yukle-bitir     -> R2'de HEAD ile boyut doğrula, kaydı 'hazir' yap
  *   POST /indir           -> yetki + presigned GET (kısa ömürlü); {satir_ici:true} görsel/PDF önizleme
+ *   GET  /d/<slug>        -> (0123) herkese açık bağlantı: DB doğrular, imzalı R2 adresine 302 (oturum gerekmez)
  *   POST /sil             -> yetki + R2 toplu silme (binding) + DB kaydı silme
  *
  * Gerekli Secret/Var (wrangler secret put ...):
@@ -305,10 +306,36 @@ async function sil(env, uid, g) {
   return { tamam: true, silinen_nesne: anahtarlar.length };
 }
 
+
+/* ------------------- HERKESE AÇIK BAĞLANTI: GET /d/<slug> (0123) -------------------
+ * Oturum/Origin GEREKMEZ (bağlantıyı alan herkes açar). Geçerlilik (süre/iptal/dosya) her tıklamada DB'den doğrulanır; geçerliyse kısa ömürlü imzalı
+ * R2 adresine 302 verilir (dosya baytı Worker'dan geçmez). Her açılış R2 Class B kotasına sayılır; kota dolarsa dosya verilmez. */
+const sayfa = (durum, baslik, mesaj) => new Response(
+  `<!doctype html><html lang="tr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${baslik}</title>` +
+  `<body style="font-family:system-ui,sans-serif;max-width:32rem;margin:15vh auto;padding:0 1.2rem;line-height:1.6"><h1>${baslik}</h1><p>${mesaj}</p></body></html>`,
+  { status: durum, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex", "Referrer-Policy": "no-referrer" } });
+async function herkeseAcikBaglanti(env, istek) {
+  const slug = decodeURIComponent(new URL(istek.url).pathname.slice(3)).toLowerCase().replace(/\/+$/, "");
+  if (!/^[a-z0-9-]{6,80}$/.test(slug)) return sayfa(404, "Bağlantı bulunamadı", "Bu adres geçerli bir paylaşım bağlantısı değil.");
+  let satir;
+  try { satir = (await rpc(env, "r2_baglanti_coz", { p_slug: slug }))?.[0]; } catch { return sayfa(502, "Geçici sorun", "Bağlantı şu an doğrulanamadı. Biraz sonra tekrar dene."); }
+  if (!satir || satir.durum === "yok") return sayfa(404, "Bağlantı bulunamadı", "Bu paylaşım bağlantısı yok ya da silinmiş.");
+  if (satir.durum === "doldu") return sayfa(410, "Bağlantının süresi doldu", "Bu paylaşım bağlantısının geçerlilik süresi bitti. Dosyayı sana gönderen kişiden yeni bir bağlantı iste.");
+  if (satir.durum === "iptal") return sayfa(410, "Bağlantı iptal edildi", "Bu paylaşım bağlantısı sahibi tarafından kapatıldı.");
+  if (satir.durum !== "gecerli" || !satir.r2_key) return sayfa(410, "Dosya artık yok", "Bu bağlantıya ait dosya kaldırılmış.");
+  try { await kotaRezerve(env, "B", 1); } catch (e) { return sayfa(429, "Şimdilik açılamıyor", "Sitenin aylık dosya erişim kotası doldu. Daha sonra tekrar dene."); }
+  const inline = new URL(istek.url).searchParams.get("o") === "1" && (/^image\/(png|jpeg|gif|webp|avif)$/.test(satir.mime || "") || satir.mime === "application/pdf");
+  const url = await presign(env, { method: "GET", key: satir.r2_key, saniye: INDIRME_SURESI, ekSorgu: {
+    "response-content-disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${rfc3986(satir.ad)}`,
+    "response-content-type": satir.mime || "application/octet-stream" } });
+  return new Response(null, { status: 302, headers: { Location: url, "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Robots-Tag": "noindex" } });
+}
+
 /* --------------------------------- giriş --------------------------------- */
 const ASIL_ISLEYICI = {
   async fetch(istek, env) {
     const origin = istek.headers.get("Origin") || "";
+    if (istek.method === "GET" && new URL(istek.url).pathname.startsWith("/d/")) return herkeseAcikBaglanti(env, istek);
     if (istek.method === "OPTIONS") {
       return IZINLI_ORIGINLER.has(origin)
         ? new Response(null, { status: 204, headers: corsBasliklari(origin) })
