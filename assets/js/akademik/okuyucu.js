@@ -102,6 +102,56 @@ function aralikMetni(aralik) {
   return s.replace(/(\p{L})-\u0001(\p{Ll})/gu, "$1$2").replace(/\u0001/g, " ").replace(/\s+/g, " ").trim();
 }
 
+/* ---- Arka plan kaydırma kilidi ----
+ * body{overflow:hidden} iOS/Safari'de arkadaki sayfanın kaymasını ENGELLEMEZ (okuyucunun arkasında site kayıyordu).
+ * Güvenilir yöntem: body'yi position:fixed yapıp mevcut kaydırma konumunu CSS değişkeninde tutmak; kapanınca geri yüklemek. */
+let kilitSayac = 0, kilitY = 0;
+function kaydirmaKilitle() {
+  if (kilitSayac++ > 0) return;
+  kilitY = window.scrollY || document.documentElement.scrollTop || 0;
+  document.body.style.setProperty("--ak-kilit-y", `-${kilitY}px`);
+  document.body.classList.add("ak-okuyucu-acik");
+  document.documentElement.classList.add("ak-okuyucu-acik-html");
+}
+function kaydirmaKilidiAc() {
+  if (kilitSayac === 0) return;
+  if (--kilitSayac > 0) return;
+  document.body.classList.remove("ak-okuyucu-acik");
+  document.documentElement.classList.remove("ak-okuyucu-acik-html");
+  document.body.style.removeProperty("--ak-kilit-y");
+  const eski = document.documentElement.style.scrollBehavior;
+  document.documentElement.style.scrollBehavior = "auto";
+  window.scrollTo(0, kilitY);
+  document.documentElement.style.scrollBehavior = eski;
+}
+
+/** Seçimi, kelimenin ortasında başlıyor/bitiyorsa TAM KELİMEYE genişletir (aynı metin düğümü içinde). "NATO's 2022" → "NATO's 2" gibi
+ *  yarım alıntıları ve vurgu kutusunun kelimeyi kesmesini önler. Değişiklik olduysa true döner. */
+const KELIME_HARF = /[\p{L}\p{N}_'’]/u;
+function secimiKelimeyeHizala(kapsayici) {
+  const s = window.getSelection();
+  if (!s || s.isCollapsed || !s.rangeCount) return false;
+  const r = s.getRangeAt(0).cloneRange();
+  const katmanda = (n) => n && n.nodeType === 3 && n.parentElement?.closest(".textLayer") && kapsayici.contains(n);
+  let degisti = false;
+  const sn = r.startContainer;
+  if (katmanda(sn)) {
+    const t = sn.nodeValue; let o = r.startOffset;
+    while (o < t.length && /\s/.test(t[o])) o++;                                                     // baştaki boşluğu at
+    while (o > 0 && KELIME_HARF.test(t[o - 1]) && KELIME_HARF.test(t[o] || "")) o--;                 // kelime ortasındaysa başa al
+    if (o !== r.startOffset) { r.setStart(sn, o); degisti = true; }
+  }
+  const en = r.endContainer;
+  if (katmanda(en)) {
+    const t = en.nodeValue; let o = r.endOffset;
+    while (o > 0 && /\s/.test(t[o - 1])) o--;                                                        // sondaki boşluğu at
+    while (o < t.length && KELIME_HARF.test(t[o - 1] || "") && KELIME_HARF.test(t[o])) o++;          // kelime ortasındaysa sona al
+    if (o !== r.endOffset) { r.setEnd(en, o); degisti = true; }
+  }
+  if (degisti && !r.collapsed) { try { s.removeAllRanges(); s.addRange(r); } catch { return false; } }
+  return degisti;
+}
+
 /* ------------------------------- ana giriş ------------------------------- */
 
 export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapaninca = null, paylasimToken = null }) {
@@ -157,14 +207,15 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
       </aside>
     </div>`;
   document.body.append(kok);
-  document.body.classList.add("ak-okuyucu-acik");
+  kok.setAttribute("translate", "no");                       // Safari/Chrome'un kendi "Çevir" simgesi seçimin başında mavi daire olarak çıkmasın
+  kaydirmaKilitle();
   if (window.innerWidth <= 900) kok.classList.add("yan-kapali"); // dar ekranda panel varsayılan kapalı
   const q = (s) => kok.querySelector(s);
   const durumYaz = (m, tur = "") => { const e = q("[data-ak-durum]"); e.textContent = m; e.className = `ak-ok-durum ${tur}`; };
   durumYaz("PDF motoru yükleniyor…");
   // Erken hata yolu: motor/PDF yüklenemezse kullanıcı yine de pencereyi kapatabilsin
   // (asıl kapat() daha sonra tanımlanan sabitlere bağlı olduğundan burada ayrı, bağımsız bir kapatma var).
-  const erkenKapat = () => { kok.remove(); document.body.classList.remove("ak-okuyucu-acik"); kapaninca?.(); };
+  const erkenKapat = () => { kok.remove(); kaydirmaKilidiAc(); kapaninca?.(); };
   q('[data-ak="kapat"]').onclick = erkenKapat;
 
   let motor;
@@ -728,6 +779,7 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
   function secimdenOlustur(tur, renk = d.renk) {
     // Canlı seçim yoksa (iOS balona dokununca seçimi çökertir) saklı aralık kullanılır; seçim DOM'a GERİ YÜKLENMEZ (çift menü/seçim önlenir).
     const s = window.getSelection();
+    if (s && !s.isCollapsed && s.rangeCount) { secimiKelimeyeHizala(kap); secimYakala(); }   // kelime ortasında kesilmiş seçim → tam kelime
     const aralik = s && !s.isCollapsed && s.rangeCount ? s.getRangeAt(0) : sonSecim?.aralik;
     if (!aralik) return false;
     let olustu = 0, tekrar = 0;
@@ -765,6 +817,7 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
     balonGizle();
     const s = window.getSelection();
     if (!s || s.isCollapsed || !s.rangeCount || !kap.contains(s.anchorNode)) return;
+    secimiKelimeyeHizala(kap);
     secimYakala();
     const rs = s.getRangeAt(0).getClientRects();
     if (!rs.length) return;
@@ -1237,7 +1290,7 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
     try { viewer.setDocument(null); belge?.destroy(); } catch { /* */ }
     popKapat(); balonGizle();
     kok.remove();
-    document.body.classList.remove("ak-okuyucu-acik");
+    kaydirmaKilidiAc();
     kapaninca?.();
   }
 
