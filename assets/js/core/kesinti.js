@@ -170,7 +170,10 @@ export function saglikKontrol({ zorla = false } = {}) {
     Object.assign(durum, { durum: d, auth: a, rest: r, gecikmeMs: Math.max(a.ms, r.ms), sonKontrol: Date.now() });
     try { localStorage.setItem(SAGLIK_ANAHTARI, JSON.stringify({ t: durum.sonKontrol, d: { durum: d, auth: a, rest: r, gecikmeMs: durum.gecikmeMs } })); } catch { /* yok say */ }
     yay("kesinti-durum", { ...durum, onceki });
-    if (!["ok", "yavas"].includes(onceki) && ["ok", "yavas"].includes(d)) { yay("kesinti-duzeldi", { onceki }); kuyrukGonderPlanla(); }
+    // "düzeldi" YALNIZCA gerçek bir kesintiden sonra yayılır. Eskiden ilk kontrolde önceki durum "bilinmiyor" olduğu için her sayfa
+    // açılışında "Sunucu bağlantısı yeniden kuruldu" bildirimi çıkıyordu (hiç kesinti olmadığı hâlde).
+    const KESINTI_DURUMLARI = ["kesinti", "cevrimdisi", "veritabani", "giris"];
+    if (KESINTI_DURUMLARI.includes(onceki) && ["ok", "yavas"].includes(d)) { yay("kesinti-duzeldi", { onceki }); kuyrukGonderPlanla(); }
     return durum;
   })().finally(() => { sondaCalisiyor = null; });
   return sondaCalisiyor;
@@ -387,6 +390,14 @@ export async function kasaOlustur({ eposta, parola, uid }) {
     return true;
   } catch (h) { console.warn("kesinti: kasa oluşturulamadı", h); return false; }
 }
+/** Bu cihazdaki kesinti verilerinin özeti (kayıt sayıları). Sistem Durumu › "Bu cihazdaki veriler" kullanır. */
+export async function depoOzeti() {
+  const say = (d) => idbIs(d, "readonly", (s) => s.count()).catch(() => 0);
+  const [kasa, onbellek, kuyruk] = await Promise.all([say("kasa"), say("onbellek"), say("kuyruk")]);
+  return { kasa: kasa || 0, onbellek: onbellek || 0, kuyruk: kuyruk || 0 };
+}
+/** YALNIZCA okuma önbelleğini siler: siteyi kullanmayı etkilemez (veriler yeniden sunucudan okunur). Çevrimdışı giriş kasası ve bekleyen işlemler korunur. */
+export async function onbellekTemizle() { await idbTemizle("onbellek"); }
 export async function kasaSil(eposta) { await idbSil("kasa", kucuk(eposta)); durum.kasaVar = false; }
 const DENEME_ANAHTARI = "aea_kesinti_deneme";
 /** Sunucuya hiç gitmeden e-posta+parolayı kasayla doğrular; doğruysa "kesinti oturumu" kurar. */
