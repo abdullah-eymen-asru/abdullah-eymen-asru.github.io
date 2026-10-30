@@ -330,16 +330,16 @@ function kutuphaneKur(kok, profil, owner) {
       if (islem === "yeni" || islem === "alt") {
         const ad = (prompt(islem === "alt" ? `“${d.klasorler.find((k) => k.id === id)?.ad}” içine yeni klasör adı:` : "Yeni klasör adı:") || "").trim();
         if (!ad) return;
-        const { data, error } = await supabase.from("akademik_koleksiyonlar").insert({ ad: ad.slice(0, 120), ust_id: islem === "alt" ? id : null, user_id: profil.id }).select().single();
+        const { data, error } = await supabase.from("akademik_koleksiyonlar").insert({ ad: ad, ust_id: islem === "alt" ? id : null, user_id: profil.id }).select().single();
         if (error) throw new Error(error.message);
         if (islem === "alt") d.acik.add(id);
         d.klasorler.push(data); d.klasor = data.id;
       } else if (islem === "ad") {
         const k = d.klasorler.find((x) => x.id === id); const ad = (prompt("Klasör adı:", k?.ad || "") || "").trim();
         if (!ad || ad === k?.ad) return;
-        const { error } = await supabase.from("akademik_koleksiyonlar").update({ ad: ad.slice(0, 120) }).eq("id", id);
+        const { error } = await supabase.from("akademik_koleksiyonlar").update({ ad: ad }).eq("id", id);
         if (error) throw new Error(error.message);
-        k.ad = ad.slice(0, 120);
+        k.ad = ad;
       } else if (islem === "sil") {
         const k = d.klasorler.find((x) => x.id === id);
         if (!confirm(`“${k?.ad}” klasörü ve alt klasörleri çöp kutusuna taşınsın mı?\nİçindeki kaynaklar SİLİNMEZ. Çöp kutusundan geri yükleyebilirsin.`)) return;
@@ -760,7 +760,7 @@ function kutuphaneKur(kok, profil, owner) {
       const anahtar = `${ust || ""}\u0001${ad.toLocaleLowerCase("tr")}`;
       let id = onbellek.get(anahtar) || d.klasorler.find((k) => (k.ust_id || null) === ust && k.ad.toLocaleLowerCase("tr") === ad.toLocaleLowerCase("tr"))?.id;
       if (!id) {
-        const { data, error } = await supabase.from("akademik_koleksiyonlar").insert({ ad: ad.slice(0, 120), ust_id: ust, user_id: profil.id }).select().single();
+        const { data, error } = await supabase.from("akademik_koleksiyonlar").insert({ ad: ad, ust_id: ust, user_id: profil.id }).select().single();
         if (error) throw new Error(error.message);
         d.klasorler.push(data); id = data.id;
       }
