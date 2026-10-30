@@ -13,9 +13,7 @@ const dkOnce = (ms) => { const dk = Math.max(0, Math.round((Date.now() - ms) / 6
 
 async function modelKarsilastir(lat, lon) {
   const u = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}&hourly=precipitation,temperature_2m&models=${MODELLER.map((m) => m[0]).join(",")}&forecast_days=2&timezone=UTC`;
-  const r = await fetch(u, { credentials: "omit", referrerPolicy: "no-referrer" });
-  if (!r.ok) throw new Error(r.status === 429 ? "Open-Meteo kotası doldu; biraz sonra dene." : `Servis ${r.status} döndürdü.`);
-  const j = await r.json();
+  const j = await omJson(u);                      // kota + API anahtarı kaynağı (openmeteo.js); hata mesajları orada açıklanır
   const zaman = j.hourly.time.map((t) => new Date(`${t}:00Z`).getTime());
   const bas = zaman.findIndex((z) => z >= Date.now() - 3600000), son = Math.min(zaman.length, bas + 24);
   const s = MODELLER.map(([id, ad]) => {
