@@ -294,4 +294,16 @@
 .ra-eski-yontem { border: 1px dashed var(--border); border-radius: 10px; padding: .5rem .8rem; }
 .ra-eski-yontem > summary { cursor: pointer; min-height: 2.2rem; display: flex; align-items: center; }
 .ra-hata { color: #c0392b; }
-.ra-baglanti-satir { align-items: flex-start; }
+/* Bağlantı satırı yalnızca iki çocuk içerir (gövde + işlemler): 4 sütunluk ortak .ra-satir ızgarası gövdeyi 1.6rem'e sıkıştırıyordu */
+.ra-baglanti-satir { grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: .6rem 1rem; padding: .85rem 1rem; }
+.ra-baglanti-satir .ra-govde { min-width: 0; overflow-wrap: anywhere; display: grid; gap: .35rem; }
+.ra-baglanti-satir .ra-meta-satir { display: flex; flex-wrap: wrap; gap: .3rem .7rem; align-items: center; }
+.ra-baglanti-satir .ra-islemler { display: flex; gap: .35rem; flex-wrap: wrap; justify-content: flex-end; }
+.ra-baglanti-adresler .ra-btn { white-space: normal; text-align: left; }
+.ra-dlg-govde { display: grid; gap: .4rem; }
+.ra-dlg .ra-ara-girdi, .ra-dlg textarea.ra-ara-girdi { width: 100%; box-sizing: border-box; }
+.ra-baglanti-dosyalar .ra-btn { text-align: left; white-space: normal; overflow-wrap: anywhere; max-width: 100%; }
+@media (max-width: 640px) {
+  .ra-baglanti-satir { grid-template-columns: minmax(0, 1fr); }
+  .ra-baglanti-satir .ra-islemler { justify-content: flex-start; }
+}
