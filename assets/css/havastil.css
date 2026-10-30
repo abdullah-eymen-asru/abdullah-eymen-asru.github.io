@@ -743,3 +743,42 @@
 .hv-om-tablo { width: 100%; font-size: .8rem; }
 .hv-om-yonetim { margin-top: .8rem; border-top: 1px solid var(--border, #ccc); padding-top: .5rem; }
 .hv-om-yonetim > summary { cursor: pointer; font-weight: 600; min-height: 2.2rem; display: flex; align-items: center; }
+
+
+/* Derin analiz: Otomatik / Yağmur / Kar segmenti (tur 11) */
+.hv-segmentler { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .4rem; }
+.hv-segment { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .1rem; text-align: center; line-height: 1.25; min-height: 3rem; padding: .45rem .5rem; }
+.hv-segment-ad { font-weight: 700; font-size: .86rem; }
+.hv-segment-alt { font-size: .72rem; color: var(--muted); }
+.hv-segment-aciklama { grid-column: 1 / -1; }
+@media (max-width: 520px) { .hv-segmentler { grid-template-columns: minmax(0, 1fr); } .hv-segment { flex-direction: row; justify-content: space-between; gap: .6rem; padding: .6rem .9rem; } }
+
+/* HavaStil: iki katmanlı sade menü (tur 11) */
+.hv-sekme-kutu { position: sticky; top: .25rem; z-index: 5; display: grid; gap: .35rem; }
+.hv-sekme-kutu .hv-sekmeler { position: static; }
+.hv-sekmeler .hv-sekme { flex: 1 1 0; }
+.hv-altbar { display: flex; gap: .35rem; overflow-x: auto; padding: .2rem .15rem; scrollbar-width: none; background: var(--hv-yuzey); border: 1px solid var(--hv-cizgi); border-radius: 14px; }
+.hv-altbar::-webkit-scrollbar { display: none; }
+.hv-altbar[hidden] { display: none; }
+.hv-alt-dugme { display: inline-flex; align-items: center; justify-content: center; gap: .35rem; flex: 1 1 auto; white-space: nowrap; border-radius: 10px; }
+@media (max-width: 520px) { .hv-sekmeler .hv-sekme { flex-direction: column; gap: .1rem; padding: .4rem .25rem; min-height: 3.2rem; font-size: .72rem; } .hv-sekmeler .hv-sekme span:not(.hv-sekme-ikon):not(.hv-sekme-sayac) { font-size: .7rem; } .hv-sekme-ikon { font-size: 1.15rem; } }
+
+/* Kota tabloları: mobilde kart düzeni (yatay taşma/kesilme yok) */
+.hv-tablo-kap { overflow-x: auto; max-width: 100%; }
+@media (max-width: 640px) {
+  .hv-om-tablo, .hv-om-tablo tbody, .hv-om-tablo tr, .hv-om-tablo th, .hv-om-tablo td { display: block; width: 100%; box-sizing: border-box; }
+  .hv-om-tablo thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .hv-om-tablo tr { border: 1px solid var(--hv-cizgi); border-radius: 12px; margin: 0 0 .6rem; padding: .35rem .6rem; display: grid; grid-template-columns: 1fr 1fr; gap: .1rem .8rem; }
+  .hv-om-tablo tr > th[scope="row"] { grid-column: 1 / -1; padding: .3rem 0; font-size: .9rem; overflow-wrap: anywhere; }
+  .hv-om-tablo td { padding: .2rem 0; text-align: left; display: flex; justify-content: space-between; gap: .5rem; }
+  .hv-om-tablo td[data-etiket]::before { content: attr(data-etiket); color: var(--muted); }
+  .hv-om-tablo td:not([data-etiket]) { grid-column: 1 / -1; }
+}
+.hv-radar-aralik-yeni { display: grid; gap: .6rem; }
+.hv-radar-aralik-yeni .hv-girdi { width: 100%; max-width: 100%; box-sizing: border-box; }
+.hv-radar-ozel { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+.hv-radar-aralik-dugmeler { display: flex; flex-wrap: wrap; gap: .5rem; }
+.hv-kademe-liste { display: grid; grid-template-columns: 1fr; gap: .15rem; margin: .4rem 0; font-size: .85rem; }
+.hv-kademe-liste dt { font-weight: 700; margin-top: .3rem; } .hv-kademe-liste dd { margin: 0; color: var(--muted); overflow-wrap: anywhere; }
+.hv-radar-api-ogesi { border: 1px solid var(--hv-cizgi); border-radius: 12px; padding: .5rem .8rem; margin: .4rem 0; }
+.hv-radar-api-ogesi summary { cursor: pointer; font-weight: 600; }
