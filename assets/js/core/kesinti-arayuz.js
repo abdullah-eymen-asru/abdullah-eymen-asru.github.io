@@ -139,7 +139,8 @@ export function kesintiArayuzuKur(K) {
   kesintiOlay("kesinti-duzeldi", () => {
     cubugu_kaldir();
     try { sessionStorage.removeItem(KAPAT_ANAHTARI); } catch { /* yok say */ }
-    bildir("Sunucu bağlantısı yeniden kuruldu." + (durum.kuyruk ? " Bekleyen işlemlerin gönderiliyor…" : ""), "kst-ok");
+    // Gürültüyü azalt: üstteki uyarı çubuğu zaten kayboluyor. Bildirim yalnızca kullanıcıyı ilgilendiriyorsa (bekleyen işlem varsa) gösterilir.
+    if (durum.kuyruk) bildir("Sunucu bağlantısı yeniden kuruldu. Bekleyen işlemlerin gönderiliyor…", "kst-ok");
   });
   kesintiOlay("kesinti-kuyruk", (e) => {
     rozetCiz();
