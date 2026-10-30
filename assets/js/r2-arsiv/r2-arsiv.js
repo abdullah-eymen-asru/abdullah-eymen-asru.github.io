@@ -17,6 +17,7 @@ import {
 import { aliciSeciciKur } from "./alici-secici.js";
 import { dosyalariTopla, kuyrukKur } from "./yukleme.js";
 import { paylasilanGorunumuKur, paylastiklarimGorunumuKur } from "./ozel-gorunumler.js";
+import { baglantilarGorunumuKur } from "./baglantilar.js";
 
 const SAYFA = 100;
 const SUTUNLAR = "id,tur,ad,klasor_yolu,boyut,mime,gercek_mime,sifreli,sahip_id,created_at";
@@ -37,7 +38,7 @@ const durum = {
 };
 let k = {};
 let kuyruk = null;
-let gPaylasilan = null, gPaylastiklarim = null;   // ayrı ekranlar (ozel-gorunumler.js)
+let gPaylasilan = null, gPaylastiklarim = null, gBaglantilar = null;   // ayrı ekranlar (ozel-gorunumler.js)
 
 /* ------------------------------ küçük yardımcılar ------------------------------ */
 let toastZamanlayici = null;
@@ -219,6 +220,7 @@ function satirYap(s, kelimeler) {
     if (kat === "gorsel" || (kat === "pdf" && !s.sifreli)) islem.appendChild(ikonButonu("👁", "Önizle", () => onizle(s)));
     islem.appendChild(ikonButonu("⬇", "İndir", (e) => indir(s, e.currentTarget)));
     if (s.sifreli && kendimin(s)) islem.appendChild(ikonButonu("👥", "Paylaşımı yönet", () => paylasAc(s)));
+    if (!s.sifreli && arsivSekmesi() && yukleyebilir()) islem.appendChild(ikonButonu("🔗", "Herkese açık bağlantı oluştur", () => { sekmeDegistir("baglantilar"); gBaglantilar?.olustur(s); }));
   }
   if (arsivSekmesi() && yukleyebilir() && (!s.sifreli || kendimin(s))) islem.appendChild(ikonButonu("✏️", "Yeniden adlandır", () => adlandir(s)));
   if (durum.yetki.sil && (arsivSekmesi() || durum.sekme === "paylastiklarim")) islem.appendChild(ikonButonu("🗑", "Sil", () => sil(s), "ra-btn-tehlike"));
@@ -451,24 +453,20 @@ async function ozetYukle() {
     if (error || !data?.length) { k.ozet.hidden = true; return; }
     const o = data[0];
     const parca = [`${o.dosya_sayisi} dosya`, `${o.klasor_sayisi} klasör`, boyutYaz(o.toplam_boyut)];
-    if (yukleyebilir()) {
-      const { data: kota } = await supabase.rpc("r2_kota_durumu");
-      if (kota?.length) {
-        const a = kota.find((x) => x.sinif === "A")?.sayi ?? 0, b = kota.find((x) => x.sinif === "B")?.sayi ?? 0;
-        parca.push(`bu ay R2: ${a} yazma · ${b} okuma işlemi`);
-      }
-    }
+    // (Eskiden burada "bu ay R2: X yazma · Y okuma" da yazıyordu. Üstteki "R2 kullanımı" kartıyla çelişen/yinelenen sayılar gösterdiği
+    // için kaldırıldı: tek doğru kaynak o kart.)
     k.ozet.textContent = parca.join(" · "); k.ozet.hidden = false;
   } catch { k.ozet.hidden = true; }
 }
 
 /* ------------------------------- sekmeler / kurulum ------------------------------- */
-const SEKMELER = [["sekmeArsiv", "arsiv"], ["sekmePaylastiklarim", "paylastiklarim"], ["sekmePaylasilan", "paylasilan"]];
+const SEKMELER = [["sekmeArsiv", "arsiv"], ["sekmePaylastiklarim", "paylastiklarim"], ["sekmeBaglantilar", "baglantilar"], ["sekmePaylasilan", "paylasilan"]];
 
 function kontrolleriGuncelle() {
   k.gArsiv.hidden = durum.sekme !== "arsiv";
   k.gPaylastiklarim.hidden = durum.sekme !== "paylastiklarim";
   k.gPaylasilan.hidden = durum.sekme !== "paylasilan";
+  k.gBaglantilar.hidden = durum.sekme !== "baglantilar";
   k.eylem.hidden = !(arsivSekmesi() && yukleyebilir());
   SEKMELER.forEach(([id, ad]) => k[id].setAttribute("aria-selected", String(durum.sekme === ad)));
 }
@@ -480,6 +478,7 @@ function sekmeDegistir(sekme, yenileEkran = true) {
   if (!yenileEkran) return;
   if (sekme === "arsiv") listele();
   else if (sekme === "paylastiklarim") gPaylastiklarim.yukle();
+  else if (sekme === "baglantilar") gBaglantilar.yukle();
   else { gPaylasilan.yukle().then(() => rozetGuncelle(0)); }
 }
 
@@ -532,7 +531,7 @@ async function basla() {
     kok: q("ra-kok"), mesaj: q("ra-mesaj"), ozet: q("ra-ozet"), yol: q("ra-yol"), liste: q("ra-liste"), bos: q("ra-bos"), daha: q("ra-daha"),
     ara: q("ra-ara"), araTemizle: q("ra-ara-temizle"), sirala: q("ra-sirala"), filtreler: q("ra-filtreler"),
     gorunumListe: q("ra-gorunum-liste"), gorunumIzgara: q("ra-gorunum-izgara"),
-    sekmeArsiv: q("ra-sekme-arsiv"), sekmePaylastiklarim: q("ra-sekme-paylastiklarim"), sekmePaylasilan: q("ra-sekme-paylasilan"),
+    sekmeArsiv: q("ra-sekme-arsiv"), sekmePaylastiklarim: q("ra-sekme-paylastiklarim"), sekmePaylasilan: q("ra-sekme-paylasilan"), sekmeBaglantilar: q("ra-sekme-baglantilar"), gBaglantilar: q("ra-gorunum-baglantilar"), baglantilarKok: q("ra-baglantilar-kok"),
     eylem: q("ra-eylem"), hedef: q("ra-hedef"), girdiDosya: q("ra-girdi-dosya"), girdiKlasor: q("ra-girdi-klasor"),
     gArsiv: q("ra-gorunum-arsiv"), gPaylastiklarim: q("ra-gorunum-paylastiklarim"), gPaylasilan: q("ra-gorunum-paylasilan"),
     paylastiklarimKok: q("ra-paylastiklarim-kok"), paylasilanKok: q("ra-paylasilan-kok"), sekmePaylasilanSayi: q("ra-sekme-paylasilan-sayi"),
@@ -553,6 +552,7 @@ async function basla() {
   durum.uid = oturum.session?.user.id;
   const { data: yetki } = await supabase.rpc("r2_arsiv_yetkilerim");
   if (yetki) durum.yetki = yetki;
+  try { const [a, o] = await Promise.all([supabase.rpc("is_admin"), supabase.rpc("is_owner")]); durum.yonetici = !!(a.data || o.data); } catch { durum.yonetici = false; }
   anahtarlariHazirla().catch((e) => console.warn("e2ee:", e.message));   // alıcı olabilmek için sessizce
 
   durum.gorunum = tercihOku("ra-gorunum", "liste") === "izgara" ? "izgara" : "liste";
@@ -578,6 +578,8 @@ async function basla() {
     gonder: (girdi) => yuklemeBaslat(dosyalariTopla(girdi)),   // dosyalariTopla ilk satırlarda FileList'i senkron okur
   });
   gPaylasilan = paylasilanGorunumuKur({ kok: k.paylasilanKok, uid: durum.uid, eylemler, bildir });
+  gBaglantilar = baglantilarGorunumuKur({ kok: k.baglantilarKok, bildir, yonetici: !!durum.yonetici });
+  k.sekmeBaglantilar.hidden = !(arsivGorunur && durum.yetki.yukle);
 
   /* sekmeler, arama, filtre, sıralama, görünüm */
   SEKMELER.forEach(([id, ad]) => k[id].addEventListener("click", () => sekmeDegistir(ad)));
