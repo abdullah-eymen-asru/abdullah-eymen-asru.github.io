@@ -13,6 +13,7 @@
 import { el, olay } from "./ui-temel.js";
 import { gorunenAd } from "./konumlar.js";
 import { dogrulamaKutusu } from "./ui-radar-dogrula.js";
+import { omJson, omOnizle, omSonKota, PENCERE_ADI } from "./openmeteo.js";
 
 const LEAFLET_SURUM = "1.9.4";
 const CDN = `https://cdnjs.cloudflare.com/ajax/libs/leaflet/${LEAFLET_SURUM}`;
@@ -65,24 +66,43 @@ const ISO = (t) => new Date(`${t}:00Z`).getTime();
 const saatYaz = (ms, gun = true) => new Date(ms).toLocaleString("tr-TR", gun ? { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" } : { hour: "2-digit", minute: "2-digit" });
 
 /* ------------------------------ tahmin ızgarası (Open-Meteo) ------------------------------ */
-async function izgaraGetir(sinir, hedefNokta, sinyal) {
+const DEGISKENLER = ["temperature_2m", "precipitation", "cloud_cover", "wind_speed_10m", "wind_direction_10m", "wind_gusts_10m", "pressure_msl", "relative_humidity_2m"];
+const GERI_SECENEKLERI = [[0, "Geçmiş yok"], [1, "1 gün geri"], [2, "2 gün geri"], [3, "3 gün geri"], [7, "7 gün geri"], [14, "14 gün geri"], [30, "30 gün geri"], [60, "60 gün geri"], [92, "92 gün geri (en çok)"]];
+const ILERI_SECENEKLERI = [[1, "1 gün ileri"], [3, "3 gün ileri"], [5, "5 gün ileri"], [7, "7 gün ileri"], [10, "10 gün ileri"], [14, "14 gün ileri"], [16, "16 gün ileri (en çok)"]];
+const ISO_GUN = (d) => d.toISOString().slice(0, 10);
+const arsivEnGec = () => ISO_GUN(new Date(Date.now() - 3 * 86400000));        // ERA5 arşivi ~2-5 gün gecikmeli
+/** Izgara noktaları + URL. aralik: {geri, ileri, arsiv:"YYYY-MM-DD"|null, arsivGun}. Uzun aralıkta nokta sayısı otomatik düşürülür (yanıt boyutu/kota). */
+function izgaraUrl(sinir, hedefNokta, aralik) {
   let [[g, b], [k, d]] = sinir;                                                  // güney-batı, kuzey-doğu
+  const gun = aralik.arsiv ? aralik.arsivGun : (aralik.geri || 0) + aralik.ileri;
+  let hedef = hedefNokta, not = "";
+  if (gun > 60 && hedef > 30) { hedef = 30; not = "uzun aralık → ızgara 30 noktaya düşürüldü"; }
+  else if (gun > 30 && hedef > 45) { hedef = 45; not = "uzun aralık → ızgara 45 noktaya düşürüldü"; }
   const enBoy = Math.max(0.5, d - b) / Math.max(0.5, k - g);
   g = Math.max(-85, g); k = Math.min(85, k);
-  const nLon = Math.max(5, Math.round(Math.sqrt(hedefNokta * enBoy))), nLat = Math.max(4, Math.round(hedefNokta / nLon));
+  const nLon = Math.max(5, Math.round(Math.sqrt(hedef * enBoy))), nLat = Math.max(4, Math.round(hedef / nLon));
   const dLat = (k - g) / (nLat - 1), dLon = (d - b) / (nLon - 1);
   const lat = [], lon = [];
   for (let i = 0; i < nLat; i++) for (let j = 0; j < nLon; j++) { lat.push((g + i * dLat).toFixed(3)); lon.push((((b + j * dLon + 540) % 360) - 180).toFixed(3)); }
-  const degiskenler = ["temperature_2m", "precipitation", "cloud_cover", "wind_speed_10m", "wind_direction_10m", "wind_gusts_10m", "pressure_msl", "relative_humidity_2m"];
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.join(",")}&longitude=${lon.join(",")}&hourly=${degiskenler.join(",")}&forecast_days=${GUN}&wind_speed_unit=kmh&timezone=UTC`;
-  const r = await fetch(url, { signal: sinyal, credentials: "omit", referrerPolicy: "no-referrer" });
-  if (r.status === 429) throw new Error("Open-Meteo günlük/dakikalık kotası doldu. Biraz sonra tekrar dene ya da daha düşük detay seç.");
-  if (!r.ok) throw new Error(`Tahmin servisi ${r.status} döndürdü.`);
-  let j = await r.json(); if (!Array.isArray(j)) j = [j];
+  const ortak = `latitude=${lat.join(",")}&longitude=${lon.join(",")}&hourly=${DEGISKENLER.join(",")}&wind_speed_unit=kmh&timezone=UTC`;
+  let url, etiket;
+  if (aralik.arsiv) {
+    const bas = aralik.arsiv, son = ISO_GUN(new Date(Math.min(Date.parse(`${bas}T00:00:00Z`) + (aralik.arsivGun - 1) * 86400000, Date.parse(`${arsivEnGec()}T00:00:00Z`))));
+    url = `https://archive-api.open-meteo.com/v1/archive?${ortak}&start_date=${bas}&end_date=${son}`; etiket = `arşiv (ERA5) ${bas} → ${son}`;
+  } else {
+    const geri = Math.min(92, Math.max(0, aralik.geri || 0)), ileri = Math.min(16, Math.max(1, aralik.ileri));
+    url = `https://api.open-meteo.com/v1/forecast?${ortak}&forecast_days=${ileri}${geri ? `&past_days=${geri}` : ""}`; etiket = `${geri ? `${geri} gün geri · ` : ""}${ileri} gün ileri`;
+  }
+  return { url, g, b, k, d, dLat, dLon, nLat, nLon, etiket, not };
+}
+async function izgaraGetir(sinir, hedefNokta, sinyal, aralik) {
+  const u = izgaraUrl(sinir, hedefNokta, aralik);
+  const j0 = await omJson(u.url, { sinyal, zamanAsimiMs: 45000 });               // kota + API anahtarı kaynağı (openmeteo.js)
+  const j = Array.isArray(j0) ? j0 : [j0];
   const zaman = j[0].hourly.time.map(ISO), n = zaman.length;
-  const veri = {}; for (const v of degiskenler) veri[v] = new Float32Array(j.length * n);
-  j.forEach((nokta, idx) => { for (const v of degiskenler) { const a = nokta.hourly[v]; for (let h = 0; h < n; h++) veri[v][idx * n + h] = a[h] ?? NaN; } });
-  return { g, b, dLat, dLon, nLat, nLon, n, zaman, veri, alinma: Date.now() };
+  const veri = {}; for (const v of DEGISKENLER) veri[v] = new Float32Array(j.length * n);
+  j.forEach((nokta, idx) => { for (const v of DEGISKENLER) { const a = nokta.hourly[v]; for (let h = 0; h < n; h++) veri[v][idx * n + h] = a[h] ?? NaN; } });
+  return { g: u.g, b: u.b, dLat: u.dLat, dLon: u.dLon, nLat: u.nLat, nLon: u.nLon, n, zaman, veri, alinma: Date.now(), etiket: u.etiket, not: u.not };
 }
 /** (lat,lon,zaman-indeksi[ondalıklı]) → değer; ızgara dışı NaN */
 function ornekle(iz, ad, lat, lon, t) {
@@ -175,7 +195,7 @@ export function radarSekmesi(d, kb) {
   if (canli && canli.anahtar === anahtar && canli.kok) { setTimeout(() => canli?.boyutTazele?.(), 60); return canli.kok; }
   radarDurdur();
   const kok = el("section", { class: "hv-radar", "aria-label": "Hava radarı" });
-  const durum = { katman: "radar", t: 0, izgara: null, oynat: false, hiz: 1, detay: 70, bolge: "konum", opaklik: 0.9, gozlem: { kareler: [], i: 0, katmanlar: new Map(), host: "" } };
+  const durum = { katman: "radar", aralik: { geri: 0, ileri: 10, arsiv: null, arsivGun: 5 }, t: 0, izgara: null, oynat: false, hiz: 1, detay: 70, bolge: "konum", opaklik: 0.9, gozlem: { kareler: [], i: 0, katmanlar: new Map(), host: "" } };
 
   const baslik = el("div", { class: "hv-radar-ust" },
     el("div", {}, el("strong", { text: "🛰️ Radar" }), el("small", { class: "muted", text: ` · 📍 ${gorunenAd(konum)}` })),
@@ -202,8 +222,27 @@ export function radarSekmesi(d, kb) {
   const taban1 = el("button", { type: "button", class: "hv-radar-mod", "data-taban": "harita", text: "🗺 Harita" });
   const taban2 = el("button", { type: "button", class: "hv-radar-mod", "data-taban": "uydu", text: "🛰 Uydu görüntüsü" });
   const modKutu = el("div", { class: "hv-radar-modlar", role: "group", "aria-label": "Zaman ve altlık" }, modGecmis, modGelecek, el("span", { class: "hv-radar-ayrac", "aria-hidden": "true" }), taban1, taban2);
+  // Tarih aralığı: geçmiş (92 güne kadar, Forecast past_days) · ileri (16 güne kadar) · eski tarih (ERA5 arşivi) + kota/maliyet satırı
+  const geriSec = el("select", { class: "hv-girdi hv-girdi-kucuk", "aria-label": "Kaç gün geriye" }, ...GERI_SECENEKLERI.map(([v, a]) => el("option", { value: String(v), text: a })));
+  const ileriSec = el("select", { class: "hv-girdi hv-girdi-kucuk", "aria-label": "Kaç gün ileriye" }, ...ILERI_SECENEKLERI.map(([v, a]) => el("option", { value: String(v), text: a })));
+  ileriSec.value = "10";
+  const arsivTarih = el("input", { type: "date", class: "hv-girdi hv-girdi-kucuk", "aria-label": "Eski tarih (arşiv)", min: "1940-01-01", max: arsivEnGec(), title: "92 günden eski bir tarihten başla (ERA5 arşivi, ~25 km çözünürlük)" });
+  const arsivGunSec = el("select", { class: "hv-girdi hv-girdi-kucuk", "aria-label": "Arşivde kaç gün gösterilsin" }, ...[1, 2, 3, 5, 7].map((v) => el("option", { value: String(v), text: `${v} gün` })));
+  arsivGunSec.value = "5";
+  const aralikUygula = el("button", { type: "button", class: "hv-btn hv-btn-birincil", text: "Aralığı uygula" });
+  const arsivKapat = el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "Arşivi kapat", hidden: true });
+  const kotaSatir = el("p", { class: "hv-radar-kota muted", role: "status", "aria-live": "polite" });
+  const aralikKutu = el("details", { class: "hv-radar-aralik" },
+    el("summary", { text: "📅 Tarih aralığı — eski ve ileri günler" }),
+    el("div", { class: "hv-radar-aralik-ic" },
+      el("label", {}, el("span", { class: "muted", text: "Geçmiş" }), geriSec), el("label", {}, el("span", { class: "muted", text: "İleri" }), ileriSec),
+      el("span", { class: "hv-radar-ayrac", "aria-hidden": "true" }),
+      el("label", {}, el("span", { class: "muted", text: "Eski tarih (arşiv)" }), arsivTarih), el("label", {}, el("span", { class: "muted", text: "Süre" }), arsivGunSec),
+      aralikUygula, arsivKapat),
+    el("p", { class: "muted hv-radar-ipucu", text: "Geçmiş ve ileri günler model verisidir (Open-Meteo); canlı radar/uydu yalnızca son ~2 saati gösterir. Aralık uzadıkça istek ağırlığı (kota) artar; maliyet aşağıda görünür." }),
+    kotaSatir);
   const dogrula = dogrulamaKutusu({ konum, oku: () => ({ gozlem: durum.gozlem, izgara: durum.izgara }) });
-  kok.append(baslik, katmanSerit, modKutu, el("div", { class: "hv-radar-kap" }, harita, efsane), zaman, dogrula, el("div", { class: "hv-radar-alt" }, detaySec, yukleDugme, durumSatir),
+  kok.append(baslik, katmanSerit, modKutu, aralikKutu, el("div", { class: "hv-radar-kap" }, harita, efsane), zaman, dogrula, el("div", { class: "hv-radar-alt" }, detaySec, yukleDugme, durumSatir),
     el("p", { class: "muted hv-radar-kaynak", text: "Veri: RainViewer (radar) · EUMETSAT / NASA GIBS (uydu) · Open-Meteo (tahmin) · harita: Esri, © OpenStreetMap katkıcıları. Radar kapsaması bölgeye göre değişir; tahmin katmanları model çıktısıdır, kesin değildir." }));
 
   let L, map, tabanKat, tabanEtiket, uyduKat, tabanMod = "harita", alanKat, parcKat, isaret, sonYuklenenSinir = null, yukluSinyal = null, zamanlayici = null, kapali = false;
@@ -239,7 +278,7 @@ export function radarSekmesi(d, kb) {
   function zamanYazisi() {
     const gozlem = KATMANLAR.find((x) => x[0] === durum.katman)[3] === "gozlem";
     if (gozlem) { const k = durum.gozlem.kareler[durum.gozlem.i]; zamanYazi.textContent = k ? `${saatYaz(k.time * 1000, false)}${k.tahmin ? " · tahmin" : " · gözlem"}` : "—"; }
-    else if (durum.izgara) { const ms = durum.izgara.zaman[Math.round(durum.t)]; const fark = Math.round((ms - Date.now()) / 3600000); zamanYazi.textContent = `${saatYaz(ms)} · ${fark >= 0 ? `+${fark}` : fark} sa`; }
+    else if (durum.izgara) { const ms = durum.izgara.zaman[Math.round(durum.t)]; const fark = Math.round((ms - Date.now()) / 3600000); const af = Math.abs(fark), gunP = af >= 48 ? `${Math.floor(af / 24)} g ${af % 24} sa` : `${af} sa`; zamanYazi.textContent = `${saatYaz(ms)} · ${fark >= 0 ? "+" : "−"}${gunP}`; }
     else zamanYazi.textContent = "Tahmin yüklenmedi";
   }
   function kareGit(i) {
@@ -282,14 +321,41 @@ export function radarSekmesi(d, kb) {
     const sinir = [[b.getSouth() - dy, b.getWest() - dx], [b.getNorth() + dy, b.getEast() + dx]];
     durumYaz("Tahmin ızgarası yükleniyor…"); yukleDugme.disabled = true;
     try {
-      const iz = await izgaraGetir(sinir, Number(detaySec.value), yukluSinyal.signal);
+      const iz = await izgaraGetir(sinir, Number(detaySec.value), yukluSinyal.signal, durum.aralik);
       durum.izgara = iz; sonYuklenenSinir = sinir;
-      durum.simdiIdx = Math.max(0, iz.zaman.findIndex((z) => z >= Date.now() - 3600000));
-      if (neden !== "koru") durum.t = durum.simdiIdx;
+      const simdi = iz.zaman.findIndex((z) => z >= Date.now() - 3600000);
+      durum.simdiIdx = simdi < 0 ? (iz.zaman[iz.n - 1] < Date.now() ? iz.n - 1 : 0) : simdi;      // tamamen geçmiş aralıkta "şimdi" = son kare
+      if (neden !== "koru") durum.t = durum.arsivModu ? 0 : durum.simdiIdx;
       yukleDugme.hidden = true; zamanKur(); alanKat?.planla();
-      durumYaz(`Tahmin: ${iz.nLat * iz.nLon} nokta · ${saatYaz(iz.alinma, false)} itibarıyla · en çok ${GUN} gün`);
+      durumYaz(`Tahmin: ${iz.nLat * iz.nLon} nokta · ${iz.etiket} · ${saatYaz(iz.alinma, false)} itibarıyla${iz.not ? ` · ${iz.not}` : ""}`);
     } catch (h) { if (h.name !== "AbortError") durumYaz(h.message || "Tahmin yüklenemedi.", true); }
-    finally { yukleDugme.disabled = false; }
+    finally { yukleDugme.disabled = false; kotaYaz(); }
+  }
+  /* kota / maliyet satırı: yükleme öncesi tahmini ağırlık + kalan günlük hak + kaynak (ücretsiz IP · site anahtarı · kendi anahtarın) */
+  const KAYNAK_AD = { varsayilan: "ücretsiz Open-Meteo (IP başına)", site: "site API anahtarı", kendi: "kendi API anahtarın" };
+  let kotaIstek = 0;
+  async function kotaYaz() {
+    if (!map || kapali) return;
+    const no = ++kotaIstek;
+    try {
+      const b = map.getBounds();
+      const u = izgaraUrl([[b.getSouth(), b.getWest()], [b.getNorth(), b.getEast()]], Number(detaySec.value), durum.aralik);
+      const o = await omOnizle(u.url);
+      if (no !== kotaIstek) return;
+      const sonKota = omSonKota();
+      const kalanParca = o.kalanGun != null ? ` · bugün kalan ≈ ${o.kalanGun.toLocaleString("tr-TR")}${o.sinirGun != null ? ` / ${o.sinirGun.toLocaleString("tr-TR")}` : ""}` : (o.kaynak === "kendi" ? " · kendi planın (site kotasına sayılmaz)" : "");
+      kotaSatir.textContent = `Bu yükleme ≈ ${o.agirlik.toLocaleString("tr-TR")} çağrı${kalanParca} · kaynak: ${KAYNAK_AD[o.kaynak] || o.kaynak}${u.not ? ` · ${u.not}` : ""}${sonKota?.kalan ? ` · son işlem sonrası kalan: ${Object.entries(sonKota.kalan).filter(([, v]) => v != null).map(([a, v]) => `${PENCERE_ADI[a]} ${Number(v).toLocaleString("tr-TR")}`).join(" · ")}` : ""}`;
+      kotaSatir.classList.toggle("hv-uyari", !o.yeter);
+      if (!o.yeter) kotaSatir.textContent += " — kalan hakkın bu yükleme için yetmiyor: aralığı/ayrıntıyı azalt.";
+    } catch { kotaSatir.textContent = ""; }
+  }
+  function aralikDegisti(yeniden = true) {
+    durum.arsivModu = !!durum.aralik.arsiv; arsivKapat.hidden = !durum.aralik.arsiv;
+    durum.izgara = null; sonYuklenenSinir = null; kotaYaz();
+    if (!yeniden || !map) return;
+    const tur = KATMANLAR.find((x) => x[0] === durum.katman)[3];
+    if (tur === "tahmin") tahminYukle();
+    else { durumYaz("Seçtiğin aralık model verisidir; canlı radar/uydu yalnızca son ~2 saati gösterir → “Yağış” katmanına geçildi."); katmanDegis("yagis"); }
   }
   function gorunumDisindaMi() {
     if (!sonYuklenenSinir || !map) return !durum.izgara;
@@ -393,6 +459,15 @@ export function radarSekmesi(d, kb) {
   olay(hizSec, "change", () => { durum.hiz = Number(hizSec.value); if (durum.oynat) oynat(true); });
   olay(detaySec, "change", () => { durum.izgara = null; sonYuklenenSinir = null; if (KATMANLAR.find((x) => x[0] === durum.katman)[3] === "tahmin") tahminYukle(); });
   olay(yukleDugme, "click", () => tahminYukle("koru"));
+  olay(geriSec, "change", () => { durum.aralik.geri = Number(geriSec.value); durum.aralik.arsiv = null; arsivTarih.value = ""; aralikDegisti(); });
+  olay(ileriSec, "change", () => { durum.aralik.ileri = Number(ileriSec.value); durum.aralik.arsiv = null; arsivTarih.value = ""; aralikDegisti(); });
+  olay(aralikUygula, "click", () => {
+    if (arsivTarih.value) { if (arsivTarih.value > arsivEnGec()) { durumYaz(`Arşiv en geç ${arsivEnGec()} tarihine kadar var (ERA5 gecikmesi).`, true); return; } durum.aralik.arsiv = arsivTarih.value; durum.aralik.arsivGun = Number(arsivGunSec.value); }
+    else durum.aralik.arsiv = null;
+    aralikDegisti();
+  });
+  olay(arsivKapat, "click", () => { durum.aralik.arsiv = null; arsivTarih.value = ""; aralikDegisti(); });
+  olay(detaySec, "change", () => kotaYaz());
   olay(modGecmis, "click", () => { if (durum.katman !== "radar" && durum.katman !== "uydu") katmanDegis("radar"); });
   olay(modGelecek, "click", () => { if (durum.katman !== "yagis") katmanDegis("yagis"); });
   olay(taban1, "click", () => tabanKur("harita")); olay(taban2, "click", () => tabanKur("uydu"));
@@ -404,14 +479,14 @@ export function radarSekmesi(d, kb) {
     tabanKur("harita");
     isaretKoy(konum.lat, konum.lon, gorunenAd(konum));
     // etiketler (şehir adları) üstte: CARTO "only_labels" yerine taban zaten etiket içerir.
-    map.on("moveend", () => { if (KATMANLAR.find((x) => x[0] === durum.katman)[3] === "tahmin") yukleDugme.hidden = !gorunumDisindaMi(); });
+    map.on("moveend", () => { kotaYaz(); if (KATMANLAR.find((x) => x[0] === durum.katman)[3] === "tahmin") yukleDugme.hidden = !gorunumDisindaMi(); });
     map.on("click", (e) => {
       const iz = durum.izgara; if (!iz || KATMANLAR.find((x) => x[0] === durum.katman)[3] !== "tahmin") return;
       const t = durum.t, f = (ad, n = 0) => { const v = ornekle(iz, ad, e.latlng.lat, e.latlng.lng, t); return Number.isNaN(v) ? "—" : v.toFixed(n); };
       L.popup({ className: "hv-radar-popup" }).setLatLng(e.latlng).setContent(`<strong>${saatYaz(iz.zaman[Math.round(t)])}</strong><br>🌡️ ${f("temperature_2m", 1)} °C · 🌧️ ${f("precipitation", 1)} mm/sa<br>☁️ ${f("cloud_cover")} % · 💧 ${f("relative_humidity_2m")} %<br>🌬️ ${f("wind_speed_10m")} km/sa (hamle ${f("wind_gusts_10m")}) · 🧭 ${f("pressure_msl")} hPa`).openOn(map);
     });
     bolgeKutu.querySelector('[data-id="konum"]').classList.add("aktif");
-    efsaneCiz(); katmanDegis("radar");
+    efsaneCiz(); katmanDegis("radar"); kotaYaz();
   }).catch((h) => durumYaz(h.message, true));
 
   canli = { anahtar, kok, boyutTazele() { try { map?.invalidateSize(); } catch { /* yok say */ } }, durdur() { kapali = true; oynat(false); yukluSinyal?.abort(); try { map?.remove(); } catch { /* yok say */ } map = null; } };
