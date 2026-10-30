@@ -10,7 +10,8 @@
  *   POST /yukle-baslat    -> yetki + MIME/boyut doğrulama + kota rezervi + presigned PUT
  *   POST /yukle-bitir     -> R2'de HEAD ile boyut doğrula, kaydı 'hazir' yap
  *   POST /indir           -> yetki + presigned GET (kısa ömürlü); {satir_ici:true} görsel/PDF önizleme
- *   GET  /d/<slug>        -> (0123) herkese açık bağlantı: DB doğrular, imzalı R2 adresine 302 (oturum gerekmez)
+ *   GET  /d/<slug>        -> (0123/0124) herkese açık bağlantı: BİLGİ SAYFASI (ad, boyut, tür, süre + İndir düğmesi; sayaç artmaz)
+ *   GET  /d/<slug>?indir=1 | ?o=1 -> DB doğrular, sayaç artar, imzalı R2 adresine 302 (oturum gerekmez)
  *   POST /sil             -> yetki + R2 toplu silme (binding) + DB kaydı silme
  *
  * Gerekli Secret/Var (wrangler secret put ...):
@@ -314,9 +315,40 @@ const sayfa = (durum, baslik, mesaj) => new Response(
   `<!doctype html><html lang="tr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${baslik}</title>` +
   `<body style="font-family:system-ui,sans-serif;max-width:32rem;margin:15vh auto;padding:0 1.2rem;line-height:1.6"><h1>${baslik}</h1><p>${mesaj}</p></body></html>`,
   { status: durum, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex", "Referrer-Policy": "no-referrer" } });
+const htmlKac = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const boyutYaz = (n) => { n = Number(n); if (!(n >= 0)) return "—"; const b = ["B", "KB", "MB", "GB", "TB"]; let i = 0; while (n >= 1024 && i < b.length - 1) { n /= 1024; i++; } return `${n >= 10 || i === 0 ? Math.round(n) : n.toFixed(1)} ${b[i]}`; };
+const tarihYaz = (t) => { try { return new Intl.DateTimeFormat("tr-TR", { dateStyle: "long", timeStyle: "short", timeZone: "Europe/Istanbul" }).format(new Date(t)); } catch { return String(t || ""); } };
+const turEtiketi = (m) => (/^image\//.test(m || "") ? "Görsel" : m === "application/pdf" ? "PDF belgesi" : /zip|compressed/.test(m || "") ? "Arşiv (ZIP)" : /word|officedocument\.wordprocessing/.test(m || "") ? "Word belgesi" : /sheet|excel/.test(m || "") ? "Excel tablosu" : /^text\//.test(m || "") ? "Metin dosyası" : (m || "Dosya"));
+const BILGI_BASLIK = { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow", "Referrer-Policy": "no-referrer", "X-Frame-Options": "DENY", "X-Content-Type-Options": "nosniff",
+  "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" };
+const BILGI_CSS = ":root{color-scheme:light dark;--bg:#f4f6fb;--kart:#fff;--yazi:#16202e;--soluk:#5b6678;--cizgi:#dde3ee;--vurgu:#2563eb}@media(prefers-color-scheme:dark){:root{--bg:#12151c;--kart:#1b1f2a;--yazi:#e8ecf4;--soluk:#9aa6ba;--cizgi:#2c3342;--vurgu:#6ea8ff}}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:1.2rem;background:var(--bg);color:var(--yazi);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.55}.kart{width:min(34rem,100%);background:var(--kart);border:1px solid var(--cizgi);border-radius:18px;padding:1.6rem 1.5rem;box-shadow:0 10px 30px rgba(0,0,0,.08)}.ikon{font-size:2.4rem;line-height:1}h1{font-size:1.35rem;margin:.6rem 0 .3rem;overflow-wrap:anywhere}p.acik{margin:.2rem 0 1rem;color:var(--soluk);overflow-wrap:anywhere;white-space:pre-wrap}dl{display:grid;grid-template-columns:auto 1fr;gap:.45rem 1rem;margin:1rem 0 1.3rem;font-size:.92rem}dt{color:var(--soluk)}dd{margin:0;overflow-wrap:anywhere}.dugmeler{display:flex;flex-wrap:wrap;gap:.6rem}.dugme{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;min-height:2.9rem;padding:.55rem 1.2rem;border-radius:12px;border:1px solid var(--vurgu);background:var(--vurgu);color:#fff;font-weight:600;text-decoration:none;font-size:1rem}.dugme.ikincil{background:transparent;color:var(--vurgu)}.alt{margin-top:1.2rem;font-size:.78rem;color:var(--soluk)}";
+function bilgiSayfasi(durum, govde) {
+  return new Response(`<!doctype html><html lang="tr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${htmlKac(govde.baslik)}</title><style>${BILGI_CSS}</style><body><main class="kart">${govde.html}<p class="alt">Bu bağlantıya sahip olan herkes dosyayı indirebilir.</p></main></body></html>`, { status: durum, headers: BILGI_BASLIK });
+}
 async function herkeseAcikBaglanti(env, istek) {
-  const slug = decodeURIComponent(new URL(istek.url).pathname.slice(3)).toLowerCase().replace(/\/+$/, "");
+  const u = new URL(istek.url);
+  const slug = decodeURIComponent(u.pathname.slice(3)).toLowerCase().replace(/\/+$/, "");
   if (!/^[a-z0-9-]{6,80}$/.test(slug)) return sayfa(404, "Bağlantı bulunamadı", "Bu adres geçerli bir paylaşım bağlantısı değil.");
+  const dogrudan = u.searchParams.get("indir") === "1" || u.searchParams.get("o") === "1";
+
+  /* 1) VARSAYILAN: bilgi sayfası (sayaç artmaz, R2 kotası harcanmaz). Dosya ayrıntıları + İndir düğmesi. */
+  if (!dogrudan) {
+    let b;
+    try { b = (await rpc(env, "r2_baglanti_bilgi", { p_slug: slug }))?.[0]; } catch { return sayfa(502, "Geçici sorun", "Bağlantı şu an doğrulanamadı. Biraz sonra tekrar dene."); }
+    if (!b || b.durum === "yok") return sayfa(404, "Bağlantı bulunamadı", "Bu paylaşım bağlantısı yok ya da silinmiş.");
+    if (b.durum === "doldu") return sayfa(410, "Bağlantının süresi doldu", `“${htmlKac(b.ad)}” paylaşımının geçerlilik süresi bitti. Dosyayı sana gönderen kişiden yeni bir bağlantı iste.`);
+    if (b.durum === "iptal") return sayfa(410, "Bağlantı iptal edildi", `“${htmlKac(b.ad)}” paylaşımı sahibi tarafından kapatıldı.`);
+    if (b.durum !== "gecerli") return sayfa(410, "Dosya artık yok", "Bu bağlantıya ait dosya kaldırılmış.");
+    const onizlenebilir = /^image\/(png|jpeg|gif|webp|avif)$/.test(b.mime || "") || b.mime === "application/pdf";
+    const satirlar = [["Dosya adı", b.dosya_ad], ["Tür", turEtiketi(b.mime)], ["Boyut", boyutYaz(b.boyut)], ["Paylaşım tarihi", tarihYaz(b.olusturma)], ["Geçerlilik", b.bitis ? `${tarihYaz(b.bitis)} tarihine kadar` : "Süresiz"]];
+    const html = `<div class="ikon" aria-hidden="true">${/^image\//.test(b.mime || "") ? "🖼️" : b.mime === "application/pdf" ? "📕" : "📄"}</div><h1>${htmlKac(b.ad)}</h1>` +
+      (b.aciklama ? `<p class="acik">${htmlKac(b.aciklama)}</p>` : "") +
+      `<dl>${satirlar.map(([k, v]) => `<dt>${htmlKac(k)}</dt><dd>${htmlKac(v)}</dd>`).join("")}</dl>` +
+      `<div class="dugmeler"><a class="dugme" href="?indir=1" rel="nofollow">⬇ İndir</a>${onizlenebilir ? '<a class="dugme ikincil" href="?o=1" rel="nofollow">👁 Önizle</a>' : ""}</div>`;
+    return bilgiSayfasi(200, { baslik: `${b.ad} · İndir`, html });
+  }
+
+  /* 2) İNDİRME / ÖNİZLEME: geçerliliği DB doğrular, sayaç artar, kısa ömürlü imzalı R2 adresine 302. */
   let satir;
   try { satir = (await rpc(env, "r2_baglanti_coz", { p_slug: slug }))?.[0]; } catch { return sayfa(502, "Geçici sorun", "Bağlantı şu an doğrulanamadı. Biraz sonra tekrar dene."); }
   if (!satir || satir.durum === "yok") return sayfa(404, "Bağlantı bulunamadı", "Bu paylaşım bağlantısı yok ya da silinmiş.");
@@ -324,7 +356,7 @@ async function herkeseAcikBaglanti(env, istek) {
   if (satir.durum === "iptal") return sayfa(410, "Bağlantı iptal edildi", "Bu paylaşım bağlantısı sahibi tarafından kapatıldı.");
   if (satir.durum !== "gecerli" || !satir.r2_key) return sayfa(410, "Dosya artık yok", "Bu bağlantıya ait dosya kaldırılmış.");
   try { await kotaRezerve(env, "B", 1); } catch (e) { return sayfa(429, "Şimdilik açılamıyor", "Sitenin aylık dosya erişim kotası doldu. Daha sonra tekrar dene."); }
-  const inline = new URL(istek.url).searchParams.get("o") === "1" && (/^image\/(png|jpeg|gif|webp|avif)$/.test(satir.mime || "") || satir.mime === "application/pdf");
+  const inline = u.searchParams.get("o") === "1" && (/^image\/(png|jpeg|gif|webp|avif)$/.test(satir.mime || "") || satir.mime === "application/pdf");
   const url = await presign(env, { method: "GET", key: satir.r2_key, saniye: INDIRME_SURESI, ekSorgu: {
     "response-content-disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${rfc3986(satir.ad)}`,
     "response-content-type": satir.mime || "application/octet-stream" } });
