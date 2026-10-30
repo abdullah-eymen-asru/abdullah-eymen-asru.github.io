@@ -1719,7 +1719,7 @@ async function dosyalariEkle(dosyalar) {
         await ekIstegi("DELETE", anahtar).catch(() => {});
         throw error;
       }
-      const ek = { id: crypto.randomUUID(), ad: f.name.slice(0, 120), tip: f.type, boyut: f.size, anahtar };
+      const ek = { id: crypto.randomUUID(), ad: f.name, tip: f.type, boyut: f.size, anahtar };
       S.duz.ekler.push(ek);
       if (f.type.startsWith("image/")) metneEkReferansiEkle(ek);
       kirlendi();
@@ -3074,7 +3074,7 @@ async function ekBaytYukle(bayt, ad, tip) {
     await ekIstegi("DELETE", anahtar).catch(() => {});
     throw error;
   }
-  return { id: crypto.randomUUID(), ad: ad.slice(0, 120), tip, boyut: bayt.byteLength, anahtar };
+  return { id: crypto.randomUUID(), ad, tip, boyut: bayt.byteLength, anahtar };
 }
 
 const GORSEL_UZANTI = { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp" };
