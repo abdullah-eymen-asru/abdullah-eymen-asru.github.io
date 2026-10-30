@@ -140,3 +140,9 @@ Amaç hava + CLO ile giyim kararıdır; **konum toplamak amaç değildir**. GPS,
 - **Geçici sohbet:** analizden sonra belirli saat/konu sorulur; kaydedilmez (sayfa belleği), her soru bağımsız gönderilir.
 
 Kurulum: Supabase’de `0113_site_duyurulari_ve_havastil_ai_kasasi.sql` (kasa tablosu bu dosyadadır). Service worker `havastil-v9`.
+
+## Tur 11 notları (radar, menü, kota)
+- HavaStil üst menüsü 5 ana gruba (Bugün · Kombin · Tahmin · Radar & Uyarı · Doğrulama & Ayar) ve alt sekmelere indirildi; hiçbir özellik kaldırılmadı. HavaStil her açılışta **Bugün** ile başlar.
+- Radar tarih aralığı artık **Uygula** düğmesiyle çalışır; nokta sayısı `nokta × ceil(gün/14) ≤ 120` olacak şekilde otomatik düşer (dakikalık kota hatasını önler); aynı görünüm 20 dk bellekte tutulur.
+- Ayarlar › **Radar API & Kota**: RainViewer (anahtarsız, zoom ≤ 7, 100 istek/IP/dk, yalnızca geçmiş radar), NASA GIBS, EUMETSAT, Esri/OSM ve Open-Meteo kademeleri. İsteğe bağlı kendi RainViewer-uyumlu sunucu adresi (yalnızca bu cihazda).
+- SQL: `0124_tur11_uye_arama_sinirsiz_karakter_baglanti_bilgi.sql` (Supabase SQL Editor'da çalıştır).
