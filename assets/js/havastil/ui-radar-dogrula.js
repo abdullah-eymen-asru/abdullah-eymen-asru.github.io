@@ -9,6 +9,14 @@
 import { el, olay } from "./ui-temel.js";
 
 const MODELLER = [["ecmwf_ifs025", "ECMWF IFS"], ["icon_seamless", "DWD ICON"], ["gfs_seamless", "NOAA GFS"]];
+const KAYNAKLAR = [
+  ["Radar gözlemi — RainViewer (durum, kapsama, limitler)", "https://www.rainviewer.com/api.html"],
+  ["Tahmin modelleri — Open-Meteo (model listesi ve güncelleme saatleri)", "https://open-meteo.com/en/docs"],
+  ["Open-Meteo model güncelleme durumu", "https://open-meteo.com/en/docs/model-updates"],
+  ["Resmî uyarılar — MGM (Meteoroloji Genel Müdürlüğü)", "https://www.mgm.gov.tr"],
+  ["Bulut/uydu — EUMETSAT View", "https://view.eumetsat.int/"],
+  ["Günlük uydu — NASA GIBS / Worldview", "https://worldview.earthdata.nasa.gov/"],
+];
 const dkOnce = (ms) => { const dk = Math.max(0, Math.round((Date.now() - ms) / 60000)); return dk < 1 ? "az önce" : dk < 90 ? `${dk} dk önce` : `${Math.round(dk / 60)} sa önce`; };
 
 async function modelKarsilastir(lat, lon) {
@@ -50,7 +58,9 @@ export function dogrulamaKutusu({ konum, oku }) {
     const model = el("li", { text: "Modeller karşılaştırılıyor…" });
     satirlar.push(model);
     ic.replaceChildren(el("ul", { class: "hv-dogrula-liste" }, ...satirlar),
-      el("p", { class: "muted", text: "Radar GÖZLEMDİR (şu an ne yağıyor); tahmin MODEL ÇIKTISIDIR (ne yağabilir) — ikisi birebir aynı olmaz. Radar kapsama dışı bölgelerde boş görünebilir. Can/mal güvenliği kararları için MGM resmî uyarılarına bak: mgm.gov.tr." }));
+      el("p", { class: "muted", text: "Radar GÖZLEMDİR (şu an ne yağıyor); tahmin MODEL ÇIKTISIDIR (ne yağabilir) — ikisi birebir aynı olmaz. Radar kapsama dışı bölgelerde boş görünebilir. Can/mal güvenliği kararları için MGM resmî uyarılarına bak: mgm.gov.tr." }),
+      el("h4", { class: "hv-dogrula-baslik", text: "Kaynakları kendin doğrula" }),
+      el("ul", { class: "hv-dogrula-liste hv-dogrula-baglar" }, ...KAYNAKLAR.map(([ad, url]) => el("li", {}, el("a", { href: url, target: "_blank", rel: "noopener noreferrer", text: `${ad} ↗` })))));
     try {
       const k = await modelKarsilastir(konum.lat, konum.lon);
       const etiket = k.uyumYuzde >= 85 && k.sicFark <= 2 ? ["iyi", "Modeller uyumlu"] : k.uyumYuzde >= 65 ? ["orta", "Kısmen uyumlu"] : ["kotu", "Belirsiz: modeller ayrışıyor"];
