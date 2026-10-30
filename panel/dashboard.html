@@ -1099,8 +1099,40 @@ permalink: "/panel/dashboard.html"
     </section>
 
     <section class="dash-view" id="view-sys-hakkimda" hidden data-view="sys-hakkimda">
-      <h1>Hakkımda &amp; Sosyal Linkler</h1>
-      <section id="hakkimda" class="panel-section">
+      <h1>Hakkımda, Sosyal Linkler &amp; SEO</h1>
+      <nav class="hk-sekmeler" id="hk-sekmeler" aria-label="Bölümler">
+        <button type="button" class="ra-sekme" data-hk="seo" aria-selected="true">🔎 SEO &amp; Site Adresleri</button>
+        <button type="button" class="ra-sekme" data-hk="hakkimda" aria-selected="false">🙋 Hakkımda</button>
+        <button type="button" class="ra-sekme" data-hk="baglantilar" aria-selected="false">🔗 Sosyal bağlantılar</button>
+      </nav>
+      <section id="seo-ayarlari" class="panel-section">
+        <h2>SEO &amp; Site Adresleri</h2>
+        <p class="muted">Bu değerler sitenin kökündeki <code>_config.yml</code> dosyasından okunur ve buradan kaydedince GitHub'a tek commit olarak yazılır (site yeniden derlenir). Kutularda şu an yayındaki değerler görünür.</p>
+        <div class="seo-alan">
+          <label for="seo-description"><strong>Site açıklaması</strong> <span class="muted">(description)</span></label>
+          <textarea id="seo-description" rows="4" maxlength="600" spellcheck="true"></textarea>
+          <p class="muted" id="seo-sayac"></p>
+          <p class="muted">Google sonuçlarında ve sosyal medya önizlemesinde görünen kısa tanıtım metni; sayfasına özel özet yazılmamış her sayfada bu kullanılır. İstediğin uzunlukta yazabilirsin; arama sonuçlarında ~160 karakter görünür.</p>
+        </div>
+        <div class="seo-alan">
+          <label for="seo-url"><strong>Ana site adresi</strong> <span class="muted">(url) — github.io, ASIL site</span></label>
+          <input type="url" id="seo-url" autocomplete="off" spellcheck="false">
+          <p class="muted">Google'ın dizinlediği <strong>birincil</strong> adres; kanonik bağlantılar, site haritası ve RSS bununla üretilir. Sonuna <code>/</code> koyma. Kendi alan adını alırsan buraya yazarsın.</p>
+        </div>
+        <div class="seo-alan">
+          <label for="seo-mirror"><strong>Yedek site adresi</strong> <span class="muted">(mirror_site_url) — pages.dev, YEDEK kopya</span></label>
+          <input type="url" id="seo-mirror" autocomplete="off" spellcheck="false">
+          <p class="muted">Aynı sitenin Cloudflare Pages'teki yedek kopyası. Ana site erişilemezse kullanılır; aramada ana adres öne çıkar.</p>
+        </div>
+        <div class="seo-alan">
+          <label for="seo-baseurl"><strong>Alt dizin</strong> <span class="muted">(baseurl)</span></label>
+          <input type="text" id="seo-baseurl" autocomplete="off" spellcheck="false" placeholder="boş bırak">
+          <p class="muted">Site alan adının kökünde yayınlanıyorsa <strong>boş</strong> kalmalı (<code>kullanici.github.io</code> için doğrusu budur). Yalnızca site bir alt klasörde yayınlanıyorsa <code>/klasor</code> yazılır. Emin değilsen DEĞİŞTİRME.</p>
+        </div>
+        <div class="seo-eylem"><button type="button" class="btn-primary csp-w-auto" id="seo-kaydet">Kaydet</button> <button type="button" class="btn-secondary csp-w-auto" id="seo-yenile">Yeniden oku</button></div>
+        <p class="muted" id="seo-mesaj" role="status" aria-live="polite"></p>
+      </section>
+      <section id="hakkimda" class="panel-section" hidden>
               <h2>Hakkımda (Anasayfa)</h2>
               <p class="muted">
                 Anasayfada görünen üstteki isim/unvan satırı ile aşağıdaki
@@ -2031,6 +2063,7 @@ permalink: "/panel/dashboard.html"
       <div class="ra-sekmeler" role="tablist" aria-label="Görünüm">
         <button type="button" class="ra-sekme" id="ra-sekme-arsiv" role="tab" aria-selected="true">🗄️ Arşiv</button>
         <button type="button" class="ra-sekme" id="ra-sekme-paylastiklarim" role="tab" aria-selected="false">📤 Özel gönderimlerim</button>
+        <button type="button" class="ra-sekme" id="ra-sekme-baglantilar" role="tab" aria-selected="false">🔗 Bağlantılar</button>
         <button type="button" class="ra-sekme" id="ra-sekme-paylasilan" role="tab" aria-selected="false">📥 Benimle paylaşılanlar <span class="ra-sekme-sayi" id="ra-sekme-paylasilan-sayi" hidden></span></button>
       </div>
       <p id="ra-ozet" class="ra-ozet" hidden></p>
@@ -2112,6 +2145,8 @@ permalink: "/panel/dashboard.html"
     <!-- ===== ÖZEL GÖNDERİMLER (şifreli): içerik JS tarafından kurulur ===== -->
     <div id="ra-gorunum-paylastiklarim" class="ra" hidden><div id="ra-paylastiklarim-kok"></div></div>
     <div id="ra-gorunum-paylasilan" class="ra" hidden><div id="ra-paylasilan-kok"></div></div>
+    <!-- ===== BAĞLANTILAR (0123): adlı/açıklamalı/süreli herkese açık dosya bağlantıları + alan adı ayarları; içerik JS tarafından kurulur ===== -->
+    <div id="ra-gorunum-baglantilar" class="ra" hidden><div id="ra-baglantilar-kok"></div></div>
 
     <div class="ra-katman" id="ra-katman" hidden aria-hidden="true">
       <div class="ra-katman-kutu">⬆ Dosya veya klasörleri bırak<span class="ra-meta" id="ra-katman-alt"></span></div>
