@@ -137,7 +137,7 @@ export function baglantilarGorunumuKur({ kok, bildir, yonetici = false }) {
     } };
   }
   function dialogAc(baslik, govdeEl, onayMetin, onay) {
-    const dl = el("dialog", "ra-dlg"); const form = el("form", "ra-dlg-ic"); form.method = "dialog";
+    const dl = el("dialog", "ra-dlg"); const form = el("form", "ra-dlg-form"); form.method = "dialog";
     const hata = el("p", "ra-hata"); hata.hidden = true;
     const tamam = btn(onayMetin, "ra-btn ra-btn-birincil"); tamam.type = "submit"; const iptal = btn("Vazgeç", "ra-btn", () => dl.close());
     form.append(el("h3", null, baslik), govdeEl, hata, el("div", "ra-dlg-alt")); form.lastChild.append(iptal, tamam); dl.append(form); document.body.append(dl);
@@ -145,12 +145,12 @@ export function baglantilarGorunumuKur({ kok, bildir, yonetici = false }) {
     dl.addEventListener("close", () => dl.remove()); dl.showModal(); return dl;
   }
   const alan = (etiket, girdi) => { const l = el("label", "ra-alan"); l.append(el("span", "ra-meta", etiket), girdi); return l; };
-  const metinGirdi = (v, ph, max) => { const g = el("input", "ra-ara-girdi"); g.type = "text"; g.value = v || ""; g.placeholder = ph; g.maxLength = max; return g; };
+  const metinGirdi = (v, ph, max) => { const g = el("input", "ra-ara-girdi"); g.type = "text"; g.value = v || ""; g.placeholder = ph; if (max) g.maxLength = max; return g; };
 
   /** Yeni bağlantı. Arşivdeki bir dosya satırından çağrılırsa dosya hazır gelir (`hazirDosya`). */
   async function olustur(hazirDosya = null) {
     let secili = hazirDosya;
-    const ad = metinGirdi(hazirDosya?.ad || "", "Bağlantı adı (örn. 2026 Faaliyet Raporu)", 120), acik = el("textarea", "ra-ara-girdi"); acik.rows = 3; acik.maxLength = 1000; acik.placeholder = "Açıklama (ileride ne olduğu anlaşılsın)";
+    const ad = metinGirdi(hazirDosya?.ad || "", "Bağlantı adı (örn. 2026 Faaliyet Raporu)"), acik = el("textarea", "ra-ara-girdi"); acik.rows = 3; acik.placeholder = "Açıklama (ileride ne olduğu anlaşılsın)";
     const sure = sureAlanlari();
     const dosyaAra = el("input", "ra-ara-girdi"); dosyaAra.type = "search"; dosyaAra.placeholder = "Arşivde dosya ara…"; dosyaAra.setAttribute("aria-label", "Arşivde dosya ara");
     const sonuc = el("ul", "ra-baglanti-dosyalar"), secimYazi = el("p", "ra-meta", secili ? `Seçili dosya: ${secili.ad}` : "Dosya seçilmedi.");
@@ -174,7 +174,7 @@ export function baglantilarGorunumuKur({ kok, bildir, yonetici = false }) {
     if (!hazirDosya) dosyaBul();
   }
   function duzenle(b) {
-    const ad = metinGirdi(b.ad, "Bağlantı adı", 120), acik = el("textarea", "ra-ara-girdi"); acik.rows = 3; acik.maxLength = 1000; acik.value = b.aciklama || "";
+    const ad = metinGirdi(b.ad, "Bağlantı adı"), acik = el("textarea", "ra-ara-girdi"); acik.rows = 3; acik.value = b.aciklama || "";
     const sure = sureAlanlari(b.bitis || null);
     const govde = el("div", "ra-dlg-govde"); govde.append(alan("Bağlantı adı", ad), alan("Açıklama", acik), alan("Geçerlilik", sure.kok));
     dialogAc("Bağlantıyı düzenle", govde, "Kaydet", async () => {
