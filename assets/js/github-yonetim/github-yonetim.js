@@ -466,6 +466,7 @@ function rolBazliArayuzuUygula() {
   const rol = GIRIS_YAPAN_PROFIL?.role;
   const kurallar = [
     { section: "profil-foto", gizle: () => rol !== "admin" && rol !== "owner" || (rol === "admin" && !ozellikErisimVarMiClient("profil_fotografi")) },
+    { section: "seo-ayarlari", gizle: () => rol !== "admin" && rol !== "owner" || (rol === "admin" && !ozellikErisimVarMiClient("hakkimda_duzenleme")) },
     { section: "hakkimda", gizle: () => rol !== "admin" && rol !== "owner" || (rol === "admin" && !ozellikErisimVarMiClient("hakkimda_duzenleme")) },
     { section: "baglantilar", gizle: () => rol !== "admin" && rol !== "owner" || (rol === "admin" && !ozellikErisimVarMiClient("baglanti_yonetimi")) },
     { section: "cv", gizle: () => rol !== "admin" && rol !== "owner" || (rol === "admin" && !ozellikErisimVarMiClient("cv_yonetimi")) },
@@ -556,6 +557,7 @@ async function init() {
     ["klasör yönetimi", () => wireKlasorYonetimi()],
     ["profil fotoğrafı", () => wireProfilFoto()],
     ["hakkımda", () => wireHakkimda()],
+    ["seo ayarları", () => wireSeoAyarlari()],
     ["bağlantılar (sosyal/akademik)", () => wireBaglantilarSosyal()],
     ["cv", () => wireCv()],
     ["yetki ayarları", () => wireYetkiAyarlari()],
@@ -4752,6 +4754,76 @@ ${enHtml.trim()}
 ${trHtml.trim()}
 </div>
 `;
+}
+
+
+/* ======================================================================= */
+/* SEO & SİTE ADRESLERİ — _config.yml: description, url, baseurl,          */
+/* mirror_site_url (tek commit; satır sonu yorumları korunur)              */
+/* ======================================================================= */
+const SEO_ALANLARI = ["description", "url", "baseurl", "mirror_site_url"];
+const seoSatirRegex = (anahtar) => new RegExp(`^${anahtar}:[ \\t]*("(?:[^"\\\\]|\\\\.)*"|'[^']*'|[^#\\r\\n]*?)?[ \\t]*(#.*)?$`, "m");
+function seoDegeriOku(icerik, anahtar) {
+  const m = icerik.match(seoSatirRegex(anahtar)); if (!m) return null;
+  let v = (m[1] || "").trim();
+  if (v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+  else if (v.startsWith("'") && v.endsWith("'")) v = v.slice(1, -1).replace(/''/g, "'");
+  return v;
+}
+const seoYamlTirnak = (v) => `"${String(v).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+function seoDegeriYaz(icerik, anahtar, deger) {
+  const re = seoSatirRegex(anahtar), m = icerik.match(re), yorum = m && m[2] ? `   ${m[2]}` : "";
+  const satir = `${anahtar}: ${seoYamlTirnak(deger)}${yorum}`;
+  return m ? icerik.replace(re, () => satir) : `${icerik.replace(/\n*$/, "\n")}${satir}\n`;
+}
+function seoDogrula(a) {
+  const hata = [];
+  const d = a.description.replace(/\s+/g, " ").trim();
+  if (!d) hata.push("Açıklama boş olamaz.");
+  const adres = /^https:\/\/[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:\d{2,5})?$/i;
+  if (!adres.test(a.url)) hata.push("Ana site adresi https:// ile başlamalı, sonunda / ve yol OLMAMALI (örn. https://abdullah-eymen-asru.github.io).");
+  if (a.mirror_site_url && !adres.test(a.mirror_site_url)) hata.push("Yedek site adresi https:// ile başlamalı ve yol içermemeli.");
+  if (a.baseurl !== "" && !/^\/[A-Za-z0-9._~\/-]*[A-Za-z0-9._~-]$/.test(a.baseurl)) hata.push("Alt dizin (baseurl) boş olmalı ya da / ile başlayıp / ile bitmemeli (örn. /site).");
+  return { hata, description: d };
+}
+function wireSeoAyarlari() {
+  const kok = document.getElementById("seo-ayarlari"); if (!kok) return;
+  const al = (id) => kok.querySelector(`#${id}`);
+  const g = { description: al("seo-description"), url: al("seo-url"), baseurl: al("seo-baseurl"), mirror_site_url: al("seo-mirror") };
+  const sayac = al("seo-sayac"), mesaj = al("seo-mesaj"), kaydet = al("seo-kaydet"), yenile = al("seo-yenile");
+  let sonSha = null, sonIcerik = "", ilk = {};
+  const yaz = (m, hata = false) => { mesaj.textContent = m; mesaj.classList.toggle("hata", hata); };
+  const sayacGuncelle = () => { const n = g.description.value.replace(/\s+/g, " ").trim().length; sayac.textContent = `${n} karakter${n > 160 ? " — Google sonuçlarında ~160. karakterden sonrası kesilebilir (yine de kaydedilir)" : n && n < 70 ? " — çok kısa; ~120-160 karakter arası ideal" : ""}`; };
+  g.description.addEventListener("input", sayacGuncelle);
+  async function yukle() {
+    yaz("_config.yml okunuyor…");
+    try {
+      const d = await ghGetContents(CONFIG_YOLU); if (!d) throw new Error("_config.yml bulunamadı.");
+      sonIcerik = b64Decode(d.content.replace(/\n/g, "")); sonSha = d.sha;
+      for (const a of SEO_ALANLARI) { ilk[a] = seoDegeriOku(sonIcerik, a) ?? ""; g[a].value = ilk[a]; }
+      sayacGuncelle(); yaz("Anlık değerler yüklendi.");
+    } catch (h) { yaz(`Okunamadı: ${h.message} (GitHub bağlantısını kontrol et.)`, true); }
+  }
+  kaydet.addEventListener("click", async () => {
+    const yeni = { description: g.description.value, url: g.url.value.trim(), baseurl: g.baseurl.value.trim(), mirror_site_url: g.mirror_site_url.value.trim() };
+    const { hata, description } = seoDogrula(yeni); yeni.description = description;
+    if (hata.length) return yaz(hata.join(" "), true);
+    const degisen = SEO_ALANLARI.filter((a) => yeni[a] !== ilk[a]); if (!degisen.length) return yaz("Değişiklik yok.");
+    if (degisen.some((a) => a === "url" || a === "baseurl") && !window.confirm("Ana site adresi/alt dizin tüm bağlantıları, site haritasını ve kanonik adresleri etkiler. Yanlış girersen site bozuk görünür. Emin misin?")) return;
+    kaydet.disabled = true; yaz("Kaydediliyor…");
+    try {
+      const taze = await ghGetContents(CONFIG_YOLU); let icerik = b64Decode(taze.content.replace(/\n/g, ""));
+      for (const a of degisen) icerik = seoDegeriYaz(icerik, a, yeni[a]);
+      await ghPutFile(CONFIG_YOLU, b64Encode(icerik), `_config.yml: ${degisen.join(", ")} güncellendi (panel › SEO)`, taze.sha);
+      ilk = { ...yeni }; yaz(`Kaydedildi: ${degisen.join(", ")}. Site yeniden derlenince (≈1-2 dk) yayında olur.`);
+    } catch (h) { yaz(`Kaydedilemedi: ${h.message}`, true); } finally { kaydet.disabled = false; }
+  });
+  yenile.addEventListener("click", yukle);
+  // üst sekmeler: SEO · Hakkımda · Sosyal bağlantılar
+  const sekmeler = [...document.querySelectorAll("#hk-sekmeler [data-hk]")];
+  const goster = (hedef) => { for (const b of sekmeler) { const id = b.dataset.hk === "seo" ? "seo-ayarlari" : b.dataset.hk; const sec = document.getElementById(id); if (sec) sec.hidden = id !== (hedef === "seo" ? "seo-ayarlari" : hedef); b.setAttribute("aria-selected", String(b.dataset.hk === hedef)); } };
+  sekmeler.forEach((b) => b.addEventListener("click", () => goster(b.dataset.hk)));
+  goster("seo"); yukle();
 }
 
 function wireHakkimda() {
