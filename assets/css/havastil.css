@@ -696,8 +696,11 @@
 .hv-radar-katmanlar { display: flex; gap: .4rem; overflow-x: auto; padding-bottom: .2rem; scrollbar-width: thin; }
 .hv-radar-kat { flex: none; display: inline-flex; gap: .35rem; align-items: center; padding: .5rem .85rem; font: inherit; color: var(--text); background: var(--card-bg, var(--bg)); border: 1px solid var(--border); border-radius: 999px; cursor: pointer; min-height: 2.5rem; white-space: nowrap; }
 .hv-radar-kat[aria-selected="true"] { color: #111; background: var(--accent); border-color: var(--accent); font-weight: 600; }
-.hv-radar-kap { position: relative; }
-.hv-radar-harita { width: 100%; height: min(68vh, 640px); min-height: 320px; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; background: #aab; }
+/* z-index KÖK NEDENİ (menü radar açıkken açılmıyordu): Leaflet'in kendi katmanları (400-1000) ve efsane (900) ayrı bir yığın bağlamı
+   içinde DEĞİLDİ; bu yüzden sayfanın geri kalanına (mobil çekmece = 40, üst menü = 50, açılır menüler) karşı kazanıp üstüne çıkıyordu.
+   isolation:isolate haritayı kendi yığın bağlamına hapseder → dışarıdaki hiçbir şeyin üstüne çıkamaz. */
+.hv-radar-kap { position: relative; isolation: isolate; z-index: 0; }
+.hv-radar-harita { position: relative; isolation: isolate; z-index: 0; width: 100%; height: min(68vh, 640px); min-height: 320px; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; background: #aab; }
 .hv-radar:fullscreen .hv-radar-harita { height: 100%; }
 .hv-radar-efsane { position: absolute; left: .6rem; bottom: .6rem; z-index: 900; display: flex; align-items: center; gap: .45rem; padding: .3rem .6rem; font-size: .75rem; color: #fff; background: rgba(15, 18, 24, .72); border-radius: 999px; backdrop-filter: blur(4px); }
 .hv-ef-bar { display: inline-block; width: 7rem; height: .5rem; border-radius: 4px; }
@@ -723,3 +726,20 @@
 .hv-rozet { display: inline-block; padding: .05rem .5rem; border-radius: 999px; font-size: .75rem; font-weight: 700; color: #fff; background: #777; }
 .hv-rozet.iyi { background: #1f9d55; } .hv-rozet.orta { background: #c98a00; } .hv-rozet.kotu { background: #c0392b; }
 .hv-osm-koyu .leaflet-tile-pane .leaflet-layer:first-child { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9); }
+
+/* radar: tarih aralığı + kota satırı */
+.hv-radar-aralik { border: 1px solid var(--border, #ccc); border-radius: 12px; padding: .4rem .8rem; background: var(--card-bg, var(--bg)); }
+.hv-radar-aralik > summary { cursor: pointer; font-weight: 600; min-height: 2.2rem; display: flex; align-items: center; }
+.hv-radar-aralik-ic { display: flex; flex-wrap: wrap; gap: .5rem .7rem; align-items: flex-end; margin: .4rem 0; }
+.hv-radar-aralik-ic label { display: grid; gap: .15rem; font-size: .8rem; }
+.hv-radar-ipucu, .hv-radar-kota { font-size: .8rem; margin: .3rem 0; overflow-wrap: anywhere; }
+.hv-radar-kota.hv-uyari { color: var(--hv-kirmizi, #c0392b); }
+
+/* Open-Meteo API & Kota kartı */
+.hv-om-kart h3 { font-size: .95rem; margin: .8rem 0 .3rem; }
+.hv-om-limit { display: flex; flex-wrap: wrap; gap: .5rem; border: 1px solid var(--border, #ccc); border-radius: 10px; margin: .5rem 0; padding: .4rem .7rem; }
+.hv-om-limit label, .hv-om-alan { display: grid; gap: .15rem; font-size: .8rem; margin: .3rem 0; }
+.hv-om-alan { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.hv-om-tablo { width: 100%; font-size: .8rem; }
+.hv-om-yonetim { margin-top: .8rem; border-top: 1px solid var(--border, #ccc); padding-top: .5rem; }
+.hv-om-yonetim > summary { cursor: pointer; font-weight: 600; min-height: 2.2rem; display: flex; align-items: center; }
