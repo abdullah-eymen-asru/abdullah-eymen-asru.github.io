@@ -87,7 +87,11 @@ async function myMemoryCeviri(metin, kaynak, hedef) {
   if (!m) throw new Error("MyMemory boş yanıt verdi.");
   return { metin: m, yontem: `MyMemory (açık çeviri belleği, ${cift}) — metin MyMemory'ye gönderildi` };
 }
-/** Motor sırasıyla dener; çevrimiçi motorlar için rıza ister. */
+/** Motor sırasıyla dener; çevrimiçi motorlar için rıza ister.
+ *  motor: "google" | "mymemory" | "cihaz" | "cihaz_sonra" (önce cihaz içi, olmazsa çevrimiçi) | "auto" (= doğrudan çevrimiçi: Google → MyMemory).
+ *  NEDEN: eskiden "auto" her seferinde önce cihaz içi çeviriyi (Chrome Translator API) deniyordu; bu API çoğu tarayıcıda olmadığı için
+ *  her çeviri gereksiz bir hata + gecikmeyle başlıyordu. Artık cihaz içi motor YALNIZCA kullanıcı seçtiyse ("cihaz"/"cihaz_sonra") denenir. */
+export const cihazCeviriVarMi = () => typeof self !== "undefined" && "Translator" in self;
 export async function ceviriYap(metin, { kaynak = "auto", hedef = "tr", motor = "auto" } = {}) {
   const hatalar = [];
   const dene = async (ad, fn) => { try { return await fn(); } catch (h) { hatalar.push(`${ad}: ${h.message}`); return null; } };
@@ -96,14 +100,17 @@ export async function ceviriYap(metin, { kaynak = "auto", hedef = "tr", motor = 
     if (typeof window.confirm === "function" && window.confirm(RIZA_METNI)) { cevirRizasiVer(); return true; }
     return false;
   };
-  if (motor === "auto" || motor === "cihaz") {
-    const c = await dene("Cihaz içi", () => cihazCeviri(metin, kaynak, hedef));
+  if (motor === "cihaz" || motor === "cihaz_sonra") {
+    const c = cihazCeviriVarMi() ? await dene("Cihaz içi", () => cihazCeviri(metin, kaynak, hedef)) : (hatalar.push("Cihaz içi: bu tarayıcıda yok (Chrome/Edge 138+ gerekir)."), null);
     if (c) return c;
     if (motor === "cihaz") throw new Error(`Cihaz içi çeviri yapılamadı. ${hatalar.join(" · ")} Ayarlar'dan çevrimiçi motoru seç.`);
   }
-  if (!onayAl()) throw new Error("Çevrimiçi çeviri için onay vermedin; hiçbir veri gönderilmedi. Cihaz içi çeviri bu tarayıcıda yoksa onay vermen gerekir.");
-  if (motor === "auto" || motor === "google") { const g = await dene("Google", () => googleCeviri(metin, kaynak, hedef)); if (g) return g; }
-  if (motor === "auto" || motor === "mymemory") { const m = await dene("MyMemory", () => myMemoryCeviri(metin, kaynak, hedef)); if (m) return m; }
+  if (!onayAl()) throw new Error("Çevrimiçi çeviri için onay vermedin; hiçbir veri gönderilmedi.");
+  const sira = motor === "mymemory" ? ["mymemory"] : motor === "google" ? ["google"] : ["google", "mymemory"];
+  for (const m of sira) {
+    const sonuc = m === "google" ? await dene("Google", () => googleCeviri(metin, kaynak, hedef)) : await dene("MyMemory", () => myMemoryCeviri(metin, kaynak, hedef));
+    if (sonuc) return sonuc;
+  }
   throw new Error(`Çeviri servislerine ulaşılamadı. ${hatalar.join(" · ")}`);
 }
 
@@ -151,11 +158,11 @@ const DILLER_URL = { tr: "tr", en: "en", de: "de", fr: "fr", es: "es", ar: "ar",
 export const KATALOG = Object.freeze({
   ceviri: {
     ad: "Çeviri (site içinde)", simge: "🌐", gizlilik: "karma", grup: "ceviri",
-    aciklama: "Seçili metni bu pencerede çevirir (yeni sekme açmaz). Otomatik modda önce cihaz içi çeviri denenir (veri çıkmaz); olmazsa onayınla Google Çeviri, sonra MyMemory kullanılır. Giden veri: yalnızca seçtiğin metin ve dil çifti.",
+    aciklama: "Seçili metni bu pencerede çevirir (yeni sekme açmaz). Otomatik modda cihaz içi çeviri DENENMEZ; onayınla doğrudan Google Çeviri, olmazsa MyMemory kullanılır. Veri çıkmasın istersen motoru «Yalnızca cihaz içi» seç. Giden veri: yalnızca seçtiğin metin ve dil çifti.",
     ayarlar: [
       { anahtar: "hedef", etiket: "Hedef dil", tur: "secim", secenekler: DIL_SECENEKLERI, varsayilan: "tr" },
       { anahtar: "kaynak", etiket: "Kaynak dil", tur: "secim", secenekler: { auto: "Otomatik algıla", ...DIL_SECENEKLERI }, varsayilan: "auto" },
-      { anahtar: "motor", etiket: "Çeviri motoru", tur: "secim", secenekler: { auto: "Otomatik (önerilen)", cihaz: "Yalnızca cihaz içi (veri çıkmaz)", google: "Google Çeviri (en iyi kalite)", mymemory: "MyMemory (açık kaynaklı bellek)" }, varsayilan: "auto" },
+      { anahtar: "motor", etiket: "Çeviri motoru", tur: "secim", secenekler: { auto: "Otomatik (önerilen): doğrudan Google, olmazsa MyMemory", cihaz_sonra: "Önce cihaz içi (varsa), olmazsa çevrimiçi", cihaz: "Yalnızca cihaz içi (veri çıkmaz)", google: "Yalnızca Google Çeviri", mymemory: "Yalnızca MyMemory" }, varsayilan: "auto" },
     ],
     async calistir({ metin, ayar }) {
       const c = await ceviriYap(metin.slice(0, 1500), { kaynak: ayar.kaynak || "auto", hedef: ayar.hedef || "tr", motor: ayar.motor || "auto" });
