@@ -23,6 +23,8 @@
  * ORTAM DEĞİŞKENLERİ (Worker > Settings > Variables and Secrets)
  *   SUPABASE_URL, SUPABASE_ANON_KEY   (Text)
  *   GROQ_API_KEY                       (SECRET)
+ *   OPEN_METEO_API_KEY                 (ops., SECRET) — Open-Meteo ticari anahtarı; yalnızca site-anahtarı modunda kullanılır (bkz. /openmeteo)
+ *   IP_TUZ                             (ops., SECRET) — IP özetinin tuzu (boşsa varsayılan)
  *   GROQ_MODEL                         (ops., Text) — zincirin başına eklenir
  *   HABER_KAYNAKLARI                   (ops., Text) — JSON dizi: [{"id","ad","havuz":"tr|dunya","tur":"ajans|genel","url":"https://…"}]
  * ---------------------------------------------------------------------------------------------------------------
@@ -474,6 +476,53 @@ function yorumuTemizle(m) {
 }
 const stilistOnbellek = new Map();
 
+
+/* ============================ OPEN-METEO: İSTEMCİ KİMLİĞİ + TİCARİ ANAHTAR VEKİLİ (v5) ============================
+ * GET /istemci   → { ip_hash }  Çağıranın IP adresinin TUZLU ÖZETİ (ham IP hiçbir yerde saklanmaz/dönmez). Open-Meteo ücretsiz kotası IP başınadır;
+ *                  tarayıcı bu özeti kota RPC'sine yollar, böylece farklı IP = ayrı sayaç olur.
+ * GET /openmeteo?u=<ücretsiz Open-Meteo URL'si>  → site ticari anahtarıyla (env.OPEN_METEO_API_KEY, SECRET) isteği yapar. Oturum + HavaStil yetkisi şart;
+ *                  kota openmeteo_kota_al() ile KULLANICININ JETONUYLA sunucuda ayrılır (istemci atlatamaz). Anahtar hiçbir yanıtta görünmez.
+ *                  Yalnızca Open-Meteo alan adları + /v1/ yolları geçer (SSRF yok). */
+const OM_MUSTERI = { "api.open-meteo.com": "customer-api.open-meteo.com", "archive-api.open-meteo.com": "customer-archive-api.open-meteo.com", "air-quality-api.open-meteo.com": "customer-air-quality-api.open-meteo.com", "climate-api.open-meteo.com": "customer-climate-api.open-meteo.com" };
+function omAgirlik(u) {
+  const p = u.searchParams, say = (a) => (p.get(a) || "").split(",").filter(Boolean).length;
+  const konum = Math.max(1, say("latitude")), degisken = say("hourly") + say("daily") + say("current") + say("minutely_15");
+  let gun = 7;
+  if (p.get("start_date") && p.get("end_date")) gun = Math.max(1, Math.round((Date.parse(p.get("end_date")) - Date.parse(p.get("start_date"))) / 86400000) + 1);
+  else gun = (Number(p.get("forecast_days")) || 7) + (Number(p.get("past_days")) || 0);
+  return Math.max(1, konum * Math.max(1, Math.ceil(degisken / 10)) * Math.max(1, Math.ceil(gun / 14)));
+}
+async function ipOzeti(env, istek) {
+  const ip = istek.headers.get("CF-Connecting-IP") || "";
+  if (!ip) return "bilinmiyor";
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${env.IP_TUZ || "aea-om-v1"}|${ip}`));
+  return [...new Uint8Array(d)].slice(0, 12).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+async function omKotaRpc(env, kim, yol, govde) {
+  const r = await fetch(`${sunucuUrl(env)}/rest/v1/rpc/${yol}`, { method: "POST", headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: kim.baslik, "Content-Type": "application/json" }, body: JSON.stringify(govde) });
+  if (!r.ok) throw new Error(`rpc_${r.status}`);
+  return r.json();
+}
+async function openMeteoVekili(istek, env, cors) {
+  const u = await yetkiliKullanici(env, istek, cors);
+  if (u.yanit) return u.yanit;
+  if (!env.OPEN_METEO_API_KEY) return json({ error: "Site Open-Meteo anahtarı Worker'a eklenmemiş (OPEN_METEO_API_KEY secret).", neden: "anahtar_yok" }, 501, cors);
+  let hedef;
+  try { hedef = new URL(new URL(istek.url).searchParams.get("u") || ""); } catch { return json({ error: "Geçersiz u parametresi." }, 400, cors); }
+  if (hedef.protocol !== "https:" || !Object.hasOwn(OM_MUSTERI, hedef.hostname) || !hedef.pathname.startsWith("/v1/") || hedef.searchParams.has("apikey")) return json({ error: "Bu adres izinli değil." }, 400, cors);
+  const ag = omAgirlik(hedef), ip = await ipOzeti(env, istek);
+  let kota;
+  try { kota = await omKotaRpc(env, u.kim, "openmeteo_kota_al", { p_agirlik: ag, p_kaynak: "site", p_ip_hash: ip }); } catch (h) { return json({ error: "Kota doğrulanamadı.", neden: String(h.message || h) }, 502, cors); }
+  if (!kota?.izin) return json({ error: kota?.neden || "Kota doldu.", neden: "kota", pencere: kota?.pencere, sinir: kota?.sinir }, 429, { ...cors, "Retry-After": "60" });
+  hedef.hostname = OM_MUSTERI[hedef.hostname]; hedef.searchParams.set("apikey", env.OPEN_METEO_API_KEY);
+  let yanit;
+  try { yanit = await fetch(hedef.toString(), { headers: { Accept: "application/json" } }); }
+  catch { try { await omKotaRpc(env, u.kim, "openmeteo_kota_iade", { p_agirlik: ag, p_kaynak: "site", p_ip_hash: ip }); } catch { /* yok say */ } return json({ error: "Open-Meteo'ya ulaşılamadı.", neden: "ag" }, 502, cors); }
+  if (yanit.status >= 500) { try { await omKotaRpc(env, u.kim, "openmeteo_kota_iade", { p_agirlik: ag, p_kaynak: "site", p_ip_hash: ip }); } catch { /* yok say */ } }
+  const govde = await yanit.text();
+  return new Response(govde, { status: yanit.status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", "X-Om-Agirlik": String(ag), ...cors } });
+}
+
 /* ============================ ANA İŞLEYİCİ ============================ */
 const ASIL_ISLEYICI = {
   async fetch(istek, env, ctx) {
@@ -481,7 +530,9 @@ const ASIL_ISLEYICI = {
     if (istek.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const yol = new URL(istek.url).pathname.replace(/\/+$/, "") || "/";
 
-    if (yol === "/saglik") return json({ ok: true, surum: 3, groq_anahtari_var: !!env.GROQ_API_KEY, model_sirasi: modelZinciri(env) }, 200, cors);
+    if (yol === "/saglik") return json({ ok: true, surum: 5, groq_anahtari_var: !!env.GROQ_API_KEY, open_meteo_anahtari_var: !!env.OPEN_METEO_API_KEY, model_sirasi: modelZinciri(env) }, 200, cors);
+    if (yol === "/istemci" && istek.method === "GET") return json({ ip_hash: await ipOzeti(env, istek) }, 200, cors);
+    if (yol === "/openmeteo" && istek.method === "GET") return openMeteoVekili(istek, env, cors);
 
     if (yol === "/haberler" && istek.method === "GET") {
       const u = await yetkiliKullanici(env, istek, cors);
