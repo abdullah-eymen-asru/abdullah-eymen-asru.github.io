@@ -60,3 +60,11 @@
 .rk-not { margin: 0; font-size: .78rem; color: var(--muted, #666); }
 .rk-hata { color: #b3261e; }
 @media (max-width: 520px) { .kst-eylem { width: 100%; } .kst-dugme { flex: 1 1 auto; } }
+
+/* Sistem Durumu › Bu cihazdaki veriler */
+.sd-cihaz-veri { margin-top: 1rem; }
+.sd-cihaz-satir { display: flex; flex-wrap: wrap; gap: .6rem 1rem; justify-content: space-between; align-items: center; padding: .7rem 0; border-top: 1px solid var(--border); }
+.sd-cihaz-satir > div:first-child { flex: 1 1 18rem; min-width: 0; }
+.sd-cihaz-satir p { margin: .2rem 0 0; }
+.sd-girdi { padding: .45rem .6rem; font: inherit; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); }
+.sd-btn-tehlike { color: #c0392b; border-color: #c0392b; }
