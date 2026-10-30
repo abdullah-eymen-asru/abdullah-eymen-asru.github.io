@@ -914,3 +914,9 @@ html.header-gizli .dash-shell { --dash-header-h: 0px !important; }   /* .dash-sh
 
 /* v114 — yeni sürüm bulununca kısa bilgi notu (panel kendini yeniler; oturum korunur) */
 .aea-guncelleme-notu { position: fixed; left: 50%; bottom: 1.2rem; transform: translateX(-50%); z-index: 2000; max-width: calc(100vw - 2rem); padding: .7rem 1.1rem; border-radius: 999px; background: var(--card-bg, #222); color: var(--text, #fff); border: 1px solid var(--accent, #4aa3ff); box-shadow: 0 8px 30px rgba(0, 0, 0, .35); font-size: .9rem; }
+
+/* Hakkımda / SEO sekmeleri */
+.hk-sekmeler { display: flex; flex-wrap: wrap; gap: .4rem; margin: 0 0 1rem; }
+.seo-alan { display: grid; gap: .3rem; margin: 0 0 1.1rem; }
+.seo-alan textarea, .seo-alan input { width: 100%; box-sizing: border-box; font: inherit; padding: .55rem .7rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); }
+.seo-eylem { display: flex; flex-wrap: wrap; gap: .5rem; }
