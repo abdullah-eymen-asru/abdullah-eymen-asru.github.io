@@ -445,3 +445,20 @@ html.ak-okuyucu-acik-html { overflow: hidden; overscroll-behavior: none; }
 .ak-cop-liste { list-style: none; margin: .3rem 0 .8rem; padding: 0; display: grid; gap: .4rem; }
 .ak-cop-liste li { display: flex; flex-wrap: wrap; gap: .4rem; justify-content: space-between; align-items: center; padding: .5rem .6rem; border: 1px solid var(--border); border-radius: 10px; }
 .ak-cop-liste small { color: var(--muted); }
+
+
+/* PDF okuyucu alt araç çubuğu onarımı (tur 11)
+ * SEBEP: mobilde .ak-ok-araclar overflow-x:auto idi → CSS kuralı gereği overflow-y de kırpılır ve içindeki mutlak konumlu
+ * "Çiz / Not" menüsü (Not · Metin · Şekiller…) yarım görünüyordu. Çözüm: kaydırıcı kaldırıldı, menü dock'a göre konumlanır. */
+@media (max-width: 700px) {
+  .ak-ok-dock { position: sticky; bottom: 0; z-index: 30; flex-wrap: wrap; }
+  .ak-ok-dock .ak-ok-araclar { overflow: visible; flex-wrap: nowrap; width: 100%; gap: .25rem; padding-bottom: 0; }
+  .ak-ok-dock .ak-ok-araclar > * { flex: 1 1 0; min-width: 0; }
+  .ak-ok-dock .ak-ok-diger { position: static; }
+  .ak-ok-dock .ak-ok-diger > summary { width: 100%; }
+  .ak-ok-dock .ak-ok-diger-ic { position: absolute; left: .5rem; right: .5rem; bottom: calc(100% + .4rem); top: auto; grid-template-columns: repeat(3, minmax(0, 1fr)); max-height: 45vh; overflow-y: auto; }
+  .ak-ok-dock .ak-ok-diger-ic .ak-arac { min-width: 0; width: 100%; flex-direction: column; height: 3.4rem; font-size: .75rem; }
+  .ak-ok-dock .ak-ok-stil { width: 100%; flex-wrap: nowrap; gap: .4rem; }
+  .ak-ok-dock .ak-ok-renkler { flex: 1 1 auto; flex-wrap: nowrap; justify-content: space-between; overflow-x: auto; }
+  .ak-ok-dock .ak-ok-sec { flex: 0 0 auto; max-width: 6.5rem; }
+}
