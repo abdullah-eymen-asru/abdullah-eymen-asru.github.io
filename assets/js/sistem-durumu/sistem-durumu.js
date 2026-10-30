@@ -6,7 +6,7 @@
  * CSP: inline stil/olay yok, innerHTML yok.
  */
 import { supabase } from "../core/supabase-client.js";
-import { durum as kd, saglikKontrol, kuyrukOzet, kesintiOlay, kesintiOturumu } from "../core/kesinti.js";
+import { durum as kd, saglikKontrol, kuyrukOzet, kuyrukTemizle, kesintiOlay, kesintiOturumu, depoOzeti, onbellekTemizle, kasaOlustur, kasaSil, kasaVarMi } from "../core/kesinti.js";
 
 const kok = document.getElementById("sd-kok");
 const el = (t, oz = {}, ...c) => { const n = document.createElement(t); for (const [k, v] of Object.entries(oz)) { if (v == null || v === false) continue; if (k === "class") n.className = v; else if (k === "text") n.textContent = v; else n.setAttribute(k, v === true ? "" : v); } n.append(...c.filter((x) => x != null)); return n; };
@@ -25,6 +25,35 @@ function kart(baslik, seviye, deger, aciklama, ek) {
   return el("article", { class: `sd-kart sd-${seviye}` }, el("h3", {}, el("span", { class: "sd-nokta", "aria-hidden": "true" }), baslik), el("div", { class: "sd-deger", text: deger }), aciklama ? el("p", { text: aciklama }) : null, ek || null);
 }
 const durumMetni = { ok: "Çalışıyor", yavas: "Yavaş", kesinti: "Kesinti", veritabani: "Veritabanı yanıt vermiyor", giris: "Giriş servisi yanıt vermiyor", cevrimdisi: "İnternet yok", bilinmiyor: "Kontrol ediliyor…" };
+
+
+/* ------------------- BU CİHAZDAKİ VERİLER: önbellek sil · çevrimdışı giriş kasasını aç/kapat · kuyruk ------------------- */
+async function cihazVerileriKarti(oturum) {
+  const kap = el("section", { class: "sd-kart sd-cihaz-veri" }, el("h3", { text: "Bu cihazdaki veriler (tarayıcı hafızası)" }));
+  const mesaj = el("p", { class: "kst-alt", role: "status" });
+  const govde = el("div", { class: "sd-cihaz-satirlar" });
+  const eposta = oturum?.user?.email || "", uid = oturum?.user?.id || "";
+  const satir = (baslik, aciklama, ...kontroller) => el("div", { class: "sd-cihaz-satir" }, el("div", {}, el("strong", { text: baslik }), el("p", { class: "muted", text: aciklama })), el("div", { class: "sd-eylemler" }, ...kontroller));
+  const dugme = (metin, fn, tehlike = false) => { const b = el("button", { type: "button", class: tehlike ? "sd-btn sd-btn-tehlike" : "sd-btn", text: metin }); b.addEventListener("click", async () => { b.disabled = true; try { await fn(); } catch (h) { mesaj.textContent = `Hata: ${h.message}`; } b.disabled = false; await yukle(); }); return b; };
+  async function yukle() {
+    const o = await depoOzeti(); const kasa = eposta ? await kasaVarMi(eposta) : false;
+    const parola = el("input", { type: "password", class: "sd-girdi", placeholder: "Hesap parolan", autocomplete: "current-password", "aria-label": "Parola" });
+    govde.replaceChildren(
+      satir("Okuma önbelleği", `${o.onbellek} kayıt. Sunucuya ulaşılamazken son görülen verileri göstermek için şifreli tutulur. Silmek güvenlidir: siteyi kullanmayı etkilemez, veriler yeniden sunucudan okunur.`,
+        dugme("Önbelleği sil", async () => { await onbellekTemizle(); mesaj.textContent = "Önbellek silindi."; })),
+      satir("Çevrimdışı giriş (bu cihazdan girebileyim)", kasa ? "AÇIK: sunucu kesilirse bu cihazdan e-posta + parolanla kısıtlı moda girebilirsin. Kapatırsan bu cihazdaki giriş kasası silinir (hesabın etkilenmez)." : "KAPALI: sunucu kesilirse bu cihazdan giriş yapılamaz. Açmak için parolanı doğrula; kasa parolanla şifrelenir.",
+        ...(kasa ? [dugme("Kapat ve kasayı sil", async () => { await kasaSil(eposta); mesaj.textContent = "Çevrimdışı giriş kapatıldı."; }, true)]
+          : eposta ? [parola, dugme("Aç", async () => {
+            if (!parola.value) throw new Error("Parolanı yaz.");
+            const { error } = await supabase.auth.signInWithPassword({ email: eposta, password: parola.value });
+            if (error) throw new Error("Parola doğrulanamadı.");
+            const ok = await kasaOlustur({ eposta, parola: parola.value, uid }); mesaj.textContent = ok ? "Çevrimdışı giriş açıldı." : "Kasa oluşturulamadı (tarayıcı şifrelemeyi desteklemiyor olabilir).";
+          })] : [])),
+      satir("Bekleyen işlemler", o.kuyruk ? `${o.kuyruk} işlem sunucuya gönderilmeyi bekliyor. Silersen bu değişiklikler KAYBOLUR.` : "Bekleyen işlem yok.", ...(o.kuyruk ? [dugme("Kuyruğu sil", async () => { if (!window.confirm("Bekleyen işlemler kalıcı olarak silinsin mi? Gönderilmemiş değişiklikler kaybolur.")) return; await kuyrukTemizle(); mesaj.textContent = "Kuyruk silindi."; }, true)] : [])),
+    );
+  }
+  kap.append(govde, mesaj); await yukle(); return kap;
+}
 
 async function ciz() {
   if (!kok) return;
@@ -93,7 +122,7 @@ async function ciz() {
   kok.replaceChildren(ozet,
     el("h3", { class: "sd-bolum-baslik", text: "Çekirdek servisler" }), el("div", { class: "sd-izgara" }, ...kartlar.slice(0, 3)),
     el("h3", { class: "sd-bolum-baslik", text: "Bağımlı dış servisler" }), el("div", { class: "sd-izgara" }, ...kartlar.slice(3)),
-    el("h3", { class: "sd-bolum-baslik", text: "Bu cihaz" }), el("div", { class: "sd-izgara" }, ...cihaz),
+    el("h3", { class: "sd-bolum-baslik", text: "Bu cihaz" }), el("div", { class: "sd-izgara" }, ...cihaz), await cihazVerileriKarti(oturum),
     el("h3", { class: "sd-bolum-baslik", text: "Kotalar & Worker'lar (yetkililere)" }), r2Yer, workerKutu, alt);
   import("../sistem-yedek/r2-kota.js").then((m) => m.r2KotaKartiKur(r2Yer, { baslik: "R2 kullanımı (bu ay) — tüm kovalar" })).catch(() => {});
 }
