@@ -153,7 +153,7 @@ const NAV = [
     group: "Medya & Takip",
     icon: "📁",
     items: [
-      { id: "media-r2", icon: "🗂️", label: "R2 Dosya Paylaşımı", module: "admin", role: ["admin", "manager", "editor"], ozellik: "dosya_paylasimi_yonetimi" },
+      // "R2 Dosya Paylaşımı" artık Dosya Yöneticisi › 🔗 Bağlantılar sekmesinde (adlı/açıklamalı/süreli-sınırsız bağlantılar); #media-r2 adresi oraya yönlenir.
       { id: "media-arsiv", icon: "🗄️", label: "Dosya Yöneticisi", module: "arsiv", role: null, izin: "arsiv", defaultAcilis: false },
       { id: "media-izleme", icon: "🎬", label: "İzleme ve Okuma Yönetimi", module: "izleme", role: null, izin: "izleme" },
       { id: "media-cv", icon: "📄", label: "Özgeçmiş (CV) & Profil Görseli", module: "gy" },
@@ -991,7 +991,7 @@ async function init() {
   // /panel/dashboard.html#me-panel aynı sayfa olduğu için tarayıcı sadece
   // hash'i değiştirir, init() TEKRAR ÇALIŞMAZ) doğru sekmeye geç.
   window.addEventListener("hashchange", () => {
-    const id = window.location.hash.replace("#", "");
+    const id = window.location.hash.replace("#", "").replace(/^media-r2$/, "media-arsiv");
     const item = NAV.flatMap((g) => g.items).find((it) => it.id === id);
     if (item && id !== activeViewId && gorunurMu(item, profile)) {
       showView(item.id, item.module);
@@ -1001,7 +1001,7 @@ async function init() {
   document.getElementById("loading")?.setAttribute("hidden", "");
   document.getElementById("app").hidden = false;
 
-  const requestedId = window.location.hash.replace("#", "");
+  const requestedId = window.location.hash.replace("#", "").replace(/^media-r2$/, "media-arsiv");
   const requested = requestedId
     ? NAV.flatMap((g) => g.items).find((it) => it.id === requestedId)
     : null;
