@@ -34,6 +34,15 @@ export { HAVASTIL_WORKER_URL };
 const VARSAYILAN_KONUM = { id: "41.008,28.978", ad: "İstanbul", lat: 41.008, lon: 28.978, ulke: "TR", ulkeAd: "Türkiye", ulkeAdEn: "Turkey", admin1: "İstanbul", il: "İstanbul", ikon: "diger" };
 const LS = { tercih: "hv_tercih2", eskiTercih: "hv_tercih", bulut: "hv_bulut", silKuyrugu: "hv_bulut_sil", aiModu: "hv_ai_modu", haberAcik: "hv_haber_acik", sekme: "hv_sekme", ai: "hv_ai3_" };
 const SEKMELER = [["bugun", "Bugün", "🏠"], ["kombin", "Kombin", "🧥"], ["plan", "Saatlik plan", "🗓️"], ["derin", "Derin analiz", "🔬"], ["gunluk", "16 gün", "📅"], ["radar", "Radar", "🛰️"], ["mevsim", "Mevsimlik eğilim", "🌍"], ["haber", "Uyarılar", "🛰️"], ["dogrula", "Veri doğrulama", "🔍"], ["ayar", "Ayarlar", "⚙️"]];
+/* v6: 10 düz sekme yerine 5 ana grup + (varsa) alt sekmeler. Hiçbir özellik kaldırılmadı; yalnızca yer değiştirdi. */
+const GRUPLAR = [
+  { id: "g-bugun", ad: "Bugün", ikon: "🏠", alt: ["bugun"] },
+  { id: "g-giyim", ad: "Kombin", ikon: "🧥", alt: ["kombin", "plan"] },
+  { id: "g-tahmin", ad: "Tahmin", ikon: "📈", alt: ["gunluk", "derin", "mevsim"] },
+  { id: "g-harita", ad: "Radar & Uyarı", ikon: "🛰️", alt: ["radar", "haber"] },
+  { id: "g-ayar", ad: "Doğrulama & Ayar", ikon: "⚙️", alt: ["dogrula", "ayar"] },
+];
+const grupBul = (sekmeId) => GRUPLAR.find((g) => g.alt.includes(sekmeId)) || GRUPLAR[0];
 const ESKI_SEKME = { ozet: "bugun", saatlik: "derin" };      // v2'de kaydedilmiş sekme adları
 const HAVA_TTL_MS = 30 * 60 * 1000, HABER_TTL_MS = 15 * 60 * 1000;
 
@@ -49,7 +58,7 @@ export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAkti
     konum: vitrin ? { ...VARSAYILAN_KONUM } : K.aktifOku(VARSAYILAN_KONUM), konumlar: vitrin ? [] : K.listeyiOku(), tercih: tercihOku(),
     aiModu: vitrin ? false : lsOku(LS.aiModu, false) === true, ai: { metin: "", etiket: "", hata: "" }, bulut: vitrin ? false : lsOku(LS.bulut, null) === true, bulutDurum: null, planGecmis: null,
     haberAcik: vitrin ? false : lsOku(LS.haberAcik, true) !== false, hava: null, sonuc: null, haber: null, kombinNo: 0, planGun: 0, planSaat: null,
-    sekme: SEKMELER.some(([id]) => id === kayitliSekme) ? kayitliSekme : "bugun",
+    sekme: "bugun",                                     // HavaStil her açıldığında "Bugün" ile başlar (son sekmeyi hatırlamak kafa karıştırıyordu)
     fizik: null, kriz: null, planAcik: false, derinGun: 0, derinGorunum: null, takvimAcik: false, takvimAy: null, mevsimAy: null, iklim: null, groqKota: null, misafir: !!misafir,
     yenilemeNo: 0, haberNo: 0,
   };
@@ -57,6 +66,8 @@ export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAkti
 
   /* ---------------- iskelet ---------------- */
   const sekmeBar = el("nav", { class: "hv-sekmeler", role: "tablist", "aria-label": "HavaStil bölümleri" });
+  const altBar = el("nav", { class: "hv-altbar", role: "tablist", "aria-label": "Bölüm sekmeleri" });
+  const sekmeKutu = el("div", { class: "hv-sekme-kutu" }, sekmeBar, altBar);
   const icerik = el("div", { class: "hv-icerik", role: "tabpanel", tabindex: "-1" });
   const konumB = konumBileseni(d, kb);
   kok.classList.add("hv");
@@ -64,16 +75,27 @@ export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAkti
     el("span", { text: " Tüm görsel özellikler, kombin kartları, 16 günlük saatlik plan, kar/don analizi ve veri doğrulama açık. Konum kaydetme, hesap senkronu ve yapay zekâ yorumu (Mod B) kilitlidir; ücretsiz kural tabanlı stilist (Mod A) çalışır." }),
     misafir ? el("a", { class: "hv-baglanti", href: "/hesap/giris.html?donus=/panel/havastil/", text: " Giriş yap →" }) : null) : null;
   const davetKutu = el("div", { class: "hv-bulut-davet-yeri" });
-  kok.replaceChildren(...[vitrinBandi, davetKutu, konumB.kok, sekmeBar, icerik].filter(Boolean));
+  kok.replaceChildren(...[vitrinBandi, davetKutu, konumB.kok, sekmeKutu, icerik].filter(Boolean));
 
   /* ---------------- çizim ---------------- */
+  const sekmeAdi = (id) => SEKMELER.find(([x]) => x === id) || [id, id, ""];
+  const sonAlt = {};                                            // grup başına son açık alt sekme (gruba dönünce kaldığın yer)
   function sekmeBarCiz() {
     const rozetSay = d.haber?.uygulananlar?.length || 0;
-    sekmeBar.replaceChildren(...SEKMELER.map(([id, ad, ikon]) => {
-      const b = el("button", { type: "button", class: "hv-sekme", role: "tab", "aria-selected": String(d.sekme === id), id: `hv-sekme-${id}` },
-        el("span", { class: "hv-sekme-ikon", "aria-hidden": "true", text: ikon }), el("span", { text: ad }), id === "haber" && rozetSay ? el("span", { class: "hv-sekme-sayac", text: String(rozetSay) }) : null);
-      return olay(b, "click", () => kb.sekmeGit(id));
+    const aktifGrup = grupBul(d.sekme); sonAlt[aktifGrup.id] = d.sekme;
+    sekmeBar.replaceChildren(...GRUPLAR.map((g) => {
+      const secili = g.id === aktifGrup.id;
+      const b = el("button", { type: "button", class: "hv-sekme", role: "tab", "aria-selected": String(secili), id: `hv-${g.id}` },
+        el("span", { class: "hv-sekme-ikon", "aria-hidden": "true", text: g.ikon }), el("span", { text: g.ad }), g.alt.includes("haber") && rozetSay ? el("span", { class: "hv-sekme-sayac", text: String(rozetSay) }) : null);
+      return olay(b, "click", () => kb.sekmeGit(secili ? g.alt[0] : (sonAlt[g.id] || g.alt[0])));
     }));
+    altBar.hidden = aktifGrup.alt.length < 2;
+    altBar.replaceChildren(...(aktifGrup.alt.length < 2 ? [] : aktifGrup.alt.map((id) => {
+      const [, ad, ikon] = sekmeAdi(id);
+      const b = el("button", { type: "button", class: "hv-altsekme hv-alt-dugme", role: "tab", "aria-selected": String(d.sekme === id), id: `hv-sekme-${id}` },
+        el("span", { "aria-hidden": "true", text: ikon }), el("span", { text: ad }), id === "haber" && rozetSay ? el("span", { class: "hv-sekme-sayac", text: String(rozetSay) }) : null);
+      return olay(b, "click", () => kb.sekmeGit(id));
+    })));
   }
   const CIZICI = { bugun: bugunSekmesi, kombin: kombinSekmesi, plan: planSekmesi, derin: derinSekmesi, gunluk: gunlukSekmesi, mevsim: mevsimSekmesi, haber: haberSekmesi, dogrula: dogrulaSekmesi, ayar: ayarSekmesi, radar: radarSekmesi };
   /** Her sekmenin başında: HANGİ KONUM için olduğu + son güncelleme + Yenile (kafa karışıklığı ve eski veri hatalarını azaltır). */
@@ -94,6 +116,10 @@ export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAkti
     catch (h) { console.warn("HavaStil çizim hatası:", h); icerik.replaceChildren(el("p", { class: "hv-uyari", text: "Bu bölüm çizilemedi. Sayfayı yenile; sürerse Ayarlar › Teşhis'e bak." })); }
   }
   kb.ciz = ciz;
+  // Yönetim panelinde "HavaStil" menüsüne HER tıklanışta (ve doğrudan #tool-havastil adresiyle gelişte) Bugün açılır.
+  const havastilGirisi = () => { if (!kok.isConnected) return; if (d.sekme !== "bugun") { d.sekme = "bugun"; ciz(); } };
+  window.addEventListener("hashchange", () => { if (/^#tool-havastil$/.test(location.hash)) havastilGirisi(); });
+  document.addEventListener("click", (e) => { const a = e.target?.closest?.('a[href="#tool-havastil"]'); if (a) havastilGirisi(); });
   kb.sekmeGit = (id) => { d.sekme = id; lsYaz(LS.sekme, id); ciz(); icerik.scrollIntoView?.({ block: "nearest" }); };
 
   /* ---------------- hesap ---------------- */
