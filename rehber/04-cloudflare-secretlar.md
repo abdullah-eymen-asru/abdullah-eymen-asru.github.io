@@ -501,6 +501,11 @@ Değer değişince Worker eski kayıtların hiçbirini kullanmaz; hepsi yeniden 
 | **Secret** *(yalnızca repo özelse)* | `GITHUB_PAT` | Fine-grained token: **Contents: Read-only**, sadece site reposu | Bölüm 2.3 — `github-icerik-yonetim`'deki (yazma yetkili) token'ı **kullanma**; bu Worker için ayrı, salt okunur bir token üret |
 | Variable *(isteğe bağlı)* | `GITHUB_REF` | Dal adı (varsayılan `main`) | — |
 | Variable *(isteğe bağlı)* | `MAX_TARAMA_SAYFA` | Sadece rakam (varsayılan `40`) | Bölüm 2.6 |
+| Variable *(isteğe bağlı ama önerilir)* | `CF_ACCOUNT_ID` | Cloudflare **Account ID** (32 karakter) | Cloudflare paneli → sağ üst hesap menüsü → **Account home** → hesabın yanındaki **⋮ → Copy account ID** |
+| **Secret** *(isteğe bağlı ama önerilir)* | `CF_API_TOKEN` | **Salt okunur** API token | Cloudflare → **My Profile → API Tokens → Create Token → Create Custom Token**. İzin: **Account → Account Analytics → Read** (başka izin EKLEME). Account Resources: yalnızca senin hesabın. |
+
+> 📊 **Bu iki değer ne işe yarar?** Panelde **R2 kullanımı** kartı (Class A/B işlem sayıları, depolama) ve Worker istek sayaçları `GET /r2/kota`, `/kota`, `/kota/analitik` uçlarından gelir; bunlar Cloudflare'in **GraphQL Analytics** API'sini bu token'la sorgular (kodda doğrulandı: `sistem_yedek_worker/worker.js › r2Kota`). İkisi yoksa uç `yapilandirilmadi` döner, kartlar "yapılandırılmadı" der; başka hiçbir şey bozulmaz. Token'da **Account Analytics: Read** yoksa kartta *"Analytics yanıtı alınamadı (token izni: Account Analytics › Read olmalı)"* hatası görünür.
+> 🔁 **Worker'ı yeniden yayınla:** `/r2/kota` ucu bu Worker'ın güncel sürümünde bulunur. Eski sürümü yayınlıysa kart boş kalır → `cloudflare worker/sistem_yedek_worker/worker.js` içeriğini Worker'a yapıştırıp **Deploy** et, ardından yukarıdaki iki değeri ekleyip **tekrar Deploy** et.
 
 - **Binding'ler (hepsi isteğe bağlı):** Her biri, ilgili Worker'ın kullandığı kovanın **aynısına** bağlanır. Bağlamadığın kaynak pakete girmez (pakette `MANIFEST.json`'a "binding yok" notu düşer), hata vermez.
 
@@ -577,7 +582,9 @@ Panel: **Yedekleme & Verilerim → Depolama Durumu → 🔌 Worker anahtarları*
 | `GET /haberler?havuz=tr\|dunya` | Haber havuzu | JWT + yetki. **Konum/il Worker'a gelmez**; il/ilçe/mahalle/sokak süzmesi tarayıcıda yapılır. Havuz Worker'da 10 dk taze, 90 dk'ya kadar "bayat ama anında" sunulur ve arka planda yenilenir → kaynaklara ≈10 dk'da en çok 1 tur istek gider. Kullanıcı kaç konum seçerse seçsin aynı havuz kullanılır. |
 | `POST /stilist` | Mod B yorumu (Groq) | Yalnızca sayılar + **katalog id'leri** (+ isteğe bağlı `haberId`). Serbest metin ve konum kabul edilmez. Hata olursa yanıtta `neden` + `ipucu` döner. |
 | `GET /tani` | **Bağlantı testi** | Oturum → yetki → Groq anahtarı → Groq çağrısı → haber havuzu adımlarını tek tek sınar. Arayüzde: Ayarlar › Yapay zekâ › **Bağlantıyı test et**. |
-| `GET /saglik` | Sağlık | `{ ok, surum, groq_anahtari_var, model_sirasi }` |
+| `GET /saglik` | Sağlık | `{ ok, surum, groq_anahtari_var, open_meteo_anahtari_var, model_sirasi }` |
+| `GET /istemci` | IP özeti | `{ ip_hash }` — çağıranın **tuzlu özeti** (ham IP dönmez/saklanmaz). Open-Meteo ücretsiz kotası IP başınadır; kota sayacı bu özetle "farklı IP = ayrı sayaç" çalışır. |
+| `GET /openmeteo?u=<url>` | Ticari anahtar vekili | **Yalnızca plan "ticari" ve `OPEN_METEO_API_KEY` tanımlıysa** kullanılır. JWT + yetki; kota sunucuda kullanıcının jetonuyla ayrılır; yalnızca Open-Meteo alan adları geçer. Ücretsiz modda istekler TARAYICIDAN doğrudan gider (Worker'ın ortak IP'si kotayı yemesin diye). |
 
 > ⚠️ **Groq modelleri (Ağustos 2026):** `llama-3.1-8b-instant` ve `llama-3.3-70b-versatile` Groq'ta **16 Ağustos 2026'da kaldırıldı** (yerleri `openai/gpt-oss-20b` / `openai/gpt-oss-120b`). Eski Worker bu modelleri çağırdığı için "yapay zekâ çalışmıyor" durumu oluşuyordu. Yeni Worker model zinciri dener: `GROQ_MODEL` (varsa ve kaldırılmış değilse) → `openai/gpt-oss-20b` → `openai/gpt-oss-120b`. Model listesi değişirse `GROQ_MODEL` ile güncel modeli yaz; kodu değiştirmene gerek yok.
 
@@ -586,6 +593,8 @@ Panel: **Yedekleme & Verilerim → Depolama Durumu → 🔌 Worker anahtarları*
 | Variable | `SUPABASE_URL` | `https://<proje-ref>.supabase.co` (sonunda `/` olmasa da olur) | Bölüm 2.2 |
 | Variable | `SUPABASE_ANON_KEY` | `anon public` anahtarı | Bölüm 2.2 |
 | **Secret** | `GROQ_API_KEY` | `gsk_...` | [console.groq.com](https://console.groq.com) → **API Keys → Create API Key** |
+| **Secret** *(ops.)* | `OPEN_METEO_API_KEY` | Open-Meteo **ticari** API anahtarı | [open-meteo.com/en/pricing](https://open-meteo.com/en/pricing) → plan al → anahtar e-postayla gelir. Yalnızca ücretli plan alırsan gerekir (aşağıya bak). |
+| **Secret** *(ops.)* | `IP_TUZ` | rastgele uzun metin | IP özetinin tuzu (kota sayacı ham IP saklamaz). Boşsa varsayılan tuz kullanılır. |
 | Variable *(ops.)* | `GROQ_MODEL` | zincirin başına eklenir | Groq'un güncel model listesi |
 | Variable *(ops.)* | `HABER_KAYNAKLARI` | varsayılan RSS listesini değiştirir | JSON dizi: `[{"id":"ntv","ad":"NTV","havuz":"tr","tur":"genel","url":"https://…"}]` (`tur`: `ajans`/`genel`; en çok 16; yalnızca `https://`) |
 
