@@ -30,7 +30,7 @@ function limitSatiri(baslik, limitler) {
 function kullanimTablosu(o) {
   const t = el("table", { class: "hv-isi-tablo hv-om-tablo" }, el("caption", { class: "muted", text: "Kullanım (çağrı ağırlığı) / sınır" }),
     el("thead", {}, el("tr", {}, el("th", { text: "" }), ...PENCERELER.map((p) => el("th", { text: PENCERE_ADI[p] })))));
-  const satir = (ad, kul, lim) => el("tr", {}, el("th", { scope: "row", text: ad }), ...PENCERELER.map((p) => el("td", { text: `${sayi(kul?.[p] ?? 0)} / ${sayi(lim?.[p])}` })));
+  const satir = (ad, kul, lim) => el("tr", {}, el("th", { scope: "row", text: ad }), ...PENCERELER.map((p) => el("td", { text: `${sayi(kul?.[p] ?? 0)} / ${sayi(lim?.[p])}`, "data-etiket": PENCERE_ADI[p] })));
   t.append(el("tbody", {}, satir("Sen (site kaynağı)", o.ben, o.kullanici_limit), satir("Bu IP (ücretsiz)", o.ip, o.ip_limit), satir("Site (ticari)", o.site, o.site_limit), satir("Kendi anahtarın", o.ben_kendi_anahtar, null)));
   return el("div", { class: "hv-tablo-kap" }, t);
 }
@@ -84,7 +84,7 @@ export function openMeteoAyarKarti(d, kb) {
     const uc = limitSatiri("Ücretsiz plan sınırı (IP başına)", a.ucretsiz_limit), ti = limitSatiri("Ticari plan sınırı (site toplamı)", a.ticari_limit), ku = limitSatiri("Kişi başı varsayılan sınır", a.kullanici_limit);
     const izin = el("input", { type: "checkbox", checked: a.kendi_anahtar_izni !== false });
     const tanimli = el("input", { type: "checkbox", checked: !!a.site_anahtari_tanimli });
-    const not = el("input", { type: "text", class: "hv-girdi", maxlength: "500", value: a.aciklama || "", placeholder: "Not (örn. plan adı, yenileme tarihi)" });
+    const not = el("input", { type: "text", class: "hv-girdi", value: a.aciklama || "", placeholder: "Not (örn. plan adı, yenileme tarihi)" });
     const mesaj = el("p", { class: "hv-ipucu", role: "status" });
     const kaydet = olay(el("button", { type: "button", class: "hv-btn hv-btn-birincil", text: "Yönetici ayarlarını kaydet" }), "click", async () => {
       try {
@@ -93,7 +93,7 @@ export function openMeteoAyarKarti(d, kb) {
       } catch (h) { mesaj.textContent = h.message; mesaj.classList.add("hv-uyari"); }
     });
     const workerDurum = saglik ? (saglik.open_meteo_anahtari_var ? "✅ Worker'da OPEN_METEO_API_KEY tanımlı." : "⚠️ Worker'da OPEN_METEO_API_KEY tanımlı DEĞİL (ticari plan için ekle: rehber/04).") : "⚠️ Worker'a ulaşılamadı (yeniden yayınlanmış mı?).";
-    const aramaGirdi = el("input", { type: "search", class: "hv-girdi", placeholder: "Üye ara (ad / e-posta)", "aria-label": "Üye ara" });
+    const aramaGirdi = el("input", { type: "search", class: "hv-girdi", placeholder: "Üye ara (ad veya e-posta)", "aria-label": "Üye ara" });
     const tabloKutu = el("div", { class: "hv-tablo-kap" });
     async function tabloYukle() {
       tabloKutu.textContent = "Yükleniyor…";
@@ -113,8 +113,8 @@ export function openMeteoAyarKarti(d, kb) {
               await omKullaniciLimitiKaydet(r.user_id, nesne); await tabloYukle();
             } catch (h) { window.alert(h.message); }
           });
-          g.append(el("tr", {}, el("th", { scope: "row", text: `${r.ad} · ${r.eposta_maskeli}` }), el("td", { text: r.rol || "" }), ...["dakika", "saat", "gun", "ay", "kendi_ay", "ip_sayisi"].map((a2) => el("td", { text: sayi(r[a2]) })),
-            el("td", { text: `${sayi(r.etkin_limit?.gun)}${r.kisiye_ozel_limit ? " *" : ""}` }), el("td", {}, duzenle)));
+          g.append(el("tr", {}, el("th", { scope: "row", text: `${r.ad} · ${r.eposta_maskeli}` }), el("td", { text: r.rol || "", "data-etiket": "Rol" }), ...[["dakika", "dk"], ["saat", "saat"], ["gun", "gün"], ["ay", "ay"], ["kendi_ay", "Kendi anahtarı (ay)"], ["ip_sayisi", "IP"]].map(([a2, et]) => el("td", { text: sayi(r[a2]), "data-etiket": et })),
+            el("td", { text: `${sayi(r.etkin_limit?.gun)}${r.kisiye_ozel_limit ? " *" : ""}`, "data-etiket": "Limit (gün)" }), el("td", {}, duzenle)));
         }
         t.append(g); tabloKutu.replaceChildren(s.length ? t : el("p", { class: "muted", text: "Kayıt yok." }));
       } catch (h) { tabloKutu.textContent = h.message; }
