@@ -210,8 +210,8 @@ export async function omYonetimKaydet(ayar) {
   const { error } = await supabase.rpc("openmeteo_ayar_kaydet", { p_plan: ayar.plan, p_ucretsiz: ayar.ucretsiz_limit, p_ticari: ayar.ticari_limit, p_kullanici: ayar.kullanici_limit, p_kendi_izin: ayar.kendi_anahtar_izni, p_site_anahtari: ayar.site_anahtari_tanimli, p_aciklama: ayar.aciklama || null });
   if (error) throw new Error(error.message); omOnbellekSifirla();
 }
-export async function omKullanimTumu(ara = null) {
-  const { data, error } = await supabase.rpc("openmeteo_kullanim_tumu", { p_ara: ara || null });
+export async function omKullanimTumu(ara = null, limit = 20, offset = 0) {
+  const { data, error } = await supabase.rpc("openmeteo_kullanim_tumu", { p_ara: ara || null, p_limit: limit, p_offset: offset });
   if (error) throw new Error(error.message); return data || [];
 }
 export async function omKullaniciLimitiKaydet(uid, limitler) {
