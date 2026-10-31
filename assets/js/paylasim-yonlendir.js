@@ -2,6 +2,12 @@
  * Statik sunucu dinamik yol bilmediği için adres 404 olarak gelir; burada "Sayfa bulunamadı" metni gösterilmez, kullanıcı doğrudan
  * dosya bilgi sayfasına (ad, boyut, tür, süre + İndir düğmesi) yönlendirilir. Yönlendirme engellenirse elle tıklanabilir bağlantı görünür. */
 (function () {
+  /* /m/<yazi>/<dosya>: yazı medyası (PDF, veri seti, her tür dosya) doğrudan Worker'a gider (0128) */
+  var mm = location.pathname.match(/^\/m\/([a-z0-9][a-z0-9-]{0,119})\/([A-Za-z0-9][A-Za-z0-9._-]{0,150})$/);
+  if (mm) { location.replace("https://r2-arsiv-worker.aeymena.workers.dev/m/" + mm[1] + "/" + encodeURIComponent(mm[2])); return; }
+  /* Temiz adres: /<yazi-anahtari>/<dosya.uzanti> (örn. /china-turkiye-relations/rapor.pdf) → Worker /m/ (yalnızca uzantılı dosya adları) */
+  var tm = location.pathname.match(/^\/([a-z0-9][a-z0-9-]{0,119})\/([A-Za-z0-9][A-Za-z0-9._-]{0,150}\.[A-Za-z0-9]{1,10})$/);
+  if (tm) { location.replace("https://r2-arsiv-worker.aeymena.workers.dev/m/" + tm[1] + "/" + encodeURIComponent(tm[2])); return; }
   var m = location.pathname.match(/^\/d\/([A-Za-z0-9-]{6,80})\/?$/);
   if (!m) return;
   var ek = /[?&]o=1\b/.test(location.search) ? "?o=1" : "";
