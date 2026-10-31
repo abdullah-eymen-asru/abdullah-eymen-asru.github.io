@@ -1,0 +1,39 @@
+/* PDF Böl & Ayıkla (tur 13). Yalnızca sınıf tabanlı biçim: inline stil yok (CSP). */
+.pb-kok { display: grid; gap: .9rem; }
+.pb-kart { border: 1px solid var(--border); border-radius: 14px; padding: .9rem 1rem; background: var(--card-bg); min-width: 0; }
+.pb-soluk { color: var(--muted); font-size: .88rem; margin: .2rem 0; overflow-wrap: anywhere; }
+.pb-gizlilik { margin: 0 0 .7rem; font-size: .88rem; color: var(--muted); }
+.pb-birak { display: grid; gap: .5rem; justify-items: start; padding: 1rem; border: 2px dashed var(--border); border-radius: 12px; }
+.pb-birak.surukle { border-color: var(--accent); background: var(--tag-bg); }
+.pb-btn { font: inherit; min-height: 2.6rem; padding: .45rem .9rem; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; }
+.pb-btn:hover { border-color: var(--accent); }
+.pb-btn:disabled { opacity: .55; cursor: progress; }
+.pb-birincil { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.pb-modlar { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .8rem; }
+.pb-mod { font: inherit; font-size: .88rem; min-height: 2.5rem; padding: .35rem .8rem; border-radius: 999px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; }
+.pb-mod[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.pb-ayarlar { display: grid; gap: .7rem; }
+.pb-alan { display: grid; gap: .3rem; }
+.pb-girdi { font: inherit; padding: .55rem .7rem; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); width: 100%; box-sizing: border-box; min-height: 2.6rem; }
+.pb-girdi:focus-visible, .pb-btn:focus-visible, .pb-mod:focus-visible, .pb-kucuk:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pb-onay { display: flex; gap: .55rem; align-items: flex-start; font-size: .9rem; }
+.pb-onay input { margin-top: .2rem; inline-size: 1.1rem; block-size: 1.1rem; }
+.pb-mesaj { margin: .6rem 0 0; min-height: 1.2rem; font-size: .9rem; overflow-wrap: anywhere; }
+.pb-mesaj.pb-hata { color: #e5584a; font-weight: 600; }
+.pb-sec-araclar, .pb-sec-satir { display: flex; flex-wrap: wrap; gap: .4rem; }
+.pb-sec-araclar { flex-direction: column; }
+.pb-izgara { display: grid; grid-template-columns: repeat(auto-fill, minmax(7.2rem, 1fr)); gap: .6rem; max-height: 34rem; overflow-y: auto; padding: .2rem; }
+.pb-kucuk { position: relative; display: grid; place-items: center; min-height: 9rem; padding: .3rem; border: 2px solid var(--border); border-radius: 10px; background: var(--bg); cursor: default; }
+.pb-izgara.secilebilir .pb-kucuk { cursor: pointer; }
+.pb-kucuk[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+.pb-kucuk[aria-pressed="true"]::after { content: "✓"; position: absolute; top: .25rem; right: .3rem; background: var(--accent); color: #fff; border-radius: 999px; inline-size: 1.4rem; block-size: 1.4rem; display: grid; place-items: center; font-size: .85rem; }
+.pb-tuval { max-inline-size: 100%; max-block-size: 8.2rem; inline-size: auto; block-size: auto; background: #fff; }
+.pb-no { position: absolute; left: .35rem; bottom: .25rem; font-size: .72rem; background: rgba(0,0,0,.65); color: #fff; padding: 0 .35rem; border-radius: 6px; }
+.pb-bozuk { opacity: .5; }
+.pb-sonuc-ust { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .6rem; }
+.pb-sonuc-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: .4rem; max-height: 22rem; overflow-y: auto; }
+.pb-sonuc-liste li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .2rem .6rem; align-items: center; padding: .4rem .6rem; border: 1px solid var(--border); border-radius: 10px; }
+.pb-sonuc-ad { overflow-wrap: anywhere; font-weight: 600; }
+.pb-sonuc-liste li small { grid-column: 1; }
+.pb-sonuc-liste li .pb-btn { grid-column: 2; grid-row: 1 / span 2; }
+@media (max-width: 520px) { .pb-izgara { grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr)); } .pb-btn { flex: 1 1 auto; } }
