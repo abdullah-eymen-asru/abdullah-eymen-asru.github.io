@@ -11,6 +11,16 @@
  */
 import { supabase } from "../core/supabase-client.js";
 import { el, hataMetni, indir, bayt, dosyaAdiTemizle, adsizAl, nefes } from "../donusturucu/ortak.js";
+
+/** Güvenli dosya adı: yasak karakterleri temizler, çok uzunsa GÖVDEYİ kısaltır ama UZANTIYI (.pdf) KORUR.
+ *  (Eski hata: ortak.js dosyaAdiTemizle 120 karakterden sonrasını keserek ".pdf"i atıyordu → ZIP içinde uzantısız/"hatalı belge".) */
+function adGuvenli(ad, yedek = "belge.pdf") {
+  const m = /(\.[A-Za-z0-9]{1,8})$/.exec(String(ad || "")); const uz = m ? m[1] : "";
+  let govde = String(ad || "").slice(0, uz ? -uz.length : undefined)
+    .replace(/[\u0000-\u001f\u007f<>:"/\\|?*]+/g, "_").replace(/\s+/g, " ").replace(/^[.\s]+|[.\s]+$/g, "").trim();
+  if (govde.length > 120) govde = govde.slice(0, 120).trim();
+  return `${govde || adsizAl(yedek)}${uz || ".pdf"}`;
+}
 import { pdfjsAl, pdfLibAl } from "../donusturucu/pdf-yukle.js";
 import { ZipYazici } from "../notlar/disa-aktar/zip.js";
 
@@ -198,7 +208,7 @@ async function kur() {
     if (!d.kaynakDoc) return;
     try {
       bildir("Hazırlanıyor… (büyük dosyalarda biraz sürebilir)"); d.sonuc = []; cizSonuc(); await nefes();
-      const taban = adsizAl(d.ad), cikti = [];
+      const taban = adsizAl(d.ad).slice(0, 80), cikti = [];
       const tumu = Array.from({ length: d.n }, (_, i) => i);
       if (islem === "ayikla" || islem === "sil" || islem === "dondur") {
         const sec = [...d.secili].sort((a, b) => a - b);
@@ -224,7 +234,7 @@ async function kur() {
         for (let b = 0; b < d.n; b += adim) { await boyutaGore(tumu.slice(b, b + adim), limit, ham); bildir(`Boyuta göre bölünüyor… ${Math.min(b + adim, d.n)}/${d.n}`); await nefes(); }
         (await sikistirKomsu(ham, limit)).forEach((p, i) => cikti.push({ ad: `${taban}_parca${i + 1}_${sayfaMetni(p.idx)}.pdf`, idx: p.idx, u8: p.u8 }));
       }
-      d.sonuc = cikti.map((c) => ({ ad: dosyaAdiTemizle(c.ad), sayfa: c.idx.length, u8: c.u8 }));
+      d.sonuc = cikti.map((c) => ({ ad: adGuvenli(c.ad), sayfa: c.idx.length, u8: c.u8 }));
       bildir(`${d.sonuc.length} dosya hazır.`); cizSonuc();
     } catch (h) { bildir(h.message || String(h), true); }
   }
@@ -244,7 +254,7 @@ async function kur() {
     if (d.sonuc.length > 1) {
       const z = el("button", { type: "button", class: "pb-btn pb-birincil", text: "📦 Tümünü ZIP olarak indir" });
       z.addEventListener("click", async () => {
-        try { z.disabled = true; const zip = new ZipYazici(); for (const s of d.sonuc) await zip.dosyaEkle(s.ad, s.u8); indir(zip.bitir(), `${adsizAl(d.ad)}_bolunmus.zip`); }
+        try { z.disabled = true; const zip = new ZipYazici(); for (const s of d.sonuc) await zip.dosyaEkle(s.ad, s.u8); indir(zip.bitir(), adGuvenli(`${adsizAl(d.ad).slice(0, 80)}_bolunmus.zip`, "bolunmus.zip")); }
         catch (h) { bildir(h.message, true); } finally { z.disabled = false; }
       });
       ust.append(z);
@@ -256,6 +266,20 @@ async function kur() {
     sonucKutu.append(ust, liste);
   }
 
+  /* 🧹 Belleği temizle: pdf.js belgesi, bayt dizileri, küçük resim tuvalleri ve sonuçlar bırakılır; sayfa yenilemeden RAM geri verilir. */
+  const bellekTemizle = el("button", { type: "button", class: "pb-btn", text: "🧹 Belleği temizle" });
+  bellekTemizle.addEventListener("click", async () => {
+    if (gozlemci) gozlemci.disconnect();
+    cizimSirasi = Promise.resolve();
+    izgara.querySelectorAll("canvas").forEach((c) => { c.width = 0; c.height = 0; });
+    izgara.replaceChildren();
+    if (d.js) { try { await d.js.destroy(); } catch { /* yoksay */ } }
+    Object.assign(d, { ad: "", bayt: null, n: 0, kaynakDoc: null, js: null, secili: new Set(), sonuc: [] });
+    bilgi.textContent = "Henüz dosya seçilmedi. Dosyan bu cihazdan çıkmaz; her şey tarayıcında yapılır.";
+    girdi.value = ""; cizAyarlar(); cizKucukler(); cizSonuc(); guncelleSecimBilgi();
+    bildir("Bellek temizlendi: dosya, küçük resimler ve hazırlanan çıktılar silindi.");
+  });
+  alan.append(bellekTemizle);
   cizModlar(); cizAyarlar(); izgara.hidden = true; sonucKutu.hidden = true;
   kok.classList.add("pb-kok");
   kok.replaceChildren(
