@@ -782,3 +782,18 @@
 .hv-kademe-liste dt { font-weight: 700; margin-top: .3rem; } .hv-kademe-liste dd { margin: 0; color: var(--muted); overflow-wrap: anywhere; }
 .hv-radar-api-ogesi { border: 1px solid var(--hv-cizgi); border-radius: 12px; padding: .5rem .8rem; margin: .4rem 0; }
 .hv-radar-api-ogesi summary { cursor: pointer; font-weight: 600; }
+
+/* Kota kartları (tur 12): tablo yok; hizalı 4 hücre, mobilde 2×2 */
+.hv-kota-liste, .hv-uye-liste { display: grid; gap: .6rem; }
+.hv-kota-kart { border: 1px solid var(--hv-cizgi); border-radius: 14px; padding: .65rem .8rem; background: var(--hv-yuzey); min-width: 0; }
+.hv-kota-baslik { margin: 0 0 .5rem; font-size: .92rem; overflow-wrap: anywhere; }
+.hv-kota-izgara { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .4rem; }
+.hv-kota-hucre { display: flex; flex-direction: column; align-items: center; gap: .1rem; padding: .4rem .2rem; border-radius: 10px; background: var(--tag-bg, rgba(127,127,127,.1)); text-align: center; min-width: 0; }
+.hv-kota-etiket { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.hv-kota-deger { font-size: 1.05rem; font-variant-numeric: tabular-nums; line-height: 1.2; overflow-wrap: anywhere; }
+.hv-kota-sinir { font-size: .74rem; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hv-uye-ust { display: flex; justify-content: space-between; align-items: flex-start; gap: .6rem; margin-bottom: .5rem; }
+.hv-uye-ad { display: grid; min-width: 0; overflow-wrap: anywhere; }
+.hv-uye-rol { font-size: .72rem; padding: .15rem .55rem; border-radius: 999px; border: 1px solid var(--hv-cizgi); white-space: nowrap; }
+.hv-uye-alt { display: flex; justify-content: space-between; align-items: center; gap: .6rem; flex-wrap: wrap; margin-top: .5rem; }
+@media (max-width: 480px) { .hv-kota-izgara { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
