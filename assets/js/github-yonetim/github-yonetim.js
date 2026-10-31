@@ -358,6 +358,20 @@ const OZELLIK_KATALOGU = [
     rolSutunlari: ["user", "special_user", "editor", "manager", "admin"],
   },
   {
+    // tur 14 — Sistem Durumu sekmesi (anlık site/servis sağlığı). VARSAYILAN AÇIK; rol bazında kapatılır. Kapalıyken menüden kalkar. Veri silinmez.
+    anahtar: "sistem_durumu",
+    baslik: "Sistem Durumu Sekmesi",
+    aciklama: "Sistem › Sistem Durumu: sitenin ve servislerin anlık sağlığını gösteren sekme. Rol bazında kapatılabilir; Site Sahibi her zaman görür.",
+    rolSutunlari: ["user", "special_user", "editor", "manager", "admin"],
+  },
+  {
+    // tur 14 — PDF Böl & Ayıkla aracı. Dönüştürücü yetkisi OLAN roller için ayrıca kapatılabilir (%100 istemci tarafı; veri sunucuya gitmez).
+    anahtar: "pdf_bol",
+    baslik: "PDF Böl & Ayıkla Aracı",
+    aciklama: "Araçlar › PDF Böl & Ayıkla (aralıklara böl, sayfa seç/sil/döndür, boyuta göre böl). Önce “Gelişmiş Belge ve Gizlilik Araçları” yetkisi gerekir; bu anahtar aracı ayrıca kapatır. Site Sahibi her zaman kullanır.",
+    rolSutunlari: ["user", "special_user", "editor", "manager", "admin"],
+  },
+  {
     // bkz. migration 0116 — Akademik okuyucu eklentileri (çeviri, sözlük, Vikipedi, Crossref, arama bağlantıları). VARSAYILAN AÇIK; rol bazında kapatılır.
     // Kod çalıştırmaz, depolama kotası kullanmaz (kullanıcı başına küçük ayar satırı). Kapalıyken okuyucu balonunda eklenti düğmesi ve Kütüphane'de ayar paneli görünmez.
     anahtar: "akademik_eklentiler",
