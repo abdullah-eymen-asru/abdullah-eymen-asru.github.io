@@ -156,3 +156,4 @@ Kurulum: Supabase’de `0113_site_duyurulari_ve_havastil_ai_kasasi.sql` (kasa ta
 - Editör: İçerik formunda gövde alanının altındaki "📎 Yazı medyası (R2)" paneli. Adresler: `/m/<anahtar>/<dosya>` (görseller ve her dosya); `github.io/<anahtar>/<dosya.uzanti>` temiz biçimi 404 sayfası üzerinden çalışır.
 - Aç/kapa: panelin altındaki "Site sahibi: R2 medya anahtarı". Kapalıyken /m/ adresleri R2'ye hiç gitmez.
 - Dosya türleri: her format yüklenebilir; tanınmayan/çalıştırılabilir türler `application/octet-stream` saklanır, yalnızca indirilir (tarayıcıda çalışmaz).
+- Tur 15: "📎 Yazı medyası" paneli form her açıldığında yeniden eklenir (form <template> klonudur); editör araç çubuğunda 📎 kısayolu. Yetki Ayarları › Özellikler: "Sistem Durumu Sekmesi" ve "PDF Böl & Ayıkla Aracı" satırları (SQL gerekmez).
