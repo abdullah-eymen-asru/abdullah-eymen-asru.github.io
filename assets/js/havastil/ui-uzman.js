@@ -112,7 +112,7 @@ function popKarti(G, simdiT, h) {
       bar("PoP", zirve.pop, "pop", null), zirve.guven != null ? bar("= Model uyumu", zirve.guven, "guven", uyumGoster(zirve.guven).etiket) : null, zirve.guven != null ? bar("× Yayılım", zirve.kapsam, "kapsam", `yağış ${yayilimMetni(zirve.kapsam)}`) : null,
       zirve.guven != null && uyumGoster(zirve.guven).uyari ? el("small", { class: "hv-ipucu", text: uyumGoster(zirve.guven).uyari }) : null,
       pratik ? el("div", { class: "hv-pop-pratik" }, el("strong", { text: pratik.baslik }), el("code", { text: pratik.formul }), el("p", { class: "hv-pop-tavsiye", text: `Özet tavsiye: “${pratik.tavsiye}”` })) : null,
-      el("p", { class: "hv-uzman-not", text: popYorumu(zirve) })) : el("p", { class: "hv-uzman-not", text: "Bu günün hiçbir saatinde belirgin yağış olasılığı yok (PoP < %10)." }),
+      el("small", { class: "hv-ipucu", text: "Formül: PoP = C × A. C = yağışın bölgede bir yerde görülme güveni (modellerin uyumu), A = yağışın bölgenin ne kadarına düşeceği (alan kapsaması)." }), el("p", { class: "hv-uzman-not", text: popYorumu(zirve) })) : el("p", { class: "hv-uzman-not", text: "Bu günün hiçbir saatinde belirgin yağış olasılığı yok (PoP < %10)." }),
     el("div", { class: "hv-matris-kaydir", tabindex: "0", role: "region", "aria-label": "Saatlik PoP, güven ve kapsam" }, tablo),
     okunus("Koyu hücre = yüksek değer. Üç satırı üst üste oku: ihtimal, Model uyumu × Yayılım'a eşittir.",
       "Model uyumu (eski adıyla Güven) = ana tahmin + ECMWF + ICON + GFS modellerinden yağış gören modellerin oranı. Yayılım (eski adıyla Kapsam) = ihtimal ÷ model uyumu.",
