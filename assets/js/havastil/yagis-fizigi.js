@@ -202,7 +202,9 @@ export function popPratik(a) {
   const baslik = `Yağış Riski: %${a.pop}`;
   if (a.pop < 5) return { baslik, formul: "Güven × Kapsam ayrıştırması gerekmiyor (risk %5'in altında).", tavsiye: "Yağış beklenmiyor; yağmurluk gerekmez.", tahmini: false };
   if (a.guven == null) return { baslik, formul: "Model uyumu verisi yok; ayrıştırma yapılamadı.", tavsiye: a.pop >= 50 ? "Yağış olasılığı yüksek: yağmurluk veya şemsiye al." : "Yağış olasılığı düşük ama sıfır değil: kabuğu çantada taşı.", tahmini: false };
-  const formul = `[Güven: %${a.guven}${a.tahmini ? "*" : ""} (${guvenMetni(a.guven)}) × Kapsam: %${a.kapsam}${a.tahmini ? "*" : ""} (${kapsamMetni(a.kapsam)})]`;
+  const yl = a.tahmini ? "*" : "";
+  // Denklemin TAM hâli: sol taraf (PoP) ve iki çarpan, her biri kısaltmasıyla: PoP = C × A
+  const formul = `Yağış Olasılığı (PoP) %${a.pop} = Güven Oranı (C) %${a.guven}${yl} (${guvenMetni(a.guven)}) × Alan Kapsama Oranı (A) %${a.kapsam}${yl} (${kapsamMetni(a.kapsam)})`;
   let tavsiye;
   if (a.guven >= 70 && a.kapsam >= 60) tavsiye = "Yağmur kesin ve geniş alana yayılacak; yağmurluk ya da şemsiye şart, su itici ayakkabı giy.";
   else if (a.guven >= 70) tavsiye = "Yağmur kesin yağacak ancak şehrin tamamına değil, yerel hücreler halinde düşecek; yanına hafif yağmurluk al.";
