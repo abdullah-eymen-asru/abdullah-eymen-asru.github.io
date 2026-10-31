@@ -149,3 +149,10 @@ Kurulum: Supabase’de `0113_site_duyurulari_ve_havastil_ai_kasasi.sql` (kasa ta
 - Tur 12: kota gösterimi tablodan karta çevrildi (mobil/masaüstü hizalı); PoP denklemi tam yazılır: PoP = C × A. SQL: `0125_tur12_baglanti_klasorleri_ve_sifirlama.sql`.
 - Tur 13: PoP bölümünde saat saat denklem listesi; Open-Meteo üye kullanımı sayfalı (20'şer), e-posta hiç gösterilmez (arama sunucuda ad+e-posta). SQL: `0126_tur13_om_kullanim_sayfalama.sql`.
 - Tur 13: yeni araç **PDF Böl & Ayıkla** (Araçlar menüsü; yetki: Dönüştürücü satırı). Arşiv ve Bağlantılar aynı klasör ağacını paylaşır (klasör oluşturma iki yerde de yansır).
+
+## Tur 14 — Yazı medyası (R2), her format, klasör silme
+- Yeni R2 bucket GEREKMEZ; mevcut kova ve secret'lar aynen kullanılır. Dosyalar R2'de düz anahtarla (`arsiv/<uuid>`) durur; klasör yapısı (Yazılar/<başlık>/) Arşiv veritabanındadır. Cloudflare panelinde klasör görünmez — adı/yolu görmek için Dosya Yöneticisi'ni kullan.
+- SQL sırası: 0124 → 0125 → 0126 → 0127 → 0128. Worker: `r2-arsiv-worker` yeniden yayınla (yeni uçlar: `/m/<yazi>/<dosya>`, `/medya-durum`).
+- Editör: İçerik formunda gövde alanının altındaki "📎 Yazı medyası (R2)" paneli. Adresler: `/m/<anahtar>/<dosya>` (görseller ve her dosya); `github.io/<anahtar>/<dosya.uzanti>` temiz biçimi 404 sayfası üzerinden çalışır.
+- Aç/kapa: panelin altındaki "Site sahibi: R2 medya anahtarı". Kapalıyken /m/ adresleri R2'ye hiç gitmez.
+- Dosya türleri: her format yüklenebilir; tanınmayan/çalıştırılabilir türler `application/octet-stream` saklanır, yalnızca indirilir (tarayıcıda çalışmaz).
