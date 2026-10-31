@@ -370,7 +370,7 @@ const OZELLIK_KATALOGU = [
     // VARSAYILAN KAPALI (diğer satırların tersi): anahtar açılana kadar yalnızca owner kullanır. Kaynak: donusturucu_yetkileri.
     anahtar: "donusturucu",
     baslik: "Gelişmiş Belge ve Gizlilik Araçları (İstemci Taraflı)",
-    aciklama: "Üç araç TEK satırda: Evrensel Metadata Temizleyici (görsel, Office, ODF, PDF, ZIP, MP4/MOV), Dönüştürücü & Belge Düzenleyici ve Belge Tarayıcı & Birleştirici (çoklu birleştirme + boyut küçültme). Hepsi buradan açılıp kapanır, araçların içinde ayrı bir yetki paneli yoktur. Varsayılan KAPALI; dosyalar tarayıcıdan çıkmaz. Kapalı rol menüde araçları görmez.",
+    aciklama: "Dört araç TEK satırda: PDF Böl & Ayıkla, Evrensel Metadata Temizleyici (görsel, Office, ODF, PDF, ZIP, MP4/MOV), Dönüştürücü & Belge Düzenleyici ve Belge Tarayıcı & Birleştirici (çoklu birleştirme + boyut küçültme). Hepsi buradan açılıp kapanır, araçların içinde ayrı bir yetki paneli yoktur. Varsayılan KAPALI; dosyalar tarayıcıdan çıkmaz. Kapalı rol menüde araçları görmez.",
     rolSutunlari: ["admin", "manager", "editor", "special_user", "user"],
     kaynak: "donusturucu",
   },
