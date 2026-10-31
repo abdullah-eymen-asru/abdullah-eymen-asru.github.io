@@ -1,0 +1,29 @@
+/* Yazı medyası: yönetim paneli editör paneli + site (okuyucu) yer tutucuları. Inline stil yok (CSP). */
+.ym-panel { border: 1px solid var(--border); border-radius: 12px; padding: .6rem .9rem; margin: .8rem 0; background: var(--card-bg); }
+.ym-ozet { cursor: pointer; font-weight: 700; }
+.ym-ic { display: grid; gap: .6rem; margin-top: .6rem; min-width: 0; }
+.ym-soluk { color: var(--muted); font-size: .86rem; margin: .1rem 0; overflow-wrap: anywhere; }
+.ym-alan { font-size: .85rem; color: var(--muted); }
+.ym-girdi { font: inherit; padding: .5rem .7rem; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); width: 100%; box-sizing: border-box; min-height: 2.5rem; }
+.ym-btn { font: inherit; min-height: 2.5rem; padding: .4rem .85rem; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; }
+.ym-btn:hover { border-color: var(--accent); }
+.ym-kucuk { min-height: 2.2rem; padding: .25rem .6rem; font-size: .84rem; }
+.ym-birincil { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.ym-tehlike { color: #e5584a; border-color: #e5584a; }
+.ym-liste, .ym-kuyruk { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; max-height: 24rem; overflow-y: auto; }
+.ym-kuyruk:empty { display: none; }
+.ym-oge { border: 1px solid var(--border); border-radius: 10px; padding: .5rem .65rem; display: grid; gap: .4rem; min-width: 0; }
+.ym-oge-ust { display: flex; justify-content: space-between; gap: .6rem; flex-wrap: wrap; }
+.ym-oge-ad { font-weight: 600; overflow-wrap: anywhere; }
+.ym-oge-alt { display: flex; flex-wrap: wrap; gap: .35rem; }
+.ym-link { border: 1px dashed var(--border); border-radius: 10px; padding: .5rem .7rem; display: grid; gap: .5rem; }
+.ym-link > summary { cursor: pointer; font-weight: 600; }
+.ym-ayar { border-top: 1px solid var(--border); padding-top: .6rem; display: grid; gap: .4rem; }
+.ym-onay { display: flex; gap: .5rem; align-items: flex-start; font-size: .88rem; }
+.ym-onay input { margin-top: .2rem; inline-size: 1.1rem; block-size: 1.1rem; }
+.ym-mesaj { margin: 0; min-height: 1.1rem; font-size: .88rem; overflow-wrap: anywhere; }
+.ym-hata { color: #e5584a; font-weight: 600; }
+/* site tarafı */
+.r2-medya-goster { font: inherit; padding: .6rem 1rem; border-radius: 10px; border: 1px dashed var(--border, #888); background: transparent; color: inherit; cursor: pointer; max-width: 100%; }
+.r2-medya-kapali { opacity: .7; font-size: .9em; }
+.r2-medya-kapali-baglanti { opacity: .6; text-decoration: line-through; cursor: not-allowed; }
