@@ -213,6 +213,14 @@ export function popPratik(a) {
   return { baslik, formul, tavsiye, tahmini: !!a.tahmini };
 }
 
+/** Saatlik tek satırlık denklem: "Yağış Olasılığı (PoP) %60 = Güven Oranı (C) %80 × Alan Kapsama Oranı (A) %75" (tahmini ayrıştırmada * ile). */
+export function popDenklemMetni(a) {
+  if (a.pop < 5) return `Yağış Olasılığı (PoP) %${a.pop} — ayrıştırma gerekmiyor (risk %5'in altında)`;
+  if (a.guven == null) return `Yağış Olasılığı (PoP) %${a.pop} — model uyumu verisi yok, C ve A hesaplanamadı`;
+  const y = a.tahmini ? "*" : "";
+  return `Yağış Olasılığı (PoP) %${a.pop} = Güven Oranı (C) %${a.guven}${y} × Alan Kapsama Oranı (A) %${a.kapsam}${y}`;
+}
+
 /** Beklenen efektif yağış (E = PoP × P) için anlaşılır şiddet rozeti. */
 export function efektifSiddet(E) {
   const e = Math.max(0, sayi(Number(E)));
