@@ -101,32 +101,43 @@ export function openMeteoAyarKarti(d, kb) {
     const workerDurum = saglik ? (saglik.open_meteo_anahtari_var ? "✅ Worker'da OPEN_METEO_API_KEY tanımlı." : "⚠️ Worker'da OPEN_METEO_API_KEY tanımlı DEĞİL (ticari plan için ekle: rehber/04).") : "⚠️ Worker'a ulaşılamadı (yeniden yayınlanmış mı?).";
     const aramaGirdi = el("input", { type: "search", class: "hv-girdi", placeholder: "Üye ara (ad veya e-posta)", "aria-label": "Üye ara" });
     const tabloKutu = el("div", { class: "hv-tablo-kap" });
-    async function tabloYukle() {
-      tabloKutu.textContent = "Yükleniyor…";
+    /* Sayfalı liste: 20'şer üye; arama sunucuda (ad + e-posta) yapılır, e-posta ekrana HİÇ çıkmaz. Üye sayısı arttıkça sayfa uzamaz. */
+    const SAYFA = 20; let yuklenen = 0, toplamUye = 0, mesgul = false;
+    const liste = el("div", { class: "hv-uye-liste hv-uye-kaydir" }), ozetSatir = el("p", { class: "hv-ipucu", role: "status" });
+    const dahaFazla = olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "Daha fazla göster" }), "click", () => sayfaYukle(false));
+    tabloKutu.replaceChildren(ozetSatir, liste, dahaFazla);
+    const uyeKarti = (r) => {
+      const duzenle = olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "Limit düzenle" }), "click", async () => {
+        const mevcut = PENCERELER.map((p) => (r.kisiye_ozel_limit?.[p] ?? "")).join(",");
+        const gir = window.prompt(`${r.ad} için kişiye özel limit: dakika,saat,gün,ay (boş = varsayılan; ∞ için "-" yaz). Tümünü silmek için boş bırak.`, mevcut);
+        if (gir === null) return;
+        try {
+          const parca = gir.split(",").map((x) => x.trim());
+          const nesne = gir.trim() === "" || gir.trim() === ",,," ? null : Object.fromEntries(PENCERELER.map((p, i) => [p, parca[i] === undefined || parca[i] === "" ? undefined : parca[i] === "-" ? null : Math.max(0, Math.floor(Number(parca[i])))]).filter(([, v]) => v !== undefined));
+          if (nesne && Object.values(nesne).some((v) => v !== null && !Number.isFinite(v))) throw new Error("Sayı geçersiz.");
+          await omKullaniciLimitiKaydet(r.user_id, nesne); await sayfaYukle(true);
+        } catch (h) { window.alert(h.message); }
+      });
+      // Kapalı satır: ad · rol · bugün/ay özeti. Açılınca dakika/saat/gün/ay hücreleri + limit düzenleme.
+      return el("details", { class: "hv-kota-kart hv-uye-kart" },
+        el("summary", { class: "hv-uye-ust" }, el("span", { class: "hv-uye-ad" }, el("strong", { text: r.ad }), el("small", { class: "muted", text: `bugün ${sayi(r.gun)} · ay ${sayi(r.ay)}${r.kisiye_ozel_limit ? " · özel limit *" : ""}` })), el("span", { class: "hv-uye-rol", text: r.rol || "" })),
+        kotaHucreleri({ dakika: r.dakika, saat: r.saat, gun: r.gun, ay: r.ay }, r.etkin_limit),
+        el("div", { class: "hv-uye-alt" }, el("small", { class: "muted", text: `Kendi anahtarı (ay): ${sayi(r.kendi_ay)} · Farklı IP (bugün): ${sayi(r.ip_sayisi)}` }), duzenle));
+    };
+    async function sayfaYukle(bastan) {
+      if (mesgul) return; mesgul = true;
       try {
-        const s = await omKullanimTumu(aramaGirdi.value.trim() || null);
-        const g = el("div", { class: "hv-uye-liste" });
-        for (const r of s) {
-          const duzenle = olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "Limit düzenle" }), "click", async () => {
-            const mevcut = PENCERELER.map((p) => (r.kisiye_ozel_limit?.[p] ?? "")).join(",");
-            const gir = window.prompt(`${r.ad} için kişiye özel limit: dakika,saat,gün,ay (boş = varsayılan; ∞ için "-" yaz). Tümünü silmek için boş bırak.`, mevcut);
-            if (gir === null) return;
-            try {
-              const parca = gir.split(",").map((x) => x.trim());
-              const nesne = gir.trim() === "" || gir.trim() === ",,," ? null : Object.fromEntries(PENCERELER.map((p, i) => [p, parca[i] === undefined || parca[i] === "" ? undefined : parca[i] === "-" ? null : Math.max(0, Math.floor(Number(parca[i])))]).filter(([, v]) => v !== undefined));
-              if (nesne && Object.values(nesne).some((v) => v !== null && !Number.isFinite(v))) throw new Error("Sayı geçersiz.");
-              await omKullaniciLimitiKaydet(r.user_id, nesne); await tabloYukle();
-            } catch (h) { window.alert(h.message); }
-          });
-          // Bu ay: dk/saat/gün/ay kullanımı; sınır = bu üyenin etkin limiti (kişiye özel varsa * ile işaretli)
-          g.append(el("section", { class: "hv-kota-kart hv-uye-kart" },
-            el("div", { class: "hv-uye-ust" }, el("div", { class: "hv-uye-ad" }, el("strong", { text: r.ad }), el("small", { class: "muted", text: r.eposta_maskeli || "" })), el("span", { class: "hv-uye-rol", text: r.rol || "" })),
-            kotaHucreleri({ dakika: r.dakika, saat: r.saat, gun: r.gun, ay: r.ay }, r.etkin_limit),
-            el("div", { class: "hv-uye-alt" }, el("small", { class: "muted", text: `Kendi anahtarı (ay): ${sayi(r.kendi_ay)} · Farklı IP (bugün): ${sayi(r.ip_sayisi)}${r.kisiye_ozel_limit ? " · kişiye özel limit *" : ""}` }), duzenle)));
-        }
-        tabloKutu.replaceChildren(s.length ? g : el("p", { class: "muted", text: "Kayıt yok." }));
-      } catch (h) { tabloKutu.textContent = h.message; }
+        if (bastan) { liste.replaceChildren(); yuklenen = 0; ozetSatir.textContent = "Yükleniyor…"; dahaFazla.hidden = true; }
+        dahaFazla.disabled = true;
+        const s = await omKullanimTumu(aramaGirdi.value.trim() || null, SAYFA, yuklenen);
+        toplamUye = Number(s[0]?.toplam ?? (bastan ? 0 : toplamUye)); yuklenen += s.length;
+        liste.append(...s.map(uyeKarti));
+        ozetSatir.textContent = toplamUye ? `${yuklenen} / ${toplamUye} üye gösteriliyor` : "Eşleşen üye yok.";
+        dahaFazla.hidden = yuklenen >= toplamUye; dahaFazla.disabled = false;
+      } catch (h) { ozetSatir.textContent = h.message; }
+      finally { mesgul = false; }
     }
+    const tabloYukle = () => sayfaYukle(true);
     olay(aramaGirdi, "input", (() => { let z; return () => { clearTimeout(z); z = setTimeout(tabloYukle, 350); }; })());
     yonetimKutu.replaceChildren(el("details", { class: "hv-om-yonetim" },
       el("summary", { text: "🛠️ Yönetici: plan, limitler, herkesin kullanımı" }),
