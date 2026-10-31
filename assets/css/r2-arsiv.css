@@ -307,3 +307,17 @@
   .ra-baglanti-satir { grid-template-columns: minmax(0, 1fr); }
   .ra-baglanti-satir .ra-islemler { justify-content: flex-start; }
 }
+
+/* Bağlantı penceresi: çok dosya olunca taşmaz; gövde kayar, düğmeler hep görünür */
+.ra-dlg { max-width: min(38rem, 94vw); width: 100%; padding: 0; }
+.ra-dlg-form { display: flex; flex-direction: column; max-height: min(88vh, 46rem); min-height: 0; }
+.ra-dlg-form > .ra-dlg-govde { overflow-y: auto; min-height: 0; flex: 1 1 auto; padding-right: .2rem; }
+.ra-dlg-alt { position: sticky; bottom: 0; background: inherit; padding-top: .6rem; display: flex; gap: .5rem; justify-content: flex-end; flex-wrap: wrap; }
+.ra-baglanti-dosyalar, .ra-baglanti-secilenler, .ra-kuyruk-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: .3rem; max-height: 11rem; overflow-y: auto; }
+.ra-baglanti-secilenler { max-height: 9rem; }
+.ra-secilen { display: flex; justify-content: space-between; align-items: center; gap: .5rem; padding: .25rem .5rem; border: 1px solid var(--border); border-radius: 8px; overflow-wrap: anywhere; }
+.ra-adres-liste { display: grid; gap: .5rem; }
+.ra-adres-satir { display: grid; grid-template-columns: 1fr; gap: .25rem; }
+.ra-dlg-baslik2 { margin: .6rem 0 0; font-size: .95rem; }
+.ra-yol-cubugu { display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; margin: .5rem 0; }
+.ra-klasor-satir .ra-govde { cursor: pointer; }
