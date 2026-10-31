@@ -12,7 +12,7 @@ import { karGorunumu } from "./ui-kar.js";
 import { gunIzgarasi } from "./ui-gun-secici.js";
 import { TERIM, uyumGoster, yayilimMetni, capeNotu, cisentiFiltresiDurumu, gunHikayesi } from "./hikaye.js";
 import { aiPaneli } from "./ui-ai.js";
-import { CAPE_BANTLARI, ESIK, YAGIS_SEVIYELERI, capeOrani, capeSeviye, saatAnaliz, saatMetniTam, gunAnalizleri, popYorumu, popPratik, guvenMetni, efektifSiddet, capeHalk } from "./yagis-fizigi.js";
+import { CAPE_BANTLARI, ESIK, YAGIS_SEVIYELERI, capeOrani, capeSeviye, saatAnaliz, saatMetniTam, gunAnalizleri, popYorumu, popPratik, popDenklemMetni, guvenMetni, efektifSiddet, capeHalk } from "./yagis-fizigi.js";
 
 const n1 = (x, n = 1) => String(Number(x).toFixed(n));          // v4: ondalık NOKTA (10 günlük liste ve ekran görüntüleriyle aynı biçim: 4.4 mm)
 const isaretli = (x) => (x == null ? "—" : `${x > 0 ? "+" : ""}${n1(x)}`);
@@ -114,6 +114,7 @@ function popKarti(G, simdiT, h) {
       pratik ? el("div", { class: "hv-pop-pratik" }, el("strong", { text: pratik.baslik }), el("code", { text: pratik.formul }), el("p", { class: "hv-pop-tavsiye", text: `Özet tavsiye: “${pratik.tavsiye}”` })) : null,
       el("small", { class: "hv-ipucu", text: "Formül: PoP = C × A. C = yağışın bölgede bir yerde görülme güveni (modellerin uyumu), A = yağışın bölgenin ne kadarına düşeceği (alan kapsaması)." }), el("p", { class: "hv-uzman-not", text: popYorumu(zirve) })) : el("p", { class: "hv-uzman-not", text: "Bu günün hiçbir saatinde belirgin yağış olasılığı yok (PoP < %10)." }),
     el("div", { class: "hv-matris-kaydir", tabindex: "0", role: "region", "aria-label": "Saatlik PoP, güven ve kapsam" }, tablo),
+    saatlikDenklem(a, simdiT),
     okunus("Koyu hücre = yüksek değer. Üç satırı üst üste oku: ihtimal, Model uyumu × Yayılım'a eşittir.",
       "Model uyumu (eski adıyla Güven) = ana tahmin + ECMWF + ICON + GFS modellerinden yağış gören modellerin oranı. Yayılım (eski adıyla Kapsam) = ihtimal ÷ model uyumu.",
       "Uyum yüksek, yayılım düşük → modeller yağış görüyor ama yerel hücreler hâlinde (sağanak). Uyum düşük, yayılım yüksek → olursa her yere düşer ama belirsiz. %100 uyum “kesin yağar” demek değildir.",
@@ -121,6 +122,18 @@ function popKarti(G, simdiT, h) {
       ...(tahminiVar ? ["* = tahmini: modellerin yağış gören oranı ana tahminin olasılığından düşük; Model uyumu ihtimale eşitlendi, Yayılım bu yüzden üst sınırdır (kesin değil)."] : [])),
     el("small", { class: "hv-ipucu", text: yok ? "Bu gün için model uyumu verisi yok (modeller en fazla birkaç gün ileriye bakar): yalnızca PoP gösteriliyor." : "Not: Open-Meteo yalnızca yağış ihtimali verir; Model uyumu ve Yayılım, modellerin uyumundan türetilen tahmini bir ayrıştırmadır (çarpımları her zaman ihtimale eşittir)." }),
     anlam(zirve && zirve.pop >= 30 ? "Model uyumu yüksekse şemsiye/kabuk kararını ciddiye al; düşükse kabuğu çantada taşı, giymek zorunda kalmayabilirsin." : "Yağış için önlem gerekmiyor."));
+}
+
+/** Her saat için tam denklem: PoP = C × A. Yağış riski %5 ve üstü saatler listelenir; kalan saatler tek satırda özetlenir. */
+function saatlikDenklem(a, simdiT) {
+  const riskli = a.filter((y) => y.pop >= 5), kuru = a.length - riskli.length;
+  const kap = el("details", { class: "hv-pop-saatlik", open: riskli.length > 0 && riskli.length <= 6 },
+    el("summary", { text: `🕐 Saat saat denklem · PoP = C × A (${riskli.length} saat)` }));
+  if (!riskli.length) { kap.append(el("p", { class: "hv-ipucu", text: "Bu gün hiçbir saatte yağış riski %5'in üzerine çıkmıyor." })); return kap; }
+  kap.append(el("ul", { class: "hv-pop-saatlik-liste" }, ...riskli.map((y) => el("li", { class: y.x.t === simdiT ? "simdi" : "" },
+    el("strong", { class: "hv-pop-saat", text: `${String(y.x.saat).padStart(2, "0")}:00` }), el("span", { text: popDenklemMetni(y) })))));
+  if (kuru) kap.append(el("small", { class: "hv-ipucu", text: `Diğer ${kuru} saatte risk %5'in altında; denklem gerekmiyor.` }));
+  return kap;
 }
 
 /* ------------------------------ 3) CAPE ------------------------------ */
