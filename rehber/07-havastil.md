@@ -157,3 +157,4 @@ Kurulum: Supabase’de `0113_site_duyurulari_ve_havastil_ai_kasasi.sql` (kasa ta
 - Aç/kapa: panelin altındaki "Site sahibi: R2 medya anahtarı". Kapalıyken /m/ adresleri R2'ye hiç gitmez.
 - Dosya türleri: her format yüklenebilir; tanınmayan/çalıştırılabilir türler `application/octet-stream` saklanır, yalnızca indirilir (tarayıcıda çalışmaz).
 - Tur 15: "📎 Yazı medyası" paneli form her açıldığında yeniden eklenir (form <template> klonudur); editör araç çubuğunda 📎 kısayolu. Yetki Ayarları › Özellikler: "Sistem Durumu Sekmesi" ve "PDF Böl & Ayıkla Aracı" satırları (SQL gerekmez).
+- Tur 16: `/m/…` ve `github.io/<anahtar>/<dosya.uzanti>` adresleri artık "Sayfa bulunamadı" göstermez: dosya bilgi sayfası (ad, tür, boyut, tarih + İndir/Önizle). SQL `0129`; `r2-arsiv-worker` VE `github-icerik-yonetim-worker` yeniden yayınlanmalı (rol hiyerarşisi: eşit/üst yetkinin yazısına müdahale engeli).
