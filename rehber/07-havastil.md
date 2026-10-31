@@ -147,3 +147,5 @@ Kurulum: Supabase’de `0113_site_duyurulari_ve_havastil_ai_kasasi.sql` (kasa ta
 - Ayarlar › **Radar API & Kota**: RainViewer (anahtarsız, zoom ≤ 7, 100 istek/IP/dk, yalnızca geçmiş radar), NASA GIBS, EUMETSAT, Esri/OSM ve Open-Meteo kademeleri. İsteğe bağlı kendi RainViewer-uyumlu sunucu adresi (yalnızca bu cihazda).
 - SQL: `0124_tur11_uye_arama_sinirsiz_karakter_baglanti_bilgi.sql` (Supabase SQL Editor'da çalıştır).
 - Tur 12: kota gösterimi tablodan karta çevrildi (mobil/masaüstü hizalı); PoP denklemi tam yazılır: PoP = C × A. SQL: `0125_tur12_baglanti_klasorleri_ve_sifirlama.sql`.
+- Tur 13: PoP bölümünde saat saat denklem listesi; Open-Meteo üye kullanımı sayfalı (20'şer), e-posta hiç gösterilmez (arama sunucuda ad+e-posta). SQL: `0126_tur13_om_kullanim_sayfalama.sql`.
+- Tur 13: yeni araç **PDF Böl & Ayıkla** (Araçlar menüsü; yetki: Dönüştürücü satırı). Arşiv ve Bağlantılar aynı klasör ağacını paylaşır (klasör oluşturma iki yerde de yansır).
