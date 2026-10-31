@@ -12,6 +12,7 @@
  *   POST /indir           -> yetki + presigned GET (kısa ömürlü); {satir_ici:true} görsel/PDF önizleme
  *   GET  /d/<slug>        -> (0123/0124) herkese açık bağlantı: BİLGİ SAYFASI (ad, boyut, tür, süre + İndir düğmesi; sayaç artmaz)
  *   GET  /d/<slug>?indir=1 | ?o=1 -> DB doğrular, sayaç artar, imzalı R2 adresine 302 (oturum gerekmez)
+ *   GET  /m/<yazi>/<dosya> -> (0128) yazı medyası: ayar açıksa imzalı R2 adresine 302; GET /medya-durum -> {acik, gorsel_otomatik}
  *   POST /sil             -> yetki + R2 toplu silme (binding) + DB kaydı silme
  *
  * Gerekli Secret/Var (wrangler secret put ...):
@@ -193,11 +194,10 @@ function adDogrula(ad) {
   const t = ad.trim();
   if (t.length < 1 || t.length > 200 || /[\/\\\u0000-\u001f\u007f]/.test(t) || t === "." || t === "..")
     throw new HttpHata(400, "Geçersiz dosya adı.");
-  const parcalar = t.toLowerCase().split(".").slice(1);
-  if (parcalar.some((u) => YASAKLI_UZANTILAR.has(u)))
-    throw new HttpHata(415, "Bu dosya türü güvenlik nedeniyle yüklenemez.");
-  return t;
+  return t;                                      // tur 14: HER format yüklenebilir; riskli türler aşağıda güvenli moda alınır (uzantiRiskli)
 }
+/** Çalıştırılabilir/komut dosyası/HTML-SVG benzeri uzantı (çift uzantı dahil). Bu dosyalar octet-stream saklanır, YALNIZCA indirilir. */
+function uzantiRiskli(ad) { return String(ad).toLowerCase().split(".").slice(1).some((u) => YASAKLI_UZANTILAR.has(u)); }
 
 function klasorYoluDogrula(yol) {
   const y = yol ?? "";
@@ -209,9 +209,9 @@ function klasorYoluDogrula(yol) {
 }
 
 function mimeDogrula(mime, sifreli) {
+  // tur 14: bilinmeyen/boş tür reddedilmez; "application/octet-stream" olarak saklanır (tarayıcı asla çalıştırmaz/göstermez, yalnızca indirilir).
   const m = String(mime || "").toLowerCase().split(";")[0].trim();
-  if (!MIME_WHITELIST.has(m)) throw new HttpHata(415, "Bu dosya türüne izin verilmiyor.");
-  return m;
+  return MIME_WHITELIST.has(m) ? m : "application/octet-stream";
 }
 
 /* -------------------------------- uç noktalar ------------------------------- */
@@ -237,7 +237,8 @@ async function yukleBaslat(env, uid, g) {
 
   // Şifreli dosyada sunucu içeriği göremez: R2'ye giden tür daima octet-stream,
   // asıl tür sadece (istemci beyanlı) üst veri olarak saklanır ve yine beyaz listeden geçer.
-  const gercekMime = mimeDogrula(g.mime, sifreli);
+  const riskli = uzantiRiskli(ad);
+  const gercekMime = riskli ? "application/octet-stream" : mimeDogrula(g.mime, sifreli);
   const r2Mime = sifreli ? "application/octet-stream" : gercekMime;
 
   await kotaRezerve(env, "A", 1);                       // PUT = Class A
@@ -341,9 +342,11 @@ async function herkeseAcikBaglanti(env, istek) {
     if (b.durum !== "gecerli") return sayfa(410, "Dosya artık yok", "Bu bağlantıya ait dosya kaldırılmış.");
     const onizlenebilir = /^image\/(png|jpeg|gif|webp|avif)$/.test(b.mime || "") || b.mime === "application/pdf";
     const satirlar = [["Dosya adı", b.dosya_ad], ["Tür", turEtiketi(b.mime)], ["Boyut", boyutYaz(b.boyut)], ["Paylaşım tarihi", tarihYaz(b.olusturma)], ["Geçerlilik", b.bitis ? `${tarihYaz(b.bitis)} tarihine kadar` : "Süresiz"]];
+    const riskliDosya = uzantiRiskli(b.dosya_ad);
     const html = `<div class="ikon" aria-hidden="true">${/^image\//.test(b.mime || "") ? "🖼️" : b.mime === "application/pdf" ? "📕" : "📄"}</div><h1>${htmlKac(b.ad)}</h1>` +
       (b.aciklama ? `<p class="acik">${htmlKac(b.aciklama)}</p>` : "") +
       `<dl>${satirlar.map(([k, v]) => `<dt>${htmlKac(k)}</dt><dd>${htmlKac(v)}</dd>`).join("")}</dl>` +
+      (riskliDosya ? `<p class="acik">⚠️ Bu dosya türü çalıştırılabilir olabilir. Yalnızca göndereni tanıyorsan ve güveniyorsan aç.</p>` : "") +
       `<div class="dugmeler"><a class="dugme" href="?indir=1" rel="nofollow">⬇ İndir</a>${onizlenebilir ? '<a class="dugme ikincil" href="?o=1" rel="nofollow">👁 Önizle</a>' : ""}</div>`;
     return bilgiSayfasi(200, { baslik: `${b.ad} · İndir`, html });
   }
@@ -363,11 +366,43 @@ async function herkeseAcikBaglanti(env, istek) {
   return new Response(null, { status: 302, headers: { Location: url, "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Robots-Tag": "noindex" } });
 }
 
+/* ------------------- Yazı medyası: /m/<yazi>/<dosya> ve /medya-durum (0128) ------------------- */
+let MEDYA_AYAR = { t: 0, v: { acik: true, gorsel_otomatik: true } };
+async function medyaAyar(env) {                                   // 60 sn bellek önbelleği: her görsel için DB sorgusu yok
+  if (Date.now() - MEDYA_AYAR.t < 60000) return MEDYA_AYAR.v;
+  try { let v = await rpc(env, "r2_medya_ayar_oku", {}); if (Array.isArray(v)) v = v[0]; if (v && typeof v === "object") MEDYA_AYAR = { t: Date.now(), v: { acik: v.acik !== false, gorsel_otomatik: v.gorsel_otomatik !== false } }; } catch { MEDYA_AYAR.t = Date.now() - 50000; }
+  return MEDYA_AYAR.v;
+}
+function medyaDurumYaniti(ayar) {
+  return new Response(JSON.stringify(ayar), { status: 200, headers: { "Content-Type": "application/json; charset=utf-8", "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=60" } });
+}
+async function medyaIstegi(env, istek) {
+  const u = new URL(istek.url);
+  const parca = u.pathname.slice(3).split("/").map((x) => { try { return decodeURIComponent(x); } catch { return ""; } });
+  const [yazi, ad] = parca;
+  if (parca.length !== 2 || !/^[a-z0-9][a-z0-9-]{0,119}$/.test(yazi || "") || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,150}$/.test(ad || "")) return sayfa(404, "Dosya bulunamadı", "Bu medya adresi geçerli değil.");
+  const ayar = await medyaAyar(env);
+  if (!ayar.acik) return new Response("Medya geçici olarak kapalı.", { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "3600", "Content-Type": "text/plain; charset=utf-8" } });
+  let satir;
+  try { satir = (await rpc(env, "r2_medya_coz", { p_yazi: yazi, p_ad: ad }))?.[0]; } catch { return new Response("Geçici sorun.", { status: 502, headers: { "Cache-Control": "no-store" } }); }
+  if (!satir?.r2_key) return sayfa(404, "Dosya bulunamadı", "Bu dosya yok ya da kaldırılmış.");
+  try { await kotaRezerve(env, "B", 1); } catch { return new Response("Kota dolu.", { status: 429, headers: { "Cache-Control": "no-store" } }); }
+  const satirIci = /^image\/(png|jpeg|gif|webp|avif)$/.test(satir.mime || "") || satir.mime === "application/pdf";
+  const adres = await presign(env, { method: "GET", key: satir.r2_key, saniye: INDIRME_SURESI, ekSorgu: {
+    "response-content-disposition": `${satirIci ? "inline" : "attachment"}; filename*=UTF-8''${rfc3986(satir.ad)}`,
+    "response-content-type": satir.mime || "application/octet-stream" } });
+  // Tarayıcı yönlendirmeyi 4 dk saklar: aynı görsel sayfada tekrar tekrar R2'ye gitmez (adres 5 dk geçerli)
+  return new Response(null, { status: 302, headers: { Location: adres, "Cache-Control": "private, max-age=240", "Referrer-Policy": "no-referrer", "X-Robots-Tag": "noindex" } });
+}
+
 /* --------------------------------- giriş --------------------------------- */
 const ASIL_ISLEYICI = {
   async fetch(istek, env) {
     const origin = istek.headers.get("Origin") || "";
-    if (istek.method === "GET" && new URL(istek.url).pathname.startsWith("/d/")) return herkeseAcikBaglanti(env, istek);
+    const _yol0 = new URL(istek.url).pathname;
+    if (istek.method === "GET" && _yol0.startsWith("/d/")) return herkeseAcikBaglanti(env, istek);
+    if (istek.method === "GET" && _yol0.startsWith("/m/")) return medyaIstegi(env, istek);
+    if (istek.method === "GET" && _yol0 === "/medya-durum") return medyaDurumYaniti(await medyaAyar(env));
     if (istek.method === "OPTIONS") {
       return IZINLI_ORIGINLER.has(origin)
         ? new Response(null, { status: 204, headers: corsBasliklari(origin) })
