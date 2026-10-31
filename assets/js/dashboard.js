@@ -187,7 +187,7 @@ const NAV = [
       { id: "tool-donusturucu", icon: "🔄", label: "Dönüştürücü & Editör", module: "donusturucu", role: null, izin: "donusturucu", defaultAcilis: false },
       { id: "tool-belge-tarayici", icon: "📑", label: "Belge Tarayıcı & Birleştirici", module: "belgeTarayici", role: null, izin: "donusturucu", defaultAcilis: false },
       { id: "tool-metadata", icon: "🧼", label: "Metadata Temizleyici", module: "metadata", role: null, izin: "donusturucu", defaultAcilis: false },
-      { id: "tool-pdfbol", icon: "✂️", label: "PDF Böl & Ayıkla", module: "pdfbol", role: null, izin: "donusturucu", defaultAcilis: false },
+      { id: "tool-pdfbol", icon: "✂️", label: "PDF Böl & Ayıkla", module: "pdfbol", role: null, ozellik: "pdf_bol", izin: "donusturucu", defaultAcilis: false },
       // role:null + izin:"havastil": owner her zaman görür; diğer roller yalnızca Yetki Ayarları'nda HavaStil açıldıysa.
       { id: "tool-havastil", icon: "🌦️", label: "HavaStil (Giyim Danışmanı)", module: "havastil", role: null, izin: "havastil", defaultAcilis: false },
     ],
@@ -196,7 +196,7 @@ const NAV = [
     group: "Sistem & Güvenlik",
     icon: "⚙️",
     items: [
-      { id: "sys-durum", icon: "🩺", label: "Sistem Durumu", module: "sistemDurumu", role: null, defaultAcilis: false },
+      { id: "sys-durum", icon: "🩺", label: "Sistem Durumu", module: "sistemDurumu", role: null, ozellik: "sistem_durumu", defaultAcilis: false },
       { id: "sys-guvenlik", icon: "🛡️", label: "Admin Güvenliği", module: "guvenlik" },
       // MADDE 4: "Yetki Ayarları" eskiden "GitHub / Worker Bağlantı Durumu"
       // görünümünün ALTINDA, ikinci bir blok olarak duruyordu — aslında
@@ -294,12 +294,14 @@ async function izinleriYukle(rol) {
       .rpc("ozellik_erisimi_var_mi", { p_ozellik: anahtar, p_rol: rol })
       .then((r) => (r.error ? true : r.data !== false))
       .catch(() => true);
-  const [arsiv, kvkk, ozelIcerik, dosyaPaylasimi, akademikKutuphane, sistemYedek, donusturucu, silmeOnayi, yetkiAyarlari, havastil, izleme, duyuru] = await Promise.all([
+  const [arsiv, kvkk, ozelIcerik, dosyaPaylasimi, akademikKutuphane, sistemDurumuAcik, pdfBolAcik, sistemYedek, donusturucu, silmeOnayi, yetkiAyarlari, havastil, izleme, duyuru] = await Promise.all([
     supabase.rpc("r2_arsiv_yetkilerim").then((r) => (r.error ? undefined : r.data)).catch(() => undefined),
     supabase.rpc("hukuki_metin_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
     ozellikSor("ozel_icerik_yonetimi"),
     ozellikSor("dosya_paylasimi_yonetimi"),
     ozellikSor("akademik_kutuphane"),
+    ozellikSor("sistem_durumu"),   // tur 14: Sistem Durumu sekmesi rol bazında kapatılabilir (varsayılan AÇIK)
+    ozellikSor("pdf_bol"),         // tur 14: PDF Böl & Ayıkla ayrı anahtar (Dönüştürücü yetkisine EK olarak kapatılabilir)
     // can_export_system: varsayılan KAPALI → hata/ağ sorununda da false (kvkk ile aynı güvenli yön).
     supabase.rpc("sistem_export_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
     // can_use_converter: varsayılan KAPALI → hata/ağ sorununda da false (güvenli yön).
@@ -325,7 +327,7 @@ async function izinleriYukle(rol) {
     havastil,
     izleme,
     duyuru,
-    ozellikler: { ozel_icerik_yonetimi: ozelIcerik, dosya_paylasimi_yonetimi: dosyaPaylasimi, akademik_kutuphane: akademikKutuphane },
+    ozellikler: { ozel_icerik_yonetimi: ozelIcerik, dosya_paylasimi_yonetimi: dosyaPaylasimi, akademik_kutuphane: akademikKutuphane, sistem_durumu: sistemDurumuAcik, pdf_bol: pdfBolAcik },
   };
 }
 
