@@ -382,16 +382,36 @@ async function medyaIstegi(env, istek) {
   const [yazi, ad] = parca;
   if (parca.length !== 2 || !/^[a-z0-9][a-z0-9-]{0,119}$/.test(yazi || "") || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,150}$/.test(ad || "")) return sayfa(404, "Dosya bulunamadı", "Bu medya adresi geçerli değil.");
   const ayar = await medyaAyar(env);
-  if (!ayar.acik) return new Response("Medya geçici olarak kapalı.", { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "3600", "Content-Type": "text/plain; charset=utf-8" } });
+  const hedefTur = istek.headers.get("Sec-Fetch-Dest") || "";                 // "document" = kullanıcı adrese tıkladı/girdi; "image" = <img>
+  const sayfaIstegi = hedefTur === "document" && u.searchParams.get("indir") !== "1" && u.searchParams.get("o") !== "1";
+  if (!ayar.acik) {
+    if (sayfaIstegi) return sayfa(503, "Medya geçici olarak kapalı", "Bu dosyaya şu an erişilemiyor. Daha sonra tekrar dene.");
+    return new Response("Medya geçici olarak kapalı.", { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "3600", "Content-Type": "text/plain; charset=utf-8" } });
+  }
   let satir;
   try { satir = (await rpc(env, "r2_medya_coz", { p_yazi: yazi, p_ad: ad }))?.[0]; } catch { return new Response("Geçici sorun.", { status: 502, headers: { "Cache-Control": "no-store" } }); }
   if (!satir?.r2_key) return sayfa(404, "Dosya bulunamadı", "Bu dosya yok ya da kaldırılmış.");
-  try { await kotaRezerve(env, "B", 1); } catch { return new Response("Kota dolu.", { status: 429, headers: { "Cache-Control": "no-store" } }); }
   const satirIci = /^image\/(png|jpeg|gif|webp|avif)$/.test(satir.mime || "") || satir.mime === "application/pdf";
+
+  /* 1) Adrese doğrudan gidildiyse: DOSYA BİLGİ SAYFASI (ad, tür, boyut, tarih + İndir / Önizle). R2'ye istek yok, kota harcanmaz. */
+  if (sayfaIstegi) {
+    const gorsel = /^image\//.test(satir.mime || "") && satirIci, riskliDosya = uzantiRiskli(satir.ad);
+    const satirlar = [["Dosya adı", satir.ad], ["Tür", turEtiketi(satir.mime)], ["Boyut", boyutYaz(satir.boyut)], ["Yüklenme", tarihYaz(satir.yuklenme)]];
+    const html = (gorsel ? '<img class="onizleme" src="?o=1" alt="Önizleme" loading="lazy">' : `<div class="ikon" aria-hidden="true">${satir.mime === "application/pdf" ? "📕" : "📄"}</div>`) +
+      `<h1>${htmlKac(satir.ad)}</h1>` +
+      (riskliDosya ? '<p class="acik">⚠️ Bu dosya türü çalıştırılabilir olabilir. Yalnızca kaynağa güveniyorsan aç.</p>' : "") +
+      `<dl>${satirlar.map(([k, v]) => `<dt>${htmlKac(k)}</dt><dd>${htmlKac(v)}</dd>`).join("")}</dl>` +
+      `<div class="dugmeler"><a class="dugme" href="?indir=1" rel="nofollow">⬇ İndir</a>${satirIci ? '<a class="dugme ikincil" href="?o=1" rel="nofollow">👁 Aç / Önizle</a>' : ""}</div>`;
+    return new Response(`<!doctype html><html lang="tr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${htmlKac(satir.ad)} · İndir</title><style>${BILGI_CSS}.onizleme{max-width:100%;max-height:18rem;border-radius:12px;display:block;margin:0 auto .6rem;background:#fff}</style><body><main class="kart">${html}<p class="alt">Bu dosya bir yazıya/projeye eklidir; bağlantıya sahip olan herkes indirebilir.</p></main></body></html>`,
+      { status: 200, headers: { ...BILGI_BASLIK, "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' https: data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" } });
+  }
+
+  /* 2) Gömülü kullanım (<img>) ya da ?indir=1 / ?o=1: kota düş, imzalı R2 adresine 302. */
+  try { await kotaRezerve(env, "B", 1); } catch { return new Response("Kota dolu.", { status: 429, headers: { "Cache-Control": "no-store" } }); }
+  const inline = satirIci && u.searchParams.get("indir") !== "1";
   const adres = await presign(env, { method: "GET", key: satir.r2_key, saniye: INDIRME_SURESI, ekSorgu: {
-    "response-content-disposition": `${satirIci ? "inline" : "attachment"}; filename*=UTF-8''${rfc3986(satir.ad)}`,
+    "response-content-disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${rfc3986(satir.ad)}`,
     "response-content-type": satir.mime || "application/octet-stream" } });
-  // Tarayıcı yönlendirmeyi 4 dk saklar: aynı görsel sayfada tekrar tekrar R2'ye gitmez (adres 5 dk geçerli)
   return new Response(null, { status: 302, headers: { Location: adres, "Cache-Control": "private, max-age=240", "Referrer-Policy": "no-referrer", "X-Robots-Tag": "noindex" } });
 }
 
