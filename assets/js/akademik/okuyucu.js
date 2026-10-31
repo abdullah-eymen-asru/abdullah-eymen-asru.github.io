@@ -879,7 +879,8 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
     kok.classList.toggle("ak-metin-modu", METIN_TURLERI.has(id));
     kok.classList.toggle("ak-arac-aktif", id !== "gez");
     if (CIZIM_ARACLARI.has(id) || id === "gez") kok.querySelector(".ak-ok-diger")?.removeAttribute("open");
-    kok.querySelectorAll("[data-ak-arac]").forEach((b) => b.classList.toggle("aktif", b.dataset.akArac === id));
+    kok.querySelectorAll("[data-ak-arac]").forEach((b) => { const a = b.dataset.akArac === id; b.classList.toggle("aktif", a); b.setAttribute("aria-pressed", String(a)); });
+    const ozet = kok.querySelector(".ak-ok-diger > summary"); if (ozet) ozet.classList.toggle("aktif", !ANA_ARACLAR.has(id));   // Çiz / Not menüsünden bir araç açıkken özet de işaretli
     sec(null);
     balonGizle();
     // metin işaretleme aracı açıkken mevcut seçim varsa hemen uygula
@@ -1034,7 +1035,12 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
   /* ---------- üst çubuk / yan panel olayları ---------- */
   kok.addEventListener("click", async (e) => {
     const ar = e.target.closest("[data-ak-arac]");
-    if (ar) { aracSec(ar.dataset.akArac); return; }
+    if (ar) {
+      // Aç/kapa: aktif araca ikinci basış aracı kapatır ve "Seç" (gez) moduna döner; her seferinde Seç'e basmak gerekmez.
+      const id = ar.dataset.akArac;
+      aracSec(d.arac === id && id !== "gez" ? "gez" : id);
+      return;
+    }
     const rn = e.target.closest("[data-ak-renkler] .ak-renk");
     if (rn) { d.renk = rn.dataset.hex; renkleriCiz(); if (d.secili && !salt) guncelle(d.secili, { renk: d.renk }); return; }
     const md = e.target.closest("[data-md]");
