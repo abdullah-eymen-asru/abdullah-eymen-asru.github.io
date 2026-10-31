@@ -302,6 +302,8 @@ async function yeniKlasor() {
   if (!ad) return;
   const { error } = await supabase.rpc("r2_arsiv_klasor_olustur", { p_klasor_yolu: durum.yol, p_ad: ad });
   if (error) return bildir(error.message || "Klasör oluşturulamadı.");
+  // Klasör yapısı Arşiv ↔ Bağlantılar'da aynıdır: aynı yol bağlantı klasörleri listesine de eklenir (yetki/RPC hatası sessiz geçilir).
+  try { await supabase.rpc("r2_baglanti_klasor_ekle", { p_yol: `${durum.yol || ""}${ad}`.replace(/\/+$/, "") }); } catch { /* migration 0125 yoksa */ }
   bildir("Klasör oluşturuldu.", "ok"); listele();
 }
 
