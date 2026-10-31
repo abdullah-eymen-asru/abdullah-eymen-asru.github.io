@@ -89,16 +89,26 @@ export function baglantilarGorunumuKur({ kok, bildir, yonetici = false }) {
     return c;
   }
   const altKlasorler = () => klasorler.filter((k) => (yol ? k.startsWith(`${yol}/`) : true) && k.slice(yol ? yol.length + 1 : 0).indexOf("/") === -1);
+  const adet = (k) => liste.filter((b) => b.klasor === k || (b.klasor || "").startsWith(`${k}/`)).length;
   function klasorSatiri(k) {
     const li = el("li", "ra-satir ra-baglanti-satir ra-klasor-satir");
-    const ad = k.split("/").pop(), adet = liste.filter((b) => b.klasor === k || (b.klasor || "").startsWith(`${k}/`)).length;
-    const govde = el("div", "ra-govde"); govde.append(el("strong", null, `📁 ${ad}`), el("span", "ra-meta", `${adet} bağlantı`));
+    const ad = k.split("/").pop(), say = adet(k);
+    const govde = el("div", "ra-govde"); govde.append(el("strong", null, `📁 ${ad}`), el("span", "ra-meta", `${say} bağlantı`));
     govde.tabIndex = 0; govde.setAttribute("role", "button"); govde.addEventListener("click", () => { yol = k; ciz(); }); govde.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); yol = k; ciz(); } });
     const islem = el("div", "ra-islemler");
-    islem.append(btn("🗑", "ra-ikon-btn ra-btn-tehlike", async () => {
-      if (!window.confirm(`“${k}” klasörü kaldırılsın mı? İçindeki bağlantılar SİLİNMEZ, ana klasöre taşınır.`)) return;
-      const { error } = await supabase.rpc("r2_baglanti_klasor_sil", { p_yol: k }); if (error) return bildir(error.message); await yenile();
-    }, { title: "Klasörü kaldır (bağlantılar korunur)", "aria-label": "Klasörü kaldır" }));
+    islem.append(btn("🗑", "ra-ikon-btn ra-btn-tehlike", () => {
+      const sec = { sil: false };
+      const kutu = el("div", "ra-dlg-govde");
+      const radyo = (deger, metin, secili) => { const l = el("label", "ra-onay"); const i = el("input"); i.type = "radio"; i.name = "klasor-sil"; i.checked = secili; i.addEventListener("change", () => { sec.sil = deger; }); l.append(i, el("span", null, metin)); return l; };
+      kutu.append(el("p", "ra-meta", `“${k}” klasörü ve alt klasörleri kaldırılacak. İçindeki ${adet(k)} bağlantı için ne yapalım? (Arşivdeki dosyalar hiçbir durumda silinmez.)`),
+        radyo(false, "Bağlantıları koru: ana klasöre taşı", true), radyo(true, "Bağlantıları da sil (adresler çalışmaz olur)", false));
+      dialogAc("Klasörü sil", kutu, "Klasörü sil", async () => {
+        const { error } = await supabase.rpc("r2_baglanti_klasor_sil", { p_yol: k, p_baglantilari_sil: sec.sil });
+        if (error) throw new Error(error.message);
+        if (yol === k || yol.startsWith(`${k}/`)) yol = "";
+        await yenile();
+      });
+    }, { title: "Klasörü sil", "aria-label": "Klasörü sil" }));
     li.append(govde, islem); return li;
   }
   function satirlar() {
@@ -233,7 +243,13 @@ export function baglantilarGorunumuKur({ kok, bildir, yonetici = false }) {
     const yukleDugme = btn("📤 Bilgisayardan dosya ekle (birden çok seçilebilir)", "ra-btn ra-btn-birincil", () => dosyaGirdi.click());
     dosyaGirdi.addEventListener("change", async () => {
       baslangicZamani = Date.now();
-      try { await kuyruk.ekle(await dosyalariTopla({ files: dosyaGirdi.files })); } catch (h) { yuklemeOzet.hidden = false; yuklemeOzet.textContent = h.message; }
+      try {
+        // "Paylaşımlar" klasörü yoksa yükleme sunucuda reddedilirdi (kuyruk yalnızca ALT klasörleri açar): önce klasörü garanti et.
+        const k = await supabase.rpc("r2_arsiv_klasor_olustur", { p_klasor_yolu: "", p_ad: "Paylaşımlar" });
+        if (k.error && !/zaten var/i.test(k.error.message || "")) throw new Error(`Klasör hazırlanamadı: ${k.error.message}`);
+        try { await supabase.rpc("r2_baglanti_klasor_ekle", { p_yol: "Paylaşımlar" }); } catch { /* 0125 yoksa sorun değil */ }
+        await kuyruk.ekle(await dosyalariTopla({ files: dosyaGirdi.files }));
+      } catch (h) { yuklemeOzet.hidden = false; yuklemeOzet.textContent = h.message; }
       dosyaGirdi.value = "";
     });
 
