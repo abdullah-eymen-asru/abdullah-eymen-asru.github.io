@@ -168,8 +168,23 @@ async function kur() {
   ic.append(el("p", "ym-soluk", "Görsel, PDF, veri seti ya da her tür dosya yükle; imleç neredeyse oraya ekle. Dosyalar bu yazıya özel R2 klasöründe durur."),
     el("label", "ym-alan", "Medya adres anahtarı"), anahtarGirdi, klasorBilgi, yuklemeDugmesi, dosyaGirdi, yukleListe, yukleOzet, yukleTemizle, ozetSatir, liste, linkKutu, ayarKutu, mesaj);
   govde.insertAdjacentElement("afterend", panel);
+  panel.open = true;                                              // varsayılan AÇIK: "Dosya yükle" düğmesi hemen görünür
   panel.addEventListener("toggle", () => { if (panel.open) { anahtarGuncelle(); listeYenile(); } });
-  anahtarGuncelle();
+  anahtarGuncelle(); listeYenile().catch(() => {});
+  /* Editör araç çubuğuna 📎 kısayolu: paneli açar ve görünür yere kaydırır */
+  const arac = govde.previousElementSibling;
+  if (arac && !arac.querySelector("[data-ym]")) {
+    const grup = el("span", "gy-editor-grup"), b = dugme("📎", "", () => { panel.open = true; panel.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, { title: "R2 medya: dosya yükle / metne ekle", "aria-label": "R2 medya paneli", "data-ym": "1" });
+    grup.append(b); arac.append(grup);
+  }
 }
-const basla = () => kur().catch((h) => console.error("yazi-medya.js:", h));
-if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", basla); else basla();
+/* Form bir <template>'ten HER açılışta yeniden klonlanır (github-yonetim.js); bu yüzden sayfa yüklenirken #ic-body YOKTUR.
+ * Formu gözleyip her görünüşünde paneli yeniden ekleriz (panel formun içinde olduğu için eski form silinince birlikte gider). */
+let kuruyor = false;
+const dene = () => {
+  if (kuruyor || !document.getElementById("ic-body") || document.getElementById("ym-panel")) return;
+  kuruyor = true;
+  kur().catch((h) => console.error("yazi-medya.js:", h)).finally(() => { kuruyor = false; });
+};
+new MutationObserver(dene).observe(document.documentElement, { childList: true, subtree: true });
+dene();
