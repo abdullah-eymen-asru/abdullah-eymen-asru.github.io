@@ -27,12 +27,18 @@ function limitSatiri(baslik, limitler) {
   return { kutu, deger: () => Object.fromEntries(PENCERELER.map((p) => [p, oku(girdiler[p])])) };
 }
 
+/* Kota gösterimi: tablo yerine kart + 4 eşit hücre (dakika/saat/gün/ay). Her hücrede KULLANIM büyük, SINIR altında küçük ve hizalı;
+ * dar ekranda 2×2'ye iner. (Tablo, mobilde harf harf kırılıyor ve rakamlar hizasız kalıyordu.) */
+function kotaHucreleri(kul, lim) {
+  return el("div", { class: "hv-kota-izgara" }, ...PENCERELER.map((p) => el("div", { class: "hv-kota-hucre" },
+    el("span", { class: "hv-kota-etiket", text: PENCERE_ADI[p] }),
+    el("strong", { class: "hv-kota-deger", text: sayi(kul?.[p] ?? 0) }),
+    el("span", { class: "hv-kota-sinir", text: `/ ${sayi(lim?.[p])}` }))));
+}
 function kullanimTablosu(o) {
-  const t = el("table", { class: "hv-isi-tablo hv-om-tablo" }, el("caption", { class: "muted", text: "Kullanım (çağrı ağırlığı) / sınır" }),
-    el("thead", {}, el("tr", {}, el("th", { text: "" }), ...PENCERELER.map((p) => el("th", { text: PENCERE_ADI[p] })))));
-  const satir = (ad, kul, lim) => el("tr", {}, el("th", { scope: "row", text: ad }), ...PENCERELER.map((p) => el("td", { text: `${sayi(kul?.[p] ?? 0)} / ${sayi(lim?.[p])}`, "data-etiket": PENCERE_ADI[p] })));
-  t.append(el("tbody", {}, satir("Sen (site kaynağı)", o.ben, o.kullanici_limit), satir("Bu IP (ücretsiz)", o.ip, o.ip_limit), satir("Site (ticari)", o.site, o.site_limit), satir("Kendi anahtarın", o.ben_kendi_anahtar, null)));
-  return el("div", { class: "hv-tablo-kap" }, t);
+  const kart1 = (ad, kul, lim) => el("section", { class: "hv-kota-kart" }, el("h4", { class: "hv-kota-baslik", text: ad }), kotaHucreleri(kul, lim));
+  return el("div", { class: "hv-kota-liste" }, el("p", { class: "hv-ipucu", text: "Kullanım (çağrı ağırlığı) / sınır" }),
+    kart1("Sen (site kaynağı)", o.ben, o.kullanici_limit), kart1("Bu IP (ücretsiz)", o.ip, o.ip_limit), kart1("Site (ticari)", o.site, o.site_limit), kart1("Kendi anahtarın", o.ben_kendi_anahtar, null));
 }
 
 export function openMeteoAyarKarti(d, kb) {
@@ -99,10 +105,9 @@ export function openMeteoAyarKarti(d, kb) {
       tabloKutu.textContent = "Yükleniyor…";
       try {
         const s = await omKullanimTumu(aramaGirdi.value.trim() || null);
-        const t = el("table", { class: "hv-isi-tablo hv-om-tablo" }, el("thead", {}, el("tr", {}, ...["Üye", "Rol", "dk", "saat", "gün", "ay", "Kendi anahtarı (ay)", "IP", "Limit (gün)", ""].map((x) => el("th", { text: x })))));
-        const g = el("tbody");
+        const g = el("div", { class: "hv-uye-liste" });
         for (const r of s) {
-          const duzenle = olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "Limit" }), "click", async () => {
+          const duzenle = olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "Limit düzenle" }), "click", async () => {
             const mevcut = PENCERELER.map((p) => (r.kisiye_ozel_limit?.[p] ?? "")).join(",");
             const gir = window.prompt(`${r.ad} için kişiye özel limit: dakika,saat,gün,ay (boş = varsayılan; ∞ için "-" yaz). Tümünü silmek için boş bırak.`, mevcut);
             if (gir === null) return;
@@ -113,10 +118,13 @@ export function openMeteoAyarKarti(d, kb) {
               await omKullaniciLimitiKaydet(r.user_id, nesne); await tabloYukle();
             } catch (h) { window.alert(h.message); }
           });
-          g.append(el("tr", {}, el("th", { scope: "row", text: `${r.ad} · ${r.eposta_maskeli}` }), el("td", { text: r.rol || "", "data-etiket": "Rol" }), ...[["dakika", "dk"], ["saat", "saat"], ["gun", "gün"], ["ay", "ay"], ["kendi_ay", "Kendi anahtarı (ay)"], ["ip_sayisi", "IP"]].map(([a2, et]) => el("td", { text: sayi(r[a2]), "data-etiket": et })),
-            el("td", { text: `${sayi(r.etkin_limit?.gun)}${r.kisiye_ozel_limit ? " *" : ""}`, "data-etiket": "Limit (gün)" }), el("td", {}, duzenle)));
+          // Bu ay: dk/saat/gün/ay kullanımı; sınır = bu üyenin etkin limiti (kişiye özel varsa * ile işaretli)
+          g.append(el("section", { class: "hv-kota-kart hv-uye-kart" },
+            el("div", { class: "hv-uye-ust" }, el("div", { class: "hv-uye-ad" }, el("strong", { text: r.ad }), el("small", { class: "muted", text: r.eposta_maskeli || "" })), el("span", { class: "hv-uye-rol", text: r.rol || "" })),
+            kotaHucreleri({ dakika: r.dakika, saat: r.saat, gun: r.gun, ay: r.ay }, r.etkin_limit),
+            el("div", { class: "hv-uye-alt" }, el("small", { class: "muted", text: `Kendi anahtarı (ay): ${sayi(r.kendi_ay)} · Farklı IP (bugün): ${sayi(r.ip_sayisi)}${r.kisiye_ozel_limit ? " · kişiye özel limit *" : ""}` }), duzenle)));
         }
-        t.append(g); tabloKutu.replaceChildren(s.length ? t : el("p", { class: "muted", text: "Kayıt yok." }));
+        tabloKutu.replaceChildren(s.length ? g : el("p", { class: "muted", text: "Kayıt yok." }));
       } catch (h) { tabloKutu.textContent = h.message; }
     }
     olay(aramaGirdi, "input", (() => { let z; return () => { clearTimeout(z); z = setTimeout(tabloYukle, 350); }; })());
