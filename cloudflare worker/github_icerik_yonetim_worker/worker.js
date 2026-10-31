@@ -434,6 +434,24 @@ function editorSahibiMi(frontMatterAlanlari, userId, kullaniciAdi, kullaniciEmai
 }
 
 /**
+ * TUR 16 — ROL HİYERARŞİSİ (güvenlik): bir kullanıcı, KENDİ yazısı dışında, yetki sırası kendisine EŞİT ya da ÜST olan birinin
+ * (oluşturan veya görünen yazar) içeriğini düzenleyemez/silemez. Sıra: owner > admin > manager > editor > special_user > user.
+ * Örnek: admin başka bir admin'in ya da Site Sahibi'nin yazısına, manager bir admin'in/owner'ın yazısına dokunamaz.
+ * Hesabı silinmiş/bulunamayan yazar kısıt oluşturmaz. owner bu kontrole hiç girmez.
+ */
+const ROL_SIRASI = { owner: 5, admin: 4, manager: 3, editor: 2, special_user: 1, user: 0 };
+async function hiyerarsiIzinVerirMi(env, rol, userId, frontMatterAlanlari) {
+  const adaylar = new Set([frontMatterAlanlari.olusturan_id, frontMatterAlanlari.yazar_id].filter(Boolean));
+  for (const id of adaylar) {
+    if (id === userId) continue;
+    const hedefRol = await yazarHedefiOwnerVeyaAdminMi(env, id);
+    if (!hedefRol) continue;
+    if ((ROL_SIRASI[hedefRol] ?? 0) >= (ROL_SIRASI[rol] ?? 0)) return false;
+  }
+  return true;
+}
+
+/**
  * MİGRATION 0028 § C ("admin olan kişi owner adına içerik yayınlayınca ya
  * da diğer herhangi bir admin adına içerik talebinde bulununca diğer
  * hiçbir admin bu yazıları düzenleme/silme/yayınlama haklarına sahip
@@ -1036,7 +1054,7 @@ const ASIL_ISLEYICI = {
         // uygulanmıyor (migration 0016'daki "editor ile aynı yazma yetkisi,
         // ama TÜM içeriği kapsar" tasarımı manager için değişmedi, bu
         // istek sadece "diğer adminler" ile ilgili).
-        if ((rol === "editor" || rol === "admin") && (request.method === "PUT" || request.method === "DELETE")) {
+        if ((rol === "editor" || rol === "admin" || rol === "manager") && (request.method === "PUT" || request.method === "DELETE")) {
           // KÜÇÜK OPTİMİZASYON: 4.0 bloğu (yukarıda) artık gitkeep DAHİL
           // owner-olmayan her PUT/DELETE için githubDosyaVarMiKesin çağırıp
           // mevcutDosyaOn'a koyuyor — burada AYNI dosyayı ikinci kez
@@ -1065,15 +1083,16 @@ const ASIL_ISLEYICI = {
               // rol === "admin" — .gitkeep'in "admin adına" kavramı yok
               // (klasör sahipliği farklı bir konudur, bkz. gitkeepSahipIdOku),
               // bu yüzden gitkeep'lerde admin hâlâ kısıtsız.
+              const fmAlan = gitkeepDosyasiMi ? {} : frontMatterAlanlariniOku(mevcutDosya);
               sahipUyusuyorMu = gitkeepDosyasiMi
                 ? true
-                : adminBuIcerigeErisebilirMi(frontMatterAlanlariniOku(mevcutDosya), userId);
+                : (rol !== "admin" || adminBuIcerigeErisebilirMi(fmAlan, userId)) && (await hiyerarsiIzinVerirMi(env, rol, userId, fmAlan));
             }
             if (!sahipUyusuyorMu) {
               const sahiplikRetMesaji = gitkeepDosyasiMi
                 ? "Bu klasörü sadece oluşturan kişi silebilir."
-                : rol === "admin"
-                ? "Bu içerik başka bir admin ya da Site Sahibi adına yayınlandı — sadece o kişi ya da Site Sahibi bu içeriği düzenleyebilir/silebilir."
+                : rol === "admin" || rol === "manager"
+                ? "Bu içerik eşit ya da daha üst yetkideki bir kullanıcıya (yönetici/Site Sahibi) ait — yalnızca sahibi ya da Site Sahibi düzenleyebilir/silebilir."
                 : "Bu içeriği düzenleme/silme yetkin yok — başka bir yazara ait.";
               await denetimKaydiYaz(env, {
                 userId,
