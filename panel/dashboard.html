@@ -19,6 +19,7 @@ permalink: "/panel/dashboard.html"
 <link rel="stylesheet" href="{{ '/assets/css/donusturucu.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/belge-tarayici.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/metadata-temizleyici.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/css/pdf-bol.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/havastil.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/demo.css' | relative_url }}">
 
@@ -1089,6 +1090,12 @@ permalink: "/panel/dashboard.html"
       <h1>Metadata Temizleyici</h1>
       <div id="mt-kok" class="mt-kok"><p class="muted">Yükleniyor...</p></div>
       <div id="mt-mesaj" class="auth-message" hidden role="status"></div>
+    </section>
+
+    <!-- PDF Böl & Ayıkla (assets/js/pdf-bol/): Araçlar altında KENDİ sekmesi. %100 istemci. Yetki: Dönüştürücü ile aynı satır (Yetki Ayarları › Özellikler). -->
+    <section class="dash-view" id="view-tool-pdfbol" hidden data-view="tool-pdfbol">
+      <h1>PDF Böl &amp; Ayıkla</h1>
+      <div id="pb-kok" class="pb-kok"><p class="muted">Yükleniyor...</p></div>
     </section>
 
     <!-- HavaStil (assets/js/havastil/panel.js): hava durumuna göre katman/giyim danışmanı. Yetki: Yetki Ayarları › Özellikler › HavaStil (varsayılan KAPALI; owner her zaman).
