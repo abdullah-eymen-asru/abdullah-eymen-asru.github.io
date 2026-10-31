@@ -146,3 +146,4 @@ Kurulum: Supabase’de `0113_site_duyurulari_ve_havastil_ai_kasasi.sql` (kasa ta
 - Radar tarih aralığı artık **Uygula** düğmesiyle çalışır; nokta sayısı `nokta × ceil(gün/14) ≤ 120` olacak şekilde otomatik düşer (dakikalık kota hatasını önler); aynı görünüm 20 dk bellekte tutulur.
 - Ayarlar › **Radar API & Kota**: RainViewer (anahtarsız, zoom ≤ 7, 100 istek/IP/dk, yalnızca geçmiş radar), NASA GIBS, EUMETSAT, Esri/OSM ve Open-Meteo kademeleri. İsteğe bağlı kendi RainViewer-uyumlu sunucu adresi (yalnızca bu cihazda).
 - SQL: `0124_tur11_uye_arama_sinirsiz_karakter_baglanti_bilgi.sql` (Supabase SQL Editor'da çalıştır).
+- Tur 12: kota gösterimi tablodan karta çevrildi (mobil/masaüstü hizalı); PoP denklemi tam yazılır: PoP = C × A. SQL: `0125_tur12_baglanti_klasorleri_ve_sifirlama.sql`.
