@@ -35,6 +35,11 @@ export function baglantilarGorunumuKur({ kok, bildir, yonetici = false }) {
     if (error) throw new Error(/does not exist|schema cache/i.test(error.message) ? "Bağlantı sistemi kurulu değil (Supabase: 0123_r2_paylasim_baglantilari.sql)." : error.message);
     liste = data || [];
     try { const { data: k } = await supabase.rpc("r2_baglanti_klasor_listele"); klasorler = (k || []).map((x) => x.yol).filter(Boolean); } catch { klasorler = []; }
+    // Arşivdeki klasörler de aynı ağaçta görünür (Arşiv ↔ Bağlantılar aynı klasör mantığı)
+    try {
+      const { data: ak } = await supabase.from("r2_arsiv").select("klasor_yolu,ad").eq("tur", "klasor").limit(3000);
+      for (const r of ak || []) { const yl = `${r.klasor_yolu || ""}${r.ad}`.replace(/\/+$/, ""); if (yl && !klasorler.includes(yl)) klasorler.push(yl); }
+    } catch { /* arşiv okuma yetkisi yoksa yalnızca bağlantı klasörleri */ }
     for (const b of liste) if (b.klasor && !klasorler.includes(b.klasor)) klasorler.push(b.klasor);
     // üst klasörler de gezilebilsin ("A/B" varsa "A" da vardır)
     for (const k of [...klasorler]) { const pr = k.split("/"); for (let i = 1; i < pr.length; i++) { const u = pr.slice(0, i).join("/"); if (!klasorler.includes(u)) klasorler.push(u); } }
@@ -57,8 +62,12 @@ export function baglantilarGorunumuKur({ kok, bildir, yonetici = false }) {
     const yeni = btn("＋ Yeni bağlantı", "ra-btn ra-btn-birincil", () => olustur());
     const yeniKlasor = btn("📁 Yeni klasör", "ra-btn", async () => {
       const ad = window.prompt(`Yeni klasör adı${yol ? ` (“${yol}” içinde)` : ""}:`); if (ad === null || !ad.trim()) return;
-      const { error } = await supabase.rpc("r2_baglanti_klasor_ekle", { p_yol: yol ? `${yol}/${ad.trim().replace(/\//g, "-")}` : ad.trim().replace(/\//g, "-") });
-      if (error) return bildir(error.message); await yenile();
+      const tam = yol ? `${yol}/${ad.trim().replace(/\//g, "-")}` : ad.trim().replace(/\//g, "-");
+      const { error } = await supabase.rpc("r2_baglanti_klasor_ekle", { p_yol: tam });
+      if (error) return bildir(error.message);
+      // Aynı yol Arşiv'de de açılır (yetkin yoksa sessizce atlanır)
+      let ust = ""; for (const parca of tam.split("/")) { try { await supabase.rpc("r2_arsiv_klasor_olustur", { p_klasor_yolu: ust, p_ad: parca }); } catch { /* var/yetki yok */ } ust += `${parca}/`; }
+      await yenile();
     });
     const eski = eskiYontemKutusu();
     const listeKap = el("ul", "ra-liste"); listeKap.append(...satirlar());
@@ -187,22 +196,22 @@ export function baglantilarGorunumuKur({ kok, bildir, yonetici = false }) {
   const metinGirdi = (v, ph, max) => { const g = el("input", "ra-ara-girdi"); g.type = "text"; g.value = v || ""; g.placeholder = ph; if (max) g.maxLength = max; return g; };
 
   /** Klasör seçici: mevcut klasörler + "Yeni klasör…" (yazılan ad). deger() → null | "A/B". */
-  function klasorSecici(baslangic) {
+  function klasorSecici(baslangic, otomatik = false) {
     const sec = el("select", "ra-secim"); sec.setAttribute("aria-label", "Klasör");
-    const secenekler = [["", "📁 Ana klasör (klasörsüz)"], ...klasorler.map((k) => [k, `📁 ${k}`]), ["__yeni__", "➕ Yeni klasör…"]];
+    const secenekler = [...(otomatik ? [["__oto__", "📁 Dosyanın arşiv klasörü (otomatik)"]] : []), ["", "📁 Ana klasör (klasörsüz)"], ...klasorler.map((k) => [k, `📁 ${k}`]), ["__yeni__", "➕ Yeni klasör…"]];
     secenekler.forEach(([v, a]) => { const o = el("option", null, a); o.value = v; sec.append(o); });
-    sec.value = baslangic && klasorler.includes(baslangic) ? baslangic : "";
+    sec.value = otomatik ? "__oto__" : baslangic && klasorler.includes(baslangic) ? baslangic : "";
     const yeniAd = metinGirdi("", "Yeni klasör adı (alt klasör için A/B yaz)"); yeniAd.hidden = true;
     sec.addEventListener("change", () => { yeniAd.hidden = sec.value !== "__yeni__"; if (!yeniAd.hidden) yeniAd.focus(); });
     const kap = el("div", "ra-dlg-govde"); kap.append(sec, yeniAd);
-    return { kok: kap, deger() { if (sec.value !== "__yeni__") return sec.value || null; const v = yeniAd.value.split("/").map((x) => x.trim()).filter(Boolean).join("/"); if (!v) throw new Error("Yeni klasör adını yaz ya da bir klasör seç."); return v; } };
+    return { kok: kap, deger() { if (sec.value === "__oto__") return "__oto__"; if (sec.value !== "__yeni__") return sec.value || null; const v = yeniAd.value.split("/").map((x) => x.trim()).filter(Boolean).join("/"); if (!v) throw new Error("Yeni klasör adını yaz ya da bir klasör seç."); return v; } };
   }
 
   /** Yeni bağlantı. Dosya: bilgisayardan yükle (çoklu) ve/veya arşivden seç (çoklu). Her dosya için ayrı bağlantı oluşur. */
   async function olustur(hazirDosya = null) {
     const secilenler = hazirDosya ? [hazirDosya] : [];
     const ad = metinGirdi("", "Bağlantı adı (boşsa dosya adı kullanılır; birden çok dosyada “ad – dosya” olur)"), acik = el("textarea", "ra-ara-girdi"); acik.rows = 2; acik.placeholder = "Açıklama (ileride ne olduğu anlaşılsın)";
-    const sure = sureAlanlari(), klasor = klasorSecici(yol);
+    const sure = sureAlanlari(), klasor = klasorSecici(yol, true);
     const secimKutu = el("ul", "ra-baglanti-secilenler"), secimYazi = el("p", "ra-meta");
     const secimiCiz = () => {
       secimYazi.textContent = secilenler.length ? `${secilenler.length} dosya seçili` : "Dosya seçilmedi. Aşağıdan yükle ya da arşivden seç.";
@@ -252,9 +261,10 @@ export function baglantilarGorunumuKur({ kok, bildir, yonetici = false }) {
         const { data, error } = await supabase.rpc("r2_baglanti_olustur", { p_dosya_id: d.id, p_ad: bAd, p_aciklama: acik.value, p_bitis: s.bitis });
         if (error) throw new Error(`${d.ad}: ${error.message}${sayac ? ` (${sayac} bağlantı oluşturuldu)` : ""}`);
         sayac++; const slug = data?.[0]?.slug; ilkSlug = ilkSlug || slug;
-        if (kl && data?.[0]?.id) { const r = await supabase.rpc("r2_baglanti_tasi", { p_id: data[0].id, p_klasor: kl }); if (r.error) throw new Error(r.error.message); }
+        const hedef = kl === "__oto__" ? ((d.klasor_yolu || "").replace(/\/+$/, "") || null) : kl;   // otomatik: dosyanın arşivdeki klasörü
+        if (hedef && data?.[0]?.id) { const r = await supabase.rpc("r2_baglanti_tasi", { p_id: data[0].id, p_klasor: hedef }); if (r.error) throw new Error(r.error.message); }
       }
-      bildir(`${sayac} bağlantı oluşturuldu.`, "ok"); altSekme = "liste"; if (kl) yol = kl; await yenile();
+      bildir(`${sayac} bağlantı oluşturuldu.`, "ok"); altSekme = "liste"; if (kl && kl !== "__oto__") yol = kl; await yenile();
       const ilk = aktifAlanlar()[0]; if (ilk && ilkSlug && sayac === 1) await panoyaKopyala(adres(ilk, ilkSlug));
     });
     if (!hazirDosya) dosyaBul();
