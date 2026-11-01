@@ -158,3 +158,11 @@ Kurulum: Supabase’de `0113_site_duyurulari_ve_havastil_ai_kasasi.sql` (kasa ta
 - Dosya türleri: her format yüklenebilir; tanınmayan/çalıştırılabilir türler `application/octet-stream` saklanır, yalnızca indirilir (tarayıcıda çalışmaz).
 - Tur 15: "📎 Yazı medyası" paneli form her açıldığında yeniden eklenir (form <template> klonudur); editör araç çubuğunda 📎 kısayolu. Yetki Ayarları › Özellikler: "Sistem Durumu Sekmesi" ve "PDF Böl & Ayıkla Aracı" satırları (SQL gerekmez).
 - Tur 16: `/m/…` ve `github.io/<anahtar>/<dosya.uzanti>` adresleri artık "Sayfa bulunamadı" göstermez: dosya bilgi sayfası (ad, tür, boyut, tarih + İndir/Önizle). SQL `0129`; `r2-arsiv-worker` VE `github-icerik-yonetim-worker` yeniden yayınlanmalı (rol hiyerarşisi: eşit/üst yetkinin yazısına müdahale engeli).
+
+## Tur 17
+- SQL sırası: 0129 → 0130 (alıcı arama sayfalama) → 0131 (özel makale R2 ekleri). Worker'lar yeniden yayınlanmalı: `r2-arsiv-worker` (5 GiB sınırı, /ozel-indir, ses/video önizleme) ve `github-icerik-yonetim-worker` (tur 16'dan).
+- Şifreli gönderim artık PARÇALI (4 MiB) AES-GCM (v2); eski dosyalar okunmaya devam eder. Tek dosya sınırı 5 GiB (R2 tek-PUT tavanı). Sınır `MAX_DOSYA_BAYT` Var'ı ile düşürülebilir.
+- Dosya Yöneticisi sekme sırası: Arşiv · Bağlantılar · Özel gönderimlerim · Benimle paylaşılanlar. Özel gönderimde "Arşivden dosya seç/ara"; alıcı arama sayfalı, seçili alıcılar kaydırılabilir alanda.
+- Sistem Durumu herkese açık; Worker sınaması ve R2 kota kartı yalnızca admin/site sahibi ve varsayılan KAPALI (kutu işaretlenmeden düğme çalışmaz).
+- Özel/gizli makale formunda "📎 R2 dosyaları": "Özel Makaleler/" ana klasöründe klasör/alt klasör, her tür dosya yükleme, silme; işaretlenen dosyalar makale sayfasında "Ekler" olarak indirilir.
+- Yazı medyası gösterimi: görsel (konum/boyut/altyazı), PDF (sayfa içinde okuyucu), ses/video oynatıcı, diğer dosyalar indirme kartı.
