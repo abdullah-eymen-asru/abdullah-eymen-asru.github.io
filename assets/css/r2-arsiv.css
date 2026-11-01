@@ -321,3 +321,15 @@
 .ra-dlg-baslik2 { margin: .6rem 0 0; font-size: .95rem; }
 .ra-yol-cubugu { display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; margin: .5rem 0; }
 .ra-klasor-satir .ra-govde { cursor: pointer; }
+
+/* Tur 17: çok alıcıda taşma yok (kaydırılabilir çip alanı), arşivden seçici */
+.ra-chipler { max-height: 9.5rem; overflow-y: auto; padding: .15rem; }
+.ra-chip-ust { flex: 1 1 100%; display: flex; justify-content: space-between; align-items: center; gap: .5rem; position: sticky; top: 0; background: var(--card-bg); padding-bottom: .2rem; }
+.ra-as-daha { cursor: pointer; text-align: center; color: var(--accent); font-weight: 600; }
+.ra-arsivden { border: 1px dashed var(--border); border-radius: 10px; padding: .45rem .7rem; margin-top: .6rem; display: grid; gap: .5rem; }
+.ra-arsivden > summary { cursor: pointer; font-weight: 600; }
+.ra-arsivden-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: .35rem; max-height: 14rem; overflow-y: auto; }
+.ra-arsivden-oge { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .2rem .6rem; align-items: center; padding: .35rem .5rem; border: 1px solid var(--border); border-radius: 8px; }
+.ra-arsivden-ad { overflow-wrap: anywhere; }
+.ra-arsivden-oge .ra-btn { grid-column: 2; grid-row: 1 / span 2; }
+@media (max-width: 520px) { .ra-arsivden-oge { grid-template-columns: 1fr; } .ra-arsivden-oge .ra-btn { grid-column: 1; grid-row: auto; } }
