@@ -117,14 +117,25 @@ async function ciz() {
     } catch (h) { sinaSonuc.replaceChildren(el("li", { text: `Hata: ${h.message}` })); }
     sinaBtn.disabled = false;
   });
-  workerKutu.append(sinaBtn, sinaSonuc);
+  /* Tur 17: Worker sınaması YALNIZCA admin / site sahibi; ayrıca varsayılan KAPALI — açıkça etkinleştirilmeden düğme çalışmaz (Cloudflare Worker kotası korunur). */
+  let rol = null;
+  try { const uid = oturum?.user?.id; if (uid) rol = (await supabase.from("profiles").select("role").eq("id", uid).maybeSingle()).data?.role || null; } catch { /* yok say */ }
+  const workerYetkili = rol === "admin" || rol === "owner";
+  const ANAHTAR = "sd_worker_sinama_acik";
+  const acikMi = () => { try { return localStorage.getItem(ANAHTAR) === "1"; } catch { return false; } };
+  const anahtarKutu = el("input", { type: "checkbox", id: "sd-worker-ac" }); anahtarKutu.checked = acikMi();
+  const durumGuncelle = () => { sinaBtn.disabled = !anahtarKutu.checked; sinaBtn.title = anahtarKutu.checked ? "" : "Önce yukarıdaki kutuyu işaretle"; };
+  anahtarKutu.addEventListener("change", () => { try { localStorage.setItem(ANAHTAR, anahtarKutu.checked ? "1" : "0"); } catch { /* yok say */ } durumGuncelle(); });
+  durumGuncelle();
+  workerKutu.append(el("label", { class: "sd-onay", for: "sd-worker-ac" }, anahtarKutu, el("span", { text: " Worker sınamasını etkinleştir (her sınama her Worker için 1 istek harcar; işin bitince kapat)" })), sinaBtn, sinaSonuc);
 
   kok.replaceChildren(ozet,
     el("h3", { class: "sd-bolum-baslik", text: "Çekirdek servisler" }), el("div", { class: "sd-izgara" }, ...kartlar.slice(0, 3)),
     el("h3", { class: "sd-bolum-baslik", text: "Bağımlı dış servisler" }), el("div", { class: "sd-izgara" }, ...kartlar.slice(3)),
     el("h3", { class: "sd-bolum-baslik", text: "Bu cihaz" }), el("div", { class: "sd-izgara" }, ...cihaz), await cihazVerileriKarti(oturum),
-    el("h3", { class: "sd-bolum-baslik", text: "Kotalar & Worker'lar (yetkililere)" }), r2Yer, workerKutu, alt);
-  import("../sistem-yedek/r2-kota.js").then((m) => m.r2KotaKartiKur(r2Yer, { baslik: "R2 kullanımı (bu ay) — tüm kovalar" })).catch(() => {});
+    ...(workerYetkili ? [el("h3", { class: "sd-bolum-baslik", text: "Kotalar & Worker'lar (yalnızca yöneticiler)" }), r2Yer, workerKutu]
+      : [el("p", { class: "kst-alt", text: "Cloudflare Worker sınaması ve kota kartları yalnızca yönetici ve site sahibine açıktır (sistem kotasını korumak için). Yukarıdaki kontroller herkes için ücretsizdir." })]), alt);
+  if (workerYetkili) import("../sistem-yedek/r2-kota.js").then((m) => m.r2KotaKartiKur(r2Yer, { baslik: "R2 kullanımı (bu ay) — tüm kovalar" })).catch(() => {});
 }
 
 let zaman = null;
