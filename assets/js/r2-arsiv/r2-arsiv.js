@@ -346,7 +346,7 @@ async function sifreliBlob(s) {
   ]);
   if (error || !zarf) throw new Error("Bu dosya için anahtarın yok.");
   if (!r.ok) throw new Error("Dosya R2'den alınamadı.");
-  const duz = await dosyaCoz(await r.arrayBuffer(), zarf.sarili_dosya_anahtari, s.id);
+  const duz = await dosyaCoz(await r.blob(), zarf.sarili_dosya_anahtari, s.id);
   const tur = GUVENLI_BLOB_TURLERI.has(s.gercek_mime) ? s.gercek_mime : "application/octet-stream";
   return new Blob([duz], { type: tur });
 }
