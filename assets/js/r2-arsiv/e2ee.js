@@ -47,7 +47,7 @@ export class E2EEKilitHatasi extends Error {
 }
 
 export const ARSIV_WORKER_URL = "https://r2-arsiv-worker.aeymena.workers.dev"; // wrangler deploy sonrası adresi doğrula
-export const E2EE_MAX_BAYT = 100 * 1024 * 1024; // bellekte şifrelendiği için 100 MB tavan
+export const E2EE_MAX_BAYT = 5 * 1024 ** 3;     // tur 17: parçalı şifreleme → bellek sınırı yok; tek R2 yüklemesinin tavanı 5 GiB
 
 const enc = new TextEncoder();
 const RSA = { name: "RSA-OAEP", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" };
@@ -422,17 +422,35 @@ export async function zarflariKaydet(dosyaId, zarflar) {
   return Number(data) || 0;
 }
 
-/** Şifreli boyut = düz boyut + 12 (IV) + 16 (GCM etiketi). Worker'a bildirilen boyut budur. */
-export const sifreliBoyut = (duzBoyut) => duzBoyut + 28;
+/* ---- Dosya şifreleme biçimi v2 (tur 17): PARÇALI AES-GCM — büyük dosyalar belleğe sığmak zorunda değildir ----
+ *   [16 bayt sihirli başlık "E2EE-CHUNKED-V2\0"] [8 bayt rastgele nonce öneki] [parça0 | etiket16] [parça1 | etiket16] …
+ *   Parça i için IV = nonce(8) ‖ i (uint32 BE). AAD = kayitId ‖ i (uint32 BE) ‖ son-parça-bayrağı (1 bayt).
+ *   Son-parça bayrağı ve parça sırası AAD'de olduğu için kırpma / yeniden sıralama / parça değiştirme GCM doğrulamasında YAKALANIR.
+ *   Eski (v1: iv12 | şifreli+etiket) dosyalar okunmaya devam eder. */
+const SIHIR = new TextEncoder().encode("E2EE-CHUNKED-V2\0");
+const NONCE_BOY = 8, BASLIK_BOY = SIHIR.length + NONCE_BOY, PARCA = 4 * 1024 * 1024, ETIKET = 16;
+const u32 = (n) => { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, n, false); return b; };
+const parcaIv = (nonce, i) => { const iv = new Uint8Array(12); iv.set(nonce, 0); iv.set(u32(i), 8); return iv; };
+const parcaAad = (kayitId, i, son) => { const k = enc.encode(kayitId), a = new Uint8Array(k.length + 5); a.set(k, 0); a.set(u32(i), k.length); a[k.length + 4] = son ? 1 : 0; return a; };
+const parcaSayisi = (duzBoyut) => Math.max(1, Math.ceil(duzBoyut / PARCA));
 
-/** Dosyayı rastgele AES-GCM anahtarıyla şifreler. Çıktı: Blob([iv | şifreli+etiket]) ve ham dosya anahtarı. */
-export async function dosyaSifrele(dosya, kayitId) {
+/** Worker'a bildirilen şifreli boyut: başlık + düz boyut + parça başına 16 bayt etiket. */
+export const sifreliBoyut = (duzBoyut) => BASLIK_BOY + duzBoyut + ETIKET * parcaSayisi(duzBoyut);
+
+/** Dosyayı rastgele AES-GCM anahtarıyla PARÇA PARÇA şifreler. Çıktı: Blob (v2 biçimi) ve ham dosya anahtarı. */
+export async function dosyaSifrele(dosya, kayitId, ilerleme = null) {
   const anahtar = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt"]);
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const sifreli = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv, additionalData: enc.encode(kayitId) }, anahtar, await dosya.arrayBuffer());
+  const nonce = crypto.getRandomValues(new Uint8Array(NONCE_BOY)), n = parcaSayisi(dosya.size);
+  const baslik = new Uint8Array(BASLIK_BOY); baslik.set(SIHIR, 0); baslik.set(nonce, SIHIR.length);
+  let blob = new Blob([baslik]);                                            // Blob-of-Blob: parçalar tarayıcı tarafından (diske) yönetilir
+  for (let i = 0; i < n; i++) {
+    const ham = await dosya.slice(i * PARCA, Math.min(dosya.size, (i + 1) * PARCA)).arrayBuffer();
+    const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv: parcaIv(nonce, i), additionalData: parcaAad(kayitId, i, i === n - 1) }, anahtar, ham);
+    blob = new Blob([blob, ct]);
+    if (ilerleme && (i % 4 === 3 || i === n - 1)) ilerleme((i + 1) / n);
+  }
   const hamAnahtar = await crypto.subtle.exportKey("raw", anahtar);
-  return { blob: new Blob([iv, sifreli], { type: "application/octet-stream" }), hamAnahtar };
+  return { blob: new Blob([blob], { type: "application/octet-stream" }), hamAnahtar };
 }
 
 /** Ham dosya anahtarını bir alıcının açık anahtarıyla zarflar -> base64. */
@@ -441,18 +459,31 @@ export async function anahtariZarfla(hamAnahtar, acikAnahtarB64) {
   return b64(await crypto.subtle.encrypt({ name: "RSA-OAEP" }, acik, hamAnahtar));
 }
 
-/** Şifreli bayt dizisini (iv | şifreli) kendi zarfımızla çözer -> ArrayBuffer. */
-export async function dosyaCoz(sifreliBuf, zarfB64, kayitId) {
+/** Şifreli veriyi (Blob ya da ArrayBuffer; v2 parçalı ya da eski v1) kendi zarfımızla çözer -> Blob (v2) / ArrayBuffer (v1). */
+export async function dosyaCoz(sifreli, zarfB64, kayitId) {
   const { ozel } = await anahtarlariHazirla();
   let ham;
   try { ham = await crypto.subtle.decrypt({ name: "RSA-OAEP" }, ozel, b64coz(zarfB64)); }
   catch { throw new Error("Dosya anahtarı açılamadı."); }
   const anahtar = await crypto.subtle.importKey("raw", ham, "AES-GCM", false, ["decrypt"]);
-  const u8 = new Uint8Array(sifreliBuf);
-  if (u8.length < 29) throw new Error("Şifreli dosya bozuk.");
+  const blob = sifreli instanceof Blob ? sifreli : new Blob([sifreli]);
+  if (blob.size < 29) throw new Error("Şifreli dosya bozuk.");
+  const bas = new Uint8Array(await blob.slice(0, BASLIK_BOY).arrayBuffer());
+  const v2 = bas.length >= BASLIK_BOY && SIHIR.every((b, i) => bas[i] === b);
   try {
-    return await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv: u8.subarray(0, 12), additionalData: enc.encode(kayitId) }, anahtar, u8.subarray(12));
+    if (!v2) {                                                              // eski biçim: iv12 | şifreli+etiket
+      const u8 = new Uint8Array(await blob.arrayBuffer());
+      return await crypto.subtle.decrypt({ name: "AES-GCM", iv: u8.subarray(0, 12), additionalData: enc.encode(kayitId) }, anahtar, u8.subarray(12));
+    }
+    const nonce = bas.subarray(SIHIR.length, BASLIK_BOY), govdeBoy = blob.size - BASLIK_BOY, n = Math.ceil(govdeBoy / (PARCA + ETIKET));
+    if (govdeBoy < ETIKET) throw new Error("kısa");
+    let cikti = new Blob([]);
+    for (let i = 0; i < n; i++) {
+      const a = BASLIK_BOY + i * (PARCA + ETIKET), ct = await blob.slice(a, Math.min(blob.size, a + PARCA + ETIKET)).arrayBuffer();
+      const duz = await crypto.subtle.decrypt({ name: "AES-GCM", iv: parcaIv(nonce, i), additionalData: parcaAad(kayitId, i, i === n - 1) }, anahtar, ct);
+      cikti = new Blob([cikti, duz]);
+    }
+    return cikti;
   } catch {
     throw new Error("Dosya doğrulanamadı: bozulmuş ya da değiştirilmiş olabilir.");
   }
