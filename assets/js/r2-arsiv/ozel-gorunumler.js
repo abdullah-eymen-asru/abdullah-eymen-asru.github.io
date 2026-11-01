@@ -12,7 +12,7 @@ import { supabase } from "../core/supabase-client.js";
 import { aliciSeciciKur } from "./alici-secici.js";
 import {
   el, btn, boyutYaz, zamanYaz, gunGrubu, normalize, aramaKelimeleri, vurgulu,
-  basHarfler, avatarSinifi, kategori, KATEGORI_IKON, trSirala,
+  basHarfler, avatarSinifi, kategori, KATEGORI_IKON, trSirala, worker,
 } from "./ortak.js";
 
 /* ------------------------------- ortak parçalar ------------------------------- */
@@ -207,7 +207,37 @@ export function paylastiklarimGorunumuKur({ kok, eylemler, bildir, gonder, yetki
   a2.appendChild(el("strong", "", "Dosyayı seç ya da bu sayfaya sürükle"));
   const girdi = document.createElement("input"); girdi.type = "file"; girdi.multiple = true; girdi.className = "ra-gizli";
   const cta = btn("", "ra-btn ra-btn-birincil ra-gonder-cta", () => girdi.click());
-  a2.append(cta, girdi, el("p", "ra-yardim", "Dosya tarayıcında şifrelenir; sunucu içeriği göremez. Şifreli gönderimde en fazla 100 MB."));
+  a2.append(cta, girdi, el("p", "ra-yardim", "Dosya tarayıcında parça parça şifrelenir; sunucu içeriği göremez. Boyut sınırı yoktur denecek kadar geniştir (tek dosya en çok 5 GB)."));
+  /* Arşivden seç: arşivdeki (şifresiz) bir dosyayı indirip tarayıcıda ŞİFRELEYEREK özel gönderir; arşivdeki kopya olduğu gibi kalır. */
+  const arsivKutu = el("details", "ra-arsivden"); arsivKutu.append(el("summary", "", "📂 Arşivden dosya seç / ara"));
+  const arsivAra = document.createElement("input"); arsivAra.type = "search"; arsivAra.className = "ra-as-girdi"; arsivAra.placeholder = "Arşivde dosya ara (ad)…"; arsivAra.setAttribute("aria-label", "Arşivde dosya ara");
+  const arsivListe = el("ul", "ra-arsivden-liste"), arsivDurum = el("p", "ra-meta"), arsivDaha = btn("Daha fazla göster", "ra-btn ra-btn-kucuk", () => arsivYukle(true));
+  arsivDaha.hidden = true; arsivKutu.append(arsivAra, arsivDurum, arsivListe, arsivDaha);
+  let arsivSayfa = 0, arsivZ = null;
+  async function arsivYukle(devam = false) {
+    const t = arsivAra.value.trim().replace(/[%_\\]/g, (c) => `\\${c}`); const bas = devam ? arsivSayfa : 0;
+    let q = supabase.from("r2_arsiv").select("id,ad,boyut,mime,klasor_yolu").eq("tur", "dosya").eq("sifreli", false).eq("durum", "hazir").order("ad").range(bas, bas + 24);
+    if (t) q = q.ilike("ad", `%${t}%`);
+    arsivDurum.textContent = "Aranıyor…"; const { data, error } = await q;
+    if (error) { arsivDurum.textContent = /42501|permission|policy/i.test(error.message) ? "Arşive erişim yetkin yok." : error.message; return; }
+    if (!devam) arsivListe.replaceChildren();
+    (data || []).forEach((d) => {
+      const li = el("li", "ra-arsivden-oge"), ad = el("span", "ra-arsivden-ad", `📄 ${d.klasor_yolu ? `/${d.klasor_yolu}` : "/"}${d.ad}`);
+      const gonderBtn = btn(durum.secili.size ? `🔐 Seç ve ${durum.secili.size} kişiye gönder` : "🔐 Seç ve bana kaydet", "ra-btn ra-btn-kucuk", async () => {
+        gonderBtn.disabled = true; arsivDurum.textContent = `“${d.ad}” arşivden alınıyor…`;
+        try {
+          const { url } = await worker("/indir", { id: d.id }); const r = await fetch(url); if (!r.ok) throw new Error("Dosya R2'den alınamadı.");
+          const f = new File([await r.blob()], d.ad, { type: d.mime || "application/octet-stream" }); arsivDurum.textContent = "Şifrelenip gönderiliyor…"; gonder({ files: [f] });
+        } catch (h) { arsivDurum.textContent = h.message || "Alınamadı."; } finally { gonderBtn.disabled = false; }
+      });
+      li.append(ad, el("small", "ra-meta", boyutYaz(d.boyut)), gonderBtn); arsivListe.appendChild(li);
+    });
+    arsivSayfa = bas + (data || []).length; arsivDaha.hidden = (data || []).length < 25;
+    arsivDurum.textContent = arsivListe.children.length ? "" : "Eşleşen dosya yok.";
+  }
+  arsivAra.addEventListener("input", () => { clearTimeout(arsivZ); arsivZ = setTimeout(() => arsivYukle(false), 250); });
+  arsivKutu.addEventListener("toggle", () => { if (arsivKutu.open && !arsivListe.children.length) arsivYukle(false); });
+  a2.appendChild(arsivKutu);
   adim2.appendChild(a2);
   kart.append(adim1, adim2);
 
@@ -221,6 +251,7 @@ export function paylastiklarimGorunumuKur({ kok, eylemler, bildir, gonder, yetki
       ? "Kimseyi seçmezsen dosya yalnızca sana kaydedilir (özel kasan). Sonradan 👥 ile kişi ekleyebilirsin."
       : `Şifreli olarak şu kişilere gönderilecek: ${adlar.length <= 2 ? adlar.join(", ") : `${adlar.slice(0, 2).join(", ")} +${adlar.length - 2} kişi`}. Sen de açabilirsin.`;
     chipListe.replaceChildren();
+    if (n > 3) { const li0 = el("li", "ra-chip-ust"); li0.append(el("span", "ra-meta", `${n} alıcı seçili`), btn("Tümünü kaldır", "ra-btn ra-btn-kucuk", () => { durum.secili.clear(); kartGuncelle(); })); chipListe.appendChild(li0); }
     durum.secili.forEach((ad, id) => {
       const li = el("li"); const c = el("span", "ra-chip");
       c.append(avatar(ad, true), el("span", "", ad),
