@@ -68,3 +68,4 @@
 .sd-cihaz-satir p { margin: .2rem 0 0; }
 .sd-girdi { padding: .45rem .6rem; font: inherit; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); }
 .sd-btn-tehlike { color: #c0392b; border-color: #c0392b; }
+.sd-onay { display: flex; gap: .5rem; align-items: flex-start; font-size: .88rem; margin: .4rem 0; } .sd-onay input { margin-top: .2rem; inline-size: 1.1rem; block-size: 1.1rem; }
