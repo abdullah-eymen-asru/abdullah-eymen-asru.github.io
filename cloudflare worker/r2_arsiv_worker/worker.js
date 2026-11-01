@@ -19,7 +19,7 @@
  *   ACCOUNT_ID, BUCKET_NAME, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
  *   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
  *   E2EE_KASA_SECRET   (base64, 32 bayt rastgele — SADECE bu worker'da durur)
- * İsteğe bağlı Var: MAX_DOSYA_BAYT (vars. 209715200), R2_SINIF_A_LIMIT (vars. 800000),
+ * İsteğe bağlı Var: MAX_DOSYA_BAYT (vars. 5368709120 = 5 GiB), R2_SINIF_A_LIMIT (vars. 800000),
  *   R2_SINIF_B_LIMIT (vars. 8000000)
  * R2 binding adı: MY_R2_BUCKET (mevcut r2_storage_worker ile aynı kova)
  */
@@ -30,7 +30,7 @@ const IZINLI_ORIGINLER = new Set([
   "http://localhost:5500",
 ]);
 
-const VARSAYILAN_MAX = 209715200; // 200 MB
+const VARSAYILAN_MAX = 5 * 1024 ** 3;          // tur 17: 5 GiB (R2 tek PUT tavanı); MAX_DOSYA_BAYT ile düşürülebilir // 200 MB
 const INDIRME_SURESI = 300;       // sn
 const YUKLEME_SURESI = 900;       // sn
 
@@ -48,6 +48,7 @@ const MIME_WHITELIST = new Set([
   "application/msword", "application/vnd.ms-excel", "application/vnd.ms-powerpoint",
   "application/vnd.oasis.opendocument.text", "application/vnd.oasis.opendocument.spreadsheet",
   "audio/mpeg", "audio/mp4", "audio/wav", "audio/ogg", "audio/flac",
+  "audio/x-m4a", "audio/aac", "audio/webm", "audio/opus", "audio/x-wav", "video/ogg",
   "video/mp4", "video/webm", "video/quicktime",
 ]);
 
@@ -294,6 +295,17 @@ async function indir(env, uid, g) {
   return { url, sifreli: satir.sifreli, sure_sn: INDIRME_SURESI };
 }
 
+/** Özel/gizli makale eki: erişimi (yönetici ya da yayında + süresi dolmamış erişim) veritabanı doğrular; kısa ömürlü indirme adresi döner (0131). */
+async function ozelIndir(env, uid, g) {
+  if (!UUID_RE.test(g.content_id || "") || !UUID_RE.test(g.arsiv_id || "")) throw new HttpHata(400, "Geçersiz kayıt.");
+  const satir = (await rpc(env, "ozel_icerik_dosya_coz", { p_uid: uid, p_content_id: g.content_id, p_arsiv_id: g.arsiv_id }))?.[0];
+  if (!satir?.r2_key) throw new HttpHata(403, "Bu dosyaya erişimin yok ya da erişim süren doldu.");
+  await kotaRezerve(env, "B", 1);
+  const url = await presign(env, { method: "GET", key: satir.r2_key, saniye: 60, ekSorgu: {
+    "response-content-disposition": `attachment; filename*=UTF-8''${rfc3986(satir.ad)}`, "response-content-type": satir.mime || "application/octet-stream" } });
+  return { url, ad: satir.ad, sure_sn: 60 };
+}
+
 async function sil(env, uid, g) {
   if (!UUID_RE.test(g.id || "")) throw new HttpHata(400, "Geçersiz kayıt.");
   // Yetki + silinecek anahtarlar tek RPC'de (klasörse alt ağaç dahil).
@@ -391,19 +403,20 @@ async function medyaIstegi(env, istek) {
   let satir;
   try { satir = (await rpc(env, "r2_medya_coz", { p_yazi: yazi, p_ad: ad }))?.[0]; } catch { return new Response("Geçici sorun.", { status: 502, headers: { "Cache-Control": "no-store" } }); }
   if (!satir?.r2_key) return sayfa(404, "Dosya bulunamadı", "Bu dosya yok ya da kaldırılmış.");
-  const satirIci = /^image\/(png|jpeg|gif|webp|avif)$/.test(satir.mime || "") || satir.mime === "application/pdf";
+  // satır içi gösterilebilir türler: görsel, PDF, ses, video (medya türleri güvenlidir; çalıştırılabilir içerik asla buraya girmez)
+  const satirIci = /^image\/(png|jpeg|gif|webp|avif)$/.test(satir.mime || "") || satir.mime === "application/pdf" || /^(audio|video)\//.test(satir.mime || "");
 
   /* 1) Adrese doğrudan gidildiyse: DOSYA BİLGİ SAYFASI (ad, tür, boyut, tarih + İndir / Önizle). R2'ye istek yok, kota harcanmaz. */
   if (sayfaIstegi) {
-    const gorsel = /^image\//.test(satir.mime || "") && satirIci, riskliDosya = uzantiRiskli(satir.ad);
+    const gorsel = /^image\//.test(satir.mime || "") && satirIci, ses = /^audio\//.test(satir.mime || ""), video = /^video\//.test(satir.mime || ""), riskliDosya = uzantiRiskli(satir.ad);
     const satirlar = [["Dosya adı", satir.ad], ["Tür", turEtiketi(satir.mime)], ["Boyut", boyutYaz(satir.boyut)], ["Yüklenme", tarihYaz(satir.yuklenme)]];
-    const html = (gorsel ? '<img class="onizleme" src="?o=1" alt="Önizleme" loading="lazy">' : `<div class="ikon" aria-hidden="true">${satir.mime === "application/pdf" ? "📕" : "📄"}</div>`) +
+    const html = (gorsel ? '<img class="onizleme" src="?o=1" alt="Önizleme" loading="lazy">' : ses ? '<audio controls preload="none" src="?o=1" class="oynatici"></audio>' : video ? '<video controls preload="none" playsinline src="?o=1" class="oynatici"></video>' : `<div class="ikon" aria-hidden="true">${satir.mime === "application/pdf" ? "📕" : "📄"}</div>`) +
       `<h1>${htmlKac(satir.ad)}</h1>` +
       (riskliDosya ? '<p class="acik">⚠️ Bu dosya türü çalıştırılabilir olabilir. Yalnızca kaynağa güveniyorsan aç.</p>' : "") +
       `<dl>${satirlar.map(([k, v]) => `<dt>${htmlKac(k)}</dt><dd>${htmlKac(v)}</dd>`).join("")}</dl>` +
       `<div class="dugmeler"><a class="dugme" href="?indir=1" rel="nofollow">⬇ İndir</a>${satirIci ? '<a class="dugme ikincil" href="?o=1" rel="nofollow">👁 Aç / Önizle</a>' : ""}</div>`;
-    return new Response(`<!doctype html><html lang="tr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${htmlKac(satir.ad)} · İndir</title><style>${BILGI_CSS}.onizleme{max-width:100%;max-height:18rem;border-radius:12px;display:block;margin:0 auto .6rem;background:#fff}</style><body><main class="kart">${html}<p class="alt">Bu dosya bir yazıya/projeye eklidir; bağlantıya sahip olan herkes indirebilir.</p></main></body></html>`,
-      { status: 200, headers: { ...BILGI_BASLIK, "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' https: data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" } });
+    return new Response(`<!doctype html><html lang="tr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${htmlKac(satir.ad)} · İndir</title><style>${BILGI_CSS}.oynatici{width:100%;margin:0 0 .6rem}.onizleme{max-width:100%;max-height:18rem;border-radius:12px;display:block;margin:0 auto .6rem;background:#fff}</style><body><main class="kart">${html}<p class="alt">Bu dosya bir yazıya/projeye eklidir; bağlantıya sahip olan herkes indirebilir.</p></main></body></html>`,
+      { status: 200, headers: { ...BILGI_BASLIK, "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' https: data:; media-src 'self' https:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" } });
   }
 
   /* 2) Gömülü kullanım (<img>) ya da ?indir=1 / ?o=1: kota düş, imzalı R2 adresine 302. */
@@ -445,6 +458,7 @@ const ASIL_ISLEYICI = {
         case "/yukle-baslat": return json(await yukleBaslat(env, uid, govde), 200, origin);
         case "/yukle-bitir":  return json(await yukleBitir(env, uid, govde), 200, origin);
         case "/indir":        return json(await indir(env, uid, govde), 200, origin);
+        case "/ozel-indir":   return json(await ozelIndir(env, uid, govde), 200, origin);
         case "/sil":          return json(await sil(env, uid, govde), 200, origin);
         default: throw new HttpHata(404, "Bulunamadı.");
       }
