@@ -28,3 +28,4 @@ begin
 end $$;
 revoke all on function public.arsiv_kullanici_ara(text, integer, integer) from public, anon;
 grant execute on function public.arsiv_kullanici_ara(text, integer, integer) to authenticated;
+
