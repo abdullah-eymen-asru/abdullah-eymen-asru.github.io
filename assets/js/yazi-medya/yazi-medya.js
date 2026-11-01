@@ -151,6 +151,36 @@ async function kur() {
   }
   const alanaYaz = (girdi, url, ad) => { girdi.value = url; girdi.dispatchEvent(new Event("input", { bubbles: true })); girdi.dispatchEvent(new Event("change", { bubbles: true })); bildir(`✔ ${ad} alanına yazıldı.`); };
   async function kopyala(metin, d) { let ok = false; try { await navigator.clipboard.writeText(metin); ok = true; } catch { ok = false; } const e = d.textContent; d.textContent = ok ? "✔ Kopyalandı" : "Kopyalanamadı"; setTimeout(() => { d.textContent = e; }, 1500); }
+  /** "Metne ekle" seçenekleri: dosya türüne göre nerede/nasıl görüneceği. Üretilen HTML tek satırdır (kramdown bloğu). */
+  const kac = (t) => String(t || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/\r?\n/g, " ").trim();
+  const tur = (ad) => (gorselMi(ad) ? "gorsel" : pdfMi(ad) ? "pdf" : /\.(mp3|m4a|wav|ogg|oga|flac|aac|opus)$/i.test(ad) ? "ses" : /\.(mp4|webm|mov|m4v|ogv)$/i.test(ad) ? "video" : "dosya");
+  function secimAlani(etiket, secenekler, varsayilan) { const l = el("label", "ym-ek-alan"), s2 = el("select", "ym-girdi"); secenekler.forEach(([v, a]) => { const o = el("option", null, a); o.value = v; s2.append(o); }); s2.value = varsayilan; l.append(el("span", "ym-soluk", etiket), s2); return { kok: l, deger: () => s2.value }; }
+  function ekleSecenekleri(k) {
+    const kutu = el("div", "ym-ekle"), t = tur(k.dosya_ad), yolu = `${anahtar()}/${k.dosya_ad}`, bos = k.dosya_ad.replace(/\.[^.]+$/, "");
+    const baslik = el("input", "ym-girdi"); baslik.type = "text"; baslik.placeholder = t === "gorsel" ? "Altyazı (görselin altında görünür, isteğe bağlı)" : "Başlık (kartta görünür, isteğe bağlı)"; baslik.setAttribute("aria-label", "Başlık / altyazı");
+    const alanlar = [];
+    let konum, boyut, gom, yuk;
+    if (t === "gorsel") {
+      konum = secimAlani("Konum", [["orta", "Ortada (satır arası)"], ["sol", "Sola yasla — yazı sağından aksın"], ["sag", "Sağa yasla — yazı solundan aksın"], ["tam", "Tam genişlik"]], "orta");
+      boyut = secimAlani("Boyut (sayfa genişliğine göre)", [["25", "Küçük (%25)"], ["50", "Orta (%50)"], ["75", "Büyük (%75)"], ["100", "Tam (%100)"]], "75"); alanlar.push(konum.kok, boyut.kok);
+    } else if (t === "pdf") {
+      gom = secimAlani("Gösterim", [["1", "Yazının içinde okuyucu (Burada oku düğmesiyle açılır) + indirme"], ["0", "Yalnızca indirme kartı"]], "1");
+      yuk = secimAlani("Okuyucu yüksekliği", [["600", "Normal"], ["800", "Yüksek"]], "600"); alanlar.push(gom.kok, yuk.kok);
+    } else alanlar.push(el("p", "ym-soluk", t === "ses" ? "Ses oynatıcı olarak gösterilir (oynat tuşuna basılınca yüklenir; kota harcanmaz)." : t === "video" ? "Video oynatıcı olarak gösterilir (oynat tuşuna basılınca yüklenir)." : "İndirme kartı olarak gösterilir; tıklayınca dosya bilgi sayfası ve İndir düğmesi açılır."));
+    const onizleme = el("code", "ym-kod");
+    const uret = () => {
+      const b = kac(baslik.value);
+      if (t === "gorsel") return `<figure class="r2-fig r2-konum-${konum.deger()} r2-w${boyut.deger()}" data-r2="${yolu}" data-tur="gorsel"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="${kac(b || bos)}">${b ? `<figcaption>${b}</figcaption>` : ""}</figure>`;
+      if (t === "pdf") return `<div data-r2="${yolu}" data-tur="pdf" data-gom="${gom.deger()}" data-yukseklik="${yuk.deger()}"${b ? ` data-baslik="${b}"` : ""}></div>`;
+      return `<div data-r2="${yolu}" data-tur="${t}"${b ? ` data-baslik="${b}"` : ""}></div>`;
+    };
+    const guncelle = () => { onizleme.textContent = uret(); };
+    [baslik, ...alanlar.flatMap((a) => (a.querySelector ? [...a.querySelectorAll("select")] : []))].forEach((g) => g.addEventListener("input", guncelle)); guncelle();
+    kutu.append(...alanlar, baslik, dugme("✔ Metne ekle (imleç konumuna)", "ym-birincil", () => { metneEkle(uret()); bildir("✔ Metne eklendi. Yayınlanan sayfada böyle görünür; konumu değiştirmek için kodu düzenleyebilir ya da yeniden ekleyebilirsin."); kutu.hidden = true; }),
+      el("details", "ym-kod-kutu", "").appendChild(el("summary", null, "Üretilen kodu göster")).parentNode);
+    kutu.lastChild.append(onizleme);
+    return kutu;
+  }
   function ciz() {
     const toplam = kayitlar.reduce((t, k) => t + Number(k.boyut || 0), 0);
     ozetSatir.textContent = kayitlar.length ? `${kayitlar.length} dosya · ${boyutYaz(toplam)} (bu yazının R2 kullanımı)` : "Bu yazıya bağlı dosya yok. Yukarıdan dosya seç.";
@@ -162,8 +192,8 @@ async function kur() {
         const iptal = dugme("Vazgeç", "ym-kucuk", () => ciz()); ust.replaceChildren(g, kaydet, iptal); g.focus(); g.select();
       });
       ust.append(ad, el("small", "ym-soluk", boyutYaz(k.boyut)));
-      const alt = el("div", "ym-oge-alt");
-      alt.append(dugme(gorselMi(k.dosya_ad) ? "➕ Metne görsel ekle" : "➕ Metne bağlantı ekle", "ym-kucuk ym-birincil", () => metneEkle(gorselMi(k.dosya_ad) ? `![${k.dosya_ad.replace(/\.[^.]+$/, "")}](${mYol(k.dosya_ad)})` : `[${k.dosya_ad}](${mYol(k.dosya_ad)})`)));
+      const alt = el("div", "ym-oge-alt"), ekleKutu = ekleSecenekleri(k); ekleKutu.hidden = true;
+      alt.append(dugme("➕ Metne ekle…", "ym-kucuk ym-birincil", () => { ekleKutu.hidden = !ekleKutu.hidden; }));
       if (pdfAlani && pdfMi(k.dosya_ad)) alt.append(dugme("📕 PDF Bağlantısı alanına yaz", "ym-kucuk", () => alanaYaz(pdfAlani, genelUrl(k.dosya_ad), "PDF Bağlantısı")));
       if (veriAlani) alt.append(dugme("📊 Veri Seti alanına yaz", "ym-kucuk", () => alanaYaz(veriAlani, genelUrl(k.dosya_ad), "Veri Seti URL")));
       alt.append(dugme("📋 Adresi kopyala", "ym-kucuk", (e) => kopyala(genelUrl(k.dosya_ad), e.currentTarget), { title: genelUrl(k.dosya_ad) }),
@@ -174,7 +204,7 @@ async function kur() {
             try { await worker("/sil", { id: data }); } catch (h) { bildir(`Kayıt kaldırıldı ama R2 dosyası silinemedi: ${h.message} (Dosya Yöneticisi'nden silebilirsin)`, true); }
             await listeYenile(); } catch (h) { bildir(h.message, true); }
         }));
-      li.append(ust, alt); return li;
+      li.append(ust, alt, ekleKutu); return li;
     }));
   }
 
