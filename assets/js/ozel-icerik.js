@@ -6,6 +6,7 @@
  * görünür) — bu yüzden "veri gelmedi" durumunu "erişimin yok" olarak
  * ele alıyoruz.
  */
+import { worker } from "./r2-arsiv/ortak.js";
 import { supabase, escapeHtml } from "./core/supabase-client.js";
 import { requireAuth } from "./auth/auth-guard.js";
 
@@ -61,6 +62,7 @@ async function init() {
     if (content.harici_dosya_url) {
       renderHariciDosyaButonu(content.harici_dosya_url);
     }
+    await renderR2Ekleri(content.id, container);
 
     await okunduIsaretleVeGoster(content.id);
   } catch (err) {
@@ -160,6 +162,30 @@ function renderHariciDosyaButonu(url) {
   const a = wrap.querySelector("#harici-dosya-link");
   a.href = url;
 }
+
+/** R2'ye siteden yüklenmiş ekler (0131): erişimi veritabanı doğrular; indirme adresi 60 sn geçerlidir. */
+async function renderR2Ekleri(contentId, container) {
+  try {
+    const { data, error } = await supabase.rpc("ozel_icerik_dosyalari_listele", { p_content_id: contentId });
+    if (error || !data?.length) return;
+    const kutu = document.createElement("section"); kutu.className = "oz-ekler";
+    const b = document.createElement("h2"); b.textContent = `📎 Ekler (${data.length})`; kutu.appendChild(b);
+    const ul = document.createElement("ul"); ul.className = "oz-ek-liste";
+    const durumEl = document.createElement("p"); durumEl.className = "muted"; durumEl.setAttribute("role", "status");
+    for (const d of data) {
+      const li = document.createElement("li"), ad = document.createElement("span"), dugme = document.createElement("button");
+      ad.textContent = `${d.ad} · ${bayt(d.boyut)}`; dugme.type = "button"; dugme.className = "btn-primary"; dugme.textContent = "⬇ İndir";
+      dugme.addEventListener("click", async () => {
+        dugme.disabled = true; durumEl.textContent = "Bağlantı hazırlanıyor…";
+        try { const r = await worker("/ozel-indir", { content_id: contentId, arsiv_id: d.arsiv_id }); durumEl.textContent = ""; window.location.assign(r.url); }
+        catch (h) { durumEl.textContent = h.message || "İndirilemedi."; } finally { dugme.disabled = false; }
+      });
+      li.append(ad, dugme); ul.appendChild(li);
+    }
+    kutu.append(ul, durumEl); container.appendChild(kutu);
+  } catch (h) { console.warn("R2 ekleri okunamadı:", h); }
+}
+function bayt(n) { const u = ["B", "KB", "MB", "GB"]; let i = 0, v = Number(n || 0); while (v >= 1024 && i < 3) { v /= 1024; i++; } return `${v.toLocaleString("tr-TR", { maximumFractionDigits: 1 })} ${u[i]}`; }
 
 async function renderDownloadButton(contentId, filePath) {
   const wrap = document.getElementById("dosya-indir-alani");
