@@ -21,6 +21,7 @@ permalink: "/panel/dashboard.html"
 <link rel="stylesheet" href="{{ '/assets/css/metadata-temizleyici.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/pdf-bol.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/yazi-medya.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/css/ozel-dosyalar.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/havastil.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/demo.css' | relative_url }}">
 
@@ -2063,6 +2064,7 @@ permalink: "/panel/dashboard.html"
 
 <script type="module" src="{{ '/assets/js/dashboard.js' | relative_url }}"></script>
 <script type="module" src="{{ '/assets/js/yazi-medya/yazi-medya.js' | relative_url }}"></script>
+<script type="module" src="{{ '/assets/js/ozel-dosyalar/ozel-dosyalar.js' | relative_url }}"></script>
 
 <template id="tmpl-dosya-yonetici">
   <div class="ra" id="ra-kok" lang="tr">
@@ -2071,8 +2073,8 @@ permalink: "/panel/dashboard.html"
     <div class="ra-ust">
       <div class="ra-sekmeler" role="tablist" aria-label="Görünüm">
         <button type="button" class="ra-sekme" id="ra-sekme-arsiv" role="tab" aria-selected="true">🗄️ Arşiv</button>
-        <button type="button" class="ra-sekme" id="ra-sekme-paylastiklarim" role="tab" aria-selected="false">📤 Özel gönderimlerim</button>
         <button type="button" class="ra-sekme" id="ra-sekme-baglantilar" role="tab" aria-selected="false">🔗 Bağlantılar</button>
+        <button type="button" class="ra-sekme" id="ra-sekme-paylastiklarim" role="tab" aria-selected="false">📤 Özel gönderimlerim</button>
         <button type="button" class="ra-sekme" id="ra-sekme-paylasilan" role="tab" aria-selected="false">📥 Benimle paylaşılanlar <span class="ra-sekme-sayi" id="ra-sekme-paylasilan-sayi" hidden></span></button>
       </div>
       <p id="ra-ozet" class="ra-ozet" hidden></p>
