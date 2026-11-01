@@ -555,6 +555,15 @@ function wireContentForm() {
       }
     }
 
+    // R2 ekleri (0131): panel kendi seçimini kaydeder; hata olursa kullanıcıya bildirilir ama içerik kaydı geri alınmaz.
+    {
+      const detay = { id: content.id, isler: [] };
+      document.dispatchEvent(new CustomEvent("ozel-icerik:kaydedildi", { detail: detay }));
+      const sonuc = await Promise.allSettled(detay.isler);
+      const hatali = sonuc.find((x) => x.status === "rejected");
+      if (hatali) showMessage(msg, "İçerik kaydedildi ama R2 ekleri kaydedilemedi: " + (hatali.reason?.message || hatali.reason));
+    }
+
     // Seçilen özel üyelere erişim ver (düzenleme modunda önceki atamalara
     // DOKUNMUYORUZ, sadece yeni seçilenleri EKLİYORUZ/GÜNCELLİYORUZ —
     // mevcut bir erişimi tamamen kaldırmak için "Erişimleri Yönet" panelini
@@ -590,6 +599,7 @@ function sifirlaIcerikFormu() {
   document.getElementById("icerik-atama-arama") && (document.getElementById("icerik-atama-arama").value = "");
   renderContentAssigneeOptions(TUM_KULLANICILAR);
   DUZENLENEN_ICERIK_ID = null;
+  document.dispatchEvent(new CustomEvent("ozel-icerik:sifirla"));
   document.getElementById("icerik-form-baslik").textContent = "Yeni Özel İçerik / Makale Ekle";
   document.getElementById("icerik-form-submit-btn").textContent = "Yayınla ve Ata";
   document.getElementById("icerik-duzenle-iptal-btn").hidden = true;
@@ -638,6 +648,7 @@ async function loadContents() {
       form.summary.value = c.summary ?? "";
       form.body_md.value = c.body_md ?? "";
       form.harici_dosya_url.value = c.harici_dosya_url ?? "";
+      document.dispatchEvent(new CustomEvent("ozel-icerik:duzenle", { detail: { id: c.id } }));   // R2 ekleri paneli (0131) mevcut ekleri yükler
       document.getElementById("icerik-form-baslik").textContent = `Düzenle: ${c.title}`;
       document.getElementById("icerik-form-submit-btn").textContent = "Değişiklikleri Kaydet";
       document.getElementById("icerik-duzenle-iptal-btn").hidden = false;
