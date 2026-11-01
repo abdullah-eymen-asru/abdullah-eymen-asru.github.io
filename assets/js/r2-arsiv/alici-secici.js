@@ -24,7 +24,8 @@ export function aliciSeciciKur({ kok, yerTutucu = "İsim ara…", anahtarGerekli
   sarmal.append(girdi, liste);
   kok.appendChild(sarmal);
 
-  let zamanlayici = null, istek = 0, sonuclar = [], aktif = -1;
+  const SAYFA = 20;
+  let zamanlayici = null, istek = 0, sonuclar = [], aktif = -1, dahaVar = false;
 
   const kapat = () => { liste.hidden = true; girdi.setAttribute("aria-expanded", "false"); aktif = -1; };
   const ac = () => { liste.hidden = false; girdi.setAttribute("aria-expanded", "true"); };
@@ -55,6 +56,10 @@ export function aliciSeciciKur({ kok, yerTutucu = "İsim ara…", anahtarGerekli
       liste.appendChild(li);
     });
     liste._gorunen = gorunen;
+    if (dahaVar) {                                                   // sayfalama: çok üyede liste taşmaz, istenirse sonraki 20 gelir
+      const daha = el("li", "ra-as-durum ra-as-daha", "Daha fazla göster…"); daha.setAttribute("role", "option");
+      daha.addEventListener("mousedown", (e) => { e.preventDefault(); ara(true); }); liste.appendChild(daha);
+    }
     ac();
   }
 
@@ -64,22 +69,23 @@ export function aliciSeciciKur({ kok, yerTutucu = "İsim ara…", anahtarGerekli
     sonuclar = [];
   }
 
-  async function ara() {
+  async function ara(devam = false) {
     const bu = ++istek;
-    durumSatiri("Aranıyor…");
-    const { data, error } = await supabase.rpc("arsiv_kullanici_ara", { p_q: girdi.value });
+    if (!devam) durumSatiri("Aranıyor…");
+    const { data, error } = await supabase.rpc("arsiv_kullanici_ara", { p_q: girdi.value, p_limit: SAYFA, p_offset: devam ? sonuclar.length : 0 });
     if (bu !== istek) return;                       // eski yanıtı at (yarış durumu)
     if (error) {
       const yetkisiz = error.code === "42501";
-      durumSatiri(yetkisiz ? "Kullanıcı arama yetkin yok." : "Arama başarısız. Veritabanı güncellemesi (0058) yapıldı mı?", true);
+      durumSatiri(yetkisiz ? "Kullanıcı arama yetkin yok." : "Arama başarısız. Veritabanı güncellemesi (0130) yapıldı mı?", true);
       console.warn("arsiv_kullanici_ara:", error.message);
       return;
     }
-    sonuclar = data || []; aktif = -1; ciz();
+    const yeni = data || []; dahaVar = yeni.length >= SAYFA;
+    sonuclar = devam ? [...sonuclar, ...yeni] : yeni; aktif = -1; ciz();
   }
 
-  girdi.addEventListener("input", () => { clearTimeout(zamanlayici); zamanlayici = setTimeout(ara, 220); });
-  girdi.addEventListener("focus", () => { ara(); });
+  girdi.addEventListener("input", () => { clearTimeout(zamanlayici); zamanlayici = setTimeout(() => ara(false), 220); });
+  girdi.addEventListener("focus", () => { ara(false); });
   girdi.addEventListener("blur", () => setTimeout(kapat, 120));
   girdi.addEventListener("keydown", (e) => {
     const ogeler = [...liste.querySelectorAll(".ra-as-oge:not(.ra-as-pasif)")];
