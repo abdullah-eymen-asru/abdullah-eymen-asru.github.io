@@ -11,11 +11,6 @@
 (function () {
   var WORKER = "https://r2-arsiv-worker.aeymena.workers.dev";
   var YOL = /^[a-z0-9][a-z0-9-]{0,119}\/[A-Za-z0-9][A-Za-z0-9._-]{0,150}$/;
-  var bloklar = Array.prototype.slice.call(document.querySelectorAll("[data-r2]")).filter(function (e) { return YOL.test(e.getAttribute("data-r2") || ""); });
-  var eskiGorsel = Array.prototype.filter.call(document.querySelectorAll("img[src^='/m/']"), function (i) { return YOL.test(i.getAttribute("src").slice(3).split("?")[0]); });
-  var eskiBag = Array.prototype.filter.call(document.querySelectorAll("a[href^='/m/']"), function (a) { return YOL.test(a.getAttribute("href").slice(3).split("?")[0]); });
-  if (!bloklar.length && !eskiGorsel.length && !eskiBag.length) return;
-
   function durumOku() {
     try { var k = JSON.parse(sessionStorage.getItem("r2_medya_durum") || "null"); if (k && Date.now() - k.t < 300000) return Promise.resolve(k.v); } catch (e) { /* yoksay */ }
     return fetch(WORKER + "/medya-durum", { credentials: "omit", referrerPolicy: "no-referrer" }).then(function (r) { return r.ok ? r.json() : { acik: true, gorsel_otomatik: true }; })
@@ -58,7 +53,7 @@
     blok.append(ust, bagla(yol, "⬇ İndir", "r2-kart-btn"));
   }
 
-  durumOku().then(function (d) {
+  function isle(d, bloklar, eskiGorsel, eskiBag) {
     bloklar.forEach(function (blok) {
       var yol = blok.getAttribute("data-r2"), tur = blok.getAttribute("data-tur") || "dosya", baslik = blok.getAttribute("data-baslik") || ad(yol);
       if (!d.acik) { var n = kapaliNotu(tur === "gorsel" ? "🖼️" : "📎", baslik); blok.replaceChildren(n); return; }
@@ -71,5 +66,18 @@
       img.src = adres(yol); img.loading = "lazy"; img.decoding = "async"; img.referrerPolicy = "no-referrer";
     });
     eskiBag.forEach(function (a) { if (!d.acik) { a.classList.add("r2-medya-kapali-baglanti"); a.setAttribute("aria-disabled", "true"); a.title = "Medya şu an kapalı"; a.addEventListener("click", function (e) { e.preventDefault(); }); } });
-  });
+  }
+
+  /* Sayfada (ya da sonradan eklenen içerikte: Supabase yazıları, önizleme) işlenmemiş medya bloklarını bulup gösterir. Her blok bir kez işlenir. */
+  var durumSoz = null;
+  function tara() {
+    var bloklar = Array.prototype.slice.call(document.querySelectorAll("[data-r2]:not([data-r2-hazir])")).filter(function (e) { return YOL.test(e.getAttribute("data-r2") || ""); });
+    var eskiGorsel = Array.prototype.filter.call(document.querySelectorAll("img[src^='/m/']:not([data-r2-hazir])"), function (i) { return YOL.test(i.getAttribute("src").slice(3).split("?")[0]); });
+    var eskiBag = Array.prototype.filter.call(document.querySelectorAll("a[href^='/m/']:not([data-r2-hazir])"), function (a) { return YOL.test(a.getAttribute("href").slice(3).split("?")[0]); });
+      bloklar.concat(eskiGorsel, eskiBag).forEach(function (e) { e.setAttribute("data-r2-hazir", "1"); });
+    (durumSoz = durumSoz || durumOku()).then(function (d) { isle(d, bloklar, eskiGorsel, eskiBag); });
+  }
+  var zamanlayici = null;
+  new MutationObserver(function () { clearTimeout(zamanlayici); zamanlayici = setTimeout(tara, 120); }).observe(document.documentElement, { childList: true, subtree: true });
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", tara); else tara();
 })();
