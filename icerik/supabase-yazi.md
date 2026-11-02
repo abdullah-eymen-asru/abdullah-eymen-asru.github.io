@@ -51,3 +51,6 @@ sitemap: false
 {% endif %}
 
 <script type="module" src="{{ '/assets/js/github-yonetim/supabase-yazi.js' | relative_url }}"></script>
+
+<link rel="stylesheet" href="{{ '/assets/css/yazi-medya.css' | relative_url }}">
+<script src="{{ '/assets/js/r2-medya.js' | relative_url }}" defer></script>
