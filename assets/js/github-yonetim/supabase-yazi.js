@@ -21,6 +21,7 @@
  * robots.txt'teki ikinci "Sitemap:" satırı üzerinden arama motorlarına
  * bildirilir.
  */
+import { r2BloklariAyikla, r2BloklariGeriKoy, r2BaglantilariCevir } from "../core/r2-bloklar.js";
 import { supabase, escapeHtml, guvenliDisUrlMi } from "../core/supabase-client.js";
 import { okumaSuresiHesapla, kaynakButonlariHtml, tocOlustur } from "../okuma-araclari/okuma-meta-yardimci.js";
 
@@ -597,7 +598,8 @@ function dipnotlariRenderla(html, tanimlar) {
   return `${isaretliHtml}<div class="footnotes"><ol>${maddeler}</ol></div>`;
 }
 
-function basitMarkdown(md) {
+function basitMarkdown(mdHam) {
+  const { md, bloklar: r2Bloklar } = r2BloklariAyikla(mdHam);          // R2 medya blokları (şema doğrulamalı), ham HTML geçirilmez
   const esc = escapeHtml(md);
   const { govde, tanimlar } = dipnotTanimlariniAyikla(esc);
   const anaHtml = govde
@@ -618,7 +620,7 @@ function basitMarkdown(md) {
     })
     .filter((parca) => parca !== "")
     .join("\n");
-  return dipnotlariRenderla(anaHtml, tanimlar);
+  return r2BloklariGeriKoy(r2BaglantilariCevir(dipnotlariRenderla(anaHtml, tanimlar)), r2Bloklar);
 }
 
 init();
