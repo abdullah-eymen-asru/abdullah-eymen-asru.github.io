@@ -25,3 +25,4 @@
 .oz-ekler { margin-top: 1.5rem; border-top: 1px solid var(--border); padding-top: 1rem; }
 .oz-ek-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
 .oz-ek-liste li { display: flex; justify-content: space-between; align-items: center; gap: .6rem; flex-wrap: wrap; padding: .5rem .7rem; border: 1px solid var(--border); border-radius: 10px; overflow-wrap: anywhere; }
+.oz-gizli-girdi { position: absolute; inline-size: 1px; block-size: 1px; opacity: 0; pointer-events: none; overflow: hidden; }
