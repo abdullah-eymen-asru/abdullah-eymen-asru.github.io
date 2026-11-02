@@ -100,12 +100,12 @@ export function baglantilarGorunumuKur({ kok, bildir, yonetici = false }) {
       const sec = { sil: false };
       const kutu = el("div", "ra-dlg-govde");
       const radyo = (deger, metin, secili) => { const l = el("label", "ra-onay"); const i = el("input"); i.type = "radio"; i.name = "klasor-sil"; i.checked = secili; i.addEventListener("change", () => { sec.sil = deger; }); l.append(i, el("span", null, metin)); return l; };
-      kutu.append(el("p", "ra-meta", `“${k}” klasörü ve alt klasörleri kaldırılacak. İçindeki ${adet(k)} bağlantı için ne yapalım? (Arşivdeki dosyalar hiçbir durumda silinmez.)`),
-        radyo(false, "Bağlantıları koru: ana klasöre taşı", true), radyo(true, "Bağlantıları da sil (adresler çalışmaz olur)", false));
+      kutu.append(el("p", "ra-meta", `“${k}” klasörü ve alt klasörleri kaldırılacak. İçindeki ${adet(k)} bağlantı için ne yapalım? Klasörü silince bağlantılar bir üst klasöre çıkar; istersen bağlantıları da silebilirsin. (Arşivdeki dosyalar hiçbir durumda silinmez.)`),
+        radyo(false, "Bağlantıları koru: bir üst klasöre taşı", true), radyo(true, "Bağlantıları da sil (adresler çalışmaz olur)", false));
       dialogAc("Klasörü sil", kutu, "Klasörü sil", async () => {
         const { error } = await supabase.rpc("r2_baglanti_klasor_sil", { p_yol: k, p_baglantilari_sil: sec.sil });
         if (error) throw new Error(error.message);
-        if (yol === k || yol.startsWith(`${k}/`)) yol = "";
+        if (yol === k || yol.startsWith(`${k}/`)) yol = k.includes("/") ? k.slice(0, k.lastIndexOf("/")) : "";
         await yenile();
       });
     }, { title: "Klasörü sil", "aria-label": "Klasörü sil" }));
