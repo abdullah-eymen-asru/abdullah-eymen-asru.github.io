@@ -61,8 +61,8 @@ async function ciz() {
   const [sb, site, gh, cf, om, rv, jd, surum] = await Promise.all([
     saglikKontrol({ zorla: true }),
     sonda(`/surum.json?_=${Date.now()}`, { json: true }),
-    sonda("https://www.githubstatus.com/api/v2/status.json", { json: true }),
-    sonda("https://www.cloudflarestatus.com/api/v2/status.json", { json: true }),
+    sonda("https://www.githubstatus.com/api/v2/summary.json", { json: true }),
+    sonda("https://www.cloudflarestatus.com/api/v2/summary.json", { json: true }),
     sonda("https://api.open-meteo.com/v1/forecast?latitude=41&longitude=29&current=temperature_2m"),
     sonda("https://api.rainviewer.com/public/weather-maps.json", { json: true }),
     sonda("https://cdn.jsdelivr.net/npm/pdfjs-dist/package.json", { secenek: { method: "HEAD" } }),
@@ -74,10 +74,28 @@ async function ciz() {
   kartlar.push(kart("Supabase — giriş (Auth)", sev(kd.auth?.ok, 2500, kd.auth?.ms), kd.auth?.ok ? `Çalışıyor · ${kd.auth.ms} ms` : "Yanıt yok", "Üye girişi, oturum yenileme, şifre sıfırlama."));
   kartlar.push(kart("Supabase — veritabanı (REST)", sev(kd.rest?.ok, 2500, kd.rest?.ms), kd.rest?.ok ? `Çalışıyor · ${kd.rest.ms} ms` : "Yanıt yok", "Panel verileri, kütüphane, notlar, ayarlar."));
   kartlar.push(kart("Bu sitenin kendisi", sev(site.ok, 2500, site.ms), site.ok ? `Ulaşılabilir · ${site.ms} ms` : "Ulaşılamıyor", site.veri?.surum || site.veri?.version ? `Sürüm: ${site.veri.surum || site.veri.version}` : "Statik dosya sunumu (GitHub Pages / Cloudflare Pages)."));
-  const stDurum = (r) => r.veri?.status?.description || (r.ok ? "Ulaşılabilir" : "Ulaşılamıyor");
-  const stSev = (r) => (!r.ok ? "yok" : r.veri?.status?.indicator === "none" || !r.veri ? "ok" : r.veri.status.indicator === "minor" ? "uyari" : "hata");
-  kartlar.push(kart("GitHub (içerik deposu / Pages)", stSev(gh), stDurum(gh), "Resmî durum sayfasından (githubstatus.com)."));
-  kartlar.push(kart("Cloudflare (Workers / R2 / DNS)", stSev(cf), stDurum(cf), "Resmî durum sayfasından (cloudflarestatus.com)."));
+  /* Resmî durum sayfaları (Atlassian Statuspage) → yalnızca BU SİTENİN kullandığı bileşenlere göre durum. Genel gösterge ("Partial System Outage")
+   * dünyadaki herhangi bir veri merkezinin sorununu da yansıttığı için sürekli yanlış alarm veriyordu. */
+  const BILESEN_DURUM = { operational: "Çalışıyor", degraded_performance: "Yavaş / kısmen bozuk", partial_outage: "Kısmi kesinti", major_outage: "Büyük kesinti", under_maintenance: "Bakımda" };
+  const BILESEN_SEV = { operational: 0, under_maintenance: 1, degraded_performance: 1, partial_outage: 2, major_outage: 3 };
+  const baglanti = (url, metin) => el("a", { class: "sd-btn", href: url, target: "_blank", rel: "noopener noreferrer", text: `${metin} ↗` });
+  function durumKarti(baslik, r, ilgili, sayfaUrl, aciklama) {
+    if (!r.ok || !r.veri?.components) return kart(baslik, "hata", "Durum sayfasına ulaşılamadı", "Bu kontrol tarayıcından yapılır; ağ ya da reklam/gizlilik engelleyici durum sayfasını engelliyor olabilir.", el("div", { class: "sd-eylemler" }, baglanti(sayfaUrl, "Resmî durum sayfasını aç")));
+    const bilesenler = r.veri.components.filter((c) => !c.group && ilgili.test(c.name));
+    const secili = bilesenler.length ? bilesenler : r.veri.components.filter((c) => !c.group);
+    const kotu = secili.filter((c) => c.status !== "operational");
+    const enKotu = Math.max(0, ...secili.map((c) => BILESEN_SEV[c.status] ?? 0));
+    const olaylar = (r.veri.incidents || []).filter((o) => o.status !== "resolved" && o.status !== "postmortem" && ((o.components || []).some((c) => ilgili.test(c.name)) || ilgili.test(o.name)));   // yalnızca bizi ilgilendiren olaylar
+    const sevi = enKotu >= 2 ? "hata" : enKotu === 1 || olaylar.length ? "uyari" : "ok";
+    const deger = enKotu === 0 && !olaylar.length ? `Kullandığımız ${secili.length} bileşen çalışıyor` : kotu.length ? `${kotu.length} bileşende sorun` : `${olaylar.length} açık olay`;
+    const ek = el("div", { class: "sd-detay" });
+    if (kotu.length) ek.append(el("ul", { class: "sd-liste" }, ...kotu.map((c) => el("li", { text: `${c.name}: ${BILESEN_DURUM[c.status] || c.status}` }))));
+    if (olaylar.length) ek.append(el("ul", { class: "sd-liste" }, ...olaylar.slice(0, 4).map((o) => el("li", {}, el("a", { href: o.shortlink || sayfaUrl, target: "_blank", rel: "noopener noreferrer", text: `${o.name} (${o.status})` })))));
+    ek.append(el("p", { class: "muted", text: `Genel durum (tüm dünya, ilgisiz veri merkezleri dahil): ${r.veri.status?.description || "—"}.` }), el("div", { class: "sd-eylemler" }, baglanti(sayfaUrl, "Resmî durum sayfası")));
+    return kart(baslik, sevi, deger, aciklama, ek);
+  }
+  kartlar.push(durumKarti("GitHub (içerik deposu / Pages)", gh, /pages|git operations|api requests|actions|webhooks/i, "https://www.githubstatus.com", "Yalnızca Pages, Git, API ve Actions bileşenleri sayılır."));
+  kartlar.push(durumKarti("Cloudflare (Workers / R2 / Pages / DNS)", cf, /workers|r2|pages|dns|cdn|sites and services|api|dashboard/i, "https://www.cloudflarestatus.com", "Yalnızca Workers, R2, Pages, DNS ve CDN bileşenleri sayılır; tek bir veri merkezindeki yerel sorun alarm vermez."));
   kartlar.push(kart("Open-Meteo (HavaStil tahminleri)", sev(om.ok, 3000, om.ms), om.ok ? `Çalışıyor · ${om.ms} ms` : "Ulaşılamıyor", "Saatlik tahmin ve ızgara verisi."));
   const kareSay = rv.veri?.radar?.past?.length;
   kartlar.push(kart("RainViewer (canlı radar)", sev(rv.ok && kareSay, 4000, rv.ms), rv.ok ? `${kareSay || 0} radar karesi · ${rv.ms} ms` : "Ulaşılamıyor", rv.veri?.generated ? `Veri üretimi: ${new Date(rv.veri.generated * 1000).toLocaleTimeString("tr-TR")} (${Math.max(0, Math.round((Date.now() / 1000 - rv.veri.generated) / 60))} dk önce)` : "Radar (geçmiş ~2 saat)."));
@@ -117,25 +135,22 @@ async function ciz() {
     } catch (h) { sinaSonuc.replaceChildren(el("li", { text: `Hata: ${h.message}` })); }
     sinaBtn.disabled = false;
   });
-  /* Tur 17: Worker sınaması YALNIZCA admin / site sahibi; ayrıca varsayılan KAPALI — açıkça etkinleştirilmeden düğme çalışmaz (Cloudflare Worker kotası korunur). */
+  /* Worker sınaması (kota koruması): admin ve site sahibi HER ZAMAN kullanır (düğmeye bağlı değil). Diğer üyeler yalnızca Yetki Ayarları › "Sistem Durumu: Worker sınaması"
+   * anahtarı kendi rolleri için AÇILMIŞSA (varsayılan KAPALI). Sınama yalnızca düğmeye basılınca çalışır; kendiliğinden hiç istek atılmaz. */
   let rol = null;
   try { const uid = oturum?.user?.id; if (uid) rol = (await supabase.from("profiles").select("role").eq("id", uid).maybeSingle()).data?.role || null; } catch { /* yok say */ }
-  const workerYetkili = rol === "admin" || rol === "owner";
-  const ANAHTAR = "sd_worker_sinama_acik";
-  const acikMi = () => { try { return localStorage.getItem(ANAHTAR) === "1"; } catch { return false; } };
-  const anahtarKutu = el("input", { type: "checkbox", id: "sd-worker-ac" }); anahtarKutu.checked = acikMi();
-  const durumGuncelle = () => { sinaBtn.disabled = !anahtarKutu.checked; sinaBtn.title = anahtarKutu.checked ? "" : "Önce yukarıdaki kutuyu işaretle"; };
-  anahtarKutu.addEventListener("change", () => { try { localStorage.setItem(ANAHTAR, anahtarKutu.checked ? "1" : "0"); } catch { /* yok say */ } durumGuncelle(); });
-  durumGuncelle();
-  workerKutu.append(el("label", { class: "sd-onay", for: "sd-worker-ac" }, anahtarKutu, el("span", { text: " Worker sınamasını etkinleştir (her sınama her Worker için 1 istek harcar; işin bitince kapat)" })), sinaBtn, sinaSonuc);
+  const yonetici = rol === "admin" || rol === "owner";
+  let workerIzin = yonetici;
+  if (!yonetici && rol) { try { const { data } = await supabase.rpc("ozellik_erisimi_var_mi", { p_ozellik: "sistem_durumu_worker", p_rol: rol }); workerIzin = data === true; } catch { workerIzin = false; } }
+  workerKutu.append(sinaBtn, sinaSonuc);
 
   kok.replaceChildren(ozet,
     el("h3", { class: "sd-bolum-baslik", text: "Çekirdek servisler" }), el("div", { class: "sd-izgara" }, ...kartlar.slice(0, 3)),
     el("h3", { class: "sd-bolum-baslik", text: "Bağımlı dış servisler" }), el("div", { class: "sd-izgara" }, ...kartlar.slice(3)),
     el("h3", { class: "sd-bolum-baslik", text: "Bu cihaz" }), el("div", { class: "sd-izgara" }, ...cihaz), await cihazVerileriKarti(oturum),
-    ...(workerYetkili ? [el("h3", { class: "sd-bolum-baslik", text: "Kotalar & Worker'lar (yalnızca yöneticiler)" }), r2Yer, workerKutu]
-      : [el("p", { class: "kst-alt", text: "Cloudflare Worker sınaması ve kota kartları yalnızca yönetici ve site sahibine açıktır (sistem kotasını korumak için). Yukarıdaki kontroller herkes için ücretsizdir." })]), alt);
-  if (workerYetkili) import("../sistem-yedek/r2-kota.js").then((m) => m.r2KotaKartiKur(r2Yer, { baslik: "R2 kullanımı (bu ay) — tüm kovalar" })).catch(() => {});
+    ...(yonetici || workerIzin ? [el("h3", { class: "sd-bolum-baslik", text: yonetici ? "Kotalar & Worker'lar" : "Worker sınaması" }), ...(yonetici ? [r2Yer] : []), workerKutu]
+      : [el("p", { class: "kst-alt", text: "Cloudflare Worker sınaması sistem kotasını harcadığı için varsayılan olarak yalnızca yönetici ve site sahibine açıktır; site sahibi Yetki Ayarları'ndan rolüne açabilir. Yukarıdaki kontroller herkes için ücretsizdir." })]), alt);
+  if (yonetici) import("../sistem-yedek/r2-kota.js").then((m) => m.r2KotaKartiKur(r2Yer, { baslik: "R2 kullanımı (bu ay) — tüm kovalar" })).catch(() => {});
 }
 
 let zaman = null;
