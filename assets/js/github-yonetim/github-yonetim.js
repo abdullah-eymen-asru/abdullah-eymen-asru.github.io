@@ -365,6 +365,13 @@ const OZELLIK_KATALOGU = [
     rolSutunlari: ["user", "special_user", "editor", "manager", "admin"],
   },
   {
+    // tur 18 — Sistem Durumu: Worker sınaması. VARSAYILAN KAPALI (0132 satırları); admin/site sahibi her zaman kullanır. Her sınama her Worker için 1 istek harcar.
+    anahtar: "sistem_durumu_worker",
+    baslik: "Sistem Durumu: Worker sınaması",
+    aciklama: "Sistem Durumu sekmesindeki “Worker'ları sına” düğmesi. Cloudflare Worker kotasından düşer (her sınama Worker başına 1 istek); bu yüzden varsayılan KAPALI. Admin ve Site Sahibi her zaman kullanır.",
+    rolSutunlari: ["user", "special_user", "editor", "manager"],
+  },
+  {
     // tur 14 — PDF Böl & Ayıkla aracı. Dönüştürücü yetkisi OLAN roller için ayrıca kapatılabilir (%100 istemci tarafı; veri sunucuya gitmez).
     anahtar: "pdf_bol",
     baslik: "PDF Böl & Ayıkla Aracı",
@@ -2877,7 +2884,7 @@ async function icerikSupabaseeYaz(tur, alan, gizliKod, govde, slug, dosyaYolu, m
   } else {
     showMessage(
       msgEl,
-      "Taslak Supabase'e kaydedildi — GitHub'a hiç commit edilmedi, sadece aşağıdaki gizli linki bilenler görebilir.",
+      "🔒 Gizli taslak olarak Supabase'e kaydedildi — GitHub'a gönderilmedi ve blogda/listelerde görünmez. “Yayında” anahtarı KAPALI olduğu için yalnızca aşağıdaki gizli bağlantıyı bilenler görebilir. Herkese açmak için “Yayında”yı açıp tekrar kaydet.",
       "success"
     );
   }
