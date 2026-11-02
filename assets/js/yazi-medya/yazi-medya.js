@@ -49,8 +49,11 @@ async function kur() {
   let anahtarElle = false;
   const anahtar = () => anahtarGirdi.value;
   const klasorAdi = () => klasorAdiYap(baslikGirdi?.value || anahtar());
+  /** Düzenleme: yazının metninde zaten R2 dosyası varsa anahtar OTOMATİK oradan alınır (başlık/adres yeniden yazılmak zorunda kalmaz). */
+  const metindenAnahtar = () => (/data-r2="([a-z0-9][a-z0-9-]{0,119})\//.exec(govde.value) || /\]\(\/m\/([a-z0-9][a-z0-9-]{0,119})\//.exec(govde.value) || /\/m\/([a-z0-9][a-z0-9-]{0,119})\/[A-Za-z0-9]/.exec(govde.value) || [])[1] || "";
   function yerGuncelle() {
-    if (!anahtarElle) anahtarGirdi.value = anahtarYap(slugGirdi?.value || baslikGirdi?.value || "");
+    const m = metindenAnahtar();
+    if (!anahtarElle) anahtarGirdi.value = m || anahtarYap(slugGirdi?.value || baslikGirdi?.value || "");
     yerBilgi.textContent = klasorAdi() ? `📁 Kayıt yeri: Arşiv › Yazılar › ${klasorAdi()}   ·   🔗 Adres: …/${anahtar() || "yazi-adresi"}/dosya-adi` : "Önce yazının başlığını yaz. Dosyalar o başlıkla bir klasöre kaydedilir.";
   }
   anahtarGirdi.addEventListener("input", () => { anahtarElle = true; anahtarGirdi.value = anahtarYap(anahtarGirdi.value); yerGuncelle(); listeYenile(); });
@@ -134,17 +137,20 @@ async function kur() {
 
   /* ---------- 4) yüklenenler ---------- */
   const liste = el("ul", "ym-liste"), ozetSatir = el("p", "ym-soluk");
-  let kayitlar = [];
+  let kayitlar = [], sekmeGuncelle = () => {}, ilkListe = () => {}, ilkGoruldu = false;
   async function listeYenile() {
     if (!anahtar()) { liste.replaceChildren(); ozetSatir.textContent = ""; return; }
     const { data, error } = await supabase.rpc("yazi_medya_listele", { p_yazi: anahtar() });
     if (error) { ozetSatir.textContent = /42501|Yetkisiz/i.test(error.message) ? "Yazı medyası için Arşiv yükleme yetkisi gerekir (Yetki Ayarları › Arşiv)." : error.message; liste.replaceChildren(); kayitlar = []; return; }
-    kayitlar = data || []; ciz();
+    kayitlar = data || []; ciz(); sekmeGuncelle(); if (!ilkGoruldu && kayitlar.length) { ilkGoruldu = true; ilkListe(); }
   }
   const mYol = (ad) => `/m/${anahtar()}/${ad}`;
   const genelUrl = (ad, alan = GH) => (/\.[A-Za-z0-9]{1,10}$/.test(ad) ? `${alan}/${anahtar()}/${ad}` : `${alan}/m/${anahtar()}/${ad}`);
   function metneEkle(parca) {
-    const bas = govde.selectionStart ?? govde.value.length, son = govde.selectionEnd ?? bas, onceki = govde.value.slice(0, bas), sonraki = govde.value.slice(son);
+    let bas = govde.selectionStart ?? govde.value.length, son = govde.selectionEnd ?? bas;
+    // İmleç daha önce eklenmiş bir medya bloğunun (<figure…</figure> / <div data-r2…></div>) İÇİNDEYSE bloğun hemen SONRASINA ekle: kod bölünüp bozulmasın.
+    for (const m of govde.value.matchAll(/<figure\b[\s\S]*?<\/figure>|<div\b[^>]*data-r2[^>]*>\s*<\/div>/gi)) { const bit = m.index + m[0].length; if (bas > m.index && bas < bit) { bas = bit; son = bit; break; } }
+    const onceki = govde.value.slice(0, bas), sonraki = govde.value.slice(son);
     const bosluk = onceki && !onceki.endsWith("\n") ? "\n\n" : "";
     govde.value = `${onceki}${bosluk}${parca}\n\n${sonraki.replace(/^\n+/, "")}`;
     const imlec = (onceki + bosluk + parca + "\n\n").length; govde.focus(); govde.setSelectionRange(imlec, imlec); govde.dispatchEvent(new Event("input", { bubbles: true }));
@@ -236,7 +242,7 @@ async function kur() {
   const linkAd = el("input", "ym-girdi"); linkAd.type = "text"; linkAd.placeholder = "Görünen ad (örn. Rapor)"; linkAd.setAttribute("aria-label", "Bağlantı adı");
   const linkUrl = el("input", "ym-girdi"); linkUrl.type = "url"; linkUrl.placeholder = "https://… (Google Drive, Zotero, başka bulut)"; linkUrl.setAttribute("aria-label", "Bağlantı adresi");
   const linkTur = el("select", "ym-girdi"); [["baglanti", "Metne bağlantı olarak ekle"], ["gorsel", "Metne görsel olarak ekle (doğrudan resim adresi)"], ["pdf", "PDF Bağlantısı alanına yaz"], ["veri", "Veri Seti URL alanına yaz"]].forEach(([v, a]) => { const o = el("option", null, a); o.value = v; linkTur.append(o); });
-  const linkKutu = el("details", "ym-link"); linkKutu.append(el("summary", null, "🔗 Dosyayı yüklemek yerine hazır bir bağlantı ekle"), el("p", "ym-soluk", "Dosya zaten Drive, Zotero ya da başka bir bulutta duruyorsa adresini buraya yapıştır; R2 kotası harcanmaz."), linkAd, linkUrl, linkTur,
+  const linkKutu = el("div", "ym-link"); linkKutu.append(el("strong", null, "🔗 Dosyayı yüklemek yerine hazır bir bağlantı ekle"), el("p", "ym-soluk", "Dosya zaten Drive, Zotero ya da başka bir bulutta duruyorsa adresini buraya yapıştır; R2 kotası harcanmaz."), linkAd, linkUrl, linkTur,
     dugme("➕ Ekle", "ym-birincil", () => {
       let u; try { u = new URL(linkUrl.value.trim()); } catch { bildir("Geçerli bir adres yaz.", true); return; }
       if (u.protocol !== "https:") { bildir("Yalnızca https:// adresleri kabul edilir.", true); return; }
@@ -263,13 +269,29 @@ async function kur() {
     } catch { /* ayar yok */ }
   })();
 
+  /* ---------- sekmeler: Yükle · Yüklenenler · Hazır bağlantı ---------- */
+  const bolumYukle = el("div", "ym-bolum"), bolumListe = el("div", "ym-bolum"), bolumLink = el("div", "ym-bolum");
+  bolumYukle.append(birak, dosyaGirdi, hazirListe, yukleDugme, kuyrukListe, kuyrukOzet, kuyrukTemizle);
+  bolumListe.append(ozetSatir, liste);
+  bolumLink.append(linkKutu);
+  const sekmeBar = el("div", "ym-sekmeler"); sekmeBar.setAttribute("role", "tablist");
+  const sekmeler = {};
+  const bolumler = { yukle: bolumYukle, liste: bolumListe, link: bolumLink };
+  const etiketler = { yukle: "① Dosya yükle", liste: "② Bu yazının dosyaları", link: "③ Hazır bağlantı" };
+  function sekmeGit(ad) { Object.entries(bolumler).forEach(([k, b]) => { b.hidden = k !== ad; sekmeler[k].setAttribute("aria-selected", String(k === ad)); }); }
+  Object.keys(bolumler).forEach((k) => { const b = dugme(etiketler[k], "ym-sekme", () => sekmeGit(k)); b.setAttribute("role", "tab"); sekmeler[k] = b; sekmeBar.append(b); });
+  sekmeGit("yukle");
+  sekmeGuncelle = () => { sekmeler.liste.textContent = `② Bu yazının dosyaları (${kayitlar.length})`; };
+  ilkListe = () => { if (kayitlar.length) sekmeGit("liste"); };
   ic.append(
-    el("p", "ym-soluk", "Bu yazıya görsel, PDF, veri seti ya da herhangi bir dosya ekle. Dosyalar R2'de yazıya özel bir klasörde saklanır. Adımlar: ① dosyaları seç → ② adını gözden geçir → ③ yükle → ④ metne ekle."),
-    yerBilgi, birak, dosyaGirdi, hazirListe, yukleDugme, kuyrukListe, kuyrukOzet, kuyrukTemizle,
-    el("h4", "ym-baslik2", "④ Bu yazıya yüklenenler"), ozetSatir, liste, linkKutu, gelismis, ayarKutu, mesaj);
+    el("p", "ym-soluk", "Görsel, PDF, ses, video, veri seti — her türlü dosya. Yükle, sonra “Bu yazının dosyaları”ndan metne ekle. Dosyalar R2'de yazıya özel klasörde durur."),
+    yerBilgi, sekmeBar, bolumYukle, bolumListe, bolumLink, gelismis, ayarKutu, mesaj);
   govde.insertAdjacentElement("afterend", panel);
   panel.addEventListener("toggle", () => { if (panel.open) { yerGuncelle(); listeYenile(); } });
   yerGuncelle(); listeYenile().catch(() => {});
+  // Düzenleme formu metni programatik doldurur (input olayı yok): kısa aralıklarla metinden anahtarı yeniden dene
+  [400, 1200, 2800].forEach((ms) => setTimeout(() => { if (!anahtarElle && metindenAnahtar() && metindenAnahtar() !== anahtarGirdi.value) { yerGuncelle(); listeYenile(); } else if (!kayitlar.length) listeYenile(); }, ms));
+  govde.addEventListener("input", () => { if (!anahtarElle && metindenAnahtar() && metindenAnahtar() !== anahtarGirdi.value) { yerGuncelle(); listeYenile(); } });
   const arac = govde.previousElementSibling;
   if (arac && !arac.querySelector("[data-ym]")) { const grup = el("span", "gy-editor-grup"); grup.append(dugme("📎", "", () => { panel.open = true; panel.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, { title: "R2 medya: dosya yükle / metne ekle", "aria-label": "R2 medya paneli", "data-ym": "1" })); arac.append(grup); }
 }
