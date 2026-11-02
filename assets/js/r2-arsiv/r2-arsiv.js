@@ -320,11 +320,20 @@ async function adlandir(s) {
 }
 
 async function sil(s) {
-  const ok = await onayAl({
-    baslik: s.tur === "klasor" ? "Klasör silinsin mi?" : "Dosya silinsin mi?",
-    metin: s.tur === "klasor" ? `“${s.ad}” klasörü ve İÇİNDEKİ HER ŞEY kalıcı olarak silinecek.` : `“${s.ad}” kalıcı olarak silinecek.`,
-  });
-  if (!ok) return;
+  if (s.tur === "klasor") {
+    // Varsayılan: klasör kalkar, İÇİNDEKİLER bir üst klasöre çıkar (dosyalar silinmez). İstenirse içindekilerle birlikte silinir.
+    const koru = await onayAl({ baslik: "Klasör silinsin mi?", metin: `“${s.ad}” klasörü silinecek; içindeki dosya ve klasörler BİR ÜST KLASÖRE taşınır (silinmez). Dosyaları istersen ayrıca silebilirsin.`, tamam: "Klasörü sil, içindekileri koru" });
+    if (koru) {
+      const { data, error } = await supabase.rpc("r2_arsiv_klasor_sil_tasi", { p_id: s.id });
+      if (error) return bildir(error.message || "Klasör silinemedi.");
+      bildir(`Klasör silindi; ${data ?? 0} öğe bir üst klasöre taşındı.`, "ok"); yenile(); return;
+    }
+    const hepsi = await onayAl({ baslik: "İçindekilerle birlikte silinsin mi?", metin: `“${s.ad}” klasörü ve İÇİNDEKİ HER ŞEY R2'den kalıcı olarak silinecek. Bu işlem geri alınamaz.`, tamam: "Hepsini sil" });
+    if (!hepsi) return;
+  } else {
+    const ok = await onayAl({ baslik: "Dosya silinsin mi?", metin: `“${s.ad}” kalıcı olarak silinecek.` });
+    if (!ok) return;
+  }
   try { await worker("/sil", { id: s.id }); bildir("Silindi.", "ok"); yenile(); }
   catch (e) { bildir(e.message); }
 }
