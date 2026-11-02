@@ -1,0 +1,1 @@
+   select email, role, is_suspended from profiles;
