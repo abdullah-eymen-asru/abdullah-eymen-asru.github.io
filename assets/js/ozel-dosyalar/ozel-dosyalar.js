@@ -34,7 +34,7 @@ async function kur(form) {
   const bildir = (m, h = false) => { mesaj.textContent = m || ""; mesaj.classList.toggle("oz-hata", !!h); };
   const yol = el("nav", "oz-yol"); yol.setAttribute("aria-label", "Klasör konumu");
   const arac = el("div", "oz-arac"), liste = el("ul", "oz-liste"), secimKutu = el("div", "oz-secim");
-  const dosyaGirdi = el("input"); dosyaGirdi.type = "file"; dosyaGirdi.multiple = true; dosyaGirdi.hidden = true;
+  const dosyaGirdi = el("input"); dosyaGirdi.type = "file"; dosyaGirdi.multiple = true; dosyaGirdi.className = "oz-gizli-girdi";
   const kuyrukListe = el("ul", "oz-kuyruk"), kuyrukOzet = el("p", "oz-soluk"), kuyrukTemizle = dg("Temizle", "oz-kucuk"); kuyrukOzet.hidden = true; kuyrukTemizle.hidden = true;
   let kayitlar = [];
 
@@ -59,9 +59,14 @@ async function kur(form) {
       if (k.tur === "klasor") {
         const ac = dg(`📁 ${k.ad}`, "oz-klasor", () => { durum.yol = [...durum.yol, k.ad]; yenile(); cizYol(); });
         li.append(ac, dg("🗑", "oz-kucuk oz-tehlike", async () => {
-          if (!window.confirm(`“${k.ad}” klasörü ve içindeki TÜM dosyalar R2'den silinsin mi? Geri alınamaz.`)) return;
-          try { await worker("/sil", { id: k.id }); durum.secili.forEach((v, id) => { /* içeriği silinen dosyalar seçimden düşer: yenileyince sunucu doğrular */ }); await yenile(); bildir("Klasör silindi."); } catch (h) { bildir(h.message, true); }
-        }, { "aria-label": `${k.ad} klasörünü sil`, title: "Klasörü ve içindekileri sil" }));
+          // Varsayılan: klasör kalkar, içindekiler BİR ÜST klasöre çıkar. İstersen hepsi silinir.
+          if (window.confirm(`“${k.ad}” klasörü silinsin mi?\n\nTamam: klasör kalkar, içindeki dosya ve klasörler bir üst klasöre taşınır (silinmez).\nİptal: bir sonraki adımda içindekilerle birlikte silme seçeneği sunulur.`)) {
+            try { const { error } = await supabase.rpc("r2_arsiv_klasor_sil_tasi", { p_id: k.id }); if (error) throw new Error(error.message); await yenile(); bildir("Klasör silindi; içindekiler bir üst klasöre taşındı."); } catch (h) { bildir(h.message, true); }
+            return;
+          }
+          if (!window.confirm(`“${k.ad}” klasörü ve İÇİNDEKİ TÜM dosyalar R2'den silinsin mi? Geri alınamaz.`)) return;
+          try { await worker("/sil", { id: k.id }); await yenile(); bildir("Klasör ve içindekiler silindi."); } catch (h) { bildir(h.message, true); }
+        }, { "aria-label": `${k.ad} klasörünü sil`, title: "Klasörü sil (içindekiler üst klasöre çıkar)" }));
       } else {
         const c = el("input"); c.type = "checkbox"; c.checked = durum.secili.has(k.id); c.setAttribute("aria-label", `${k.ad} dosyasını bu makaleye ekle`);
         c.addEventListener("change", () => { if (c.checked) durum.secili.set(k.id, { ad: k.ad, boyut: k.boyut }); else durum.secili.delete(k.id); cizSecim(); });
@@ -90,12 +95,15 @@ async function kur(form) {
       try { await kokuGaranti(); const ust = [KOK, ...durum.yol].join("/") + "/"; const { error } = await supabase.rpc("r2_arsiv_klasor_olustur", { p_klasor_yolu: durum.yol.length ? ust.slice(0, -1) + "/" : `${KOK}/`, p_ad: t });
         if (error) throw new Error(error.message); await yenile(); bildir("Klasör oluşturuldu."); } catch (h) { bildir(h.message, true); }
     }),
-    dg("📤 Dosya yükle (her format, birden çok)", "oz-birincil", async () => { try { await kokuGaranti(); await klasorHazirla(); dosyaGirdi.click(); } catch (h) { bildir(h.message, true); } }));
+    dg("📤 Dosya yükle (her format, birden çok)", "oz-birincil", () => dosyaGirdi.click()));   // tıklama hemen dosya seçiciyi açar (tarayıcılar async sonrası click()'i engeller)
   async function klasorHazirla() {                                 // alt klasör zincirinin var olduğundan emin ol
     let ust = `${KOK}/`; for (const p of durum.yol) { await supabase.rpc("r2_arsiv_klasor_olustur", { p_klasor_yolu: ust, p_ad: p }); ust += `${p}/`; }
   }
   dosyaGirdi.addEventListener("change", async () => {
-    try { bildir(""); await kuyruk.ekle(await dosyalariTopla({ files: dosyaGirdi.files })); } catch (h) { bildir(h.message || String(h), true); }
+    try {
+      bildir("Klasör hazırlanıyor…"); await kokuGaranti(); await klasorHazirla(); bildir("");
+      await kuyruk.ekle(await dosyalariTopla({ files: dosyaGirdi.files }));
+    } catch (h) { bildir(h.message || String(h), true); }
     dosyaGirdi.value = "";
   });
 
