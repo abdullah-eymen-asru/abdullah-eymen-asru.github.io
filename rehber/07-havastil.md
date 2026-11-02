@@ -166,3 +166,8 @@ Kurulum: Supabase’de `0113_site_duyurulari_ve_havastil_ai_kasasi.sql` (kasa ta
 - Sistem Durumu herkese açık; Worker sınaması ve R2 kota kartı yalnızca admin/site sahibi ve varsayılan KAPALI (kutu işaretlenmeden düğme çalışmaz).
 - Özel/gizli makale formunda "📎 R2 dosyaları": "Özel Makaleler/" ana klasöründe klasör/alt klasör, her tür dosya yükleme, silme; işaretlenen dosyalar makale sayfasında "Ekler" olarak indirilir.
 - Yazı medyası gösterimi: görsel (konum/boyut/altyazı), PDF (sayfa içinde okuyucu), ses/video oynatıcı, diğer dosyalar indirme kartı.
+
+## Tur 18
+- SQL: `0132_tur18_sahip_askisi_demo_cikar_klasor_tasi_worker_yetkisi.sql` (Site Sahibi askı bayrağı düzeltmesi, `admin_demo_cikar`, klasör silinince içerik üst klasöre taşıma, `sistem_durumu_worker` varsayılan kapalı).
+- Supabase'te yayınlanan yazılar ve önizleme: R2 medya blokları artık şema doğrulamalı olarak görsel/PDF/ses/video/dosya kartına dönüşür (`assets/js/core/r2-bloklar.js`); `r2-medya.js` dinamik içeriği de tarar.
+- Sistem Durumu: Cloudflare/GitHub durumu yalnızca kullandığımız bileşenlere ve ilgili açık olaylara göre; olay bağlantıları gösterilir. Worker sınaması: admin/owner her zaman, diğer roller Yetki Ayarları › "Sistem Durumu: Worker sınaması" ile.
