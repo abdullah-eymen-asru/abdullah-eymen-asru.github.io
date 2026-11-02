@@ -69,3 +69,5 @@
 .sd-girdi { padding: .45rem .6rem; font: inherit; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); }
 .sd-btn-tehlike { color: #c0392b; border-color: #c0392b; }
 .sd-onay { display: flex; gap: .5rem; align-items: flex-start; font-size: .88rem; margin: .4rem 0; } .sd-onay input { margin-top: .2rem; inline-size: 1.1rem; block-size: 1.1rem; }
+
+.sd-detay { display: grid; gap: .4rem; margin-top: .4rem; } .sd-detay .sd-liste { margin: 0; padding-left: 1.1rem; font-size: .88rem; } .sd-detay .sd-eylemler { display: flex; flex-wrap: wrap; gap: .4rem; }
