@@ -125,6 +125,10 @@ async function loadUsers() {
   }
 
   TUM_KULLANICILAR = data || [];
+  // Teşhis: Site Sahibi yalnızca kendini görüyorsa hesabı "askıda" işaretli olabilir (0132 bunu düzeltir).
+  if (GIRIS_YAPAN_PROFIL?.role === "owner" && TUM_KULLANICILAR.length <= 1) {
+    liste.insertAdjacentHTML("beforebegin", '<p class="auth-message error" role="alert">Yalnızca kendi kaydını görüyorsun. Veritabanında 0132 numaralı güncellemeyi çalıştır (Site Sahibi hesabının “askıda” bayrağı sorunu) ya da SQL Editor\'de <code>select email, role, is_suspended from profiles;</code> ile kontrol et.</p>');
+  }
   renderStats(TUM_KULLANICILAR);
   renderListe();
 }
@@ -396,7 +400,7 @@ function rolSecimHtml(u) {
   const benOwnerMi = GIRIS_YAPAN_PROFIL?.role === "owner";
   const hedefZatenAdminMi = u.role === "admin";
   const hedefDemoMu = u.role === "demo";
-  const devreDisi = (hedefZatenAdminMi || hedefDemoMu) && !benOwnerMi;
+  const devreDisi = hedefZatenAdminMi && !benOwnerMi;           // demo üyeyi yönetici de normal role çıkarabilir (admin_demo_cikar, 0132)
 
   const secenekler = [
     { rol: "user", etiket: "Üye" },
@@ -470,9 +474,9 @@ function wireKartOlaylari(liste) {
         ({ error } = await supabase.rpc("owner_demo_rolu_ata", { p_user_id: userId, p_demo: true }));
       } else {
         if (eskiRol === "demo") {
-          ({ error } = await supabase.rpc("owner_demo_rolu_ata", { p_user_id: userId, p_demo: false })); // demo → user
-        }
-        if (!error && !(eskiRol === "demo" && yeniRol === "user")) {
+          // demo → normal rol: Site Sahibi de, Yönetici de yapabilir (tek RPC, rol doğrudan atanır)
+          ({ error } = await supabase.rpc("admin_demo_cikar", { p_user_id: userId, p_yeni_rol: yeniRol }));
+        } else {
           ({ error } = await supabase.rpc("admin_set_user_role", { p_user_id: userId, p_new_role: yeniRol }));
         }
       }
