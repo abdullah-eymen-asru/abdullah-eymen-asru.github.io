@@ -234,6 +234,27 @@ async function kur() {
   alanYardimcisi(pdfAlani, "PDF Bağlantısı", ".pdf,application/pdf", pdfMi);
   alanYardimcisi(veriAlani, "Veri Seti URL", "", () => true);
 
+  /* ---------- önceden yüklenmiş dosya kümeleri: düzenlemede otomatik bul / elle seç ---------- */
+  let kumeler = [];
+  const kumeSec = el("select", "ym-girdi"); kumeSec.setAttribute("aria-label", "Önceden yüklenmiş dosya kümeleri"); kumeSec.hidden = true;
+  const kumeNot = el("p", "ym-soluk"); kumeNot.hidden = true;
+  async function kumeleriYukle() {
+    const { data } = await supabase.rpc("yazi_medya_anahtarlarim"); kumeler = data || [];
+    kumeSec.replaceChildren(); const o0 = el("option", null, "📚 Önceden yüklenmiş dosya kümesi seç…"); o0.value = ""; kumeSec.append(o0);
+    kumeler.forEach((k) => { const o = el("option", null, `${k.anahtar} · ${k.dosya_sayisi} dosya · ${boyutYaz(k.toplam_boyut)}`); o.value = k.anahtar; kumeSec.append(o); });
+    kumeSec.hidden = !kumeler.length;
+    otomatikEslestir();
+  }
+  /** Otomatik eşleştirme: (1) metindeki R2 adresleri, (2) yazının adres/slug'ı ya da başlığından türeyen anahtar, (3) tek bir küme varsa öner. Elle seçilmediyse uygulanır. */
+  function otomatikEslestir() {
+    if (anahtarElle || !kumeler.length) return;
+    const aday = metindenAnahtar() || anahtarYap(slugGirdi?.value || "") || anahtarYap(baslikGirdi?.value || "");
+    const bulunan = kumeler.find((k) => k.anahtar === aday) || kumeler.find((k) => aday && (k.anahtar.startsWith(aday) || aday.startsWith(k.anahtar)));
+    if (bulunan && bulunan.anahtar !== anahtarGirdi.value) { anahtarGirdi.value = bulunan.anahtar; yerGuncelle(); listeYenile(); kumeSec.value = bulunan.anahtar; kumeNot.hidden = true; }
+    else if (!bulunan && !kayitlar.length) { kumeNot.hidden = false; kumeNot.textContent = `Bu yazıyla otomatik eşleşen bir dosya kümesi bulunamadı. Daha önce dosya yüklediysen yukarıdaki listeden seç (${kumeler.length} küme var).`; }
+  }
+  kumeSec.addEventListener("change", () => { if (!kumeSec.value) return; anahtarElle = true; anahtarGirdi.value = kumeSec.value; yerGuncelle(); listeYenile(); kumeNot.hidden = true; sekmeGit?.("liste"); });
+
   /* ---------- gelişmiş: adres anahtarı ---------- */
   const gelismis = el("details", "ym-gelismis"); gelismis.append(el("summary", null, "⚙ Gelişmiş: adres anahtarı"),
     el("p", "ym-soluk", "Dosya adreslerinin yazıya özel kısmı (örn. china-turkiye-relations). Normalde başlıktan otomatik oluşur; değiştirirsen daha önce metne eklediğin adresler eski anahtarla kalır."), anahtarGirdi);
@@ -285,12 +306,19 @@ async function kur() {
   ilkListe = () => { if (kayitlar.length) sekmeGit("liste"); };
   ic.append(
     el("p", "ym-soluk", "Görsel, PDF, ses, video, veri seti — her türlü dosya. Yükle, sonra “Bu yazının dosyaları”ndan metne ekle. Dosyalar R2'de yazıya özel klasörde durur."),
-    yerBilgi, sekmeBar, bolumYukle, bolumListe, bolumLink, gelismis, ayarKutu, mesaj);
+    yerBilgi, kumeSec, kumeNot, sekmeBar, bolumYukle, bolumListe, bolumLink, gelismis, ayarKutu, mesaj);
   govde.insertAdjacentElement("afterend", panel);
   panel.addEventListener("toggle", () => { if (panel.open) { yerGuncelle(); listeYenile(); } });
   yerGuncelle(); listeYenile().catch(() => {});
-  // Düzenleme formu metni programatik doldurur (input olayı yok): kısa aralıklarla metinden anahtarı yeniden dene
-  [400, 1200, 2800].forEach((ms) => setTimeout(() => { if (!anahtarElle && metindenAnahtar() && metindenAnahtar() !== anahtarGirdi.value) { yerGuncelle(); listeYenile(); } else if (!kayitlar.length) listeYenile(); }, ms));
+  // Düzenleme formu alanları programatik doldurur (input olayı yok): ilk ~12 sn boyunca başlık/adres/metin değişimini izleyip anahtarı ve listeyi güncelle
+  let sonImza = "";
+  const izle = setInterval(() => {
+    if (!document.body.contains(panel)) { clearInterval(izle); return; }
+    const imza = `${baslikGirdi?.value}|${slugGirdi?.value}|${metindenAnahtar()}`;
+    if (imza !== sonImza) { sonImza = imza; if (!anahtarElle) { yerGuncelle(); otomatikEslestir(); listeYenile(); } }
+  }, 600);
+  setTimeout(() => clearInterval(izle), 12000);
+  kumeleriYukle().catch(() => {});
   govde.addEventListener("input", () => { if (!anahtarElle && metindenAnahtar() && metindenAnahtar() !== anahtarGirdi.value) { yerGuncelle(); listeYenile(); } });
   const arac = govde.previousElementSibling;
   if (arac && !arac.querySelector("[data-ym]")) { const grup = el("span", "gy-editor-grup"); grup.append(dugme("📎", "", () => { panel.open = true; panel.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, { title: "R2 medya: dosya yükle / metne ekle", "aria-label": "R2 medya paneli", "data-ym": "1" })); arac.append(grup); }
