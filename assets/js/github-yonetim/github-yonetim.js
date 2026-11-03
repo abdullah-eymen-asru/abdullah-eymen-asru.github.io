@@ -372,6 +372,13 @@ const OZELLIK_KATALOGU = [
     rolSutunlari: ["user", "special_user", "editor", "manager"],
   },
   {
+    // tur 19 — PDF Düzenleyici (Araçlar altında ayrı sekme). Dönüştürücü yetkisi OLAN roller için ayrıca kapatılabilir; %100 tarayıcıda, veri sunucuya gitmez.
+    anahtar: "pdf_duzenle",
+    baslik: "PDF Düzenleyici Aracı",
+    aciklama: "Araçlar › PDF Düzenleyici (metin düzenleme, ekleme, çizim, vurgulama, sayfa işlemleri). Önce “Gelişmiş Belge ve Gizlilik Araçları” yetkisi gerekir; bu anahtar aracı ayrıca kapatır. Site Sahibi her zaman kullanır.",
+    rolSutunlari: ["user", "special_user", "editor", "manager", "admin"],
+  },
+  {
     // tur 14 — PDF Böl & Ayıkla aracı. Dönüştürücü yetkisi OLAN roller için ayrıca kapatılabilir (%100 istemci tarafı; veri sunucuya gitmez).
     anahtar: "pdf_bol",
     baslik: "PDF Böl & Ayıkla Aracı",
