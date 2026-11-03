@@ -1,0 +1,26 @@
+/* PDF Düzenleyici sekmesi (tur 19). Editörün kendi stilleri donusturucu.css'te. Inline stil yok (CSP). */
+.pd-kok { display: grid; gap: .9rem; }
+.pd-kart { border: 1px solid var(--border); border-radius: 14px; padding: .9rem 1rem; background: var(--card-bg); }
+.pd-soluk { color: var(--muted); font-size: .88rem; margin: .2rem 0; overflow-wrap: anywhere; }
+.pd-gizlilik { margin: 0 0 .7rem; font-size: .88rem; color: var(--muted); }
+.pd-birak { display: grid; gap: .5rem; justify-items: start; padding: 1rem; border: 2px dashed var(--border); border-radius: 12px; }
+.pd-birak.surukle { border-color: var(--accent); background: var(--tag-bg); }
+.pd-btn { font: inherit; min-height: 2.6rem; padding: .45rem .9rem; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; }
+.pd-btn:hover { border-color: var(--accent); } .pd-btn:disabled { opacity: .55; }
+.pd-birincil { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.pd-kucukbtn { min-height: 2.2rem; padding: .2rem .7rem; font-size: .85rem; }
+.pd-arac { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.pd-onay { display: flex; gap: .45rem; align-items: center; font-size: .9rem; }
+.pd-onay input { inline-size: 1.1rem; block-size: 1.1rem; }
+.pd-panel { border: 1px solid var(--border); border-radius: 14px; padding: .8rem 1rem; background: var(--card-bg); display: grid; gap: .6rem; }
+.pd-panel[hidden], .pd-arac[hidden] { display: none; }
+.pd-panel-ust { display: flex; justify-content: space-between; align-items: center; gap: .6rem; }
+.pd-girdi { font: inherit; padding: .5rem .7rem; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); width: 100%; box-sizing: border-box; min-height: 2.5rem; }
+.pd-izgara { display: grid; grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr)); gap: .6rem; max-height: 32rem; overflow-y: auto; padding: .2rem; }
+.pd-kucuk { position: relative; display: grid; place-items: center; padding: .3rem; border: 2px solid var(--border); border-radius: 10px; background: var(--bg); cursor: pointer; }
+.pd-kucuk canvas { max-inline-size: 100%; block-size: auto; background: #fff; }
+.pd-no { position: absolute; left: .35rem; bottom: .25rem; font-size: .72rem; background: rgba(0,0,0,.65); color: #fff; padding: 0 .35rem; border-radius: 6px; }
+.pd-baglantilar { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; max-height: 24rem; overflow-y: auto; }
+.pd-baglantilar li { display: grid; gap: .3rem; padding: .5rem .6rem; border: 1px solid var(--border); border-radius: 10px; }
+.pd-mesaj { margin: 0; min-height: 1.2rem; font-size: .9rem; overflow-wrap: anywhere; } .pd-hata { color: #e5584a; font-weight: 600; }
+.pd-editor { min-width: 0; }
