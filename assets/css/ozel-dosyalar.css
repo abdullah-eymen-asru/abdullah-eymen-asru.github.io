@@ -11,7 +11,7 @@
 .oz-yol, .oz-arac { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
 .oz-liste, .oz-kuyruk { list-style: none; margin: 0; padding: 0; display: grid; gap: .4rem; max-height: 20rem; overflow-y: auto; }
 .oz-kuyruk:empty { display: none; }
-.oz-oge { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .5rem; align-items: center; padding: .35rem .5rem; border: 1px solid var(--border); border-radius: 10px; }
+.oz-oge { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem; align-items: center; padding: .35rem .5rem; border: 1px solid var(--border); border-radius: 10px; }
 .oz-klasor { text-align: left; font: inherit; background: none; border: 0; cursor: pointer; color: var(--text); font-weight: 600; padding: .3rem; overflow-wrap: anywhere; }
 .oz-dosya { display: flex; gap: .5rem; align-items: center; min-width: 0; cursor: pointer; }
 .oz-dosya input { inline-size: 1.15rem; block-size: 1.15rem; }
@@ -26,3 +26,4 @@
 .oz-ek-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
 .oz-ek-liste li { display: flex; justify-content: space-between; align-items: center; gap: .6rem; flex-wrap: wrap; padding: .5rem .7rem; border: 1px solid var(--border); border-radius: 10px; overflow-wrap: anywhere; }
 .oz-gizli-girdi { position: absolute; inline-size: 1px; block-size: 1px; opacity: 0; pointer-events: none; overflow: hidden; }
+.oz-oge > .oz-klasor, .oz-oge > .oz-dosya { flex: 1 1 12rem; min-width: 0; } .oz-girdi { font: inherit; padding: .4rem .6rem; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); max-width: 100%; }
