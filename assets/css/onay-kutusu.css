@@ -1,0 +1,29 @@
+/* Onay Kutusu (tur 19) — inline stil yok (CSP) */
+.ok-kok { display: grid; gap: .8rem; }
+.ok-soluk { color: var(--muted); font-size: .88rem; margin: .2rem 0; overflow-wrap: anywhere; }
+.ok-gonder { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; } .ok-gonder:empty { display: none; }
+.ok-filtre { display: flex; flex-wrap: wrap; gap: .4rem; }
+.ok-sekme[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.ok-btn { font: inherit; min-height: 2.5rem; padding: .35rem .85rem; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+.ok-btn:hover { border-color: var(--accent); }
+.ok-birincil { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.ok-tehlike { color: #e5584a; border-color: #e5584a; }
+.ok-kucuk { min-height: 2.1rem; padding: .15rem .6rem; font-size: .84rem; }
+.ok-girdi { font: inherit; padding: .5rem .7rem; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); width: 100%; box-sizing: border-box; }
+.ok-gonder .ok-girdi { width: auto; flex: 1 1 16rem; }
+.ok-govde { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .88rem; }
+.ok-liste { display: grid; gap: .7rem; }
+.ok-kart { border: 1px solid var(--border); border-radius: 14px; padding: .8rem 1rem; background: var(--card-bg); display: grid; gap: .5rem; min-width: 0; }
+.ok-kart-ust { display: flex; justify-content: space-between; gap: .6rem; flex-wrap: wrap; align-items: flex-start; }
+.ok-baslik { overflow-wrap: anywhere; }
+.ok-meta { margin: 0; color: var(--muted); font-size: .85rem; }
+.ok-rozet { font-size: .78rem; padding: .15rem .6rem; border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; }
+.ok-tamam { border-color: #3fb27f; color: #3fb27f; } .ok-duzelt { border-color: #e0a93b; color: #e0a93b; } .ok-iptal { border-color: #e5584a; color: #e5584a; } .ok-bekle { border-color: var(--accent); color: var(--accent); }
+.ok-eylem { display: flex; flex-wrap: wrap; gap: .4rem; }
+.ok-duzen, .ok-not-form, .ok-not-ic { display: grid; gap: .4rem; }
+.ok-duzen[hidden] { display: none; }
+.ok-etiket { font-size: .85rem; color: var(--muted); }
+.ok-notlar > summary { cursor: pointer; font-weight: 600; }
+.ok-not { border-left: 3px solid var(--accent); padding: .3rem .6rem; background: var(--tag-bg); border-radius: 6px; display: grid; gap: .2rem; }
+.ok-not-ust { font-size: .8rem; color: var(--muted); } .ok-not-metin { white-space: pre-wrap; overflow-wrap: anywhere; }
+.ok-mesaj { margin: 0; min-height: 1.2rem; font-size: .9rem; } .ok-hata { color: #e5584a; font-weight: 600; }
