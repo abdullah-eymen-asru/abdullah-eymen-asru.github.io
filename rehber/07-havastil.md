@@ -171,3 +171,8 @@ Kurulum: Supabase’de `0113_site_duyurulari_ve_havastil_ai_kasasi.sql` (kasa ta
 - SQL: `0132_tur18_sahip_askisi_demo_cikar_klasor_tasi_worker_yetkisi.sql` (Site Sahibi askı bayrağı düzeltmesi, `admin_demo_cikar`, klasör silinince içerik üst klasöre taşıma, `sistem_durumu_worker` varsayılan kapalı).
 - Supabase'te yayınlanan yazılar ve önizleme: R2 medya blokları artık şema doğrulamalı olarak görsel/PDF/ses/video/dosya kartına dönüşür (`assets/js/core/r2-bloklar.js`); `r2-medya.js` dinamik içeriği de tarar.
 - Sistem Durumu: Cloudflare/GitHub durumu yalnızca kullandığımız bileşenlere ve ilgili açık olaylara göre; olay bağlantıları gösterilir. Worker sınaması: admin/owner her zaman, diğer roller Yetki Ayarları › "Sistem Durumu: Worker sınaması" ile.
+
+## Tur 19
+- SQL: `0133_tur19_onay_kutusu_tasima_medya_kumeleri.sql` (Onay Kutusu tabloları/RPC'leri, `r2_arsiv_tasi`, `yazi_medya_anahtarlarim`, taslak RLS rol hiyerarşisi).
+- İçerik Yönetimi › **Onay Kutusu** (admin/manager/editor); **Notlarım** artık Medya & Takip altında (aynı sekme kimliği). Araçlar › **PDF Düzenleyici** (yetki anahtarı: `pdf_duzenle`).
+- Özel makale R2 dosyaları: klasör/dosya **Taşı**; yazı medyası paneli düzenlemede dosya kümesini otomatik bulur.
