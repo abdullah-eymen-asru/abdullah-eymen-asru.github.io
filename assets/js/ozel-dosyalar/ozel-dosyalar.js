@@ -47,6 +47,17 @@ async function kur(form) {
     if (error) { kayitlar = []; liste.replaceChildren(el("li", "oz-soluk", /42501|permission|policy/i.test(error.message) ? "R2 dosyaları için Arşiv erişim yetkisi gerekir (Yetki Ayarları › Arşiv)." : error.message)); return; }
     kayitlar = (data || []).filter((k) => !k.sifreli); cizListe();
   }
+  /** Taşı: hedef klasörü seç (Özel Makaleler ağacı) → r2_arsiv_tasi (0133). Klasör kendi altına taşınamaz; ad çakışması sunucuda reddedilir. */
+  async function tasiKutusu(li, k) {
+    const { data } = await supabase.from("r2_arsiv").select("klasor_yolu,ad").eq("tur", "klasor").like("klasor_yolu", `${KOK}/%`).limit(1000);
+    const yollar = [`${KOK}/`, ...(data || []).map((f) => `${f.klasor_yolu}${f.ad}/`)].filter((y, i, a) => a.indexOf(y) === i).sort((a, b) => a.localeCompare(b, "tr"));
+    const kendi = k.tur === "klasor" ? `${klasorYolu()}${k.ad}/` : null;
+    const sec = el("select", "oz-girdi"); sec.setAttribute("aria-label", "Hedef klasör");
+    yollar.filter((y) => y !== klasorYolu() && !(kendi && y.startsWith(kendi))).forEach((y) => { const o = el("option", null, `📁 ${y.replace(/\/$/, "").replace(`${KOK}`, KOK) || KOK}`); o.value = y; sec.append(o); });
+    if (!sec.options.length) { bildir("Taşınacak başka klasör yok. Önce “Yeni klasör” oluştur.", true); return; }
+    const tamam = dg("Taşı", "oz-birincil oz-kucuk", async () => { try { const { error } = await supabase.rpc("r2_arsiv_tasi", { p_id: k.id, p_hedef_yol: sec.value }); if (error) throw new Error(error.message); durum.secili.forEach(() => {}); await yenile(); bildir(`“${k.ad}” taşındı.`); } catch (h) { bildir(h.message, true); } });
+    li.replaceChildren(el("span", "oz-soluk", `“${k.ad}” nereye taşınsın?`), sec, tamam, dg("Vazgeç", "oz-kucuk", () => cizListe()));
+  }
   function cizYol() {
     yol.replaceChildren(dg(`🗂 ${KOK}`, "oz-kucuk", () => { durum.yol = []; yenile(); cizYol(); }));
     durum.yol.forEach((p, i) => { yol.append(el("span", "oz-soluk", "›"), dg(p, "oz-kucuk", () => { durum.yol = durum.yol.slice(0, i + 1); yenile(); cizYol(); })); });
@@ -58,7 +69,7 @@ async function kur(form) {
       const li = el("li", "oz-oge");
       if (k.tur === "klasor") {
         const ac = dg(`📁 ${k.ad}`, "oz-klasor", () => { durum.yol = [...durum.yol, k.ad]; yenile(); cizYol(); });
-        li.append(ac, dg("🗑", "oz-kucuk oz-tehlike", async () => {
+        li.append(ac, dg("↪ Taşı", "oz-kucuk", () => tasiKutusu(li, k), { title: "Klasörü başka klasöre taşı" }), dg("🗑", "oz-kucuk oz-tehlike", async () => {
           // Varsayılan: klasör kalkar, içindekiler BİR ÜST klasöre çıkar. İstersen hepsi silinir.
           if (window.confirm(`“${k.ad}” klasörü silinsin mi?\n\nTamam: klasör kalkar, içindeki dosya ve klasörler bir üst klasöre taşınır (silinmez).\nİptal: bir sonraki adımda içindekilerle birlikte silme seçeneği sunulur.`)) {
             try { const { error } = await supabase.rpc("r2_arsiv_klasor_sil_tasi", { p_id: k.id }); if (error) throw new Error(error.message); await yenile(); bildir("Klasör silindi; içindekiler bir üst klasöre taşındı."); } catch (h) { bildir(h.message, true); }
@@ -71,7 +82,7 @@ async function kur(form) {
         const c = el("input"); c.type = "checkbox"; c.checked = durum.secili.has(k.id); c.setAttribute("aria-label", `${k.ad} dosyasını bu makaleye ekle`);
         c.addEventListener("change", () => { if (c.checked) durum.secili.set(k.id, { ad: k.ad, boyut: k.boyut }); else durum.secili.delete(k.id); cizSecim(); });
         const lab = el("label", "oz-dosya"); lab.append(c, el("span", "oz-ad", `📄 ${k.ad}`), el("small", "oz-soluk", boyutYaz(k.boyut)));
-        li.append(lab, dg("🗑", "oz-kucuk oz-tehlike", async () => {
+        li.append(lab, dg("↪ Taşı", "oz-kucuk", () => tasiKutusu(li, k), { title: "Dosyayı başka klasöre taşı" }), dg("🗑", "oz-kucuk oz-tehlike", async () => {
           if (!window.confirm(`“${k.ad}” R2'den silinsin mi? Geri alınamaz.`)) return;
           try { await worker("/sil", { id: k.id }); durum.secili.delete(k.id); await yenile(); cizSecim(); bildir("Dosya silindi."); } catch (h) { bildir(h.message, true); }
         }, { "aria-label": `${k.ad} dosyasını sil` }));
