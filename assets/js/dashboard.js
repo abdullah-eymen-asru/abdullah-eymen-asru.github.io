@@ -102,6 +102,8 @@ const MODULES = {
   metadata: { src: "./metadata-temizleyici/metadata-temizleyici.js", role: null },
   // PDF Böl & Ayıkla (assets/js/pdf-bol/): %100 istemci; yetki Dönüştürücü ile AYNI satır (Yetki Ayarları › Özellikler).
   pdfbol: { src: "./pdf-bol/pdf-bol.js", role: null },
+  onay: { src: "./onay-kutusu/onay-kutusu.js", role: null },
+  pdfduzenle: { src: "./pdf-duzenle/pdf-duzenle.js", role: null },
   // HavaStil (migration 0099): hava durumuna göre katman/giyim danışmanı. Görünürlük role DEĞİL, Yetki Ayarları › Özellikler'deki
   // "havastil" anahtarına bağlı (VARSAYILAN KAPALI; owner her zaman). NAV'daki izin:"havastil" + izinleriYukle. Modül kendi içinde RPC ile tekrar doğrular.
   havastil: { src: "./havastil/panel.js", role: null },
@@ -140,10 +142,8 @@ const NAV = [
     items: [
       { id: "content-all", icon: "📚", label: "Tüm Yazılar & Projeler", module: "gy" },
       { id: "content-new", icon: "➕", label: "Yeni İçerik Ekle", module: "gy" },
-      // defaultAcilis:false -> owner bir üyeye modülü açtığında o üyenin giriş sonrası varsayılan sekmesi
-      // (adreste # yokken) değişmesin; notlar kendiliğinden açılmasın. Editor/manager/admin için
-      // varsayılan açılış zaten daha önceki "içerik" sekmeleridir, onlar değişmez.
-      { id: "content-notlar", icon: "🗒️", label: "Notlarım", module: "notlar", defaultAcilis: false },
+      // Onay Kutusu: onaya gönderilen taslakları inceleme (onayla / düzeltme iste / iptal / sil) + yazara düzeltme notu. Yazar da kendi taslaklarının durumunu ve notlarını burada görür.
+      { id: "content-onay", icon: "✅", label: "Onay Kutusu", module: "onay", role: ["admin", "manager", "editor"] },
       // role override: admin modülü (MODULES.admin) editor'e AÇILMAZ (sys-hesabim gibi sekmeler admin/manager
       // kalsın); bu iki sekme ise Yetki Ayarları'nda editor için de açılıp kapanır (migration 0066).
       // ozellik: owner kapattıysa (admin/manager/editor fark etmez) sekme hiç çizilmez; gerçek sınır RLS + worker.
@@ -159,6 +159,9 @@ const NAV = [
       { id: "media-arsiv", icon: "🗄️", label: "Dosya Yöneticisi", module: "arsiv", role: null, izin: "arsiv", defaultAcilis: false },
       { id: "media-izleme", icon: "🎬", label: "İzleme ve Okuma Yönetimi", module: "izleme", role: null, izin: "izleme" },
       { id: "media-cv", icon: "📄", label: "Özgeçmiş (CV) & Profil Görseli", module: "gy" },
+      // Notlarım artık burada (İçerik Yönetimi kalabalıklaşmasın diye taşındı); sekme kimliği AYNI kaldığı için eski bağlantılar çalışır.
+      // defaultAcilis:false -> notlar giriş sonrası kendiliğinden açılmasın.
+      { id: "content-notlar", icon: "🗒️", label: "Notlarım", module: "notlar", defaultAcilis: false },
     ],
   },
   {
@@ -188,6 +191,7 @@ const NAV = [
       { id: "tool-belge-tarayici", icon: "📑", label: "Belge Tarayıcı & Birleştirici", module: "belgeTarayici", role: null, izin: "donusturucu", defaultAcilis: false },
       { id: "tool-metadata", icon: "🧼", label: "Metadata Temizleyici", module: "metadata", role: null, izin: "donusturucu", defaultAcilis: false },
       { id: "tool-pdfbol", icon: "✂️", label: "PDF Böl & Ayıkla", module: "pdfbol", role: null, ozellik: "pdf_bol", izin: "donusturucu", defaultAcilis: false },
+      { id: "tool-pdfduzenle", icon: "📝", label: "PDF Düzenleyici", module: "pdfduzenle", role: null, ozellik: "pdf_duzenle", izin: "donusturucu", defaultAcilis: false },
       // role:null + izin:"havastil": owner her zaman görür; diğer roller yalnızca Yetki Ayarları'nda HavaStil açıldıysa.
       { id: "tool-havastil", icon: "🌦️", label: "HavaStil (Giyim Danışmanı)", module: "havastil", role: null, izin: "havastil", defaultAcilis: false },
     ],
@@ -294,14 +298,15 @@ async function izinleriYukle(rol) {
       .rpc("ozellik_erisimi_var_mi", { p_ozellik: anahtar, p_rol: rol })
       .then((r) => (r.error ? true : r.data !== false))
       .catch(() => true);
-  const [arsiv, kvkk, ozelIcerik, dosyaPaylasimi, akademikKutuphane, sistemDurumuAcik, pdfBolAcik, sistemYedek, donusturucu, silmeOnayi, yetkiAyarlari, havastil, izleme, duyuru] = await Promise.all([
+  const [arsiv, kvkk, ozelIcerik, dosyaPaylasimi, akademikKutuphane, sistemDurumuAcik, pdfBolAcik, pdfDuzenleAcik, sistemYedek, donusturucu, silmeOnayi, yetkiAyarlari, havastil, izleme, duyuru] = await Promise.all([
     supabase.rpc("r2_arsiv_yetkilerim").then((r) => (r.error ? undefined : r.data)).catch(() => undefined),
     supabase.rpc("hukuki_metin_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
     ozellikSor("ozel_icerik_yonetimi"),
     ozellikSor("dosya_paylasimi_yonetimi"),
     ozellikSor("akademik_kutuphane"),
     ozellikSor("sistem_durumu"),   // tur 14: Sistem Durumu sekmesi rol bazında kapatılabilir (varsayılan AÇIK)
-    ozellikSor("pdf_bol"),         // tur 14: PDF Böl & Ayıkla ayrı anahtar (Dönüştürücü yetkisine EK olarak kapatılabilir)
+    ozellikSor("pdf_bol"),
+    ozellikSor("pdf_duzenle"),     // tur 19: PDF Düzenleyici ayrı anahtar         // tur 14: PDF Böl & Ayıkla ayrı anahtar (Dönüştürücü yetkisine EK olarak kapatılabilir)
     // can_export_system: varsayılan KAPALI → hata/ağ sorununda da false (kvkk ile aynı güvenli yön).
     supabase.rpc("sistem_export_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
     // can_use_converter: varsayılan KAPALI → hata/ağ sorununda da false (güvenli yön).
@@ -327,7 +332,7 @@ async function izinleriYukle(rol) {
     havastil,
     izleme,
     duyuru,
-    ozellikler: { ozel_icerik_yonetimi: ozelIcerik, dosya_paylasimi_yonetimi: dosyaPaylasimi, akademik_kutuphane: akademikKutuphane, sistem_durumu: sistemDurumuAcik, pdf_bol: pdfBolAcik },
+    ozellikler: { ozel_icerik_yonetimi: ozelIcerik, dosya_paylasimi_yonetimi: dosyaPaylasimi, akademik_kutuphane: akademikKutuphane, sistem_durumu: sistemDurumuAcik, pdf_bol: pdfBolAcik, pdf_duzenle: pdfDuzenleAcik },
   };
 }
 
