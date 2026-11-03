@@ -20,6 +20,8 @@ permalink: "/panel/dashboard.html"
 <link rel="stylesheet" href="{{ '/assets/css/belge-tarayici.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/metadata-temizleyici.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/pdf-bol.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/css/pdf-duzenle.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/css/onay-kutusu.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/yazi-medya.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/ozel-dosyalar.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/havastil.css' | relative_url }}">
@@ -1098,6 +1100,18 @@ permalink: "/panel/dashboard.html"
     <section class="dash-view" id="view-tool-pdfbol" hidden data-view="tool-pdfbol">
       <h1>PDF Böl &amp; Ayıkla</h1>
       <div id="pb-kok" class="pb-kok"><p class="muted">Yükleniyor...</p></div>
+    </section>
+
+    <!-- PDF Düzenleyici (assets/js/pdf-duzenle/): Araçlar altında kendi sekmesi. %100 istemci. -->
+    <section class="dash-view" id="view-tool-pdfduzenle" hidden data-view="tool-pdfduzenle">
+      <h1>PDF Düzenleyici</h1>
+      <div id="pd-kok" class="pd-kok"><p class="muted">Yükleniyor...</p></div>
+    </section>
+
+    <!-- Onay Kutusu (assets/js/onay-kutusu/): İçerik Yönetimi altında. -->
+    <section class="dash-view" id="view-content-onay" hidden data-view="content-onay">
+      <h1>Onay Kutusu</h1>
+      <div id="ok-kok" class="ok-kok"><p class="muted">Yükleniyor...</p></div>
     </section>
 
     <!-- HavaStil (assets/js/havastil/panel.js): hava durumuna göre katman/giyim danışmanı. Yetki: Yetki Ayarları › Özellikler › HavaStil (varsayılan KAPALI; owner her zaman).
