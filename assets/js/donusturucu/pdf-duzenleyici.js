@@ -779,14 +779,14 @@ export async function pdfDuzenleyiciKur(kap, { dosyalar, onDegisim, mesaj = () =
   metinDiv.addEventListener("pointerup", (e) => { if (e.pointerType === "mouse" && (arac === "vurgu" || arac === "alt" || arac === "ust")) setTimeout(() => secimiUygula(true), 0); });
 
   /* ---- yazı düzenleme (mevcut yazıya dokun → yeni metni yaz) ---- */
-  function renkOrnekle(rc) {
+  function renkOrnekle(rc, cv = tuval, olcek = null) {
     const yedek = { zemin: "#ffffff", yazi: "#111111" };
     try {
-      const k = tuval.width / anaOlcu.W;
+      const k = olcek ?? cv.width / anaOlcu.W;
       const X = Math.max(0, Math.floor(rc.x * k)); const Y = Math.max(0, Math.floor(rc.y * k));
-      const W = Math.min(tuval.width - X, Math.ceil(rc.w * k)); const H = Math.min(tuval.height - Y, Math.ceil(rc.h * k));
+      const W = Math.min(cv.width - X, Math.ceil(rc.w * k)); const H = Math.min(cv.height - Y, Math.ceil(rc.h * k));
       if (W < 2 || H < 2) return yedek;
-      const d = tuval.getContext("2d", { willReadFrequently: true }).getImageData(X, Y, W, H).data;
+      const d = cv.getContext("2d", { willReadFrequently: true }).getImageData(X, Y, W, H).data;
       const sayac = new Map();
       for (let i = 0; i < d.length; i += 4) {
         const anahtar = ((d[i] >> 4) << 8) | ((d[i + 1] >> 4) << 4) | (d[i + 2] >> 4);
@@ -814,6 +814,44 @@ export async function pdfDuzenleyiciKur(kap, { dosyalar, onDegisim, mesaj = () =
     if (w <= 0 || h <= 0) return 0;
     return (w * h) / Math.min(a.w * a.h, b.w * b.h);
   };
+  /** TÜM sayfalarda yazı bul → değiştir. Her eşleşen yazı parçasının üstü sayfa rengiyle kapatılıp yeni yazı yazılır (tek tek "yama"; Geri al ile topluca geri alınır).
+   *  Yalnızca yatay yazılar işlenir; döndürülmüş/dikey yazılar atlanır ve sayılır. Özgün yazı tipi yerine Helvetica/serif/mono yedeği kullanılır. */
+  async function bulDegistir(aranan, yeni, { buyukKucuk = false } = {}) {
+    if (!aranan) throw new Error("Aranacak yazıyı yaz.");
+    const re = new RegExp(aranan.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), buyukKucuk ? "g" : "gi");
+    let adet = 0, atlanan = 0; const etkilenen = new Set();
+    const olcer = document.createElement("canvas").getContext("2d");
+    for (let i = 0; i < sayfalar.length; i++) {
+      if (yokEdildi) break;
+      const s = sayfalar[i]; const { p, T, W } = await olcu(s);
+      const vp = p.getViewport({ scale: 1, rotation: T });
+      const tc = await p.getTextContent();
+      const eslesen = tc.items.filter((it) => typeof it.str === "string" && it.str && (re.lastIndex = 0, re.test(it.str)));
+      if (!eslesen.length) continue;
+      const cv = document.createElement("canvas"); const ol = 2; const vp2 = p.getViewport({ scale: ol, rotation: T });
+      cv.width = Math.ceil(vp2.width); cv.height = Math.ceil(vp2.height);
+      const cx = cv.getContext("2d", { willReadFrequently: true }); cx.fillStyle = "#fff"; cx.fillRect(0, 0, cv.width, cv.height);
+      await p.render({ canvasContext: cx, viewport: vp2 }).promise;
+      for (const it of eslesen) {
+        const m = pdfjs.Util.transform(vp.transform, it.transform);
+        if (Math.abs(m[1]) > 0.35 || Math.abs(m[2]) > 0.35 + Math.abs(m[0]) * 0.4) { atlanan++; continue; }   // dikey/eğik yazı
+        const fh = Math.hypot(m[2], m[3]) || 10;
+        const yeniMetin = it.str.replace(re, () => yeni ?? ""); re.lastIndex = 0;
+        const boyut = Math.max(4, Math.min(120, fh * 0.98));
+        olcer.font = `${boyut}px ${YAZI_AILELERI.sans}`;
+        const h = fh * 1.25, rc = { x: m[4], y: m[5] - h * 0.8, w: Math.max(it.width, olcer.measureText(yeniMetin).width), h };
+        const { zemin, yazi } = renkOrnekle({ x: m[4], y: m[5] - h * 0.8, w: it.width, h }, cv, ol);
+        const mevcut = s.anot.find((a) => a.t === "yama" && kesisimOrani(a, rc) > 0.5);
+        if (mevcut) Object.assign(mevcut, { metin: mevcut.metin.replace(re, () => yeni ?? ""), w: Math.max(mevcut.w, rc.w) });
+        else s.anot.push({ t: "yama", id: anotSayaci++, x: rc.x, y: rc.y, w: rc.w, h: rc.h, metin: yeniMetin, boyut, renk: yazi, zemin, aile: "sans" });
+        re.lastIndex = 0; adet++; etkilenen.add(i);
+      }
+      cv.width = 0; cv.height = 0;
+      p.cleanup?.();
+    }
+    if (adet) { kaydet(); katmanCiz(); ozetGuncelle(); await kucuklerYenile(); await sayfaGoster(); }
+    return { adet, sayfa: etkilenen.size, atlanan };
+  }
   async function yaziDuzenle(sp) {
     const s = sf();
     if (!s || !anaOlcu) return;
@@ -1068,6 +1106,10 @@ export async function pdfDuzenleyiciKur(kap, { dosyalar, onDegisim, mesaj = () =
     sayfaSayisi: () => sayfalar.length,
     ad: () => adsizAl(kaynaklar.values().next().value?.ad || "belge"),
     pdfAl: pdfOlustur,
+    bulDegistir,
+    sayfaGit: (n) => sayfaGit(n),
+    aktifIndeks: () => aktif,
+    sayfaCiz: (n, canvas) => (sayfalar[n] ? kucukCiz(sayfalar[n], canvas) : Promise.resolve()),
     kirli: () => kirli,
     sigdir: () => sigdir(),
     yokEt() {
