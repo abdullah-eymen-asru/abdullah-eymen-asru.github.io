@@ -20,7 +20,9 @@ async function kur() {
   if (!kok) return;
   const { data: { session } } = await supabase.auth.getSession(); const uid = session?.user?.id;
   if (!uid) { kok.replaceChildren(el("p", "auth-message error", "Oturum bulunamadı.")); return; }
-  let liste = [], filtre = "bekleyen";
+  let liste = [], filtre = "bekleyen", sahip = false;
+  try { sahip = (await supabase.rpc("is_owner")).data === true; } catch { sahip = false; }
+  const gyGit = (taslakId, eylem, hash) => { sessionStorage.setItem("gy_bekleyen_eylem", JSON.stringify({ taslakId, eylem })); if (location.hash === hash) document.dispatchEvent(new CustomEvent("gy:bekleyen-eylem")); else location.hash = hash; };
   const mesaj = el("p", "ok-mesaj"); mesaj.setAttribute("role", "status"); mesaj.setAttribute("aria-live", "polite");
   const bildir = (m, h = false) => { mesaj.textContent = m || ""; mesaj.classList.toggle("ok-hata", !!h); };
   const alan = el("div", "ok-liste"), cubuk = el("div", "ok-filtre"), gonderKutu = el("div", "ok-gonder");
@@ -59,7 +61,14 @@ async function kur() {
       eylem.append(dg("📋 Yazılar listesinde aç", "", () => { location.hash = "#content-all"; }));
       k.append(el("p", "ok-soluk", "Bu yazı başka biri adına yayın onayı bekliyor: kararı “Tüm Yazılar & Projeler” listesindeki onay düğmeleriyle ver."));
     } else {
-      eylem.append(dg("✏️ Düzenle", "", () => { duzenAlan.hidden = !duzenAlan.hidden; if (!duzenAlan.hidden && !duzenAlan.firstChild) duzenleKur(x, duzenAlan); }));
+      eylem.append(dg("✏️ Tam düzenleyici", "", () => gyGit(x.taslak_id, "duzenle", "#content-new"), { title: "Yeni İçerik Ekle formu: zengin metin, medya, R2, tür/kategori, bağlantılar… hepsiyle açılır" }),
+        dg("⚡ Hızlı düzenle", "", () => { duzenAlan.hidden = !duzenAlan.hidden; if (!duzenAlan.hidden && !duzenAlan.firstChild) duzenleKur(x, duzenAlan); }));
+      if (x.durum === "onaylandi" && (x.karar_verebilir || sahip)) eylem.append(dg("↩ Onayı geri çek", "", () => geriCek(x)));
+      if (sahip) eylem.append(dg("🚀 Doğrudan yayına al", "ok-birincil", async () => {
+        if (!window.confirm("Onay/inceleme aşamaları atlanarak yazı HEMEN GitHub'a yayınlanacak. Devam edilsin mi?")) return;
+        if (x.durum !== "onaylandi") { const { error } = await supabase.rpc("yazi_inceleme_karar", { p_taslak_id: x.taslak_id, p_karar: "onayla", p_not: null }); if (error) { bildir(error.message, true); return; } }
+        gyGit(x.taslak_id, "yayinla", "#content-all");
+      }, { title: "Yalnızca Site Sahibi: onay ve inceleme aşamalarını atlar" }));
       if (x.karar_verebilir && x.durum !== "onaylandi") eylem.append(dg("✅ Onayla", "ok-birincil", () => karar(x, "onayla", null)));
       if (x.karar_verebilir && x.durum !== "duzeltme_istendi") eylem.append(dg("🛠 Düzeltme iste", "", () => notAlani(x, k, "duzeltme_iste")));
       if (x.karar_verebilir && x.durum !== "iptal") eylem.append(dg("⛔ İptal", "", () => notAlani(x, k, "iptal")));
@@ -73,6 +82,13 @@ async function kur() {
     return k;
   }
 
+  async function geriCek(x) {
+    const neden = window.prompt("Onayı geri çekme nedeni (isteğe bağlı; yazara not olarak iletilir):", "");
+    if (neden === null) return;
+    const { error } = await supabase.rpc("yazi_onay_geri_cek", { p_taslak_id: x.taslak_id, p_not: neden.trim() || null });
+    if (error) { bildir(/yazi_onay_geri_cek/.test(error.message) ? "Bu özellik için veritabanı güncellemesi (0134) gerekli." : error.message, true); return; }
+    bildir("✔ Onay geri çekildi; yazı tekrar “onay bekliyor” aşamasında."); await yukle();
+  }
   async function karar(x, tur, metin) {
     const { error } = await supabase.rpc("yazi_inceleme_karar", { p_taslak_id: x.taslak_id, p_karar: tur, p_not: metin });
     if (error) { bildir(error.message, true); return; }
@@ -92,7 +108,7 @@ async function kur() {
     const o = el("textarea", "ok-girdi"); o.rows = 2; o.value = data.ozet || ""; o.setAttribute("aria-label", "Özet");
     const g = el("textarea", "ok-girdi ok-govde"); g.rows = 14; g.value = data.govde || ""; g.setAttribute("aria-label", "İçerik (Markdown)");
     const kaydet = dg("💾 Kaydet", "ok-birincil", async () => { const { error: e } = await supabase.from("taslak_icerikler").update({ baslik: b.value.trim(), ozet: o.value, govde: g.value }).eq("id", x.taslak_id); if (e) bildir(e.message, true); else { bildir("✔ Kaydedildi."); await yukle(); } });
-    hedef.replaceChildren(el("label", "ok-etiket", "Başlık"), b, el("label", "ok-etiket", "Özet"), o, el("label", "ok-etiket", "İçerik (Markdown)"), g, el("div", "ok-eylem", kaydet));
+    hedef.replaceChildren(el("label", "ok-etiket", "Başlık"), b, el("label", "ok-etiket", "Özet"), o, el("label", "ok-etiket", "İçerik (Markdown)"), g, (() => { const d = el("div", "ok-eylem"); d.append(kaydet); return d; })());
   }
   function notlar(x) {
     const d = el("details", "ok-notlar"); d.append(el("summary", null, `🗒 Düzeltme notları${x.not_sayisi ? ` (${x.not_sayisi})` : ""}`));
