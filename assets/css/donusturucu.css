@@ -10,7 +10,8 @@
   --dn-tehlike: #c62828;
   --dn-iyi: #1f7a45;
   --dn-uyari: #8a6100;
-  --dn-yukseklik: clamp(420px, calc(100dvh - 250px), 960px);
+  --dn-yukseklik: max(480px, calc(100vh - 6rem)); /* tam ekran duyarlı: görüntüleyici ekran yüksekliğine oturur (tur 20) */
+  --dn-yukseklik: max(480px, calc(100dvh - 6rem));
 }
 [data-theme="dark"] .dn-kok, [data-theme="dark"] .dn-dialog, [data-theme="dark"] #dn-izin-kok { --dn-on-vurgu: #0b1220; --dn-iyi: #5fd08d; --dn-uyari: #e6b84d; }
 .dn-kok { display: flex; flex-direction: column; gap: 14px; min-width: 0; max-width: 100%; overflow-x: clip; color: var(--text); }
@@ -201,7 +202,7 @@
   .dn-ad-girdi, .dn-ust-eylem .dn-select { width: 100%; min-width: 0; }
   .dn-editor.dn-pdf { height: max(460px, calc(100dvh - 90px)); }
   .dn-pdf-sahne { padding: 6px; }
-  .dn-editor { --dn-yukseklik: clamp(380px, calc(100dvh - 190px), 900px); border-radius: 10px; }
+  .dn-editor { --dn-yukseklik: max(460px, calc(100dvh - 6rem)); border-radius: 10px; }
   .dn-pdf-alan { flex-direction: column; }
   .dn-pdf-kenar { display: none; flex: none; border-right: 0; border-bottom: 1px solid var(--dn-cizgi); max-height: 150px; overflow-y: hidden; overflow-x: auto; }
   .dn-pdf--panel-acik .dn-pdf-kenar { display: block; }
@@ -248,3 +249,10 @@
 .dn-editor.dn-tam .dn-pdf-alan { height: calc(100dvh - 190px); min-height: 300px; }
 .dn-tam-ekran-acik { overflow: hidden; }
 .dn-tam-cik { position: sticky; top: 0; z-index: 5; margin: 6px; align-self: flex-end; }
+
+/* Tur 20 — PDF Düzenleyici sekmesi ve Dönüştürücü: görüntüleyici tam genişlik + ekran yüksekliğine oturur; metin katmanı sayfa ölçeğiyle birlikte ölçeklenir */
+.dn-editor { width: 100%; }
+.dn-pdf-sahne { overscroll-behavior: contain; }
+.dn-pdf-metin { font-family: Arial, Helvetica, sans-serif; line-height: 1; white-space: pre; transform-origin: 0 0; }
+.dn-pdf-metin span { position: absolute; color: transparent; white-space: pre; cursor: text; transform-origin: 0 0; }
+.dn-pdf--metinsec .dn-pdf-metin span::selection { background: rgba(37, 99, 235, .35); }
