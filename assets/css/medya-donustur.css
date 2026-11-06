@@ -1,0 +1,10 @@
+/* Ses & Video Dönüştürücü + Transkript (tur 20) — inline stil yok (CSP) */
+.md-kok { display: grid; gap: .9rem; }
+.md-kart { border: 1px solid var(--border); border-radius: 14px; padding: .9rem 1rem; background: var(--card-bg); display: grid; gap: .6rem; min-width: 0; }
+.md-kart h2 { margin: 0; font-size: 1rem; } .md-soluk { color: var(--muted); font-size: .88rem; margin: .2rem 0; overflow-wrap: anywhere; }
+.md-btn { font: inherit; min-height: 2.6rem; padding: .45rem .9rem; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; } .md-btn:disabled { opacity: .55; }
+.md-birincil { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.md-girdi { font: inherit; padding: .5rem .7rem; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); width: 100%; box-sizing: border-box; min-height: 2.5rem; }
+.md-sonuc { font-family: ui-sans-serif, system-ui, sans-serif; line-height: 1.5; }
+.md-eylem { display: flex; flex-wrap: wrap; gap: .5rem; } .md-eylem[hidden], .md-sonuc[hidden] { display: none; }
+.md-mesaj { margin: 0; min-height: 1.2rem; font-size: .9rem; overflow-wrap: anywhere; } .md-hata { color: #e5584a; font-weight: 600; }
