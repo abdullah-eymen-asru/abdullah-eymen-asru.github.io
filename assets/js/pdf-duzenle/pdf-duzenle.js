@@ -156,7 +156,7 @@ async function kur() {
   }
 
   arac.append(dg("⬇ PDF'i indir", indirPdf, "pd-birincil"), dg("▦ Tüm sayfalar", tumSayfalar), dg("🔎 Bul ve değiştir", bulPaneli), dg("🔗 Bağlantılar", baglantiPaneli), metaEtiket, dg("🧹 Belleği temizle", () => temizle(true)));
-  kok.classList.add("pd-kok");
+  kok.classList.add("pd-kok", "dn-kok");           // dn-kok: düzenleyicinin CSS değişkenleri (yükseklik, renkler) buradan gelir — eksikliği sayfa alanını 0 yükseklikte bırakıyordu
   kok.replaceChildren(el("div", { class: "pd-kart" }, el("p", { class: "pd-gizlilik", text: "🔒 Dosyan sunucuya yüklenmez; tüm işlem tarayıcında (pdf.js + pdf-lib, açık kaynak) yapılır." }), birak), arac, panel, editorKap, mesaj);
   void dosyalar;
 }
