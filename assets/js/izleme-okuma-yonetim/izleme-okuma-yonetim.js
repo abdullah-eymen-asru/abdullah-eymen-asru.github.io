@@ -94,7 +94,9 @@ function alanGirdiElemaniOlustur(alan, idOneki, mevcutDeger) {
     bosOption.textContent = "— Seçilmedi —";
     select.appendChild(bosOption);
 
-    (alan.options || []).forEach((secenek) => {
+    // "Tür" alanı (Film/Dizi ve Kitap): Türkçe alfabeye göre A→Z; diğer alanların (Status vb.) panodaki sırası korunur.
+    const secenekler = /^t[üu]r$/i.test(String(alan.name || "").trim()) ? [...(alan.options || [])].sort((a, b) => String(a).localeCompare(String(b), "tr", { sensitivity: "base" })) : (alan.options || []);
+    secenekler.forEach((secenek) => {
       const opt = document.createElement("option");
       opt.value = secenek;
       opt.textContent = secenek;
