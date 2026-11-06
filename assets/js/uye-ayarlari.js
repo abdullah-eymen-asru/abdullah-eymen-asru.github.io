@@ -248,6 +248,7 @@ function renderListe() {
 
   liste.innerHTML = sayfaVerisi.map(uyeKartHtml).join("");
   wireKartOlaylari(liste);
+  import("./uye-gizleme/uye-gizleme.js").then((m) => m.anahtarlariEkle(liste, GIRIS_YAPAN_PROFIL)).catch(() => {});   // yalnızca Site Sahibi (0136)
   renderSayfalama(toplamSayfa, filtrelenmis.length);
 }
 
