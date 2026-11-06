@@ -6218,3 +6218,25 @@ async function yetkiAyariniKaydet(input) {
   }
 }
 
+/* ------------------------------------------------------------------------------------------------------------------------------------------
+ * Onay Kutusu köprüsü (tur 20): Onay Kutusu sekmesi sessionStorage'a "gy_bekleyen_eylem" yazar ve ilgili sekmeye geçer; burada form/liste hazır olunca
+ * ya TAM düzenleyici (Yeni İçerik Ekle formu, tüm özellikleriyle) açılır ya da taslak GitHub'a yayınlanır (mevcut taslagiYayinla akışı).
+ * ------------------------------------------------------------------------------------------------------------------------------------------ */
+(function onayKutusuKoprusu() {
+  async function dene() {
+    let bek = null;
+    try { bek = JSON.parse(sessionStorage.getItem("gy_bekleyen_eylem") || "null"); } catch { bek = null; }
+    if (!bek) return false;
+    const hazir = bek.eylem === "yayinla" ? document.getElementById("ic-liste") : document.getElementById("ic-title");
+    if (!hazir) return false;
+    sessionStorage.removeItem("gy_bekleyen_eylem");
+    try { if (!TUM_ICERIKLER.length) await panelVerisiniYukleVeyaOnbellektenAl(); } catch { /* aşağıda bulunamazsa bildirilir */ }
+    const item = TUM_ICERIKLER.find((i) => i.taslakId === bek.taslakId);
+    if (!item) { window.alert("Taslak listede bulunamadı (başka bir yetkiyle oluşturulmuş ya da silinmiş olabilir). “Tüm Yazılar & Projeler”den dene."); return true; }
+    const tur = item.tur || (String(item.path || "").includes("projects") ? "proje" : "blog");
+    if (bek.eylem === "yayinla") await taslagiYayinla(item, tur, document.createElement("button")); else await icerikDuzenlemeyeYukle(item, tur);
+    return true;
+  }
+  document.addEventListener("gy:bekleyen-eylem", () => { dene(); });
+  let n = 0; const t = setInterval(async () => { try { if (await dene() || ++n > 60) clearInterval(t); } catch { clearInterval(t); } }, 700);
+})();
