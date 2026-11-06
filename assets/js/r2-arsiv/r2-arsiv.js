@@ -8,6 +8,7 @@
  *
  * CSP: inline style/handler yok; DOM yalnızca createElement/textContent ile kurulur.
  */
+import { depolamaGostergesiKur, klasorSec } from "./depolama.js";
 import { supabase } from "../core/supabase-client.js";
 import { anahtarlariHazirla, aliciAnahtarlariniGetir, dosyaCoz, anahtariYenidenZarfla, zarflariKaydet } from "./e2ee.js";
 import {
@@ -276,6 +277,16 @@ function secimGuncelle() {
   k.secimSayi.textContent = `${n} öğe seçili`;
   const gorunen = gorunenler();
   k.hepsiniSec.checked = n > 0 && gorunen.length > 0 && gorunen.every((s) => durum.secili.has(s.id));
+}
+
+async function topluTasi() {
+  const idler = [...durum.secili]; if (!idler.length) return;
+  const klasorler = durum.veri.filter((s) => idler.includes(s.id) && s.tur === "klasor").map((s) => `${s.klasor_yolu || ""}${s.ad}/`);
+  const hedef = await klasorSec({ haric: klasorler }); if (hedef === null) return;
+  let ok = 0, hata = 0, son = "";
+  for (const id of idler) { const { error } = await supabase.rpc("r2_arsiv_tasi", { p_id: id, p_hedef_yol: hedef }); if (error) { hata++; son = error.message; } else ok++; }
+  bildir(hata ? `${ok} öğe taşındı, ${hata} öğe taşınamadı: ${son}` : `${ok} öğe taşındı.`, hata ? "hata" : "ok");
+  listele(); ozetYukle();
 }
 
 async function topluSil() {
@@ -625,7 +636,11 @@ async function basla() {
     ciz();
   });
   q("ra-secim-iptal").addEventListener("click", () => { durum.secili.clear(); ciz(); });
+  // "Taşı" düğmesi (0133 r2_arsiv_tasi): seçili dosya/klasörleri başka klasöre taşır; R2 anahtarları "eşitle" ile Cloudflare'de de güncellenir
+  { const t = document.createElement("button"); t.type = "button"; t.className = "ra-btn ra-btn-kucuk"; t.id = "ra-secim-tasi"; t.textContent = "↪ Taşı"; q("ra-secim-sil").before(t); t.addEventListener("click", topluTasi); }
   q("ra-secim-sil").addEventListener("click", topluSil);
+  // R2 depolama göstergesi (X GB / 10 GB, %85/%95 uyarı) + Cloudflare klasör eşitleme (admin/site sahibi)
+  { const kok = document.getElementById("ra-gorunum-arsiv"); if (kok) { Promise.all([supabase.rpc("is_owner"), supabase.rpc("is_admin")]).then(([o, a]) => depolamaGostergesiKur(kok, { esitle: o.data === true || a.data === true, sahip: o.data === true })).catch(() => {}); } }
 
   /* yükleme */
   q("ra-yukle-dosya").addEventListener("click", () => k.girdiDosya.click());
