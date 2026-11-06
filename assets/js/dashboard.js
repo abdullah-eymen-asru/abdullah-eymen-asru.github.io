@@ -103,6 +103,8 @@ const MODULES = {
   // PDF Böl & Ayıkla (assets/js/pdf-bol/): %100 istemci; yetki Dönüştürücü ile AYNI satır (Yetki Ayarları › Özellikler).
   pdfbol: { src: "./pdf-bol/pdf-bol.js", role: null },
   onay: { src: "./onay-kutusu/onay-kutusu.js", role: null },
+  medyadonustur: { src: "./medya-donustur/medya-donustur.js", role: null },
+  yorumlarim: { src: "./yorumlarim/yorumlarim.js", role: null },
   pdfduzenle: { src: "./pdf-duzenle/pdf-duzenle.js", role: null },
   // HavaStil (migration 0099): hava durumuna göre katman/giyim danışmanı. Görünürlük role DEĞİL, Yetki Ayarları › Özellikler'deki
   // "havastil" anahtarına bağlı (VARSAYILAN KAPALI; owner her zaman). NAV'daki izin:"havastil" + izinleriYukle. Modül kendi içinde RPC ile tekrar doğrular.
@@ -131,6 +133,7 @@ const NAV = [
       // budur (bkz. firstAvailableView).
       // Ana Ekran: rol/yetkiye göre erişilebilen TÜM modüller tek ekranda (kartlar + arama). Varsayılan açılış.
       { id: "me-hub", icon: "🧭", label: "Ana Ekran", module: "hub", role: null },
+      { id: "me-yorumlarim", icon: "💬", label: "Yorumlarım", module: "yorumlarim", role: null, defaultAcilis: false },
       // Her üye kendi verisini yedekler/geri yükler (KVKK taşınabilirlik); Site Sahibi aynı ekranda tam sistem araçlarını da görür.
       { id: "sys-yedek", icon: "📦", label: "Yedekleme & Verilerim", module: "sistemYedek", role: null, izin: "sistemyedek", defaultAcilis: false },
       { id: "me-panel", icon: "🙍", label: "Panelim", module: "panelim", role: null, defaultAcilis: false },
@@ -192,6 +195,7 @@ const NAV = [
       { id: "tool-metadata", icon: "🧼", label: "Metadata Temizleyici", module: "metadata", role: null, izin: "donusturucu", defaultAcilis: false },
       { id: "tool-pdfbol", icon: "✂️", label: "PDF Böl & Ayıkla", module: "pdfbol", role: null, ozellik: "pdf_bol", izin: "donusturucu", defaultAcilis: false },
       { id: "tool-pdfduzenle", icon: "📝", label: "PDF Düzenleyici", module: "pdfduzenle", role: null, ozellik: "pdf_duzenle", izin: "donusturucu", defaultAcilis: false },
+      { id: "tool-medya", icon: "🎧", label: "Ses & Video + Transkript", module: "medyadonustur", role: null, izin: "donusturucu", defaultAcilis: false },
       // role:null + izin:"havastil": owner her zaman görür; diğer roller yalnızca Yetki Ayarları'nda HavaStil açıldıysa.
       { id: "tool-havastil", icon: "🌦️", label: "HavaStil (Giyim Danışmanı)", module: "havastil", role: null, izin: "havastil", defaultAcilis: false },
     ],
