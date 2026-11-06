@@ -52,12 +52,8 @@ cv_url: ""
 cloudflare_worker_url: "https://izleme-okuma-api.aeymena.workers.dev"   # Cloudflare Worker'ı deploy edince buraya yapıştır
 mirror_site_url: "https://abdullah-eymen-asru.pages.dev"   # İkincil/yedek kopya   # Aynı sitenin Cloudflare Pages'teki yedek kopyası
 
-giscus:
-  repo: "abdullah-eymen-asru/abdullah-eymen-asru.github.io"
-  repo_id: "R_kgDOTVoWUg"       # giscus.app'ten alacaksın
-  category: "Announcements"
-  category_id: "DIC_kwDOTVoWUs4DBEO0"
-  
+# Giscus KALDIRILDI (tur 20): yorumlar Supabase'te yerli tutulur — bkz. _includes/comments.html, migration 0137.
+
 # SOSYAL / AKADEMİK BAĞLANTILAR — anasayfadaki bağlantı listesini besler.
 # Panelden ("GitHub İçerik Yönetimi" → "🔗 Bağlantılar" sekmesi, sadece
 # admin/owner) kod yazmadan yönetilebilir: yeni bir platform eklemek,
