@@ -1,0 +1,16 @@
+/* Yerli yorum sistemi (tur 20) — inline stil yok (CSP) */
+.comments-section { margin-top: 2.5rem; border-top: 1px solid var(--border); padding-top: 1.2rem; display: grid; gap: .8rem; }
+.yk-soluk { color: var(--muted); font-size: .88rem; margin: .2rem 0; }
+.yk-liste { display: grid; gap: .7rem; }
+.yk-yorum { border: 1px solid var(--border); border-radius: 12px; padding: .7rem .9rem; display: grid; gap: .4rem; background: var(--card-bg, transparent); }
+.yk-yorum[data-derinlik="1"] { margin-left: 1rem; } .yk-yorum[data-derinlik="2"] { margin-left: 2rem; } .yk-yorum[data-derinlik="3"] { margin-left: 3rem; }
+.yk-gizli { opacity: .6; border-style: dashed; }
+.yk-metin { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.yk-eylem { display: flex; flex-wrap: wrap; gap: .4rem; }
+.yk-form { display: grid; gap: .5rem; }
+.yk-girdi { font: inherit; padding: .6rem .8rem; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); width: 100%; box-sizing: border-box; }
+.yk-btn { font: inherit; min-height: 2.4rem; padding: .3rem .85rem; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+.yk-birincil { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; } .yk-tehlike { color: #e5584a; border-color: #e5584a; }
+.yk-onay { display: flex; gap: .4rem; align-items: center; font-size: .9rem; }
+.yk-mesaj { margin: 0; min-height: 1.2rem; font-size: .9rem; } .yk-hata { color: #e5584a; font-weight: 600; }
+@media (max-width: 520px) { .yk-yorum[data-derinlik="2"], .yk-yorum[data-derinlik="3"] { margin-left: 1.2rem; } }
