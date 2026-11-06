@@ -150,6 +150,7 @@ async function ciz() {
     el("h3", { class: "sd-bolum-baslik", text: "Bu cihaz" }), el("div", { class: "sd-izgara" }, ...cihaz), await cihazVerileriKarti(oturum),
     ...(yonetici || workerIzin ? [el("h3", { class: "sd-bolum-baslik", text: yonetici ? "Kotalar & Worker'lar" : "Worker sınaması" }), ...(yonetici ? [r2Yer] : []), workerKutu]
       : [el("p", { class: "kst-alt", text: "Cloudflare Worker sınaması sistem kotasını harcadığı için varsayılan olarak yalnızca yönetici ve site sahibine açıktır; site sahibi Yetki Ayarları'ndan rolüne açabilir. Yukarıdaki kontroller herkes için ücretsizdir." })]), alt);
+  if (yonetici) import("../r2-arsiv/depolama.js").then((m) => m.depolamaGostergesiKur(r2Yer, { esitle: false, sahip: rol === "owner" })).catch(() => {});
   if (yonetici) import("../sistem-yedek/r2-kota.js").then((m) => m.r2KotaKartiKur(r2Yer, { baslik: "R2 kullanımı (bu ay) — tüm kovalar" })).catch(() => {});
 }
 
