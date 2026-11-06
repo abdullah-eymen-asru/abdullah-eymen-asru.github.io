@@ -333,3 +333,11 @@
 .ra-arsivden-ad { overflow-wrap: anywhere; }
 .ra-arsivden-oge .ra-btn { grid-column: 2; grid-row: 1 / span 2; }
 @media (max-width: 520px) { .ra-arsivden-oge { grid-template-columns: 1fr; } .ra-arsivden-oge .ra-btn { grid-column: 1; grid-row: auto; } }
+
+/* Tur 20: depolama göstergesi + taşı iletişim kutusu */
+.ra-depo { border: 1px solid var(--border); border-radius: 12px; padding: .7rem .9rem; margin: .4rem 0 .8rem; display: grid; gap: .5rem; background: var(--card-bg); }
+.ra-depo-ust { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .4rem; align-items: baseline; }
+.ra-depo progress { width: 100%; height: .8rem; accent-color: var(--accent); }
+.ra-depo progress.ra-depo-uyari { accent-color: #e0a93b; } .ra-depo progress.ra-depo-kritik { accent-color: #e5584a; }
+.ra-depo-kart { padding: .55rem .7rem; border-radius: 10px; border: 1px solid; font-size: .88rem; } .ra-depo-kart.uyari { border-color: #e0a93b; } .ra-depo-kart.kritik { border-color: #e5584a; }
+.ra-depo-alt { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
