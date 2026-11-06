@@ -37,6 +37,10 @@ async function kur() {
   const baslikGirdi = document.getElementById("ic-title"), slugGirdi = document.getElementById("ic-slug");
   const pdfAlani = document.getElementById("ic-pdf-url"), veriAlani = document.getElementById("ic-veri-url");
 
+  // Transkript aracından "Taslağa aktar": başlık ve metin forma yazılır (bir kez)
+  try { const ob = JSON.parse(sessionStorage.getItem("gy_onbilgi") || "null"); if (ob) { sessionStorage.removeItem("gy_onbilgi");
+    if (baslikGirdi && !baslikGirdi.value) { baslikGirdi.value = ob.baslik || ""; baslikGirdi.dispatchEvent(new Event("input", { bubbles: true })); }
+    if (!govde.value) { govde.value = ob.govde || ""; govde.dispatchEvent(new Event("input", { bubbles: true })); } } } catch { /* yok say */ }
   const panel = el("details", "ym-panel"); panel.id = "ym-panel"; panel.open = true;
   panel.append(el("summary", "ym-ozet", "📎 Yazı Medyası (R2) — görsel, PDF, veri seti ve her tür dosya"));
   const ic = el("div", "ym-ic"); panel.append(ic);
