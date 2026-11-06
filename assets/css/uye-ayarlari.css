@@ -310,3 +310,9 @@
 .uya-dlg-sonuc-bilgi { display: grid; min-width: 0; }
 .uya-dlg-sonuc-bilgi strong, .uya-dlg-sonuc-bilgi small { overflow-wrap: anywhere; }
 @media (max-width: 480px) { .uya-dlg-sonuc-satir { flex-direction: column; align-items: stretch; } .uya-dlg-sonuc-satir .btn-primary, .uya-dlg-sonuc-satir .btn-secondary { width: 100%; min-height: 44px; } }
+
+/* Site Sahibi: gizleme ve körlük anahtarları (tur 20) */
+.uya-gizle, .uya-korluk { display: flex; gap: .5rem; align-items: center; font-size: .88rem; padding: .35rem 0; cursor: pointer; }
+.uya-korluk { border: 1px dashed var(--border); border-radius: 10px; padding: .5rem .8rem; margin-bottom: .6rem; }
+.uya-gizle input, .uya-korluk input { inline-size: 2.4rem; block-size: 1.3rem; accent-color: var(--accent); }
+.uya-kart.uya-gizli { opacity: .65; outline: 2px dashed var(--border); }
