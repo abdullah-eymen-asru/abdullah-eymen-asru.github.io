@@ -116,9 +116,7 @@ permalink: "/kurumsal/gizlilik-politikasi.html"
     <tr>
       <td><strong>İşlevsel / Üçüncü Taraf</strong></td>
       <td>
-        Blog ve proje sayfalarındaki Giscus (GitHub Discussions tabanlı)
-        yorum widget'ının yüklenmesini sağlar; widget, giscus.app ve
-        github.com alan adlarından çerez kurabilir.
+        Blog ve proje sayfalarındaki yorumlar bu sitenin kendi veritabanında (Supabase) tutulur; üçüncü taraf yorum widget'ı KULLANILMAZ. Bu kategori, ileride eklenebilecek üçüncü taraf işlevsel hizmetler için saklıdır.
       </td>
       <td>
         Evet — reddederseniz widget hiç yüklenmez (yerine "kabul et"
