@@ -85,3 +85,13 @@
 .ym-sekme[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
 .ym-bolum { display: grid; gap: .6rem; min-width: 0; }
 .ym-bolum[hidden] { display: none; }
+
+/* 404 / paylaşım dosya kartı (paylasim-yonlendir.js) */
+.dosya-karti { max-width: 34rem; margin: 2rem auto; padding: 1.4rem 1.3rem; border: 1px solid var(--border, #8884); border-radius: 16px; display: grid; gap: .8rem; }
+.dosya-karti h1 { margin: 0; font-size: 1.3rem; overflow-wrap: anywhere; } .dosya-ikon { font-size: 2.4rem; line-height: 1; }
+.dosya-bilgi { display: grid; grid-template-columns: auto 1fr; gap: .4rem 1rem; margin: 0; font-size: .92rem; } .dosya-bilgi dt { opacity: .7; } .dosya-bilgi dd { margin: 0; overflow-wrap: anywhere; }
+.dosya-eylem { display: flex; flex-wrap: wrap; gap: .6rem; }
+.dosya-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 2.8rem; padding: .5rem 1.1rem; border-radius: 12px; border: 1px solid var(--accent, #2563eb); color: var(--accent, #2563eb); background: transparent; text-decoration: none; font: inherit; cursor: pointer; }
+.dosya-btn-ana { background: var(--accent, #2563eb); color: #fff; font-weight: 600; }
+.dosya-yedek { display: grid; gap: .5rem; padding-top: .6rem; border-top: 1px dashed var(--border, #8884); } .dosya-yedek input { font: inherit; padding: .5rem .7rem; border-radius: 10px; border: 1px solid var(--border, #8884); background: transparent; color: inherit; width: 100%; box-sizing: border-box; }
+.dosya-ipucu { margin: 0; font-size: .85rem; opacity: .8; } .dosya-uyari { margin: 0; font-size: .88rem; } .dosya-aciklama { margin: 0; opacity: .8; white-space: pre-wrap; }
