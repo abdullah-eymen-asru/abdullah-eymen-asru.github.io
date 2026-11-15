@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0131_tur17_ozel_icerik_r2_dosyalari.sql — İçerik Yönetimi › Özel / Gizli Makaleler: siteden R2'ye HER TÜR dosya ekleme
+-- 0131_ozel_icerik_r2_dosyalari.sql — İçerik Yönetimi › Özel / Gizli Makaleler: siteden R2'ye HER TÜR dosya ekleme
 --  • Dosyalar Arşiv'de AYRI ana klasörde durur: "Özel Makaleler/…" (alt klasörler serbest; Dosya Yöneticisi gibi yönetilir).
 --  • ozel_icerik_dosyalari: hangi arşiv dosyası hangi özel makaleye bağlı. Doğrudan tablo erişimi YOK; yalnızca RPC.
 --  • Okuyucu (erişim verilmiş üye) dosyayı Worker /ozel-indir ile kısa ömürlü imzalı adresten indirir; erişimi veritabanı doğrular.
