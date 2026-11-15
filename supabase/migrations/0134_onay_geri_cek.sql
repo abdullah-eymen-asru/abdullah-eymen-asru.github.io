@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0134_tur20_onay_geri_cek.sql — Onay Kutusu: onaylanmış içeriğin onayını geri çekme.
+-- 0134_onay_geri_cek.sql — Onay Kutusu: onaylanmış içeriğin onayını geri çekme.
 -- Yönetici (admin) ve Site Sahibi yapabilir; durum tekrar 'bekliyor' olur (inceleme aşaması). Rol kuralı: kendi yazısı hariç, yazarın rol sırası çekenin
 -- rol sırasından DÜŞÜK olmalı (Site Sahibi her şeyi geri çekebilir). Geri çekme notu isteğe bağlıdır ve yazara düzeltme notu olarak iletilir.
 -- Gereksinim: 0133. Tekrar çalıştırmak güvenlidir.
