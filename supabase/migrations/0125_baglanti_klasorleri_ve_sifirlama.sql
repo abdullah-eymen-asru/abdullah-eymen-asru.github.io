@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0125_tur12_baglanti_klasorleri_ve_sifirlama.sql
+-- 0125_baglanti_klasorleri_ve_sifirlama.sql
 -- Dosya Yöneticisi › Bağlantılar:
 --  1) Klasör / alt klasör (r2_baglanti_klasorleri + r2_baglantilari.klasor)
 --  2) r2_baglanti_tasi / klasor_ekle / klasor_sil / klasor_listele RPC'leri
