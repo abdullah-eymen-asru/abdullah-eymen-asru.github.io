@@ -10,7 +10,7 @@
  */
 import { supabase } from "../core/supabase-client.js";
 import { el, hataMetni, indir, bayt, adsizAl } from "../donusturucu/ortak.js";
-import { pdfjsAl, pdfLibAl } from "../donusturucu/pdf-yukle.js";
+import { pdfjsAl, pdfLibAl, pdfAcSecenekleri } from "../donusturucu/pdf-yukle.js";
 import { pdfDuzenleyiciKur } from "../donusturucu/pdf-duzenleyici.js";
 
 const kok = document.getElementById("pd-kok");
@@ -125,7 +125,7 @@ async function kur() {
     panel.replaceChildren(el("div", { class: "pd-panel-ust" }, el("strong", { text: "🔗 Yönlendirmeli bağlantılar" }), dg("Kapat", () => { panel.hidden = true; }, "pd-kucukbtn")), el("p", { class: "pd-soluk", text: "Taranıyor…" }));
     panel.hidden = false;
     try {
-      const blob = await ed.pdfAl(), pdfjs = await pdfjsAl(), gorev = pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }), pdf = await gorev.promise, liste = [];
+      const blob = await ed.pdfAl(), pdfjs = await pdfjsAl(), gorev = pdfjs.getDocument(await pdfAcSecenekleri({ data: new Uint8Array(await blob.arrayBuffer()) })), pdf = await gorev.promise, liste = [];
       for (let i = 1; i <= pdf.numPages; i++) { const sf = await pdf.getPage(i); for (const a of await sf.getAnnotations()) if (a.subtype === "Link") liste.push({ sayfa: i - 1, rect: a.rect.map(Number), url: a.url || a.unsafeUrl || "", ic: !a.url && !a.unsafeUrl }); sf.cleanup?.(); }
       try { await pdf.destroy(); } catch { /* yok say */ }
       yamalar = [];
