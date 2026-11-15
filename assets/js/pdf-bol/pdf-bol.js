@@ -21,7 +21,7 @@ function adGuvenli(ad, yedek = "belge.pdf") {
   if (govde.length > 120) govde = govde.slice(0, 120).trim();
   return `${govde || adsizAl(yedek)}${uz || ".pdf"}`;
 }
-import { pdfjsAl, pdfLibAl } from "../donusturucu/pdf-yukle.js";
+import { pdfjsAl, pdfLibAl, pdfAcSecenekleri } from "../donusturucu/pdf-yukle.js";
 import { ZipYazici } from "../notlar/disa-aktar/zip.js";
 
 const kok = document.getElementById("pb-kok");
@@ -83,7 +83,7 @@ async function kur() {
       try { doc = await lib.PDFDocument.load(u8, { updateMetadata: false }); }
       catch (h) { throw new Error(/encrypt/i.test(h.message) ? "Bu PDF şifreli. Önce şifresini kaldırıp (açıp yeniden kaydederek) tekrar dene." : `PDF okunamadı: ${h.message}`); }
       if (d.js) { try { await d.js.destroy(); } catch { /* yoksay */ } }
-      d.js = await pdfjs.getDocument({ data: u8.slice(0) }).promise;
+      d.js = await pdfjs.getDocument(await pdfAcSecenekleri({ data: u8.slice(0) })).promise;
       Object.assign(d, { ad: dosya.name, bayt: u8, n: doc.getPageCount(), kaynakDoc: doc, secili: new Set(), sonuc: [] });
       bilgi.textContent = `${dosya.name} · ${d.n} sayfa · ${bayt(dosya.size)}`;
       bildir(""); cizAyarlar(); cizKucukler(); cizSonuc();
@@ -98,7 +98,11 @@ async function kur() {
   function cizModlar() {
     modBar.replaceChildren(...MODLAR.map(([id, ad]) => {
       const b = el("button", { type: "button", class: "pb-mod", role: "tab", "aria-selected": String(d.mod === id), text: ad });
-      b.addEventListener("click", () => { d.mod = id; cizModlar(); cizAyarlar(); cizKucukler(); });
+      b.addEventListener("click", () => {
+        if (d.mod === id) return;
+        d.mod = id; d.secili = new Set(); d.sonuc = [];          // yöntem değişince seçim ve eski sonuçlar SIFIRLANIR (eski seçim yeni yöntemi bozuyordu)
+        bildir(""); cizModlar(); cizAyarlar(); cizKucukler(); cizSonuc();
+      });
       return b;
     }));
   }
@@ -145,7 +149,7 @@ async function kur() {
       for (const k of kayitlar) if (k.isIntersecting) { gozlemci.unobserve(k.target); const i = Number(k.target.dataset.i); cizimSirasi = cizimSirasi.then(() => kucukCiz(k.target, i)); }
     }, { rootMargin: "300px" });
     for (let i = 0; i < d.n; i++) {
-      const b = el("button", { type: "button", class: "pb-kucuk", "data-i": String(i), "aria-pressed": String(d.secili.has(i)), "aria-label": `Sayfa ${i + 1}` }, el("span", { class: "pb-no", text: String(i + 1) }));
+      const b = el("button", { type: "button", class: "pb-kucuk", "data-i": String(i), "aria-pressed": String(d.mod === "sec" && d.secili.has(i)), "aria-label": `Sayfa ${i + 1}` }, el("span", { class: "pb-no", text: String(i + 1) }));
       b.addEventListener("click", () => { if (d.mod !== "sec") return; if (d.secili.has(i)) d.secili.delete(i); else d.secili.add(i); b.setAttribute("aria-pressed", String(d.secili.has(i))); guncelleSecimBilgi(); });
       izgara.append(b); gozlemci.observe(b);
     }
