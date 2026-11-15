@@ -47,16 +47,33 @@ async function kur(form) {
     if (error) { kayitlar = []; liste.replaceChildren(el("li", "oz-soluk", /42501|permission|policy/i.test(error.message) ? "R2 dosyaları için Arşiv erişim yetkisi gerekir (Yetki Ayarları › Arşiv)." : error.message)); return; }
     kayitlar = (data || []).filter((k) => !k.sifreli); cizListe();
   }
-  /** Taşı: hedef klasörü seç (Özel Makaleler ağacı) → r2_arsiv_tasi (0133). Klasör kendi altına taşınamaz; ad çakışması sunucuda reddedilir. */
+  /** Taşı: hedef klasörü AĞAÇ üzerinden seç. Her alt klasör kendi üst klasörünün içinde görünür; ▸ ile genişletilir (düz liste kafa karıştırıyordu).
+   *  Klasör kendi altına taşınamaz; ad çakışması sunucuda reddedilir (0133 r2_arsiv_tasi). */
   async function tasiKutusu(li, k) {
-    const { data } = await supabase.from("r2_arsiv").select("klasor_yolu,ad").eq("tur", "klasor").like("klasor_yolu", `${KOK}/%`).limit(1000);
-    const yollar = [`${KOK}/`, ...(data || []).map((f) => `${f.klasor_yolu}${f.ad}/`)].filter((y, i, a) => a.indexOf(y) === i).sort((a, b) => a.localeCompare(b, "tr"));
-    const kendi = k.tur === "klasor" ? `${klasorYolu()}${k.ad}/` : null;
-    const sec = el("select", "oz-girdi"); sec.setAttribute("aria-label", "Hedef klasör");
-    yollar.filter((y) => y !== klasorYolu() && !(kendi && y.startsWith(kendi))).forEach((y) => { const o = el("option", null, `📁 ${y.replace(/\/$/, "").replace(`${KOK}`, KOK) || KOK}`); o.value = y; sec.append(o); });
-    if (!sec.options.length) { bildir("Taşınacak başka klasör yok. Önce “Yeni klasör” oluştur.", true); return; }
-    const tamam = dg("Taşı", "oz-birincil oz-kucuk", async () => { try { const { error } = await supabase.rpc("r2_arsiv_tasi", { p_id: k.id, p_hedef_yol: sec.value }); if (error) throw new Error(error.message); durum.secili.forEach(() => {}); await yenile(); bildir(`“${k.ad}” taşındı.`); } catch (h) { bildir(h.message, true); } });
-    li.replaceChildren(el("span", "oz-soluk", `“${k.ad}” nereye taşınsın?`), sec, tamam, dg("Vazgeç", "oz-kucuk", () => cizListe()));
+    const { data } = await supabase.from("r2_arsiv").select("klasor_yolu,ad").eq("tur", "klasor").like("klasor_yolu", `${KOK}/%`).limit(2000);
+    const tumu = [...new Set((data || []).map((f) => `${f.klasor_yolu}${f.ad}/`))];
+    const kendi = k.tur === "klasor" ? `${klasorYolu()}${k.ad}/` : null, simdiki = klasorYolu();
+    const cocuklar = (ust) => tumu.filter((y) => y.startsWith(ust) && y !== ust && y.slice(ust.length).replace(/\/$/, "").indexOf("/") === -1).sort((a, b) => a.localeCompare(b, "tr"));
+    if (!tumu.length && simdiki === `${KOK}/`) { bildir("Taşınacak başka klasör yok. Önce “Yeni klasör” oluştur.", true); return; }
+    const kutu = el("div", "oz-agac"); kutu.setAttribute("role", "tree");
+    const dugum = (yol, etiket) => {
+      const satir = el("div", "oz-agac-satir"), alt = el("div", "oz-agac-alt"), kids = cocuklar(yol), engelli = yol === simdiki || (kendi && yol.startsWith(kendi));
+      alt.hidden = true; let ac = false;
+      const gen = el("button", "oz-agac-ac", kids.length ? "▸" : "•"); gen.type = "button"; gen.disabled = !kids.length; gen.setAttribute("aria-label", `${etiket} alt klasörlerini genişlet`); gen.setAttribute("aria-expanded", "false");
+      gen.addEventListener("click", () => { ac = !ac; alt.hidden = !ac; gen.textContent = ac ? "▾" : "▸"; gen.setAttribute("aria-expanded", String(ac)); });
+      const ad = el("span", "oz-agac-ad", `📁 ${etiket}`), tamam = dg("Buraya taşı", "oz-kucuk oz-birincil", async () => {
+        try { const { error } = await supabase.rpc("r2_arsiv_tasi", { p_id: k.id, p_hedef_yol: yol }); if (error) throw new Error(error.message); await yenile(); bildir(`“${k.ad}” taşındı → ${etiket}.`); eslemeBaslat(); } catch (h) { bildir(h.message, true); } });
+      tamam.disabled = !!engelli; if (engelli) tamam.title = yol === simdiki ? "Dosya zaten bu klasörde" : "Klasör kendi içine taşınamaz";
+      satir.append(gen, ad, tamam); kids.forEach((c) => alt.append(dugum(c, c.slice(yol.length).replace(/\/$/, ""))));
+      const sar = el("div", "oz-agac-dugum"); sar.append(satir, alt); return sar;
+    };
+    kutu.append(dugum(`${KOK}/`, `${KOK} (ana klasör)`));
+    li.replaceChildren(el("span", "oz-soluk", `“${k.ad}” nereye taşınsın? Klasörleri ▸ ile genişlet.`), kutu, dg("Vazgeç", "oz-kucuk", () => cizListe()));
+  }
+  /** Taşıma sonrası Cloudflare R2 anahtarlarını arka planda eşitle (yalnızca admin/site sahibi; hata sessizce yutulur — düğmeyle de yapılabilir). */
+  async function eslemeBaslat() {
+    try { const [o, a] = await Promise.all([supabase.rpc("is_owner"), supabase.rpc("is_admin")]); if (o.data !== true && a.data !== true) return;
+      for (let i = 0; i < 40; i++) { const r = await worker("/anahtar-esitle", { limit: 10 }); if (!r.denenen || !r.tamam) break; } } catch { /* sessiz */ }
   }
   function cizYol() {
     yol.replaceChildren(dg(`🗂 ${KOK}`, "oz-kucuk", () => { durum.yol = []; yenile(); cizYol(); }));
