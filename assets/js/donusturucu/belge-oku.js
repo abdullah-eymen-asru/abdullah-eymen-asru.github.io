@@ -7,7 +7,7 @@ import { temizHtml, metinDenHtml } from "./temizle.js";
 import { baytlariOku, metinOku, adsizAl } from "./ortak.js";
 import { epubOku } from "./belge-epub.js";
 import { pdfDenHtml } from "./pdf-metin.js";
-import { pdfjsAl, pdfBirak } from "./pdf-yukle.js";
+import { pdfjsAl, pdfBirak, pdfAcSecenekleri } from "./pdf-yukle.js";
 
 const STIL_HARITASI = [
   "p[style-name='Title'] => h1:fresh",
@@ -66,7 +66,7 @@ export async function belgeHtmlAl(dosya, tur, ctx = {}) {
     case "pdf": {
       const pdfjs = await pdfjsAl();
       const bayt = new Uint8Array(await baytlariOku(dosya));
-      const gorev = pdfjs.getDocument({ data: bayt });
+      const gorev = pdfjs.getDocument(await pdfAcSecenekleri({ data: bayt }));
       gorev.onPassword = async (cevapVer, neden) => {
         const p = ctx.parola ? await ctx.parola(neden === 2) : null;
         if (p == null) { pdfBirak(gorev); return; }
