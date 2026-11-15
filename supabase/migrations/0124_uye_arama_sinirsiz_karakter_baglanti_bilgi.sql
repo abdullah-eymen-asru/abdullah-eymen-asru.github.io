@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0124_tur11_uye_arama_sinirsiz_karakter_baglanti_bilgi.sql
+-- 0124_uye_arama_sinirsiz_karakter_baglanti_bilgi.sql
 -- 1) openmeteo_kullanim_tumu: "structure of query does not match function result type" hatası giderildi.
 --    SEBEP: sum(bigint) PostgreSQL'de NUMERIC döndürür; fonksiyon bigint bildiriyordu. Ayrıca p.role/p.email tipleri text'e sabitlendi.
 --    Arama artık AD ve E-POSTA (tam adres) üzerinde, Türkçe karakter/büyük-küçük harf duyarsız çalışır.
