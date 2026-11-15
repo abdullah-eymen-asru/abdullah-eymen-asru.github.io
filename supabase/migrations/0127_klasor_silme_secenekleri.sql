@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0127_tur14_klasor_silme_secenekleri.sql
+-- 0127_klasor_silme_secenekleri.sql
 -- Bağlantı klasörünü silerken seçenek: içindeki bağlantılar ana klasöre TAŞINSIN (varsayılan) ya da klasörle BİRLİKTE SİLİNSİN.
 -- Arşivdeki dosyalar hiçbir durumda silinmez (yalnızca paylaşım bağlantıları). Gereksinim: 0125.
 -- ============================================================================
