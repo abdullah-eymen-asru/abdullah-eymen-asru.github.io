@@ -8,7 +8,7 @@
  *
  * CSP: inline style/handler yok; DOM yalnızca createElement/textContent ile kurulur.
  */
-import { depolamaGostergesiKur, klasorSec } from "./depolama.js";
+import { depolamaGostergesiKur, klasorSec, arkaPlandaEsitle } from "./depolama.js";
 import { supabase } from "../core/supabase-client.js";
 import { anahtarlariHazirla, aliciAnahtarlariniGetir, dosyaCoz, anahtariYenidenZarfla, zarflariKaydet } from "./e2ee.js";
 import {
@@ -286,7 +286,7 @@ async function topluTasi() {
   let ok = 0, hata = 0, son = "";
   for (const id of idler) { const { error } = await supabase.rpc("r2_arsiv_tasi", { p_id: id, p_hedef_yol: hedef }); if (error) { hata++; son = error.message; } else ok++; }
   bildir(hata ? `${ok} öğe taşındı, ${hata} öğe taşınamadı: ${son}` : `${ok} öğe taşındı.`, hata ? "hata" : "ok");
-  listele(); ozetYukle();
+  listele(); ozetYukle(); arkaPlandaEsitle();   // R2 anahtarları Cloudflare'de de yeni klasöre taşınır
 }
 
 async function topluSil() {
@@ -337,7 +337,7 @@ async function sil(s) {
     if (koru) {
       const { data, error } = await supabase.rpc("r2_arsiv_klasor_sil_tasi", { p_id: s.id });
       if (error) return bildir(error.message || "Klasör silinemedi.");
-      bildir(`Klasör silindi; ${data ?? 0} öğe bir üst klasöre taşındı.`, "ok"); yenile(); return;
+      bildir(`Klasör silindi; ${data ?? 0} öğe bir üst klasöre taşındı.`, "ok"); yenile(); arkaPlandaEsitle(); return;
     }
     const hepsi = await onayAl({ baslik: "İçindekilerle birlikte silinsin mi?", metin: `“${s.ad}” klasörü ve İÇİNDEKİ HER ŞEY R2'den kalıcı olarak silinecek. Bu işlem geri alınamaz.`, tamam: "Hepsini sil" });
     if (!hepsi) return;
