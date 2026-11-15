@@ -55,3 +55,11 @@ export async function klasorSec({ haric = [] } = {}) {
     const sat = el("div", "ra-dlg-alt"); sat.append(iptal, tamam); f.append(el("h3", null, "Nereye taşınsın?"), sec, sat); d.append(f); document.body.append(d); d.showModal();
   });
 }
+
+/** Taşıma/silme sonrası R2 anahtarlarını arka planda eşitler (yalnızca admin/site sahibi). Hata sessiz geçilir; "Eşitle" düğmesi her zaman çalışır. */
+export async function arkaPlandaEsitle() {
+  try {
+    const [o, a] = await Promise.all([supabase.rpc("is_owner"), supabase.rpc("is_admin")]); if (o.data !== true && a.data !== true) return;
+    for (let i = 0; i < 40; i++) { const r = await worker("/anahtar-esitle", { limit: 10 }); if (!r.denenen || !r.tamam) break; }
+  } catch { /* sessiz */ }
+}
