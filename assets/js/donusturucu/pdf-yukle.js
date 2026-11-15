@@ -86,3 +86,14 @@ export function pdfLibAl() {
   }
   return sozPdflib;
 }
+
+
+/** pdf.js getDocument seçenekleri (tur 21): CMap + standart yazı tipleri + WASM çözücüler (JPX/JBIG2/ICC). Bunlar OLMADAN eski/taranmış PDF'lerin bazı sayfaları (CID yazı tipleri,
+ *  JPEG2000/JBIG2 görseller) BEYAZ çizilir. Akademik okuyucudaki ayarla aynıdır. Kullanım: pdfjs.getDocument(await pdfAcSecenekleri({ data: u8 })) */
+export async function pdfAcSecenekleri(temel) {
+  let taban = null;
+  try { const m = await (await import("../akademik/motor.js")).motoruYukle(); taban = m.taban || null; } catch { taban = null; }
+  const o = { isEvalSupported: false, enableXfa: false, useSystemFonts: true, ...temel };
+  if (taban) Object.assign(o, { cMapUrl: `${taban}cmaps/`, cMapPacked: true, standardFontDataUrl: `${taban}standard_fonts/`, wasmUrl: `${taban}wasm/`, iccUrl: `${taban}iccs/` });
+  return o;
+}
