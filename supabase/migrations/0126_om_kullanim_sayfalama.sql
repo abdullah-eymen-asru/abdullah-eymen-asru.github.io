@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0126_tur13_om_kullanim_sayfalama.sql
+-- 0126_om_kullanim_sayfalama.sql
 -- HavaStil › Open-Meteo "Herkesin bireysel kullanımı": çok üyeli sitede taşmasın diye SAYFALAMA + sunucu tarafı arama.
 --  • E-posta artık HİÇ dönmez (maskeli de değil); arama yine ad ve e-posta üzerinde çalışır (eşleşme sunucuda, adres istemciye çıkmaz).
 --  • p_limit (1–100, varsayılan 20) / p_offset; her satırda toplam (eşleşen üye sayısı).
