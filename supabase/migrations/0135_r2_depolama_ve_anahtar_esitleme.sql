@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0135_tur20_r2_depolama_ve_anahtar_esitleme.sql
+-- 0135_r2_depolama_ve_anahtar_esitleme.sql
 --  1) R2 depolama göstergesi: r2_depolama_ozeti() — toplam kullanım / sınır (varsayılan 10 GB). Sınır ücretli plana geçince YÖNETİCİ tarafından artırılır
 --     (r2_depolama_limit_ayarla; Site Sahibi). Göstergede %85 (uyarı) ve %95 (kritik) eşikleri.
 --  2) R2 FİZİKİ KLASÖR EŞİTLEME: nesne anahtarı artık klasör yolunu yansıtabilir ("arsiv/Klasör/dosya.pdf") — Cloudflare panelinde klasör ağacı görünür.
