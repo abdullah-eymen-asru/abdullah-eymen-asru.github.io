@@ -13,7 +13,7 @@ import { htmlDenEpub } from "./belge-epub.js";
 import { gorselDonustur, gorsellerdenPdf, sayfaGorseliMime } from "./motor-gorsel.js";
 import { veriDonustur } from "./motor-veri.js";
 import { kutuphaneYukle } from "./cdn.js";
-import { pdfjsAl, pdfLibAl, pdfBirak } from "./pdf-yukle.js";
+import { pdfjsAl, pdfLibAl, pdfBirak, pdfAcSecenekleri } from "./pdf-yukle.js";
 import { temizHtml } from "./temizle.js";
 
 const HTML_SABLON_CSS = "body{font-family:system-ui,Segoe UI,Roboto,sans-serif;line-height:1.6;max-width:800px;margin:2rem auto;padding:0 1rem;color:#222}img{max-width:100%;height:auto}table{border-collapse:collapse;width:100%}td,th{border:1px solid #bbb;padding:.35rem .5rem}th{background:#f1f3f5}pre{background:#f4f5f7;padding:.8rem;overflow:auto}code{font-family:ui-monospace,Consolas,monospace}blockquote{margin-left:0;padding-left:1rem;border-left:3px solid #aab}[align=center]{text-align:center}[align=right]{text-align:right}[align=justify]{text-align:justify}";
@@ -62,7 +62,7 @@ export async function htmldenCikti(html, hedef, { baslik = "Belge", yazar = "", 
 export async function pdfSayfaGorselleri(dosya, hedef, { olcek = 2, ilerle, iptalKontrol, parola } = {}) {
   const pdfjs = await pdfjsAl();
   const bayt = new Uint8Array(await baytlariOku(dosya));
-  const gorev = pdfjs.getDocument({ data: bayt });
+  const gorev = pdfjs.getDocument(await pdfAcSecenekleri({ data: bayt }));
   gorev.onPassword = async (cevapVer, neden) => { const p = parola ? await parola(neden === 2) : null; if (p == null) { pdfBirak(gorev); return; } cevapVer(p); };
   const pdf = await gorev.promise;
   const cikti = [];
