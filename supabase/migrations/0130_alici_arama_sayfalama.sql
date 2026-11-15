@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0130_tur17_alici_arama_sayfalama.sql — "Kime gönder" kullanıcı araması SAYFALI (çok üyede liste taşmaz).
+-- 0130_alici_arama_sayfalama.sql — "Kime gönder" kullanıcı araması SAYFALI (çok üyede liste taşmaz).
 -- arsiv_kullanici_ara(p_q, p_limit = 20, p_offset = 0). E-posta yine ASLA dönmez. Eski tek parametreli sürüm kaldırılır (belirsiz çağrıyı önlemek için).
 -- Gereksinim: 0063. Tekrar çalıştırmak güvenlidir.
 -- ============================================================================
