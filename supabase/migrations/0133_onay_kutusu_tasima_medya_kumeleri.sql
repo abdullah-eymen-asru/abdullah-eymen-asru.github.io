@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0133_tur19_onay_kutusu_tasima_medya_kumeleri.sql
+-- 0133_onay_kutusu_tasima_medya_kumeleri.sql
 --  1) ONAY KUTUSU: yazi_inceleme + yazi_inceleme_notlari (+ RPC'ler). Taslak yazılar onaya gönderilir; yetkili inceler: ONAYLA / DÜZELTME İSTE (not) / İPTAL.
 --     Düzeltme notları yalnızca yazan kişi tarafından silinebilir; yazı yayına alınınca (taslak → yayın) ya da taslak silinince OTOMATİK temizlenir (depolama dolmaz).
 --     Kural: kimse kendi yazısını onaylayamaz (Site Sahibi hariç); onaylayanın rol sırası yazarınkinden YÜKSEK olmalı (owner > admin > manager > editor).
