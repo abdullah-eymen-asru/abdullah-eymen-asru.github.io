@@ -8,6 +8,7 @@
  *  • Maliyet: R2 → Worker → tarayıcı; R2'den çıkış ücreti yoktur (zero-egress).
  *  • İndirmeler denetim günlüğüne yazılır. innerHTML yok, inline stil yok (CSP).
  */
+import { pdfAcSecenekleri } from "../donusturucu/pdf-yukle.js";
 import { supabase } from "../core/supabase-client.js";
 import { el, bayt, workerFetch, hataMetni, dugme } from "../sistem-yedek/ortak.js";
 import { AkisliZip, aliciOlustur } from "../sistem-yedek/zip-yazici.js";
@@ -52,7 +53,7 @@ export function dosyaPaneliKur(kok, uye, mesaj) {
       } else if (blob.type === "application/pdf") {
         const { pdfjsAl, pdfBirak } = await import("../donusturucu/pdf-yukle.js");
         const pdfjs = await pdfjsAl();
-        const gorev = pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) });
+        const gorev = pdfjs.getDocument(await pdfAcSecenekleri({ data: new Uint8Array(await blob.arrayBuffer()) }));
         try {
           const pdf = await gorev.promise;
           const sayfa = await pdf.getPage(1);
