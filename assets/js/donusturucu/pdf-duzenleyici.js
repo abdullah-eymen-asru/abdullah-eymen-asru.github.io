@@ -16,7 +16,7 @@
  * -----------------------------------------------------------------------
  */
 import { el, dugme, bos, formIste, baytlariOku, nefes, IOS_MU, adsizAl } from "./ortak.js";
-import { pdfjsAl, pdfLibAl, pdfBirak } from "./pdf-yukle.js";
+import { pdfjsAl, pdfLibAl, pdfBirak, pdfAcSecenekleri } from "./pdf-yukle.js";
 import { gorsellerdenPdf } from "./motor-gorsel.js";
 
 const RENKLER = ["#ffeb3b", "#8bc34a", "#4fc3f7", "#f48fb1", "#ff9800", "#e53935", "#1e40af", "#111111"];
@@ -176,7 +176,7 @@ export async function pdfDuzenleyiciKur(kap, { dosyalar, onDegisim, mesaj = () =
 
   /* ---- kaynak yükleme ---- */
   async function pdfYukle(bayt, ad) {
-    const gorev = pdfjs.getDocument({ data: bayt.slice(0) });
+    const gorev = pdfjs.getDocument(await pdfAcSecenekleri({ data: bayt.slice(0) }));
     let sifreli = false;
     gorev.onPassword = () => { sifreli = true; pdfBirak(gorev); };
     let pdf;
