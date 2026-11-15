@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0129_tur16_medya_bilgi_sayfasi_ve_anahtar_sahipligi.sql
+-- 0129_medya_bilgi_sayfasi_ve_anahtar_sahipligi.sql
 --  1) r2_medya_coz: boyut + yükleme tarihi de döner (Worker'ın dosya bilgi sayfası için).
 --  2) GÜVENLİK: yazi_medya_anahtarlari — bir medya adres anahtarını İLK kaydeden sahiplenir. Başka bir (site sahibi olmayan) kullanıcı
 --     o anahtara dosya EKLEYEMEZ ve listesini GÖREMEZ (başkasının yazısının adresinde "isim işgali" / sahte dosya yerleştirme engellenir).
