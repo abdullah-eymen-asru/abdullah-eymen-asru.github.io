@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0128_tur14_yazi_medyasi.sql — Yazı / proje / veri seti medyası (R2)
+-- 0128_yazi_medyasi.sql — Yazı / proje / veri seti medyası (R2)
 --  • yazi_medya: bir yazıya (slug) bağlı R2 dosyaları (görsel, PDF, veri seti, her tür). Adres: /m/<yazi-slug>/<dosya-adi>
 --  • r2_medya_ayar: SİTE GENELİ aç/kapa (kota koruması). acik=false → /m/ adresleri hiç R2'ye gitmez; gorsel_otomatik=false → görseller
 --    "Görseli göster" düğmesiyle (tıklayınca) yüklenir.
