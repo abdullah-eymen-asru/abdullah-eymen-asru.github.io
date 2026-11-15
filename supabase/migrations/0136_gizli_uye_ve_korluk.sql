@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0136_tur20_gizli_uye_ve_korluk.sql — Site Sahibi'nin "gizli üye" ve "geçici körlük" (blind mode) özellikleri
+-- 0136_gizli_uye_ve_korluk.sql — Site Sahibi'nin "gizli üye" ve "geçici körlük" (blind mode) özellikleri
 --  • gizli_uyeler: Site Sahibi'nin gizlediği üyeler. (Şartnamedeki profiles.is_hidden_by_owner bayrağı yerine AYRI tablo: gizlenen üye kendi satırındaki bayrağı
 --    okuyup gizlendiğini ÖĞRENEMESİN diye.) Tabloya yalnızca Site Sahibi RPC'leri erişir.
 --  • owner_ayarlari.blind_mode: açıkken Site Sahibi de gizli üyeleri göremez; kapatınca hepsi anında geri gelir.
