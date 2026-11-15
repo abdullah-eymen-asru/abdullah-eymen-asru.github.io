@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0137_tur20_yerli_yorum_sistemi.sql — Giscus yerine Supabase YERLİ yorum sistemi
+-- 0137_yerli_yorum_sistemi.sql — Giscus yerine Supabase YERLİ yorum sistemi
 --  • Yorumlar yalnızca RPC'lerle yazılır/okunur (doğrudan tablo erişimi YOK).
 --  • Yazar kendi yorumunu düzenler/siler; "(Düzenlendi - YYYY-MM-DD)" damgası SAAT OLMADAN. Admin/yönetici yalnızca GİZLER/SİLER; METNİ DÜZENLEYEMEZ (düzenleme yolu yok).
 --  • Anonim yorum: ad yerine "Anonim" gösterilir (yazar kimliği yine kayıtlıdır; yalnızca site sahibi/DB görür).
