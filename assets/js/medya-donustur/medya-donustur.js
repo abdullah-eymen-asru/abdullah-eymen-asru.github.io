@@ -45,6 +45,16 @@ async function kur() {
   if (yetkili !== true) { kok.replaceChildren(el("div", { class: "md-kart", role: "alert" }, el("h2", { text: "🚫 Erişim yok" }), el("p", { class: "md-soluk", text: "Bu araca erişim yetkin bulunmuyor." }))); return; }
   let dosya = null, buf = null, metin = "";
   const mesaj = el("p", { class: "md-mesaj", role: "status", "aria-live": "polite" }), bildir = (m, h = false) => { mesaj.textContent = m || ""; mesaj.classList.toggle("md-hata", !!h); };
+  /* İlerleme: yüzde + geçen süre + tahmini kalan süre. Yüzdesi bilinmeyen adımda (ses çözme) çubuk "belirsiz" döner ve tahmini süre dosya boyutundan hesaplanır. */
+  const cubuk = document.createElement("progress"); cubuk.className = "md-ilerleme"; cubuk.max = 100; cubuk.hidden = true; const sureYazi = el("p", { class: "md-soluk md-sure", "aria-live": "off" }); sureYazi.hidden = true;
+  const ilr = { t0: 0, etiket: "", oran: null, tahmin: 0, z: null,
+    baslat(etiket, tahminSn = 0) { this.t0 = Date.now(); this.etiket = etiket; this.oran = null; this.tahmin = tahminSn; cubuk.hidden = false; sureYazi.hidden = false; cubuk.removeAttribute("value"); clearInterval(this.z); this.z = setInterval(() => this.ciz(), 500); this.ciz(); },
+    guncelle(oran, etiket) { if (etiket) this.etiket = etiket; this.oran = oran; this.ciz(); },
+    ciz() { const g = (Date.now() - this.t0) / 1000, f = (n) => (n >= 60 ? `${Math.floor(n / 60)} dk ${Math.round(n % 60)} sn` : `${Math.round(n)} sn`); let kalan = "";
+      if (this.oran != null && this.oran > 0.02) { cubuk.value = Math.round(this.oran * 100); kalan = ` · tahmini kalan ${f(Math.max(0, g * (1 - this.oran) / this.oran))}`; }
+      else { cubuk.removeAttribute("value"); if (this.tahmin) kalan = ` · tahmini toplam ~${f(this.tahmin)}`; }
+      bildir(`${this.etiket}${this.oran != null ? ` — %${Math.round(this.oran * 100)}` : ""}`); sureYazi.textContent = `Geçen süre ${f(g)}${kalan}`; },
+    bitir(son) { clearInterval(this.z); cubuk.hidden = true; sureYazi.hidden = true; if (son) bildir(son); } };
   const girdi = el("input", { type: "file", accept: "audio/*,video/mp4,video/quicktime,video/webm,.mp3,.wav,.m4a,.ogg,.mp4,.mov,.webm", hidden: true });
   const sec = el("button", { type: "button", class: "md-btn md-birincil", text: "🎬 Ses / video seç" }), bilgi = el("p", { class: "md-soluk", text: "Dosya tarayıcında işlenir. MP4, MOV, WAV, MP3, M4A, OGG, WEBM." });
   sec.addEventListener("click", () => girdi.click());
@@ -59,35 +69,35 @@ async function kur() {
   async function yukle(f) {
     try {
       if (f.size > SINIR) throw new Error(`Dosya çok büyük (${bayt(f.size)}); üst sınır ${bayt(SINIR)}.`);
-      bildir("Ses çözülüyor…"); dosya = f; buf = await sesCoz(f);
+      ilr.baslat("Ses çözülüyor", Math.max(2, f.size / (12 * 1024 * 1024))); dosya = f; buf = await sesCoz(f); ilr.bitir();
       bilgi.textContent = `${f.name} · ${bayt(f.size)} · ${Math.round(buf.duration / 60 * 10) / 10} dk`; dugmeler.forEach((b) => { b.disabled = false; }); bildir("Hazır.");
-    } catch (h) { bildir(h.message, true); dosya = null; buf = null; dugmeler.forEach((b) => { b.disabled = true; }); }
+    } catch (h) { ilr.bitir(); bildir(h.message, true); dosya = null; buf = null; dugmeler.forEach((b) => { b.disabled = true; }); }
   }
   girdi.addEventListener("change", () => { if (girdi.files?.[0]) yukle(girdi.files[0]); girdi.value = ""; });
 
   donusturBtn.addEventListener("click", async () => {
     if (!buf) return; donusturBtn.disabled = true;
-    try { const lame = await lameYukle(); bildir("Mono'ya indiriliyor…"); const f32 = await monoOrnekle(buf); await sleep();
-      const blob = mp3Kodla(lame, f32, Number(kbps.value), (p) => bildir(`MP3 kodlanıyor… %${Math.round(p * 100)}`));
+    try { ilr.baslat("Hazırlanıyor (mono'ya indiriliyor)", Math.max(2, buf.duration / 40)); const lame = await lameYukle(), f32 = await monoOrnekle(buf); await sleep();
+      const blob = mp3Kodla(lame, f32, Number(kbps.value), (p) => ilr.guncelle(p, "MP3 kodlanıyor")); ilr.bitir();
       indir(blob, `${adsizAl(dosya.name)}_${kbps.value}kbps.mp3`); bildir(`✔ ${bayt(dosya.size)} → ${bayt(blob.size)} (mono ${kbps.value} kbps MP3).`); }
-    catch (h) { bildir(h.message || String(h), true); } finally { donusturBtn.disabled = false; }
+    catch (h) { ilr.bitir(); bildir(h.message || String(h), true); } finally { donusturBtn.disabled = false; }
   });
 
   transBtn.addEventListener("click", async () => {
     if (!buf) return; transBtn.disabled = true; sonuc.hidden = true; cikti.hidden = true; metin = "";
     try {
       const lame = await lameYukle(), { data: { session } } = await supabase.auth.getSession(); if (!session) throw new Error("Oturum gerekli.");
-      bildir("Ses hazırlanıyor…"); const f32 = await monoOrnekle(buf), parcaN = PARCA_SN * ORNEK, adet = Math.max(1, Math.ceil(f32.length / parcaN)), parcalar = [];
+      ilr.baslat("Ses hazırlanıyor", Math.max(2, buf.duration / 40)); const f32 = await monoOrnekle(buf), parcaN = PARCA_SN * ORNEK, adet = Math.max(1, Math.ceil(f32.length / parcaN)), parcalar = [];
       for (let i = 0; i < adet; i++) {
-        bildir(`Parça ${i + 1}/${adet} sıkıştırılıyor…`); await sleep();
+        ilr.guncelle(i / adet, `Parça ${i + 1}/${adet} sıkıştırılıyor`); await sleep();
         const blob = mp3Kodla(lame, f32.subarray(i * parcaN, Math.min(f32.length, (i + 1) * parcaN)), 64);
         const fd = new FormData(); fd.append("dosya", new File([blob], `parca-${i + 1}.mp3`, { type: "audio/mpeg" })); fd.append("mod", mod.value); if (dil.value) fd.append("dil", dil.value);
-        bildir(`Parça ${i + 1}/${adet} yazıya dökülüyor…`);
+        ilr.guncelle((i + 0.5) / adet, `Parça ${i + 1}/${adet} yazıya dökülüyor`);
         const r = await fetch(`${WORKER}/transkript`, { method: "POST", headers: { Authorization: `Bearer ${session.access_token}` }, body: fd }), j = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(j.hata || `Transkript hatası (${r.status})`); parcalar.push(j.metin || "");
+        if (!r.ok) throw new Error(j.hata || `Transkript hatası (${r.status})`); parcalar.push(j.metin || ""); ilr.guncelle((i + 1) / adet);
       }
-      metin = parcalar.join("\n\n").trim(); sonuc.value = metin; sonuc.hidden = false; cikti.hidden = false; bildir(`✔ Transkript hazır (${metin.length.toLocaleString("tr-TR")} karakter). İstersen metni düzenle.`);
-    } catch (h) { bildir(h.message || String(h), true); } finally { transBtn.disabled = false; }
+      metin = parcalar.join("\n\n").trim(); sonuc.value = metin; sonuc.hidden = false; cikti.hidden = false; ilr.bitir(); bildir(`✔ Transkript hazır (${metin.length.toLocaleString("tr-TR")} karakter). İstersen metni düzenle.`);
+    } catch (h) { ilr.bitir(); bildir(h.message || String(h), true); } finally { transBtn.disabled = false; }
   });
 
   const dg = (m, f) => { const b = el("button", { type: "button", class: "md-btn", text: m }); b.addEventListener("click", f); return b; };
@@ -96,10 +106,10 @@ async function kur() {
     dg("⬇ TXT indir", () => indir(new Blob([guncel()], { type: "text/plain;charset=utf-8" }), `${adsizAl(dosya?.name || "transkript")}_transkript.txt`)),
     dg("⬇ PDF indir", async () => { try { bildir("PDF hazırlanıyor…"); indir(await metinPdf(guncel(), adsizAl(dosya?.name || "Transkript")), `${adsizAl(dosya?.name || "transkript")}_transkript.pdf`); bildir("✔ PDF indirildi."); } catch (h) { bildir(h.message, true); } }),
     dg("📝 Taslağa aktar (Yeni İçerik)", () => { sessionStorage.setItem("gy_onbilgi", JSON.stringify({ baslik: `${adsizAl(dosya?.name || "Transkript")} — transkript`, govde: guncel() })); location.hash = "#content-new"; }));
-  const temizle = dg("🧹 Belleği temizle", () => { dosya = null; buf = null; metin = ""; sonuc.value = ""; sonuc.hidden = true; cikti.hidden = true; dugmeler.forEach((b) => { b.disabled = true; }); bilgi.textContent = "Dosya tarayıcında işlenir."; bildir("🧹 Bellek temizlendi."); });
+  const temizle = dg("🧹 Belleği temizle", () => { dosya = null; buf = null; metin = ""; sonuc.value = ""; sonuc.hidden = true; cikti.hidden = true; ilr.bitir(); dugmeler.forEach((b) => { b.disabled = true; }); bilgi.textContent = "Dosya tarayıcında işlenir."; bildir("🧹 Bellek temizlendi."); });
   kok.classList.add("md-kok");
   kok.replaceChildren(el("div", { class: "md-kart" }, el("p", { class: "md-soluk", text: "🔒 Dönüştürme tarayıcıda yapılır. Transkriptte yalnızca küçültülmüş SES, kendi Worker'ın üzerinden Groq Whisper'a gider." }), sec, girdi, bilgi),
-    el("div", { class: "md-kart" }, el("h2", { text: "1) MP3'e küçült" }), kbps, donusturBtn), el("div", { class: "md-kart" }, el("h2", { text: "2) Transkript" }), mod, dil, transBtn, sonuc, cikti), temizle, mesaj);
+    el("div", { class: "md-kart" }, el("h2", { text: "1) MP3'e küçült" }), kbps, donusturBtn), el("div", { class: "md-kart" }, el("h2", { text: "2) Transkript" }), mod, dil, transBtn, sonuc, cikti), temizle, cubuk, sureYazi, mesaj);
 }
 
 /** Türkçe karakter güvenli PDF: sayfalar tuvalde çizilir, PNG olarak gömülür (metin seçilemez; seçilebilir metin için TXT kullan). */
