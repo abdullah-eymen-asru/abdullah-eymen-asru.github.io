@@ -12,7 +12,7 @@
 import { baytlariOku, uzantiAl, adsizAl, nefes, IptalHatasi } from "../donusturucu/ortak.js";
 import { gorselCoz } from "../donusturucu/motor-gorsel.js";
 import { kutuphaneYukle } from "../donusturucu/cdn.js";
-import { pdfjsAl, pdfBirak } from "../donusturucu/pdf-yukle.js";
+import { pdfjsAl, pdfBirak, pdfAcSecenekleri } from "../donusturucu/pdf-yukle.js";
 import { tuvalAl, tuvalBirak, alanaSigdir } from "./bellek-kalkani.js";
 
 const GORSEL_UZ = new Set(["jpg", "jpeg", "jpe", "jfif", "png", "webp", "gif", "bmp", "avif", "heic", "heif"]);
@@ -134,7 +134,7 @@ async function tiffAyikla(file, onOge, ctx, uyar) {
 async function pdfAyikla(file, onOge, ctx, uyar) {
   const pdfjs = await pdfjsAl();
   let u8 = new Uint8Array(await baytlariOku(file));
-  const gorev = pdfjs.getDocument({ data: u8, isEvalSupported: false });
+  const gorev = pdfjs.getDocument(await pdfAcSecenekleri({ data: u8 }));
   let pdf;
   try { pdf = await gorev.promise; } catch (h) {
     pdfBirak(gorev, null);
