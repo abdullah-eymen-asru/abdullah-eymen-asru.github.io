@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0132_tur18_sahip_askisi_demo_cikar_klasor_tasi_worker_yetkisi.sql
+-- 0132_sahip_askisi_demo_cikar_klasor_tasi_worker_yetkisi.sql
 --  1) SİTE SAHİBİ ASLA "askıda" sayılmaz: is_admin() / is_manager_or_admin() owner'ı askı bayrağından bağımsız kabul eder; olası yanlış bayrak temizlenir.
 --     (Belirti: Site Sahibi Üye Ayarları'nda yalnızca kendini görür; çünkü profiles RLS "yönetici" kontrolünü geçemez.)
 --  2) admin_demo_cikar: bir YÖNETİCİ, demo üyeyi normal bir role (user/special_user/editor/manager) çıkarabilir. Demo ATAMA hâlâ yalnızca Site Sahibi'dir.
