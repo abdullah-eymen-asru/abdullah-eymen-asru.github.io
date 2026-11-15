@@ -379,6 +379,13 @@ const OZELLIK_KATALOGU = [
     rolSutunlari: ["user", "special_user", "editor", "manager", "admin"],
   },
   {
+    // tur 21 — Yorum yönetimi. VARSAYILAN AÇIK; kapatılırsa o rol başkasının yorumunu gizleyemez/silemez, yönetim listesini göremez (kendi yorumları için normal üye gibi davranır).
+    anahtar: "yorum_yonetimi",
+    baslik: "Yorum Yönetimi (gizle / sil)",
+    aciklama: "Hesabım › Yorumlarım › “Yorum yönetimi” sekmesi ve yazı altındaki Gizle/Sil düğmeleri. Kapatılırsa yalnızca kendi yorumlarını düzenleyip silebilirler. Site Sahibi her zaman yönetir.",
+    rolSutunlari: ["manager", "admin"],
+  },
+  {
     // tur 14 — PDF Böl & Ayıkla aracı. Dönüştürücü yetkisi OLAN roller için ayrıca kapatılabilir (%100 istemci tarafı; veri sunucuya gitmez).
     anahtar: "pdf_bol",
     baslik: "PDF Böl & Ayıkla Aracı",
