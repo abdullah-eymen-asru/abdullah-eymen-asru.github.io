@@ -6,7 +6,7 @@ title: Anasayfa
 <div class="hero">
   {% if site.profile_image and site.profile_image != "" %}
   <img src="{{ site.profile_image | relative_url }}" alt="{{ site.title }}" class="profile-photo">
-  {% endif %}
+  {% endif %} 
 
   {% include hakkimda-kutusu.md %}
 
