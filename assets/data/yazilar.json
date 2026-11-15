@@ -1,0 +1,5 @@
+---
+layout: null
+permalink: /assets/data/yazilar.json
+---
+[{% for p in site.posts %}{"url":{{ p.url | jsonify }},"baslik":{{ p.title | jsonify }},"tur":"blog"},{% endfor %}{% for p in site.projects %}{"url":{{ p.url | jsonify }},"baslik":{{ p.title | jsonify }},"tur":"proje"},{% endfor %}{"url":"/","baslik":"","tur":""}]
