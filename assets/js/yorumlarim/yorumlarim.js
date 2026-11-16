@@ -21,9 +21,13 @@ async function kur() {
   const moderator = (await supabase.rpc("_yorum_moderator")).data === true;
   const mesaj = el("p", "yk-mesaj"); mesaj.setAttribute("role", "status");
   const bildir = (m, h = false) => { mesaj.textContent = m || ""; mesaj.classList.toggle("yk-hata", !!h); };
-  const durum = { ana: "benim", tur: "blog", ara: "" };
+  const durum = { ana: "benim", tur: "blog", ara: "", sira: "baslik" };
   const anaCubuk = el("div", "yk-sekmeler"), turCubuk = el("div", "yk-sekmeler"), ara = el("input", "yk-girdi"), alan = el("div", "yk-liste");
   ara.type = "search"; ara.placeholder = "Ara: yorum metni, yorumu yapan, yazı/proje başlığı…"; ara.setAttribute("aria-label", "Yorumlarda ara");
+  const sira = el("select", "yk-girdi"); sira.setAttribute("aria-label", "Sırala");
+  [["baslik", "Sırala: yazı başlığı (A–Z)"], ["yeni", "Sırala: en yeni önce"], ["eski", "Sırala: en eski önce"], ["cok", "Sırala: en çok yorum"]].forEach(([v, ad]) => { const o = el("option", null, ad); o.value = v; sira.append(o); });
+  sira.addEventListener("change", () => { durum.sira = sira.value; ciz(); });
+  const arac = el("div", "yk-arac"); arac.append(ara, sira);
   let veri = [];
 
   function sekmeCiz() {
@@ -42,6 +46,7 @@ async function kur() {
   function yorumSatiri(y) {
     const k = el("article", `yk-yorum${y.gizli ? " yk-gizli" : ""}`), m = el("p", "yk-metin", y.metin), e = el("div", "yk-eylem");
     k.append(el("div", "yk-ust", `${durum.ana === "yonetim" ? `${y.ad}${y.anonim ? " (anonim yazdı)" : ""}${y.rumuz ? " (takma ad)" : ""} · ` : ""}${tarih(y.tarih)}${y.duzenlendi ? ` (Düzenlendi - ${y.duzenlendi})` : ""}${y.ust_id ? " · ↳ yanıt" : ""}${y.gizli ? " · 🙈 gizli" : ""}`), m, e);
+    const git = el("a", "yk-btn yk-kucuk", "↗ Yoruma git"); git.href = `${y.icerik_anahtari}#yorum-${y.id}`; e.append(git);
     if (durum.ana === "benim") {
       e.append(dg("✏️ Düzenle", "yk-kucuk", () => { const t = el("textarea", "yk-girdi"); t.value = y.metin; t.rows = 4; m.replaceWith(t); e.replaceChildren(dg("Kaydet", "yk-birincil yk-kucuk", async () => { const r = await supabase.rpc("yorum_duzenle", { p_id: y.id, p_metin: t.value }); if (r.error) bildir(r.error.message, true); else { bildir("✔ Güncellendi."); await yukle(); } }), dg("Vazgeç", "yk-kucuk", ciz)); }),
         dg("🗑 Sil", "yk-kucuk yk-tehlike", async () => { if (!window.confirm("Yorumun silinsin mi?")) return; const r = await supabase.rpc("yorum_sil", { p_id: y.id }); if (r.error) bildir(r.error.message, true); else await yukle(); }));
@@ -58,13 +63,39 @@ async function kur() {
     const secili = veri.filter((y) => turBul(y.icerik_anahtari) === durum.tur), gruplar = new Map();
     secili.forEach((y) => { if (!gruplar.has(y.icerik_anahtari)) gruplar.set(y.icerik_anahtari, []); gruplar.get(y.icerik_anahtari).push(y); });
     if (!gruplar.size) { alan.append(el("p", "yk-soluk", durum.ara ? "Aramaya uyan yorum yok." : "Bu bölümde yorum yok.")); return; }
-    [...gruplar.entries()].sort((a, b) => baslikBul(a[0]).localeCompare(baslikBul(b[0]), "tr")).forEach(([adres, liste]) => {
+    const enYeni = (l) => l.reduce((m, y) => (y.tarih > m ? y.tarih : m), "");
+    const enEski = (l) => l.reduce((m, y) => (!m || y.tarih < m ? y.tarih : m), "");
+    const gSira = { baslik: (a, b) => baslikBul(a[0]).localeCompare(baslikBul(b[0]), "tr"), yeni: (a, b) => enYeni(b[1]).localeCompare(enYeni(a[1])), eski: (a, b) => enEski(a[1]).localeCompare(enEski(b[1])), cok: (a, b) => b[1].length - a[1].length || baslikBul(a[0]).localeCompare(baslikBul(b[0]), "tr") }[durum.sira];
+    [...gruplar.entries()].sort(gSira).forEach(([adres, liste]) => {
+      liste = [...liste].sort((a, b) => (durum.sira === "eski" ? a.tarih.localeCompare(b.tarih) : b.tarih.localeCompare(a.tarih)));
       const d = el("details", "yk-grup"); d.open = gruplar.size <= 3 || !!durum.ara;
       const s = el("summary", null, `${baslikBul(adres)} (${liste.length})`), a = el("a", "yk-link", " ↗ yazıya git"); a.href = adres; s.append(a); d.append(s);
       const g = el("div", "yk-grup-liste"); liste.forEach((y) => g.append(yorumSatiri(y))); d.append(g); alan.append(d);
     });
   }
   let z; ara.addEventListener("input", () => { clearTimeout(z); z = setTimeout(() => { durum.ara = ara.value.trim(); yukle(); }, 300); });
-  sekmeCiz(); kok.replaceChildren(anaCubuk, turCubuk, ara, alan, mesaj); await yukle();
+  const kutu = el("details", "yk-kutu"); kutu.append(el("summary", null, "🧰 Yedekle · Geri yükle · Takma ad"));
+  const indirDosya = (ad, tur, icerik) => { const u = URL.createObjectURL(new Blob([icerik], { type: `${tur};charset=utf-8` })); const a = el("a"); a.href = u; a.download = ad; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); };
+  const gun = () => new Date().toISOString().slice(0, 10);
+  const csvHucre = (v) => { let t = v == null ? "" : String(v); if (/^[=+\-@\t\r]/.test(t)) t = `'${t}`; return `"${t.replace(/"/g, '""')}"`; };
+  async function yedekAl() { const r = await supabase.rpc("yorum_yedek_al"); if (r.error) { bildir(r.error.message, true); return null; } return r.data || []; }
+  const jsonBtn = dg("⬇ JSON yedek", "yk-kucuk", async () => { const v = await yedekAl(); if (!v) return; indirDosya(`yorumlarim-${gun()}.json`, "application/json", JSON.stringify({ tur: "asru-yorum-yedek", surum: 1, tarih: new Date().toISOString(), yorumlar: v }, null, 2)); bildir(`✔ ${v.length} yorum JSON olarak indirildi.`); });
+  const csvBtn = dg("⬇ CSV yedek", "yk-kucuk", async () => { const v = await yedekAl(); if (!v) return; const ks = ["id", "icerik_anahtari", "ust_id", "metin", "created_at", "edited_at", "anonim", "rumuz", "gorunen_ad", "author_signature_hash"]; indirDosya(`yorumlarim-${gun()}.csv`, "text/csv", `\ufeff${ks.join(",")}\r\n${v.map((y) => ks.map((k) => csvHucre(y[k])).join(",")).join("\r\n")}`); bildir(`✔ ${v.length} yorum CSV olarak indirildi.`); });
+  const dosyaSec = el("input"); dosyaSec.type = "file"; dosyaSec.accept = "application/json,.json"; dosyaSec.hidden = true;
+  dosyaSec.addEventListener("change", async () => {
+    const f = dosyaSec.files?.[0]; dosyaSec.value = ""; if (!f) return;
+    if (f.size > 20 * 1024 * 1024) { bildir("Dosya çok büyük (en fazla 20 MB).", true); return; }
+    let liste; try { const j = JSON.parse(await f.text()); liste = Array.isArray(j) ? j : j?.yorumlar; if (!Array.isArray(liste)) throw 0; } catch { bildir("Geçerli bir yorum yedeği (JSON) seç.", true); return; }
+    if (!window.confirm(`${liste.length} yorum işlenecek. Yalnızca KENDİ imzanı taşıyan ve zaten var olmayan yorumlar eklenir. Devam edilsin mi?`)) return;
+    let e = 0, a = 0, g = 0;
+    for (let i = 0; i < liste.length; i += 500) { const r = await supabase.rpc("yorum_geri_yukle", { p_veri: liste.slice(i, i + 500) }); if (r.error) { bildir(r.error.message, true); return; } e += r.data?.eklendi || 0; a += r.data?.atlandi || 0; g += r.data?.gecersiz || 0; }
+    bildir(`✔ Geri yükleme bitti: ${e} eklendi, ${a} zaten vardı (atlandı), ${g} geçersiz/başkasına ait (atlandı).`); await yukle();
+  });
+  const yukleBtn = dg("⬆ JSON'dan geri yükle", "yk-kucuk", () => dosyaSec.click());
+  const takma = el("input", "yk-girdi"); takma.type = "text"; takma.maxLength = 40; takma.placeholder = "Yeni takma ad (boş = adıma dön)"; takma.setAttribute("aria-label", "Takma ad");
+  const takmaBtn = dg("🏷 Takma adı uygula", "yk-kucuk", async () => { const r = await supabase.rpc("yorum_takma_ad_degistir", { p_ad: takma.value }); if (r.error) bildir(r.error.message, true); else { bildir(`✔ ${r.data} yorumda görünen ad güncellendi (anonim yorumlar değişmez).`); await yukle(); } });
+  const arac1 = el("div", "yk-arac"), arac2 = el("div", "yk-arac"); arac1.append(jsonBtn, csvBtn, yukleBtn, dosyaSec); arac2.append(takma, takmaBtn);
+  kutu.append(el("p", "yk-soluk", "Yedek yalnızca senin yorumlarını içerir. Geri yüklemede başka birine ait ya da zaten var olan yorumlar eklenmez."), arac1, arac2);
+  sekmeCiz(); kok.replaceChildren(anaCubuk, kutu, turCubuk, arac, alan, mesaj); await yukle();
 }
 kur().catch((h) => { console.error("yorumlarim.js:", h); if (kok) kok.textContent = "Yorumlar yüklenemedi."; });

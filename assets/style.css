@@ -1056,46 +1056,6 @@ th { color: var(--muted); font-weight: 600; }
 
 .comments-section h2 { margin-top: 0; }
 
-/* Giscus, kendi <iframe>'ini #giscus-container'ın İÇİNE ekliyor. Konteynerin
-   ve iframe'in tam genişliği kullanması için burada açıkça belirtiyoruz —
-   yoksa bazı durumlarda (özellikle iframe henüz yüklenirken) içerik kadar
-   dar kalıp sonradan büyüyormuş gibi bir görünüm oluşabiliyor. */
-#giscus-container {
-  width: 100%;
-  /* iframe henüz yüklenmemişken (lazy-load) veya tema senkronizasyonu
-     tamamlanmadan önceki kısa anda, konteynerin sitenin kendi temasıyla
-     uyumlu görünmesi için. Aksi halde tarayıcı varsayılan (genelde beyaz)
-     bir alan gösterip site ile uyuşmayan bir "yama" oluşturuyordu. */
-  background: var(--bg);
-  min-height: 150px;
-  border-radius: 10px;
-  overflow: hidden;
-  transition: background-color 0.12s ease;
-}
-
-#giscus-container iframe.giscus-frame {
-  width: 100% !important;
-  min-height: 150px;
-  border: none;
-  display: block;
-  background: var(--bg);
-  /* ÖNEMLİ: "color-scheme: normal" YANLIŞTI ve koyu/açık tema
-     uyuşmazlığının asıl sebeplerinden biriydi. "normal" değeri,
-     tarayıcıya bu iframe'in rengi konusunda "haberim yok" demesini
-     söylüyor — bu da tarayıcının, iframe içindeki form elemanları
-     (yorum kutusu, scrollbar vs.) gibi kendi native arayüz parçalarını
-     SİTENİN o anki temasından bağımsız, kendi varsayılan (genelde açık)
-     rengiyle çizmesine yol açıyordu. Sonuç: giscus'un kendi CSS'i doğru
-     temada gelse bile, tarayıcının native öğeleri yanlış/karışık
-     görünüyordu. Çözüm: color-scheme'i site ile SENKRON tutmak. Bu
-     kural [data-theme="dark"] altında ayrıca override ediliyor. */
-  color-scheme: light;
-}
-
-[data-theme="dark"] #giscus-container iframe.giscus-frame {
-  color-scheme: dark;
-}
-
 .paylas-alani {
   display: flex;
   align-items: center;
@@ -1387,9 +1347,20 @@ th { color: var(--muted); font-weight: 600; }
    tek sütuna geri dönülüyor ki kart içeriği sıkışıp okunmaz hâle gelmesin. */
 .scroll-list tbody {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* TAM RESPONSIVE: mobil 1 → md(768) 2 → lg(1024) 3 → xl(1280) 4 sütun.
+     (grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ile aynı eşikler.) */
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
+  align-items: start;
 }
+@media (min-width: 768px)  { .scroll-list tbody { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .scroll-list tbody { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1280px) { .scroll-list tbody { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+/* Listelerim sayfaları (genis: true) — 3-4 sütun sığsın diye ana sütun genişletilir. */
+main.wrap.wrap--genis { max-width: 1240px; }
+@media (min-width: 1280px) { main.wrap.wrap--genis { max-width: 1480px; } }
+@media print { main.wrap.wrap--genis { max-width: 100% !important; } }
 
 .scroll-list td, .scroll-list th {
   overflow-wrap: break-word;
@@ -1415,8 +1386,10 @@ th { color: var(--muted); font-weight: 600; }
   flex-wrap: wrap;
   border: 1px solid var(--border);
   border-radius: 12px;
-  margin-bottom: 12px;
+  margin: 0; /* aralık grid gap'inden gelir (eskiden margin-bottom + gap çift boşluk yapıyordu) */
   padding: 4px 16px;
+  min-width: 0;
+  align-self: stretch; /* aynı satırdaki kartlar eşit yükseklikte */
   background: var(--card-bg);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -1541,6 +1514,9 @@ th { color: var(--muted); font-weight: 600; }
 .scroll-list td:nth-child(n+3):last-child {
   border-bottom: none;
 }
+.scroll-list td.hucre-bos { display: none; }
+/* son GÖRÜNEN hücrenin alt çizgisi (sonraki hücreler boş olduğunda) */
+.scroll-list td:nth-child(n+3):not(.hucre-bos):has(~ td.hucre-bos:last-child):not(:has(~ td:not(.hucre-bos))) { border-bottom: none; }
 .scroll-list td:nth-child(n+3)::before {
   content: attr(data-label);
   color: var(--muted);
@@ -1555,10 +1531,6 @@ th { color: var(--muted); font-weight: 600; }
   .scroll-list tbody tr { padding: 4px 12px; }
   .koleksiyon-baslik-link { font-size: 0.98rem; }
   .scroll-list td:nth-child(n+3) { font-size: 0.86rem; }
-  /* Çok dar telefonlarda 2 sütun her kartı aşırı daraltır (ör. "Bitiş
-     Tarihi: 2018-06-02" gibi satırlar sıkışıp okunmaz olur) — burada tek
-     sütuna geri dönülüyor. */
-  .scroll-list tbody { grid-template-columns: 1fr; }
 }
 
 .no-results-row td {

@@ -201,7 +201,7 @@ function satirYap(s, kelimeler) {
   vurgulu(adBtn, s.ad, kelimeler);
   adBtn.addEventListener("click", () => {
     if (s.tur === "klasor") klasoreGit(s.klasor_yolu + s.ad + "/");
-    else if (kat === "gorsel" || (kat === "pdf" && !s.sifreli)) onizle(s);
+    else if (kat === "gorsel" || kat === "pdf") onizle(s);
     else indir(s);
   });
   govde.appendChild(adBtn);
@@ -218,7 +218,7 @@ function satirYap(s, kelimeler) {
 
   const islem = el("div", "ra-islemler");
   if (s.tur === "dosya") {
-    if (kat === "gorsel" || (kat === "pdf" && !s.sifreli)) islem.appendChild(ikonButonu("👁", "Önizle", () => onizle(s)));
+    if (kat === "gorsel" || kat === "pdf") islem.appendChild(ikonButonu("👁", "Önizle", () => onizle(s)));
     islem.appendChild(ikonButonu("⬇", "İndir", (e) => indir(s, e.currentTarget)));
     if (s.sifreli && kendimin(s)) islem.appendChild(ikonButonu("👥", "Paylaşımı yönet", () => paylasAc(s)));
     if (!s.sifreli && arsivSekmesi() && yukleyebilir()) islem.appendChild(ikonButonu("🔗", "Herkese açık bağlantı oluştur", () => { sekmeDegistir("baglantilar"); gBaglantilar?.olustur(s); }));
@@ -327,7 +327,7 @@ async function adlandir(s) {
   if (!yeni || yeni === s.ad) return;
   const { error } = await supabase.rpc("r2_arsiv_yeniden_adlandir", { p_id: s.id, p_yeni_ad: yeni });
   if (error) return bildir(error.message || "Yeniden adlandırılamadı.");
-  bildir("Ad güncellendi.", "ok"); listele();             // R2 işlemi yok: anahtarlar opak
+  bildir("Ad güncellendi.", "ok"); listele(); arkaPlandaEsitle();   // anahtar klasör/dosya yolunu yansıttığı için (0135) Cloudflare tarafı da kopyala-sil ile güncellenir
 }
 
 async function sil(s) {
@@ -381,8 +381,12 @@ async function indir(s, dugme) {
 }
 
 let onizlemeUrl = null;
+let onizlemePdf = null; // evrensel PDF okuyucu örneği (bkz. pdf-okuyucu/evrensel-pdf.js)
 function onizlemeKapat() {
   if (onizlemeUrl) { URL.revokeObjectURL(onizlemeUrl); onizlemeUrl = null; }
+  if (onizlemePdf) { try { onizlemePdf.yokEt(); } catch { /* yok say */ } onizlemePdf = null; }
+  k.onizlemeImg.parentElement?.querySelector(".ra-onizleme-pdf")?.remove();
+  k.onizlemeImg.hidden = false;
   k.onizlemeImg.removeAttribute("src");
   if (k.dlgOnizleme.open) k.dlgOnizleme.close();
 }
@@ -390,10 +394,22 @@ function onizlemeKapat() {
 async function onizle(s) {
   const kat = kategori(s);
   try {
-    if (kat === "pdf" && !s.sifreli) {                 // PDF: yeni sekmede (satır içi imzalı bağlantı)
-      const { url } = await worker("/indir", { id: s.id, satir_ici: true });
-      const a = document.createElement("a"); a.href = url; a.target = "_blank"; a.rel = "noopener noreferrer";
-      document.body.appendChild(a); a.click(); a.remove(); return;
+    if (kat === "pdf") {
+      // PDF: eskiden yeni sekmeye/<img>'e gidiyor, bazı tarayıcılarda BEYAZ sayfa veriyordu. Artık iletişim kutusunda evrensel okuyucu:
+      // PDF.js (cMap + yazı tipleri + WASM) → olmazsa tarayıcının yerleşik okuyucusu. Şifreli dosyalar tarayıcıda çözülüp gösterilir.
+      k.onizlemeBaslik.textContent = s.ad; k.onizlemeHata.hidden = true;
+      k.onizlemeIndir.onclick = () => indir(s, k.onizlemeIndir);
+      k.onizlemeImg.hidden = true; k.onizlemeImg.removeAttribute("src");
+      const pdfKap = document.createElement("div"); pdfKap.className = "ra-onizleme-pdf";
+      k.onizlemeImg.parentElement.append(pdfKap);
+      k.dlgOnizleme.showModal();
+      pdfKap.textContent = "PDF hazırlanıyor…";
+      const { evrenselPdfGoster } = await import("../pdf-okuyucu/evrensel-pdf.js");
+      let kaynak, indirUrl = null;
+      if (s.sifreli) kaynak = { blob: await sifreliBlob(s) };
+      else { const { url } = await worker("/indir", { id: s.id, satir_ici: true }); kaynak = { url }; indirUrl = url; }
+      onizlemePdf = await evrenselPdfGoster(pdfKap, kaynak, { baslik: s.ad, indirUrl });
+      return;
     }
     if (kat !== "gorsel") return indir(s);
     k.onizlemeBaslik.textContent = s.ad; k.onizlemeImg.alt = s.ad; k.onizlemeHata.hidden = true;

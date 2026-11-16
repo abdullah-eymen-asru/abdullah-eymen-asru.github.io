@@ -15,6 +15,8 @@ import { veriDonustur } from "./motor-veri.js";
 import { kutuphaneYukle } from "./cdn.js";
 import { pdfjsAl, pdfLibAl, pdfBirak, pdfAcSecenekleri } from "./pdf-yukle.js";
 import { temizHtml } from "./temizle.js";
+import { pptxOku, pptOku, pptxDenPdf, pptxSlaytGorselleri } from "./belge-pptx.js";
+import { irDenPptx, goruntulerdenPptx } from "./belge-pptx-yaz.js";
 
 const HTML_SABLON_CSS = "body{font-family:system-ui,Segoe UI,Roboto,sans-serif;line-height:1.6;max-width:800px;margin:2rem auto;padding:0 1rem;color:#222}img{max-width:100%;height:auto}table{border-collapse:collapse;width:100%}td,th{border:1px solid #bbb;padding:.35rem .5rem}th{background:#f1f3f5}pre{background:#f4f5f7;padding:.8rem;overflow:auto}code{font-family:ui-monospace,Consolas,monospace}blockquote{margin-left:0;padding-left:1rem;border-left:3px solid #aab}[align=center]{text-align:center}[align=right]{text-align:right}[align=justify]{text-align:justify}";
 
@@ -53,6 +55,7 @@ export async function htmldenCikti(html, hedef, { baslik = "Belge", yazar = "", 
     case "docx": return [{ blob: await irDenDocx(htmlDenIR(html), { baslik, yazar }), ad: `${ad}.docx` }];
     case "pdf": return [{ blob: await irDenPdf(htmlDenIR(html), { baslik, yazar }), ad: `${ad}.pdf` }];
     case "epub": return [{ blob: await htmlDenEpub(html, { baslik, yazar }), ad: `${ad}.epub` }];
+    case "pptx": return [{ blob: await irDenPptx(htmlDenIR(html), { baslik, yazar, ilerle: ctx?.ilerle }), ad: `${ad}.pptx` }];
     default: throw new Error(`Desteklenmeyen belge çıktısı: ${hedef}`);
   }
 }
@@ -91,6 +94,15 @@ export async function pdfSayfaGorselleri(dosya, hedef, { olcek = 2, ilerle, ipta
     }
   } finally { pdfBirak(gorev, pdf); }
   return cikti;
+}
+
+/** PDF sayfa metinleri (PPTX konuşmacı notları için). */
+async function pdfSayfaMetinleri(dosya) {
+  const pdfjs = await pdfjsAl();
+  const gorev = pdfjs.getDocument(await pdfAcSecenekleri({ data: new Uint8Array(await baytlariOku(dosya)) }));
+  const pdf = await gorev.promise, r = [];
+  try { for (let n = 1; n <= pdf.numPages; n++) { const s = await pdf.getPage(n); const t = await s.getTextContent(); r.push(t.items.map((i) => i.str).join(" ").replace(/\s+/g, " ").trim()); s.cleanup?.(); } } finally { pdfBirak(gorev, pdf); }
+  return r;
 }
 
 /** Taranmış PDF → sayfa görüntülerinden oluşan DOCX (metin yoksa içeriği korumanın tek yolu; OCR yapılmaz). */
@@ -142,6 +154,7 @@ export async function donustur(dosya, tur, hedef, ctx = {}) {
 
   if (f.aile === "gorsel") {
     if (hedef === "pdf") return [{ blob: await gorsellerdenPdf([{ blob: dosya, ad: dosya.name }], { sayfaBoyutu: ctx.sayfaBoyutu, ilerle: ctx.ilerle, uyarilar: ctx.uyarilar }), ad: `${dosyaAdiTemizle(ad)}.pdf` }];
+    if (hedef === "pptx") { ctx.ilerle?.(0.3, "Slayta yerleştiriliyor…"); return [{ blob: await goruntulerdenPptx([await gorselDonustur(dosya, "png", { kalite: 0.92, uyarilar: ctx.uyarilar, ad: dosya.name })], { baslik: ad }), ad: `${dosyaAdiTemizle(ad)}.pptx` }]; }
     ctx.ilerle?.(0.3, "Dönüştürülüyor…");
     const b = await gorselDonustur(dosya, hedef, { kalite: ctx.kalite, icoBoyutlari: ctx.icoBoyutlari, uyarilar: ctx.uyarilar, ad: dosya.name });
     return [{ blob: b, ad: `${dosyaAdiTemizle(ad)}.${FORMATLAR[hedef].uzanti}` }];
@@ -149,8 +162,36 @@ export async function donustur(dosya, tur, hedef, ctx = {}) {
 
   if (tur === "pdf" && ["png", "jpg", "webp"].includes(hedef)) return pdfSayfaGorselleri(dosya, hedef, ctx);
 
+  // PDF → PPTX: her sayfa, sayfa oranında bir slayta TAM SAYFA GÖRÜNTÜ (mizanpaj birebir); sayfa metni konuşmacı notuna konur.
+  if (tur === "pdf" && hedef === "pptx") {
+    const sayfalar = await pdfSayfaGorselleri(dosya, "jpg", { olcek: 1.6, ilerle: (o, m) => ctx.ilerle?.(o * 0.5, m), iptalKontrol: ctx.iptalKontrol, parola: ctx.parola });
+    let notlar = [];
+    try { notlar = await pdfSayfaMetinleri(dosya); } catch { /* notlar isteğe bağlı */ }
+    ctx.uyarilar?.push("PDF → PPTX: sayfalar slayta görüntü olarak yerleştirildi (tasarım birebir korunur, ancak slayt içindeki metin düzenlenemez). Sayfa metni konuşmacı notlarına eklendi.");
+    return [{ blob: await goruntulerdenPptx(sayfalar.map((s) => s.blob), { baslik: ad, notlar, ilerle: ctx.ilerle }), ad: `${dosyaAdiTemizle(ad)}.pptx` }];
+  }
+
+  // PPTX / PPT kaynaklı: PDF ve slayt görselleri tasarım korunarak (canvas çizimi); diğer biçimler HTML pivotundan.
+  if ((tur === "pptx" || tur === "ppt") && (hedef === "pdf" || ["png", "jpg", "webp"].includes(hedef) || (tur === "ppt" && hedef === "pptx"))) {
+    ctx.ilerle?.(0.05, "Sunum okunuyor…");
+    const model = tur === "pptx" ? await pptxOku(await baytlariOku(dosya), ctx) : pptOku(await baytlariOku(dosya));
+    try {
+      model.uyarilar.forEach((u) => ctx.uyarilar?.push(u));
+      if (hedef === "pdf") {
+        ctx.uyarilar?.push("PPTX → PDF: slaytlar görüntü olarak yazılır (tasarım ve mizanpaj korunur; PDF içindeki metin seçilemez). Çizilemeyen nesneler yer tutucu kutu olarak gösterilir.");
+        return [{ blob: await pptxDenPdf(model, { baslik: ad, ilerle: ctx.ilerle, iptalKontrol: ctx.iptalKontrol, pdfLibAl }), ad: `${dosyaAdiTemizle(ad)}.pdf` }];
+      }
+      if (hedef === "pptx") {
+        const gorselOlarak = await pptxSlaytGorselleri(model, "jpg", { adTaban: dosyaAdiTemizle(ad), ilerle: ctx.ilerle, iptalKontrol: ctx.iptalKontrol });
+        return [{ blob: await goruntulerdenPptx(gorselOlarak.map((g) => g.blob), { baslik: ad, notlar: model.slaytlar.map((s) => s.notlar || s.baslik), ilerle: ctx.ilerle }), ad: `${dosyaAdiTemizle(ad)}.pptx` }];
+      }
+      return await pptxSlaytGorselleri(model, hedef, { adTaban: dosyaAdiTemizle(ad), ilerle: ctx.ilerle, iptalKontrol: ctx.iptalKontrol });
+    } finally { model.temizle?.(); }
+  }
+
   ctx.ilerle?.(0.05, "Belge okunuyor…");
   const belge = await belgeHtmlAl(dosya, tur, ctx);
+  (belge.uyarilar || []).forEach((u) => ctx.uyarilar?.push(u));
   if (belge.taranmis) {
     if (hedef === "docx") { ctx.uyarilar?.push("Bu PDF taranmış görüntü içeriyor (metin katmanı yok). OCR yapılmaz; sayfalar görüntü olarak Word'e konuldu."); return [{ blob: await taranmisDocx(dosya, ctx), ad: `${dosyaAdiTemizle(ad)}.docx` }]; }
     throw new Error("Bu PDF taranmış bir görüntü gibi görünüyor (metin katmanı yok). Metin çıkarılamaz; 'Word' (sayfa görüntüleri) ya da PNG/JPG seçebilirsin.");

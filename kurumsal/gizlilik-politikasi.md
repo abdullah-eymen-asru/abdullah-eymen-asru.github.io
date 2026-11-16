@@ -59,13 +59,22 @@ permalink: "/kurumsal/gizlilik-politikasi.html"
 
 <h2>2. Yorumlar</h2>
 <p>
-  Blog yazılarına ve proje sayfalarına yorum yapabilmek için
-  <strong>GitHub hesabınızla</strong> giriş yapmanız gerekir (Giscus
-  altyapısı, GitHub Discussions üzerinden çalışır). Yaptığınız yorumlar
-  GitHub'ın kendi platformunda, GitHub hesabınızla ilişkilendirilmiş
-  şekilde saklanır; bu site ayrıca hiçbir yorum verisi tutmaz. Yorum
-  widget'ının kendisi de aşağıdaki § 3'da açıklanan çerez onayı olmadan
-  yüklenmez.
+  Blog yazılarına ve proje sayfalarına yorum yazabilmek için bu sitede
+  <strong>üye olarak giriş yapmanız</strong> gerekir. Yorumlar, üçüncü taraf bir
+  yorum hizmeti kullanılmadan, bu sitenin kendi veritabanında (Supabase) saklanır.
+  Yorumla birlikte şu veriler tutulur: yorum metni, yazıldığı sayfa, tarih ve
+  (varsa) düzenleme tarihi, görünen adınız (veya seçtiğiniz takma ad) ve hesabınıza
+  bağlı bir <em>yazar imzası</em> (e-posta adresinizden türetilen tek yönlü bir özet;
+  e-posta adresiniz yorumla birlikte gösterilmez ve geri elde edilemez).
+</p>
+<p>
+  <strong>Anonim yorum</strong> seçerseniz sayfada ad yerine "Anonim" görünür; ancak
+  kötüye kullanımı önlemek için yorumun hesabınızla ilişkisi veritabanında saklanır ve
+  yalnızca site sahibi tarafından görülebilir. Yorumunuzu istediğiniz zaman düzenleyebilir
+  veya silebilirsiniz; yöneticiler yorum metnini değiştiremez, yalnızca uygunsuz yorumu
+  gizleyebilir veya silebilir. Hesap panelindeki <em>Yorumlarım</em> bölümünden kendi
+  yorumlarınızı JSON/CSV olarak yedekleyebilir, JSON yedeğinden geri yükleyebilirsiniz.
+  Yorum altyapısı için çerez onayı gerekmez; yalnızca oturum açmanız yeterlidir.
 </p>
 
 
@@ -119,14 +128,8 @@ permalink: "/kurumsal/gizlilik-politikasi.html"
         Blog ve proje sayfalarındaki yorumlar bu sitenin kendi veritabanında (Supabase) tutulur; üçüncü taraf yorum widget'ı KULLANILMAZ. Bu kategori, ileride eklenebilecek üçüncü taraf işlevsel hizmetler için saklıdır.
       </td>
       <td>
-        Evet — reddederseniz widget hiç yüklenmez (yerine "kabul et"
-        butonu içeren bir yer tutucu görünür); sonradan kapatırsanız
-        widget sayfadan kaldırılır. <strong>Önemli sınır:</strong>
-        giscus.app ve github.com alan adlarında zaten oluşmuş çerezleri, bu
-        site (farklı bir alan adı olduğu için tarayıcı güvenlik modeli
-        gereği) SİLEMEZ; bunları kaldırmak isterseniz tarayıcınızın kendi
-        "Site Verileri/Çerezler" ayarlarında o alan adlarını aramanız
-        gerekir.
+        Evet — reddederseniz bu kategorideki hiçbir üçüncü taraf hizmet yüklenmez.
+        Şu an bu kategoriyi kullanan etkin bir hizmet bulunmamaktadır.
       </td>
     </tr>
     <tr>
@@ -139,8 +142,8 @@ permalink: "/kurumsal/gizlilik-politikasi.html"
       <td>
         Evet — reddederseniz reklam script'i hiç yüklenmez, sayfada hiçbir
         reklam (otomatik ya da yazı içi) görünmez; sonradan kapatırsanız
-        mevcut reklamlar kaldırılır. <strong>Önemli sınır:</strong> Giscus
-        ile aynı sebeple, google.com ve googlesyndication.com alan
+        mevcut reklamlar kaldırılır. <strong>Önemli sınır:</strong> Tarayıcı
+        güvenlik modeli gereği, google.com ve googlesyndication.com alan
         adlarında zaten oluşmuş çerezleri bu site SİLEMEZ; kaldırmak
         isterseniz tarayıcınızın kendi "Site Verileri/Çerezler"
         ayarlarında o alan adlarını aramanız ya da yukarıdaki Google
@@ -189,7 +192,7 @@ permalink: "/kurumsal/gizlilik-politikasi.html"
     (Cloudflare R2). Cloudflare, sayfayı sunarken teknik gereklilik olarak IP
     adresi gibi bağlantı bilgilerini işleyebilir.</li>
   <li><strong>GitHub</strong> — sitenin kaynak deposu, yedek barındırma
-    (GitHub Pages) ve yorum altyapısı (Giscus/GitHub Discussions).</li>
+    (GitHub Pages). Yorumlar GitHub'da değil, bu sitenin kendi veritabanında tutulur.</li>
   <li><strong>Google</strong> — Google Analytics, Google AdSense ve Google
     Forms (bkz. § 1 ve § 4).</li>
   <li><strong>Umami Cloud</strong> — çerezsiz istatistik (bkz. § 1).</li>

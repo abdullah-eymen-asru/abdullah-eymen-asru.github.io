@@ -43,11 +43,12 @@ katı izin listesi (her zaman). Uzak görseller kaldırılır (render sırasınd
 |---|---|---|---|---|
 | pdfjs-dist | 5.6.205 | Apache-2.0 | PDF gösterim / metin / sayfa görseli (mevcut Akademik Kütüphane yükleyicisi) | motor.js |
 | pdf-lib | 1.17.1 | MIT | PDF sayfa işlemleri, birleştirme, kayıt | motor.js |
-| jszip | 3.10.1 | MIT/GPL-3 | ZIP / EPUB / çoklu çıktı | ✔ |
-| docx | 9.6.1 | MIT | Word üretimi | ✔ |
-| marked | 18.0.2 | MIT | Markdown → HTML | ✔ |
-| mammoth | 1.8.0 | BSD-2 | Word → HTML | — |
-| dompurify | 3.2.6 | Apache-2/MPL-2 | HTML temizleme | — |
+| jszip | 3.10.2 | MIT/GPL-3 | ZIP / EPUB / PPTX okuma / çoklu çıktı | ✔ |
+| docx | 9.15.1 | MIT | Word üretimi | ✔ |
+| marked | 18.1.2 | MIT | Markdown → HTML | ✔ |
+| mammoth | 1.13.0 | BSD-2 | Word → HTML | ✔ |
+| dompurify | 3.4.17 | Apache-2/MPL-2 | HTML temizleme | ✔ |
+| pptxgenjs | 4.0.1 | MIT | PPTX üretimi (tüm biçimler → PowerPoint) | ✔ |
 | pdfmake | 0.2.20 | MIT | PDF üretimi (Roboto gömülü, Türkçe dahil) | — |
 | heic2any | 0.0.4 | MIT | HEIC/HEIF çözme (yalnızca gerektiğinde, WASM) | — |
 
@@ -64,11 +65,11 @@ Bu adım **zorunlu değil**: `sri: null` ile her şey çalışır. Hash, CDN ele
 3. İlgili özelliği bir kez dene. Çalışmazsa `sri`'yi tekrar `null` yap.
 
 ```bash
-# mammoth 1.8.0 (Word → HTML)
-curl -s https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js | openssl dgst -sha384 -binary | openssl base64 -A
+# mammoth 1.13.0 (Word → HTML)
+curl -s https://cdn.jsdelivr.net/npm/mammoth@1.13.0/mammoth.browser.min.js | openssl dgst -sha384 -binary | openssl base64 -A
 
-# dompurify 3.2.6 (HTML temizleme)
-curl -s https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js | openssl dgst -sha384 -binary | openssl base64 -A
+# dompurify 3.4.17 (HTML temizleme)
+curl -s https://cdn.jsdelivr.net/npm/dompurify@3.4.17/dist/purify.min.js | openssl dgst -sha384 -binary | openssl base64 -A
 
 # pdfmake 0.2.20 (PDF üretimi) — yalnızca ana dosya; build/vfs_fonts.js hash'siz kalır
 curl -s https://cdn.jsdelivr.net/npm/pdfmake@0.2.20/build/pdfmake.min.js | openssl dgst -sha384 -binary | openssl base64 -A
@@ -90,6 +91,16 @@ Uyarı: komut hata verip boş çıktı üretirse (internet yok vb.) `sri`'ya yaz
 `_layouts/default.html` ve `_headers` içine `script-src 'self' https: 'wasm-unsafe-eval'` eklendi (önceden `default-src 'self' https:`
 üzerinden aynı kaynaklar zaten serbestti; tek fark WebAssembly'e izin). JS `eval`'e izin **vermez**. Yalnız HEIC (iPhone) çözümü için
 gerekir; istemezsen token'ı sil — HEIC dışındaki her şey çalışır. (`csp_hash_enjekte.rb` mevcut script-src'yi korur, hash ekler.)
+
+## PowerPoint (PPTX / PPT) desteği
+- **PPTX → PDF / PNG / JPG / WebP**: slayt XML'i (tema renkleri, düzen/ana slayt yer tutucuları, şekiller, metin, madde işaretleri, resimler + kırpma, tablolar, gruplar, notlar) tarayıcıda canvas'a çizilir → tasarım ve yerleşim korunur. PDF'te her sayfa slayt boyutunda bir görüntüdür (**metin seçilemez**).
+- **PPTX → DOCX / MD / HTML / TXT / EPUB**: slayt başlığı + metin + resim + tablo, HTML pivotu üzerinden.
+- **Herhangi bir biçim → PPTX**: PDF sayfaları slayt görseli olur (sayfa metni konuşmacı notuna), görseller slayt olur, belgeler başlıklara göre slaytlara bölünür.
+- **PPT (eski ikili biçim)**: yalnızca metin çıkarılır; tasarım/resimler okunamaz ve bu kullanıcıya uyarı olarak gösterilir. En iyi sonuç için dosyayı PowerPoint/LibreOffice'te PPTX olarak kaydet.
+- SmartArt/grafik nesneleri çizilemez; yer tutucu kutu gösterilir ve uyarı verilir.
+
+## PDF Okuyucu (her yerde aynı)
+`assets/js/pdf-okuyucu/evrensel-pdf.js`: PDF.js'i `cMapUrl`, `standardFontDataUrl`, `wasmUrl`, `iccUrl` ile açar; başarısız olursa **tarayıcının yerleşik PDF okuyucusuna** (blob iframe; CSP `frame-src blob:`) düşer. Araçlar, Dönüştürücü, PDF Düzenleyici, Akademik Kütüphane, Dosya Yöneticisi önizlemesi ve yazı içi PDF'ler bunu kullanır. Beyaz sayfa hatasının kök nedeni `pdf-yukle.js` içinde kaynak adresindeki eksik `/` idi; düzeltildi.
 
 ## Bilinen sınırlar (bilerek)
 - **PDF → Word/MD/…**: düzen birebir değil; metin/başlık/liste sezgiyle yeniden kurulur, tablolar düz akışa döner. Taranmış (metinsiz)

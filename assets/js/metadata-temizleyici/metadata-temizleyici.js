@@ -9,6 +9,7 @@
 import { supabase } from "../core/supabase-client.js";
 import { el, hataMetni } from "../donusturucu/ortak.js";
 import { metadataKartiYap } from "./arayuz.js";
+import { sekmeSifirlamaKaydet } from "../core/gezinme-kilidi.js";
 
 const kok = document.getElementById("mt-kok");
 
@@ -24,6 +25,11 @@ async function kur() {
   }
   kok.classList.add("dn-kok");
   kok.replaceChildren(metadataKartiYap());
+  // Sekme değişince: önce kartın kendi "Belleği Güvenli Sıfırla" düğmesi (nesne URL'lerini bırakır), sonra taze kart.
+  sekmeSifirlamaKaydet("tool-metadata", () => {
+    try { kok.querySelector("[data-sifirla]")?.click(); } catch { /* yok say */ }
+    kok.replaceChildren(metadataKartiYap());
+  });
 }
 
 kur().catch((h) => {

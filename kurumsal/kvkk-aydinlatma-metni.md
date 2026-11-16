@@ -68,6 +68,11 @@ permalink: "/kurumsal/kvkk-aydinlatma-metni.html"
     kendi isteğinizle etkinleştirirseniz, Supabase Auth tarafından
     yönetilen bir TOTP (Authenticator uygulaması) gizli anahtarı ve
     yedek kodlar saklanır. Bu anahtar tarafımdan görüntülenemez.</li>
+  <li><strong>Yorum verisi:</strong> blog/proje sayfalarına yazdığınız yorumların metni, yazıldığı
+    sayfa, oluşturma/düzenleme tarihi, görünen adınız ya da seçtiğiniz takma ad ve e-posta adresinizden
+    türetilen tek yönlü <em>yazar imzası</em> (özet) saklanır. Anonim yorumda sayfada ad gösterilmez; hesabınızla ilişkisi
+    yalnızca site sahibi tarafından görülebilir. Yorumlarınızı istediğiniz zaman düzenleyip silebilir,
+    JSON/CSV olarak yedekleyebilir ve JSON yedeğinden geri yükleyebilirsiniz.</li>
   <li><strong>Mesajlaşma verisi:</strong> panelin Sohbet/Mesajlar
     özelliğini kullanırsanız, sohbetin katılımcıları, zaman damgaları ve
     <strong>uçtan uca şifrelenmiş</strong> mesaj içeriği ile konu başlığı

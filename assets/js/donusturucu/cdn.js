@@ -15,27 +15,27 @@
 
 export const KUTUPHANELER = {
   jszip: {
-    paket: "jszip", surum: "3.10.1", dosya: "dist/jszip.min.js", global: "JSZip", lisans: "MIT veya GPL-3.0",
-    sri: "sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG",
+    paket: "jszip", surum: "3.10.2", dosya: "dist/jszip.min.js", global: "JSZip", lisans: "MIT veya GPL-3.0",
+    sri: "sha384-DdGlNq+wVXAn83gXqwyeFHB7iyXy6L0rLrNzgDmhKWPjiJLg9vj6qosYmZmkMfQ+",
     amac: "ZIP okuma/yazma (EPUB, DOCX, çoklu çıktı paketi)",
   },
   docx: {
-    paket: "docx", surum: "9.6.1", dosya: "dist/index.iife.js", global: "docx", lisans: "MIT",
-    sri: "sha384-NFScaGYD8NnHsUV2z0M1gCuKoEsGy7LB1EuWKYFsmQbO4k23nzZzEHFySoCvt8Xn",
+    paket: "docx", surum: "9.15.1", dosya: "dist/index.iife.js", global: "docx", lisans: "MIT",
+    sri: "sha384-ud8085E8t6iW4uUom5nN5cpzTZ4OdsNKB/AKWfOsI62tzsoV2X7r7/o4KWESO8rq",
     amac: "Word (.docx) üretimi",
   },
   marked: {
-    paket: "marked", surum: "18.0.2", dosya: "lib/marked.umd.js", global: "marked", lisans: "MIT",
-    sri: "sha384-7AnLEKZ+m8uFTgZ3D3njjhz/8KRCyH9OpRs5gJwID3vGDxmSHXvmn/2LnegrLjuT",
+    paket: "marked", surum: "18.1.2", dosya: "lib/marked.umd.js", global: "marked", lisans: "MIT",
+    sri: "sha384-nCN5FOaVTXXYilftBH/VQuC9ypBYOxrctAZn2x7ggYClXaporWSzM0y+ODhb8MTi",
     amac: "Markdown → HTML",
   },
   mammoth: {
-    paket: "mammoth", surum: "1.8.0", dosya: "mammoth.browser.min.js", global: "mammoth", lisans: "BSD-2-Clause",
-    sri: "sha384-/cXAMbzovUIKbBERjPmR3SnPTh8siWr5lsvFYj1Uq4XP0yaJUZJmsh0YXyGv5P0y", amac: "Word (.docx) → HTML",
+    paket: "mammoth", surum: "1.13.0", dosya: "mammoth.browser.min.js", global: "mammoth", lisans: "BSD-2-Clause",
+    sri: "sha384-8NWE3bZDrmRI4IePMoQaEoLhAQ1MmRMJkdNgnGiHRFanTqsFKr0TmK6aSZvFJ/PO", amac: "Word (.docx) → HTML",
   },
   dompurify: {
-    paket: "dompurify", surum: "3.2.6", dosya: "dist/purify.min.js", global: "DOMPurify", lisans: "Apache-2.0 veya MPL-2.0",
-    sri: "sha384-JEyTNhjM6R1ElGoJns4U2Ln4ofPcqzSsynQkmEc/KGy6336qAZl70tDLufbkla+3", amac: "HTML temizleme (XSS koruması); yüklenemezse yerleşik katı temizleyici kullanılır",
+    paket: "dompurify", surum: "3.4.17", dosya: "dist/purify.min.js", global: "DOMPurify", lisans: "Apache-2.0 veya MPL-2.0",
+    sri: "sha384-P0JNneQf81HOl9VwNXK76cQ9VMD6Nfsnepxb0cCOg8+UzEdzgPHAPV4wVQrvYQSx", amac: "HTML temizleme (XSS koruması); yüklenemezse yerleşik katı temizleyici kullanılır",
   },
   pdfmake: {
     paket: "pdfmake", surum: "0.2.20", dosya: "build/pdfmake.min.js", global: "pdfMake", lisans: "MIT",
@@ -44,11 +44,16 @@ export const KUTUPHANELER = {
   },
   utif: {
     paket: "utif", surum: "3.1.0", dosya: "UTIF.js", global: "UTIF", lisans: "MIT",
-    sri: null, amac: "TIFF çözme (Chrome/Firefox çözemez; Safari yerel çözer) — Belge Tarayıcı",
+    sri: "sha384-RyBmXHdfZ/Uon+ud+/AqSyWpUWnKYt2tkRG/P4gWoRUGDU+qIAV3tGBPNlYTBZEF", amac: "TIFF çözme (Chrome/Firefox çözemez; Safari yerel çözer) — Belge Tarayıcı",
   },
   pako: {
     paket: "pako", surum: "2.1.0", dosya: "dist/pako.min.js", global: "pako", lisans: "MIT AND Zlib",
-    sri: null, amac: "Deflate sıkıştırmalı TIFF'ler için (UTIF'in isteğe bağlı bağımlılığı)",
+    sri: "sha384-rNlaE5fs9dGIjmxWDALQh/RBAaGRYT5ChrzHo6tRfgrZ36iRFAiquP5g41Jsv+0j", amac: "Deflate sıkıştırmalı TIFF'ler için (UTIF'in isteğe bağlı bağımlılığı)",
+  },
+  pptxgenjs: {
+    paket: "pptxgenjs", surum: "4.0.1", dosya: "dist/pptxgen.bundle.js", global: "PptxGenJS", lisans: "MIT",
+    sri: "sha384-qb0Xhi7LLYpvW1HCK6oMrmDLSY9sy7vwm6ZlV6KjtrlL9yg30+YN4neTwnmX+Kp8",
+    amac: "PowerPoint (.pptx) üretimi — hiçbir şey sunucuya gitmez",
   },
   heic2any: {
     paket: "heic2any", surum: "0.0.4", dosya: "dist/heic2any.min.js", global: "heic2any", lisans: "MIT",

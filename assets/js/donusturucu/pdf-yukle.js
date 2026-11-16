@@ -13,6 +13,7 @@ const cdnler = () => (globalThis.__DN_CDN__ ? [globalThis.__DN_CDN__, ...CDNLER]
 
 let sozPdfjs = null;
 let sozPdflib = null;
+let yedekTaban = null; // yedek yükleyici kullanıldıysa: pdfjs-dist kök adresi (cmaps/standard_fonts/wasm/iccs için)
 
 function scriptYukle(src) {
   return new Promise((coz, red) => {
@@ -32,6 +33,7 @@ async function yedekPdfjs() {
     try {
       const m = await import(/* @vite-ignore */ f("pdfjs-dist", VARSAYILAN.pdfjs, `${dizin}build/pdf.min.mjs`));
       m.GlobalWorkerOptions.workerSrc = f("pdfjs-dist", VARSAYILAN.pdfjs, `${dizin}build/pdf.worker.min.mjs`);
+      yedekTaban = f("pdfjs-dist", VARSAYILAN.pdfjs, "").replace(/\/$/, "");
       globalThis.pdfjsLib = globalThis.pdfjsLib || m;
       return m;
     } catch (h) { son = h; }
@@ -93,7 +95,10 @@ export function pdfLibAl() {
 export async function pdfAcSecenekleri(temel) {
   let taban = null;
   try { const m = await (await import("../akademik/motor.js")).motoruYukle(); taban = m.taban || null; } catch { taban = null; }
+  // Akademik motor yoksa/çalışmadıysa: yedek yükleyicinin adresi, o da yoksa sabit sürümün jsDelivr adresi (cMap/yazı tipi/WASM HER ZAMAN verilir).
+  if (!taban) taban = yedekTaban || `https://cdn.jsdelivr.net/npm/pdfjs-dist@${VARSAYILAN.pdfjs}`;
+  taban = taban.replace(/\/$/, "");
   const o = { isEvalSupported: false, enableXfa: false, useSystemFonts: true, ...temel };
-  if (taban) Object.assign(o, { cMapUrl: `${taban}cmaps/`, cMapPacked: true, standardFontDataUrl: `${taban}standard_fonts/`, wasmUrl: `${taban}wasm/`, iccUrl: `${taban}iccs/` });
+  Object.assign(o, { cMapUrl: `${taban}/cmaps/`, cMapPacked: true, standardFontDataUrl: `${taban}/standard_fonts/`, wasmUrl: `${taban}/wasm/`, iccUrl: `${taban}/iccs/` });
   return o;
 }

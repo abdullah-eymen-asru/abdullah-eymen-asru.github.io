@@ -27,7 +27,10 @@ async function kur() {
     if (oturum) { try { await supabase.rpc("yorum_sahipligi_geri_al"); } catch { /* 0137 yok */ } }
     const { data, error } = await supabase.rpc("yorum_listele", { p_anahtar: anahtar });
     if (error) { liste.replaceChildren(el("p", "yk-soluk", /yorum_listele/.test(error.message) ? "Yorumlar için veritabanı güncellemesi (0137/0138) gerekli." : error.message)); return; }
-    yorumlar = data || []; ciz();
+    yorumlar = data || []; const hedefId = (location.hash.match(/^#yorum-([0-9a-f-]{36})$/i) || [])[1];
+    if (hedefId) { gorunen = Math.max(gorunen, yorumlar.length); let h = yorumlar.find((c) => c.id === hedefId); while (h?.ust_id) { acik.add(h.ust_id); h = yorumlar.find((c) => c.id === h.ust_id); } }
+    ciz();
+    if (hedefId) { const d = document.getElementById(`yorum-${hedefId}`); if (d) { d.classList.add("yk-vurgu"); d.scrollIntoView({ block: "center" }); } }
   }
 
   function formKur(ust, hedef, bitince) {
@@ -52,7 +55,7 @@ async function kur() {
   }
 
   function kart(y, cocuklar, derinlik) {
-    const k = el("article", `yk-yorum${y.gizli ? " yk-gizli" : ""}`); k.dataset.derinlik = String(Math.min(derinlik, 2));
+    const k = el("article", `yk-yorum${y.gizli ? " yk-gizli" : ""}`); k.id = `yorum-${y.id}`; k.dataset.derinlik = String(Math.min(derinlik, 2));
     const ust = el("div", "yk-ust"); ust.append(el("strong", null, y.ad), ...(y.rumuz ? [el("span", "yk-rozet", "takma ad")] : []), el("span", "yk-soluk", ` · ${tarihYaz(y.tarih)}${y.duzenlendi ? ` (Düzenlendi - ${y.duzenlendi})` : ""}${y.gizli ? " · 🙈 gizli" : ""}`));
     const m = el("p", "yk-metin", y.metin), eylem = el("div", "yk-eylem"), yanitKutu = el("div", "yk-yanit-kutu"); yanitKutu.hidden = true;
     if (oturum) eylem.append(dg("↩ Yanıtla", "yk-kucuk", () => { yanitKutu.hidden = !yanitKutu.hidden; if (!yanitKutu.hidden) { formKur(y, yanitKutu, () => { yanitKutu.hidden = true; }); yanitKutu.querySelector("textarea")?.focus(); } }));

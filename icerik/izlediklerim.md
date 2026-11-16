@@ -1,5 +1,6 @@
 ---
 layout: default
+genis: true
 title: İzlediklerim
 permalink: "/icerik/izlediklerim.html"
 ---
@@ -75,7 +76,7 @@ permalink: "/icerik/izlediklerim.html"
     yilSelectId: "yil-filtresi",
     aramaAlanlari: ["Tür", "Sezon/Bölüm", "Durum"],
     gizliAlanlar: [],
-    sayfaBasinaKayit: 25,
+    sayfaBasinaKayit: 24,
     istatistikContainerId: "izleme-istatistik",
     istatistikEylem: "izlediğim",
     istatistikTamamlandiDegeri: "İzlendi",

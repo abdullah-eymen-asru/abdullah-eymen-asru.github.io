@@ -612,6 +612,19 @@ Panel: **Yedekleme & Verilerim → Depolama Durumu → 🔌 Worker anahtarları*
 **Worker aç/kapa (kota koruması):** `havastil-worker`, **Yedekleme & Verilerim → Depolama Durumu → 🔌 Worker anahtarları** listesinde (migration 0099 ekler). Kapatınca tarayıcılar istek göndermez, Worker 503 döner; HavaStil çalışmaya devam eder (haber ve yapay zekâ yorumu yerel özete düşer).
 ---
 
+### 🎧 `transkript-worker` ve `medya-indirici-worker` (Araçlar › Medya Araçları)
+
+Her ikisi de **kayıt tutmaz**; çağıranın Supabase oturumunu ve **Dönüştürücü yetkisini** (`donusturucu_yetkisi_var_mi`, migration 0077) kontrol eder.
+
+| Worker | Dosya | Secret / Var | Ne yapar |
+|---|---|---|---|
+| `transkript-worker` | `cloudflare worker/transkript_worker/worker.js` | `GROQ_API_KEY` (**Secret**), `SUPABASE_URL`, `SUPABASE_ANON_KEY`; ops. `GROQ_CEVIRI_MODELI` | `POST /transkript` — Groq Whisper large-v3; modlar: orijinal · İngilizce (Whisper çevirisi) · Türkçe (döküm + Groq sohbet modeliyle çeviri) |
+| `medya-indirici-worker` | `cloudflare worker/medya_indirici_worker/worker.js` | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `COBALT_API_URL`; ops. `COBALT_API_KEY`, `YTDLP_API_URL`, `YTDLP_API_KEY`, `MEDYA_ORIGINLERI` | `POST /indir` — bağlantıyı Cobalt (veya kendi yt-dlp uç noktan) ile çözer, **indirme adresini** döner; medya baytları Worker'dan geçmez |
+
+Kurulum: Workers & Pages → Create Worker → adlar yukarıdaki gibi (**`transkript-worker`**, **`medya-indirici-worker`**; adı farklı verirsen `assets/js/medya-donustur/medya-donustur.js` ve `assets/js/medya-indir/medya-indir.js` içindeki `WORKER` sabitlerini güncelle) → kodu yapıştır → Deploy → Settings → Variables and Secrets.
+
+**Dürüst not (Medya İndirici):** Cobalt (açık kaynak, kendi sunucunda `docker compose`) YouTube/YouTube Music, X, Instagram, TikTok, Reddit, SoundCloud, Vimeo, Twitch, Facebook vb. destekler; **LinkedIn ve NSosyal desteklemez**. Bu siteler için `YTDLP_API_URL` ile kendi yt-dlp sarmalayıcını bağla (sözleşme `worker.js` başındaki yorumda). Yapılandırılmamışsa araç bunu açıkça söyler. Herkese açık Cobalt örnekleri genelde botlara kapalıdır; kendi örneğini kur. Yalnızca indirme hakkına sahip olduğun içerikler için kullan; telif/kullanım koşulları kullanıcıya aittir.
+
 ## 5. Cloudflare Pages ayarları
 
 Siteyi Cloudflare Pages'e bağladığında (**Workers & Pages → Create → Pages → Connect to Git**) ayarlar iki yerde durur: **Build** ve **Variables and secrets**. Pages ayarlarına sonradan:

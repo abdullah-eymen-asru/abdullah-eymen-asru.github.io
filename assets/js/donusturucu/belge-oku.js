@@ -8,6 +8,7 @@ import { baytlariOku, metinOku, adsizAl } from "./ortak.js";
 import { epubOku } from "./belge-epub.js";
 import { pdfDenHtml } from "./pdf-metin.js";
 import { pdfjsAl, pdfBirak, pdfAcSecenekleri } from "./pdf-yukle.js";
+import { pptxOku, pptOku, pptxDenHtml } from "./belge-pptx.js";
 
 const STIL_HARITASI = [
   "p[style-name='Title'] => h1:fresh",
@@ -58,6 +59,10 @@ export async function belgeHtmlAl(dosya, tur, ctx = {}) {
     case "html": {
       const ham = await metinOku(dosya);
       return { html: await temizHtml(ham), baslik: htmlBaslik(ham) || ad };
+    }
+    case "pptx": case "ppt": {
+      const model = tur === "pptx" ? await pptxOku(await baytlariOku(dosya), ctx) : pptOku(await baytlariOku(dosya));
+      try { return { html: await temizHtml(await pptxDenHtml(model)), baslik: ad, uyarilar: model.uyarilar }; } finally { model.temizle?.(); }
     }
     case "epub": {
       const e = await epubOku(await baytlariOku(dosya));

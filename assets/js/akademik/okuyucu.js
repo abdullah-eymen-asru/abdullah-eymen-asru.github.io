@@ -239,12 +239,24 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
     belge = await pdfjsLib.getDocument({
       data: new Uint8Array(bayt), // kopya: PDF.js diziyi iş parçacığına devreder
       cMapUrl: `${taban}/cmaps/`, cMapPacked: true,
-      standardFontDataUrl: `${taban}/standard_fonts/`, wasmUrl: `${taban}/wasm/`,
-      isEvalSupported: false, useWasm: false, enableXfa: false,
+      standardFontDataUrl: `${taban}/standard_fonts/`, wasmUrl: `${taban}/wasm/`, iccUrl: `${taban}/iccs/`,
+      // useWasm:false KALDIRILDI: JPEG2000/JBIG2 görselli (taranmış/eski) PDF'lerde sayfa BEYAZ çiziliyordu.
+      isEvalSupported: false, enableXfa: false,
     }).promise;
   } catch (h) {
     console.error(h);
     durumYaz(`PDF açılamadı: ${h.message || h}`, "hata");
+    // YEDEK: tarayıcının yerleşik PDF okuyucusu (blob: çerçeve). Annotation/not araçları bu modda yoktur; belge en azından okunabilir.
+    if (d.bytes && h?.name !== "PasswordException") {
+      try {
+        const { yerlesikOkuyucuGoster } = await import("../pdf-okuyucu/evrensel-pdf.js");
+        const kap = q(".ak-ok-kap");
+        if (kap) {
+          yerlesikOkuyucuGoster(kap, new Blob([d.bytes], { type: "application/pdf" }), kaynak.baslik);
+          durumYaz("PDF.js bu belgeyi çizemedi; tarayıcının yerleşik okuyucusu kullanılıyor (not/vurgu araçları kapalı).", "uyari");
+        }
+      } catch (ic) { console.error(ic); }
+    }
     return;
   }
   d.belge = belge;

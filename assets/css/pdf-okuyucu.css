@@ -1,0 +1,27 @@
+/* assets/css/pdf-okuyucu.css — Evrensel PDF okuyucu (assets/js/pdf-okuyucu/evrensel-pdf.js). Satır içi stil yok (CSP). */
+.eo-kok { display: grid; gap: 8px; min-width: 0; }
+.eo-bilgi { margin: 0; font-size: .9rem; color: var(--muted); }
+.eo-hata { margin: 0; color: #c0392b; }
+.eo-arac { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.eo-btn {
+  font: inherit; font-size: .9rem; cursor: pointer; text-decoration: none;
+  min-height: 36px; padding: 6px 12px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--card-bg); color: var(--text);
+  display: inline-flex; align-items: center;
+}
+.eo-btn:hover { border-color: var(--accent); }
+.eo-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.eo-sayfa { width: 4.2rem; min-height: 36px; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); font: inherit; text-align: center; }
+.eo-toplam { color: var(--muted); font-size: .9rem; margin-right: 4px; }
+.eo-alan {
+  height: min(75vh, 800px); overflow: auto; overscroll-behavior: contain;
+  background: color-mix(in srgb, var(--border) 45%, transparent);
+  border: 1px solid var(--border); border-radius: 10px; padding: 10px 0;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+}
+.eo-alan:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.eo-sayfa-kap { background: #fff; box-shadow: 0 1px 6px rgb(0 0 0 / .25); flex: 0 0 auto; max-width: none; }
+.eo-canvas { display: block; width: 100%; height: 100%; background: #fff; }
+.eo-yerlesik-kap { height: min(75vh, 800px); }
+.eo-yerlesik { width: 100%; height: 100%; border: 1px solid var(--border); border-radius: 10px; background: #fff; }
+@media (max-width: 640px) { .eo-alan, .eo-yerlesik-kap { height: 70vh; } }

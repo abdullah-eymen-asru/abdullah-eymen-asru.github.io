@@ -20,6 +20,7 @@ export function metadataKartiYap() {
   const durum = el("p", { class: "dn-muted", role: "status", "aria-live": "polite" });
   const hepsi = dugme({ metin: "Hepsini temizle", ikon: "🧼", tur: "birincil", disabled: true });
   const sifirla = dugme({ metin: "Belleği Güvenli Sıfırla", ikon: "🧹", title: "Listeyi, çıktı dosyalarını ve nesne URL'lerini bellekten bırakır" });
+  sifirla.setAttribute("data-sifirla", "1");
 
   function ciz() {
     liste.replaceChildren(...kayitlar.map((k, i) => {

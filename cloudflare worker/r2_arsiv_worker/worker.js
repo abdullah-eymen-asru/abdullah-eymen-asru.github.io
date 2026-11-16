@@ -425,6 +425,17 @@ async function medyaIstegi(env, istek) {
   const adres = await presign(env, { method: "GET", key: satir.r2_key, saniye: INDIRME_SURESI, ekSorgu: {
     "response-content-disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${rfc3986(satir.ad)}`,
     "response-content-type": satir.mime || "application/octet-stream" } });
+  // ?b=1 (yalnızca PDF): evrensel PDF okuyucu baytları CORS ile okuyabilsin diye Worker, imzalı adresten akıtır
+  // (R2 kovasına ayrıca CORS gerekmez; kota yukarıda zaten bir kez düşüldü). Yalnızca izinli site kökenlerine yanıt verir.
+  if (u.searchParams.get("b") === "1" && satir.mime === "application/pdf") {
+    const orijin = istek.headers.get("Origin") || "";
+    if (!IZINLI_ORIGINLER.has(orijin)) return new Response("Yasak.", { status: 403, headers: { "Cache-Control": "no-store" } });
+    const r = await fetch(adres);
+    if (!r.ok) return new Response("Dosya alınamadı.", { status: 502, headers: { "Cache-Control": "no-store" } });
+    return new Response(r.body, { status: 200, headers: {
+      "Content-Type": "application/pdf", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox",
+      "Access-Control-Allow-Origin": orijin, "Vary": "Origin", "Cache-Control": "private, max-age=240", "Referrer-Policy": "no-referrer", "X-Robots-Tag": "noindex" } });
+  }
   return new Response(null, { status: 302, headers: { Location: adres, "Cache-Control": "private, max-age=240", "Referrer-Policy": "no-referrer", "X-Robots-Tag": "noindex" } });
 }
 

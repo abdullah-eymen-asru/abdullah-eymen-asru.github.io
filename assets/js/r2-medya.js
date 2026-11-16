@@ -10,6 +10,12 @@
  */
 (function () {
   var WORKER = "https://r2-arsiv-worker.aeymena.workers.dev";
+  // Site kökü (alt dizinde barınan kurulumlar için): bu betiğin kendi adresinden türetilir. Evrensel PDF okuyucu buradan tembel yüklenir.
+  var KOK = (function () { try { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/\/assets\/js\/r2-medya\.js.*$/, "") : ""; } catch (e) { return ""; } })();
+  function okuyucuCssEkle() {
+    if (!KOK || document.querySelector('link[data-eo-css]')) return;
+    var l = document.createElement("link"); l.rel = "stylesheet"; l.href = KOK + "/assets/css/pdf-okuyucu.css"; l.setAttribute("data-eo-css", "1"); document.head.appendChild(l);
+  }
   var YOL = /^[a-z0-9][a-z0-9-]{0,119}\/[A-Za-z0-9][A-Za-z0-9._-]{0,150}$/;
   function durumOku() {
     try { var k = JSON.parse(sessionStorage.getItem("r2_medya_durum") || "null"); if (k && Date.now() - k.t < 300000) return Promise.resolve(k.v); } catch (e) { /* yoksay */ }
@@ -36,7 +42,15 @@
     var eylem = yap("div", "r2-kart-eylem"), alan = yap("div", "r2-pdf-alan");
     if (gom) eylem.append(dugme("📖 Burada oku", function () {
       if (alan.firstChild) { alan.replaceChildren(); return; }
-      var f = yap("iframe", "r2-pdf-cerceve"); f.src = adres(yol, "?o=1"); f.title = baslik; f.loading = "lazy"; f.setAttribute("data-yuk", String(yuk)); f.referrerPolicy = "no-referrer"; f.classList.add(yuk >= 800 ? "r2-yuk-800" : "r2-yuk-600"); alan.append(f);
+      // Yedek (eski davranış): çerçeve. Evrensel okuyucu yüklenemezse buna düşülür.
+      var cerceveyeDus = function () { alan.replaceChildren(); var f = yap("iframe", "r2-pdf-cerceve"); f.src = adres(yol, "?o=1"); f.title = baslik; f.loading = "lazy"; f.setAttribute("data-yuk", String(yuk)); f.referrerPolicy = "no-referrer"; f.classList.add(yuk >= 800 ? "r2-yuk-800" : "r2-yuk-600"); alan.append(f); };
+      if (!KOK) { cerceveyeDus(); return; }
+      // 1) PDF.js (cMap + yazı tipleri + WASM) 2) olmazsa tarayıcının yerleşik okuyucusu (modül içinde) 3) modül hiç yüklenmezse çerçeve.
+      okuyucuCssEkle(); alan.textContent = "PDF açılıyor…";
+      import(KOK + "/assets/js/pdf-okuyucu/evrensel-pdf.js").then(function (m) {
+        alan.replaceChildren();
+        return m.evrenselPdfGoster(alan, { url: adres(yol, "?b=1"), yerlesikUrl: adres(yol, "?o=1") }, { baslik: baslik, indirUrl: adres(yol), yukseklik: yuk });
+      }).catch(function () { cerceveyeDus(); });
     }));
     eylem.append(bagla(yol, "⬇ İndir / yeni sekmede aç", "r2-kart-btn"));
     blok.append(ust, eylem, alan);

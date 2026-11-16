@@ -509,6 +509,54 @@ function wireDenetimKaydiKontrolleri() {
   });
 }
 
+/* Admin listesi: canlı arama (isim / e-posta) + rol filtresi.
+   Türkçe büyük/küçük harf duyarlı karşılaştırma (İ/ı) için toLocaleLowerCase("tr"). */
+const AG_KUCUK = (v) => String(v ?? "").toLocaleLowerCase("tr");
+let agFiltreBagli = false;
+
+function adminListesiniCiz() {
+  const kutu = document.getElementById("ag-admin-listesi");
+  const sayac = document.getElementById("ag-admin-sayac");
+  if (!kutu) return;
+  const q = AG_KUCUK(document.getElementById("ag-admin-ara")?.value.trim());
+  const rol = document.getElementById("ag-admin-rol")?.value || "";
+
+  const liste = ADMIN_LISTESI.filter((u) => {
+    if (rol === "askida" && !u.is_suspended) return false;
+    if (rol && rol !== "askida" && u.role !== rol) return false;
+    if (!q) return true;
+    const rolMetni = u.role === "owner" ? "site sahibi owner" : "yönetici admin";
+    return AG_KUCUK(`${u.full_name || ""} ${u.email || ""} ${rolMetni}`).includes(q);
+  });
+
+  if (sayac) sayac.textContent = `${liste.length} / ${ADMIN_LISTESI.length} kişi gösteriliyor`;
+  if (liste.length === 0) {
+    kutu.innerHTML = `<p class="muted">Eşleşen yönetici bulunamadı.</p>`;
+    return;
+  }
+  kutu.innerHTML = liste.map(
+    (u) => `
+    <div class="uya-kart" data-id="${escapeHtml(u.id)}">
+      <div class="uya-kart-ust">
+        <div class="uya-kart-kimlik">
+          <strong>${escapeHtml(u.full_name || u.email)}</strong>
+          <span class="uya-email muted">${escapeHtml(u.email)}</span>
+        </div>
+        <span class="uya-rol-etiket uya-rol-etiket--${u.role === "owner" ? "owner" : "admin"}">
+          ${u.role === "owner" ? "Site Sahibi" : "Yönetici"}${u.is_suspended ? " · 🔴 Askıda" : ""}
+        </span>
+      </div>
+    </div>`
+  ).join("");
+}
+
+function adminListesiFiltreBagla() {
+  if (agFiltreBagli) return;
+  agFiltreBagli = true;
+  document.getElementById("ag-admin-ara")?.addEventListener("input", adminListesiniCiz);
+  document.getElementById("ag-admin-rol")?.addEventListener("change", adminListesiniCiz);
+}
+
 /* ---------------------------------------------------------------------- */
 /* ADMİN LİSTESİ + "Askıya Al" formunun hedef dropdown'ı                   */
 /* ---------------------------------------------------------------------- */
@@ -524,20 +572,8 @@ async function loadAdminListesi() {
   }
   ADMIN_LISTESI = data || [];
 
-  kutu.innerHTML = ADMIN_LISTESI.map(
-    (u) => `
-    <div class="uya-kart" data-id="${u.id}">
-      <div class="uya-kart-ust">
-        <div class="uya-kart-kimlik">
-          <strong>${escapeHtml(u.full_name || u.email)}</strong>
-          <span class="uya-email muted">${escapeHtml(u.email)}</span>
-        </div>
-        <span class="uya-rol-etiket uya-rol-etiket--${u.role}">
-          ${u.role === "owner" ? "Site Sahibi" : "Yönetici"}${u.is_suspended ? " · 🔴 Askıda" : ""}
-        </span>
-      </div>
-    </div>`
-  ).join("");
+  adminListesiniCiz();
+  adminListesiFiltreBagla();
 
   if (hedefSecim) {
     const secilebilirler = ADMIN_LISTESI.filter(

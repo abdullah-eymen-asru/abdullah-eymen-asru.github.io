@@ -154,7 +154,7 @@
     connect-src 'self' https: wss:;
     img-src 'self' data: https: blob:;
     font-src 'self' data: https:;
-    frame-src 'self' https:;
+    frame-src 'self' https: blob:;
     worker-src 'self' blob:;
     object-src 'none';
 ">
@@ -714,7 +714,7 @@
        uyuyor hem de initAuthNav()'ı gereksiz gecikme olmadan çağırıyor. -->
   <script type="module" src="{{ '/assets/js/auth/nav-auth-init.js' | relative_url }}"></script>
 
-  <main class="wrap content">
+  <main class="wrap content{% if page.genis %} wrap--genis{% endif %}">
     {{ content }}
   </main>
 

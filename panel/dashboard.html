@@ -23,6 +23,9 @@ permalink: "/panel/dashboard.html"
 <link rel="stylesheet" href="{{ '/assets/css/pdf-duzenle.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/onay-kutusu.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/medya-donustur.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/css/medya-indir.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/css/calisma-alani.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/css/pdf-okuyucu.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/yorumlar.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/yazi-medya.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/ozel-dosyalar.css' | relative_url }}">
@@ -732,7 +735,6 @@ permalink: "/panel/dashboard.html"
 
     <section class="dash-view" id="view-sys-guvenlik" hidden data-view="sys-guvenlik">
       <h1>Admin Güvenliği</h1>
-        <h1>Admin Güvenliği</h1>
         <p class="muted">
           Buradan başka bir admin'i şüpheli bir durumda anında "askıya" alabilir
           (tüm oturumları sonlanır), açık vakalara oy kullanabilir ve (sadece
@@ -754,8 +756,21 @@ permalink: "/panel/dashboard.html"
         <div class="panel-grid">
 
           <section class="panel-section">
-            <h2>Adminler / Site Sahibi</h2>
-            <div id="ag-admin-listesi"><p class="muted">Yükleniyor...</p></div>
+            <h2>Adminler ve Yöneticiler</h2>
+            <!-- Canlı arama + rol filtresi: yönetici sayısı arttığında liste sayfayı taşırmaz
+                 (sabit yükseklik + iç kaydırma; bkz. assets/css/dashboard.css .ag-admin-kaydirma). -->
+            <div class="ag-admin-filtre" role="search">
+              <input type="search" id="ag-admin-ara" class="search-box" placeholder="İsim veya e-posta ara…"
+                     aria-label="Admin ara (isim veya e-posta)" autocomplete="off">
+              <select id="ag-admin-rol" class="tur-select" aria-label="Yetki rolüne göre filtrele">
+                <option value="">Tüm roller</option>
+                <option value="owner">Site Sahibi</option>
+                <option value="admin">Yönetici</option>
+                <option value="askida">Askıda olanlar</option>
+              </select>
+            </div>
+            <p class="muted ag-admin-sayac" id="ag-admin-sayac" aria-live="polite"></p>
+            <div id="ag-admin-listesi" class="ag-admin-kaydirma" tabindex="0"><p class="muted">Yükleniyor...</p></div>
           </section>
 
           <!-- SADECE owner (Site Sahibi) görür/kullanır — bkz. admin-guvenlik.js
@@ -1075,39 +1090,40 @@ permalink: "/panel/dashboard.html"
       <div id="sy-mesaj" class="auth-message" hidden></div>
     </section>
 
-    <!-- Evrensel Dosya Dönüştürücü & Tarayıcı İçi Belge Düzenleyici (assets/js/donusturucu/donusturucu.js; migration 0077).
-         %100 istemci tarafı. Owner her zaman; diğer roller yalnızca can_use_converter açıksa. -->
-    <section class="dash-view" id="view-tool-donusturucu" hidden data-view="tool-donusturucu">
-      <h1>Dönüştürücü &amp; Belge Düzenleyici</h1>
-      <div id="dn-kok" class="dn-kok"><p class="muted">Yükleniyor...</p></div>
-      <div id="dn-mesaj" class="auth-message" hidden role="status"></div>
-    </section>
-
-    <!-- Belge Tarayıcı, Kümülatif Çoklu Birleştirici, Evrensel Sıkıştırma & Bellek Korumalı Dönüştürücü
-         (assets/js/belge-tarayici/belge-tarayici.js). %100 istemci: sıfır sunucu/Worker isteği. Yetki: Dönüştürücü ile aynı (can_use_converter). -->
-    <section class="dash-view" id="view-tool-belge-tarayici" hidden data-view="tool-belge-tarayici">
-      <h1>Belge Tarayıcı &amp; Birleştirici</h1>
-      <div id="bt-kok" class="bt-kok"><p class="muted">Yükleniyor...</p></div>
-      <div id="bt-mesaj" class="auth-message" hidden role="status"></div>
-    </section>
-
-    <!-- Evrensel Metadata Temizleyici (assets/js/metadata-temizleyici/): Araçlar altında KENDİ sekmesi. %100 istemci. Yetki: Dönüştürücü ile aynı (can_use_converter). -->
-    <section class="dash-view" id="view-tool-metadata" hidden data-view="tool-metadata">
-      <h1>Metadata Temizleyici</h1>
-      <div id="mt-kok" class="mt-kok"><p class="muted">Yükleniyor...</p></div>
-      <div id="mt-mesaj" class="auth-message" hidden role="status"></div>
-    </section>
-
-    <!-- PDF Böl & Ayıkla (assets/js/pdf-bol/): Araçlar altında KENDİ sekmesi. %100 istemci. Yetki: Dönüştürücü ile aynı satır (Yetki Ayarları › Özellikler). -->
-    <section class="dash-view" id="view-tool-pdfbol" hidden data-view="tool-pdfbol">
-      <h1>PDF Böl &amp; Ayıkla</h1>
-      <div id="pb-kok" class="pb-kok"><p class="muted">Yükleniyor...</p></div>
-    </section>
-
-    <!-- PDF Düzenleyici (assets/js/pdf-duzenle/): Araçlar altında kendi sekmesi. %100 istemci. -->
-    <section class="dash-view" id="view-tool-pdfduzenle" hidden data-view="tool-pdfduzenle">
-      <h1>PDF Düzenleyici</h1>
-      <div id="pd-kok" class="pd-kok"><p class="muted">Yükleniyor...</p></div>
+    <!-- ========================================================================================================
+         BİRLEŞİK PDF & BELGE ÇALIŞMA ALANI (Görüntüle · Düzenle · Dönüştür) — tek sekme, alt araçlar panel olarak.
+         Eskiden 5 ayrı sekmeydi; modüllerin kullandığı id'ler (dn-kok, bt-kok, mt-kok, pb-kok, pd-kok) DEĞİŞMEDİ.
+         Kategori/araç şeridi assets/js/dashboard.js › altKabukKur ile çizilir. Alt panellerde class "dash-view" YOK
+         (showView yalnızca .dash-view'leri gizler); görünürlüğü [hidden] ile altAracAc yönetir.
+         %100 istemci: dosyalar cihazdan çıkmaz. Yetki: Dönüştürücü (can_use_converter) — owner her zaman.
+         ======================================================================================================== -->
+    <section class="dash-view" id="view-tool-calisma-alani" hidden data-view="tool-calisma-alani">
+      <h1>PDF &amp; Belge Çalışma Alanı</h1>
+      <p class="muted ca-aciklama">Belgelerini tek yerde <strong>görüntüle</strong>, <strong>düzenle</strong> ve <strong>dönüştür</strong>. Dosyaların cihazından çıkmaz; her şey tarayıcında işlenir. Sekme değiştirdiğinde önceki aracın seçimleri otomatik temizlenir.</p>
+      <div class="ca-kabuk" data-ca-kabuk="tool-calisma-alani"></div>
+      <div class="ca-paneller">
+        <section class="ca-pane" id="view-tool-belge-goruntule" data-ca-pane="tool-belge-goruntule" hidden>
+          <div id="bg-kok" class="bg-kok"><p class="muted">Yükleniyor...</p></div>
+        </section>
+        <section class="ca-pane" id="view-tool-pdfduzenle" data-ca-pane="tool-pdfduzenle" hidden>
+          <div id="pd-kok" class="pd-kok"><p class="muted">Yükleniyor...</p></div>
+        </section>
+        <section class="ca-pane" id="view-tool-pdfbol" data-ca-pane="tool-pdfbol" hidden>
+          <div id="pb-kok" class="pb-kok"><p class="muted">Yükleniyor...</p></div>
+        </section>
+        <section class="ca-pane" id="view-tool-belge-tarayici" data-ca-pane="tool-belge-tarayici" hidden>
+          <div id="bt-kok" class="bt-kok"><p class="muted">Yükleniyor...</p></div>
+          <div id="bt-mesaj" class="auth-message" hidden role="status"></div>
+        </section>
+        <section class="ca-pane" id="view-tool-metadata" data-ca-pane="tool-metadata" hidden>
+          <div id="mt-kok" class="mt-kok"><p class="muted">Yükleniyor...</p></div>
+          <div id="mt-mesaj" class="auth-message" hidden role="status"></div>
+        </section>
+        <section class="ca-pane" id="view-tool-donusturucu" data-ca-pane="tool-donusturucu" hidden>
+          <div id="dn-kok" class="dn-kok"><p class="muted">Yükleniyor...</p></div>
+          <div id="dn-mesaj" class="auth-message" hidden role="status"></div>
+        </section>
+      </div>
     </section>
 
     <!-- Yorumlarım / yorum yönetimi (assets/js/yorumlarim/): yerli yorum sistemi (0137). -->
@@ -1116,10 +1132,18 @@ permalink: "/panel/dashboard.html"
       <div id="yy-kok"><p class="muted">Yükleniyor...</p></div>
     </section>
 
-    <!-- Ses & Video Dönüştürücü + Transkript (assets/js/medya-donustur/): Araçlar altında. -->
+    <!-- Medya Araçları: Ses & Video Dönüştürücü + Transkript (assets/js/medya-donustur/) ve Evrensel Medya İndirici (assets/js/medya-indir/). -->
     <section class="dash-view" id="view-tool-medya" hidden data-view="tool-medya">
-      <h1>Ses &amp; Video + Transkript</h1>
-      <div id="md-kok" class="md-kok"><p class="muted">Yükleniyor...</p></div>
+      <h1>Medya Araçları</h1>
+      <div class="ca-kabuk" data-ca-kabuk="tool-medya"></div>
+      <div class="ca-paneller">
+        <section class="ca-pane" id="view-tool-medya-donustur" data-ca-pane="tool-medya-donustur" hidden>
+          <div id="md-kok" class="md-kok"><p class="muted">Yükleniyor...</p></div>
+        </section>
+        <section class="ca-pane" id="view-tool-medya-indir" data-ca-pane="tool-medya-indir" hidden>
+          <div id="mi-kok" class="mi-kok"><p class="muted">Yükleniyor...</p></div>
+        </section>
+      </div>
     </section>
 
     <!-- Onay Kutusu (assets/js/onay-kutusu/): İçerik Yönetimi altında. -->

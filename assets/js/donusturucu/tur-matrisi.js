@@ -12,6 +12,8 @@ export const FORMATLAR = {
   md: { ad: "Markdown", aile: "belge", mime: "text/markdown", uzanti: "md" },
   txt: { ad: "Düz metin", aile: "belge", mime: "text/plain", uzanti: "txt" },
   epub: { ad: "EPUB", aile: "belge", mime: "application/epub+zip", uzanti: "epub" },
+  pptx: { ad: "PowerPoint (.pptx)", aile: "belge", mime: "application/vnd.openxmlformats-officedocument.presentationml.presentation", uzanti: "pptx" },
+  ppt: { ad: "PowerPoint 97-2003 (.ppt)", aile: "belge", mime: "application/vnd.ms-powerpoint", uzanti: "ppt", cikis: false },
   jpg: { ad: "JPG", aile: "gorsel", mime: "image/jpeg", uzanti: "jpg" },
   png: { ad: "PNG", aile: "gorsel", mime: "image/png", uzanti: "png" },
   webp: { ad: "WebP", aile: "gorsel", mime: "image/webp", uzanti: "webp" },
@@ -29,6 +31,7 @@ export const FORMATLAR = {
 const UZANTI_HARITASI = {
   pdf: "pdf", docx: "docx", html: "html", htm: "html", xhtml: "html", md: "md", markdown: "md", mdown: "md",
   txt: "txt", text: "txt", log: "txt", epub: "epub",
+  pptx: "pptx", pptm: "pptx", potx: "pptx", ppsx: "pptx", ppt: "ppt", pps: "ppt", pot: "ppt",
   jpg: "jpg", jpeg: "jpg", jpe: "jpg", jfif: "jpg", png: "png", webp: "webp", avif: "avif", bmp: "bmp",
   ico: "ico", cur: "ico", svg: "svg", gif: "gif", heic: "heic", heif: "heic",
   csv: "csv", tsv: "csv", json: "json", xml: "xml",
@@ -44,7 +47,8 @@ const MIME_HARITASI = {
   "application/pdf": "pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
   "text/html": "html", "application/xhtml+xml": "html", "text/markdown": "md", "text/plain": "txt",
-  "application/epub+zip": "epub", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/avif": "avif",
+  "application/epub+zip": "epub",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx", "application/vnd.ms-powerpoint": "ppt", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/avif": "avif",
   "image/bmp": "bmp", "image/x-icon": "ico", "image/vnd.microsoft.icon": "ico", "image/svg+xml": "svg", "image/gif": "gif",
   "image/heic": "heic", "image/heif": "heic", "text/csv": "csv", "application/json": "json", "application/xml": "xml", "text/xml": "xml",
 };
@@ -59,14 +63,16 @@ export function turBul(dosya) {
   return { tur: null, uzanti, kod: false };
 }
 
-const BELGE_HEDEFLERI = ["pdf", "docx", "md", "html", "txt", "epub"];
-const GORSEL_HEDEFLERI = ["jpg", "png", "webp", "avif", "bmp", "ico", "svg", "pdf"];
+const BELGE_HEDEFLERI = ["pdf", "docx", "pptx", "md", "html", "txt", "epub"];
+const GORSEL_HEDEFLERI = ["jpg", "png", "webp", "avif", "bmp", "ico", "svg", "pdf", "pptx"];
 
 /** Tek dosya için hedef formatlar (kendisi hariç). Çalışma zamanı yetenek süzgeci arayüzde uygulanır. */
 export function hedefler(tur) {
   const f = FORMATLAR[tur];
   if (!f) return [];
-  if (tur === "pdf") return ["docx", "md", "html", "txt", "epub", "png", "jpg", "webp"];
+  if (tur === "pdf") return ["docx", "pptx", "md", "html", "txt", "epub", "png", "jpg", "webp"];
+  // PowerPoint: PDF'e slayt tasarımı korunarak; slayt görselleri; diğer belge biçimlerine metin/resim/tablo olarak.
+  if (tur === "pptx" || tur === "ppt") return ["pdf", "docx", "md", "html", "txt", "epub", "png", "jpg", "webp", ...(tur === "ppt" ? ["pptx"] : [])];
   if (f.aile === "belge") return BELGE_HEDEFLERI.filter((x) => x !== tur);
   if (f.aile === "gorsel") return GORSEL_HEDEFLERI.filter((x) => x !== tur);
   if (tur === "csv") return ["json", "xml"];

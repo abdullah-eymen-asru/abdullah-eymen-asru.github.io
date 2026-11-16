@@ -341,3 +341,8 @@
 .ra-depo progress.ra-depo-uyari { accent-color: #e0a93b; } .ra-depo progress.ra-depo-kritik { accent-color: #e5584a; }
 .ra-depo-kart { padding: .55rem .7rem; border-radius: 10px; border: 1px solid; font-size: .88rem; } .ra-depo-kart.uyari { border-color: #e0a93b; } .ra-depo-kart.kritik { border-color: #e5584a; }
 .ra-depo-alt { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+
+/* PDF önizleme (evrensel okuyucu) — iletişim kutusu içinde */
+.ra-onizleme-alan:has(.ra-onizleme-pdf) { display: block; max-height: none; overflow: visible; background: none; }
+.ra-onizleme-pdf { width: min(92vw, 980px); min-height: 12rem; }
+.ra-onizleme-pdf .eo-alan { height: min(70vh, 720px); }

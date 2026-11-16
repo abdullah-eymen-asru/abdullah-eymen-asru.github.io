@@ -17,12 +17,12 @@ import { belgeHtmlAl } from "./belge-oku.js";
 import { veriDonustur } from "./motor-veri.js";
 import { kutuphaneListesi } from "./cdn.js";
 import { sifirla as bellekSifirla, kaydet as bellekKaydet, dugumKaydet } from "./bellek.js";
-import { ayrilmaKancasiKaydet } from "../core/gezinme-kilidi.js";
+import { ayrilmaKancasiKaydet, sekmeSifirlamaKaydet } from "../core/gezinme-kilidi.js";
 import { UYARI_ESIGI, buyukDosyaUyarisi, yerelYonerge } from "./buyuk-dosya.js";
 
 const MAKS_TEK = 250 * 1024 * 1024;
 const MAKS_TOPLAM = 500 * 1024 * 1024;
-const KABUL = ".pdf,.docx,.html,.htm,.md,.markdown,.txt,.epub,.jpg,.jpeg,.png,.webp,.avif,.bmp,.ico,.svg,.gif,.heic,.heif,.csv,.tsv,.json,.xml,.js,.ts,.css,.py,.yml,.yaml,.sql,.sh,.ini,.log";
+const KABUL = ".pdf,.docx,.html,.htm,.md,.markdown,.txt,.epub,.pptx,.ppt,.pps,.ppsx,.jpg,.jpeg,.png,.webp,.avif,.bmp,.ico,.svg,.gif,.heic,.heif,.csv,.tsv,.json,.xml,.js,.ts,.css,.py,.yml,.yaml,.sql,.sh,.ini,.log";
 
 const kok = document.getElementById("dn-kok");
 const mesajEl = document.getElementById("dn-mesaj");
@@ -290,7 +290,7 @@ async function duzenleyiciKapat(sor = true) {
   bildir("");
 }
 
-const DISA_BELGE = ["docx", "pdf", "md", "html", "txt", "epub"];
+const DISA_BELGE = ["docx", "pdf", "pptx", "md", "html", "txt", "epub"];
 
 async function duzenleyiciAc() {
   if (!dosyalar.length) return;
@@ -308,7 +308,7 @@ async function duzenleyiciAc() {
     if (edTur === "pdf") {
       const { pdfDuzenleyiciKur } = await import("./pdf-duzenleyici.js");
       nesne = await pdfDuzenleyiciKur(kap, { dosyalar: dosyalar.map((d) => d.file), mesaj: bildir });
-      hedefListesi = [["pdf", "PDF (düzenlenmiş)"], ["png-zip", "Sayfa görselleri (ZIP)"], ["docx", "Word (.docx)"], ["md", "Markdown"], ["txt", "Düz metin"], ["html", "HTML"], ["epub", "EPUB"]];
+      hedefListesi = [["pdf", "PDF (düzenlenmiş)"], ["png-zip", "Sayfa görselleri (ZIP)"], ["docx", "Word (.docx)"], ["pptx", "PowerPoint (.pptx)"], ["md", "Markdown"], ["txt", "Düz metin"], ["html", "HTML"], ["epub", "EPUB"]];
     } else if (edTur === "zengin") {
       const { zenginDuzenleyiciKur } = await import("./zengin-duzenleyici.js");
       const b = await belgeHtmlAl(d0.file, d0.tur, { parola: null });
@@ -534,6 +534,8 @@ async function kur() {
   window.addEventListener("pagehide", () => { try { oturumuSifirla(); } catch { /* yok say */ } });
   // Panel sekmesinden ayrılma kalkanı (dashboard.js showView → gezinme-kilidi)
   ayrilmaKancasiKaydet("tool-donusturucu", ayrilirkenSor);
+  // Sekme değişince seçili dosyalar/düzenleyici sıfırlanır (bkz. gezinme-kilidi.js › sekmeSifirla).
+  sekmeSifirlamaKaydet("tool-donusturucu", () => { oturumuSifirla(); bildir(""); ilerleme.gizle(); ciz(); });
 }
 
 kur().catch((h) => {

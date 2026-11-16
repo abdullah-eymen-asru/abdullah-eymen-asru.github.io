@@ -1,0 +1,66 @@
+/* assets/css/calisma-alani.css — Birleşik PDF & Belge Çalışma Alanı ve Medya Araçları kabuğu.
+   Kategori sekmeleri (üst) + araç şeridi (alt) + paneller. Inline stil yok (CSP). Koyu/açık tema değişkenleri style.css'ten gelir. */
+.ca-aciklama { margin: 0 0 14px; max-width: 70ch; }
+
+.ca-kabuk { display: grid; gap: 10px; margin: 0 0 16px; }
+
+.ca-kategoriler,
+.ca-araclar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ca-kategoriler {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ca-kat,
+.ca-arac {
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text);
+  border-radius: 999px;
+  min-height: 40px;            /* dokunma hedefi */
+  padding: 8px 16px;
+  line-height: 1.2;
+  transition: border-color .15s ease, background-color .15s ease;
+}
+.ca-kat { font-weight: 600; }
+.ca-arac { font-size: .92rem; padding: 6px 14px; min-height: 36px; }
+.ca-arac[hidden] { display: none; }
+
+.ca-kat:hover,
+.ca-arac:hover { border-color: var(--accent); }
+
+.ca-kat[aria-selected="true"],
+.ca-arac[aria-selected="true"] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, var(--card-bg));
+  color: var(--accent);
+}
+.ca-kat:focus-visible,
+.ca-arac:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.ca-paneller { min-width: 0; }
+.ca-pane { min-width: 0; }
+.ca-pane[hidden] { display: none; }
+
+@media (max-width: 640px) {
+  .ca-kategoriler { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+  .ca-kat { flex: 0 0 auto; }
+  .ca-araclar { gap: 6px; }
+  .ca-arac { flex: 1 1 auto; text-align: center; }
+}
+
+/* Görüntüle sekmesi (assets/js/belge-goruntule/) */
+.bg-bolge { display: grid; gap: 10px; justify-items: center; text-align: center; padding: 28px 16px; border: 2px dashed var(--border); border-radius: 14px; background: var(--card-bg); }
+.bg-bolge.bg-ustunde { border-color: var(--accent); }
+.bg-bolge-metin { margin: 0; font-weight: 600; }
+.bg-bolge:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.bg-resim { max-width: 100%; height: auto; border-radius: 10px; }
+.bg-metin { max-height: 70vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); }

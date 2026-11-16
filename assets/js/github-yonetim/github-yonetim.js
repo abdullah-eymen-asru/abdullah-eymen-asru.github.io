@@ -3180,6 +3180,8 @@ let LISTE_FILTRE_DURUM = "tum"; // 'tum' | 'yayinda' | 'gizli'
 const LISTE_SAYFA_BASI = 12;
 let LISTE_SAYFA_BLOG = 1;
 let LISTE_SAYFA_PROJE = 1;
+let LISTE_KLASOR_GORUNUMU = (() => { try { return localStorage.getItem("gy-klasor-gorunumu") === "1"; } catch { return false; } })();
+const KLASOR_ACIK = new Map(); // klasör anahtarı → kullanıcının son açık/kapalı tercihi (yeniden çizimde korunur)
 
 function wireIcerikListe() {
   // "Yenile": sessionStorage önbelleğini TEK istekle tazeleyip listeyi
@@ -3617,8 +3619,92 @@ function listeyiYenidenCiz() {
   el.innerHTML = "";
   sonucYokEl.hidden = filtrelenmis.length !== 0;
 
-  if (LISTE_FILTRE_TUR !== "proje") el.appendChild(icerikListesiCiz("Blog Yazıları", postlar, "blog"));
-  if (LISTE_FILTRE_TUR !== "blog") el.appendChild(icerikListesiCiz("Akademik Projeler", projeler, "proje"));
+  // Görünüm anahtarı: Düz liste (sayfalı) ↔ Klasör görünümü (alt klasörler iç içe, tüm yazılar altında)
+  const gorunumBar = document.createElement("div");
+  gorunumBar.className = "gy-gorunum-bar";
+  const gorunumBtn = document.createElement("button");
+  gorunumBtn.type = "button";
+  gorunumBtn.className = "gy-sayfalama-btn";
+  gorunumBtn.setAttribute("aria-pressed", String(LISTE_KLASOR_GORUNUMU));
+  gorunumBtn.textContent = LISTE_KLASOR_GORUNUMU ? "📄 Düz liste görünümü" : "🗂 Klasör görünümü";
+  gorunumBtn.addEventListener("click", () => {
+    LISTE_KLASOR_GORUNUMU = !LISTE_KLASOR_GORUNUMU;
+    try { localStorage.setItem("gy-klasor-gorunumu", LISTE_KLASOR_GORUNUMU ? "1" : "0"); } catch { /* depolama kapalı olabilir */ }
+    listeyiYenidenCiz();
+  });
+  gorunumBar.appendChild(gorunumBtn);
+  el.appendChild(gorunumBar);
+
+  const ciz = LISTE_KLASOR_GORUNUMU ? icerikKlasorAgaciCiz : icerikListesiCiz;
+  if (LISTE_FILTRE_TUR !== "proje") el.appendChild(ciz("Blog Yazıları", postlar, "blog"));
+  if (LISTE_FILTRE_TUR !== "blog") el.appendChild(ciz("Akademik Projeler", projeler, "proje"));
+}
+
+
+/**
+ * Klasör görünümü: _posts/ ve _projects/ altındaki TÜM alt klasörleri iç içe açılır-kapanır gruplar olarak gösterir;
+ * her yazı kendi klasörünün altında listelenir. Yolu olmayan (yalnızca Supabase'te duran) taslaklar "Taslaklar" grubunda toplanır.
+ * Bir grup açılınca içindeki "hafif" GitHub öğeleri (yalnız envanter) o anda zenginleştirilir → gereksiz GitHub isteği atılmaz.
+ */
+function icerikKlasorAgaciCiz(baslik, liste, tur) {
+  const wrap = document.createElement("div");
+  if (liste.length === 0) return wrap;
+  const h = document.createElement("div");
+  h.className = "gy-liste-baslik";
+  h.innerHTML = `${escapeHtml(baslik)} <span class="gy-liste-baslik-sayac">${liste.length}</span>`;
+  wrap.appendChild(h);
+
+  const kok = { ad: "", alt: new Map(), ogeler: [] };
+  const kokKlasor = tur === "blog" ? "_posts" : "_projects";
+  for (const item of liste) {
+    let dugum = kok;
+    if (!item.path) {
+      if (!kok.alt.has("\u0000taslak")) kok.alt.set("\u0000taslak", { ad: "✏️ Taslaklar (yayınlanmamış)", alt: new Map(), ogeler: [] });
+      dugum = kok.alt.get("\u0000taslak");
+    } else {
+      const parcalar = item.path.split("/").slice(0, -1).filter((x) => x && x !== kokKlasor);
+      for (const p of parcalar) {
+        if (!dugum.alt.has(p)) dugum.alt.set(p, { ad: `📁 ${p}`, alt: new Map(), ogeler: [] });
+        dugum = dugum.alt.get(p);
+      }
+    }
+    dugum.ogeler.push(item);
+  }
+  const say = (d) => d.ogeler.length + [...d.alt.values()].reduce((a, c) => a + say(c), 0);
+  const aramaVar = !!(typeof LISTE_ARAMA === "string" && LISTE_ARAMA.trim());
+  const dugumCiz = (d, derinlik, hedef, anahtar = tur) => {
+    const gruplar = [...d.alt.entries()].sort((x, y) => x[0].localeCompare(y[0], "tr", { numeric: true }));
+    for (const [ad, c] of gruplar) {
+      const k = `${anahtar}/${ad}`;
+      const det = document.createElement("details");
+      det.className = "gy-klasor-grup";
+      det.open = aramaVar || (KLASOR_ACIK.has(k) ? KLASOR_ACIK.get(k) : derinlik === 0 && gruplar.length <= 6);
+      const sum = document.createElement("summary");
+      sum.textContent = `${c.ad} (${say(c)})`;
+      det.appendChild(sum);
+      const icerik = document.createElement("div");
+      icerik.className = "gy-klasor-icerik";
+      det.appendChild(icerik);
+      let cizildi = false;
+      const doldur = () => {
+        if (cizildi) return;
+        cizildi = true;
+        dugumCiz(c, derinlik + 1, icerik, k);
+      };
+      if (det.open) doldur();
+      det.addEventListener("toggle", () => { KLASOR_ACIK.set(k, det.open); if (det.open) doldur(); });
+      hedef.appendChild(det);
+    }
+    const sirali = [...d.ogeler].sort((x, y) => String(y.data?.date || "").localeCompare(String(x.data?.date || "")));
+    sirali.forEach((item) => hedef.appendChild(icerikKartiCiz(item, tur)));
+    const hafifler = sirali.filter((it) => it.hafif && it.kaynak === "github");
+    if (hafifler.length) Promise.all(hafifler.map((it) => icerikIcerigiZenginlestir(it))).then(() => { if (LISTE_KLASOR_GORUNUMU) listeyiYenidenCiz(); });
+  };
+  const govde = document.createElement("div");
+  govde.className = "gy-klasor-agaci";
+  dugumCiz(kok, 0, govde);
+  wrap.appendChild(govde);
+  return wrap;
 }
 
 function icerikListesiCiz(baslik, liste, tur) {

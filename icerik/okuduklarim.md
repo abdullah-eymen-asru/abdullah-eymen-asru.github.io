@@ -1,5 +1,6 @@
 ---
 layout: default
+genis: true
 title: Okuduklarım
 permalink: "/icerik/okuduklarim.html"
 ---
@@ -75,7 +76,7 @@ permalink: "/icerik/okuduklarim.html"
     yilSelectId: "yil-filtresi",
     aramaAlanlari: ["Yazar", "Tür", "Okuma Durumu"],
     gizliAlanlar: [],
-    sayfaBasinaKayit: 25,
+    sayfaBasinaKayit: 24,
     istatistikContainerId: "okuma-istatistik",
     istatistikEylem: "okuduğum",
     istatistikTamamlandiDegeri: "Okudum",

@@ -410,7 +410,9 @@ async function koleksiyonTablosuOlustur(config) {
       // yazıyoruz — thead'deki metinle birebir aynı olmalı.
       const hucreler = sutunlar.map(sutun => {
         const deger = item[sutun];
-        return `<td data-label="${escapeHtml(sutun)}">${escapeHtml(deger == null ? "" : deger)}</td>`;
+        const bos = deger == null || String(deger).trim() === "";
+        // Boş alanlar (ör. başlama/bitiş tarihi) kartta etiket-boş satır olarak kalmasın diye gizlenir.
+        return `<td data-label="${escapeHtml(sutun)}"${bos ? ' class="hucre-bos"' : ""}>${escapeHtml(bos ? "" : deger)}</td>`;
       }).join("");
 
       rows += `

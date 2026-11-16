@@ -10,7 +10,7 @@
  * -----------------------------------------------------------------------
  */
 import { supabase, showMessage } from "../core/supabase-client.js";
-import { ayrilmaKancasiKaydet } from "../core/gezinme-kilidi.js";
+import { ayrilmaKancasiKaydet, sekmeSifirlamaKaydet } from "../core/gezinme-kilidi.js";
 import { el, bos, dugme, ilerlemeCubugu, bayt, onayIste, isBaglami, IptalHatasi, hataMetni } from "../donusturucu/ortak.js";
 import { girdiTuru, dosyayiAyikla, KABUL } from "./girdi.js";
 import { ogeyiIsle, belgeyiAlgila, kosalariDondur } from "./tarama.js";
@@ -459,6 +459,7 @@ async function kur() {
   yonetimNotu().then((n) => { if (n) kok.append(n); }).catch(() => {});
   window.addEventListener("pagehide", () => { try { oturumuSifirla(); } catch { /* yok say */ } });
   ayrilmaKancasiKaydet("tool-belge-tarayici", ayrilirkenSor);
+  sekmeSifirlamaKaydet("tool-belge-tarayici", () => { oturumuSifirla(); });
 }
 
 kur().catch((h) => { console.error("belge-tarayici.js:", h); bildir(`Araç yüklenemedi: ${h.message || h}`, "error"); });

@@ -9,6 +9,7 @@
 import { supabase } from "../core/supabase-client.js";
 import { el, hataMetni, indir, bayt, adsizAl } from "../donusturucu/ortak.js";
 import { pdfLibAl } from "../donusturucu/pdf-yukle.js";
+import { sekmeSifirlamaKaydet } from "../core/gezinme-kilidi.js";
 
 const kok = document.getElementById("md-kok");
 const WORKER = "https://transkript-worker.aeymena.workers.dev";
@@ -107,6 +108,7 @@ async function kur() {
     dg("⬇ PDF indir", async () => { try { bildir("PDF hazırlanıyor…"); indir(await metinPdf(guncel(), adsizAl(dosya?.name || "Transkript")), `${adsizAl(dosya?.name || "transkript")}_transkript.pdf`); bildir("✔ PDF indirildi."); } catch (h) { bildir(h.message, true); } }),
     dg("📝 Taslağa aktar (Yeni İçerik)", () => { sessionStorage.setItem("gy_onbilgi", JSON.stringify({ baslik: `${adsizAl(dosya?.name || "Transkript")} — transkript`, govde: guncel() })); location.hash = "#content-new"; }));
   const temizle = dg("🧹 Belleği temizle", () => { dosya = null; buf = null; metin = ""; sonuc.value = ""; sonuc.hidden = true; cikti.hidden = true; ilr.bitir(); dugmeler.forEach((b) => { b.disabled = true; }); bilgi.textContent = "Dosya tarayıcında işlenir."; bildir("🧹 Bellek temizlendi."); });
+  sekmeSifirlamaKaydet("tool-medya-donustur", () => temizle.click());
   kok.classList.add("md-kok");
   kok.replaceChildren(el("div", { class: "md-kart" }, el("p", { class: "md-soluk", text: "🔒 Dönüştürme tarayıcıda yapılır. Transkriptte yalnızca küçültülmüş SES, kendi Worker'ın üzerinden Groq Whisper'a gider." }), sec, girdi, bilgi),
     el("div", { class: "md-kart" }, el("h2", { text: "1) MP3'e küçült" }), kbps, donusturBtn), el("div", { class: "md-kart" }, el("h2", { text: "2) Transkript" }), mod, dil, transBtn, sonuc, cikti), temizle, cubuk, sureYazi, mesaj);

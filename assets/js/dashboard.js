@@ -37,7 +37,7 @@
 
 import { requireAuthOrShowError } from "./auth/auth-guard.js";
 import { supabase } from "./core/supabase-client.js";
-import { ayrilmayaIzinVarMi } from "./core/gezinme-kilidi.js";
+import { ayrilmayaIzinVarMi, sekmeSifirla } from "./core/gezinme-kilidi.js";
 import { hubCiz, sonKullanilanKaydet } from "./hub/hub.js";
 // DEMO / VİTRİN MODU (migration 0083): rol 'demo' + sahte veri katmanı. Görünürlük TEK yerden gelir: demoSekmeAcikMi()
 // (izinli sekme listesi + Site Sahibi'nin canlı yapılandırması). Ayrıntı: assets/js/demo/*.
@@ -104,6 +104,11 @@ const MODULES = {
   pdfbol: { src: "./pdf-bol/pdf-bol.js", role: null },
   onay: { src: "./onay-kutusu/onay-kutusu.js", role: null },
   medyadonustur: { src: "./medya-donustur/medya-donustur.js", role: null },
+  // Evrensel Medya İndirici (açık kaynak Cobalt / yapılandırılabilir yt-dlp uç noktası; log tutmaz). Yetki Dönüştürücü ile aynı.
+  medyaIndir: { src: "./medya-indir/medya-indir.js", role: null },
+  // Birleşik PDF & Belge Çalışma Alanı: yerleşik kabuk (alt sekmeleri kendi modülleri doldurur) + salt-okunur belge görüntüleyici.
+  calismaAlani: { yerlesik: true, role: null },
+  belgeGoruntule: { src: "./belge-goruntule/belge-goruntule.js", role: null },
   yorumlarim: { src: "./yorumlarim/yorumlarim.js", role: null },
   pdfduzenle: { src: "./pdf-duzenle/pdf-duzenle.js", role: null },
   // HavaStil (migration 0099): hava durumuna göre katman/giyim danışmanı. Görünürlük role DEĞİL, Yetki Ayarları › Özellikler'deki
@@ -190,12 +195,11 @@ const NAV = [
     items: [
       // role:null + izin:"donusturucu": owner her zaman görür; diğer roller yalnızca can_use_converter açıksa.
       // Menüde görünmeyen rol, #tool-donusturucu adresine gitse bile hash Guard'ına (gorunurMu) takılır.
-      { id: "tool-donusturucu", icon: "🔄", label: "Dönüştürücü & Editör", module: "donusturucu", role: null, izin: "donusturucu", defaultAcilis: false },
-      { id: "tool-belge-tarayici", icon: "📑", label: "Belge Tarayıcı & Birleştirici", module: "belgeTarayici", role: null, izin: "donusturucu", defaultAcilis: false },
-      { id: "tool-metadata", icon: "🧼", label: "Metadata Temizleyici", module: "metadata", role: null, izin: "donusturucu", defaultAcilis: false },
-      { id: "tool-pdfbol", icon: "✂️", label: "PDF Böl & Ayıkla", module: "pdfbol", role: null, ozellik: "pdf_bol", izin: "donusturucu", defaultAcilis: false },
-      { id: "tool-pdfduzenle", icon: "📝", label: "PDF Düzenleyici", module: "pdfduzenle", role: null, ozellik: "pdf_duzenle", izin: "donusturucu", defaultAcilis: false },
-      { id: "tool-medya", icon: "🎧", label: "Ses & Video + Transkript", module: "medyadonustur", role: null, izin: "donusturucu", defaultAcilis: false },
+      // BİRLEŞİK ÇALIŞMA ALANI: eskiden 5 ayrı sekme olan Dönüştürücü / Belge Tarayıcı / Metadata / PDF Böl / PDF Düzenleyici
+      // artık TEK sekmede, "Görüntüle · Düzenle · Dönüştür" kategorileri altında (bkz. CALISMA_ALANI). Eski #tool-* adresleri yönlendirilir.
+      { id: "tool-calisma-alani", icon: "🗂️", label: "PDF & Belge Çalışma Alanı", module: "calismaAlani", role: null, izin: "donusturucu", defaultAcilis: false },
+      // Medya: dönüştürme + transkript ve (yeni) Evrensel Medya İndirici aynı çatı altında.
+      { id: "tool-medya", icon: "🎧", label: "Medya Araçları (Dönüştür · İndir)", module: "medyadonustur", role: null, izin: "donusturucu", defaultAcilis: false },
       // role:null + izin:"havastil": owner her zaman görür; diğer roller yalnızca Yetki Ayarları'nda HavaStil açıldıysa.
       { id: "tool-havastil", icon: "🌦️", label: "HavaStil (Giyim Danışmanı)", module: "havastil", role: null, izin: "havastil", defaultAcilis: false },
     ],
@@ -607,7 +611,136 @@ async function yeniSurumVarsaYenile(hedefViewId) {
   } catch { return false; }
 }
 
-async function showView(viewId, moduleKey) {
+/* ------------------------------------------------------------------ */
+/* 5b) Eski adresler (alias) + ALT SEKME KABUKLARI (Çalışma Alanı, Medya) */
+/* ------------------------------------------------------------------ */
+
+// Eski sekme adresleri (yer imleri, hub, eski mesajlar) → yeni yer. alt: kabuk içinde açılacak alt araç.
+const ESKI_ADRESLER = {
+  "media-r2": { id: "media-arsiv" },
+  "tool-donusturucu": { id: "tool-calisma-alani", alt: "tool-donusturucu" },
+  "tool-belge-tarayici": { id: "tool-calisma-alani", alt: "tool-belge-tarayici" },
+  "tool-metadata": { id: "tool-calisma-alani", alt: "tool-metadata" },
+  "tool-pdfbol": { id: "tool-calisma-alani", alt: "tool-pdfbol" },
+  "tool-pdfduzenle": { id: "tool-calisma-alani", alt: "tool-pdfduzenle" },
+};
+
+// Kabuk tanımları. ozellik: Yetki Ayarları › Özellikler anahtarı (owner hariç kapalıysa alt sekme gizlenir).
+const ALT_KABUKLAR = {
+  "tool-calisma-alani": {
+    kategoriler: [
+      { id: "goruntule", etiket: "👁️ Görüntüle", araclar: [
+        { id: "tool-belge-goruntule", etiket: "PDF & Belge Görüntüleyici", module: "belgeGoruntule" } ] },
+      { id: "duzenle", etiket: "✏️ Düzenle", araclar: [
+        { id: "tool-pdfduzenle", etiket: "PDF Düzenleyici", module: "pdfduzenle", ozellik: "pdf_duzenle" },
+        { id: "tool-pdfbol", etiket: "PDF Böl & Ayıkla", module: "pdfbol", ozellik: "pdf_bol" },
+        { id: "tool-belge-tarayici", etiket: "Tarayıcı & Birleştirici", module: "belgeTarayici" },
+        { id: "tool-metadata", etiket: "Metadata Temizleyici", module: "metadata" } ] },
+      { id: "donustur", etiket: "🔄 Dönüştür", araclar: [
+        { id: "tool-donusturucu", etiket: "Dönüştürücü & Editör (PDF · DOCX · PPTX · görsel)", module: "donusturucu" } ] },
+    ],
+  },
+  "tool-medya": {
+    kategoriler: [
+      { id: "donustur", etiket: "🎛️ Dönüştür & Transkript", araclar: [
+        { id: "tool-medya-donustur", etiket: "Ses & Video + Transkript", module: "medyadonustur" } ] },
+      { id: "indir", etiket: "⬇️ Medya İndirici", araclar: [
+        { id: "tool-medya-indir", etiket: "Evrensel Medya İndirici", module: "medyaIndir" } ] },
+    ],
+  },
+};
+const ALT_SEKME_ANAHTARI = (kabukId) => `aea_altsekme_${kabukId}`;
+const aktifAlt = new Map(); // kabukId -> aktif alt araç id
+let GIRIS_PROFIL = null;
+
+/** Adres kimliğini (hash) çöz: eski adresleri yeni konuma çevirir. → { item, alt } | null */
+function navHedefiBul(adresId) {
+  const esl = ESKI_ADRESLER[adresId];
+  const id = esl ? esl.id : adresId;
+  const item = NAV.flatMap((g) => g.items).find((it) => it.id === id);
+  return item ? { item, alt: esl?.alt || null } : null;
+}
+
+function altAracGorunurMu(arac) {
+  const p = GIRIS_PROFIL;
+  if (!p) return true;
+  if (p.role === "owner" || isDemoMode) return true;
+  return !(arac.ozellik && p.izinler?.ozellikler?.[arac.ozellik] === false);
+}
+
+function altPaneBul(aracId) {
+  return document.querySelector(`[data-ca-pane="${aracId}"]`);
+}
+
+/** Etkin alt araçtan ayrılırken: önce "ayrılma kalkanı" (kaydedilmemiş iş), sonra o aracın durumunu SIFIRLA. */
+async function altAracdanAyril(kabukId, hedefAracId) {
+  const onceki = aktifAlt.get(kabukId);
+  if (!onceki || onceki === hedefAracId) return true;
+  if (!(await ayrilmayaIzinVarMi(onceki, hedefAracId))) return false;
+  sekmeSifirla(onceki, altPaneBul(onceki));
+  return true;
+}
+
+async function altAracAc(kabukId, aracId) {
+  const kabuk = ALT_KABUKLAR[kabukId];
+  if (!kabuk) return;
+  const tum = kabuk.kategoriler.flatMap((k) => k.araclar.map((a) => ({ ...a, kategori: k.id })));
+  const arac = tum.find((a) => a.id === aracId && altAracGorunurMu(a)) || tum.find((a) => altAracGorunurMu(a));
+  if (!arac) return;
+  if (!(await altAracdanAyril(kabukId, arac.id))) return;
+  aktifAlt.set(kabukId, arac.id);
+  try { sessionStorage.setItem(ALT_SEKME_ANAHTARI(kabukId), arac.id); } catch { /* depo kapalı */ }
+  const kok = document.getElementById(`view-${kabukId}`);
+  if (!kok) return;
+  kok.querySelectorAll("[data-ca-pane]").forEach((p) => { p.hidden = p.dataset.caPane !== arac.id; });
+  kok.querySelectorAll("[data-ca-kat]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.caKat === arac.kategori)));
+  kok.querySelectorAll("[data-ca-arac]").forEach((b) => {
+    b.hidden = b.dataset.caKatYeri !== arac.kategori;
+    b.setAttribute("aria-selected", String(b.dataset.caArac === arac.id));
+  });
+  await ensureModuleLoaded(arac.module, `view-${kabukId}`);
+}
+
+/** Kabuğun kategori/alt araç şeridini (bir kez) çizer. */
+function altKabukKur(kabukId) {
+  const kabuk = ALT_KABUKLAR[kabukId];
+  const kap = document.querySelector(`[data-ca-kabuk="${kabukId}"]`);
+  if (!kabuk || !kap || kap.dataset.kuruldu) return;
+  kap.dataset.kuruldu = "1";
+  const katSerit = document.createElement("div");
+  katSerit.className = "ca-kategoriler"; katSerit.setAttribute("role", "tablist"); katSerit.setAttribute("aria-label", "Kategoriler");
+  const aracSerit = document.createElement("div");
+  aracSerit.className = "ca-araclar"; aracSerit.setAttribute("role", "tablist"); aracSerit.setAttribute("aria-label", "Araçlar");
+  for (const k of kabuk.kategoriler) {
+    const gorunen = k.araclar.filter(altAracGorunurMu);
+    if (!gorunen.length) continue;
+    const kb = document.createElement("button");
+    kb.type = "button"; kb.className = "ca-kat"; kb.dataset.caKat = k.id; kb.setAttribute("role", "tab"); kb.textContent = k.etiket;
+    kb.addEventListener("click", () => {
+      const sonSecilen = gorunen.find((a) => a.id === aktifAlt.get(kabukId));
+      altAracAc(kabukId, (sonSecilen || gorunen[0]).id);
+    });
+    katSerit.append(kb);
+    for (const a of gorunen) {
+      const ab = document.createElement("button");
+      ab.type = "button"; ab.className = "ca-arac"; ab.dataset.caArac = a.id; ab.dataset.caKatYeri = k.id; ab.setAttribute("role", "tab"); ab.hidden = true; ab.textContent = a.etiket;
+      ab.addEventListener("click", () => altAracAc(kabukId, a.id));
+      aracSerit.append(ab);
+    }
+  }
+  kap.append(katSerit, aracSerit);
+}
+
+/** Kabuk sekmesi açılırken: şeridi kur ve (varsa) istenen / son kullanılan alt aracı aç. */
+async function altKabukAc(kabukId, istenenAlt) {
+  if (!ALT_KABUKLAR[kabukId]) return;
+  altKabukKur(kabukId);
+  let hedef = istenenAlt;
+  if (!hedef) { try { hedef = sessionStorage.getItem(ALT_SEKME_ANAHTARI(kabukId)); } catch { /* depo kapalı */ } }
+  await altAracAc(kabukId, hedef || aktifAlt.get(kabukId));
+}
+
+async function showView(viewId, moduleKey, altArac = null) {
   if (viewId === "sys-uye-aktarim" || viewId === "sys-demo") { // eski adresler → birleşik Yetki Ayarları
     try { sessionStorage.setItem(YA_ALTSEKME_ANAHTARI, viewId === "sys-demo" ? "ya-pane-demo" : "ya-pane-uye"); } catch { /* depo kapalı */ }
     return showView("sys-yetki", "gy");
@@ -621,8 +754,11 @@ async function showView(viewId, moduleKey) {
     if (gecisSuruyor) { history.replaceState(null, "", `#${activeViewId}`); return; }
     gecisSuruyor = true;
     let izin = true;
-    try { izin = await ayrilmayaIzinVarMi(activeViewId, viewId); } finally { gecisSuruyor = false; }
+    try { izin = await ayrilmayaIzinVarMi(aktifAlt.get(activeViewId) || activeViewId, viewId); } finally { gecisSuruyor = false; }
     if (!izin) { history.replaceState(null, "", `#${activeViewId}`); return; }
+    // SEKME DEĞİŞİNCE SIFIRLA: önceki sekmedeki dosya/öğe seçimleri (state, dosya girdileri, nesne URL'leri) temizlenir.
+    if (ALT_KABUKLAR[activeViewId]) { const a = aktifAlt.get(activeViewId); if (a) sekmeSifirla(a, altPaneBul(a)); }
+    else sekmeSifirla(activeViewId);
     // YENİ SÜRÜM KONTROLÜ (assets/js/core/surum-kontrol.js): her sekme geçişinde (en çok 30 sn'de bir, ucuz no-store istek) sunucudaki
     // derleme kimliğine bakılır; yeni deploy varsa sayfa HEDEF SEKMEYLE yenilenir — elle yenilemeye gerek kalmaz. Oturum korunur (çıkış yok).
     if (await yeniSurumVarsaYenile(viewId)) return;
@@ -664,6 +800,7 @@ async function showView(viewId, moduleKey) {
   if (viewId === "me-hub") hubuCiz();
 
   await ensureModuleLoaded(moduleKey, viewId);
+  if (ALT_KABUKLAR[viewId]) await altKabukAc(viewId, altArac);
   // Yetki Ayarları: owner için "R2 Erişim İzni" bölümü (ayrı modül; gy modülüne dokunmaz)
   // Bu iki modül yalnızca Site Sahibi'nin sekmelerini doldurur (yetkili admin yalnızca Özellikler'i görür).
   // Yetki Ayarları alt sekmeleri: Site Sahibi VE Yetki Ayarları erişimi açık yönetici için HEPSİ yüklenir. Biri hata verse diğerleri etkilenmez.
@@ -841,10 +978,10 @@ function wireDashIciLinkler() {
     const link = e.target.closest("[data-dash-git]");
     if (!link) return;
     const hedefId = link.dataset.dashGit;
-    const item = NAV.flatMap((g) => g.items).find((it) => it.id === hedefId);
-    if (!item) return; // tanınmayan hedef: tarayıcı normal davransın
+    const hedef = navHedefiBul(hedefId);
+    if (!hedef) return; // tanınmayan hedef: tarayıcı normal davransın
     e.preventDefault();
-    showView(item.id, item.module);
+    showView(hedef.item.id, hedef.item.module, hedef.alt);
     closeMobileSidebar();
     window.scrollTo({ top: 0, behavior: "smooth" });
   });
@@ -944,6 +1081,7 @@ async function init() {
 
   GIRIS_PROFIL_ROLU = profile.role;
   profile.izinler = await izinleriYukle(profile.role);
+  GIRIS_PROFIL = profile;
   GIRIS_YETKILI_YONETIM = profile.role === "owner" || (profile.role === "admin" && !!profile.izinler?.yetkiAyarlari);
 
   // Notlarım: erişimi owner belirler (migration 0059/0060, Yetki Ayarları).
@@ -1005,31 +1143,31 @@ async function init() {
   // /panel/dashboard.html#me-panel aynı sayfa olduğu için tarayıcı sadece
   // hash'i değiştirir, init() TEKRAR ÇALIŞMAZ) doğru sekmeye geç.
   window.addEventListener("hashchange", () => {
-    const id = window.location.hash.replace("#", "").replace(/^media-r2$/, "media-arsiv");
-    const item = NAV.flatMap((g) => g.items).find((it) => it.id === id);
-    if (item && id !== activeViewId && gorunurMu(item, profile)) {
-      showView(item.id, item.module);
+    const id = window.location.hash.replace("#", "");
+    const hedef = navHedefiBul(id);
+    if (hedef && (hedef.item.id !== activeViewId || hedef.alt) && gorunurMu(hedef.item, profile)) {
+      showView(hedef.item.id, hedef.item.module, hedef.alt);
     }
   });
 
   document.getElementById("loading")?.setAttribute("hidden", "");
   document.getElementById("app").hidden = false;
 
-  const requestedId = window.location.hash.replace("#", "").replace(/^media-r2$/, "media-arsiv");
-  const requested = requestedId
-    ? NAV.flatMap((g) => g.items).find((it) => it.id === requestedId)
-    : null;
+  const requestedId = window.location.hash.replace("#", "");
+  const requestedHedef = requestedId ? navHedefiBul(requestedId) : null;
+  const requested = requestedHedef?.item || null;
   const target =
     requested && gorunurMu(requested, profile)
       ? requested
       : firstAvailableView(profile);
+  const baslangicAlt = requested && target === requested ? requestedHedef.alt : null;
 
   if (isDemoMode) {
     // Vitrin bandı, alt özellik gizleme (PDF araç çubuğu, ZIP inceleme, filtre çipleri) ve "Demodan çık".
     import("./demo/demo-gorunum.js").then((m) => m.demoGorunumuKur()).catch((h) => console.warn("Demo görünümü kurulamadı:", h));
   }
   if (target) {
-    await showView(target.id, target.module);
+    await showView(target.id, target.module, baslangicAlt);
   } else if (isDemoMode) {
     document.getElementById("dash-main").innerHTML =
       '<p class="muted">Bu demoda şu an görüntülenecek bir bölüm açık değil. Site sahibi vitrin ayarlarını güncellemiş olabilir.</p>';

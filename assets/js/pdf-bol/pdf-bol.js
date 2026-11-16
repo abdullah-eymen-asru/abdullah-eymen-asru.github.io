@@ -23,6 +23,7 @@ function adGuvenli(ad, yedek = "belge.pdf") {
 }
 import { pdfjsAl, pdfLibAl, pdfAcSecenekleri } from "../donusturucu/pdf-yukle.js";
 import { ZipYazici } from "../notlar/disa-aktar/zip.js";
+import { sekmeSifirlamaKaydet } from "../core/gezinme-kilidi.js";
 
 const kok = document.getElementById("pb-kok");
 const SINIR = 300 * 1024 * 1024;
@@ -284,6 +285,7 @@ async function kur() {
     bildir("Bellek temizlendi: dosya, küçük resimler ve hazırlanan çıktılar silindi.");
   });
   alan.append(bellekTemizle);
+  sekmeSifirlamaKaydet("tool-pdfbol", () => bellekTemizle.click());
   cizModlar(); cizAyarlar(); izgara.hidden = true; sonucKutu.hidden = true;
   kok.classList.add("pb-kok");
   kok.replaceChildren(

@@ -12,6 +12,7 @@ import { supabase } from "../core/supabase-client.js";
 import { el, hataMetni, indir, bayt, adsizAl } from "../donusturucu/ortak.js";
 import { pdfjsAl, pdfLibAl, pdfAcSecenekleri } from "../donusturucu/pdf-yukle.js";
 import { pdfDuzenleyiciKur } from "../donusturucu/pdf-duzenleyici.js";
+import { sekmeSifirlamaKaydet } from "../core/gezinme-kilidi.js";
 
 const kok = document.getElementById("pd-kok");
 const SINIR = 300 * 1024 * 1024;
@@ -158,6 +159,7 @@ async function kur() {
   arac.append(dg("⬇ PDF'i indir", indirPdf, "pd-birincil"), dg("▦ Tüm sayfalar", tumSayfalar), dg("🔎 Bul ve değiştir", bulPaneli), dg("🔗 Bağlantılar", baglantiPaneli), metaEtiket, dg("🧹 Belleği temizle", () => temizle(true)));
   kok.classList.add("pd-kok", "dn-kok");           // dn-kok: düzenleyicinin CSS değişkenleri (yükseklik, renkler) buradan gelir — eksikliği sayfa alanını 0 yükseklikte bırakıyordu
   kok.replaceChildren(el("div", { class: "pd-kart" }, el("p", { class: "pd-gizlilik", text: "🔒 Dosyan sunucuya yüklenmez; tüm işlem tarayıcında (pdf.js + pdf-lib, açık kaynak) yapılır." }), birak), arac, panel, editorKap, mesaj);
+  sekmeSifirlamaKaydet("tool-pdfduzenle", () => temizle(false));
   void dosyalar;
 }
 kur().catch((h) => { console.error("pdf-duzenle.js:", h); if (kok) kok.replaceChildren(el("p", { class: "auth-message error", text: `Araç yüklenemedi: ${h?.message || h}` })); });
