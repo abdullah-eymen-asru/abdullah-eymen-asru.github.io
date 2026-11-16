@@ -10,8 +10,8 @@ import { supabase } from "../core/supabase-client.js";
 import { AkisliZip, zipGirisleri, zipGirisOku } from "./zip-yazici.js";
 import { workerFetch, hataMetni, bugunDamga } from "./ortak.js";
 
-const SIRA = ["profiles", "e2ee_kullanici_anahtarlari", "not_kasasi", "notlar", "not_ek_kayitlari", "akademik_kaynaklar", "akademik_koleksiyonlar", "akademik_koleksiyon_ogeleri", "akademik_notlar", "akademik_eklenti_ayarlari", "r2_arsiv", "taslak_icerikler", "special_content", "content_access"];
-const SAYFA = { notlar: 25, akademik_kaynaklar: 100, akademik_notlar: 100, akademik_koleksiyonlar: 200, akademik_koleksiyon_ogeleri: 500, special_content: 50, taslak_icerikler: 50, messages: 200 };
+const SIRA = ["profiles", "e2ee_kullanici_anahtarlari", "not_kasasi", "notlar", "not_ek_kayitlari", "akademik_kaynaklar", "akademik_koleksiyonlar", "akademik_koleksiyon_ogeleri", "akademik_notlar", "akademik_eklenti_ayarlari", "r2_arsiv", "taslak_icerikler", "special_content", "content_access", "yorumlar"];
+const SAYFA = { notlar: 25, akademik_kaynaklar: 100, akademik_notlar: 100, akademik_koleksiyonlar: 200, akademik_koleksiyon_ogeleri: 500, special_content: 50, taslak_icerikler: 50, messages: 200, yorumlar: 200 };
 const kodla = new TextEncoder();
 
 const siraNo = (t) => { const i = SIRA.indexOf(t); return i < 0 ? 999 : i; };
@@ -267,7 +267,7 @@ export async function yedekAl({ bilesenler, kapsam, hedefler = [], hedefAdlari =
   };
 
   try {
-    if (!sadeceEk && (secili.has("veritabani") || secili.has("notlar") || secili.has("akademik"))) {
+    if (!sadeceEk && (secili.has("veritabani") || secili.has("notlar") || secili.has("akademik") || secili.has("yorumlar"))) {
       ilerleme({ asama: "Tablo listesi alınıyor…" });
       const { data: tablolar, error: te } = await supabase.rpc("sistem_export_tablo_listesi", { p_id: oturum });
       if (te) throw new Error(hataMetni(te));

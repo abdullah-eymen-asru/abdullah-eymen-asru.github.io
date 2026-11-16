@@ -71,6 +71,8 @@ dosyasındaki adresi de güncellemen gerekir.
 | 4.9 | `akademik_kutuphane_worker` | `akademik-kutuphane-worker` | `SUPABASE_URL`, `SUPABASE_ANON_KEY` *(+ yalnızca çok büyük dosya imzası için: `ACCOUNT_ID`, `BUCKET_NAME`)* | — *(bilerek `service_role` yok)* *(+ yalnızca çok büyük dosya imzası için: `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`)* | `AKADEMIK_BUCKET` |
 | 4.10 | `sistem_yedek_worker` | `sistem-yedek-worker` | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `GITHUB_OWNER`, `GITHUB_REPO` *(+ isteğe bağlı `GITHUB_REF`, `MAX_TARAMA_SAYFA`)* | `GITHUB_PAT` *(yalnızca repo **özel** ise; bilerek `service_role` yok)* | `AKADEMIK_BUCKET`, `ARSIV_BUCKET`, `NOT_EK_BUCKET` *(üçü de isteğe bağlı; bağlamadığın kaynak pakete girmez)* |
 | 4.11 | `havastil_worker` | `havastil-worker` | `SUPABASE_URL`, `SUPABASE_ANON_KEY` *(+ isteğe bağlı `GROQ_MODEL`, `HABER_KAYNAKLARI`)* | `GROQ_API_KEY` *(bilerek `service_role` yok)* | — |
+| 4.12 | `transkript_worker` | `transkript-worker` | `SUPABASE_URL`, `SUPABASE_ANON_KEY` *(+ isteğe bağlı `GROQ_SES_MODELI`, `GROQ_CEVIRI_MODELI`, `TRANSKRIPT_ORIGINLERI`)* | `GROQ_API_KEY` *(bilerek `service_role` yok)* | — |
+| 4.13 | `medya_indirici_worker` | `medya-indirici-worker` | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `COBALT_API_URL` *(+ isteğe bağlı `YTDLP_API_URL`, `MEDYA_ORIGINLERI`)* | *(isteğe bağlı)* `COBALT_API_KEY`, `YTDLP_API_KEY` *(bilerek `service_role` yok)* | — |
 
 > 💡 **"Variable mı Secret mı?" tablodaki sütunlar bir öneridir.** Kod ikisini de
 > aynı şekilde okur (`env.ADI`). Önemli olan, gizli değerlerin **Secret**
@@ -612,18 +614,48 @@ Panel: **Yedekleme & Verilerim → Depolama Durumu → 🔌 Worker anahtarları*
 **Worker aç/kapa (kota koruması):** `havastil-worker`, **Yedekleme & Verilerim → Depolama Durumu → 🔌 Worker anahtarları** listesinde (migration 0099 ekler). Kapatınca tarayıcılar istek göndermez, Worker 503 döner; HavaStil çalışmaya devam eder (haber ve yapay zekâ yorumu yerel özete düşer).
 ---
 
-### 🎧 `transkript-worker` ve `medya-indirici-worker` (Araçlar › Medya Araçları)
+### 4.12 `transkript-worker` — Çok dilli transkript (Araçlar › Medya Araçları › Dönüştür & Transkript)
 
-Her ikisi de **kayıt tutmaz**; çağıranın Supabase oturumunu ve **Dönüştürücü yetkisini** (`donusturucu_yetkisi_var_mi`, migration 0077) kontrol eder.
+**Ne yapar?** Tarayıcıda küçültülen ses parçasını (≤ 20 dk, 64 kbps mono MP3) alır, **Groq Whisper** ile metne çevirir. Modlar: orijinal dilde · İngilizce (Whisper çevirisi) · Türkçe (döküm + Groq sohbet modeliyle çeviri). **Kayıt tutmaz**: ses ve metin Worker'da saklanmaz, loglanmaz. Çağıranın Supabase oturumunu ve **Dönüştürücü yetkisini** (`donusturucu_yetkisi_var_mi`, migration 0077) kontrol eder.
 
-| Worker | Dosya | Secret / Var | Ne yapar |
+> 🔒 **Gizlilik (dürüst not):** Bu özellikte küçültülmüş **ses**, Groq'a (üçüncü taraf) gider. Groq ücretsiz katmanı vardır; ama ses kendi cihazının dışına çıkar. Hassas kayıtları bu araçla yazıya dökme. Dönüştürme ve diğer tüm araçlar tamamen tarayıcıda çalışır.
+
+| Tip | Ad | Değer | Nereden? |
 |---|---|---|---|
-| `transkript-worker` | `cloudflare worker/transkript_worker/worker.js` | `GROQ_API_KEY` (**Secret**), `SUPABASE_URL`, `SUPABASE_ANON_KEY`; ops. `GROQ_CEVIRI_MODELI` | `POST /transkript` — Groq Whisper large-v3; modlar: orijinal · İngilizce (Whisper çevirisi) · Türkçe (döküm + Groq sohbet modeliyle çeviri) |
-| `medya-indirici-worker` | `cloudflare worker/medya_indirici_worker/worker.js` | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `COBALT_API_URL`; ops. `COBALT_API_KEY`, `YTDLP_API_URL`, `YTDLP_API_KEY`, `MEDYA_ORIGINLERI` | `POST /indir` — bağlantıyı Cobalt (veya kendi yt-dlp uç noktan) ile çözer, **indirme adresini** döner; medya baytları Worker'dan geçmez |
+| Variable | `SUPABASE_URL` | `https://<proje-ref>.supabase.co` | Bölüm 2.2 |
+| Variable | `SUPABASE_ANON_KEY` | `anon public` anahtarı | Bölüm 2.2 |
+| **Secret** | `GROQ_API_KEY` | `gsk_...` | [console.groq.com](https://console.groq.com) → **API Keys → Create API Key** (ücretsiz hesap yeter; HavaStil'de kullandığın **aynı anahtarı** girebilirsin) |
+| Variable *(ops.)* | `GROQ_SES_MODELI` | örn. `whisper-large-v3-turbo` | Boş bırak: `whisper-large-v3` → `whisper-large-v3-turbo` zinciri denenir |
+| Variable *(ops.)* | `GROQ_CEVIRI_MODELI` | örn. `openai/gpt-oss-120b` | Boş bırak: `openai/gpt-oss-20b` → `openai/gpt-oss-120b` zinciri denenir |
+| Variable *(ops.)* | `TRANSKRIPT_ORIGINLERI` | `https://siteadresin.com,https://www.siteadresin.com` | **Kendi alan adını kullanıyorsan şart**: Worker varsayılan olarak yalnızca `https://abdullah-eymen-asru.github.io`, `localhost:5500` ve `127.0.0.1:5500` kaynaklarına izin verir |
 
-Kurulum: Workers & Pages → Create Worker → adlar yukarıdaki gibi (**`transkript-worker`**, **`medya-indirici-worker`**; adı farklı verirsen `assets/js/medya-donustur/medya-donustur.js` ve `assets/js/medya-indir/medya-indir.js` içindeki `WORKER` sabitlerini güncelle) → kodu yapıştır → Deploy → Settings → Variables and Secrets.
+**Kurulum:** Cloudflare → Workers & Pages → **Create → Create Worker** → ad: **`transkript-worker`** → Deploy → **Edit code** → `cloudflare worker/transkript_worker/worker.js` içeriğini yapıştır → Deploy → **Settings → Variables and Secrets** (Bölüm 3.1) → tablodaki değerleri ekle. Worker adresi `https://transkript-worker.<hesap-alt-alanın>.workers.dev` olur; `<hesap-alt-alanın>` Cloudflare panelinde **Workers & Pages** sayfasının sağ tarafında yazar. Bu adres `assets/js/medya-donustur/medya-donustur.js` içindeki `WORKER` sabitiyle **aynı** olmalı (farklıysa dosyadaki sabiti değiştir).
+**Test:** Panel → Araçlar → Medya Araçları → Dönüştür & Transkript → kısa bir ses dosyası → **Transkript**. `403` = alan adın `TRANSKRIPT_ORIGINLERI`'nde yok; `403 "erişim yetkin yok"` = Dönüştürücü yetkin kapalı (Yetki Ayarları); `500 yapılandırılmamış` = `GROQ_API_KEY` eksik.
 
-**Dürüst not (Medya İndirici):** Cobalt (açık kaynak, kendi sunucunda `docker compose`) YouTube/YouTube Music, X, Instagram, TikTok, Reddit, SoundCloud, Vimeo, Twitch, Facebook vb. destekler; **LinkedIn ve NSosyal desteklemez**. Bu siteler için `YTDLP_API_URL` ile kendi yt-dlp sarmalayıcını bağla (sözleşme `worker.js` başındaki yorumda). Yapılandırılmamışsa araç bunu açıkça söyler. Herkese açık Cobalt örnekleri genelde botlara kapalıdır; kendi örneğini kur. Yalnızca indirme hakkına sahip olduğun içerikler için kullan; telif/kullanım koşulları kullanıcıya aittir.
+### 4.13 `medya-indirici-worker` — Evrensel Medya İndirici (Araçlar › Medya Araçları › Medya İndirici)
+
+**Ne yapar?** Bağlantıyı, **senin kurduğun açık kaynak çözümleyiciye** ([Cobalt](https://github.com/imputnet/cobalt), isteğe bağlı kendi yt-dlp uç noktan) iletir ve **indirme adresini** döner. Medya baytları Worker'dan geçmez (CPU/kota harcanmaz). **Kayıt tutmaz**: bağlantı, IP ve kullanıcı bilgisi saklanmaz. Çağıranın oturumu ve Dönüştürücü yetkisi kontrol edilir; yalnızca genel `http(s)` alan adları kabul edilir (yerel/özel ağ adresleri reddedilir).
+
+> ⚠️ **Dürüst not — "sunucusuz" mümkün değil:** Tarayıcı veya Cloudflare Worker, YouTube/Instagram/X gibi sitelerden doğrudan video çekemez (CORS + site korumaları). Bu yüzden bir **çözümleyici** gerekir. Ücretsiz ve veri sızdırmayan yol: **Cobalt'ı kendi bilgisayarında (Docker) çalıştırıp [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) (ücretsiz) ile dışarı açmak**; ücretli sunucu gerekmez. Bilgisayar kapalıyken araç çalışmaz. Herkese açık Cobalt örnekleri genelde botlara kapalıdır, onlara güvenme. Evde çalışan Cobalt, veri merkezi IP'lerine göre YouTube engellerine daha az takılır.
+> **LinkedIn ve NSosyal Cobalt tarafından desteklenmez.** Bunlar için `YTDLP_API_URL` ile kendi yt-dlp sarmalayıcını bağla (sözleşme `worker.js` başındaki yorumda). Bağlamazsan araç bunu açıkça söyler. Özel/oturum gerektiren içerik indirilemez.
+> **Yasal:** Yalnızca indirme hakkına sahip olduğun veya lisansı serbest içerikleri indir. Telif ve platform kullanım koşulları sana aittir.
+
+| Tip | Ad | Değer | Nereden? |
+|---|---|---|---|
+| Variable | `SUPABASE_URL` | `https://<proje-ref>.supabase.co` | Bölüm 2.2 |
+| Variable | `SUPABASE_ANON_KEY` | `anon public` anahtarı | Bölüm 2.2 |
+| Variable | `COBALT_API_URL` | örn. `https://cobalt.siteadresin.com` (sonunda `/` olmadan) | Kendi Cobalt örneğinin **dışarıdan erişilen** adresi → aşağıdaki "Cobalt kurulumu" |
+| **Secret** *(ops.)* | `COBALT_API_KEY` | Cobalt örneğine girdiğin API anahtarı | Cobalt'ta anahtar zorunluysa (`API_AUTH_REQUIRED`) kendi ürettiğin değer; Cobalt'ın [instance belgesine](https://github.com/imputnet/cobalt/blob/main/docs/run-an-instance.md) bak |
+| Variable *(ops.)* | `YTDLP_API_URL` | kendi yt-dlp uç noktanın tam adresi | Yalnızca LinkedIn/NSosyal gibi siteler için; sözleşme `worker.js` başında |
+| **Secret** *(ops.)* | `YTDLP_API_KEY` | uç noktanın `Bearer` anahtarı | Kendi ürettiğin rastgele değer (Bölüm 2.4) |
+| Variable *(ops.)* | `MEDYA_ORIGINLERI` | `https://siteadresin.com` (virgülle birden çok) | Kendi alan adını kullanıyorsan şart (varsayılan: `abdullah-eymen-asru.github.io` ve `localhost:5500`) |
+
+**Cobalt kurulumu (ücretsiz, kendi bilgisayarında):**
+1. Docker'ı kur (Docker Desktop). Cobalt'ın [`docker-compose.yml` örneğini](https://github.com/imputnet/cobalt/blob/main/docs/examples/docker-compose.example.yml) indir; `API_URL` değerini 2. adımdaki **dışarıdan erişilen adresle** doldur → `docker compose up -d`.
+2. Cloudflare Tunnel ile `http://localhost:9000` adresini ücretsiz bir adrese bağla (kendi alan adın Cloudflare'deyse kalıcı: `cloudflared tunnel` → Public hostname; değilse geçici: `cloudflared tunnel --url http://localhost:9000`, adres her başlatmada değişir).
+3. Bu adresi `COBALT_API_URL` olarak Worker'a gir.
+
+**Worker kurulumu:** Create Worker → ad **`medya-indirici-worker`** → kod: `cloudflare worker/medya_indirici_worker/worker.js` → Deploy → Settings → Variables and Secrets → tablo. Adres `https://medya-indirici-worker.<hesap-alt-alanın>.workers.dev` olur ve `assets/js/medya-indir/medya-indir.js` içindeki `WORKER` sabitiyle aynı olmalı. **Test:** Araçlar → Medya Araçları → Medya İndirici → herkese açık bir video bağlantısı → "İndirme bağlantısını hazırla". `501 yapılandırılmamış` = `COBALT_API_URL` eksik; `422` = içerik çözülemedi (özel/engelli).
 
 ## 5. Cloudflare Pages ayarları
 

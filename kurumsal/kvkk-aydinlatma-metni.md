@@ -72,7 +72,7 @@ permalink: "/kurumsal/kvkk-aydinlatma-metni.html"
     sayfa, oluşturma/düzenleme tarihi, görünen adınız ya da seçtiğiniz takma ad ve e-posta adresinizden
     türetilen tek yönlü <em>yazar imzası</em> (özet) saklanır. Anonim yorumda sayfada ad gösterilmez; hesabınızla ilişkisi
     yalnızca site sahibi tarafından görülebilir. Yorumlarınızı istediğiniz zaman düzenleyip silebilir,
-    JSON/CSV olarak yedekleyebilir ve JSON yedeğinden geri yükleyebilirsiniz.</li>
+    Yedekleme &amp; Verilerim › Kişisel verilerim bölümünden yedekleyebilir ve yedekten geri yükleyebilirsiniz.</li>
   <li><strong>Mesajlaşma verisi:</strong> panelin Sohbet/Mesajlar
     özelliğini kullanırsanız, sohbetin katılımcıları, zaman damgaları ve
     <strong>uçtan uca şifrelenmiş</strong> mesaj içeriği ile konu başlığı

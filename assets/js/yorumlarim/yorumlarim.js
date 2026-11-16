@@ -74,28 +74,11 @@ async function kur() {
     });
   }
   let z; ara.addEventListener("input", () => { clearTimeout(z); z = setTimeout(() => { durum.ara = ara.value.trim(); yukle(); }, 300); });
-  const kutu = el("details", "yk-kutu"); kutu.append(el("summary", null, "🧰 Yedekle · Geri yükle · Takma ad"));
-  const indirDosya = (ad, tur, icerik) => { const u = URL.createObjectURL(new Blob([icerik], { type: `${tur};charset=utf-8` })); const a = el("a"); a.href = u; a.download = ad; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); };
-  const gun = () => new Date().toISOString().slice(0, 10);
-  const csvHucre = (v) => { let t = v == null ? "" : String(v); if (/^[=+\-@\t\r]/.test(t)) t = `'${t}`; return `"${t.replace(/"/g, '""')}"`; };
-  async function yedekAl() { const r = await supabase.rpc("yorum_yedek_al"); if (r.error) { bildir(r.error.message, true); return null; } return r.data || []; }
-  const jsonBtn = dg("⬇ JSON yedek", "yk-kucuk", async () => { const v = await yedekAl(); if (!v) return; indirDosya(`yorumlarim-${gun()}.json`, "application/json", JSON.stringify({ tur: "asru-yorum-yedek", surum: 1, tarih: new Date().toISOString(), yorumlar: v }, null, 2)); bildir(`✔ ${v.length} yorum JSON olarak indirildi.`); });
-  const csvBtn = dg("⬇ CSV yedek", "yk-kucuk", async () => { const v = await yedekAl(); if (!v) return; const ks = ["id", "icerik_anahtari", "ust_id", "metin", "created_at", "edited_at", "anonim", "rumuz", "gorunen_ad", "author_signature_hash"]; indirDosya(`yorumlarim-${gun()}.csv`, "text/csv", `\ufeff${ks.join(",")}\r\n${v.map((y) => ks.map((k) => csvHucre(y[k])).join(",")).join("\r\n")}`); bildir(`✔ ${v.length} yorum CSV olarak indirildi.`); });
-  const dosyaSec = el("input"); dosyaSec.type = "file"; dosyaSec.accept = "application/json,.json"; dosyaSec.hidden = true;
-  dosyaSec.addEventListener("change", async () => {
-    const f = dosyaSec.files?.[0]; dosyaSec.value = ""; if (!f) return;
-    if (f.size > 20 * 1024 * 1024) { bildir("Dosya çok büyük (en fazla 20 MB).", true); return; }
-    let liste; try { const j = JSON.parse(await f.text()); liste = Array.isArray(j) ? j : j?.yorumlar; if (!Array.isArray(liste)) throw 0; } catch { bildir("Geçerli bir yorum yedeği (JSON) seç.", true); return; }
-    if (!window.confirm(`${liste.length} yorum işlenecek. Yalnızca KENDİ imzanı taşıyan ve zaten var olmayan yorumlar eklenir. Devam edilsin mi?`)) return;
-    let e = 0, a = 0, g = 0;
-    for (let i = 0; i < liste.length; i += 500) { const r = await supabase.rpc("yorum_geri_yukle", { p_veri: liste.slice(i, i + 500) }); if (r.error) { bildir(r.error.message, true); return; } e += r.data?.eklendi || 0; a += r.data?.atlandi || 0; g += r.data?.gecersiz || 0; }
-    bildir(`✔ Geri yükleme bitti: ${e} eklendi, ${a} zaten vardı (atlandı), ${g} geçersiz/başkasına ait (atlandı).`); await yukle();
-  });
-  const yukleBtn = dg("⬆ JSON'dan geri yükle", "yk-kucuk", () => dosyaSec.click());
+  const kutu = el("details", "yk-kutu"); kutu.append(el("summary", null, "🏷 Takma ad"));
   const takma = el("input", "yk-girdi"); takma.type = "text"; takma.maxLength = 40; takma.placeholder = "Yeni takma ad (boş = adıma dön)"; takma.setAttribute("aria-label", "Takma ad");
   const takmaBtn = dg("🏷 Takma adı uygula", "yk-kucuk", async () => { const r = await supabase.rpc("yorum_takma_ad_degistir", { p_ad: takma.value }); if (r.error) bildir(r.error.message, true); else { bildir(`✔ ${r.data} yorumda görünen ad güncellendi (anonim yorumlar değişmez).`); await yukle(); } });
-  const arac1 = el("div", "yk-arac"), arac2 = el("div", "yk-arac"); arac1.append(jsonBtn, csvBtn, yukleBtn, dosyaSec); arac2.append(takma, takmaBtn);
-  kutu.append(el("p", "yk-soluk", "Yedek yalnızca senin yorumlarını içerir. Geri yüklemede başka birine ait ya da zaten var olan yorumlar eklenmez."), arac1, arac2);
+  const arac2 = el("div", "yk-arac"); arac2.append(takma, takmaBtn);
+  kutu.append(el("p", "yk-soluk", "Takma adın, anonim olmayan tüm yorumlarında görünür; istediğin zaman değiştirebilirsin. Yorumlarını yedeklemek/geri yüklemek için Yedekleme & Verilerim bölümünü kullan."), arac2);
   sekmeCiz(); kok.replaceChildren(anaCubuk, kutu, turCubuk, arac, alan, mesaj); await yukle();
 }
 kur().catch((h) => { console.error("yorumlarim.js:", h); if (kok) kok.textContent = "Yorumlar yüklenemedi."; });

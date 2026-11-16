@@ -40,6 +40,7 @@ const TABLO_BILGI = {
   taslak_icerikler: ["icerik", "Gizli yayınlanan / taslak yazı ve proje içerikleri."],
   special_content: ["icerik", "Özel / gizli makaleler."],
   content_access: ["icerik", "Özel içeriklere kimin erişebildiği ve okuduğu."],
+  yorumlar: ["icerik", "Blog/proje yorumları (yazar imzası, takma ad, gizleme durumu). Kişisel yedekte yalnızca üyenin kendi yorumları."],
   r2_arsiv: ["icerik", "Dosya Yöneticisi dizini: klasörler, dosya adları, boyutlar (dosyaların kendisi R2'de)."],
   r2_arsiv_izinleri: ["icerik", "Dosya Yöneticisi paylaşım ve erişim izinleri."],
   r2_islem_sayaci: ["icerik", "R2 işlem kotası sayacı."],

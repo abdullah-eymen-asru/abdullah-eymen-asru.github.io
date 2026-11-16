@@ -21,12 +21,13 @@ const kart = (id, baslik, aciklama, secili = true) => {
 const parolaAlani = (id, etiket) => { const g = el("input", { type: "password", id, class: "sy-girdi", autocomplete: "new-password", "aria-label": etiket, placeholder: etiket }); return g; };
 
 export function kisiselVeriCiz(kok, mesaj) {
-  const uyari = el("p", { class: "sy-bilgi" }, ikon("kalkan"), el("span", { text: "Bu bölüm yalnızca SENİN verilerin içindir: notların, yüklediğin belgeler ve mesajların. Buradan yapılan içe aktarma site ayarlarını, rolleri ve yetkileri ASLA değiştirmez." }));
+  const uyari = el("p", { class: "sy-bilgi" }, ikon("kalkan"), el("span", { text: "Bu bölüm yalnızca SENİN verilerin içindir: notların, yüklediğin belgeler, yorumların ve mesajların. Buradan yapılan içe aktarma site ayarlarını, rolleri ve yetkileri ASLA değiştirmez." }));
 
   /* ---------------- dışa aktar ---------------- */
   const notlarK = kart("kv-notlar", "📝 Notlarım", "Notların, alıntıların, kaynakların ve şifreli ekleri + Yedek Kurtarma Kodu bilgisi (kod olmadan açılamaz). Başka hesapta içe aktarırken AYNI kodla açılır.");
   const akademikK = kart("kv-akademik", "📚 Akademik Kütüphanem", "Kaynak künyeleri, vurgu ve notların + PDF dosyaların (klasör yapısıyla).");
   const belgeK = kart("kv-belge", "📄 Yüklediğim belgeler", "Dosya yöneticisi ve kütüphanedeki kendi dosyaların.");
+  const yorumK = kart("kv-yorum", "💬 Yorumlarım", "Blog/proje yazılarına yazdığın yorumlar (JSON). Geri yüklemede yalnızca kendi imzanı taşıyan, zaten var olmayan yorumlar eklenir; gizleme kararları geri gelmez.", false);
   const mesajK = kart("kv-mesaj", "💬 Mesajlarım (Yedek Kurtarma Koduyla şifreli)", "Sohbetlerin tarayıcıda çözülür ve 16 haneli Yedek Kurtarma Kodunla yeniden şifrelenir; başka hesaba taşınabilir.");
   const kodGirdi = el("input", { type: "text", id: "kv-kod", class: "sy-girdi", autocomplete: "off", autocapitalize: "characters", spellcheck: "false", maxlength: "19", inputmode: "text", "aria-label": "Yedek Kurtarma Kodu", placeholder: "XXXX-XXXX-XXXX-XXXX" });
   kodGirdi.addEventListener("input", () => { kodGirdi.value = kodBicimle(kodGirdi.value); });
@@ -36,7 +37,7 @@ export function kisiselVeriCiz(kok, mesaj) {
   const ilerleme = el("p", { class: "muted sy-not", role: "status", "aria-live": "polite" });
   const indir = dugme({ metin: "Kişisel yedeği oluştur ve indir", ikonAdi: "indir", tur: "birincil" });
   indir.addEventListener("click", async () => {
-    const bilesenler = []; if (notlarK.girdi.checked) bilesenler.push("notlar"); if (belgeK.girdi.checked) bilesenler.push("r2"); if (akademikK.girdi.checked) bilesenler.push("akademik");
+    const bilesenler = []; if (notlarK.girdi.checked) bilesenler.push("notlar"); if (belgeK.girdi.checked) bilesenler.push("r2"); if (akademikK.girdi.checked) bilesenler.push("akademik"); if (yorumK.girdi.checked) bilesenler.push("yorumlar");
     const mesajlar = mesajK.girdi.checked;
     if (!bilesenler.length && !mesajlar) return mesaj("En az bir öğe seç.");
     const kodGerekli = mesajlar || notlarK.girdi.checked;          // Notlar da Mesajlar da AYNI kodla açılır → tek doğrulama kutusu
@@ -70,7 +71,7 @@ export function kisiselVeriCiz(kok, mesaj) {
     } catch (h) { try { await alici?.iptal?.(); } catch { /* yok say */ } mesaj(`Yedek alınamadı: ${hataMetni(h)}`); }
     finally { indir.disabled = false; ilerleme.textContent = ""; }
   });
-  const disaPanel = el("div", { class: "sy-sekme-panel" }, el("h2", { text: "Kişisel verilerimi dışa aktar" }), notlarK.etiket, akademikK.etiket, belgeK.etiket, mesajK.etiket, parolaKutu, el("div", { class: "sy-eylemler" }, indir), ilerleme);
+  const disaPanel = el("div", { class: "sy-sekme-panel" }, el("h2", { text: "Kişisel verilerimi dışa aktar" }), notlarK.etiket, akademikK.etiket, belgeK.etiket, yorumK.etiket, mesajK.etiket, parolaKutu, el("div", { class: "sy-eylemler" }, indir), ilerleme);
 
   /* ---------------- içe aktar ---------------- */
   const icKok = el("div", { class: "sy-alt" });

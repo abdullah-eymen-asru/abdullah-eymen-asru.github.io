@@ -72,8 +72,9 @@ permalink: "/kurumsal/gizlilik-politikasi.html"
   kötüye kullanımı önlemek için yorumun hesabınızla ilişkisi veritabanında saklanır ve
   yalnızca site sahibi tarafından görülebilir. Yorumunuzu istediğiniz zaman düzenleyebilir
   veya silebilirsiniz; yöneticiler yorum metnini değiştiremez, yalnızca uygunsuz yorumu
-  gizleyebilir veya silebilir. Hesap panelindeki <em>Yorumlarım</em> bölümünden kendi
-  yorumlarınızı JSON/CSV olarak yedekleyebilir, JSON yedeğinden geri yükleyebilirsiniz.
+  gizleyebilir veya silebilir. Hesap panelindeki <em>Yedekleme &amp; Verilerim › Kişisel verilerim</em> bölümünden kendi
+  yorumlarınızı yedekleyebilir ve yedekten geri yükleyebilirsiniz; geri yüklemede yalnızca kendi
+  imzanızı taşıyan yorumlar eklenir.
   Yorum altyapısı için çerez onayı gerekmez; yalnızca oturum açmanız yeterlidir.
 </p>
 
