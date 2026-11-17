@@ -58,8 +58,8 @@ const tabloHatasi = (e) => (/does not exist|42P01|schema cache/i.test(e?.message
 export async function kayitliSaglayicilar() {
   const { data, error } = await supabase.from("havastil_ai_kasasi").select("saglayici, model");
   if (error) throw new Error(tabloHatasi(error));
-  // 'openmeteo' (kullanıcının kendi hava verisi anahtarı, 0121) yapay zekâ sağlayıcısı DEĞİLDİR; AI arayüzlerini bozmasın diye burada süzülür.
-  return Object.fromEntries((data || []).filter((r) => r.saglayici !== "openmeteo").map((r) => [r.saglayici, { model: r.model || null }]));
+  // 'openmeteo' (hava verisi, 0121), 'groq' (Transkript) ve 'cozumleyici' (Medya İndirici, 0140) HavaStil yapay zekâ sağlayıcısı DEĞİLDİR; AI arayüzlerini bozmasın diye burada süzülür.
+  return Object.fromEntries((data || []).filter((r) => !["openmeteo", "groq", "cozumleyici"].includes(r.saglayici)).map((r) => [r.saglayici, { model: r.model || null }]));
 }
 /** Kullanıcının Open-Meteo anahtarı kasada kayıtlı mı? (anahtar çözülmez) */
 export async function openmeteoKayitliMi() {

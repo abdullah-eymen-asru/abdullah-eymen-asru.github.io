@@ -73,6 +73,14 @@ async function jsonSatirlari(blob) {
 
 /* ------------------------------ analiz ------------------------------ */
 
+/** Üst yorumlar önce gelsin (derinlik sırası): geri yüklemede yanıt zinciri bozulmaz. */
+function yorumSirala(satirlar) {
+  if (satirlar.__sirali) return satirlar;
+  const harita = new Map(satirlar.map((x) => [x.id, x])), derinlik = (x) => { let d = 0, k = x, n = 0; while (k?.ust_id && harita.has(k.ust_id) && n++ < 30) { d += 1; k = harita.get(k.ust_id); } return d; };
+  const l = satirlar.map((x) => [derinlik(x), x]).sort((a, b) => a[0] - b[0] || String(a[1].created_at).localeCompare(String(b[1].created_at))).map((q) => q[1]);
+  l.__sirali = true; satirlar.length = 0; satirlar.push(...l); satirlar.__sirali = true; return satirlar;
+}
+
 async function analizEt(dosyalar, sema, ilerleme, ctx = {}) {
   const tablolar = new Map(); // tablo -> {tablo, parcalar:[satirlar], kaynaklar:[], yontem, korumali}
   const r2 = [];              // {kaynak, anahtar, ad, boyut, al: ()=>Promise<Blob>, secenekler?}
@@ -113,6 +121,7 @@ async function analizEt(dosyalar, sema, ilerleme, ctx = {}) {
       let z;
       try { z = await zipAc(f); } catch (h) { notlar.push(`${ad}: ${h.message}`); continue; }
       const manifestG = z.bul("r2/MANIFEST.json");
+      const anaYorumVar = !!z.bul("veritabani/json/yorumlar.json");   // yazı/sayfa bazlı yorum dosyaları yalnızca ana dosya yoksa okunur (çift yazım olmasın)
       const yedekMi = !!z.bul("manifest.json") || !!manifestG || z.girisler.some((g) => /^(veritabani|notlar|akademik)\/json\//.test(g.ad));
       const manifestYollari = new Set();
       if (manifestG) {
@@ -134,6 +143,12 @@ async function analizEt(dosyalar, sema, ilerleme, ctx = {}) {
         if (/^(icerik-md|github)\//.test(g.ad)) continue;
         if (/\.sql$/i.test(g.ad)) { sqlVar = true; continue; }
         if (/^(manifest\.json|OKUBENI\.txt)$/.test(g.ad)) continue;
+        if (/^yorumlar\/.+\.json$/i.test(g.ad)) {
+          if (anaYorumVar || /INDEKS\.json$/i.test(g.ad)) continue;
+          try { const o = JSON.parse(await z.metin(g)); if (Array.isArray(o?.yorumlar) && o.yorumlar.length && sema.some((x) => x.tablo === "yorumlar")) tabloEkle("yorumlar", o.yorumlar, `${ad} › ${g.ad}`, "dosya adı"); }
+          catch (h) { notlar.push(`${ad} › ${g.ad}: okunamadı — ${h.message}`); }
+          continue;
+        }
         if (/\.json$/i.test(g.ad)) {
           if (/^notlar\/ekler\//.test(g.ad)) continue;
           if (yedekMi && !/^(veritabani|notlar|akademik)\/json\//.test(g.ad)) continue;
@@ -379,7 +394,10 @@ export async function icAktarCiz(kok, mesaj, { uye = false } = {}) {
           for (let i = 0; i < t.satirlar.length; i += SAYFA) {
             iptalKontrol();
             asama.textContent = `Tablo ${t.tablo} (tur ${tur}) — ${Math.min(i + SAYFA, t.satirlar.length)}/${t.satirlar.length}`;
-            const { data, error } = await supabase.rpc(uye ? "uye_geri_yukle_tablo" : "sistem_geri_yukle_tablo", { p_tablo: t.tablo, p_satirlar: t.satirlar.slice(i, i + SAYFA), p_mod: m });
+            const yorumOwner = !uye && t.tablo === "yorumlar";   // 0140: başka veritabanına da dönebilir (olmayan kullanıcı → sahipsiz; imzayla eşleşme; yanıt zinciri)
+            const { data, error } = yorumOwner
+              ? await supabase.rpc("yorum_geri_yukle", { p_satirlar: yorumSirala(t.satirlar).slice(i, i + SAYFA), p_mod: m === "uzerine" ? "uzerine" : "eksikleri" })
+              : await supabase.rpc(uye ? "uye_geri_yukle_tablo" : "sistem_geri_yukle_tablo", { p_tablo: t.tablo, p_satirlar: t.satirlar.slice(i, i + SAYFA), p_mod: m });
             if (error) throw new Error(`${t.tablo}: ${hataMetni(error)}`);
             top.eklenen += data.eklenen; top.guncellenen += data.guncellenen; hataliBu += data.hatali;
             if (tur === 1) { bitenIs += Math.min(SAYFA, t.satirlar.length - i); cubuk.value = bitenIs; }
@@ -392,6 +410,14 @@ export async function icAktarCiz(kok, mesaj, { uye = false } = {}) {
           if (hataliBu && tur < 4) sonraki.push(t);
         }
         bekleyen = sonraki;
+      }
+
+      // 1b) yorumlar: üst yorumu sonradan gelen yanıtları bağla (sayfa sırası fark etse bile zincir eksiksiz kalır)
+      const yt = !uye && tSec.find((t) => t.tablo === "yorumlar");
+      if (yt) {
+        const esl = yt.satirlar.filter((x) => x?.ust_id).map((x) => ({ id: x.id, ust_id: x.ust_id }));
+        for (let i = 0; i < esl.length; i += 1000) { const { error } = await supabase.rpc("yorum_yanit_bagla", { p_eslemeler: esl.slice(i, i + 1000) }); if (error) logla(`⚠️ yorum yanıt bağlama: ${hataMetni(error)}`); }
+        if (esl.length) logla(`✓ yorumlar: ${esl.length} yanıt bağlantısı denetlendi`);
       }
 
       // 2) R2 dosyaları (tek tek; Worker gövde sınırı aşılırsa o dosya "hata" olarak raporlanır, diğerleri sürer)

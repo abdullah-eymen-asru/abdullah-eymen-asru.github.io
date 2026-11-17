@@ -3,3 +3,4 @@
 .mi-etiket { display: grid; gap: .25rem; font-size: .85rem; color: var(--muted); min-width: 9rem; flex: 1 1 9rem; }
 .mi-sonuc { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; } .mi-sonuc[hidden] { display: none; } .mi-sonuc > p { flex: 1 0 100%; margin: 0; }
 .mi-indir { text-decoration: none; display: inline-flex; align-items: center; }
+.mi-akis { display: grid; gap: .4rem; flex: 1 0 100%; }

@@ -70,7 +70,9 @@ async function sayfalar(oturum, tablo, kolonSayisi, sinyal, her) {
    Bunun için ilgili tablolar JSON/SQL yazılırken bellekte (yalnızca küçük künye alanları) toplanır. */
 const AK = { kaynak: [], klasor: [], oge: [], uye: new Map() };
 const AK_TABLO = new Set(["akademik_kaynaklar", "akademik_koleksiyonlar", "akademik_koleksiyon_ogeleri", "profiles"]);
+const YK = [];   // yorumlar: yazı/sayfa bazlı klasörleme için toplanır (veritabani/json/yorumlar.json'a EK, okunabilir kopya)
 function akTopla(tablo, satirlar) {
+  if (tablo === "yorumlar") { YK.push(...satirlar); return; }
   if (!AK_TABLO.has(tablo)) return;
   for (const s of satirlar) {
     if (tablo === "akademik_kaynaklar") AK.kaynak.push({ id: s.id, user_id: s.user_id, baslik: s.baslik, yil: s.yayin_yili, yazarlar: s.yazarlar, pdf: s.pdf_r2_yolu, dosya: s.pdf_dosya_adi });
@@ -116,7 +118,7 @@ function akAgacMetni() {
 }
 
 async function veritabaniYaz(zip, oturum, tablolar, bicimler, ilerleme, sinyal, ozet) {
-  AK.kaynak.length = 0; AK.klasor.length = 0; AK.oge.length = 0; AK.uye.clear();
+  AK.kaynak.length = 0; AK.klasor.length = 0; AK.oge.length = 0; AK.uye.clear(); YK.length = 0;
   const gruplar = new Map();
   for (const t of tablolar) {
     if (!gruplar.has(t.hedef)) gruplar.set(t.hedef, []);
@@ -164,6 +166,28 @@ async function veritabaniYaz(zip, oturum, tablolar, bicimler, ilerleme, sinyal, 
     }
     ozet.tablolar[hedef] = say;
   }
+  await yorumKlasorleriYaz(zip, ozet);
+}
+
+/* Yorumlar: yazı/sayfa bazlı, KATEGORİ klasörlü kopya.  yorumlar/<kategori>/<sayfa>.json  +  yorumlar/INDEKS.json
+ * Kategori = adresin ilk bölümü (blog, projeler, …). Her dosya tek sayfanın TÜM yorumlarını (yanıt zinciri dâhil) içerir.
+ * Geri yükleme: İçe Aktar bu dosyaları da tanır; başka bir Supabase veritabanına bile eksiksiz döner (olmayan kullanıcı → sahipsiz yorum; e-posta imzasıyla yeniden bağlanır). */
+const yorumAdi = (t) => (String(t).normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "sayfa");
+async function yorumKlasorleriYaz(zip, ozet) {
+  if (!YK.length) return;
+  const sayfalar = new Map();
+  for (const y of YK) { const k = String(y.icerik_anahtari || "/"); if (!sayfalar.has(k)) sayfalar.set(k, []); sayfalar.get(k).push(y); }
+  const indeks = [], kullanilan = new Set();
+  for (const [anahtar, liste] of sayfalar) {
+    const parca = anahtar.split("/").filter(Boolean), kategori = yorumAdi(parca.length > 1 ? parca[0] : "genel"), ad = yorumAdi(parca.length > 1 ? parca.slice(1).join("-") : (parca[0] || "anasayfa"));
+    let yol = `yorumlar/${kategori}/${ad}.json`, n = 2; while (kullanilan.has(yol)) yol = `yorumlar/${kategori}/${ad}-${n++}.json`; kullanilan.add(yol);
+    liste.sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+    await zip.dosyaEkle(yol, JSON.stringify({ tur: "yorum-sayfasi", surum: 1, icerik_anahtari: anahtar, kategori, yorumlar: liste }, null, 2));
+    indeks.push({ icerik_anahtari: anahtar, kategori, dosya: yol, yorum: liste.length });
+  }
+  await zip.dosyaEkle("yorumlar/INDEKS.json", JSON.stringify({ tur: "yorum-indeksi", surum: 1, olusturma: new Date().toISOString(), toplam: YK.length, sayfa: indeks.length, sayfalar: indeks }, null, 2));
+  ozet.yorumKlasorleri = { sayfa: indeks.length, yorum: YK.length };
+  YK.length = 0;
 }
 
 /* ------------------------------------- R2 dosyaları ------------------------------------- */
@@ -312,6 +336,7 @@ function okubeni(o) {
     "  notlar/ekler/                  Şifreli not ekleri (TÜM SİSTEM yedeğinde notlar/ekler/<kullanıcı-id>/<ek-id>.bin); notların ve klasör ağacının kendisi şifrelidir",
     "  icerik-md/                     Depodaki tüm .md dosyaları (klasör yapısı korunur)",
     "  github/                        Kaynak kod zip'i",
+    "  yorumlar/<kategori>/<sayfa>.json  Yorumlar, yazı/sayfa bazlı ve kategori klasörlü (yanıt zinciri dâhil) · yorumlar/INDEKS.json özet liste",
     "",
     "ÖNEMLİ",
     "  * Kişisel Notlar bileşeni her zaman yalnızca paketi alan kişinin kendi notlarını içerir.",

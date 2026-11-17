@@ -30,8 +30,8 @@ import { r2CopCiz, kilitliKasalariCiz } from "./r2-cop.js";
 const ROLLER = { owner: "Site Sahibi", admin: "Yönetici", manager: "İçerik Sorumlusu", editor: "Editör", special_user: "Özel Üye", user: "Üye" };
 
 /** Onay kutusu kartı (kapsam ve bileşenler AYNI görünüm). */
-function secenekKarti({ id, baslik, aciklama, kucuk = false, secili = false }) {
-  const girdi = el("input", { type: "checkbox", id, checked: secili });
+function secenekKarti({ id, baslik, aciklama, kucuk = false, secili = false, radyo = null }) {
+  const girdi = el("input", radyo ? { type: "radio", id, name: radyo, checked: secili } : { type: "checkbox", id, checked: secili });
   const etiket = el("label", { class: `sy-secenek${kucuk ? " sy-secenek--kucuk" : ""}`, for: id }, girdi,
     el("span", { class: "sy-secenek-metin" }, el("strong", { text: baslik }), aciklama ? el("small", { text: aciklama }) : null));
   return { girdi, etiket };
@@ -159,32 +159,32 @@ async function kur() {
 
   /* ---------------- 2) Dışa aktarma formu ---------------- */
   // Kapsam kartları (yalnızca owner'da seçenek vardır; diğer roller yalnızca kendi verisini alır)
-  const benim = secenekKarti({ id: "sy-kapsam-benim", baslik: "Sadece Kendi Verilerimi İndir (Kişisel Yedek)", aciklama: "Yalnızca senin oluşturduğun notlar, yüklediğin dosyalar ve profil verilerin — hafif paket.", kucuk: true, secili: true });
-  const seciliK = secenekKarti({ id: "sy-kapsam-secili", baslik: "Seçili üyeler", aciklama: "Üyeleri arayıp işaretle; yalnızca onların kayıtları ve dosyaları pakete girer (notlar hariç).", kucuk: true });
-  const tumK = secenekKarti({ id: "sy-kapsam-tum", baslik: "Tam Sistem & Felaket Kurtarma Yedeği", aciklama: "Tüm veritabanı (şema + veri), yapılandırmalar ve bütün kullanıcıların dosyaları. Mesajlar uçtan uca ŞİFRELİ taşınır. Yukarıdaki iki seçeneği kapsar.", kucuk: true });
+  const benim = secenekKarti({ id: "sy-kapsam-benim", radyo: "sy-kapsam", baslik: "Sadece Kendi Verilerimi İndir (Kişisel Yedek)", aciklama: "Yalnızca senin oluşturduğun notlar, yüklediğin dosyalar ve profil verilerin — hafif paket.", kucuk: true, secili: true });
+  const seciliK = secenekKarti({ id: "sy-kapsam-secili", radyo: "sy-kapsam", baslik: "Seçili üyeler", aciklama: "Üyeleri arayıp işaretle; yalnızca onların kayıtları ve dosyaları pakete girer (notlar hariç).", kucuk: true });
+  const tumK = secenekKarti({ id: "sy-kapsam-tum", radyo: "sy-kapsam", baslik: "Tam Sistem & Felaket Kurtarma Yedeği", aciklama: "Tüm veritabanı (şema + veri), yapılandırmalar ve bütün kullanıcıların dosyaları. Mesajlar uçtan uca ŞİFRELİ taşınır. Yukarıdaki iki seçeneği kapsar.", kucuk: true });
   const secilenler = new Map();
   const secici = ownerMi ? uyeSecici(secilenler, () => durumGuncelle()) : null;
-  const seciciKutu = el("div", { class: "sy-alt", hidden: true }, secici?.kok);
+  const seciciKutu = el("div", { class: "sy-alt", hidden: true }, secici?.kok, null);
   let seciciYuklendi = false;
 
   const hassasK = secenekKarti({ id: "sy-hassas", baslik: "Eski DÜZ METİN mesajları da dahil et", aciklama: "Şifreli mesajlar zaten pakete girer (okunamaz haldedir). Bu seçenek yalnızca şifreleme öncesi kalmış açık metin mesajları ekler — KVKK açısından hassastır; gerçekten gerekliyse işaretle.", kucuk: true });
   const hassasKutu = el("div", { class: "sy-alt", hidden: true }, hassasK.etiket);
 
-  // İKİLİ YEDEK AYRIMI: tek tıkla iki net paket (kapsam + bileşenleri birlikte ayarlar).
-  const paketKisisel = dugme({ metin: "👤 Kişisel yedek (hafif)", tur: "ikincil", kucuk: true });
-  const paketTam = dugme({ metin: "🛟 Tam sistem & felaket kurtarma", tur: "ikincil", kucuk: true });
-  const paketSec = (tam) => {
-    tumK.girdi.checked = tam; seciliK.girdi.checked = false; benim.girdi.checked = !tam;
-    for (const [id, k] of kutular) { if (k.girdi.disabled) continue; k.girdi.checked = tam ? id !== "github" || tamMi : ["veritabani", "r2", "notlar", "mesajlar", "akademik"].includes(id); }
+  // TEK SEÇİM: kapsam artık üç net moddan biridir (radyo). Mod seçilince bileşenler moda göre otomatik işaretlenir; istersen sonra değiştirirsin.
+  const kendiEkle = secenekKarti({ id: "sy-kendi-ekle", baslik: "Kendi verilerimi de pakete ekle", aciklama: "Seçili üyelerin yanında senin notların, mesajların ve kayıtların da pakete girer.", kucuk: true });
+  const modOzet = el("p", { class: "sy-bilgi", "aria-live": "polite" });
+  const modUygula = () => {
+    const tam = tumK.girdi.checked, secili = seciliK.girdi.checked;
+    const set = tam ? null : secili ? ["veritabani", "r2", "akademik", "yorumlar"] : ["veritabani", "r2", "notlar", "mesajlar", "akademik", "yorumlar"];
+    for (const [id, k] of kutular) { if (k.girdi.disabled) continue; k.girdi.checked = tam ? (id !== "github" || tamMi) : set.includes(id); }
     durumGuncelle();
   };
-  paketKisisel.addEventListener("click", () => paketSec(false));
-  paketTam.addEventListener("click", () => paketSec(true));
+  for (const k of [benim, seciliK, tumK]) k.girdi.addEventListener("change", () => { if (k.girdi.checked) modUygula(); });
 
   const kapsamIcerik = ownerMi
     ? [
-        el("div", { class: "sy-eylemler" }, paketKisisel, paketTam),
-        el("div", { class: "sy-secenekler" }, benim.etiket, seciliK.etiket, seciciKutu, tumK.etiket),
+        el("div", { class: "sy-secenekler", role: "radiogroup", "aria-label": "Yedek kapsamı" }, benim.etiket, seciliK.etiket, seciciKutu, tumK.etiket),
+        modOzet,
         hassasKutu,
       ]
     : [el("p", { class: "sy-bilgi" }, ikon("kisi"), el("span", { text: "Pakete yalnızca SENİN kendi verilerin girer. Başka üyelerin verisini yalnızca Site Sahibi alabilir." }))];
@@ -225,18 +225,21 @@ async function kur() {
   function durumGuncelle() {
     if (ownerMi) {
       const tum = tumK.girdi.checked;
-      benim.girdi.disabled = tum;
-      seciliK.girdi.disabled = tum;
-      seciciKutu.hidden = !seciliK.girdi.checked || tum;
+      seciciKutu.hidden = !seciliK.girdi.checked;
+      if (!seciciKutu.querySelector("#sy-kendi-ekle")) seciciKutu.append(kendiEkle.etiket);
       if (!seciciKutu.hidden && !seciciYuklendi) { seciciYuklendi = true; secici.yukle(); }
       hassasKutu.hidden = !(tum && kutular.get("veritabani").girdi.checked);
       if (hassasKutu.hidden) hassasK.girdi.checked = false;
       // Kişisel notlar yalnızca çağıranın kendi notlarıdır: "benim" kapsamı yoksa seçilemez.
-      const notlarMumkun = tum || benim.girdi.checked;
+      const notlarMumkun = tum || benim.girdi.checked || (seciliK.girdi.checked && kendiEkle.girdi.checked);
       notlarK.girdi.disabled = !notlarMumkun;
       if (!notlarMumkun) notlarK.girdi.checked = false;
       mesajlarK.girdi.disabled = !notlarMumkun;
       if (!notlarMumkun) mesajlarK.girdi.checked = false;
+      modOzet.textContent = tum
+        ? "Felaket kurtarma paketi: tüm veritabanı tabloları (herkesin yorumları, yazı/sayfa kategorili klasörlerde de), tüm kullanıcıların dosyaları, içerik (.md) ve kaynak kod. Başka bir Supabase veritabanına içe aktarılabilir. Parolalar ve servis anahtarları pakete girmez — Cloudflare secret'larını rehber/04'e göre ayrıca sakla."
+        : seciliK.girdi.checked ? `${secilenler.size} üyenin kayıtları ve dosyaları (+ isteğe bağlı kendi verilerin). İşlem denetim günlüğüne yazılır.`
+          : "Hafif kişisel paket: yalnızca SENİN hesabına ait kayıtlar, dosyalar, notlar, mesajlar ve yorumların.";
       seciliK.etiket.querySelector("small").textContent = secilenler.size
         ? `${secilenler.size} üye seçili. Yalnızca onların kayıtları ve dosyaları pakete girer (notlar hariç).`
         : "Üyeleri arayıp işaretle; yalnızca onların kayıtları ve dosyaları pakete girer (notlar hariç).";
@@ -246,7 +249,7 @@ async function kur() {
     tumuDugme.querySelector("span").textContent = [...kutular.values()].every((k) => k.girdi.checked || k.girdi.disabled) ? "Seçimi kaldır" : "Tümünü seç";
   }
   for (const k of kutular.values()) k.girdi.addEventListener("change", durumGuncelle);
-  for (const k of [benim, seciliK, tumK]) k.girdi.addEventListener("change", durumGuncelle);
+  for (const k of [benim, seciliK, tumK, kendiEkle]) k.girdi.addEventListener("change", durumGuncelle);
 
   const ilerleme = el("div", { class: "sy-ilerleme", "aria-live": "polite", hidden: true });
   const indir = dugme({ metin: "Yedeği oluştur ve indir", ikonAdi: "indir", tur: "birincil" });
@@ -281,9 +284,7 @@ async function kur() {
         kapsam = "secili";
         hedefler = [...secilenler.keys()];
         hedefAdlari = [...secilenler.values()];
-        if (benim.girdi.checked && benimId && !hedefler.includes(benimId)) { hedefler.push(benimId); hedefAdlari.push("Ben"); }
-      } else if (!benim.girdi.checked) {
-        return mesaj("Kapsam için en az bir seçenek işaretle (Benim verilerim, Seçili üyeler ya da Tüm sistem).");
+        if (kendiEkle.girdi.checked && benimId && !hedefler.includes(benimId)) { hedefler.push(benimId); hedefAdlari.push("Ben"); }
       }
       if (kapsam === "secili" && (secili.includes("notlar") || mesajlarSecili) && !hedefler.includes(benimId)) {
         return mesaj("Kişisel Notlar ve Mesajlar yalnızca kendi verilerini içerir: 'Benim verilerim'i işaretle ya da bu bileşeni kaldır.");
@@ -369,7 +370,7 @@ async function kur() {
     el("section", { class: "sy-bolum" },
       el("h2", { text: "Dışa Aktar" }),
       el("p", { class: "muted", text: "Seçtiğin bileşenler tek, tarih damgalı bir ZIP paketinde indirilir. Her işlem denetim günlüğüne kaydedilir." }),
-      adim(++no, "Kimin verileri?", ownerMi ? "Hepsi isteğe bağlıdır; birlikte işaretleyebilirsin." : null, ...kapsamIcerik),
+      adim(++no, "Hangi yedek?", ownerMi ? "Üç moddan birini seç. Altındaki bileşenler moda göre otomatik işaretlenir; istersen değiştirebilirsin." : null, ...kapsamIcerik),
       adim(++no, "Neler pakete girsin?", null,
         el("div", { class: "sy-ustarac" }, el("span", { class: "muted", text: "İstediklerini işaretle." }), tumuDugme),
         el("div", { class: "sy-secenekler" }, bilesenKartlari),

@@ -1,0 +1,41 @@
+/* Transkript Stüdyosu + Medya ortak kota/anahtar parçaları — inline stil yok (CSP). Renkler/genişlikler JS ile CSSOM üzerinden (--renk, left/width). */
+.mk-satir { display: grid; gap: .3rem; } .mk-ust { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .3rem 1rem; }
+.mk-cubuk { width: 100%; height: .8rem; accent-color: var(--accent); } .mk-cubuk.mk-dolu { accent-color: #e5584a; }
+.mk-govde { display: grid; gap: .7rem; }
+.mk-ayar { border-top: 1px dashed var(--border); padding-top: .6rem; } .mk-ayar summary { cursor: pointer; font-weight: 600; }
+.mk-onay { display: flex; gap: .5rem; align-items: flex-start; font-size: .9rem; margin: .35rem 0; } .mk-onay input { margin-top: .2rem; }
+.mk-ozet { display: grid; gap: .3rem; margin-top: .6rem; } .mk-ozet-satir { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .2rem 1rem; border-bottom: 1px solid var(--border); padding: .25rem 0; }
+.mk-kaynak { margin: 0; display: grid; gap: .6rem; min-width: 0; } .mk-kaynak legend { font-weight: 700; padding: 0 .3rem; }
+.mk-secenek { display: flex; gap: .6rem; align-items: flex-start; padding: .55rem .7rem; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; } .mk-secenek span { display: grid; gap: .15rem; }
+.mk-kendi { display: grid; gap: .6rem; padding: .7rem; border: 1px dashed var(--border); border-radius: 10px; } .mk-kendi[hidden] { display: none; }
+.mk-durum { margin: 0; min-height: 1.1rem; }
+
+.mt-studyo { display: grid; gap: .9rem; } .mt-studyo[hidden] { display: none; }
+.mt-baslikalani { display: flex; flex-wrap: wrap; gap: .5rem; } .mt-baslik { flex: 1 1 16rem; font-weight: 700; font-size: 1.05rem; }
+.mt-meta, .mt-anahtar { margin: 0; }
+.mt-oynat { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; } .mt-oynatici { flex: 1 1 16rem; min-width: 0; width: 100%; } .mt-hiz { width: auto; min-width: 5rem; }
+.mt-arac, .mt-toplu { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; } .mt-arac .md-girdi { flex: 1 1 12rem; width: auto; }
+.mt-arasay { min-width: 4rem; }
+.mt-secenekler { display: flex; flex-wrap: wrap; gap: .3rem 1.2rem; }
+.mt-liste { display: grid; gap: .35rem; margin-top: .6rem; }
+.mt-satir { display: grid; grid-template-columns: auto auto minmax(7rem, 9rem) 1fr auto; gap: .4rem; align-items: start; padding: .4rem .5rem; border: 1px solid var(--border); border-left: 4px solid var(--renk, #94a3b8); border-radius: 10px; background: var(--bg); min-width: 0; }
+.mt-satir.mt-aktif { background: color-mix(in srgb, var(--accent) 12%, var(--bg)); outline: 2px solid var(--accent); }
+.mt-satir.mt-bulundu { box-shadow: 0 0 0 2px #f5b50066; }
+.mt-zaman { font: inherit; font-size: .8rem; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); border-radius: 8px; padding: .25rem .45rem; cursor: pointer; white-space: nowrap; min-height: 2rem; }
+.mt-kisi { font: inherit; font-size: .85rem; padding: .25rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); min-width: 0; min-height: 2rem; }
+.mt-metin { font: inherit; line-height: 1.5; border: 1px solid transparent; background: transparent; color: var(--text); resize: vertical; padding: .2rem .35rem; border-radius: 8px; min-width: 0; width: 100%; box-sizing: border-box; } .mt-metin:focus { border-color: var(--border); background: var(--card-bg); outline: none; }
+.mt-islem { display: flex; gap: .2rem; } .mt-islem button { border: 1px solid var(--border); background: var(--card-bg); color: var(--text); border-radius: 8px; min-width: 2rem; min-height: 2rem; cursor: pointer; }
+.mt-sec { width: 1.15rem; height: 1.15rem; margin-top: .45rem; }
+.mt-kizgara { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: .6rem; }
+.mt-kkart { border: 1px solid var(--border); border-top: 4px solid var(--renk); border-radius: 12px; padding: .6rem .7rem; display: grid; gap: .4rem; min-width: 0; background: var(--bg); }
+.mt-kust { display: flex; gap: .5rem; align-items: center; } .mt-nokta { width: .8rem; height: .8rem; border-radius: 50%; background: var(--renk); flex: none; } .mt-kad { min-height: 2.2rem; }
+.mt-zamanserit { position: relative; height: .7rem; border-radius: 6px; background: color-mix(in srgb, var(--muted) 18%, transparent); overflow: hidden; }
+.mt-parca { position: absolute; top: 0; bottom: 0; background: var(--renk); opacity: .9; }
+.mt-aralik { list-style: none; margin: .4rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: .3rem; max-height: 12rem; overflow: auto; }
+.mt-detay summary { cursor: pointer; font-size: .88rem; }
+.mt-tahmin .md-girdi { width: auto; }
+.mt-gecmis { display: grid; gap: .4rem; } .mt-gkayit { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .4rem; align-items: center; border: 1px solid var(--border); border-radius: 10px; padding: .5rem .7rem; } .mt-gkayit > div:first-child { display: grid; gap: .1rem; min-width: 0; }
+@media (max-width: 720px) {
+  .mt-satir { grid-template-columns: auto 1fr auto; }
+  .mt-satir .mt-kisi { grid-column: 2 / 4; } .mt-satir .mt-metin { grid-column: 1 / 4; } .mt-islem { grid-column: 3; grid-row: 1; }
+}

@@ -471,6 +471,54 @@ const OZELLIK_KATALOGU = [
     rolSutunlari: ["admin"],
     kaynak: "kapali",
   },
+  {
+    // bkz. migration 0140 — Medya araçları AYRI yetkilerdir (eskiden tek "Dönüştürücü" anahtarına bağlıydı). VARSAYILAN KAPALI; Dönüştürücü yetkisi açık olan roller migration ile açık başladı.
+    // Karar veritabanındadır (arac_yetkisi_var_mi): menü, RLS (kasa), Worker'lar ve RPC'ler aynı kaynağa bakar.
+    anahtar: "arac_transkript",
+    baslik: "Transkript Stüdyosu (Groq Whisper)",
+    aciklama: "Araçlar › Medya › Transkript: ses/videoyu konuşmacı ve zaman damgalı yazıya döker. Ses, Worker üzerinden Groq'a gider (üçüncü taraf). Günlük kota ve isteğe bağlı kendi Groq anahtarı geçerlidir. Varsayılan KAPALI.",
+    rolSutunlari: ["admin", "manager", "editor", "special_user", "user"],
+    kaynak: "kapali",
+  },
+  {
+    anahtar: "arac_medya_indir",
+    baslik: "Evrensel Medya İndirici",
+    aciklama: "Araçlar › Medya › İndirici: bağlantıdan video/ses indirme (Cobalt / yt-dlp / kurulumsuz sayfa çözümleyici). Günlük kota ve isteğe bağlı kendi çözümleyici geçerlidir. Varsayılan KAPALI.",
+    rolSutunlari: ["admin", "manager", "editor", "special_user", "user"],
+    kaynak: "kapali",
+  },
+  {
+    anahtar: "arac_medya_donustur",
+    baslik: "Ses & Video Dönüştürücü (MP3)",
+    aciklama: "Araçlar › Medya › Dönüştürücü: ses/videonun sesini tarayıcıda MP3'e küçültme. %100 istemci tarafı; veri sunucuya gitmez. Varsayılan KAPALI.",
+    rolSutunlari: ["admin", "manager", "editor", "special_user", "user"],
+    kaynak: "kapali",
+  },
+  {
+    // Aşağıdaki dört araç %100 istemci tarafıdır ve "Gelişmiş Belge ve Gizlilik Araçları" yetkisine EK olarak tek tek kapatılabilir (pdf_bol / pdf_duzenle ile aynı mantık). VARSAYILAN AÇIK.
+    anahtar: "arac_belge_goruntule",
+    baslik: "PDF & Belge Görüntüleyici Aracı",
+    aciklama: "Araçlar › PDF & Belge Çalışma Alanı › Görüntüle. Önce “Gelişmiş Belge ve Gizlilik Araçları” yetkisi gerekir; bu anahtar aracı ayrıca kapatır.",
+    rolSutunlari: ["user", "special_user", "editor", "manager", "admin"],
+  },
+  {
+    anahtar: "arac_belge_tarayici",
+    baslik: "Belge Tarayıcı & Birleştirici Aracı",
+    aciklama: "Araçlar › PDF & Belge Çalışma Alanı › Tarayıcı & Birleştirici. Önce “Gelişmiş Belge ve Gizlilik Araçları” yetkisi gerekir; bu anahtar aracı ayrıca kapatır.",
+    rolSutunlari: ["user", "special_user", "editor", "manager", "admin"],
+  },
+  {
+    anahtar: "arac_metadata",
+    baslik: "Metadata Temizleyici Aracı",
+    aciklama: "Araçlar › PDF & Belge Çalışma Alanı › Metadata Temizleyici. Önce “Gelişmiş Belge ve Gizlilik Araçları” yetkisi gerekir; bu anahtar aracı ayrıca kapatır.",
+    rolSutunlari: ["user", "special_user", "editor", "manager", "admin"],
+  },
+  {
+    anahtar: "arac_donusturucu_editor",
+    baslik: "Dönüştürücü & Belge Editörü Aracı",
+    aciklama: "Araçlar › PDF & Belge Çalışma Alanı › Dönüştürücü & Editör (PDF · DOCX · PPTX · görsel). Önce “Gelişmiş Belge ve Gizlilik Araçları” yetkisi gerekir; bu anahtar aracı ayrıca kapatır.",
+    rolSutunlari: ["user", "special_user", "editor", "manager", "admin"],
+  },
 ];
 
 /** Sıradan bir kullanıcının (owner OLMAYAN) kendi rolü için bir özelliğe

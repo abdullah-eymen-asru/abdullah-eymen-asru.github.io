@@ -104,6 +104,8 @@ const MODULES = {
   pdfbol: { src: "./pdf-bol/pdf-bol.js", role: null },
   onay: { src: "./onay-kutusu/onay-kutusu.js", role: null },
   medyadonustur: { src: "./medya-donustur/medya-donustur.js", role: null },
+  // Transkript (Groq Whisper): kendi yetki anahtarı (arac_transkript) + kota + isteğe bağlı kendi API anahtarı.
+  medyaTranskript: { src: "./medya-transkript/medya-transkript.js", role: null },
   // Evrensel Medya İndirici (açık kaynak Cobalt / yapılandırılabilir yt-dlp uç noktası; log tutmaz). Yetki Dönüştürücü ile aynı.
   medyaIndir: { src: "./medya-indir/medya-indir.js", role: null },
   // Birleşik PDF & Belge Çalışma Alanı: yerleşik kabuk (alt sekmeleri kendi modülleri doldurur) + salt-okunur belge görüntüleyici.
@@ -199,7 +201,7 @@ const NAV = [
       // artık TEK sekmede, "Görüntüle · Düzenle · Dönüştür" kategorileri altında (bkz. CALISMA_ALANI). Eski #tool-* adresleri yönlendirilir.
       { id: "tool-calisma-alani", icon: "🗂️", label: "PDF & Belge Çalışma Alanı", module: "calismaAlani", role: null, izin: "donusturucu", defaultAcilis: false },
       // Medya: dönüştürme + transkript ve (yeni) Evrensel Medya İndirici aynı çatı altında.
-      { id: "tool-medya", icon: "🎧", label: "Medya Araçları (Dönüştür · İndir)", module: "medyadonustur", role: null, izin: "donusturucu", defaultAcilis: false },
+      { id: "tool-medya", icon: "🎧", label: "Medya Araçları (Dönüştür · Transkript · İndir)", module: "medyadonustur", role: null, izin: "medya", defaultAcilis: false },
       // role:null + izin:"havastil": owner her zaman görür; diğer roller yalnızca Yetki Ayarları'nda HavaStil açıldıysa.
       { id: "tool-havastil", icon: "🌦️", label: "HavaStil (Giyim Danışmanı)", module: "havastil", role: null, izin: "havastil", defaultAcilis: false },
     ],
@@ -282,6 +284,9 @@ function gorunurMu(item, profile) {
   if (item.izin === "silmeonayi") {
     return profile.role === "owner" || (profile.role === "admin" && !!profile.izinler?.silmeOnayi);
   }
+  if (item.izin === "medya") {
+    return profile.role === "owner" || Object.values(profile.izinler?.araclar || {}).some((v) => v === true);
+  }
   if (item.izin === "donusturucu") {
     return profile.role === "owner" || !!profile.izinler?.donusturucu;
   }
@@ -306,7 +311,7 @@ async function izinleriYukle(rol) {
       .rpc("ozellik_erisimi_var_mi", { p_ozellik: anahtar, p_rol: rol })
       .then((r) => (r.error ? true : r.data !== false))
       .catch(() => true);
-  const [arsiv, kvkk, ozelIcerik, dosyaPaylasimi, akademikKutuphane, sistemDurumuAcik, pdfBolAcik, pdfDuzenleAcik, sistemYedek, donusturucu, silmeOnayi, yetkiAyarlari, havastil, izleme, duyuru] = await Promise.all([
+  const [arsiv, kvkk, ozelIcerik, dosyaPaylasimi, akademikKutuphane, sistemDurumuAcik, pdfBolAcik, pdfDuzenleAcik, aracBelgeG, aracBelgeT, aracMeta, aracDonEd, sistemYedek, donusturucu, silmeOnayi, yetkiAyarlari, havastil, izleme, duyuru, aracTranskript, aracMedyaDonustur, aracMedyaIndir] = await Promise.all([
     supabase.rpc("r2_arsiv_yetkilerim").then((r) => (r.error ? undefined : r.data)).catch(() => undefined),
     supabase.rpc("hukuki_metin_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
     ozellikSor("ozel_icerik_yonetimi"),
@@ -315,6 +320,7 @@ async function izinleriYukle(rol) {
     ozellikSor("sistem_durumu"),   // tur 14: Sistem Durumu sekmesi rol bazında kapatılabilir (varsayılan AÇIK)
     ozellikSor("pdf_bol"),
     ozellikSor("pdf_duzenle"),     // tur 19: PDF Düzenleyici ayrı anahtar         // tur 14: PDF Böl & Ayıkla ayrı anahtar (Dönüştürücü yetkisine EK olarak kapatılabilir)
+    ozellikSor("arac_belge_goruntule"), ozellikSor("arac_belge_tarayici"), ozellikSor("arac_metadata"), ozellikSor("arac_donusturucu_editor"),   // 0140: her istemci aracı ayrı kapatılabilir
     // can_export_system: varsayılan KAPALI → hata/ağ sorununda da false (kvkk ile aynı güvenli yön).
     supabase.rpc("sistem_export_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
     // can_use_converter: varsayılan KAPALI → hata/ağ sorununda da false (güvenli yön).
@@ -329,6 +335,8 @@ async function izinleriYukle(rol) {
     supabase.rpc("izleme_okuma_yonetimi_yetkili").then((r) => (r.error ? false : !!r.data)).catch(() => false),
     // duyuru_yonetimi (migration 0113): varsayılan KAPALI → hata/migration yoksa false.
     supabase.rpc("duyuru_yonetim_yetkili").then((r) => (r.error ? false : !!r.data)).catch(() => false),
+    // Medya araçları (migration 0140): her biri AYRI yetki; varsayılan KAPALI → hata/migration yoksa false.
+    ...["transkript", "medya_donustur", "medya_indir"].map((a) => supabase.rpc("arac_yetkisi_var_mi", { p_arac: a }).then((r) => (r.error ? false : !!r.data)).catch(() => false)),
   ]);
   return {
     arsiv,
@@ -340,7 +348,8 @@ async function izinleriYukle(rol) {
     havastil,
     izleme,
     duyuru,
-    ozellikler: { ozel_icerik_yonetimi: ozelIcerik, dosya_paylasimi_yonetimi: dosyaPaylasimi, akademik_kutuphane: akademikKutuphane, sistem_durumu: sistemDurumuAcik, pdf_bol: pdfBolAcik, pdf_duzenle: pdfDuzenleAcik },
+    araclar: { transkript: aracTranskript, medya_donustur: aracMedyaDonustur, medya_indir: aracMedyaIndir },
+    ozellikler: { ozel_icerik_yonetimi: ozelIcerik, dosya_paylasimi_yonetimi: dosyaPaylasimi, akademik_kutuphane: akademikKutuphane, sistem_durumu: sistemDurumuAcik, pdf_bol: pdfBolAcik, pdf_duzenle: pdfDuzenleAcik, arac_belge_goruntule: aracBelgeG, arac_belge_tarayici: aracBelgeT, arac_metadata: aracMeta, arac_donusturucu_editor: aracDonEd },
   };
 }
 
@@ -630,22 +639,24 @@ const ALT_KABUKLAR = {
   "tool-calisma-alani": {
     kategoriler: [
       { id: "goruntule", etiket: "👁️ Görüntüle", araclar: [
-        { id: "tool-belge-goruntule", etiket: "PDF & Belge Görüntüleyici", module: "belgeGoruntule" } ] },
+        { id: "tool-belge-goruntule", etiket: "PDF & Belge Görüntüleyici", module: "belgeGoruntule", ozellik: "arac_belge_goruntule" } ] },
       { id: "duzenle", etiket: "✏️ Düzenle", araclar: [
         { id: "tool-pdfduzenle", etiket: "PDF Düzenleyici", module: "pdfduzenle", ozellik: "pdf_duzenle" },
         { id: "tool-pdfbol", etiket: "PDF Böl & Ayıkla", module: "pdfbol", ozellik: "pdf_bol" },
-        { id: "tool-belge-tarayici", etiket: "Tarayıcı & Birleştirici", module: "belgeTarayici" },
-        { id: "tool-metadata", etiket: "Metadata Temizleyici", module: "metadata" } ] },
+        { id: "tool-belge-tarayici", etiket: "Tarayıcı & Birleştirici", module: "belgeTarayici", ozellik: "arac_belge_tarayici" },
+        { id: "tool-metadata", etiket: "Metadata Temizleyici", module: "metadata", ozellik: "arac_metadata" } ] },
       { id: "donustur", etiket: "🔄 Dönüştür", araclar: [
-        { id: "tool-donusturucu", etiket: "Dönüştürücü & Editör (PDF · DOCX · PPTX · görsel)", module: "donusturucu" } ] },
+        { id: "tool-donusturucu", etiket: "Dönüştürücü & Editör (PDF · DOCX · PPTX · görsel)", module: "donusturucu", ozellik: "arac_donusturucu_editor" } ] },
     ],
   },
   "tool-medya": {
     kategoriler: [
-      { id: "donustur", etiket: "🎛️ Dönüştür & Transkript", araclar: [
-        { id: "tool-medya-donustur", etiket: "Ses & Video + Transkript", module: "medyadonustur" } ] },
+      { id: "donustur", etiket: "🎛️ Ses & Video", araclar: [
+        { id: "tool-medya-donustur", etiket: "Ses & Video Dönüştürücü", module: "medyadonustur", aracIzni: "medya_donustur" } ] },
+      { id: "transkript", etiket: "📝 Transkript", araclar: [
+        { id: "tool-medya-transkript", etiket: "Transkript Stüdyosu", module: "medyaTranskript", aracIzni: "transkript" } ] },
       { id: "indir", etiket: "⬇️ Medya İndirici", araclar: [
-        { id: "tool-medya-indir", etiket: "Evrensel Medya İndirici", module: "medyaIndir" } ] },
+        { id: "tool-medya-indir", etiket: "Evrensel Medya İndirici", module: "medyaIndir", aracIzni: "medya_indir" } ] },
     ],
   },
 };
@@ -665,6 +676,7 @@ function altAracGorunurMu(arac) {
   const p = GIRIS_PROFIL;
   if (!p) return true;
   if (p.role === "owner" || isDemoMode) return true;
+  if (arac.aracIzni && p.izinler?.araclar?.[arac.aracIzni] !== true) return false;
   return !(arac.ozellik && p.izinler?.ozellikler?.[arac.ozellik] === false);
 }
 
