@@ -34,12 +34,13 @@ export { HAVASTIL_WORKER_URL };
 const VARSAYILAN_KONUM = { id: "41.008,28.978", ad: "İstanbul", lat: 41.008, lon: 28.978, ulke: "TR", ulkeAd: "Türkiye", ulkeAdEn: "Turkey", admin1: "İstanbul", il: "İstanbul", ikon: "diger" };
 const LS = { tercih: "hv_tercih2", eskiTercih: "hv_tercih", bulut: "hv_bulut", silKuyrugu: "hv_bulut_sil", aiModu: "hv_ai_modu", haberAcik: "hv_haber_acik", sekme: "hv_sekme", ai: "hv_ai3_" };
 const SEKMELER = [["bugun", "Bugün", "🏠"], ["kombin", "Kombin", "🧥"], ["plan", "Saatlik plan", "🗓️"], ["derin", "Derin analiz", "🔬"], ["gunluk", "16 gün", "📅"], ["radar", "Radar", "🛰️"], ["mevsim", "Mevsimlik eğilim", "🌍"], ["haber", "Uyarılar", "🛰️"], ["dogrula", "Veri doğrulama", "🔍"], ["ayar", "Ayarlar", "⚙️"]];
-/* v6: 10 düz sekme yerine 5 ana grup + (varsa) alt sekmeler. Hiçbir özellik kaldırılmadı; yalnızca yer değiştirdi. */
+/* v6: 10 düz sekme yerine 5 ana grup + (varsa) alt sekmeler. Hiçbir özellik kaldırılmadı; yalnızca yer değiştirdi.
+   Bir gruba tıklayınca HER ZAMAN ilk alt sekme açılır: Tahmin → Derin analiz (16 gün değil), Radar & Uyarı → önce Uyarılar. */
 const GRUPLAR = [
   { id: "g-bugun", ad: "Bugün", ikon: "🏠", alt: ["bugun"] },
   { id: "g-giyim", ad: "Kombin", ikon: "🧥", alt: ["kombin", "plan"] },
-  { id: "g-tahmin", ad: "Tahmin", ikon: "📈", alt: ["gunluk", "derin", "mevsim"] },
-  { id: "g-harita", ad: "Radar & Uyarı", ikon: "🛰️", alt: ["radar", "haber"] },
+  { id: "g-tahmin", ad: "Tahmin", ikon: "📈", alt: ["derin", "gunluk", "mevsim"] },
+  { id: "g-harita", ad: "Radar & Uyarı", ikon: "🛰️", alt: ["haber", "radar"] },
   { id: "g-ayar", ad: "Doğrulama & Ayar", ikon: "⚙️", alt: ["dogrula", "ayar"] },
 ];
 const grupBul = (sekmeId) => GRUPLAR.find((g) => g.alt.includes(sekmeId)) || GRUPLAR[0];
@@ -87,7 +88,7 @@ export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAkti
       const secili = g.id === aktifGrup.id;
       const b = el("button", { type: "button", class: "hv-sekme", role: "tab", "aria-selected": String(secili), id: `hv-${g.id}` },
         el("span", { class: "hv-sekme-ikon", "aria-hidden": "true", text: g.ikon }), el("span", { text: g.ad }), g.alt.includes("haber") && rozetSay ? el("span", { class: "hv-sekme-sayac", text: String(rozetSay) }) : null);
-      return olay(b, "click", () => kb.sekmeGit(secili ? g.alt[0] : (sonAlt[g.id] || g.alt[0])));
+      return olay(b, "click", () => kb.sekmeGit(g.alt[0]));
     }));
     altBar.hidden = aktifGrup.alt.length < 2;
     altBar.replaceChildren(...(aktifGrup.alt.length < 2 ? [] : aktifGrup.alt.map((id) => {

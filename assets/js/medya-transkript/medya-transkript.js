@@ -14,7 +14,7 @@ import { lameYukle, sesCoz, monoOrnekle, mp3Kodla, sleep, SINIR, ORNEK, PARCA_SN
 import { kotaPaneli, kaynakSecici } from "../medya-kota/medya-kota.js";
 import { RENKLER, saat, gunSaniyesi, gunSaati, kelimeSay, istatistik, tahminiAyir, dolguTemizle, anahtarKelimeler, baslikOner, metinUret } from "./transkript-mantik.js";
 
-const kok = document.getElementById("mt-kok");
+const kok = document.getElementById("ts-kok");
 const WORKER = "https://transkript-worker.aeymena.workers.dev";
 const SAYFA = 250;
 const DILLER = [["", "Otomatik algıla"], ["tr", "Türkçe"], ["en", "İngilizce"], ["de", "Almanca"], ["fr", "Fransızca"], ["es", "İspanyolca"], ["it", "İtalyanca"], ["pt", "Portekizce"], ["nl", "Felemenkçe"], ["ru", "Rusça"], ["ar", "Arapça"], ["fa", "Farsça"], ["zh", "Çince"], ["ja", "Japonca"], ["ko", "Korece"], ["hi", "Hintçe"], ["uk", "Ukraynaca"], ["pl", "Lehçe"]];
@@ -56,21 +56,21 @@ async function kur() {
   const etiket = (y, g, ip) => el("label", { class: "mi-etiket" }, y, g, ip ? el("small", { class: "md-soluk", text: ip }) : null);
 
   /* ---------------- Stüdyo ---------------- */
-  const stud = el("div", { class: "mt-studyo", hidden: true });
-  const baslikGirdi = el("input", { class: "md-girdi mt-baslik", type: "text", maxlength: "140", placeholder: "Başlık (içerikten önerilir)", "aria-label": "Transkript başlığı" });
+  const stud = el("div", { class: "ts-studyo", hidden: true });
+  const baslikGirdi = el("input", { class: "md-girdi ts-baslik", type: "text", maxlength: "140", placeholder: "Başlık (içerikten önerilir)", "aria-label": "Transkript başlığı" });
   const baslikOneri = el("button", { type: "button", class: "md-btn", text: "✨ İçerikten öner", title: "Dosya adını değil, konuşmanın içeriğini kullanır" });
-  const meta = el("p", { class: "md-soluk mt-meta" }), anahtarlar = el("p", { class: "md-soluk mt-anahtar" });
+  const meta = el("p", { class: "md-soluk ts-meta" }), anahtarlar = el("p", { class: "md-soluk ts-anahtar" });
   const geriBtn = el("button", { type: "button", class: "md-btn", text: "↩ Geri al" }); geriBtn.disabled = true;
-  const ara = el("input", { class: "md-girdi", type: "search", placeholder: "Transkriptte ara…", "aria-label": "Ara", autocomplete: "off" }), araSay = el("span", { class: "md-soluk mt-arasay" });
+  const ara = el("input", { class: "md-girdi", type: "search", placeholder: "Transkriptte ara…", "aria-label": "Ara", autocomplete: "off" }), araSay = el("span", { class: "md-soluk ts-arasay" });
   const onceki = el("button", { type: "button", class: "md-btn", text: "▲", "aria-label": "Önceki sonuç" }), sonraki = el("button", { type: "button", class: "md-btn", text: "▼", "aria-label": "Sonraki sonuç" });
   const degis = el("input", { class: "md-girdi", type: "text", placeholder: "Şununla değiştir…", "aria-label": "Değiştirilecek metin", autocomplete: "off" }), degisBtn = el("button", { type: "button", class: "md-btn", text: "Tümünü değiştir" });
   const dolguBtn = el("button", { type: "button", class: "md-btn", text: "🧹 Dolgu seslerini temizle (eee, ııı…)" });
-  const oynatici = el("audio", { controls: true, preload: "metadata", class: "mt-oynatici", "aria-label": "Kayıt" });
-  const hiz = el("select", { class: "md-girdi mt-hiz", "aria-label": "Oynatma hızı" }, ...["0.75", "1", "1.25", "1.5", "2"].map((v) => el("option", { value: v, text: `${v}×` })));
+  const oynatici = el("audio", { controls: true, preload: "metadata", class: "ts-oynatici", "aria-label": "Kayıt" });
+  const hiz = el("select", { class: "md-girdi ts-hiz", "aria-label": "Oynatma hızı" }, ...["0.75", "1", "1.25", "1.5", "2"].map((v) => el("option", { value: v, text: `${v}×` })));
   hiz.value = "1";
   const takip = el("input", { type: "checkbox", checked: true }), sesBaglaBtn = el("button", { type: "button", class: "md-btn", text: "🔗 Kayıt dosyasını bağla (oynatma için)" });
-  const liste = el("div", { class: "mt-liste", role: "list" }), sayfaYeri = el("div", { class: "mt-sayfa md-eylem" });
-  const kPanel = el("section", { class: "md-kart mt-konusmacilar" });
+  const liste = el("div", { class: "ts-liste", role: "list" }), sayfaYeri = el("div", { class: "ts-sayfa md-eylem" });
+  const kPanel = el("section", { class: "md-kart ts-konusmacilar" });
   const topluSec = el("select", { class: "md-girdi", "aria-label": "Seçili satırlara atanacak konuşmacı" }), topluBtn = el("button", { type: "button", class: "md-btn", text: "Seçililere ata" }), sondanBtn = el("button", { type: "button", class: "md-btn", text: "İlk seçiliden sona kadar ata" }), secTumBtn = el("button", { type: "button", class: "md-btn", text: "Hepsini seç / kaldır" });
   const zamanSec = el("input", { type: "checkbox", checked: true }), kSec = el("input", { type: "checkbox", checked: true }), gunSaatiSec = el("input", { type: "checkbox" });
 
@@ -85,15 +85,15 @@ async function kur() {
 
   /* ---------------- Satır listesi ---------------- */
   function satirYap(s, i) {
-    const k = el("select", { class: "mt-kisi", "aria-label": "Konuşmacı" }, el("option", { value: "", text: "—" }), ...T.konusmacilar.map((x, j) => el("option", { value: String(j), text: x.ad })));
+    const k = el("select", { class: "ts-kisi", "aria-label": "Konuşmacı" }, el("option", { value: "", text: "—" }), ...T.konusmacilar.map((x, j) => el("option", { value: String(j), text: x.ad })));
     k.value = s.k == null ? "" : String(s.k);
-    const ta = el("textarea", { class: "mt-metin", rows: Math.max(1, Math.ceil(s.m.length / 70)), "aria-label": `Satır ${i + 1} metni`, spellcheck: "false" }); ta.value = s.m;
-    const sat = el("div", { class: "mt-satir", role: "listitem", "data-i": String(i) },
-      el("input", { type: "checkbox", class: "mt-sec", "aria-label": "Satırı seç", checked: secili.has(s.id) }),
-      el("button", { type: "button", class: "mt-zaman", "data-islem": "git", title: "Buradan oynat", text: `▶ ${saat(s.b)}` }), k, ta,
-      el("span", { class: "mt-islem" }, el("button", { type: "button", "data-islem": "bol", title: "İmleçten böl", text: "✂" }), el("button", { type: "button", "data-islem": "birles", title: "Sonrakiyle birleştir", text: "⤵" }), el("button", { type: "button", "data-islem": "sil", title: "Sil", text: "🗑" })));
+    const ta = el("textarea", { class: "ts-metin", rows: Math.max(1, Math.ceil(s.m.length / 70)), "aria-label": `Satır ${i + 1} metni`, spellcheck: "false" }); ta.value = s.m;
+    const sat = el("div", { class: "ts-satir", role: "listitem", "data-i": String(i) },
+      el("input", { type: "checkbox", class: "ts-sec", "aria-label": "Satırı seç", checked: secili.has(s.id) }),
+      el("button", { type: "button", class: "ts-zaman", "data-islem": "git", title: "Buradan oynat", text: `▶ ${saat(s.b)}` }), k, ta,
+      el("span", { class: "ts-islem" }, el("button", { type: "button", "data-islem": "bol", title: "İmleçten böl", text: "✂" }), el("button", { type: "button", "data-islem": "birles", title: "Sonrakiyle birleştir", text: "⤵" }), el("button", { type: "button", "data-islem": "sil", title: "Sil", text: "🗑" })));
     sat.style.setProperty("--renk", renk(s.k));
-    if (bulunan.includes(i)) sat.classList.add("mt-bulundu");
+    if (bulunan.includes(i)) sat.classList.add("ts-bulundu");
     return sat;
   }
   function listeCiz() {
@@ -106,19 +106,19 @@ async function kur() {
       sayfaYeri.append(o, el("span", { class: "md-soluk", text: `${sayfaBas + 1}–${son} / ${T.segmentler.length}` }), n);
     }
   }
-  liste.addEventListener("input", (e) => { const sat = e.target.closest(".mt-satir"); if (!sat || !e.target.classList.contains("mt-metin")) return; const s = T.segmentler[Number(sat.dataset.i)]; s.m = e.target.value; e.target.rows = Math.max(1, Math.ceil(s.m.length / 70)); ozetGuncelle(); });
+  liste.addEventListener("input", (e) => { const sat = e.target.closest(".ts-satir"); if (!sat || !e.target.classList.contains("ts-metin")) return; const s = T.segmentler[Number(sat.dataset.i)]; s.m = e.target.value; e.target.rows = Math.max(1, Math.ceil(s.m.length / 70)); ozetGuncelle(); });
   liste.addEventListener("change", (e) => {
-    const sat = e.target.closest(".mt-satir"); if (!sat) return; const i = Number(sat.dataset.i), s = T.segmentler[i];
-    if (e.target.classList.contains("mt-sec")) { e.target.checked ? secili.add(s.id) : secili.delete(s.id); return; }
-    if (e.target.classList.contains("mt-kisi")) { kaydetGeri(); s.k = e.target.value === "" ? null : Number(e.target.value); sat.style.setProperty("--renk", renk(s.k)); konusmacilariCiz(); }
+    const sat = e.target.closest(".ts-satir"); if (!sat) return; const i = Number(sat.dataset.i), s = T.segmentler[i];
+    if (e.target.classList.contains("ts-sec")) { e.target.checked ? secili.add(s.id) : secili.delete(s.id); return; }
+    if (e.target.classList.contains("ts-kisi")) { kaydetGeri(); s.k = e.target.value === "" ? null : Number(e.target.value); sat.style.setProperty("--renk", renk(s.k)); konusmacilariCiz(); }
   });
   liste.addEventListener("click", (e) => {
-    const d = e.target.closest("[data-islem]"); if (!d) return; const sat = d.closest(".mt-satir"), i = Number(sat.dataset.i), s = T.segmentler[i];
+    const d = e.target.closest("[data-islem]"); if (!d) return; const sat = d.closest(".ts-satir"), i = Number(sat.dataset.i), s = T.segmentler[i];
     if (d.dataset.islem === "git") { if (!sesUrl) { bildir("Oynatmak için önce “Kayıt dosyasını bağla” ile dosyayı seç.", true); return; } oynatici.currentTime = s.b; oynatici.play().catch(() => {}); }
     else if (d.dataset.islem === "sil") { kaydetGeri(); T.segmentler.splice(i, 1); secili.delete(s.id); hepsiniCiz(); }
     else if (d.dataset.islem === "birles") { const n = T.segmentler[i + 1]; if (!n) return; kaydetGeri(); s.m = `${s.m} ${n.m}`.trim(); s.s = n.s; T.segmentler.splice(i + 1, 1); hepsiniCiz(); }
     else if (d.dataset.islem === "bol") {
-      const ta = sat.querySelector(".mt-metin"), p = ta.selectionStart; if (!p || p <= 0 || p >= ta.value.length) { bildir("Bölmek için metinde imleci bölünecek yere koy.", true); return; }
+      const ta = sat.querySelector(".ts-metin"), p = ta.selectionStart; if (!p || p <= 0 || p >= ta.value.length) { bildir("Bölmek için metinde imleci bölünecek yere koy.", true); return; }
       kaydetGeri(); const a = ta.value.slice(0, p).trim(), b = ta.value.slice(p).trim(), oran = a.length / (a.length + b.length || 1), orta = s.b + (s.s - s.b) * oran;
       T.segmentler.splice(i, 1, { ...s, m: a, s: orta }, yeniSeg({ b: orta, s: s.s, m: b, k: s.k })); hepsiniCiz();
     }
@@ -134,18 +134,18 @@ async function kur() {
     const ist = istatistik(T.segmentler, T.konusmacilar), toplam = Math.max(topSure(), 1);
     const satirlar = ist.map((x) => {
       const kisi = x.k == null ? null : T.konusmacilar[x.k];
-      const ad = kisi ? el("input", { class: "md-girdi mt-kad", type: "text", value: kisi.ad, maxlength: "40", "aria-label": "Konuşmacı adı" }) : el("strong", { text: "Atanmamış" });
+      const ad = kisi ? el("input", { class: "md-girdi ts-kad", type: "text", value: kisi.ad, maxlength: "40", "aria-label": "Konuşmacı adı" }) : el("strong", { text: "Atanmamış" });
       if (kisi) ad.addEventListener("change", () => { kisi.ad = ad.value.trim() || `Konuşmacı ${x.k + 1}`; listeCiz(); konusmacilariCiz(); });
       const sil = kisi ? el("button", { type: "button", class: "md-btn", text: "Kaldır", title: "Konuşmacıyı kaldır (satırları atanmamış olur)" }) : null;
       sil?.addEventListener("click", () => { kaydetGeri(); T.segmentler.forEach((s) => { if (s.k === x.k) s.k = null; else if (s.k > x.k) s.k -= 1; }); T.konusmacilar.splice(x.k, 1); hepsiniCiz(); });
-      const cizgi = el("div", { class: "mt-zamanserit", "aria-hidden": "true" });
-      for (const s of T.segmentler.filter((q) => (x.k == null ? q.k == null || !T.konusmacilar[q.k] : q.k === x.k))) { const b = el("span", { class: "mt-parca" }); b.style.left = `${(s.b / toplam) * 100}%`; b.style.width = `${Math.max(0.25, ((s.s - s.b) / toplam) * 100)}%`; cizgi.append(b); }
+      const cizgi = el("div", { class: "ts-zamanserit", "aria-hidden": "true" });
+      for (const s of T.segmentler.filter((q) => (x.k == null ? q.k == null || !T.konusmacilar[q.k] : q.k === x.k))) { const b = el("span", { class: "ts-parca" }); b.style.left = `${(s.b / toplam) * 100}%`; b.style.width = `${Math.max(0.25, ((s.s - s.b) / toplam) * 100)}%`; cizgi.append(b); }
       cizgi.style.setProperty("--renk", renk(x.k));
-      const aralikListe = x.aralik.length ? el("ul", { class: "mt-aralik" }, ...x.aralik.map((a) => el("li", {}, el("button", { type: "button", class: "mt-zaman", "data-git": String(a.b), text: `▶ ${zamanYazi(a.b)} – ${zamanYazi(a.s)}` })))) : null;
-      const kart = el("div", { class: "mt-kkart" },
-        el("div", { class: "mt-kust" }, el("span", { class: "mt-nokta" }), ad, sil),
+      const aralikListe = x.aralik.length ? el("ul", { class: "ts-aralik" }, ...x.aralik.map((a) => el("li", {}, el("button", { type: "button", class: "ts-zaman", "data-git": String(a.b), text: `▶ ${zamanYazi(a.b)} – ${zamanYazi(a.s)}` })))) : null;
+      const kart = el("div", { class: "ts-kkart" },
+        el("div", { class: "ts-kust" }, el("span", { class: "ts-nokta" }), ad, sil),
         el("p", { class: "md-soluk", text: `${saat(x.sn)} konuştu · %${Math.round(x.pay * 100)} · ${x.kelime.toLocaleString("tr-TR")} kelime · ${x.bolum} bölüm${x.wpm ? ` · ~${x.wpm} kelime/dk` : ""}` }),
-        cizgi, aralikListe ? el("details", { class: "mt-detay" }, el("summary", { text: `Konuştuğu aralıklar (${x.aralik.length})` }), aralikListe) : null);
+        cizgi, aralikListe ? el("details", { class: "ts-detay" }, el("summary", { text: `Konuştuğu aralıklar (${x.aralik.length})` }), aralikListe) : null);
       kart.style.setProperty("--renk", renk(x.k)); return kart;
     });
     const ekle = el("button", { type: "button", class: "md-btn", text: "➕ Konuşmacı ekle" });
@@ -156,8 +156,8 @@ async function kur() {
     tahmin.addEventListener("click", () => { kaydetGeri(); const n = Number(nSec.value); while (T.konusmacilar.length < n) T.konusmacilar.push({ ad: `Konuşmacı ${T.konusmacilar.length + 1}`, renk: RENKLER[T.konusmacilar.length % RENKLER.length] }); tahminiAyir(T.segmentler, n, Number(esik.value)); hepsiniCiz(); bildir("Tahmini ayrım uygulandı: duraklamalarda sıradaki konuşmacıya geçildi. Whisper konuşmacıyı tanımaz; yanlış satırları elle düzelt."); });
     kPanel.replaceChildren(el("h2", { text: "👥 Konuşmacılar" }),
       el("p", { class: "md-soluk", text: "Her satırın solundaki listeden konuşmacıyı seç; satırları işaretleyip toplu da atayabilirsin. Hangi dakika/saat aralığında konuştukları aşağıda görünür." }),
-      el("div", { class: "mt-kizgara" }, ...satirlar),
-      el("div", { class: "md-eylem" }, ekle), el("div", { class: "md-eylem mt-tahmin" }, nSec, esik, tahmin),
+      el("div", { class: "ts-kizgara" }, ...satirlar),
+      el("div", { class: "md-eylem" }, ekle), el("div", { class: "md-eylem ts-tahmin" }, nSec, esik, tahmin),
       el("p", { class: "md-soluk", text: "⚠ Otomatik ayrım yalnızca duraklamalara bakar (tahmindir). Kayıtta kimin konuştuğunu ses tonundan tanıyan ücretsiz/açık bir yöntem tarayıcıda yoktur; kesin sonuç için satırları elle ata." }));
   }
   kPanel.addEventListener("click", (e) => { const g = e.target.closest("[data-git]"); if (g && sesUrl) { oynatici.currentTime = Number(g.dataset.git); oynatici.play().catch(() => {}); } else if (g) bildir("Oynatmak için önce “Kayıt dosyasını bağla” ile dosyayı seç.", true); });
@@ -191,9 +191,9 @@ async function kur() {
   let aktifI = -1;
   oynatici.addEventListener("timeupdate", () => {
     const t = oynatici.currentTime; const i = T.segmentler.findIndex((s) => t >= s.b && t < s.s); if (i === aktifI) return; aktifI = i;
-    liste.querySelectorAll(".mt-aktif").forEach((x) => x.classList.remove("mt-aktif"));
+    liste.querySelectorAll(".ts-aktif").forEach((x) => x.classList.remove("ts-aktif"));
     if (i < 0) return; if (takip.checked && (i < sayfaBas || i >= sayfaBas + SAYFA)) { sayfaBas = Math.floor(i / SAYFA) * SAYFA; listeCiz(); }
-    const sat = liste.querySelector(`[data-i="${i}"]`); sat?.classList.add("mt-aktif"); if (takip.checked) sat?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    const sat = liste.querySelector(`[data-i="${i}"]`); sat?.classList.add("ts-aktif"); if (takip.checked) sat?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   });
   hiz.addEventListener("change", () => { oynatici.playbackRate = Number(hiz.value); });
   function sesBagla(f) { if (sesUrl) URL.revokeObjectURL(sesUrl); sesUrl = URL.createObjectURL(f); oynatici.src = sesUrl; oynatici.playbackRate = Number(hiz.value); }
@@ -226,7 +226,7 @@ async function kur() {
   }
   const dugme = (m, f, t = "") => { const b = el("button", { type: "button", class: "md-btn", text: m, title: t }); b.addEventListener("click", f); return b; };
   const disaKart = el("section", { class: "md-kart" }, el("h2", { text: "⬇ Dışa aktar" }),
-    el("div", { class: "mt-secenekler" }, el("label", { class: "mk-onay" }, zamanSec, " Zaman damgası"), el("label", { class: "mk-onay" }, kSec, " Konuşmacı adı"), el("label", { class: "mk-onay" }, gunSaatiSec, " Gün saati kullan (kayıt başlangıç saatini gir)")),
+    el("div", { class: "ts-secenekler" }, el("label", { class: "mk-onay" }, zamanSec, " Zaman damgası"), el("label", { class: "mk-onay" }, kSec, " Konuşmacı adı"), el("label", { class: "mk-onay" }, gunSaatiSec, " Gün saati kullan (kayıt başlangıç saatini gir)")),
     el("div", { class: "md-eylem" }, ...[["txt", "TXT"], ["md", "Markdown"], ["docx", "Word"], ["pdf", "PDF"], ["srt", "SRT altyazı"], ["vtt", "VTT altyazı"], ["csv", "CSV"], ["json", "JSON"]].map(([t, a]) => dugme(`⬇ ${a}`, () => disaAktar(t)))),
     el("div", { class: "md-eylem" },
       dugme("📋 Panoya kopyala", async () => { try { await navigator.clipboard.writeText(metinUret({ ...T, baslik: T.baslik || "Transkript" }, "txt", secenek())); bildir("✔ Panoya kopyalandı."); } catch { bildir("Pano erişimi reddedildi.", true); } }),
@@ -234,12 +234,12 @@ async function kur() {
       dugme("💾 Bu cihazda sakla", kaydetYerel, "Yalnızca bu tarayıcının IndexedDB'sine; sunucuya gitmez")));
 
   /* ---------------- Yerel geçmiş ---------------- */
-  const gecmisKart = el("section", { class: "md-kart" }), gecmisListe = el("div", { class: "mt-gecmis" });
+  const gecmisKart = el("section", { class: "md-kart" }), gecmisListe = el("div", { class: "ts-gecmis" });
   gecmisKart.append(el("h2", { text: "🗂 Bu cihazdaki kayıtlı transkriptler" }), el("p", { class: "md-soluk", text: "Yalnızca bu tarayıcıda saklanır (sunucuya gitmez); tarayıcı verisini silersen kaybolur. Ses dosyası saklanmaz — oynatmak için yeniden bağla." }), gecmisListe);
   async function gecmisCiz() {
     let l = []; try { l = (await gecmis.liste()) || []; } catch { gecmisListe.replaceChildren(el("p", { class: "md-soluk", text: "Yerel depolama bu tarayıcıda kullanılamıyor." })); return; }
     l.sort((a, b) => b.tarih - a.tarih);
-    gecmisListe.replaceChildren(...(l.length ? l.map((k) => el("div", { class: "mt-gkayit" }, el("div", {}, el("strong", { text: k.baslik || "Başlıksız transkript" }), el("small", { class: "md-soluk", text: `${new Date(k.tarih).toLocaleString("tr-TR")} · ${saat(k.sure)} · ${k.T.segmentler.length} satır` })),
+    gecmisListe.replaceChildren(...(l.length ? l.map((k) => el("div", { class: "ts-gkayit" }, el("div", {}, el("strong", { text: k.baslik || "Başlıksız transkript" }), el("small", { class: "md-soluk", text: `${new Date(k.tarih).toLocaleString("tr-TR")} · ${saat(k.sure)} · ${k.T.segmentler.length} satır` })),
       el("div", { class: "md-eylem" }, dugme("Aç", () => ac(k)), dugme("Sil", async () => { await gecmis.sil(k.id); gecmisCiz(); })))) : [el("p", { class: "md-soluk", text: "Henüz kayıt yok." })]));
   }
   async function kaydetYerel() { try { kayitId ||= `t${Date.now()}`; await gecmis.kaydet({ id: kayitId, baslik: T.baslik, tarih: Date.now(), sure: topSure(), T }); bildir("✔ Bu cihaza kaydedildi."); gecmisCiz(); } catch { bildir("Yerel depolamaya yazılamadı (özel pencere ya da kota).", true); } }
@@ -302,11 +302,11 @@ async function kur() {
 
   /* ---------------- Yerleşim ---------------- */
   stud.append(
-    el("section", { class: "md-kart" }, el("h2", { text: "📄 Transkript" }), el("div", { class: "mt-baslikalani" }, baslikGirdi, baslikOneri), meta, anahtarlar,
-      el("div", { class: "mt-oynat" }, oynatici, hiz), el("div", { class: "md-eylem" }, sesBaglaBtn, el("label", { class: "mk-onay" }, takip, " Oynatmayı takip et"), bagGirdi),
-      el("div", { class: "mt-arac" }, ara, onceki, sonraki, araSay), el("div", { class: "mt-arac" }, degis, degisBtn, dolguBtn, geriBtn)),
+    el("section", { class: "md-kart" }, el("h2", { text: "📄 Transkript" }), el("div", { class: "ts-baslikalani" }, baslikGirdi, baslikOneri), meta, anahtarlar,
+      el("div", { class: "ts-oynat" }, oynatici, hiz), el("div", { class: "md-eylem" }, sesBaglaBtn, el("label", { class: "mk-onay" }, takip, " Oynatmayı takip et"), bagGirdi),
+      el("div", { class: "ts-arac" }, ara, onceki, sonraki, araSay), el("div", { class: "ts-arac" }, degis, degisBtn, dolguBtn, geriBtn)),
     kPanel,
-    el("section", { class: "md-kart" }, el("div", { class: "mt-toplu md-eylem" }, topluSec, topluBtn, sondanBtn, secTumBtn), liste, sayfaYeri),
+    el("section", { class: "md-kart" }, el("div", { class: "ts-toplu md-eylem" }, topluSec, topluBtn, sondanBtn, secTumBtn), liste, sayfaYeri),
     disaKart);
   kok.classList.add("md-kok");
   kok.replaceChildren(

@@ -256,3 +256,8 @@
 .dn-pdf-metin { font-family: Arial, Helvetica, sans-serif; line-height: 1; white-space: pre; transform-origin: 0 0; }
 .dn-pdf-metin span { position: absolute; color: transparent; white-space: pre; cursor: text; transform-origin: 0 0; }
 .dn-pdf--metinsec .dn-pdf-metin span::selection { background: rgba(37, 99, 235, .35); }
+
+/* Birebir (sunucu) mod onay kutusu: tam genişlik, yatay yerleşim */
+.dn-secenekler label.dn-sunucu { grid-column: 1 / -1; flex-direction: row; align-items: flex-start; gap: 8px; padding: 10px 12px; border: 1px solid var(--border, rgba(127,127,127,.35)); border-radius: 10px; color: inherit; }
+.dn-sunucu input { margin-top: 3px; }
+.dn-sunucu small { display: block; margin-top: 2px; }

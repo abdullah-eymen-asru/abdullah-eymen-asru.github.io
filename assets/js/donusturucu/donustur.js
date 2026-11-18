@@ -17,6 +17,7 @@ import { pdfjsAl, pdfLibAl, pdfBirak, pdfAcSecenekleri } from "./pdf-yukle.js";
 import { temizHtml } from "./temizle.js";
 import { pptxOku, pptOku, pptxDenPdf, pptxSlaytGorselleri } from "./belge-pptx.js";
 import { irDenPptx, goruntulerdenPptx } from "./belge-pptx-yaz.js";
+import { sunucudaDonustur, SUNUCU_DESTEKLI, SUNUCU_HEDEFLER } from "./sunucu-donustur.js";
 
 const HTML_SABLON_CSS = "body{font-family:system-ui,Segoe UI,Roboto,sans-serif;line-height:1.6;max-width:800px;margin:2rem auto;padding:0 1rem;color:#222}img{max-width:100%;height:auto}table{border-collapse:collapse;width:100%}td,th{border:1px solid #bbb;padding:.35rem .5rem}th{background:#f1f3f5}pre{background:#f4f5f7;padding:.8rem;overflow:auto}code{font-family:ui-monospace,Consolas,monospace}blockquote{margin-left:0;padding-left:1rem;border-left:3px solid #aab}[align=center]{text-align:center}[align=right]{text-align:right}[align=justify]{text-align:justify}";
 
@@ -169,6 +170,14 @@ export async function donustur(dosya, tur, hedef, ctx = {}) {
     try { notlar = await pdfSayfaMetinleri(dosya); } catch { /* notlar isteğe bağlı */ }
     ctx.uyarilar?.push("PDF → PPTX: sayfalar slayta görüntü olarak yerleştirildi (tasarım birebir korunur, ancak slayt içindeki metin düzenlenemez). Sayfa metni konuşmacı notlarına eklendi.");
     return [{ blob: await goruntulerdenPptx(sayfalar.map((s) => s.blob), { baslik: ad, notlar, ilerle: ctx.ilerle }), ad: `${dosyaAdiTemizle(ad)}.pptx` }];
+  }
+
+  // BİREBİR MOD (isteğe bağlı, kullanıcı onaylı): ppt/pptx → pptx/pdf LibreOffice ile; diğer hedefler için ppt önce pptx'e çevrilip yerel yoldan sürer.
+  if (ctx.sunucu && SUNUCU_DESTEKLI.has(tur) && !(tur === "pptx" && hedef === "pptx")) {
+    try {
+      if (SUNUCU_HEDEFLER.has(hedef)) return [{ blob: await sunucudaDonustur(dosya, hedef, ctx), ad: `${dosyaAdiTemizle(ad)}.${hedef}` }];
+      if (tur === "ppt") { const px = new File([await sunucudaDonustur(dosya, "pptx", ctx)], `${dosyaAdiTemizle(ad)}.pptx`, { type: FORMATLAR.pptx.mime }); return await donustur(px, "pptx", hedef, { ...ctx, sunucu: false }); }
+    } catch (h) { ctx.uyarilar?.push(`Sunucuda birebir dönüştürülemedi (${h?.message || h}); yerel yöntemle devam edildi${tur === "ppt" ? " — eski .ppt yalnızca metin olarak okunabilir" : ""}.`); }
   }
 
   // PPTX / PPT kaynaklı: PDF ve slayt görselleri tasarım korunarak (canvas çizimi); diğer biçimler HTML pivotundan.

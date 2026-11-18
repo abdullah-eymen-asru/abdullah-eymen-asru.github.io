@@ -940,6 +940,7 @@ permalink: "/panel/dashboard.html"
         <button type="button" role="tab" class="ya-altsekme" id="ya-tab-kalkan" data-ya-pane="gk-kalkan-bolumu" aria-controls="gk-kalkan-bolumu" aria-selected="false" tabindex="-1">🛡️ Erişim Kalkanı</button>
         <button type="button" role="tab" class="ya-altsekme" id="ya-tab-demo" data-ya-pane="ya-pane-demo" aria-controls="ya-pane-demo" aria-selected="false" tabindex="-1">🎭 Demo Görünürlük</button>
         <button type="button" role="tab" class="ya-altsekme" id="ya-tab-uye" data-ya-pane="ya-pane-uye" aria-controls="ya-pane-uye" aria-selected="false" tabindex="-1">📤 Üye Verisi İndirme</button>
+        <button type="button" role="tab" class="ya-altsekme" id="ya-tab-medyakota" data-ya-pane="ya-pane-medyakota" aria-controls="ya-pane-medyakota" aria-selected="false" tabindex="-1">🎧 Medya Kotaları</button>
       </div>
 
       <!-- 1) Özellik matrisi. id="yetki-ayarlari" ve içindeki id'ler AYNEN korundu:
@@ -1031,6 +1032,13 @@ permalink: "/panel/dashboard.html"
         <p class="muted">Hangi rollerin (ve hangi yöneticinin) üye bilgilerini (CSV, Excel, TXT, PDF) indirebileceğini belirle ve geçmişi izle.</p>
         <div id="uye-aktarim-kok"><p class="muted">Yükleniyor...</p></div>
         <div id="uye-aktarim-mesaj" class="auth-message" hidden></div>
+      </section>
+
+      <!-- 7) Medya Kotaları (assets/js/medya-kota/kota-yonetim.js; yalnızca Site Sahibi): Transkript + Medya İndirici günlük kota aç/kapa ve limitler -->
+      <section id="ya-pane-medyakota" class="panel-section ya-pane" role="tabpanel" aria-labelledby="ya-tab-medyakota" hidden>
+        <h2>Medya Kotaları</h2>
+        <p class="muted">Transkript Stüdyosu ve Medya İndirici için günlük kota: aç/kapat, kişi başı ve tüm site limiti, kendi anahtar izni.</p>
+        <div id="ya-medyakota-kok"><p class="muted">Yükleniyor...</p></div>
       </section>
     </section>
 
@@ -1142,7 +1150,7 @@ permalink: "/panel/dashboard.html"
           <div id="md-kok" class="md-kok"><p class="muted">Yükleniyor...</p></div>
         </section>
         <section class="ca-pane" id="view-tool-medya-transkript" data-ca-pane="tool-medya-transkript" hidden>
-          <div id="mt-kok" class="mt-kok"><p class="muted">Yükleniyor...</p></div>
+          <div id="ts-kok" class="ts-kok"><p class="muted">Yükleniyor...</p></div>
         </section>
         <section class="ca-pane" id="view-tool-medya-indir" data-ca-pane="tool-medya-indir" hidden>
           <div id="mi-kok" class="mi-kok"><p class="muted">Yükleniyor...</p></div>

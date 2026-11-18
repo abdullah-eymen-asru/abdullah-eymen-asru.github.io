@@ -106,6 +106,8 @@ const MODULES = {
   medyadonustur: { src: "./medya-donustur/medya-donustur.js", role: null },
   // Transkript (Groq Whisper): kendi yetki anahtarı (arac_transkript) + kota + isteğe bağlı kendi API anahtarı.
   medyaTranskript: { src: "./medya-transkript/medya-transkript.js", role: null },
+  // Yetki Ayarları › Medya Kotaları (yalnızca Site Sahibi): günlük kota aç/kapa + limitler. Gerçek yetki SQL'de (owner_medya_kota_ayarla).
+  medyaKotaYonetim: { src: "./medya-kota/kota-yonetim.js", role: "owner" },
   // Evrensel Medya İndirici (açık kaynak Cobalt / yapılandırılabilir yt-dlp uç noktası; log tutmaz). Yetki Dönüştürücü ile aynı.
   medyaIndir: { src: "./medya-indir/medya-indir.js", role: null },
   // Birleşik PDF & Belge Çalışma Alanı: yerleşik kabuk (alt sekmeleri kendi modülleri doldurur) + salt-okunur belge görüntüleyici.
@@ -711,6 +713,22 @@ async function altAracAc(kabukId, aracId) {
     b.setAttribute("aria-selected", String(b.dataset.caArac === arac.id));
   });
   await ensureModuleLoaded(arac.module, `view-${kabukId}`);
+  yuklemeBekciKur(arac.id);
+}
+
+/** Sessiz "Yükleniyor..." takılmasına karşı bekçi: modül yüklendi ama 10 sn sonra panel hâlâ yer tutucudaysa nedeni ve "Yeniden dene" düğmesini göster. */
+function yuklemeBekciKur(aracId) {
+  setTimeout(() => {
+    const pane = altPaneBul(aracId);
+    if (!pane || pane.hidden) return;
+    const yer = [...pane.querySelectorAll("p.muted")].find((p) => /^Yükleniyor/.test(p.textContent.trim()));
+    if (!yer || pane.querySelector(".dash-modul-hata")) return;
+    console.warn(`dashboard.js: "${aracId}" paneli 10 sn sonra hâlâ yükleniyor — olası kök neden: aynı id'li ikinci bir öğe ya da yanıt vermeyen istek.`);
+    const kutu = document.createElement("div"); kutu.className = "auth-message error dash-modul-hata"; kutu.setAttribute("role", "alert");
+    const m = document.createElement("p"); m.textContent = "Bu araç beklenenden uzun sürdü ve açılamadı. Sayfayı yenileyip tekrar dene; sürerse veritabanı güncellemelerinin (SQL) uygulandığından emin ol.";
+    const d = document.createElement("button"); d.type = "button"; d.className = "btn"; d.textContent = "Yeniden dene"; d.addEventListener("click", () => window.location.reload());
+    kutu.append(m, d); pane.prepend(kutu);
+  }, 10000);
 }
 
 /** Kabuğun kategori/alt araç şeridini (bir kez) çizer. */
@@ -817,7 +835,7 @@ async function showView(viewId, moduleKey, altArac = null) {
   // Bu iki modül yalnızca Site Sahibi'nin sekmelerini doldurur (yetkili admin yalnızca Özellikler'i görür).
   // Yetki Ayarları alt sekmeleri: Site Sahibi VE Yetki Ayarları erişimi açık yönetici için HEPSİ yüklenir. Biri hata verse diğerleri etkilenmez.
   if (viewId === "sys-yetki" && GIRIS_YETKILI_YONETIM) {
-    for (const m of ["arsivIzin", "kalkan", "demoYetki", "uyeAktarimYetki"]) {
+    for (const m of ["arsivIzin", "kalkan", "demoYetki", "uyeAktarimYetki", ...(GIRIS_PROFIL_ROLU === "owner" ? ["medyaKotaYonetim"] : [])]) {
       try { await ensureModuleLoaded(m); } catch (err) { console.warn(`Yetki Ayarları paneli yüklenemedi (${m}):`, err); }
     }
   }
@@ -1013,6 +1031,7 @@ const YA_ALTSEKME_ANAHTARI = "aea_yetki_altsekme";
 function wireYetkiAltSekmeler() {
   const serit = document.getElementById("ya-altsekmeler");
   if (!serit) return;
+  if (GIRIS_PROFIL_ROLU !== "owner") { document.getElementById("ya-pane-medyakota")?.remove(); } // medya kotaları: yalnızca Site Sahibi
   if (!GIRIS_YETKILI_YONETIM) { document.getElementById("ya-pane-uye")?.remove(); } // üye verisi indirme izinleri: Site Sahibi + yetkili Yönetici
   // Owner değilse github-yonetim.js ilgili paneli DOM'dan silebilir; paneli olmayan sekmeyi at.
   const sekmeler = [...serit.querySelectorAll("[data-ya-pane]")].filter((s) => {

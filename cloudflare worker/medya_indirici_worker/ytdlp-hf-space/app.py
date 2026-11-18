@@ -5,10 +5,11 @@ Sözleşme (Worker ile):  POST /  {url, mod:"video"|"ses", kalite:"2160"|"1080"|
    url, bu servisin imzalı ve kısa ömürlü /akis adresidir (medya bu servis üzerinden akar; YouTube adresleri IP'ye bağlı olduğu için doğrudan verilemez).
 Secret: API_KEY (zorunlu; Worker'daki YTDLP_API_KEY ile aynı). İsteğe bağlı: IZINLI_ORIGIN (yoksa CORS kapalı).
 """
-import base64, hashlib, hmac, json, os, re, subprocess, time
+import asyncio, base64, hashlib, hmac, json, os, re, shutil, subprocess, tempfile, time, uuid
 from urllib.parse import urlparse
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from starlette.background import BackgroundTask
 import yt_dlp
 
 API_KEY = os.environ.get("API_KEY", "")
@@ -96,3 +97,49 @@ def akis(p: str = "", s: str = ""):
 
 @app.get("/")
 def saglik(): return {"durum": "hazir"}
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# BELGE DÖNÜŞTÜRÜCÜ (LibreOffice, açık kaynak): .ppt/.pps/.pot/.pptx/.ppsx/.potx/.odp → pptx | pdf  (slayt, şekil, resim, yazı tipi, tablo korunur)
+# POST /belge?hedef=pptx|pdf&ad=sunum.ppt    gövde = ham dosya baytları    Authorization: Bearer <API_KEY>
+# Dosya YALNIZCA bu istek süresince geçici klasörde tutulur ve yanıt bitince SİLİNİR; günlük/depolama yoktur.
+# ----------------------------------------------------------------------------------------------------------------
+BELGE_UZANTILAR = {"ppt", "pps", "pot", "pptx", "ppsx", "potx", "odp"}
+BELGE_HEDEF = {"pptx": ("pptx", 'pptx:Impress MS PowerPoint 2007 XML', "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
+               "pdf": ("pdf", "pdf:impress_pdf_Export", "application/pdf")}
+BELGE_MAX = 60 * 1024 * 1024
+BELGE_SIRA = asyncio.Semaphore(2)          # aynı anda en fazla 2 dönüştürme (ücretsiz Space belleğini korur)
+
+def _lo_calistir(girdi: str, klasor: str, filtre: str):
+    profil = os.path.join(klasor, "profil")
+    return subprocess.run(["soffice", f"-env:UserInstallation=file://{profil}", "--headless", "--norestore", "--nologo", "--nodefault",
+                           "--convert-to", filtre, "--outdir", klasor, girdi], capture_output=True, timeout=170, cwd=klasor)
+
+@app.post("/belge")
+async def belge(istek: Request, hedef: str = "pptx", ad: str = "sunum.ppt"):
+    if not API_KEY: return hata(500, "API_KEY tanımlı değil.")
+    if not hmac.compare_digest(istek.headers.get("authorization", ""), f"Bearer {API_KEY}"): return hata(401, "Yetkisiz.")
+    uz = (ad.rsplit(".", 1)[-1] if "." in ad else "").lower()
+    if uz not in BELGE_UZANTILAR or hedef not in BELGE_HEDEF: return hata(400, "Desteklenmeyen dönüşüm.")
+    try:
+        if int(istek.headers.get("content-length", "0")) > BELGE_MAX: return hata(413, "Dosya çok büyük (en fazla 60 MB).")
+    except ValueError: return hata(400, "Geçersiz istek.")
+    klasor = tempfile.mkdtemp(prefix="belge_")
+    temizle = lambda: shutil.rmtree(klasor, ignore_errors=True)
+    try:
+        girdi = os.path.join(klasor, f"{uuid.uuid4().hex}.{uz}"); boyut = 0
+        with open(girdi, "wb") as f:
+            async for parca in istek.stream():
+                boyut += len(parca)
+                if boyut > BELGE_MAX: temizle(); return hata(413, "Dosya çok büyük (en fazla 60 MB).")
+                f.write(parca)
+        if boyut < 512: temizle(); return hata(400, "Dosya boş ya da bozuk.")
+        uzanti, filtre, mime = BELGE_HEDEF[hedef]
+        async with BELGE_SIRA:
+            try: await asyncio.to_thread(_lo_calistir, girdi, klasor, filtre)
+            except subprocess.TimeoutExpired: temizle(); return hata(504, "Dönüştürme zaman aşımına uğradı (dosya çok karmaşık olabilir).")
+        cikti = os.path.splitext(girdi)[0] + "." + uzanti
+        if girdi == cikti or not os.path.exists(cikti) or os.path.getsize(cikti) < 200: temizle(); return hata(422, "Dosya dönüştürülemedi (bozuk ya da parola korumalı olabilir).")
+        return FileResponse(cikti, media_type=mime, background=BackgroundTask(temizle), headers={"Cache-Control": "no-store"})
+    except Exception:
+        temizle(); return hata(500, "Dönüştürme sırasında hata oluştu.")

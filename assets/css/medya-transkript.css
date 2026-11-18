@@ -10,32 +10,43 @@
 .mk-kendi { display: grid; gap: .6rem; padding: .7rem; border: 1px dashed var(--border); border-radius: 10px; } .mk-kendi[hidden] { display: none; }
 .mk-durum { margin: 0; min-height: 1.1rem; }
 
-.mt-studyo { display: grid; gap: .9rem; } .mt-studyo[hidden] { display: none; }
-.mt-baslikalani { display: flex; flex-wrap: wrap; gap: .5rem; } .mt-baslik { flex: 1 1 16rem; font-weight: 700; font-size: 1.05rem; }
-.mt-meta, .mt-anahtar { margin: 0; }
-.mt-oynat { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; } .mt-oynatici { flex: 1 1 16rem; min-width: 0; width: 100%; } .mt-hiz { width: auto; min-width: 5rem; }
-.mt-arac, .mt-toplu { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; } .mt-arac .md-girdi { flex: 1 1 12rem; width: auto; }
-.mt-arasay { min-width: 4rem; }
-.mt-secenekler { display: flex; flex-wrap: wrap; gap: .3rem 1.2rem; }
-.mt-liste { display: grid; gap: .35rem; margin-top: .6rem; }
-.mt-satir { display: grid; grid-template-columns: auto auto minmax(7rem, 9rem) 1fr auto; gap: .4rem; align-items: start; padding: .4rem .5rem; border: 1px solid var(--border); border-left: 4px solid var(--renk, #94a3b8); border-radius: 10px; background: var(--bg); min-width: 0; }
-.mt-satir.mt-aktif { background: color-mix(in srgb, var(--accent) 12%, var(--bg)); outline: 2px solid var(--accent); }
-.mt-satir.mt-bulundu { box-shadow: 0 0 0 2px #f5b50066; }
-.mt-zaman { font: inherit; font-size: .8rem; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); border-radius: 8px; padding: .25rem .45rem; cursor: pointer; white-space: nowrap; min-height: 2rem; }
-.mt-kisi { font: inherit; font-size: .85rem; padding: .25rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); min-width: 0; min-height: 2rem; }
-.mt-metin { font: inherit; line-height: 1.5; border: 1px solid transparent; background: transparent; color: var(--text); resize: vertical; padding: .2rem .35rem; border-radius: 8px; min-width: 0; width: 100%; box-sizing: border-box; } .mt-metin:focus { border-color: var(--border); background: var(--card-bg); outline: none; }
-.mt-islem { display: flex; gap: .2rem; } .mt-islem button { border: 1px solid var(--border); background: var(--card-bg); color: var(--text); border-radius: 8px; min-width: 2rem; min-height: 2rem; cursor: pointer; }
-.mt-sec { width: 1.15rem; height: 1.15rem; margin-top: .45rem; }
-.mt-kizgara { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: .6rem; }
-.mt-kkart { border: 1px solid var(--border); border-top: 4px solid var(--renk); border-radius: 12px; padding: .6rem .7rem; display: grid; gap: .4rem; min-width: 0; background: var(--bg); }
-.mt-kust { display: flex; gap: .5rem; align-items: center; } .mt-nokta { width: .8rem; height: .8rem; border-radius: 50%; background: var(--renk); flex: none; } .mt-kad { min-height: 2.2rem; }
-.mt-zamanserit { position: relative; height: .7rem; border-radius: 6px; background: color-mix(in srgb, var(--muted) 18%, transparent); overflow: hidden; }
-.mt-parca { position: absolute; top: 0; bottom: 0; background: var(--renk); opacity: .9; }
-.mt-aralik { list-style: none; margin: .4rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: .3rem; max-height: 12rem; overflow: auto; }
-.mt-detay summary { cursor: pointer; font-size: .88rem; }
-.mt-tahmin .md-girdi { width: auto; }
-.mt-gecmis { display: grid; gap: .4rem; } .mt-gkayit { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .4rem; align-items: center; border: 1px solid var(--border); border-radius: 10px; padding: .5rem .7rem; } .mt-gkayit > div:first-child { display: grid; gap: .1rem; min-width: 0; }
+.ts-studyo { display: grid; gap: .9rem; } .ts-studyo[hidden] { display: none; }
+.ts-baslikalani { display: flex; flex-wrap: wrap; gap: .5rem; } .ts-baslik { flex: 1 1 16rem; font-weight: 700; font-size: 1.05rem; }
+.ts-meta, .ts-anahtar { margin: 0; }
+.ts-oynat { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; } .ts-oynatici { flex: 1 1 16rem; min-width: 0; width: 100%; } .ts-hiz { width: auto; min-width: 5rem; }
+.ts-arac, .ts-toplu { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; } .ts-arac .md-girdi { flex: 1 1 12rem; width: auto; }
+.ts-arasay { min-width: 4rem; }
+.ts-secenekler { display: flex; flex-wrap: wrap; gap: .3rem 1.2rem; }
+.ts-liste { display: grid; gap: .35rem; margin-top: .6rem; }
+.ts-satir { display: grid; grid-template-columns: auto auto minmax(7rem, 9rem) 1fr auto; gap: .4rem; align-items: start; padding: .4rem .5rem; border: 1px solid var(--border); border-left: 4px solid var(--renk, #94a3b8); border-radius: 10px; background: var(--bg); min-width: 0; }
+.ts-satir.ts-aktif { background: color-mix(in srgb, var(--accent) 12%, var(--bg)); outline: 2px solid var(--accent); }
+.ts-satir.ts-bulundu { box-shadow: 0 0 0 2px #f5b50066; }
+.ts-zaman { font: inherit; font-size: .8rem; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); border-radius: 8px; padding: .25rem .45rem; cursor: pointer; white-space: nowrap; min-height: 2rem; }
+.ts-kisi { font: inherit; font-size: .85rem; padding: .25rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); min-width: 0; min-height: 2rem; }
+.ts-metin { font: inherit; line-height: 1.5; border: 1px solid transparent; background: transparent; color: var(--text); resize: vertical; padding: .2rem .35rem; border-radius: 8px; min-width: 0; width: 100%; box-sizing: border-box; } .ts-metin:focus { border-color: var(--border); background: var(--card-bg); outline: none; }
+.ts-islem { display: flex; gap: .2rem; } .ts-islem button { border: 1px solid var(--border); background: var(--card-bg); color: var(--text); border-radius: 8px; min-width: 2rem; min-height: 2rem; cursor: pointer; }
+.ts-sec { width: 1.15rem; height: 1.15rem; margin-top: .45rem; }
+.ts-kizgara { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: .6rem; }
+.ts-kkart { border: 1px solid var(--border); border-top: 4px solid var(--renk); border-radius: 12px; padding: .6rem .7rem; display: grid; gap: .4rem; min-width: 0; background: var(--bg); }
+.ts-kust { display: flex; gap: .5rem; align-items: center; } .ts-nokta { width: .8rem; height: .8rem; border-radius: 50%; background: var(--renk); flex: none; } .ts-kad { min-height: 2.2rem; }
+.ts-zamanserit { position: relative; height: .7rem; border-radius: 6px; background: color-mix(in srgb, var(--muted) 18%, transparent); overflow: hidden; }
+.ts-parca { position: absolute; top: 0; bottom: 0; background: var(--renk); opacity: .9; }
+.ts-aralik { list-style: none; margin: .4rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: .3rem; max-height: 12rem; overflow: auto; }
+.ts-detay summary { cursor: pointer; font-size: .88rem; }
+.ts-tahmin .md-girdi { width: auto; }
+.ts-gecmis { display: grid; gap: .4rem; } .ts-gkayit { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .4rem; align-items: center; border: 1px solid var(--border); border-radius: 10px; padding: .5rem .7rem; } .ts-gkayit > div:first-child { display: grid; gap: .1rem; min-width: 0; }
 @media (max-width: 720px) {
-  .mt-satir { grid-template-columns: auto 1fr auto; }
-  .mt-satir .mt-kisi { grid-column: 2 / 4; } .mt-satir .mt-metin { grid-column: 1 / 4; } .mt-islem { grid-column: 3; grid-row: 1; }
+  .ts-satir { grid-template-columns: auto 1fr auto; }
+  .ts-satir .ts-kisi { grid-column: 2 / 4; } .ts-satir .ts-metin { grid-column: 1 / 4; } .ts-islem { grid-column: 3; grid-row: 1; }
 }
+
+/* Kota kapsamı + kayıtlı anahtar özeti + Yetki Ayarları › Medya Kotaları */
+.mk-kapsam { margin: .6rem 0; padding: .55rem .75rem; border: 1px solid var(--border, rgba(127,127,127,.35)); border-radius: 10px; }
+.mk-kapsam summary { cursor: pointer; font-weight: 600; }
+.mk-kapsam strong { display: block; margin-top: .6rem; }
+.mk-liste { margin: .25rem 0 .25rem 1.1rem; padding: 0; font-size: .9rem; }
+.mk-liste li { margin: .15rem 0; }
+.mk-kayit { margin: .4rem 0; padding: .45rem .65rem; border-radius: 8px; background: rgba(127,127,127,.12); font-size: .88rem; word-break: break-word; }
+.mk-kayit:empty { display: none; }
+.mk-yonetim { display: grid; gap: 1rem; }
+.mk-yonetim details.mk-ayar { margin-top: 0; }

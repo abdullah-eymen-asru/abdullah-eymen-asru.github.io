@@ -73,6 +73,7 @@ dosyasındaki adresi de güncellemen gerekir.
 | 4.11 | `havastil_worker` | `havastil-worker` | `SUPABASE_URL`, `SUPABASE_ANON_KEY` *(+ isteğe bağlı `GROQ_MODEL`, `HABER_KAYNAKLARI`)* | `GROQ_API_KEY` *(bilerek `service_role` yok)* | — |
 | 4.12 | `transkript_worker` | `transkript-worker` | `SUPABASE_URL`, `SUPABASE_ANON_KEY` *(+ isteğe bağlı `GROQ_SES_MODELI`, `GROQ_CEVIRI_MODELI`, `TRANSKRIPT_ORIGINLERI`)* | `GROQ_API_KEY` *(isteğe bağlı: boşsa yalnızca kendi anahtarını giren üyeler kullanır; bilerek `service_role` yok)* |
 | 4.13 | `medya_indirici_worker` | `medya-indirici-worker` | `SUPABASE_URL`, `SUPABASE_ANON_KEY` *(+ isteğe bağlı `YTDLP_API_URL`, `COBALT_API_URL`, `MEDYA_ORIGINLERI`)* | *(isteğe bağlı)* `YTDLP_API_KEY`, `COBALT_API_KEY` |
+| 4.14 | `belge_donusturucu_worker` | `belge-donusturucu-worker` | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `BELGE_API_URL` *(+ isteğe bağlı `BELGE_ORIGINLERI`)* | `BELGE_API_KEY` |
 
 > 💡 **"Variable mı Secret mı?" tablodaki sütunlar bir öneridir.** Kod ikisini de
 > aynı şekilde okur (`env.ADI`). Önemli olan, gizli değerlerin **Secret**
@@ -664,6 +665,23 @@ Panel: **Yedekleme & Verilerim → Depolama Durumu → 🔌 Worker anahtarları*
 Aynı Space'i **üyeler kendi hesaplarında** da kurup kendi adreslerini araçta “Kendi çözümleyicim” olarak girebilir.
 
 **Worker kurulumu:** Create Worker → ad **`medya-indirici-worker`** → kod: `cloudflare worker/medya_indirici_worker/worker.js` → Deploy → Variables and Secrets. Adres `assets/js/medya-indir/medya-indir.js` içindeki `WORKER` sabitiyle aynı olmalı. **Kapatma anahtarı:** Worker anahtarları listesinde `medya-indirici-worker`.
+
+
+### 4.14 `belge-donusturucu-worker` — Birebir sunum dönüştürme (Araçlar › PDF & Belge › Dönüştürücü › “Birebir dönüştür”)
+
+**Ne yapar?** Eski `.ppt` (ve istenirse `.pptx`) sunumları **LibreOffice** (açık kaynak) ile gerçekten açıp `.pptx` / `.pdf` olarak yeniden yazar; slayt sayfaları, şekiller, resimler, yazı tipleri ve tablolar korunur. Tarayıcı `.ppt` ikili biçiminden yalnızca düz metin okuyabildiği için bu mod olmadan eski `.ppt` dosyaları “sadece yazı” olarak döner. Bu mod **yalnızca kullanıcı kutuyu işaretlerse** çalışır; dosya Worker'da saklanmaz, Space'te işlem süresince geçici klasördedir ve hemen silinir. **Kayıt tutmaz.**
+
+**Yetki ve kota (0141):** Dönüştürücü yetkisi + günlük kota (kişi başı 20, site 300 adet/gün). Site Sahibi: **Yetki Ayarları › 🎧 Medya Kotaları**. Açma/kapama: **Sistem Yedek › Worker anahtarları › `belge-donusturucu-worker`**.
+
+| Tip | Ad | Değer | Nereden? |
+|---|---|---|---|
+| Variable | `SUPABASE_URL` | `https://<proje-ref>.supabase.co` | Bölüm 2.2 |
+| Variable | `SUPABASE_ANON_KEY` | `anon public` anahtarı | Bölüm 2.2 |
+| Variable | `BELGE_API_URL` | `https://<kullanici>-<space>.hf.space` | **4.13'teki aynı Hugging Face Space** (LibreOffice artık onun içinde) |
+| **Secret** | `BELGE_API_KEY` | Space'teki `API_KEY` ile **aynı** değer | 4.13 ile aynı anahtar |
+| Variable *(ops.)* | `BELGE_ORIGINLERI` | `https://siteadresin.com` | Kendi alan adını kullanıyorsan |
+
+**Kurulum:** (1) Space'in `Dockerfile` ve `app.py` dosyalarını bu sürümle **güncelle** (LibreOffice eklendi; ilk derleme ~10 dk). (2) Cloudflare → Workers → Create → adı **`belge-donusturucu-worker`** → `cloudflare worker/belge_donusturucu_worker/worker.js` içeriğini yapıştır → yukarıdaki değişkenleri ekle → Deploy. (3) Worker adresi farklıysa `assets/js/donusturucu/sunucu-donustur.js` içindeki `BELGE_WORKER` sabitini düzelt.
 
 ---
 

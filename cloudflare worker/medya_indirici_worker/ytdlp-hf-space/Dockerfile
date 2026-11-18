@@ -1,6 +1,7 @@
-# Hugging Face Space (SDK: Docker) — bulutta derlenir; kendi bilgisayarına Docker kurmana GEREK YOK.
+# Hugging Face Space (SDK: Docker) — medya çözümleyici (yt-dlp+ffmpeg) + belge dönüştürücü (LibreOffice, açık kaynak).
+#  — bulutta derlenir; kendi bilgisayarına Docker kurmana GEREK YOK.
 FROM python:3.12-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates libreoffice-impress fonts-crosextra-carlito fonts-crosextra-caladea fonts-liberation fonts-dejavu fonts-noto-core && rm -rf /var/lib/apt/lists/*
 RUN useradd -m -u 1000 kullanici
 USER kullanici
 WORKDIR /home/kullanici/uygulama

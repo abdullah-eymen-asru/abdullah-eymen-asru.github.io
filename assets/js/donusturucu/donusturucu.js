@@ -78,7 +78,7 @@ function gizlilikRozeti() {
   return el("div", { class: "dn-gizlilik", role: "note" },
     el("span", { "aria-hidden": "true", text: "🔒" }),
     el("span", {}, el("b", { text: "Verileriniz cihazınızdan asla dışarı çıkmaz, işlem tarayıcınızda gerçekleşir." }),
-      " Dosyalar sunucuya, Supabase'e ya da R2'ye gönderilmez; yalnızca açık kaynak kütüphane kodu indirilir."));
+      " Dosyalar Supabase'e ya da R2'ye gönderilmez; yalnızca açık kaynak kütüphane kodu indirilir. Tek istisna: sunum dönüştürmede “Birebir dönüştür (sunucuda)” kutusunu SEN işaretlersen o dosya yalnızca o dönüştürme için gönderilir ve saklanmaz."));
 }
 
 function dropzone() {
@@ -206,6 +206,14 @@ function secenekCiz(turler, h, uyum) {
     alanlar.push(sec("ayirac", "CSV ayracı", [["", "Otomatik / virgül"], [",", "Virgül ( , )"], [";", "Noktalı virgül ( ; )"], ["\t", "Sekme"], ["|", "Dikey çizgi ( | )"]], ""));
     if (h === "csv") alanlar.push(sec("bom", "UTF-8 BOM (Excel'de Türkçe karakterler)", [["1", "Ekle (önerilir)"], ["0", "Ekleme"]], "1"));
   }
+  // Sunum kaynakları: isteğe bağlı BİREBİR (sunucu) mod — açık onay kutusu; eski .ppt için neredeyse zorunludur.
+  if (turler.some((t) => t === "ppt" || t === "pptx")) {
+    const ppt = turler.includes("ppt");
+    const k = el("input", { type: "checkbox" }); k.checked = SECENEK.sunucu === "1";
+    k.addEventListener("change", () => { SECENEK.sunucu = k.checked ? "1" : "0"; });
+    alanlar.push(el("label", { class: "dn-sunucu" }, k, el("span", {}, " 🖥️ Birebir dönüştür (sunucuda, LibreOffice) — slayt, şekil, resim ve yazı tipleri korunur. ",
+      el("small", { class: "muted", text: `İşaretlersen dosyan yalnızca bu dönüştürme için kendi Hugging Face Space'ine gönderilir, saklanmaz; günlük kotan düşer.${ppt ? " Eski .ppt dosyaları işaretlenmezse yalnızca metin olarak dönüşür." : ""}` }))));
+  }
   return alanlar.length ? el("div", { class: "dn-secenekler" }, ...alanlar) : null;
 }
 
@@ -221,6 +229,7 @@ function ctxOlustur(uyarilar, isCtx) {
     olcek: s.olcek ? Number(s.olcek) : 2,
     ayirac: s.ayirac || undefined,
     bom: s.bom !== "0",
+    sunucu: s.sunucu === "1",
     parola: async (yanlis) => { const v = await formIste({ baslik: "PDF parola korumalı", aciklama: yanlis ? "Parola yanlış, tekrar dene." : "Bu PDF'i okumak için parola gerekli (parola cihazından çıkmaz).", alanlar: [{ ad: "p", etiket: "Parola", tur: "password" }], tamam: "Aç" }); return v ? v.p : null; },
   };
 }
