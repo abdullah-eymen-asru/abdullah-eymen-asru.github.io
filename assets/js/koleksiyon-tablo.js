@@ -438,7 +438,7 @@ async function koleksiyonTablosuOlustur(config) {
       rows += `
         <tr class="searchable" data-search="${escapeHtml(searchTextKucuk)}"${filtreDataAttrs}>
           <td class="col-index">${index + 1}</td>
-          <td><a class="koleksiyon-baslik-link" href="${escapeHtml(guvenliLink(item.url))}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.title)}</a></td>
+          <td><a class="koleksiyon-baslik-link" title="${escapeHtml(item.title)}" href="${escapeHtml(guvenliLink(item.url))}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.title)}</a></td>
           ${hucreler}
         </tr>`;
     });

@@ -27,7 +27,7 @@ export function kisiselVeriCiz(kok, mesaj) {
   const notlarK = kart("kv-notlar", "📝 Notlarım", "Notların, alıntıların, kaynakların ve şifreli ekleri + Yedek Kurtarma Kodu bilgisi (kod olmadan açılamaz). Başka hesapta içe aktarırken AYNI kodla açılır.");
   const akademikK = kart("kv-akademik", "📚 Akademik Kütüphanem", "Kaynak künyeleri, vurgu ve notların + PDF dosyaların (klasör yapısıyla).");
   const belgeK = kart("kv-belge", "📄 Yüklediğim belgeler", "Dosya yöneticisi ve kütüphanedeki kendi dosyaların.");
-  const yorumK = kart("kv-yorum", "💬 Yorumlarım", "Blog/proje yazılarına yazdığın yorumlar (JSON). Geri yüklemede yalnızca kendi imzanı taşıyan, zaten var olmayan yorumlar eklenir; gizleme kararları geri gelmez.", false);
+  const yorumK = kart("kv-yorum", "💬 Yorumlarım", "Blog/proje yazılarına yazdığın yorumlar (JSON). Geri yüklemede yalnızca kendi imzanı taşıyan, zaten var olmayan yorumlar eklenir; gizleme kararları geri gelmez.");
   const mesajK = kart("kv-mesaj", "💬 Mesajlarım (Yedek Kurtarma Koduyla şifreli)", "Sohbetlerin tarayıcıda çözülür ve 16 haneli Yedek Kurtarma Kodunla yeniden şifrelenir; başka hesaba taşınabilir.");
   const kodGirdi = el("input", { type: "text", id: "kv-kod", class: "sy-girdi", autocomplete: "off", autocapitalize: "characters", spellcheck: "false", maxlength: "19", inputmode: "text", "aria-label": "Yedek Kurtarma Kodu", placeholder: "XXXX-XXXX-XXXX-XXXX" });
   kodGirdi.addEventListener("input", () => { kodGirdi.value = kodBicimle(kodGirdi.value); });

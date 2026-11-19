@@ -1382,8 +1382,11 @@ main.wrap.wrap--genis { max-width: 1240px; }
 }
 
 .scroll-list tbody tr {
-  display: flex;
-  flex-wrap: wrap;
+  /* GRID (flex-wrap yerine): flex-wrap + eşit yükseklik (align-self: stretch) satırların arasına ARTAN BOŞLUK dağıtıyordu (align-content: stretch) →
+     kısa kartlarda ayraç çizgileri aşağı kayıp kartlar arasında hizasız görünüyordu. Grid'de satırlar üstten dizilir (align-content: start). */
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: start;
   border: 1px solid var(--border);
   border-radius: 12px;
   margin: 0; /* aralık grid gap'inden gelir (eskiden margin-bottom + gap çift boşluk yapıyordu) */
@@ -1430,7 +1433,9 @@ main.wrap.wrap--genis { max-width: 1240px; }
   font-size: 0.85rem;
   text-align: left;
   padding: 10px 8px 8px 0;
-  align-self: flex-start;
+  align-self: start;
+  grid-column: 1;
+  line-height: 1.73;                 /* 0.85rem × 1.73 ≈ başlığın 1.05rem × 1.4 satır yüksekliği → numara başlığın ilk satırıyla aynı hizada */
   border-bottom: none;
 }
 
@@ -1447,6 +1452,7 @@ main.wrap.wrap--genis { max-width: 1240px; }
   width: auto;
   padding: 10px 0 8px;
   min-width: 0;
+  grid-column: 2;
   border-bottom: none;
 }
 
@@ -1469,7 +1475,15 @@ main.wrap.wrap--genis { max-width: 1240px; }
   line-height: 1.4;
   overflow-wrap: break-word;
   hyphens: auto;
+  /* Uzun başlıklar en çok 2 satır gösterilir (tamamı bağlantının title'ında ve tıklayınca açılan sayfada); kartlar karmaşık görünmez. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
 }
+/* Çok sütunlu görünümde başlık alanı HER ZAMAN 2 satır yüksekliğinde: yan yana kartlarda ayraç çizgileri ve ilk alan aynı hizada başlar. */
+@media (min-width: 768px) { .koleksiyon-baslik-link { min-height: calc(2 * 1.4em); } }
 .koleksiyon-baslik-link:hover,
 .koleksiyon-baslik-link:focus-visible {
   text-decoration: underline;
@@ -1485,7 +1499,7 @@ main.wrap.wrap--genis { max-width: 1240px; }
 .scroll-list tbody tr:not(.no-results-row)::after {
   content: "";
   order: 3;
-  flex: 1 1 100%;
+  grid-column: 1 / -1;
   margin-top: 4px;
   border-bottom: 1px solid var(--border);
 }
@@ -1500,7 +1514,7 @@ main.wrap.wrap--genis { max-width: 1240px; }
    TEK bir ayraç oluyor hem de dış çerçeveyle karışıp gürültü yapmıyor. */
 .scroll-list td:nth-child(n+3) {
   order: 4;
-  flex: 1 1 100%;
+  grid-column: 1 / -1;
   display: flex;
   justify-content: space-between;
   align-items: baseline;
