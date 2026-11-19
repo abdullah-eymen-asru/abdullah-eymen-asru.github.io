@@ -33,11 +33,11 @@
 .sd-kok { display: grid; gap: 1rem; }
 .sd-ozet { display: flex; flex-wrap: wrap; gap: .8rem; align-items: center; padding: 1rem 1.1rem; border: 1px solid var(--border, #ccc); border-radius: 14px; background: var(--card-bg, var(--bg, #fff)); }
 .sd-ozet h2 { margin: 0; font-size: 1.15rem; flex: 1 1 14rem; }
-.sd-nokta { display: inline-block; width: .8rem; height: .8rem; border-radius: 50%; background: #999; margin-right: .45rem; vertical-align: middle; }
+.sd-nokta { display: inline-block; box-sizing: border-box; flex: 0 0 .8rem; width: .8rem; min-width: .8rem; height: .8rem; min-height: .8rem; border-radius: 50%; background: #999; margin-right: .45rem; margin-top: .2em; align-self: flex-start; vertical-align: middle; }
 .sd-ok .sd-nokta { background: #1f9d55; } .sd-uyari .sd-nokta { background: #e0a800; } .sd-hata .sd-nokta { background: #d64538; } .sd-yok .sd-nokta { background: #8a8a8a; }
 .sd-izgara { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(17rem, 100%), 1fr)); gap: .8rem; }
 .sd-kart { padding: .85rem 1rem; border: 1px solid var(--border, #ccc); border-radius: 14px; background: var(--card-bg, var(--bg, #fff)); display: grid; gap: .3rem; align-content: start; min-width: 0; }
-.sd-kart h3 { margin: 0; font-size: 1rem; display: flex; align-items: center; }
+.sd-kart h3 { margin: 0; font-size: 1rem; display: flex; align-items: flex-start; line-height: 1.3; overflow-wrap: anywhere; }
 .sd-kart p { margin: 0; font-size: .86rem; color: var(--muted, #666); overflow-wrap: anywhere; }
 .sd-kart .sd-deger { font-weight: 600; color: var(--text, #111); font-size: .95rem; }
 .sd-bolum-baslik { margin: .4rem 0 0; font-size: 1rem; }

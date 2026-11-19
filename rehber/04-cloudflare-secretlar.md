@@ -734,6 +734,12 @@ Aynı klasör (`ytdlp-hf-space/`) Render'da da çalışır. **İki ayrı Render 
 
 ---
 
+#### 4.10e Gatekeeper (Pages Function) günlük sınırı
+1. Supabase SQL Editor'da `0144_gatekeeper_gunluk_limit.sql` dosyasını çalıştır.
+2. Cloudflare Pages › Settings › Variables: `GK_LIMIT_URL` = sistem-yedek-worker adresin (örn. `https://sistem-yedek-worker.<hesap>.workers.dev`) → Pages'i yeniden dağıt.
+3. Yedeklerim ve verilerim › Worker anahtarları › Gatekeeper satırına günlük sınır yaz.
+- Sınır aşılınca Function **kendini atlar** (istekleri işlemeden geçirir). Pages Function workers.dev ile kesilemediği için istek yine kotaya sayılır ve kilitli sayfalar o süre **herkese açık** kalır. Kullanım analitiği 1–5 dk geriden gelir.
+
 ## 5. Cloudflare Pages ayarları
 
 Siteyi Cloudflare Pages'e bağladığında (**Workers & Pages → Create → Pages → Connect to Git**) ayarlar iki yerde durur: **Build** ve **Variables and secrets**. Pages ayarlarına sonradan:

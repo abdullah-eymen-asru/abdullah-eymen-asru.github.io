@@ -125,7 +125,8 @@ export function workerAnahtarKarti() {
 
   /** Günlük (UTC) sert sınır satırı: bugünkü kullanım / sınır, kalan hak, sınır ayarla. Sınır MUTLAKTIR: kullanım zaten 20 ise sınır 23 → 3 hak kalır. */
   function limitSatiri(s) {
-    if (!limitDestek || s.tur !== "worker" || s.korumali) return null;
+    if (!limitDestek || s.korumali) return null;
+    const gk = s.tur === "pages_function";
     const kul = kullanimVeri?.kullanim ? (kullanimVeri.kullanim[s.ad] || 0) : null;
     const lim = s.gunluk_limit ?? null;
     const doldu = lim != null && kul != null && kul >= lim;
@@ -136,7 +137,7 @@ export function workerAnahtarKarti() {
     async function yaz(deger) {
       kaydet.disabled = true; if (kaldir) kaldir.disabled = true; durum.textContent = "Kaydediliyor…";
       const { error } = await supabase.rpc("worker_limit_ayarla", { p_ad: s.ad, p_limit: deger });
-      if (error) { durum.textContent = /does not exist|PGRST202|42883|schema cache/i.test(error.message || "") ? "Önce migration 0143 çalıştırılmalı." : hataMetni(error); kaydet.disabled = false; if (kaldir) kaldir.disabled = false; return; }
+      if (error) { durum.textContent = /does not exist|PGRST202|42883|schema cache/i.test(error.message || "") ? (gk ? "Önce migration 0144 çalıştırılmalı." : "Önce migration 0143 çalıştırılmalı.") : hataMetni(error); kaydet.disabled = false; if (kaldir) kaldir.disabled = false; return; }
       await yukle();
     }
     kaydet.addEventListener("click", () => {
@@ -153,7 +154,10 @@ export function workerAnahtarKarti() {
         : `Bugün (UTC): ${kul.toLocaleString("tr-TR")} / ${lim.toLocaleString("tr-TR")} istek · ${doldu ? "hak kalmadı" : `${(lim - kul).toLocaleString("tr-TR")} hak kaldı`}`;
     return el("div", { class: "sy-wk-limit" },
       el("span", { class: doldu ? "sy-rozet sy-rozet--kritik" : "muted", text: ozet }),
-      doldu ? el("span", { class: "sy-not", text: "Sınır doldu: workers.dev adresi kesildi (kotaya sayılmaz). UTC 00:00'da ya da sınırı yükseltince 1 dk içinde kendiliğinden açılır." }) : null,
+      doldu ? el("span", { class: "sy-not", text: gk
+        ? "Sınır doldu: Gatekeeper kendini atlıyor (kilitli sayfalar bu sürede herkese AÇIK). İstekler Cloudflare kotasına yine sayılır. UTC 00:00'da ya da sınırı yükseltince kendiliğinden döner (en çok birkaç dk gecikmeyle)."
+        : "Sınır doldu: workers.dev adresi kesildi (kotaya sayılmaz). UTC 00:00'da ya da sınırı yükseltince 1 dk içinde kendiliğinden açılır." }) : null,
+      gk && lim != null ? el("span", { class: "muted sy-not", text: "Gatekeeper sınırı için Pages'te GK_LIMIT_URL (sistem-yedek-worker adresi) tanımlı olmalı; yoksa sınır uygulanmaz." }) : null,
       el("div", { class: "sy-eylemler" }, input, kaydet, kaldir, durum));
   }
 

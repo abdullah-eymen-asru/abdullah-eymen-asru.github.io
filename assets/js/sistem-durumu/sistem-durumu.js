@@ -137,6 +137,7 @@ async function kaliciKur(oturum) {
   }
   try { const k = JSON.parse(localStorage.getItem(SON) || "null"); if (k?.j && k?.z) rCiz(k.j, k.z, true); } catch { /* yok say */ }
   rBtn.addEventListener("click", async () => {
+    if (!yonetici) { rSonuc.replaceChildren(el("li", { text: "Bu sınama yalnızca Admin ve Site Sahibi içindir." })); return; }   // arayüz + Worker (sunucu) ikisi de denetler
     rBtn.disabled = true; rBtn.textContent = "Sınanıyor… (60 sn'ye kadar sürebilir)"; rSonuc.replaceChildren(el("li", { text: "Servisler uyandırılıyor…" }));
     const jeton = (await supabase.auth.getSession()).data?.session?.access_token;
     const cagri = async (url) => {

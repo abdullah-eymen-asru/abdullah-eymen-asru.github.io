@@ -49,9 +49,13 @@ export default {
     try {
       const auth = istek.headers.get("Authorization") || "";
       const yapilandirildi = env.SUPABASE_URL && env.SUPABASE_ANON_KEY && env.BELGE_API_URL && env.BELGE_API_KEY;
-      // GET /saglik : oturumlu herkes; sunucunun hazır olup olmadığını ve yeteneklerini (LibreOffice vb.) döndürür. Gizli değer yok.
+      // GET /saglik : YALNIZCA Admin / Site Sahibi (sınama Render'ı uyandırır; diğer üyeler gereksiz yere uyandıramasın); sunucunun hazır olup olmadığını ve yeteneklerini (LibreOffice vb.) döndürür. Gizli değer yok.
       if (istek.method === "GET" && yol === "/saglik") {
         if (!auth.startsWith("Bearer ")) throw new HttpHata(401, "Oturum gerekli.");
+        if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) throw new HttpHata(503, "Worker yapılandırması eksik.");
+        const yr = await rpc(env, auth, "is_admin_or_owner_gorebilir");
+        const yk = yr.ok ? await yr.json().catch(() => null) : null;
+        if (yk !== true) throw new HttpHata(403, "Bu sınama yalnızca Admin ve Site Sahibi içindir.");
         if (!yapilandirildi) return json({ yapilandirildi: false }, 200, origin);
         const t0 = Date.now();
         const r = await fetch(`${new URL(env.BELGE_API_URL).origin}/saglik`, { signal: AbortSignal.timeout(45000) }).catch(() => null);

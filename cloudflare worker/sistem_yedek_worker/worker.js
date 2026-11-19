@@ -715,12 +715,36 @@ async function limitleriUygula(env) {
   return { gun: k.gun, islenen: limitli.length, sonuc };
 }
 
+/** Bugünün (UTC) Pages Functions istek sayısı (saatlik analitikten, 5 dk önbellekli); okunamazsa null. */
+async function gatekeeperBugun(env) {
+  if (!env.CF_ACCOUNT_ID || !env.CF_API_TOKEN) return null;
+  const sv = await saatlikVeriAl(env).catch(() => ({ hata: "x" }));
+  if (sv.hata || sv.pages_okunamadi) return null;
+  return gunToplami(sv.saatlik, new Date().toISOString().slice(0, 10)).p;
+}
+
+/** HERKESE AÇIK, gizli değer yok: Gatekeeper günlük sınırı aşıldı mı? (Pages Function bunu sorar; yalnızca bir boolean döner.) */
+async function gatekeeperLimitDurum(env, cors) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return json({ asildi: false, neden: "yapılandırılmamış" }, 200, cors);
+  const r = await fetch(`${env.SUPABASE_URL}/rest/v1/worker_anahtarlari?ad=eq.gatekeeper-function&select=gunluk_limit`, {
+    headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}` },
+  }).catch(() => null);
+  const sat = r?.ok ? (await r.json().catch(() => []))[0] : null;
+  const limit = sat?.gunluk_limit ?? null;
+  if (limit == null) return json({ asildi: false, limit: null }, 200, { ...cors, "Cache-Control": "public, max-age=30" });
+  const kul = await gatekeeperBugun(env);
+  if (kul == null) return json({ asildi: false, neden: "kullanım okunamadı" }, 200, cors);   // okunamazsa açık kal
+  return json({ asildi: kul >= limit, limit }, 200, { ...cors, "Cache-Control": "public, max-age=60" });
+}
+
 /** Panel için: bugünkü Worker bazlı kullanım (yalnızca istatistik yetkilileri). */
 async function workerLimitKullanim(env, kimlik, cors) {
   if (!(await istatistikYetkiliMi(env, kimlik))) return json({ error: "Bu istatistikleri görme yetkin yok." }, 403, cors);
   if (!env.CF_ACCOUNT_ID || !env.CF_API_TOKEN) return json({ yapilandirilmadi: true }, 200, cors);
   const k = await workerGunlukKullanim(env, true);
   if (k.hata) return json({ error: k.hata }, 502, cors);
+  const gp = await gatekeeperBugun(env);                      // Pages Function (Gatekeeper) kullanımı: ayrı veri kümesi
+  if (gp != null) k.kullanim = { ...k.kullanim, "gatekeeper-function": gp };
   return json({ ...k, sert_destek: !!env.CF_WORKERS_TOKEN }, 200, cors);
 }
 
@@ -896,6 +920,8 @@ export default {
         github: !!(env.GITHUB_OWNER && env.GITHUB_REPO),
       }, 200, cors);
     }
+
+    if (istek.method === "GET" && yol === "/gatekeeper-limit/durum") return await gatekeeperLimitDurum(env, cors);
 
     if (istek.method === "POST" && yol === "/uye-temizle") {
       if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return json({ error: "Worker yapılandırması eksik (SUPABASE_URL, SUPABASE_ANON_KEY)." }, 500, cors);

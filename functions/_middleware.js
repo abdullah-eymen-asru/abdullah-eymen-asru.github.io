@@ -33,6 +33,8 @@
  *   GK_COOKIE_SECRET    (zorunlu, SECRET)  en az 32 karakter rastgele; cookie imzası için
  *   GK_COOKIE_DAKIKA    (opsiyonel) cookie ömrü, vars. 15 (1-120 arası)
  *   GK_AYAR_TTL_SN      (opsiyonel) site_ayarlari önbellek süresi, vars. 30 (5-300 arası)
+ *   GK_LIMIT_URL        (opsiyonel) sistem-yedek-worker adresi (https://…workers.dev). Panelde Gatekeeper'a günlük sınır konursa
+ *                       sınır aşılınca Function kendini atlar (istekleri işlemeden geçirir). Boşsa sınır uygulanmaz.
  *   GK_HATA_KILIT       (opsiyonel) "1" ise: ayarlar okunamazsa VE bilinen son ayar yoksa KİLİTLE.
  *                       Varsayılan: AÇIK kal (gatekeeper.js ile aynı ilke: erişilebilirlik).
  *
@@ -211,18 +213,38 @@ async function gatekeeperFonksiyonuAcikMi(env) {
   const ttl = sinirla(env.GK_AYAR_TTL_SN, 30, 5, 300) * 1000;
   if (Date.now() - fnAnahtar.t < ttl) return fnAnahtar.v;
   if (!fnAnahtarUcusta) {
-    fnAnahtarUcusta = supabaseFetch(
-      env,
-      "/rest/v1/worker_anahtarlari?ad=eq.gatekeeper-function&select=acik",
-      { headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}` } },
-      1500,
-    )
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`worker_anahtarlari ${r.status}`);
-        const satirlar = await r.json();
-        fnAnahtar = { v: !(Array.isArray(satirlar) && satirlar.length === 1 && satirlar[0].acik === false), t: Date.now() };
-        return fnAnahtar.v;
-      })
+    fnAnahtarUcusta = (async () => {
+      const r = await supabaseFetch(
+        env,
+        "/rest/v1/worker_anahtarlari?ad=eq.gatekeeper-function&select=acik,gunluk_limit",
+        { headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}` } },
+        1500,
+      );
+      if (!r.ok) {
+        // Sütun (migration 0143/0144) yoksa yalnızca "acik" ile devam et.
+        const r2 = await supabaseFetch(env, "/rest/v1/worker_anahtarlari?ad=eq.gatekeeper-function&select=acik",
+          { headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}` } }, 1500);
+        if (!r2.ok) throw new Error(`worker_anahtarlari ${r2.status}`);
+        const s2 = await r2.json();
+        return !(Array.isArray(s2) && s2.length === 1 && s2[0].acik === false);
+      }
+      const satirlar = await r.json();
+      const sat = Array.isArray(satirlar) && satirlar.length === 1 ? satirlar[0] : null;
+      if (sat && sat.acik === false) return false;                       // elle kapalı
+      // GÜNLÜK (UTC) KOTA: sınır varsa ve sistem-yedek-worker "aşıldı" diyorsa Function kendini ATLAR (istekleri işlemeden geçirir).
+      // DÜRÜST SINIR: Pages Function Cloudflare'de "kesilemez"; istek yine Function'a uğrar ve kotaya sayılır — yalnızca Supabase/cookie işi durur.
+      if (sat && sat.gunluk_limit != null && env.GK_LIMIT_URL) {
+        try {
+          const kontrol = new AbortController();
+          const z = setTimeout(() => kontrol.abort(), 1500);
+          let l;
+          try { l = await fetch(`${String(env.GK_LIMIT_URL).replace(/\/+$/, "")}/gatekeeper-limit/durum`, { signal: kontrol.signal }); } finally { clearTimeout(z); }
+          if (l.ok) { const j = await l.json(); if (j && j.asildi === true) return false; }
+        } catch { /* okunamazsa açık kal (fail-open) */ }
+      }
+      return true;
+    })()
+      .then((v) => { fnAnahtar = { v, t: Date.now() }; return v; })
       .catch(() => {
         fnAnahtar = { v: fnAnahtar.v, t: Date.now() - ttl + 5000 }; // bilinen son durumla 5 sn daha dayan
         return fnAnahtar.v;
