@@ -13,7 +13,15 @@ export const FORMATLAR = {
   txt: { ad: "Düz metin", aile: "belge", mime: "text/plain", uzanti: "txt" },
   epub: { ad: "EPUB", aile: "belge", mime: "application/epub+zip", uzanti: "epub" },
   pptx: { ad: "PowerPoint (.pptx)", aile: "belge", mime: "application/vnd.openxmlformats-officedocument.presentationml.presentation", uzanti: "pptx" },
-  ppt: { ad: "PowerPoint 97-2003 (.ppt)", aile: "belge", mime: "application/vnd.ms-powerpoint", uzanti: "ppt", cikis: false },
+  ppt: { ad: "PowerPoint 97-2003 (.ppt)", aile: "belge", mime: "application/vnd.ms-powerpoint", uzanti: "ppt", cikis: false, sunucuOnly: false },
+  // Yalnızca SUNUCU (LibreOffice) yöntemiyle okunup yazılan ofis biçimleri — tarayıcıda okuma/yazma motoru yoktur.
+  doc: { ad: "Word 97-2003 (.doc)", aile: "ofis", mime: "application/msword", uzanti: "doc", sunucuOnly: true },
+  odt: { ad: "OpenDocument Metin (.odt)", aile: "ofis", mime: "application/vnd.oasis.opendocument.text", uzanti: "odt", sunucuOnly: true },
+  rtf: { ad: "Zengin Metin (.rtf)", aile: "ofis", mime: "application/rtf", uzanti: "rtf", sunucuOnly: true },
+  xlsx: { ad: "Excel (.xlsx)", aile: "ofis", mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", uzanti: "xlsx", sunucuOnly: true },
+  xls: { ad: "Excel 97-2003 (.xls)", aile: "ofis", mime: "application/vnd.ms-excel", uzanti: "xls", sunucuOnly: true },
+  ods: { ad: "OpenDocument Hesap Tablosu (.ods)", aile: "ofis", mime: "application/vnd.oasis.opendocument.spreadsheet", uzanti: "ods", sunucuOnly: true },
+  odp: { ad: "OpenDocument Sunum (.odp)", aile: "ofis", mime: "application/vnd.oasis.opendocument.presentation", uzanti: "odp", sunucuOnly: true },
   jpg: { ad: "JPG", aile: "gorsel", mime: "image/jpeg", uzanti: "jpg" },
   png: { ad: "PNG", aile: "gorsel", mime: "image/png", uzanti: "png" },
   webp: { ad: "WebP", aile: "gorsel", mime: "image/webp", uzanti: "webp" },
@@ -31,6 +39,7 @@ export const FORMATLAR = {
 const UZANTI_HARITASI = {
   pdf: "pdf", docx: "docx", html: "html", htm: "html", xhtml: "html", md: "md", markdown: "md", mdown: "md",
   txt: "txt", text: "txt", log: "txt", epub: "epub",
+  doc: "doc", dot: "doc", odt: "odt", rtf: "rtf", xlsx: "xlsx", xlsm: "xlsx", xltx: "xlsx", xls: "xls", xlt: "xls", ods: "ods", odp: "odp",
   pptx: "pptx", pptm: "pptx", potx: "pptx", ppsx: "pptx", ppt: "ppt", pps: "ppt", pot: "ppt",
   jpg: "jpg", jpeg: "jpg", jpe: "jpg", jfif: "jpg", png: "png", webp: "webp", avif: "avif", bmp: "bmp",
   ico: "ico", cur: "ico", svg: "svg", gif: "gif", heic: "heic", heif: "heic",
@@ -40,14 +49,15 @@ const UZANTI_HARITASI = {
 /** Kod/yapılandırma dosyaları → düz metin düzenleyicide açılır (türü "txt" sayılır, dil ipucu korunur). */
 const KOD_UZANTILARI = new Set([
   "js", "mjs", "cjs", "ts", "tsx", "jsx", "css", "scss", "less", "py", "java", "c", "h", "cpp", "hpp", "cs", "go", "rs", "rb",
-  "php", "sh", "bash", "zsh", "ps1", "sql", "yml", "yaml", "toml", "ini", "cfg", "conf", "env", "tex", "rtf", "srt", "vtt", "gitignore",
+  "php", "sh", "bash", "zsh", "ps1", "sql", "yml", "yaml", "toml", "ini", "cfg", "conf", "env", "tex", "srt", "vtt", "gitignore",
 ]);
 
 const MIME_HARITASI = {
   "application/pdf": "pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
   "text/html": "html", "application/xhtml+xml": "html", "text/markdown": "md", "text/plain": "txt",
-  "application/epub+zip": "epub",
+  "application/epub+zip": "epub", "application/msword": "doc", "application/vnd.oasis.opendocument.text": "odt", "application/rtf": "rtf", "text/rtf": "rtf",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx", "application/vnd.ms-excel": "xls", "application/vnd.oasis.opendocument.spreadsheet": "ods", "application/vnd.oasis.opendocument.presentation": "odp",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx", "application/vnd.ms-powerpoint": "ppt", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/avif": "avif",
   "image/bmp": "bmp", "image/x-icon": "ico", "image/vnd.microsoft.icon": "ico", "image/svg+xml": "svg", "image/gif": "gif",
   "image/heic": "heic", "image/heif": "heic", "text/csv": "csv", "application/json": "json", "application/xml": "xml", "text/xml": "xml",
@@ -70,6 +80,7 @@ const GORSEL_HEDEFLERI = ["jpg", "png", "webp", "avif", "bmp", "ico", "svg", "pd
 export function hedefler(tur) {
   const f = FORMATLAR[tur];
   if (!f) return [];
+  if (f.sunucuOnly) return [];   // yalnızca "Sunucuda" yöntemiyle dönüşür (bkz. sunucu-matris.js)
   if (tur === "pdf") return ["docx", "pptx", "md", "html", "txt", "epub", "png", "jpg", "webp"];
   // PowerPoint: PDF'e slayt tasarımı korunarak; slayt görselleri; diğer belge biçimlerine metin/resim/tablo olarak.
   if (tur === "pptx" || tur === "ppt") return ["pdf", "docx", "md", "html", "txt", "epub", "png", "jpg", "webp", ...(tur === "ppt" ? ["pptx"] : [])];
@@ -119,6 +130,7 @@ export function cokluDegerlendir(turler) {
     return { uygun: true, aile, hedefler: ortak, birlestir: true, birlestirHedef: "pdf" };
   }
   if (aile === "pdf") return { uygun: true, aile, hedefler: ["pdf-birlestir", ...hedefler("pdf")], birlestir: true, birlestirHedef: "pdf-birlestir" };
+  if (aile === "ofis") return { uygun: true, aile, hedefler: [], birlestir: false };   // hedefler yalnızca sunucu yönteminde (arayüz doldurur)
   if (aile === "belge") {
     const ortak = BELGE_HEDEFLERI.filter((h) => farkli.every((t) => t !== h));
     return { uygun: true, aile, hedefler: ortak, birlestir: false };

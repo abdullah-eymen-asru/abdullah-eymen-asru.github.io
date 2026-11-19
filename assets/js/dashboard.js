@@ -107,7 +107,7 @@ const MODULES = {
   // Transkript (Groq Whisper): kendi yetki anahtarı (arac_transkript) + kota + isteğe bağlı kendi API anahtarı.
   medyaTranskript: { src: "./medya-transkript/medya-transkript.js", role: null },
   // Yetki Ayarları › Medya Kotaları (yalnızca Site Sahibi): günlük kota aç/kapa + limitler. Gerçek yetki SQL'de (owner_medya_kota_ayarla).
-  medyaKotaYonetim: { src: "./medya-kota/kota-yonetim.js", role: "owner" },
+  medyaKotaYonetim: { src: "./medya-kota/kota-yonetim.js", role: null },
   // Evrensel Medya İndirici (açık kaynak Cobalt / yapılandırılabilir yt-dlp uç noktası; log tutmaz). Yetki Dönüştürücü ile aynı.
   medyaIndir: { src: "./medya-indir/medya-indir.js", role: null },
   // Birleşik PDF & Belge Çalışma Alanı: yerleşik kabuk (alt sekmeleri kendi modülleri doldurur) + salt-okunur belge görüntüleyici.
@@ -313,7 +313,7 @@ async function izinleriYukle(rol) {
       .rpc("ozellik_erisimi_var_mi", { p_ozellik: anahtar, p_rol: rol })
       .then((r) => (r.error ? true : r.data !== false))
       .catch(() => true);
-  const [arsiv, kvkk, ozelIcerik, dosyaPaylasimi, akademikKutuphane, sistemDurumuAcik, pdfBolAcik, pdfDuzenleAcik, aracBelgeG, aracBelgeT, aracMeta, aracDonEd, sistemYedek, donusturucu, silmeOnayi, yetkiAyarlari, havastil, izleme, duyuru, aracTranskript, aracMedyaDonustur, aracMedyaIndir] = await Promise.all([
+  const [arsiv, kvkk, ozelIcerik, dosyaPaylasimi, akademikKutuphane, sistemDurumuAcik, pdfBolAcik, pdfDuzenleAcik, aracBelgeG, aracBelgeT, aracMeta, aracDonEd, sistemYedek, donusturucu, silmeOnayi, yetkiAyarlari, havastil, izleme, duyuru, aracTranskript, aracMedyaDonustur, aracMedyaIndir, kotaYonetim] = await Promise.all([
     supabase.rpc("r2_arsiv_yetkilerim").then((r) => (r.error ? undefined : r.data)).catch(() => undefined),
     supabase.rpc("hukuki_metin_yetkisi_var_mi").then((r) => (r.error ? false : !!r.data)).catch(() => false),
     ozellikSor("ozel_icerik_yonetimi"),
@@ -339,6 +339,8 @@ async function izinleriYukle(rol) {
     supabase.rpc("duyuru_yonetim_yetkili").then((r) => (r.error ? false : !!r.data)).catch(() => false),
     // Medya araçları (migration 0140): her biri AYRI yetki; varsayılan KAPALI → hata/migration yoksa false.
     ...["transkript", "medya_donustur", "medya_indir"].map((a) => supabase.rpc("arac_yetkisi_var_mi", { p_arac: a }).then((r) => (r.error ? false : !!r.data)).catch(() => false)),
+    // Medya Kotaları yönetimi (migration 0142): owner her zaman; admin yalnızca anahtar AÇIKSA. Varsayılan KAPALI.
+    supabase.rpc("medya_kota_yonetim_yetkili").then((r) => (r.error ? false : !!r.data)).catch(() => false),
   ]);
   return {
     arsiv,
@@ -350,6 +352,7 @@ async function izinleriYukle(rol) {
     havastil,
     izleme,
     duyuru,
+    kotaYonetim,
     araclar: { transkript: aracTranskript, medya_donustur: aracMedyaDonustur, medya_indir: aracMedyaIndir },
     ozellikler: { ozel_icerik_yonetimi: ozelIcerik, dosya_paylasimi_yonetimi: dosyaPaylasimi, akademik_kutuphane: akademikKutuphane, sistem_durumu: sistemDurumuAcik, pdf_bol: pdfBolAcik, pdf_duzenle: pdfDuzenleAcik, arac_belge_goruntule: aracBelgeG, arac_belge_tarayici: aracBelgeT, arac_metadata: aracMeta, arac_donusturucu_editor: aracDonEd },
   };
@@ -497,6 +500,7 @@ async function ensureModuleLoaded(key, viewId) {
 
 let activeViewId = null;
 let GIRIS_PROFIL_ROLU = null;
+let GIRIS_KOTA_YONETIM = false;
 /** Site Sahibi ya da Yetki Ayarları erişimi AÇIK yönetici: tüm Yetki Ayarları sekmeleri bunlar için yüklenir (gerçek sınır SQL'dedir). */
 let GIRIS_YETKILI_YONETIM = false;
 
@@ -835,7 +839,7 @@ async function showView(viewId, moduleKey, altArac = null) {
   // Bu iki modül yalnızca Site Sahibi'nin sekmelerini doldurur (yetkili admin yalnızca Özellikler'i görür).
   // Yetki Ayarları alt sekmeleri: Site Sahibi VE Yetki Ayarları erişimi açık yönetici için HEPSİ yüklenir. Biri hata verse diğerleri etkilenmez.
   if (viewId === "sys-yetki" && GIRIS_YETKILI_YONETIM) {
-    for (const m of ["arsivIzin", "kalkan", "demoYetki", "uyeAktarimYetki", ...(GIRIS_PROFIL_ROLU === "owner" ? ["medyaKotaYonetim"] : [])]) {
+    for (const m of ["arsivIzin", "kalkan", "demoYetki", "uyeAktarimYetki", ...(GIRIS_KOTA_YONETIM ? ["medyaKotaYonetim"] : [])]) {
       try { await ensureModuleLoaded(m); } catch (err) { console.warn(`Yetki Ayarları paneli yüklenemedi (${m}):`, err); }
     }
   }
@@ -1031,7 +1035,7 @@ const YA_ALTSEKME_ANAHTARI = "aea_yetki_altsekme";
 function wireYetkiAltSekmeler() {
   const serit = document.getElementById("ya-altsekmeler");
   if (!serit) return;
-  if (GIRIS_PROFIL_ROLU !== "owner") { document.getElementById("ya-pane-medyakota")?.remove(); } // medya kotaları: yalnızca Site Sahibi
+  if (!GIRIS_KOTA_YONETIM) { document.getElementById("ya-pane-medyakota")?.remove(); document.getElementById("ya-tab-medyakota")?.remove(); } // medya kotaları: Site Sahibi + yetkilendirilmiş Yönetici
   if (!GIRIS_YETKILI_YONETIM) { document.getElementById("ya-pane-uye")?.remove(); } // üye verisi indirme izinleri: Site Sahibi + yetkili Yönetici
   // Owner değilse github-yonetim.js ilgili paneli DOM'dan silebilir; paneli olmayan sekmeyi at.
   const sekmeler = [...serit.querySelectorAll("[data-ya-pane]")].filter((s) => {
@@ -1111,6 +1115,7 @@ async function init() {
 
 
   GIRIS_PROFIL_ROLU = profile.role;
+  GIRIS_KOTA_YONETIM = profile.role === "owner" || !!profile.izinler?.kotaYonetim;
   profile.izinler = await izinleriYukle(profile.role);
   GIRIS_PROFIL = profile;
   GIRIS_YETKILI_YONETIM = profile.role === "owner" || (profile.role === "admin" && !!profile.izinler?.yetkiAyarlari);

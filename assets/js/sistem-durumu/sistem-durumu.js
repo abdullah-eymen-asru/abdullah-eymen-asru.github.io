@@ -144,12 +144,75 @@ async function ciz() {
   if (!yonetici && rol) { try { const { data } = await supabase.rpc("ozellik_erisimi_var_mi", { p_ozellik: "sistem_durumu_worker", p_rol: rol }); workerIzin = data === true; } catch { workerIzin = false; } }
   workerKutu.append(sinaBtn, sinaSonuc);
 
+  /* ---- Render.com servisleri (Cobalt + yt-dlp/LibreOffice): yalnızca Site Sahibi, yalnızca düğmeyle (ücretsiz Render uykudaysa uyandırır: 30–60 sn) ---- */
+  const renderKutu = el("div", { class: "sd-kart" }, el("h3", { text: "Render.com servisleri (medya indirme + belge dönüştürme)" }),
+    el("p", { text: "Ücretsiz Render servisleri 15 dk kullanılmayınca uyur; ilk istek 30–60 sn sürer — bu NORMALDİR, kesinti sayılmaz. Sınama servisleri uyandırır ve Worker üzerinden gerçek bir çözümleme denemesi yapar (video indirmez)." }));
+  const rBtn = el("button", { type: "button", class: "sd-btn" }, "Render servislerini sına");
+  const rSonuc = el("ul", { class: "sd-liste" });
+  const rOnerisi = el("div", { class: "sd-detay" });
+  const rYaz = (ad, v) => {
+    if (!v || v.yapilandirildi === false) return el("li", { text: `${ad}: Worker'da adres tanımlı değil (rehber 4.13 / 4.14).` });
+    if (!v.ulasilabilir) return el("li", { text: `❌ ${ad}: ulaşılamadı (${v.neden || "bilinmiyor"}, ${v.ms} ms). Render panelinde servis "Failed/Suspended" mı bak; Logs sekmesini oku.` });
+    const ek = [];
+    if (v.surum) ek.push(`sürüm ${v.surum}`);
+    if ("deno" in v) ek.push(`deno ${v.deno ? "✓" : "✗ (YouTube çalışmaz → Dockerfile'ı yeniden dağıt)"}`);
+    if ("ffmpeg" in v) ek.push(`ffmpeg ${v.ffmpeg ? "✓" : "✗ (ses çıkarma çalışmaz)"}`);
+    if ("soffice" in v) ek.push(`LibreOffice ${v.soffice ? "✓" : "✗ (sunucuda belge dönüşümü çalışmaz)"}`);
+    if (v.auth_sorunu) ek.push("⚠ kimlik doğrulama sorunu: Cobalt API_AUTH_REQUIRED=1 ama geçerli anahtar yok (rehber 4.13)");
+    else if ("auth_sorunu" in v) ek.push("kimlik doğrulama sorunu yok");
+    if (v.test_kodu) ek.push(`deneme yanıtı: ${v.test_kodu}`);
+    const kotu = v.auth_sorunu || v.deno === false || v.ffmpeg === false || v.soffice === false;
+    return el("li", { text: `${kotu ? "⚠" : "✅"} ${ad}: yanıt veriyor · ${v.ms} ms${v.ms > 8000 ? " (uykudan uyanmış olabilir)" : ""} · ${ek.join(" · ")}` });
+  };
+  rBtn.addEventListener("click", async () => {
+    rBtn.disabled = true; rBtn.textContent = "Sınanıyor… (60 sn'ye kadar sürebilir)"; rSonuc.replaceChildren(el("li", { text: "Servisler uyandırılıyor…" }));
+    try {
+      const jeton = (await supabase.auth.getSession()).data?.session?.access_token;
+      const r = await fetch("https://medya-indirici-worker.aeymena.workers.dev/saglik", { headers: { Authorization: `Bearer ${jeton}` }, cache: "no-store", credentials: "omit", referrerPolicy: "no-referrer", signal: AbortSignal.timeout(110000) });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j) throw new Error(j?.hata || (r.status === 403 ? "Yetkisiz (yalnızca Site Sahibi)" : `HTTP ${r.status}`));
+      rSonuc.replaceChildren(rYaz("Cobalt çözümleyici (Render)", j.cobalt), rYaz("yt-dlp + LibreOffice servisi (Render)", j.ytdlp), el("li", { class: "muted", text: `Kontrol: ${new Date(j.zaman).toLocaleTimeString("tr-TR")}` }));
+    } catch (h) { rSonuc.replaceChildren(el("li", { text: `Sınama başarısız: ${h.name === "TimeoutError" ? "zaman aşımı (Render uyanamadı ya da Worker kapalı)" : h.message}. "Worker'ları sına" ile Worker'ın kendisine bak.` })); }
+    rBtn.disabled = false; rBtn.textContent = "Render servislerini sına";
+  });
+  renderKutu.append(rBtn, rSonuc, rOnerisi);
+
+  /* ---- Kesinti olursa ne yapmalıyım? (bileşen bileşen) ---- */
+  const rehberSatir = (baslik, ...adimlar) => el("details", { class: "sd-rehber" }, el("summary", { text: baslik }), el("ol", { class: "sd-liste" }, ...adimlar.map((a) => el("li", { text: a }))));
+  const kesintiRehberi = el("section", { class: "sd-kart" }, el("h3", { text: "Kesinti olursa ne yapmalıyım?" }),
+    el("p", { class: "muted", text: "Önce yukarıdaki kartlara bak: hangisi kırmızı/sarıysa aşağıdaki ilgili maddeyi aç." }),
+    rehberSatir("Supabase (giriş/veritabanı) kırmızı",
+      "status.supabase.com'a bak. Resmî kesintiyse bekle: site okuma önbelleğiyle ve (açıksa) çevrimdışı girişle kısıtlı çalışır, yaptığın değişiklikler kuyruğa alınır ve bağlantı gelince gönderilir.",
+      "Resmî kesinti yoksa Supabase panelinde projenin 'Paused' (ücretsiz plan 7 gün hareketsizlikte uyutur) olup olmadığına bak → Restore project.",
+      "Sürekli 'JWT/oturum' hatası varsa çıkış yapıp yeniden gir."),
+    rehberSatir("Site (GitHub Pages) açılmıyor",
+      "githubstatus.com'da 'Pages' bileşenine bak. Sorun yoksa deponun Actions sekmesinde son 'pages build and deployment' çalışmasının yeşil olduğunu doğrula.",
+      "Son yayın hatalıysa son commit'i geri al (git revert) ve yeniden gönder. Özel alan adında Settings › Pages › Custom domain doğrulamasını kontrol et."),
+    rehberSatir("Cloudflare Worker/R2 hatalı",
+      "cloudflarestatus.com'a bak. 'Worker'ları sına' ile hangi Worker'ın yanıt vermediğini gör.",
+      "Kota bitmiş olabilir (ücretsiz: günlük 100.000 istek) → Cloudflare paneli › Workers › Metrics. Gece yarısı UTC'de sıfırlanır.",
+      "Yakın zamanda dağıttıysan Workers › Deployments'tan önceki sürüme dön (Rollback)."),
+    rehberSatir("Medya indirici / belge dönüştürücü (Render) çalışmıyor",
+      "'Render servislerini sına'ya bas. İlk yanıt 60 sn'ye kadar gecikebilir (uyku) — tekrar dene.",
+      "Cobalt kartında 'kimlik doğrulama sorunu' varsa: Render › Cobalt › Environment: API_AUTH_REQUIRED=0 yap (ya da keys.json + API_KEY_URL tanımla ve aynı UUID'yi Worker'a COBALT_API_KEY olarak gir).",
+      "deno ✗ / ffmpeg ✗ / LibreOffice ✗ görürsen: Render › yt-dlp servisi › Manual Deploy › 'Clear build cache & deploy'.",
+      "YouTube özellikle başarısızsa: yt-dlp YouTube'da sık değişir → 'Clear build cache & deploy' ile güncelle. Bulut IP'leri YouTube tarafından 'bot' diye engellenebilir; bu durumda Cobalt'ı dene ya da bekle. Özel/yaş kısıtlı/DRM'li içerik indirilemez.",
+      "Render panelinde servis 'Suspended' ise aylık 750 saatlik ücretsiz süre bitmiş olabilir; yeni ayı bekle veya hesabı doğrula.",
+      "Hâlâ çözülmezse Yetki Ayarları › Worker anahtarlarından ilgili aracı geçici KAPAT (üyeler bozuk araç yerine açıklayıcı mesaj görür)."),
+    rehberSatir("HavaStil / harita verisi yok",
+      "Open-Meteo ve RainViewer kartlarına bak. Sağlayıcı kapalıysa tahmin/radar kendiliğinden döner; sitenin hatası değildir.",
+      "Groq/AI özetleri çalışmıyorsa kasadaki anahtar süresi dolmuş olabilir: HavaStil › Ayarlar'dan anahtarı yenile."),
+    rehberSatir("Hiçbiri kırmızı değil ama bir şey bozuk",
+      "Sayfayı Ctrl+F5 ile yenile; 'Bu cihazdaki veriler' bölümünden önbelleği sil.",
+      "Tarayıcı konsolunda (F12) kırmızı hata varsa ekran görüntüsüyle bildir; bekleyen işlem sayısı > 0 ise sağ alttaki düğmeden gönder."));
+
   kok.replaceChildren(ozet,
     el("h3", { class: "sd-bolum-baslik", text: "Çekirdek servisler" }), el("div", { class: "sd-izgara" }, ...kartlar.slice(0, 3)),
     el("h3", { class: "sd-bolum-baslik", text: "Bağımlı dış servisler" }), el("div", { class: "sd-izgara" }, ...kartlar.slice(3)),
     el("h3", { class: "sd-bolum-baslik", text: "Bu cihaz" }), el("div", { class: "sd-izgara" }, ...cihaz), await cihazVerileriKarti(oturum),
-    ...(yonetici || workerIzin ? [el("h3", { class: "sd-bolum-baslik", text: yonetici ? "Kotalar & Worker'lar" : "Worker sınaması" }), ...(yonetici ? [r2Yer] : []), workerKutu]
+    ...(yonetici || workerIzin ? [el("h3", { class: "sd-bolum-baslik", text: yonetici ? "Kotalar & Worker'lar" : "Worker sınaması" }), ...(yonetici ? [r2Yer] : []), workerKutu, ...(rol === "owner" ? [renderKutu] : [])]
       : [el("p", { class: "kst-alt", text: "Cloudflare Worker sınaması sistem kotasını harcadığı için varsayılan olarak yalnızca yönetici ve site sahibine açıktır; site sahibi Yetki Ayarları'ndan rolüne açabilir. Yukarıdaki kontroller herkes için ücretsizdir." })]), alt);
+  if (yonetici) kok.append(kesintiRehberi);
   if (yonetici) import("../r2-arsiv/depolama.js").then((m) => m.depolamaGostergesiKur(r2Yer, { esitle: false, sahip: rol === "owner" })).catch(() => {});
   if (yonetici) import("../sistem-yedek/r2-kota.js").then((m) => m.r2KotaKartiKur(r2Yer, { baslik: "R2 kullanımı (bu ay) — tüm kovalar" })).catch(() => {});
 }

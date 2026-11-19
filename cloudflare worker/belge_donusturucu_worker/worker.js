@@ -6,7 +6,7 @@
  * Cloudflare Worker LibreOffice çalıştıramaz; bu yüzden dosya, ÜCRETSİZ Hugging Face Space'teki /belge uç noktasına iletilir
  * (aynı Space: cloudflare worker/medya_indirici_worker/ytdlp-hf-space). Worker yalnızca kapı bekçisidir: oturum + yetki + kota + boyut.
  *
- * Uç nokta:  POST /donustur?hedef=pptx|pdf&ad=sunum.ppt     (Authorization: Bearer <Supabase JWT>; gövde = ham dosya, en çok 55 MB)
+ * Uç nokta:  POST /donustur?hedef=<biçim>&ad=dosya.<uzantı>  (Word/Excel/PowerPoint/OpenDocument/RTF/HTML/TXT/CSV/PDF)  ·  GET /saglik  ·  POST /temizle     (Authorization: Bearer <Supabase JWT>; gövde = ham dosya, en çok 55 MB)
  *   Yetki: donusturucu_yetkisi_var_mi()  ·  Kota: medya_kota_durumu('belge_donustur') önce, başarıdan sonra medya_kota_harca (iade yok).
  *   Yanıt: dönüştürülmüş dosya baytları (200) | {hata} (4xx/5xx)
  *
@@ -18,13 +18,20 @@
  */
 const VARSAYILAN_ORIGINLER = ["https://abdullah-eymen-asru.github.io", "http://127.0.0.1:5500", "http://localhost:5500"];
 const MAX_BAYT = 55 * 1024 * 1024;
-const UZANTILAR = new Set(["ppt", "pps", "pot", "pptx", "ppsx", "potx", "odp"]);
-const HEDEFLER = new Set(["pptx", "pdf"]);
+// Space'teki (ytdlp-hf-space/app.py) aile/hedef tablosuyla AYNI olmalı.
+const YAZI = new Set(["doc", "docx", "odt", "rtf", "txt", "html", "htm"]);
+const TABLO = new Set(["xls", "xlsx", "ods", "csv"]);
+const SUNUM = new Set(["ppt", "pps", "pot", "pptx", "ppsx", "potx", "odp"]);
+const HEDEF_TABLOSU = {
+  yazi: ["pdf", "docx", "doc", "odt", "rtf", "txt", "html"], tablo: ["pdf", "xlsx", "xls", "ods", "csv", "html"],
+  sunum: ["pdf", "pptx", "ppt", "odp"], pdf: ["docx", "odt", "rtf", "html", "pptx", "odp"],
+};
+const aile = (uz) => (YAZI.has(uz) ? "yazi" : TABLO.has(uz) ? "tablo" : SUNUM.has(uz) ? "sunum" : uz === "pdf" ? "pdf" : null);
 const ARAC = "belge_donustur";
 
 class HttpHata extends Error { constructor(kod, mesaj) { super(mesaj); this.kod = kod; } }
 const izinliOrigin = (env, o) => !!o && (VARSAYILAN_ORIGINLER.includes(o) || String(env.BELGE_ORIGINLERI || "").split(",").map((s) => s.trim()).includes(o));
-const cors = (o) => ({ "Access-Control-Allow-Origin": o, "Vary": "Origin", "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Allow-Headers": "Authorization, Content-Type", "Access-Control-Max-Age": "600" });
+const cors = (o) => ({ "Access-Control-Allow-Origin": o, "Vary": "Origin", "Access-Control-Allow-Methods": "GET, POST, OPTIONS", "Access-Control-Allow-Headers": "Authorization, Content-Type", "Access-Control-Max-Age": "600" });
 const json = (veri, durum, o) => new Response(JSON.stringify(veri), { status: durum, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...(o ? cors(o) : {}) } });
 
 async function rpc(env, auth, ad, govde) {
@@ -40,14 +47,33 @@ export default {
     if (istek.method === "OPTIONS") return izinliOrigin(env, origin) ? new Response(null, { status: 204, headers: cors(origin) }) : new Response(null, { status: 403 });
     if (!izinliOrigin(env, origin)) return json({ hata: "Bu kaynak için izin yok." }, 403);
     try {
-      if (istek.method !== "POST" || yol !== "/donustur") throw new HttpHata(404, "Bulunamadı.");
       const auth = istek.headers.get("Authorization") || "";
+      const yapilandirildi = env.SUPABASE_URL && env.SUPABASE_ANON_KEY && env.BELGE_API_URL && env.BELGE_API_KEY;
+      // GET /saglik : oturumlu herkes; sunucunun hazır olup olmadığını ve yeteneklerini (LibreOffice vb.) döndürür. Gizli değer yok.
+      if (istek.method === "GET" && yol === "/saglik") {
+        if (!auth.startsWith("Bearer ")) throw new HttpHata(401, "Oturum gerekli.");
+        if (!yapilandirildi) return json({ yapilandirildi: false }, 200, origin);
+        const t0 = Date.now();
+        const r = await fetch(`${new URL(env.BELGE_API_URL).origin}/saglik`, { signal: AbortSignal.timeout(45000) }).catch(() => null);
+        const j = r?.ok ? await r.json().catch(() => null) : null;
+        return json({ yapilandirildi: true, ulasilabilir: !!j, ms: Date.now() - t0, soffice: !!j?.soffice }, 200, origin);
+      }
+      // POST /temizle : kullanıcının isteğiyle sunucudaki TÜM geçici belge klasörlerini hemen siler (oturum gerekir).
+      if (istek.method === "POST" && yol === "/temizle") {
+        if (!auth.startsWith("Bearer ")) throw new HttpHata(401, "Oturum gerekli.");
+        if (!yapilandirildi) throw new HttpHata(503, "Belge dönüştürme sunucusu yapılandırılmamış.");
+        const r = await fetch(`${new URL(env.BELGE_API_URL).origin}/temizle`, { method: "POST", headers: { Authorization: `Bearer ${env.BELGE_API_KEY}` }, signal: AbortSignal.timeout(45000) }).catch(() => null);
+        if (!r?.ok) throw new HttpHata(502, "Sunucuya ulaşılamadı (uykuda olabilir). Uykudaki sunucuda zaten belge yoktur.");
+        return json({ ok: true, ...(await r.json().catch(() => ({}))) }, 200, origin);
+      }
+      if (istek.method !== "POST" || yol !== "/donustur") throw new HttpHata(404, "Bulunamadı.");
       if (!auth.startsWith("Bearer ")) throw new HttpHata(401, "Oturum gerekli.");
-      if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY || !env.BELGE_API_URL || !env.BELGE_API_KEY) throw new HttpHata(503, "Belge dönüştürme sunucusu yapılandırılmamış.");
+      if (!yapilandirildi) throw new HttpHata(503, "Belge dönüştürme sunucusu yapılandırılmamış.");
 
       const u = new URL(istek.url), hedef = u.searchParams.get("hedef") || "", ad = (u.searchParams.get("ad") || "").slice(0, 200);
       const uz = ad.includes(".") ? ad.split(".").pop().toLowerCase() : "";
-      if (!HEDEFLER.has(hedef) || !UZANTILAR.has(uz)) throw new HttpHata(400, "Desteklenmeyen dönüşüm.");
+      const fam = aile(uz);
+      if (!fam || !HEDEF_TABLOSU[fam].includes(hedef) || hedef === uz) throw new HttpHata(400, "Desteklenmeyen dönüşüm.");
       const boyut = Number(istek.headers.get("Content-Length") || 0);
       if (!Number.isFinite(boyut) || boyut < 512) throw new HttpHata(400, "Dosya boş ya da bozuk.");
       if (boyut > MAX_BAYT) throw new HttpHata(413, "Dosya çok büyük (en fazla 55 MB).");

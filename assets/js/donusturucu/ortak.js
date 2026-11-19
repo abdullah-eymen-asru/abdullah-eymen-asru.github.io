@@ -128,17 +128,34 @@ export function indir(blob, ad) {
 export function ilerlemeCubugu() {
   const bar = el("progress", { class: "dn-ilerleme-bar", max: "100", value: "0", "aria-label": "İşlem ilerlemesi" });
   const metin = el("span", { class: "dn-ilerleme-metin", role: "status", "aria-live": "polite" });
-  const kap = el("div", { class: "dn-ilerleme", hidden: true }, bar, metin);
+  const sure = el("span", { class: "dn-ilerleme-sure", "aria-hidden": "true" });
+  const kap = el("div", { class: "dn-ilerleme", hidden: true }, bar, metin, sure);
+  let t0 = 0, tahmin = 0, oran = null, zamanlayici = null;
+  const sn = (v) => { v = Math.max(0, Math.round(v)); return v >= 60 ? `${Math.floor(v / 60)} dk ${String(v % 60).padStart(2, "0")} sn` : `${v} sn`; };
+  // Süre: geçen + TAHMİNİ kalan. Yeterli ilerleme varsa gerçek hıza göre, yoksa başta verilen tahmine göre hesaplanır.
+  function sureYaz() {
+    if (kap.hidden || !t0) { sure.textContent = ""; return; }
+    const gecen = (Date.now() - t0) / 1000;
+    let kalan = null;
+    if (oran != null && oran >= 0.08 && gecen >= 2) kalan = gecen * (1 - oran) / oran;
+    else if (tahmin) kalan = Math.max(tahmin - gecen, 0);
+    sure.textContent = `Geçen ${sn(gecen)}${kalan != null ? (kalan < 3 ? " · birazdan biter" : ` · tahmini kalan ≈ ${sn(kalan)}`) : ""}`;
+  }
+  const durdur = () => { if (zamanlayici) { clearInterval(zamanlayici); zamanlayici = null; } };
   return {
     el: kap,
-    goster(m = "") { kap.hidden = false; metin.textContent = m; },
-    ayarla(oran, m) {
+    /** tahminSn: işe başlamadan bilinen kaba süre (sn). */
+    goster(m = "", tahminSn = 0) { kap.hidden = false; metin.textContent = m; if (!t0) { t0 = Date.now(); tahmin = tahminSn || 0; oran = null; } if (!zamanlayici) zamanlayici = setInterval(sureYaz, 1000); sureYaz(); },
+    ayarla(o, m) {
       kap.hidden = false;
-      if (oran == null) bar.removeAttribute("value");
-      else bar.value = Math.round(Math.max(0, Math.min(1, oran)) * 100);
+      if (!t0) { t0 = Date.now(); if (!zamanlayici) zamanlayici = setInterval(sureYaz, 1000); }
+      oran = o;
+      if (o == null) bar.removeAttribute("value");
+      else bar.value = Math.round(Math.max(0, Math.min(1, o)) * 100);
       if (m != null) metin.textContent = m;
+      sureYaz();
     },
-    gizle() { kap.hidden = true; bar.value = 0; metin.textContent = ""; },
+    gizle() { durdur(); kap.hidden = true; bar.value = 0; metin.textContent = ""; sure.textContent = ""; t0 = 0; tahmin = 0; oran = null; },
   };
 }
 

@@ -261,3 +261,11 @@
 .dn-secenekler label.dn-sunucu { grid-column: 1 / -1; flex-direction: row; align-items: flex-start; gap: 8px; padding: 10px 12px; border: 1px solid var(--border, rgba(127,127,127,.35)); border-radius: 10px; color: inherit; }
 .dn-sunucu input { margin-top: 3px; }
 .dn-sunucu small { display: block; margin-top: 2px; }
+
+/* ---- Hedef biçim netliği, yöntem seçimi, süre tahmini ---- */
+.dn-ilerleme-sure { font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.dn-ozet { margin: 10px 0 4px; padding: 10px 12px; border-radius: 10px; border: 1px dashed var(--dn-kenar, rgba(127,127,127,.5)); font-size: .92rem; overflow-wrap: anywhere; }
+.dn-ozet--secili { border-style: solid; border-color: var(--accent, #2563eb); background: color-mix(in srgb, var(--accent, #2563eb) 9%, transparent); font-weight: 600; }
+.dn-hedefler [aria-pressed="true"] { outline: 2px solid var(--accent, #2563eb); outline-offset: 1px; font-weight: 700; }
+.dn-yontem-kart .dn-mod[aria-pressed="true"] { outline: 2px solid var(--accent, #2563eb); outline-offset: 1px; }
+.dn-yontem-kart .dn-mod small { display: block; margin-top: 4px; font-weight: 400; }

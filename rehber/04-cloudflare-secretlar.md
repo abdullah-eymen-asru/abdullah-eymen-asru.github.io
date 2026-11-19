@@ -664,10 +664,45 @@ Panel: **Yedekleme & Verilerim → Depolama Durumu → 🔌 Worker anahtarları*
 4. Adres: `https://<kullanici>-<space-adi>.hf.space` → Worker'a `YTDLP_API_URL` (sonunda `/`) ve `YTDLP_API_KEY` olarak gir. Ücretsiz Space boştayken uyur (ilk istek ~30 sn).
 Aynı Space'i **üyeler kendi hesaplarında** da kurup kendi adreslerini araçta “Kendi çözümleyicim” olarak girebilir.
 
+#### Render.com ile kurulum (ücretsiz Docker Web Service) — Hugging Face yerine/yanında
+
+Aynı klasör (`ytdlp-hf-space/`) Render'da da çalışır. **İki ayrı Render servisi** olabilir (ikisi de ücretsiz): **(A) yt-dlp + LibreOffice servisi** (bu klasör) ve **(B) Cobalt** (hazır `ghcr.io/imputnet/cobalt` imajı; isteğe bağlı).
+
+**(A) yt-dlp + belge dönüştürme servisi**
+1. Render → **New → Web Service** → deponu bağla (GitHub) → **Language: Docker**.
+2. **Root Directory:** `cloudflare worker/medya_indirici_worker/ytdlp-hf-space` · **Dockerfile Path:** `./Dockerfile` · **Instance Type: Free**.
+3. **Docker Command** (Dockerfile'daki komutu ezmek istersen; boş bırakırsan Dockerfile'ınki kullanılır):
+   `python3 -m uvicorn app:app --host 0.0.0.0 --port 7860`
+4. **Environment Variables:**
+
+| Ad | Değer | Not |
+|---|---|---|
+| `API_KEY` | uzun rastgele değer (Bölüm 2.4) | Worker'daki `YTDLP_API_KEY` ve `BELGE_API_KEY` ile **aynı** olmalı |
+| `PORT` | `7860` | Docker Command'da 7860 yazdığın için Render'a bu portu söyler |
+
+5. **Deploy**. Adres: `https://<servis-adi>.onrender.com` → Worker'a `YTDLP_API_URL` (örn. `https://<servis-adi>.onrender.com/`) ve `BELGE_API_URL` (sonda `/` olmadan) olarak gir; `YTDLP_API_KEY` / `BELGE_API_KEY` = yukarıdaki `API_KEY`.
+6. **Doğrulama:** tarayıcıda `https://<servis-adi>.onrender.com/saglik` → `{"durum":"hazir", "yt_dlp":"…", "deno":true, "ffmpeg":true, "soffice":true}` görmelisin. `deno`/`ffmpeg`/`soffice` `false` ise imaj eski: **Manual Deploy → Clear build cache & deploy**.
+
+**(B) Cobalt (isteğe bağlı, Render'da)** — Render'da imaj olarak `ghcr.io/imputnet/cobalt:11` (Docker Hub/ghcr "Existing image"). Environment:
+
+| Ad | Değer |
+|---|---|
+| `API_URL` | `https://<cobalt-servisi>.onrender.com` (kendi adresi, sonda `/` yok) |
+| `API_AUTH_REQUIRED` | **`0`** (en kolay) — Worker anahtar göndermeden kullanır |
+
+> ⚠️ **Cobalt'ta `API_KEY` diye bir değişken YOKTUR** (girsen de yok sayılır). `API_AUTH_REQUIRED=1` yaparsan Cobalt her isteği reddeder ve araç “oturum gerekiyor” gibi yanlış hatalar gösterir. Anahtarlı kullanmak istersen: Render → **Secret Files** → `keys.json` = `{"<UUIDv4>": {"name": "worker", "limit": 60}}`; `API_KEY_URL=file:///etc/secrets/keys.json`; aynı UUID'yi Worker'a **Secret `COBALT_API_KEY`** olarak gir; Worker'a `COBALT_API_URL` = Cobalt adresi.
+
+**Render'a özgü notlar**
+- Ücretsiz servis **15 dk** kullanılmayınca uyur; ilk istek **30–60 sn** sürer (araç “servis uyanıyor” diye bekler). Aylık 750 saat ücretsiz süre vardır; iki servis aynı anda 7/24 açık kalamaz — yoğun olmayan servisleri uyutmak normal.
+- RAM **512 MB**: LibreOffice aynı anda tek dönüşüm yapar (sıraya alır); 60 MB üstü belgeler reddedilir.
+- YouTube sık değişir: indirme birden bozulursa Render → servis → **Manual Deploy → Clear build cache & deploy** (en güncel yt-dlp kurulur). Bulut IP'leri bazen YouTube'da “bot” sayılır; o zaman Cobalt'ı dene ya da bekle.
+- Hiçbir belge/medya diskte kalıcı tutulmaz; her iş geçici klasörde yapılır ve biter bitmez silinir. Araçlardaki **“Belleği ve sunucuyu temizle”** düğmesi sunucudaki geçici klasörleri hemen siler (`POST /temizle`).
+- Sağlık/izleme: **Sistem ve Güvenlik › Sistem Durumu › Render servislerini sına** (yalnızca Site Sahibi).
+
 **Worker kurulumu:** Create Worker → ad **`medya-indirici-worker`** → kod: `cloudflare worker/medya_indirici_worker/worker.js` → Deploy → Variables and Secrets. Adres `assets/js/medya-indir/medya-indir.js` içindeki `WORKER` sabitiyle aynı olmalı. **Kapatma anahtarı:** Worker anahtarları listesinde `medya-indirici-worker`.
 
 
-### 4.14 `belge-donusturucu-worker` — Birebir sunum dönüştürme (Araçlar › PDF & Belge › Dönüştürücü › “Birebir dönüştür”)
+### 4.14 `belge-donusturucu-worker` — Sunucuda (LibreOffice) birebir dönüştürme: Word · Excel · PowerPoint · PDF · ODF · RTF · HTML · TXT · CSV (Araçlar › PDF & Belge › Dönüştürücü › “Sunucuda (LibreOffice)” yöntemi)
 
 **Ne yapar?** Eski `.ppt` (ve istenirse `.pptx`) sunumları **LibreOffice** (açık kaynak) ile gerçekten açıp `.pptx` / `.pdf` olarak yeniden yazar; slayt sayfaları, şekiller, resimler, yazı tipleri ve tablolar korunur. Tarayıcı `.ppt` ikili biçiminden yalnızca düz metin okuyabildiği için bu mod olmadan eski `.ppt` dosyaları “sadece yazı” olarak döner. Bu mod **yalnızca kullanıcı kutuyu işaretlerse** çalışır; dosya Worker'da saklanmaz, Space'te işlem süresince geçici klasördedir ve hemen silinir. **Kayıt tutmaz.**
 
@@ -677,11 +712,13 @@ Aynı Space'i **üyeler kendi hesaplarında** da kurup kendi adreslerini araçta
 |---|---|---|---|
 | Variable | `SUPABASE_URL` | `https://<proje-ref>.supabase.co` | Bölüm 2.2 |
 | Variable | `SUPABASE_ANON_KEY` | `anon public` anahtarı | Bölüm 2.2 |
-| Variable | `BELGE_API_URL` | `https://<kullanici>-<space>.hf.space` | **4.13'teki aynı Hugging Face Space** (LibreOffice artık onun içinde) |
+| Variable | `BELGE_API_URL` | `https://<servis>.onrender.com` **veya** `https://<kullanici>-<space>.hf.space` | **4.13'teki aynı servis** (Render ya da Hugging Face; LibreOffice onun içinde) |
 | **Secret** | `BELGE_API_KEY` | Space'teki `API_KEY` ile **aynı** değer | 4.13 ile aynı anahtar |
 | Variable *(ops.)* | `BELGE_ORIGINLERI` | `https://siteadresin.com` | Kendi alan adını kullanıyorsan |
 
-**Kurulum:** (1) Space'in `Dockerfile` ve `app.py` dosyalarını bu sürümle **güncelle** (LibreOffice eklendi; ilk derleme ~10 dk). (2) Cloudflare → Workers → Create → adı **`belge-donusturucu-worker`** → `cloudflare worker/belge_donusturucu_worker/worker.js` içeriğini yapıştır → yukarıdaki değişkenleri ekle → Deploy. (3) Worker adresi farklıysa `assets/js/donusturucu/sunucu-donustur.js` içindeki `BELGE_WORKER` sabitini düzelt.
+**Yöntem seçimi:** Dönüştürücüde kullanıcı **💻 Tarayıcıda** (dosya cihazdan çıkmaz; düzen birebir olmayabilir) ya da **🖥️ Sunucuda (LibreOffice)** (en sadık; dosya yalnızca o işlem için gönderilir, saklanmaz, kota düşer) yöntemini açıkça seçer. Sunucu desteği: Word/ODT/RTF/HTML/TXT ⇄ PDF ve birbirleri, Excel/ODS/CSV ⇄ PDF ve birbirleri, PowerPoint/ODP ⇄ PDF ve birbirleri, PDF → Word/ODT/RTF/HTML/PowerPoint/ODP. (PDF → düz metin ve çapraz aileler — Word→Excel gibi — anlamsız olduğundan yoktur; PDF→TXT tarayıcı yöntemindedir.) **Belleği ve Sunucuyu Sıfırla** düğmesi `POST /temizle` ile sunucudaki geçici klasörleri anında sildirir. Sağlık: `GET /saglik`.
+
+**Kurulum:** (1) Servisin `Dockerfile` ve `app.py` dosyalarını bu sürümle **güncelle** (LibreOffice eklendi; ilk derleme ~10 dk). (2) Cloudflare → Workers → Create → adı **`belge-donusturucu-worker`** → `cloudflare worker/belge_donusturucu_worker/worker.js` içeriğini yapıştır → yukarıdaki değişkenleri ekle → Deploy. (3) Worker adresi farklıysa `assets/js/donusturucu/sunucu-donustur.js` içindeki `BELGE_WORKER` sabitini düzelt.
 
 ---
 

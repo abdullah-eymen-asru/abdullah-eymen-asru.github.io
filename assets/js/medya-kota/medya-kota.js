@@ -76,7 +76,7 @@ export function kotaPaneli(arac) {
   };
   kok.append(el("h2", { text: "📊 Kota durumu (bugün)" }), govde, kapsamKutusu(arac), ayarYeri);
   yenile();
-  supabase.rpc("is_owner").then(({ data }) => { if (data === true) ayarYeri.append(ownerAyar(arac, t, () => yenile())); }).catch(() => {});
+  supabase.rpc("medya_kota_yonetim_yetkili").then(({ data }) => { if (data === true) ayarYeri.append(ownerAyar(arac, t, () => yenile())); }).catch(() => {});
   return { kok, yenile, durum: () => son };
 }
 
@@ -105,7 +105,7 @@ export function ownerAyar(arac, t = ARACLAR[arac], bitti = () => {}, acik = fals
     const { error } = await supabase.rpc("owner_medya_kota_ayarla", { p_arac: arac, p_kullanici: sayi(kul.value), p_genel: sayi(gen.value), p_kendi_izni: kendiIzin.checked, p_sistem_acik: sistemAcik.checked, p_kota_aktif: kotaAktif.checked });
     kaydet.disabled = false; msg.textContent = error ? `Kaydedilemedi: ${hataMetni(error)}` : "✔ Kaydedildi."; if (!error) bitti();
   });
-  const d = el("details", { class: "mk-ayar" }, el("summary", { text: "⚙️ Kota ayarları (yalnızca Site Sahibi)" }),
+  const d = el("details", { class: "mk-ayar" }, el("summary", { text: "⚙️ Kota ayarları (Site Sahibi / yetkili Yönetici)" }),
     el("div", { class: "mi-satir" }, alan(`Kullanıcı başına günlük limit (${birimYazi})`, kul, "Boş = sınırsız"), alan(`Tüm site günlük limit (${birimYazi})`, gen, dak ? "Groq ücretsiz katmanı yaklaşık 28.800 sn/gün (8 saat) ses; güvenli pay için ~330 dk önerilir." : "Boş = sınırsız")),
     el("label", { class: "mk-onay" }, kotaAktif, " Günlük kota UYGULANSIN (kapatılırsa bu araç için limit yoktur; kullanım yine de sayılır)"),
     t.saglayici ? el("label", { class: "mk-onay" }, kendiIzin, " Üyeler kendi anahtarını/çözümleyicisini kullanabilsin (sistem kotasına sayılmaz)") : null,

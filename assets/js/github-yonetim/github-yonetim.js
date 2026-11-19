@@ -481,6 +481,14 @@ const OZELLIK_KATALOGU = [
     kaynak: "kapali",
   },
   {
+    // bkz. migration 0142 — Yetki Ayarları › "Medya Kotaları" sekmesi (günlük kota aç/kapa + limitler) yöneticiye de açılabilir. VARSAYILAN KAPALI.
+    anahtar: "yonetim_medya_kota",
+    baslik: "Medya Kotaları Yönetimi",
+    aciklama: "Yetki Ayarları › Medya Kotaları sekmesi: Transkript, Medya İndirici ve Belge Dönüştürücü günlük kotalarını aç/kapa, limit değiştir, bugünkü kullanımı gör. Varsayılan KAPALI; Site Sahibi her zaman yapar. Yönetici için ayrıca 'Yetki Ayarları erişimi' de açık olmalıdır (sekme o ekranın içindedir).",
+    rolSutunlari: ["admin"],
+    kaynak: "kapali",
+  },
+  {
     anahtar: "arac_medya_indir",
     baslik: "Evrensel Medya İndirici",
     aciklama: "Araçlar › Medya › İndirici: bağlantıdan video/ses indirme (Cobalt / yt-dlp / kurulumsuz sayfa çözümleyici). Günlük kota ve isteğe bağlı kendi çözümleyici geçerlidir. Varsayılan KAPALI.",

@@ -41,7 +41,7 @@ const MAX_URL = 2048;
 class HttpHata extends Error { constructor(kod, mesaj) { super(mesaj); this.kod = kod; } }
 
 const izinliOrigin = (env, o) => !!o && (VARSAYILAN_ORIGINLER.includes(o) || String(env.MEDYA_ORIGINLERI || "").split(",").map((s) => s.trim()).includes(o));
-const cors = (o) => ({ "Access-Control-Allow-Origin": o, "Vary": "Origin", "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Cozumleyici-Adresi, X-Cozumleyici-Anahtari, X-Cozumleyici-Turu", "Access-Control-Max-Age": "86400" });
+const cors = (o) => ({ "Access-Control-Allow-Origin": o, "Vary": "Origin", "Access-Control-Allow-Methods": "GET, POST, OPTIONS", "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Cozumleyici-Adresi, X-Cozumleyici-Anahtari, X-Cozumleyici-Turu", "Access-Control-Max-Age": "86400" });
 const json = (veri, durum, o) => new Response(JSON.stringify(veri), { status: durum, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...cors(o) } });
 
 /* SSRF/kötüye kullanım: yalnızca genel http(s) adresleri; yerel/özel ağ ve IP-literal reddedilir. */
@@ -92,7 +92,7 @@ async function cobaltIste(env, url, o) {
   else govde.videoQuality = o.kalite;
   const basliklar = { Accept: "application/json", "Content-Type": "application/json" };
   if (env.COBALT_API_KEY) basliklar.Authorization = `Api-Key ${env.COBALT_API_KEY}`;
-  const r = await fetch(`${String(env.COBALT_API_URL).replace(/\/+$/, "")}/`, { method: "POST", headers: basliklar, body: JSON.stringify(govde) });
+  let r; try { r = await fetch(`${String(env.COBALT_API_URL).replace(/\/+$/, "")}/`, { method: "POST", headers: basliklar, body: JSON.stringify(govde), signal: AbortSignal.timeout(60000) }); } catch { throw new HttpHata(502, "Cobalt çözümleyicisine ulaşılamadı (ücretsiz sunucu uyku modundan uyanıyor olabilir; 1 dk sonra yeniden dene)."); }
   const j = await r.json().catch(() => null);
   if (!j) throw new HttpHata(502, "İndirme hizmeti beklenmedik yanıt verdi.");
   if (j.status === "tunnel" || j.status === "redirect") return { durum: "hazir", url: j.url, dosya_adi: j.filename || null, yontem: "cobalt" };
@@ -101,18 +101,24 @@ async function cobaltIste(env, url, o) {
   throw new HttpHata(422, cobaltHata(kod));
 }
 function cobaltHata(kod) {
-  if (/login|auth/.test(kod)) return "Bu içerik oturum gerektiriyor (özel/yaş kısıtlı); indirilemez.";
-  if (/not_found|empty/.test(kod)) return "İçerik bulunamadı ya da herkese açık değil.";
+  kod = String(kod || "");
+  if (/^(error\.)?api\.auth\./.test(kod)) return "Cobalt çözümleyicisi kimlik doğrulaması istiyor (API_AUTH_REQUIRED=1) ama geçerli anahtar gönderilemedi. Yönetici: Cobalt'ta API_AUTH_REQUIRED=0 yap ya da keys.json + API_KEY_URL tanımlayıp aynı UUID'yi Worker'a COBALT_API_KEY olarak gir (rehber 4.13).";
+  if (/content\.video\.age|age/.test(kod)) return "Bu içerik yaş kısıtlı; oturum açılmadan indirilemez.";
+  if (/youtube\.(login|token|no_matching|decipher|api_error)|youtube\.login/.test(kod)) return "YouTube bu çözümleyicinin IP adresini robot şüphesiyle engelledi (ücretsiz bulut sunucularında sık olur). Birkaç dakika sonra yeniden dene; sürerse kendi çözümleyicini ekle ya da yt-dlp servisini güncelle.";
+  if (/video\.private|content\.post\.private|private/.test(kod)) return "İçerik özel; herkese açık değil.";
+  if (/region/.test(kod)) return "İçerik bu bölgede kullanılamıyor.";
+  if (/live|stream/.test(kod)) return "Canlı yayınlar indirilemez.";
+  if (/not_found|empty|unavailable|content\.post\.unavailable/.test(kod)) return "İçerik bulunamadı ya da herkese açık değil.";
   if (/unsupported|invalid|link\.unsupported/.test(kod)) return "Bu bağlantı türü desteklenmiyor.";
-  if (/rate_limit/.test(kod)) return "Çok fazla istek; biraz bekleyip yeniden dene.";
+  if (/rate_?limit/.test(kod)) return "Çok fazla istek; biraz bekleyip yeniden dene.";
   if (/length|too_long/.test(kod)) return "İçerik izin verilen süreden uzun.";
-  return "İçerik çözülemedi. Bağlantıyı ve kaynağın herkese açık olduğunu kontrol et.";
+  return `İçerik çözülemedi${kod ? ` (${kod.replace(/^error\./, "")})` : ""}. Bağlantıyı ve kaynağın herkese açık olduğunu kontrol et.`;
 }
 
 async function ytdlpIste(adres, anahtar, url, o) {
   const basliklar = { "Content-Type": "application/json", Accept: "application/json" };
   if (anahtar) basliklar.Authorization = `Bearer ${anahtar}`;
-  let r; try { r = await fetch(String(adres), { method: "POST", headers: basliklar, body: JSON.stringify({ url, ...o }), signal: AbortSignal.timeout(45000) }); } catch { throw new HttpHata(502, "Çözümleyiciye ulaşılamadı (uyku modunda olabilir; birkaç saniye sonra yeniden dene)."); }
+  let r; try { r = await fetch(String(adres), { method: "POST", headers: basliklar, body: JSON.stringify({ url, ...o }), signal: AbortSignal.timeout(90000) }); } catch { throw new HttpHata(502, "Çözümleyiciye ulaşılamadı (uyku modunda olabilir; birkaç saniye sonra yeniden dene)."); }
   const j = await r.json().catch(() => null);
   if (!r.ok || !j?.url) throw new HttpHata(422, j?.hata || "İçerik çözülemedi.");
   return { durum: "hazir", url: j.url, dosya_adi: j.dosya_adi || null, yontem: "ytdlp" };
@@ -200,7 +206,7 @@ async function indir(env, istek) {
   }
   const ytdlpVar = !!env.YTDLP_API_URL, cobaltVar = !!env.COBALT_API_URL;
   let sonuc = null, sonHata = null;
-  const dene = async (fn) => { try { sonuc = await fn(); return true; } catch (e) { if (!(e instanceof HttpHata) || e.kod === 400 || e.kod === 429) throw e; sonHata = e; return false; } };
+  const dene = async (fn) => { try { sonuc = await fn(); return true; } catch (e) { if (!(e instanceof HttpHata) || e.kod === 400 || e.kod === 429) throw e; if (!sonHata || !/Cobalt/.test(e.message)) sonHata = e; return false; } };
 
   if (kendi) {
     await dene(() => (kendi.tur === "cobalt" ? cobaltIste({ COBALT_API_URL: kendi.adres, COBALT_API_KEY: kendi.anahtar }, u.href, o) : ytdlpIste(kendi.adres, kendi.anahtar, u.href, o)));
@@ -224,6 +230,29 @@ async function indir(env, istek) {
   return sonuc;
 }
 
+/** Yönetici sağlık denetimi (Sistem Durumu sayfası için). Gizli değer döndürmez; geçerli oturum ister. */
+async function saglik(env, istek) {
+  const auth = istek.headers.get("Authorization") || "";
+  if (!auth.startsWith("Bearer ")) throw new HttpHata(401, "Oturum gerekli.");
+  await rpc(env, auth, "is_owner");
+  const olc = async (fn) => { const t0 = Date.now(); try { const v = await fn(); return { ulasilabilir: true, ms: Date.now() - t0, ...v }; } catch (e) { return { ulasilabilir: false, ms: Date.now() - t0, neden: e?.name === "TimeoutError" ? "zaman aşımı (sunucu uyku modundan uyanıyor olabilir)" : "bağlantı kurulamadı" }; } };
+  const cobalt = !env.COBALT_API_URL ? { yapilandirildi: false } : { yapilandirildi: true, ...(await olc(async () => {
+    const kok = String(env.COBALT_API_URL).replace(/\/+$/, "");
+    const r = await fetch(`${kok}/`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(40000) });
+    const j = await r.json().catch(() => null);
+    const bas = { "Content-Type": "application/json", Accept: "application/json" }; if (env.COBALT_API_KEY) bas.Authorization = `Api-Key ${env.COBALT_API_KEY}`;
+    const d = await fetch(`${kok}/`, { method: "POST", headers: bas, body: JSON.stringify({ url: "https://www.youtube.com/watch?v=aqz-KE-bpKQ" }), signal: AbortSignal.timeout(25000) }).then((x) => x.json()).catch(() => null);
+    const kod = String(d?.error?.code || "");
+    return { surum: j?.cobalt?.version || null, auth_sorunu: /api\.auth\./.test(kod), anahtar_var: !!env.COBALT_API_KEY, test_kodu: kod || (d?.status || null) };
+  })) };
+  const ytdlp = !env.YTDLP_API_URL ? { yapilandirildi: false } : { yapilandirildi: true, ...(await olc(async () => {
+    const r = await fetch(`${new URL(env.YTDLP_API_URL).origin}/saglik`, { signal: AbortSignal.timeout(40000) });
+    if (!r.ok) throw new Error("saglik");
+    const j = await r.json(); return { surum: j.yt_dlp || null, deno: !!j.deno, ffmpeg: !!j.ffmpeg, soffice: !!j.soffice };
+  })) };
+  return { cobalt, ytdlp, zaman: new Date().toISOString() };
+}
+
 export default {
   async fetch(istek, env) {
     const origin = istek.headers.get("Origin") || "";
@@ -231,6 +260,7 @@ export default {
     if (istek.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(origin) });
     try {
       const yol = new URL(istek.url).pathname.replace(/\/+$/, "");
+      if (istek.method === "GET" && yol === "/saglik") return json(await saglik(env, istek), 200, origin);
       if (istek.method === "POST" && yol === "/indir") return json(await indir(env, istek), 200, origin);
       return json({ hata: "Bulunamadı." }, 404, origin);
     } catch (e) {

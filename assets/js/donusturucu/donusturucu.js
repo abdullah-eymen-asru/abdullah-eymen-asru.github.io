@@ -18,11 +18,13 @@ import { veriDonustur } from "./motor-veri.js";
 import { kutuphaneListesi } from "./cdn.js";
 import { sifirla as bellekSifirla, kaydet as bellekKaydet, dugumKaydet } from "./bellek.js";
 import { ayrilmaKancasiKaydet, sekmeSifirlamaKaydet } from "../core/gezinme-kilidi.js";
+import { sunucuHedefleri, sunucuOrtakHedefler, sunucuTahminSn, yerelTahminSn, SUNUCU_UYKU_NOTU } from "./sunucu-matris.js";
+import { sunucuyuTemizle } from "./sunucu-donustur.js";
 import { UYARI_ESIGI, buyukDosyaUyarisi, yerelYonerge } from "./buyuk-dosya.js";
 
 const MAKS_TEK = 250 * 1024 * 1024;
 const MAKS_TOPLAM = 500 * 1024 * 1024;
-const KABUL = ".pdf,.docx,.html,.htm,.md,.markdown,.txt,.epub,.pptx,.ppt,.pps,.ppsx,.jpg,.jpeg,.png,.webp,.avif,.bmp,.ico,.svg,.gif,.heic,.heif,.csv,.tsv,.json,.xml,.js,.ts,.css,.py,.yml,.yaml,.sql,.sh,.ini,.log";
+const KABUL = ".pdf,.docx,.doc,.odt,.rtf,.xlsx,.xls,.ods,.odp,.html,.htm,.md,.markdown,.txt,.epub,.pptx,.ppt,.pps,.ppsx,.jpg,.jpeg,.png,.webp,.avif,.bmp,.ico,.svg,.gif,.heic,.heif,.csv,.tsv,.json,.xml,.js,.ts,.css,.py,.yml,.yaml,.sql,.sh,.ini,.log";
 
 const kok = document.getElementById("dn-kok");
 const mesajEl = document.getElementById("dn-mesaj");
@@ -58,6 +60,7 @@ function dosyalariAl(fl) {
   const toplam = [...dosyalar, ...yeni].reduce((a, d) => a + d.file.size, 0);
   if (toplam > MAKS_TOPLAM) { bildir("Toplam boyut 500 MB'ı aşıyor; tarayıcı belleği için dosyaları parçalara böl.", "error"); return; }
   dosyalar = [...dosyalar, ...yeni];
+  delete SECENEK.sunucu;   // yöntem seçimi her yeni dosya kümesinde varsayılana döner
   if (reddedilen.length) bildir(`Desteklenmeyen/uygunsuz dosya atlandı: ${reddedilen.join(" · ")}`, "error");
   else if (uyarilar.length) bildir(uyarilar.join(" "), "info");
   hedef = null;
@@ -78,7 +81,7 @@ function gizlilikRozeti() {
   return el("div", { class: "dn-gizlilik", role: "note" },
     el("span", { "aria-hidden": "true", text: "🔒" }),
     el("span", {}, el("b", { text: "Verileriniz cihazınızdan asla dışarı çıkmaz, işlem tarayıcınızda gerçekleşir." }),
-      " Dosyalar Supabase'e ya da R2'ye gönderilmez; yalnızca açık kaynak kütüphane kodu indirilir. Tek istisna: sunum dönüştürmede “Birebir dönüştür (sunucuda)” kutusunu SEN işaretlersen o dosya yalnızca o dönüştürme için gönderilir ve saklanmaz."));
+      " Dosyalar Supabase'e ya da R2'ye gönderilmez; yalnızca açık kaynak kütüphane kodu indirilir. Tek istisna: “Sunucuda (LibreOffice)” yöntemini SEN seçersen o dosya yalnızca o dönüştürme için gönderilir ve saklanmaz."));
 }
 
 function dropzone() {
@@ -99,7 +102,7 @@ function dosyaListesiCiz() {
   bos(liste);
   dosyalar.forEach((d, i) => {
     const sil = dugme({ ikon: "✕", kucuk: true, tur: "hayalet", "aria-label": `${d.file.name} dosyasını kaldır`, title: "Kaldır" });
-    sil.addEventListener("click", () => { dosyalar.splice(i, 1); hedef = null; ciz(); });
+    sil.addEventListener("click", () => { dosyalar.splice(i, 1); hedef = null; delete SECENEK.sunucu; ciz(); });
     const adDegis = dugme({ ikon: "✎", kucuk: true, tur: "hayalet", "aria-label": `${d.file.name} dosyasının adını değiştir`, title: "Adı değiştir" });
     adDegis.addEventListener("click", async () => {
       const v = await formIste({ baslik: "Dosya adını değiştir", aciklama: `Uzantı (.${uzantiAl(d.file.name) || d.uzanti || ""}) korunur.`, alanlar: [{ ad: "ad", etiket: "Yeni ad", tur: "text", deger: adsizAl(d.file.name) }], tamam: "Kaydet" });
@@ -153,32 +156,67 @@ async function kontrolCiz() {
   kontrolAlani.append(modKart);
 
   if (dosyalar.length > 1 && !uyum.uygun) { kontrolAlani.append(el("div", { class: "dn-uyari", role: "alert", text: uyum.mesaj || "Bu dosya kombinasyonu desteklenmiyor." })); return; }
-  if (!hedefListesi.length) { kontrolAlani.append(el("div", { class: "dn-uyari", text: "Bu dosya için dönüştürme hedefi yok." })); return; }
+  // ---- YÖNTEM: Tarayıcıda (cihazdan çıkmaz) ↔ Sunucuda (LibreOffice, birebir). Kullanıcı AÇIKÇA seçer. ----
+  const yerelVar = hedefListesi.length > 0;
+  const sunucuH = dosyalar.length === 1 ? sunucuHedefleri(turler[0]) : sunucuOrtakHedefler(turler);
+  const sunucuVar = sunucuH.length > 0;
+  if (!yerelVar && !sunucuVar) { kontrolAlani.append(el("div", { class: "dn-uyari", text: "Bu dosya için dönüştürme hedefi yok." })); return; }
+  let yontem = "tarayici";
+  if (!yerelVar) yontem = "sunucu";
+  else if (sunucuVar && (SECENEK.sunucu === "1" || (SECENEK.sunucu == null && turler.includes("ppt")))) yontem = "sunucu";
+  SECENEK.sunucu = yontem === "sunucu" ? "1" : "0";
 
-  const suzulmus = await hedefSecenekleri(hedefListesi.filter((h) => h !== "pdf-birlestir"));
+  if (yerelVar && sunucuVar) {
+    const yk = el("div", { class: "dn-kart dn-yontem-kart" }, el("h2", { text: "Dönüştürme yöntemi" }));
+    const sat = el("div", { class: "dn-modlar", role: "group", "aria-label": "Dönüştürme yöntemi" });
+    const yb = (anahtar, baslik, alt) => {
+      const b = dugme({ tur: "ikincil", class: "dn-mod", "aria-pressed": String(yontem === anahtar) });
+      b.append(el("strong", { text: `${yontem === anahtar ? "✓ " : ""}${baslik}` }), el("small", { text: alt }));
+      b.addEventListener("click", () => { SECENEK.sunucu = anahtar === "sunucu" ? "1" : "0"; hedef = null; kontrolCiz(); });
+      return b;
+    };
+    sat.append(
+      yb("tarayici", "💻 Tarayıcıda", "Dosya cihazından HİÇ çıkmaz. Hızlı; ama düzen birebir olmayabilir (özellikle eski .ppt, PDF→Word)."),
+      yb("sunucu", "🖥️ Sunucuda (LibreOffice)", "Word, Excel, PowerPoint, PDF, ODF, RTF… arasında en sadık dönüşüm. Dosya yalnızca bu işlem için gönderilir, saklanmaz; günlük kotan düşer."));
+    yk.append(sat);
+    kontrolAlani.append(yk);
+  } else if (!yerelVar) {
+    kontrolAlani.append(el("div", { class: "dn-uyari", role: "note", text: "🖥️ Bu dosya türü yalnızca sunucuda (LibreOffice) dönüştürülür: dosya yalnızca bu işlem için gönderilir, saklanmaz; günlük kotan düşer." }));
+  }
+
+  const hamListe = yontem === "sunucu" ? sunucuH : hedefListesi.filter((h) => h !== "pdf-birlestir");
+  const suzulmus = yontem === "sunucu" ? hamListe : await hedefSecenekleri(hamListe);
   if (tur !== kontrolTur) return; // daha yeni bir çizim başladı
-  const tumHedefler = hedefListesi.includes("pdf-birlestir") ? ["pdf-birlestir", ...suzulmus] : suzulmus;
+  const tumHedefler = yontem !== "sunucu" && hedefListesi.includes("pdf-birlestir") ? ["pdf-birlestir", ...suzulmus] : suzulmus;
   if (!tumHedefler.includes(hedef)) hedef = null;
 
-  const kart = el("div", { class: "dn-kart" }, el("h2", { text: "Hedef biçim" }));
+  const hedefAdi = (h) => (h === "pdf-birlestir" ? "PDF'leri birleştir" : (h === "pdf" && uyum.aile === "gorsel" && dosyalar.length > 1 ? "Tek PDF (birleştir)" : FORMATLAR[h]?.ad || h));
+  const kart = el("div", { class: "dn-kart" }, el("h2", { text: "Hangi biçime dönüşsün?" }));
   const hedefSatiri = el("div", { class: "dn-hedefler", role: "group", "aria-label": "Hedef biçim" });
   for (const h of tumHedefler) {
-    const ad = h === "pdf-birlestir" ? "PDF'leri birleştir" : (h === "pdf" && uyum.aile === "gorsel" && dosyalar.length > 1 ? "Tek PDF (birleştir)" : FORMATLAR[h].ad);
-    const d = dugme({ metin: ad, "aria-pressed": String(h === hedef) });
+    const d = dugme({ metin: `${h === hedef ? "✓ " : ""}${hedefAdi(h)}`, "aria-pressed": String(h === hedef) });
     d.addEventListener("click", () => { hedef = h; kontrolCiz(); });
     hedefSatiri.append(d);
   }
   kart.append(hedefSatiri);
 
+  // Seçimin ÖZETİ: kullanıcı neyin neye, hangi yöntemle ve yaklaşık ne kadar sürede dönüşeceğinden emin olsun.
+  const toplamBayt = dosyalar.reduce((a, d) => a + d.file.size, 0);
+  const tahmin = !hedef ? 0 : yontem === "sunucu" ? dosyalar.reduce((a, d) => a + sunucuTahminSn(d.file.size), 0) : dosyalar.reduce((a, d) => a + yerelTahminSn(d.file.size, d.tur, hedef), 0);
+  const kaynakAd = dosyalar.length === 1 ? FORMATLAR[turler[0]].ad : `${dosyalar.length} dosya`;
+  kart.append(el("p", { class: `dn-ozet${hedef ? " dn-ozet--secili" : ""}`, role: "status", text: hedef
+    ? `Seçimin: ${kaynakAd} → ${hedefAdi(hedef)} · ${yontem === "sunucu" ? "🖥️ Sunucuda" : "💻 Tarayıcıda"} · tahmini süre ≈ ${tahmin < 60 ? `${Math.max(tahmin, 3)} sn` : `${Math.round(tahmin / 60)} dk`} (${bayt(toplamBayt)})${yontem === "sunucu" ? `. ${SUNUCU_UYKU_NOTU}` : ""}`
+    : "Önce yukarıdan hedef biçimi seç; seçimin burada görünür." }));
+
   const secenek = secenekCiz(turler, hedef, uyum);
   if (secenek) kart.append(secenek);
 
-  const git = dugme({ metin: "Dönüştür ve indir", ikon: "⬇", tur: "birincil", disabled: !hedef || !!calisiyor });
+  const git = dugme({ metin: hedef ? `${hedefAdi(hedef)} olarak dönüştür ve indir` : "Önce hedef biçimi seç", ikon: "⬇", tur: "birincil", disabled: !hedef || !!calisiyor });
   const iptal = dugme({ metin: "İptal", hidden: !calisiyor });
-  git.addEventListener("click", () => hizliDonustur(git, iptal));
+  git.addEventListener("click", () => hizliDonustur(git, iptal, tahmin));
   iptal.addEventListener("click", () => calisiyor?.iptal());
   kart.append(el("div", { class: "dn-eylemler" }, git, iptal), ilerleme.el);
-  if (turler.includes("pdf") && hedef && !["png", "jpg", "webp", "pdf-birlestir"].includes(hedef)) kart.append(el("p", { class: "dn-muted", text: "Not: PDF'ten dönüştürmede düzen birebir korunmaz; metin ve başlıklar yeniden oluşturulur. Taranmış PDF'lerde OCR yapılmaz." }));
+  if (turler.includes("pdf") && hedef && yontem !== "sunucu" && !["png", "jpg", "webp", "pdf-birlestir"].includes(hedef)) kart.append(el("p", { class: "dn-muted", text: "Not: Tarayıcıda PDF'ten dönüştürmede düzen birebir korunmaz; metin ve başlıklar yeniden oluşturulur. Daha sadık sonuç için “Sunucuda (LibreOffice)” yöntemini dene. Taranmış PDF'lerde OCR yapılmaz." }));
   kontrolAlani.append(kart);
 }
 
@@ -206,14 +244,6 @@ function secenekCiz(turler, h, uyum) {
     alanlar.push(sec("ayirac", "CSV ayracı", [["", "Otomatik / virgül"], [",", "Virgül ( , )"], [";", "Noktalı virgül ( ; )"], ["\t", "Sekme"], ["|", "Dikey çizgi ( | )"]], ""));
     if (h === "csv") alanlar.push(sec("bom", "UTF-8 BOM (Excel'de Türkçe karakterler)", [["1", "Ekle (önerilir)"], ["0", "Ekleme"]], "1"));
   }
-  // Sunum kaynakları: isteğe bağlı BİREBİR (sunucu) mod — açık onay kutusu; eski .ppt için neredeyse zorunludur.
-  if (turler.some((t) => t === "ppt" || t === "pptx")) {
-    const ppt = turler.includes("ppt");
-    const k = el("input", { type: "checkbox" }); k.checked = SECENEK.sunucu === "1";
-    k.addEventListener("change", () => { SECENEK.sunucu = k.checked ? "1" : "0"; });
-    alanlar.push(el("label", { class: "dn-sunucu" }, k, el("span", {}, " 🖥️ Birebir dönüştür (sunucuda, LibreOffice) — slayt, şekil, resim ve yazı tipleri korunur. ",
-      el("small", { class: "muted", text: `İşaretlersen dosyan yalnızca bu dönüştürme için kendi Hugging Face Space'ine gönderilir, saklanmaz; günlük kotan düşer.${ppt ? " Eski .ppt dosyaları işaretlenmezse yalnızca metin olarak dönüşür." : ""}` }))));
-  }
   return alanlar.length ? el("div", { class: "dn-secenekler" }, ...alanlar) : null;
 }
 
@@ -234,13 +264,13 @@ function ctxOlustur(uyarilar, isCtx) {
   };
 }
 
-async function hizliDonustur(git, iptal) {
+async function hizliDonustur(git, iptal, tahmin = 0) {
   if (!hedef || calisiyor) return;
   bildir("");
   const uyarilar = [];
   calisiyor = isBaglami((o, m) => ilerleme.ayarla(o, m));
   git.disabled = true; iptal.hidden = false;
-  ilerleme.goster("Başlıyor…");
+  ilerleme.goster("Başlıyor…", tahmin);
   try {
     const ctx = ctxOlustur(uyarilar, calisiyor);
     const toplam = dosyalar.length;
@@ -490,15 +520,17 @@ function tamEkranDugmesi() {
 }
 
 function sifirlaDugmesi() {
-  const b = dugme({ metin: "Belleği Güvenli Sıfırla", ikon: "🧹", class: "dn-sifirla", title: "Dosyayı Güvenli Sil: açık dosyaları, düzenleyiciyi ve önizlemeleri bellekten siler", "aria-label": "Oturumu sıfırla, dosyayı güvenli sil" });
+  const b = dugme({ metin: "Belleği ve Sunucuyu Sıfırla", ikon: "🧹", class: "dn-sifirla", title: "Açık dosyaları, düzenleyiciyi ve önizlemeleri tarayıcı belleğinden siler; sunucudaki (LibreOffice) geçici klasörleri de hemen sildirir", "aria-label": "Belleği ve sunucuyu sıfırla, belgeleri güvenli sil" });
   b.addEventListener("click", async () => {
-    if (!bellekteVeriVar()) { bildir("Bellekte silinecek belge yok.", "info"); return; }
     const kirli = duzenleyici?.nesne?.kirli?.();
-    const ok = await onayIste({ baslik: "Oturum sıfırlansın mı?", metin: kirli ? "Kaydedilmemiş değişiklikler VAR ve kaybolacak. Açık belgeler bellekten silinecek (sunucuda zaten hiçbir kopya yok)." : "Açık belgeler, düzenleyici ve önizlemeler bellekten silinecek.", tamam: "Sıfırla ve sil", tehlike: true });
+    const ok = await onayIste({ baslik: "Bellek ve sunucu sıfırlansın mı?", metin: `${kirli ? "Kaydedilmemiş değişiklikler VAR ve kaybolacak. " : ""}Açık belgeler tarayıcı belleğinden silinecek ve sunucudaki geçici dönüştürme klasörleri hemen temizlenecek (sunucu zaten işlem bitince siler; bu, ek güvence).`, tamam: "Sıfırla ve sil", tehlike: true });
     if (!ok) return;
+    b.disabled = true;
     oturumuSifirla();
     await ciz();
-    bildir("Oturum sıfırlandı: belgeler bellekten silindi.", "success");
+    const r = await sunucuyuTemizle();
+    b.disabled = false;
+    bildir(`Tarayıcı belleği temizlendi. ${r.mesaj}`, r.ok ? "success" : "info");
   });
   return b;
 }
