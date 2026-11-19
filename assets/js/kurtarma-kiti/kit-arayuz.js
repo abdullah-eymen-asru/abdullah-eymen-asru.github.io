@@ -83,13 +83,13 @@ export function kitKartiAc(duyur = () => {}) {
       const onay = h("input", { type: "checkbox", id: "kk-onay" });
       const bitti = h("button", { type: "button", class: "kk-btn kk-btn--birincil", text: "Bitti", disabled: true, onclick: () => p.kapat(true) });
       onay.addEventListener("change", () => { bitti.disabled = !onay.checked; });
-      govde.replaceChildren(
+      govde.replaceChildren(...[
         h("p", { class: "kk-durum kk-durum--iyi", text: "Kodun hazır. Bu pencereyi kapatınca bir daha gösterilmez:" }),
         kodEl, h("div", { class: "kk-eylem kk-eylem--sol" }, kopyala, indir),
         !r.notlar ? h("p", { class: "kk-durum kk-durum--uyari", text: "Not: Bu hesapta henüz bir Notlar kasası yok; kod şimdilik yalnızca mesajlarını kapsıyor. Notlar kasasını kurduktan sonra kodu yenile." }) : null,
         !r.mesajlar ? h("p", { class: "kk-durum kk-durum--uyari", text: "Not: Mesaj anahtarı oluşturulamadığı için kod şimdilik yalnızca notlarını kapsıyor; Mesajlar'ı bir kez açıp kodu yenile." }) : null,
         h("label", { class: "kk-onay", for: "kk-onay" }, onay, h("span", { text: "Kodu güvenli bir yere kaydettim." })),
-        h("div", { class: "kk-eylem" }, bitti));
+        h("div", { class: "kk-eylem" }, bitti)].filter(Boolean));
     }
     baslangic();
   });

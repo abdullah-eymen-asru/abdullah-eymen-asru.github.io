@@ -79,7 +79,7 @@ permalink: "/icerik/okuduklarim.html"
     sayfaBasinaKayit: 24,
     istatistikContainerId: "okuma-istatistik",
     istatistikEylem: "okuduğum",
-    istatistikTamamlandiDegeri: "Okudum",
+    istatistikTamamlandiDegeri: ["Okudum", "Okundu"],
     baslamaTarihiAlani: "Başlama Tarihi",
     bitisTarihiAlani: "Bitiş Tarihi"
   });

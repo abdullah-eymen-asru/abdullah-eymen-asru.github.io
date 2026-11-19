@@ -11,6 +11,8 @@
  *     kaynağında kesilir; doğrudan adrese gelen istekler yine sayılır (reddedilmiş olsa bile).
  *  2) SERT (isteğe bağlı): CF_WORKERS_TOKEN tanımlıysa Worker'ın workers.dev adresi Cloudflare API ile kapatılır → istek Worker'a
  *     hiç ulaşmaz, kotaya SAYILMAZ. Pages Function için sert kapatma yoktur (Cloudflare izin vermez; bkz. _routes.json).
+ * GÜNLÜK SERT SINIR (migration 0143): her Worker için UTC günlük toplam istek sınırı konabilir. Sınır MUTLAKTIR (gün içinde 20 istek
+ *  geldiyse sınırı 23 yapmak 3 hak bırakır). Dolunca sistem-yedek-worker cron'u workers.dev adresini keser (kotaya sayılmaz); UTC 00:00'da açar.
  * innerHTML YOK, inline stil YOK (CSP).
  */
 import { supabase } from "../core/supabase-client.js";
@@ -70,6 +72,8 @@ export function workerAnahtarKarti() {
 
   let sertDestek = false;
   let ownerMi = false;
+  let limitDestek = true;       // migration 0143 yoksa limit satırı gösterilmez
+  let kullanimVeri = null;      // { gun, kullanim: { script: n }, sert_destek } — Cloudflare Analytics (1–3 dk gecikmeli)
   const rozetler = new Map();   // servis adı -> {metin, sinif}: Cloudflare API onay rozeti (oturum boyunca)
 
   async function sertDurumu() {
@@ -119,6 +123,40 @@ export function workerAnahtarKarti() {
     }
   }
 
+  /** Günlük (UTC) sert sınır satırı: bugünkü kullanım / sınır, kalan hak, sınır ayarla. Sınır MUTLAKTIR: kullanım zaten 20 ise sınır 23 → 3 hak kalır. */
+  function limitSatiri(s) {
+    if (!limitDestek || s.tur !== "worker" || s.korumali) return null;
+    const kul = kullanimVeri?.kullanim ? (kullanimVeri.kullanim[s.ad] || 0) : null;
+    const lim = s.gunluk_limit ?? null;
+    const doldu = lim != null && kul != null && kul >= lim;
+    const input = el("input", { type: "number", min: "1", step: "1", inputmode: "numeric", class: "sy-wk-limit-giris", placeholder: "Günlük sınır", "aria-label": `${s.etiket} günlük istek sınırı`, value: lim != null ? String(lim) : "" });
+    const kaydet = dugme({ metin: "Sınırı kaydet", tur: "ikincil", kucuk: true });
+    const kaldir = lim != null ? dugme({ metin: "Sınırı kaldır", tur: "ikincil", kucuk: true }) : null;
+    const durum = el("span", { class: "muted sy-not", role: "status" });
+    async function yaz(deger) {
+      kaydet.disabled = true; if (kaldir) kaldir.disabled = true; durum.textContent = "Kaydediliyor…";
+      const { error } = await supabase.rpc("worker_limit_ayarla", { p_ad: s.ad, p_limit: deger });
+      if (error) { durum.textContent = /does not exist|PGRST202|42883|schema cache/i.test(error.message || "") ? "Önce migration 0143 çalıştırılmalı." : hataMetni(error); kaydet.disabled = false; if (kaldir) kaldir.disabled = false; return; }
+      await yukle();
+    }
+    kaydet.addEventListener("click", () => {
+      const v = input.value.trim();
+      if (v === "") return yaz(null);
+      const n = Number(v);
+      if (!Number.isInteger(n) || n < 1) { durum.textContent = "1 veya daha büyük bir tam sayı gir."; return; }
+      yaz(n);
+    });
+    kaldir?.addEventListener("click", () => yaz(null));
+    const ozet = kul == null
+      ? (kullanimVeri === null ? "Bugünkü kullanım okunamadı (CF_API_TOKEN: Account Analytics › Read gerekli)." : "")
+      : lim == null ? `Bugün (UTC): ${kul.toLocaleString("tr-TR")} istek · sınır yok`
+        : `Bugün (UTC): ${kul.toLocaleString("tr-TR")} / ${lim.toLocaleString("tr-TR")} istek · ${doldu ? "hak kalmadı" : `${(lim - kul).toLocaleString("tr-TR")} hak kaldı`}`;
+    return el("div", { class: "sy-wk-limit" },
+      el("span", { class: doldu ? "sy-rozet sy-rozet--kritik" : "muted", text: ozet }),
+      doldu ? el("span", { class: "sy-not", text: "Sınır doldu: workers.dev adresi kesildi (kotaya sayılmaz). UTC 00:00'da ya da sınırı yükseltince 1 dk içinde kendiliğinden açılır." }) : null,
+      el("div", { class: "sy-eylemler" }, input, kaydet, kaldir, durum));
+  }
+
   function satirCiz(s) {
     const btn = dugme({ metin: s.acik ? "Kapat" : "Aç", tur: s.acik ? "ikincil" : "birincil", kucuk: true });
     if (s.korumali) { btn.disabled = true; btn.title = "Korumalı servis: kapatılamaz"; }
@@ -130,7 +168,8 @@ export function workerAnahtarKarti() {
         s.korumali ? el("span", { class: "muted sy-not", text: "Korumalı (her zaman açık)" }) : null),
       el("span", { class: `sy-rozet sy-rozet--${s.acik ? "iyi" : "kritik"}`, text: s.acik ? "Açık" : "Kapalı" }),
       btn,
-      rozetler.has(s.ad) ? el("span", { class: `sy-rozet sy-rozet--${rozetler.get(s.ad).sinif} wk-onay`, text: rozetler.get(s.ad).metin, role: "status" }) : null);
+      rozetler.has(s.ad) ? el("span", { class: `sy-rozet sy-rozet--${rozetler.get(s.ad).sinif} wk-onay`, text: rozetler.get(s.ad).metin, role: "status" }) : null,
+      limitSatiri(s));
   }
 
   /** Arama kutusu + sabit yükseklikli kaydırılabilir liste (ad, etiket veya durum "açık/kapalı" ile süzer). */
@@ -157,9 +196,16 @@ export function workerAnahtarKarti() {
     try {
       await sertDurumu();
       try { ownerMi = (await supabase.rpc("is_owner")).data === true; } catch { ownerMi = false; }
-      const { data, error } = await supabase.from("worker_anahtarlari")
-        .select("ad, etiket, tur, acik, korumali, guncelleme").order("tur", { ascending: false }).order("etiket");
+      let { data, error } = await supabase.from("worker_anahtarlari")
+        .select("ad, etiket, tur, acik, korumali, guncelleme, gunluk_limit").order("tur", { ascending: false }).order("etiket");
+      limitDestek = true;
+      if (error && /gunluk_limit|42703|column/i.test(error.message || "")) {      // migration 0143 henüz yok → limitsiz görünüm
+        limitDestek = false;
+        ({ data, error } = await supabase.from("worker_anahtarlari").select("ad, etiket, tur, acik, korumali, guncelleme").order("tur", { ascending: false }).order("etiket"));
+      }
       if (error) throw error;
+      kullanimVeri = null;
+      if (limitDestek) { try { const k = await workerJson("/worker-limit/kullanim"); kullanimVeri = k?.kullanim ? k : null; } catch { kullanimVeri = null; } }
       const gunlukKok = el("div", {});
       const gunluk = el("details", { class: "sy-wk-gunluk" }, el("summary", { text: "Son değişiklikler" }), gunlukKok);
       async function gunlukCiz() {
@@ -181,7 +227,7 @@ export function workerAnahtarKarti() {
           if (er) { gunlukKok.prepend(el("p", { class: "auth-message error", text: `Temizlenemedi: ${hataMetni(er)}` })); temizle.disabled = false; return; }
           await gunlukCiz();
         });
-        gunlukKok.replaceChildren(
+        gunlukKok.replaceChildren(...[
           satirlar.length ? el("ul", { class: "sy-kota-liste" }, satirlar.map((x) => {
             const sil = ownerMi ? dugme({ metin: "Sil", tur: "ikincil", kucuk: true }) : null;
             sil?.addEventListener("click", async () => {
@@ -194,18 +240,18 @@ export function workerAnahtarKarti() {
               el("span", { text: x.ozet ? `Günlük temizlendi · ${x.kullanici}` : `${x.ad} → ${x.acik ? "açıldı" : "kapatıldı"} · ${x.kullanici}` }),
               el("span", { class: "muted", text: tarihMetni(x.zaman) }), sil);
           })) : el("p", { class: "muted sy-not", text: "Kayıtlı değişiklik yok." }),
-          temizle ? el("div", { class: "sy-eylemler" }, temizle) : null);
+          temizle ? el("div", { class: "sy-eylemler" }, temizle) : null].filter(Boolean));
       }
       let gunlukYuklendi = false;
       gunluk.addEventListener("toggle", async () => {
         if (!gunluk.open || gunlukYuklendi) return;
         gunlukYuklendi = true; await gunlukCiz();
       });
-      govde.replaceChildren(
+      govde.replaceChildren(...[
         uyari ? el("p", { class: "auth-message error", text: uyari }) : null,
         el("p", { class: "muted sy-not", text: "Kapalı bir servise tarayıcılar istek göndermez, Worker'lar gelen isteği hemen reddeder; Gatekeeper Function ise isteği işlemeden geçirir. Kota dolmadan önce yoğun/gereksiz servisleri buradan kapatabilirsin." }),
         aramaVeListe((data || []), satirCiz),
-        gunluk);
+        gunluk].filter(Boolean));
       const kapali = (data || []).filter((x) => !x.acik).length;
       ozetSayac.textContent = `${(data || []).length} servis · ${kapali} kapalı`;
     } catch (h) {

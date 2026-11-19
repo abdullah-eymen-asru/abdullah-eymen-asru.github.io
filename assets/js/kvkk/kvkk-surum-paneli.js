@@ -253,9 +253,9 @@ async function kur() {
   const { data: ozet, error } = await supabase.rpc("kvkk_onay_ozeti");
   const satir = Array.isArray(ozet) ? ozet[0] : ozet;
   if (error || !satir || satir.kvkk_yetkim === undefined) {
-    kok.replaceChildren(el("p", { class: "muted", text: yokMu(error) || (!error && (!satir || satir.kvkk_yetkim === undefined))
+    kok.replaceChildren(...[el("p", { class: "muted", text: yokMu(error) || (!error && (!satir || satir.kvkk_yetkim === undefined))
       ? "0064, 0065, 0070, 0073 ve 0076 numaralı migration'lar tam çalıştırılmamış görünüyor: dosyaları SQL Editor'de sırayla çalıştır."
-      : `Yüklenemedi: ${error.message}` }));
+      : `Yüklenemedi: ${error.message}` })].filter(Boolean));
     return;
   }
 

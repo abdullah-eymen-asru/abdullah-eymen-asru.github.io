@@ -541,7 +541,7 @@ function r2Paneli(mesaj) {
     const dahaFazla = d.imlec ? dugme({ metin: "Daha fazla yükle", tur: "ikincil", kucuk: true, disabled: d.yukleniyor }) : null;
     dahaFazla?.addEventListener("click", () => sayfaYukle(true));
 
-    gezginKutu.replaceChildren(
+    gezginKutu.replaceChildren(...[
       el("div", { class: "sy-gz-r2-ust" }, kirinti, kapat),
       el("div", { class: "sy-gz-cubuk", role: "status", "aria-live": "polite" },
         el("span", { class: "sy-gz-cubuk-metin", text: o.adet ? `${sayi(o.adet)} nesne seçili · ${bayt(o.bayt)} (${sayi(o.kayitli)} kayıtlı, ${sayi(o.yetim)} yetim)` : "Silmek için dosya seç; kilitli (korumalı) öğeler seçilemez." }),
@@ -551,7 +551,7 @@ function r2Paneli(mesaj) {
         ? [...klasorSatirlari, ...nesneSatirlari]
         : (d.yukleniyor ? [] : [el("li", { class: "muted", text: "Bu konumda öğe yok." })])),
       dahaFazla
-    );
+    ].filter(Boolean));
   }
 
   kok.append(

@@ -65,8 +65,28 @@ function kucukHarfeCevirTr(metin) {
 // kapalı, garanti doğru bir yöntem.
 function yilCikar(tarihMetni) {
   if (typeof tarihMetni !== "string") return null;
-  const eslesme = tarihMetni.match(/^(\d{4})-\d{2}-\d{2}/);
-  return eslesme ? eslesme[1] : null;
+  const t = tarihMetni.trim();
+  // GitHub Projects: "YYYY-MM-DD" (veya "YYYY-MM-DDTHH…"). Elle girilmiş olası biçimler de tolere edilir: "YYYY", "DD.MM.YYYY", "DD/MM/YYYY".
+  let e = t.match(/^(\d{4})(?:-\d{1,2}(?:-\d{1,2})?)?(?:[T\s]|$)/);
+  if (!e) e = t.match(/^\d{1,2}[./-]\d{1,2}[./-](\d{4})$/);
+  if (!e) return null;
+  const y = Number(e[1]);
+  return y >= 1900 && y <= 2100 ? String(y) : null;
+}
+
+// "Tamamlandı" durumu: "İzledim / İzlendi / İzlenen / Okudum / Okundu / Bitti …" — büyük-küçük harf, boşluk, emoji ve noktalamaya
+// duyarsız karşılaştırılır (ör. "✅ İzledim", "izledim ", "OKUDUM"). Yapılandırmadaki değer metin ya da dizi olabilir; eş anlamlılar otomatik eklenir.
+const TAMAMLANDI_ESANLAM = [
+  ["izledim", "izlendi", "izlenen", "izlenmis", "izledik"],
+  ["okudum", "okundu", "okunan", "okunmus", "okudum okudum"],
+];
+function durumAnahtari(m) {
+  return kucukHarfeCevirTr(m == null ? "" : String(m)).normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/ı/g, "i").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+function tamamlandiKumesi(deger) {
+  const kume = new Set((Array.isArray(deger) ? deger : [deger]).filter(Boolean).map(durumAnahtari));
+  for (const grup of TAMAMLANDI_ESANLAM) if (grup.some((g) => kume.has(g))) grup.forEach((g) => kume.add(g));
+  return kume;
 }
 
 /**
@@ -107,11 +127,10 @@ function istatistikGosterimiOlustur(items, config) {
     el.hidden = true;
     return;
   }
-  const tamamlandiDegeri = kucukHarfeCevirTr(config.istatistikTamamlandiDegeri);
+  const tamamlandiKume = tamamlandiKumesi(config.istatistikTamamlandiDegeri);
 
-  const tamamlananlar = items.filter(
-    item => kucukHarfeCevirTr(item[durumAlani] || "") === tamamlandiDegeri
-  );
+  // TOPLAM: durumu "tamamlandı" olan HER kayıt (yıl/tarih olsun olmasın). Yıl kartları yalnızca tarihi olanlardan türetilir.
+  const tamamlananlar = items.filter(item => tamamlandiKume.has(durumAnahtari(item[durumAlani])));
 
   if (tamamlananlar.length === 0) {
     // Geliştirme/hata ayıklama kolaylığı: "tamamlandı" sayılan hiçbir kayıt
@@ -140,6 +159,7 @@ function istatistikGosterimiOlustur(items, config) {
   });
 
   const toplam = tamamlananlar.length;
+  const tarihsiz = tamamlananlar.filter(item => !yilCikar(item[bitisAlani] || "") && !yilCikar(item[baslamaAlani] || "")).length;
   // localeCompare ile string sıralama, 4 haneli yıllar için ("2026" > "2025")
   // sayısal sıralamayla birebir aynı sonucu verir, ekstra Number() dönüşümüne
   // gerek yok.
@@ -150,7 +170,7 @@ function istatistikGosterimiOlustur(items, config) {
   if (yillar.length === 0) {
     el.hidden = false;
     el.innerHTML = `
-      <div class="liste-istatistik-kart liste-istatistik-kart--toplam">
+      <div class="liste-istatistik-kart liste-istatistik-kart--toplam" ${tarihsiz ? `title="${tarihsiz} kaydın tarihi yok; toplama dahildir"` : ""}>
         <span class="liste-istatistik-sayi">${toplam.toLocaleString("tr-TR")}</span>
         <span class="liste-istatistik-etiket">Toplam ${escapeHtml(eylem)}</span>
       </div>`;
@@ -166,7 +186,7 @@ function istatistikGosterimiOlustur(items, config) {
 
   el.hidden = false;
   el.innerHTML = `
-    <div class="liste-istatistik-kart liste-istatistik-kart--toplam">
+    <div class="liste-istatistik-kart liste-istatistik-kart--toplam" ${tarihsiz ? `title="${tarihsiz} kaydın tarihi yok; toplama dahildir, yıl kartlarına yazılmaz"` : ""}>
       <span class="liste-istatistik-sayi">${toplam.toLocaleString("tr-TR")}</span>
       <span class="liste-istatistik-etiket">Toplam ${escapeHtml(eylem)}</span>
     </div>

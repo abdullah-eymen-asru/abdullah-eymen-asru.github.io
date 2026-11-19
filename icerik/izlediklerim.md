@@ -79,7 +79,7 @@ permalink: "/icerik/izlediklerim.html"
     sayfaBasinaKayit: 24,
     istatistikContainerId: "izleme-istatistik",
     istatistikEylem: "izlediğim",
-    istatistikTamamlandiDegeri: "İzlendi",
+    istatistikTamamlandiDegeri: ["İzledim", "İzlendi"],  // eş anlamlılar + büyük/küçük harf, emoji ve boşluk farkı otomatik tolere edilir
     baslamaTarihiAlani: "Başlama Tarihi",
     bitisTarihiAlani: "Bitiş Tarihi"
   });

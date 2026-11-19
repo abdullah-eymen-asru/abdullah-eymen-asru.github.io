@@ -560,6 +560,18 @@ Ekledikten sonra **Deploy**'a bas. Panelde: Yedekleme & Verilerim → Depolama D
 
 **`delete-account` Edge Function** değişmedi. `/uye-temizle` artık çok büyük hesaplarda işlem bütçesi dolarsa HTTP 409 döner; Edge Function bu durumda veritabanına dokunmadan hata verir, aynı işlemi tekrar çalıştırmak güvenlidir.
 
+#### 4.10d Worker başına GÜNLÜK (UTC) sert sınır — migration 0143 + Cron
+
+Yedekleme & Verilerim › Worker anahtarları'nda her Worker satırında **günlük istek sınırı** girilebilir (boş = sınırsız). Sınır **mutlaktır**: o UTC gününde Worker'a zaten 20 istek geldiyse ve sınırı 23 yaparsan **3 hakkı kalır** (20 + 23 = 43 değil). Sınır dolunca Worker'ın `workers.dev` adresi **Cloudflare'de kesilir** (sert kapatma → istek Worker'a ulaşmaz, kotaya SAYILMAZ). UTC 00:00'da (Türkiye saatiyle 03:00) ya da sınırı yükseltince/kaldırınca **1 dk içinde kendiliğinden yeniden açılır**. Elle kapattığın (Kapalı) servise bu mekanizma dokunmaz.
+
+Kurulum (bir kez):
+1. Supabase SQL Editor'da `0143_worker_gunluk_limit.sql` çalıştır.
+2. `sistem-yedek-worker` kodunu yeniden dağıt (cron işleyicisi eklendi).
+3. Cloudflare › Workers › `sistem-yedek-worker` › **Settings › Triggers › Cron Triggers › Add** → `* * * * *` (her dakika; ücretsizdir, günde 1.440 istek sayar).
+4. Gerekli secret'lar zaten 4.10c'de: `CF_ACCOUNT_ID`, `CF_API_TOKEN` (Account Analytics › Read), `CF_WORKERS_TOKEN` (Workers Scripts › Edit), `SUPABASE_URL`, `SUPABASE_ANON_KEY`.
+
+Dürüst sınırlar: kullanım Cloudflare Analytics'ten okunur ve **1–3 dk gecikmelidir**; çok yoğun bir Worker'da sınır birkaç istek aşılabilir. Yalnızca Worker'lar için geçerlidir (Pages Function `workers.dev` ile kesilemez; korumalı servislere sınır konamaz).
+
 #### 4.10c Worker anahtarları (kota koruması) — migration 0088
 
 Panel: **Yedekleme & Verilerim → Depolama Durumu → 🔌 Worker anahtarları**. Site Sahibi ve sistem yedekleme yetkisi olan roller, Gatekeeper Function'ı ve her Worker'ı tek tek açıp kapatabilir (sistem-yedek-worker ve admin-guvenlik-bildirim-worker **korumalıdır**, kapatılamaz).

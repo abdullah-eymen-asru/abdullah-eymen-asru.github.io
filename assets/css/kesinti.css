@@ -71,3 +71,12 @@
 .sd-onay { display: flex; gap: .5rem; align-items: flex-start; font-size: .88rem; margin: .4rem 0; } .sd-onay input { margin-top: .2rem; inline-size: 1.1rem; block-size: 1.1rem; }
 
 .sd-detay { display: grid; gap: .4rem; margin-top: .4rem; } .sd-detay .sd-liste { margin: 0; padding-left: 1.1rem; font-size: .88rem; } .sd-detay .sd-eylemler { display: flex; flex-wrap: wrap; gap: .4rem; }
+
+/* ---- Sistem Durumu: öneri notu, ölçüm geçmişi, genel özet, Worker satır rozetleri ---- */
+.sd-oneri { margin: .5rem 0 0; padding: .5rem .65rem; border-left: 3px solid #e0a800; border-radius: 6px; background: rgba(224, 168, 0, .10); font-size: .88rem; }
+.sd-hata .sd-oneri { border-left-color: #d64538; background: rgba(214, 69, 56, .10); }
+.sd-gecmis { font-size: .8rem; font-variant-numeric: tabular-nums; }
+.sd-ozet-alt { margin: .25rem 0 .5rem; }
+.sd-rozet-m { display: inline-flex; justify-content: center; align-items: center; width: 1.3em; height: 1.3em; border-radius: 50%; font-size: .75rem; font-weight: 700; color: #fff; }
+.sd-rozet-ok { background: #1f9d55; } .sd-rozet-uyari { background: #e0a800; } .sd-rozet-hata { background: #d64538; }
+.sd-rehber summary { cursor: pointer; font-weight: 600; padding: .35rem 0; }

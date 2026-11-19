@@ -457,3 +457,8 @@
 .sy-wk-arama:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .sy-wk-kaydir { max-height: min(46vh, 420px); overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
 .sy-wk-satir[hidden] { display: none; }
+
+/* ---- Worker günlük (UTC) sert sınırı ---- */
+.sy-wk-limit { flex-basis: 100%; display: grid; gap: 6px; padding: 6px 0 2px 8px; border-left: 2px solid var(--border, rgba(127, 127, 127, .35)); }
+.sy-wk-limit .sy-eylemler { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.sy-wk-limit-giris { width: 9.5rem; min-height: 36px; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--border, rgba(127, 127, 127, .5)); background: transparent; color: inherit; font: inherit; }

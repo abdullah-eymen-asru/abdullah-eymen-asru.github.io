@@ -639,6 +639,91 @@ async function uyeDosya(env, kimlik, url, cors) {
   });
 }
 
+/* ------------------------- WORKER BAŞINA GÜNLÜK (UTC) SERT LİMİT ------------------------- */
+
+/** Bugünün (UTC) Worker bazında istek sayıları: { gun, kullanim: { <script>: n } } ya da { hata }. cache=true → 60 sn edge cache (panel); cron için false. */
+async function workerGunlukKullanim(env, cache) {
+  const simdi = new Date();
+  const gun = simdi.toISOString().slice(0, 10);
+  const anahtar = new Request(`https://kota.invalid/worker-gunluk/v1/${env.CF_ACCOUNT_ID}/${Math.floor(simdi.getTime() / 60000)}`);
+  if (cache) { const v = await caches.default.match(anahtar); if (v) return JSON.parse(await v.text()); }
+  const bas = `${gun}T00:00:00Z`;
+  const sorgu = `query($acc:String!,$from:Time!,$to:Time!){viewer{accounts(filter:{accountTag:$acc}){workersInvocationsAdaptive(limit:10000,filter:{datetime_geq:$from,datetime_leq:$to}){sum{requests}dimensions{scriptName}}}}}`;
+  let g;
+  try {
+    const r = await fetch("https://api.cloudflare.com/client/v4/graphql", {
+      method: "POST", headers: { Authorization: `Bearer ${env.CF_API_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ query: sorgu, variables: { acc: env.CF_ACCOUNT_ID, from: bas, to: simdi.toISOString() } }),
+    });
+    g = await r.json().catch(() => ({}));
+    if (!r.ok || (Array.isArray(g.errors) && g.errors.length)) return { hata: "Analytics yanıtı alınamadı (token izni: Account Analytics › Read)." };
+  } catch { return { hata: "Cloudflare Analytics'e ulaşılamadı." }; }
+  const satirlar = g?.data?.viewer?.accounts?.[0]?.workersInvocationsAdaptive;
+  if (!Array.isArray(satirlar)) return { hata: "Analytics yanıtı beklenen biçimde değil." };
+  const kullanim = {};
+  for (const x of satirlar) { const ad = x.dimensions?.scriptName; if (ad) kullanim[ad] = (kullanim[ad] || 0) + (Number(x.sum?.requests) || 0); }
+  const veri = { gun, kullanim, guncelleme: simdi.toISOString() };
+  if (cache) await caches.default.put(anahtar, new Response(JSON.stringify(veri), { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=60" } }));
+  return veri;
+}
+
+async function subdomainDurumu(env, ad) {
+  const adres = `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/workers/scripts/${encodeURIComponent(ad)}/subdomain`;
+  try {
+    const o = await fetch(adres, { headers: { Authorization: `Bearer ${env.CF_WORKERS_TOKEN}` } });
+    const j = await o.json().catch(() => ({}));
+    return o.ok && typeof j?.result?.enabled === "boolean" ? j.result.enabled : null;
+  } catch { return null; }
+}
+async function subdomainAyarla(env, ad, acik) {
+  const adres = `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/workers/scripts/${encodeURIComponent(ad)}/subdomain`;
+  for (const yontem of ["POST", "PUT"]) {
+    const r = await fetch(adres, { method: yontem, headers: { Authorization: `Bearer ${env.CF_WORKERS_TOKEN}`, "Content-Type": "application/json" }, body: JSON.stringify({ enabled: acik }) });
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 404 || r.status === 405) continue;
+    return r.ok && j.success !== false;
+  }
+  return false;
+}
+
+/**
+ * CRON (her dakika): limiti olan Worker'lar için bugünkü (UTC) kullanım >= limit ise workers.dev adresini KES (sert kapat → kotaya sayılmaz);
+ * kullanım < limit (yeni gün ya da limit yükseltildi) ve servis yönetici tarafından kapatılmamışsa (acik=true) adresi yeniden AÇ.
+ * Elle kapatılmış (acik=false) servise ve limitsiz servise dokunmaz. Gizli anahtar gerekmez: limitler herkese açık okunur.
+ * DÜRÜST NOT: Cloudflare analitiği 1–3 dk gecikmeli; çok yoğun bir Worker'da sınır birkaç istek aşılabilir.
+ */
+async function limitleriUygula(env) {
+  if (!env.CF_ACCOUNT_ID || !env.CF_API_TOKEN || !env.CF_WORKERS_TOKEN || !env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return { atlandi: "yapılandırılmamış" };
+  const r = await fetch(`${env.SUPABASE_URL}/rest/v1/worker_anahtarlari?select=ad,acik,tur,korumali,gunluk_limit&gunluk_limit=not.is.null`, {
+    headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}` },
+  }).catch(() => null);
+  if (!r?.ok) return { atlandi: "limitler okunamadı" };
+  const limitli = (await r.json().catch(() => [])).filter((x) => x.tur === "worker" && !x.korumali && x.gunluk_limit >= 1);
+  if (!limitli.length) return { islenen: 0 };
+  const k = await workerGunlukKullanim(env, false);
+  if (k.hata) return { atlandi: k.hata };
+  const sonuc = [];
+  for (const w of limitli.slice(0, 40)) {
+    const kullanilan = k.kullanim[w.ad] || 0;
+    const asildi = kullanilan >= w.gunluk_limit;
+    if (!w.acik) continue;                                    // elle kapatılmış: dokunma
+    const mevcut = await subdomainDurumu(env, w.ad);
+    if (mevcut === null) { sonuc.push({ ad: w.ad, hata: "durum okunamadı" }); continue; }
+    if (asildi && mevcut) sonuc.push({ ad: w.ad, islem: "kapatildi", ok: await subdomainAyarla(env, w.ad, false) });
+    else if (!asildi && !mevcut) sonuc.push({ ad: w.ad, islem: "acildi", ok: await subdomainAyarla(env, w.ad, true) });
+  }
+  return { gun: k.gun, islenen: limitli.length, sonuc };
+}
+
+/** Panel için: bugünkü Worker bazlı kullanım (yalnızca istatistik yetkilileri). */
+async function workerLimitKullanim(env, kimlik, cors) {
+  if (!(await istatistikYetkiliMi(env, kimlik))) return json({ error: "Bu istatistikleri görme yetkin yok." }, 403, cors);
+  if (!env.CF_ACCOUNT_ID || !env.CF_API_TOKEN) return json({ yapilandirilmadi: true }, 200, cors);
+  const k = await workerGunlukKullanim(env, true);
+  if (k.hata) return json({ error: k.hata }, 502, cors);
+  return json({ ...k, sert_destek: !!env.CF_WORKERS_TOKEN }, 200, cors);
+}
+
 /* -------------------------------- giriş -------------------------------- */
 
 /**
@@ -795,6 +880,9 @@ async function r2Kota(env, kimlik, cors) {
 }
 
 export default {
+  /** Cron Trigger (Cloudflare › Workers › sistem-yedek-worker › Triggers › Cron: "* * * * *"): günlük Worker limitlerini uygular. */
+  async scheduled(_olay, env, ctx) { ctx.waitUntil(limitleriUygula(env).catch(() => {})); },
+
   async fetch(istek, env) {
     const cors = corsBasliklari(istek);
     if (istek.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
@@ -848,6 +936,7 @@ export default {
       if (yol === "/kota") return await kotaGetir(env, kimlik, cors);
       if (yol === "/kota/analitik") return await kotaAnalitik(env, kimlik, cors);
       if (yol === "/r2/kota") return await r2Kota(env, kimlik, cors);
+      if (yol === "/worker-limit/kullanim") return await workerLimitKullanim(env, kimlik, cors);
       if (yol === "/worker-sert/durum") return json({ yapilandirildi: !!(env.CF_ACCOUNT_ID && env.CF_WORKERS_TOKEN) }, 200, cors);
       if (yol === "/r2/gezgin") return await r2Gezgin(env, kimlik, url, cors);
       if (yol === "/r2/hayalet-tara") return await hayaletTara(env, kimlik, url, cors);
