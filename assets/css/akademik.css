@@ -462,3 +462,61 @@ html.ak-okuyucu-acik-html { overflow: hidden; overscroll-behavior: none; }
   .ak-ok-dock .ak-ok-renkler { flex: 1 1 auto; flex-wrap: nowrap; justify-content: space-between; overflow-x: auto; }
   .ak-ok-dock .ak-ok-sec { flex: 0 0 auto; max-width: 6.5rem; }
 }
+
+/* ======================================================================================================
+   v2026.11.20 — OKUYUCU DÜZELTMELERİ (kök neden yamaları)
+   1) Site genelindeki `* { box-sizing:border-box }` ve geçiş kuralı PDF.js sayfa geometrisini bozuyordu
+      (.page 9px kenarlıklı ve content-box varsayar) → metin katmanı/vurgular sayfadan kayıyor, satır dışına taşıyordu.
+   2) Tek seçim katmanı: yerel ::selection şeffaf; seçimi .ak-sec katmanı (gerçek getClientRects) çizer.
+   3) Sürüklenebilir kırmızı not (pin), tek satırlık durum çubuğu, menü taşmaları.
+   ====================================================================================================== */
+.ak-okuyucu .pdfViewer .page,
+.ak-okuyucu .pdfViewer .page *,
+.ak-okuyucu .pdfViewer .page *::before,
+.ak-okuyucu .pdfViewer .page *::after { box-sizing: content-box; transition: none; }
+.ak-okuyucu .pdfViewer .page .ak-kat,
+.ak-okuyucu .pdfViewer .page .ak-sec { box-sizing: border-box; }
+
+/* Tek seçim katmanı */
+.ak-okuyucu .textLayer ::selection,
+.ak-okuyucu .textLayer::selection { background: transparent; color: inherit; }
+.ak-okuyucu .textLayer br::selection { background: transparent; }
+.ak-okuyucu .textLayer.ak-yerel-secim ::selection { background: rgba(40, 110, 255, .32); }   /* katman çizilemezse yedek */
+.ak-okuyucu .pdfViewer .page .ak-sec { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
+.ak-okuyucu .ak-sec i { position: absolute; background: rgba(40, 110, 255, .30); border-radius: 1px; mix-blend-mode: multiply; }
+.ak-okuyucu .textLayer .endOfContent { pointer-events: none; }
+
+/* Sürüklenebilir not işareti */
+.ak-okuyucu .ak-pin { position: absolute; z-index: 1; display: grid; place-items: center; width: 1.9rem; height: 1.9rem; margin: -.95rem 0 0 -.95rem; padding: 0; border: 2px solid #fff; border-radius: 50% 50% 50% 8%; background: #e53935; color: #fff; font: 700 .8rem/1 system-ui, sans-serif; box-shadow: 0 2px 6px rgba(0,0,0,.4); cursor: grab; pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.ak-okuyucu .ak-pin.surukleniyor { cursor: grabbing; transform: scale(1.12); box-shadow: 0 6px 14px rgba(0,0,0,.45); z-index: 6; }
+.ak-okuyucu .ak-pin.secili { outline: 3px solid rgba(40,110,255,.7); outline-offset: 2px; }
+.ak-okuyucu .ak-pin.salt { cursor: pointer; touch-action: manipulation; }
+.ak-okuyucu .pdfViewer .page .ak-pinkat { position: absolute; inset: 0; z-index: 4; pointer-events: none; box-sizing: border-box; }
+.ak-okuyucu .ak-flas { animation: ak-flas 1.4s ease-out 1; }
+@keyframes ak-flas { 0% { outline: 3px solid rgba(255,170,0,.95); background-color: rgba(255,200,0,.45); } 100% { outline: 3px solid rgba(255,170,0,0); background-color: rgba(255,200,0,0); } }
+
+/* Durum + otomatik çeviri satırları tek satırda */
+.ak-ok-durumsatiri { display: flex; flex-wrap: wrap; align-items: center; gap: .2rem .8rem; border-bottom: 1px solid var(--border); padding: 0 .8rem; min-height: 1.5rem; }
+.ak-ok-durumsatiri .ak-ok-durum, .ak-ok-durumsatiri .ak-ok-oto { border: 0; padding: .2rem 0; min-height: 0; flex: 0 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.ak-ok-durumsatiri .ak-ok-oto:empty, .ak-ok-durumsatiri .ak-ok-durum:empty { display: none; }
+
+/* Otomatik çeviri sonucu (balon içinde / kompakt kart) */
+.ak-oto-ceviri { margin: .35rem 0 0; padding: .4rem .55rem; max-width: 22rem; font-size: .85rem; line-height: 1.35; color: var(--text); background: color-mix(in srgb, var(--accent) 10%, transparent); border-left: 3px solid var(--accent); border-radius: 6px; overflow-wrap: anywhere; user-select: text; }
+.ak-oto-ceviri small { display: block; color: var(--muted); }
+.ak-oto-kart { position: fixed; z-index: 60; left: 50%; bottom: 1rem; transform: translateX(-50%); max-width: min(92vw, 26rem); background: var(--bg); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.35); padding: .5rem .7rem; }
+
+/* Kenar çubuğu arama */
+.ak-liste-ara { width: 100%; box-sizing: border-box; margin: 0 0 .4rem; padding: .4rem .6rem; font: inherit; color: var(--text); background: transparent; border: 1px solid var(--border); border-radius: 8px; }
+
+/* Menü / üst çubuk taşmaları */
+.ak-menu-liste { min-width: min(20rem, 92vw); max-width: 92vw; }
+.ak-menu-liste button { flex-wrap: nowrap; white-space: normal; }
+.ak-menu-liste button small { flex: 1 1 auto; }
+
+/* Mobil: seçim tutamaçları (touch-action / callout çakışmasının tek kuralı) */
+.ak-okuyucu .textLayer, .ak-okuyucu .textLayer span { -webkit-touch-callout: default; -webkit-user-select: text; user-select: text; }
+.ak-okuyucu.ak-cizim-modu .textLayer { touch-action: none; }
+.ak-okuyucu .ak-flas-kutu { position: absolute; border-radius: 4px; pointer-events: none; z-index: 5; }
+.ak-okuyucu .ak-pin { margin: 0; border: 1px solid #222; border-radius: 3px; color: #222; font-size: .75rem; }
+.ak-okuyucu .ak-pin::after { content: ""; position: absolute; inset: -8px; }   /* ≥ 32px dokunma alanı */
+.ak-okuyucu .ak-pin:focus-visible { outline: 3px solid rgba(40,110,255,.8); outline-offset: 2px; }

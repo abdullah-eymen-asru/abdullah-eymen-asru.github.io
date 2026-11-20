@@ -4,6 +4,7 @@
  * Depolama: kullanıcı başına tek küçük satır (≤ 8 KB) + yerel yedek. PDF/çeviri içeriği HİÇBİR yere kaydedilmez. CSP: satır içi stil/olay yok.
  */
 import { el, toast } from "./ortak.js";
+import { modulDurumlari, modulAyarla, modulDinle } from "./modul-kayit.js";
 import { KATALOG, eklentilerAcikMi, ayarYukle, ayarKaydet, ozelUrlGecerli, aramaAdresiniCevir, cevirRizasiVarMi, cevirRizasiVer, cevirRizasiGeriAl, RIZA_METNI } from "./eklentiler.js";
 
 export async function eklentiPaneliKur(yer) {
@@ -50,6 +51,23 @@ export async function eklentiPaneliKur(yer) {
     const riza = el("input", { type: "checkbox", id: "ak-ek-riza", checked: cevirRizasiVarMi() });
     riza.addEventListener("change", () => { if (riza.checked) { if (window.confirm(RIZA_METNI)) cevirRizasiVer(); else riza.checked = false; } else cevirRizasiGeriAl(); });
     liste.prepend(el("label", { class: "ak-ek-satir ak-ek-riza", for: "ak-ek-riza" }, el("span", { class: "ak-ek-ust" }, riza, el("strong", { text: "Çevrimiçi çeviriye izin ver" })), el("small", { class: "ak-alt", text: "Açıkken seçtiğin metin (en çok 1500 karakter) ve dil çifti çeviri servisine (Google Çeviri / MyMemory) gönderilir; başka hiçbir bilgin gönderilmez. Kapalıyken yalnızca cihaz içi çeviri (Chrome/Edge) çalışır." })));
+
+    // Otomatik Anında Çeviri (Gizlilik Modu): varsayılan AÇIK. Kapalıyken seçimde HİÇBİR çeviri isteği gönderilmez; yalnızca "Çevir" düğmesi çalışır.
+    const oto = el("input", { type: "checkbox", id: "ak-ek-oto", checked: a.otoCeviri !== false });
+    oto.addEventListener("change", () => { a.otoCeviri = oto.checked; kaydet(); });
+    liste.prepend(el("label", { class: "ak-ek-satir ak-ek-riza", for: "ak-ek-oto" }, el("span", { class: "ak-ek-ust" }, oto, el("strong", { text: "Otomatik Anında Çeviri (Gizlilik Modu)" })), el("small", { class: "ak-alt", text: "Açıkken yabancı dilde metin seçtiğinde (ya da altını çizerken) çeviri, “Çevir”e basmadan seçim menüsünde görünür; bunun için seçtiğin metin (en çok 600 karakter) çeviri servisine gönderilir. Kapalıyken seçimde HİÇBİR istek gönderilmez, çeviri yalnızca “Çevir” düğmesine basınca yapılır." })));
+
+    // Modüller (genişletme altyapısı): sorunlu bir modül buradan kapatılır; okuyucu/notlar/veritabanı etkilenmez.
+    const mod = modulDurumlari();
+    if (mod.length) {
+      const kutu = el("div", { class: "ak-ek-grup" }, el("h4", { text: "🧱 Okuyucu modülleri" }));
+      for (const m of mod) {
+        const k = el("input", { type: "checkbox", id: `ak-mod-${m.id}`, checked: m.durum === "etkin", disabled: m.durum === "reddedildi" });
+        k.addEventListener("change", () => { modulAyarla(m.id, k.checked); });
+        kutu.append(el("label", { class: "ak-ek-satir", for: `ak-mod-${m.id}` }, el("span", { class: "ak-ek-ust" }, k, el("strong", { text: `${m.ad} ${m.surum}` }), el("span", { class: "ak-ek-rozet yerel", text: m.durum === "etkin" ? "çalışıyor" : m.durum })), el("small", { class: "ak-alt", text: m.neden || m.aciklama })));
+      }
+      liste.append(kutu);
+    }
 
     const ad = el("input", { type: "text", maxlength: "40", placeholder: "Sitenin adı (örn. Dergipark)", "aria-label": "Arama sitesinin adı" });
     const url = el("input", { type: "url", maxlength: "500", placeholder: "Sonuç sayfasının adresini buraya yapıştır", "aria-label": "Sonuç sayfası adresi" });

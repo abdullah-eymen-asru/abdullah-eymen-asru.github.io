@@ -55,12 +55,14 @@ export const cevirRizasiGeriAl = () => { try { localStorage.removeItem(RIZA_ANAH
 export const RIZA_METNI = "Çevrimiçi çeviri için seçtiğin metin (en çok 1500 karakter), kaynak/hedef dil ve IP adresin çeviri servisine (Google Çeviri veya MyMemory) gönderilir. Hesabın, kütüphane bilgilerin ve PDF'in kendisi GÖNDERİLMEZ. Servis metni kendi gizlilik koşullarına göre işleyebilir. Cihaz-içi çeviri (Chrome/Edge) kullanılabiliyorsa önce o denenir ve hiçbir şey gönderilmez. Onaylıyor musun? (Ayarlar'dan istediğin an geri alabilirsin.)";
 async function zamanAsimliFetch(url, secenek = {}, ms = ZAMAN_ASIMI) {
   const k = new AbortController(), z = setTimeout(() => k.abort(), ms);
-  try { const r = await fetch(url, { credentials: "omit", referrerPolicy: "no-referrer", signal: k.signal, ...secenek }); if (!r.ok) throw new Error(`HTTP ${r.status}`); return r; }
+  const dis = secenek.signal;                                     // dışarıdan iptal (yeni seçim yapılınca eski istek bırakılır)
+  if (dis) { if (dis.aborted) k.abort(); else dis.addEventListener("abort", () => k.abort(), { once: true }); }
+  try { const r = await fetch(url, { credentials: "omit", referrerPolicy: "no-referrer", ...secenek, signal: k.signal }); if (!r.ok) throw new Error(`HTTP ${r.status}`); return r; }
   finally { clearTimeout(z); }
 }
-async function googleCeviri(metin, kaynak, hedef) {
+async function googleCeviri(metin, kaynak, hedef, sinyal) {
   const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(kaynak)}&tl=${encodeURIComponent(hedef)}&dt=t&q=${encodeURIComponent(metin)}`;
-  const j = await (await zamanAsimliFetch(url)).json();
+  const j = await (await zamanAsimliFetch(url, { signal: sinyal })).json();
   const parcalar = Array.isArray(j?.[0]) ? j[0].map((x) => x?.[0] || "").join("") : "";
   if (!parcalar) throw new Error("Google boş yanıt verdi.");
   return { metin: parcalar, algilanan: j?.[2] || "", yontem: `Google Çeviri (${j?.[2] || kaynak}→${hedef}) — metin Google'a gönderildi` };
@@ -75,11 +77,11 @@ function parcala(metin, n) {
   if (cur.trim()) cikti.push(cur.trim());
   return cikti;
 }
-async function myMemoryCeviri(metin, kaynak, hedef) {
+async function myMemoryCeviri(metin, kaynak, hedef, sinyal) {
   const cift = `${kaynak === "auto" ? "Autodetect" : kaynak}|${hedef}`;
   const sonuc = [];
   for (const p of parcala(metin, 450)) {
-    const j = await (await zamanAsimliFetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(p)}&langpair=${encodeURIComponent(cift)}`)).json();
+    const j = await (await zamanAsimliFetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(p)}&langpair=${encodeURIComponent(cift)}`, { signal: sinyal })).json();
     if (j?.responseStatus && Number(j.responseStatus) !== 200) throw new Error(j.responseDetails || "MyMemory hata verdi.");
     sonuc.push(j?.responseData?.translatedText || "");
   }
@@ -92,7 +94,9 @@ async function myMemoryCeviri(metin, kaynak, hedef) {
  *  NEDEN: eskiden "auto" her seferinde önce cihaz içi çeviriyi (Chrome Translator API) deniyordu; bu API çoğu tarayıcıda olmadığı için
  *  her çeviri gereksiz bir hata + gecikmeyle başlıyordu. Artık cihaz içi motor YALNIZCA kullanıcı seçtiyse ("cihaz"/"cihaz_sonra") denenir. */
 export const cihazCeviriVarMi = () => typeof self !== "undefined" && "Translator" in self;
-export async function ceviriYap(metin, { kaynak = "auto", hedef = "tr", motor = "auto" } = {}) {
+/** otomatik: true → "Otomatik Anında Çeviri" ayarı AÇIK olduğu için ayrıca onay penceresi çıkarılmaz (ayarın kendisi rızadır);
+ *  ayar kapalıyken bu yol HİÇ çağrılmaz. sinyal: AbortSignal (eski isteği iptal etmek için). */
+export async function ceviriYap(metin, { kaynak = "auto", hedef = "tr", motor = "auto", otomatik = false, sinyal = undefined } = {}) {
   const hatalar = [];
   const dene = async (ad, fn) => { try { return await fn(); } catch (h) { hatalar.push(`${ad}: ${h.message}`); return null; } };
   const onayAl = () => {
@@ -105,10 +109,10 @@ export async function ceviriYap(metin, { kaynak = "auto", hedef = "tr", motor = 
     if (c) return c;
     if (motor === "cihaz") throw new Error(`Cihaz içi çeviri yapılamadı. ${hatalar.join(" · ")} Ayarlar'dan çevrimiçi motoru seç.`);
   }
-  if (!onayAl()) throw new Error("Çevrimiçi çeviri için onay vermedin; hiçbir veri gönderilmedi.");
+  if (!otomatik && !onayAl()) throw new Error("Çevrimiçi çeviri için onay vermedin; hiçbir veri gönderilmedi.");
   const sira = motor === "mymemory" ? ["mymemory"] : motor === "google" ? ["google"] : ["google", "mymemory"];
   for (const m of sira) {
-    const sonuc = m === "google" ? await dene("Google", () => googleCeviri(metin, kaynak, hedef)) : await dene("MyMemory", () => myMemoryCeviri(metin, kaynak, hedef));
+    const sonuc = m === "google" ? await dene("Google", () => googleCeviri(metin, kaynak, hedef, sinyal)) : await dene("MyMemory", () => myMemoryCeviri(metin, kaynak, hedef, sinyal));
     if (sonuc) return sonuc;
   }
   throw new Error(`Çeviri servislerine ulaşılamadı. ${hatalar.join(" · ")}`);
@@ -211,11 +215,13 @@ export const KATALOG = Object.freeze({
   wiktionary: { ad: "Vikisözlük'te ara", simge: "📖", gizlilik: "baglanti", varsayilanKapali: true, aciklama: "Seçili kelimeyi Vikisözlük'te yeni sekmede arar. Tercihe bağlı.", ayarlar: [], baglanti: ({ metin }) => `https://tr.wiktionary.org/w/index.php?search=${encodeURIComponent(kisalt(metin, 60))}` },
 });
 
-export const VARSAYILAN_AYAR = Object.freeze({ v: 1, acik: ["ceviri", "istatistik", "temizle", "doi_cikar"], ayar: {}, ozel: [], aramalar: [] });
+export const VARSAYILAN_AYAR = Object.freeze({ v: 1, acik: ["ceviri", "istatistik", "temizle", "doi_cikar"], ayar: {}, ozel: [], aramalar: [], otoCeviri: true });
+/** "Otomatik Anında Çeviri (Gizlilik Modu)": varsayılan AÇIK. Kapalıysa seçimde hiçbir çeviri isteği gönderilmez; yalnızca "Çevir" düğmesi çalışır. */
+export const otoCeviriAcikMi = (a) => !!a && a.otoCeviri !== false && Array.isArray(a.acik) && a.acik.includes("ceviri");
 
 /* ------------------------------ ayar saklama (yerel + küçük bulut satırı) ------------------------------ */
 function temizle(a) {
-  const o = { v: 1, acik: [], ayar: {}, ozel: [], aramalar: [] };
+  const o = { v: 1, acik: [], ayar: {}, ozel: [], aramalar: [], otoCeviri: true };
   if (!a || typeof a !== "object") return { ...VARSAYILAN_AYAR, acik: [...VARSAYILAN_AYAR.acik] };
   const ozel = (Array.isArray(a.ozel) ? a.ozel : []).filter((x) => x && typeof x.id === "string" && ozelUrlGecerli(x.url)).slice(0, 10)
     .map((x) => ({ id: String(x.id).slice(0, 40), ad: kisalt(String(x.ad || "Arama"), 40), simge: kisalt(String(x.simge || "🔗"), 4), url: String(x.url).slice(0, 500) }));
@@ -227,6 +233,7 @@ function temizle(a) {
   o.aramalar = (Array.isArray(a.aramalar) ? a.aramalar : []).filter((x) => x && typeof x.ad === "string").slice(-30)
     .map((x) => ({ ad: x.ad.slice(0, 60), ara: String(x.ara || "").slice(0, 200), klasor: typeof x.klasor === "string" ? x.klasor.slice(0, 40) : "", f: Object.fromEntries(Object.entries(x.f && typeof x.f === "object" ? x.f : {}).filter(([k, v]) => ["tur", "etiket", "yazar", "yilBas", "yilSon", "gorunurluk", "pdfli"].includes(k) && ["string", "number", "boolean"].includes(typeof v)).map(([k, v]) => [k, typeof v === "string" ? v.slice(0, 120) : v])) }));
   o.ozel = ozel;
+  o.otoCeviri = typeof a.otoCeviri === "boolean" ? a.otoCeviri : true;
   for (const [id, v] of Object.entries(a.ayar && typeof a.ayar === "object" ? a.ayar : {})) {
     if (!KATALOG[id]) continue;
     o.ayar[id] = {};
