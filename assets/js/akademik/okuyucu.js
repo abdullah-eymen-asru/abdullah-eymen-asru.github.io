@@ -16,7 +16,7 @@ import { motoruYukle, pdfLibAl } from "./motor.js";
 import { acikla, uygula, satirlaraBol, NOT_BOYUTU } from "./pdf-yaz.js";
 import { alintiMarkdown } from "./atif.js";
 import { taslakYaz, taslakOku, taslakSil } from "./taslak.js";
-import { eklentilerAcikMi, ayarYukle, acikEklentiler, eklentiCalistir as eklentiYurut, ceviriYap, otoCeviriAcikMi } from "./eklentiler.js";
+import { eklentilerAcikMi, ayarYukle, ayarKaydet, acikEklentiler, eklentiCalistir as eklentiYurut, ceviriUzun, otoCeviriAcikMi, DIL_SECENEKLERI } from "./eklentiler.js";
 import { kancaCalistir, konumuYukselt, konumEkstra, SEMA_SURUMU } from "./modul-kayit.js";
 
 /** Veritabanı `konum` verisini model alanlarına açar: şema yükseltilir, bilinmeyen alanlar `ekstra` altında saklanır (kaydederken geri yazılır). */
@@ -887,57 +887,76 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
   let otoIptal = null;
   const TR_HARF = /[çğıöşüÇĞİÖŞÜ]/;
   const TR_KELIME = /^(ve|bir|bu|için|ile|olarak|olan|daha|gibi|çok|ama|veya|de|da|ki|ne|mi|ise|her|çünkü)$/i;
-  function otoUygunMu(m) {
-    if (m.length < 3 || m.length > 600 || !/\p{L}{2,}/u.test(m) || TR_HARF.test(m)) return false;
+  /** Seçimden çeviri metni: satır sonu tire bölünmeleri (“kar-\nşılaştır”) birleşir, boşluklar sadeleşir; paragraf/sayfa atlayan seçim tek metin olur. */
+  const otoMetin = (ham) => String(ham || "").replace(/[\u00ad\u200b]/g, "").replace(/(\p{Ll})-[ \t]*\r?\n[ \t]*(\p{Ll})/gu, "$1$2").replace(/\s+/g, " ").trim();
+  /** Gönderilsin mi? Uzunluk sınırı yok (6000 karaktere kadar parça parça çevrilir). Metin zaten Türkçeyse ve hedef Türkçeyse gönderilmez. */
+  function otoUygunMu(m, hedef = "tr", kaynak = "auto") {
+    if (m.length < 3 || !/\p{L}{2,}/u.test(m)) return false;
+    if (hedef !== "tr" || kaynak !== "auto") return true;
+    if (TR_HARF.test(m)) return false;
     const kel = m.split(/\s+/);
-    if (kel.length >= 4 && kel.filter((k) => TR_KELIME.test(k.replace(/[^\p{L}]/gu, ""))).length / kel.length > 0.2) return false;
-    return true;
+    return !(kel.length >= 4 && kel.filter((k) => TR_KELIME.test(k.replace(/[^\p{L}]/gu, ""))).length / kel.length > 0.2);
   }
-  async function otoCeviriGoster(ham, baglan, hala) {
-    const m = String(ham || "").replace(/\s+/g, " ").trim();
-    if (!otoUygunMu(m)) return;
+  /** Çeviri kartı: kaynak/hedef dil seçicileri, kendi içinde kaydırılan metin, kopyala/küçült/kapat. Masaüstünde sağ altta, mobilde alt panel (en çok ekranın ~⅓'ü). */
+  let otoKart = null;
+  let otoSira = 0;
+  async function otoCeviriKarti(ham) {
+    const m = otoMetin(ham), sira = ++otoSira;
     let ayar;
     try { if (!(await eklentilerAcikMi())) return; ayar = await ayarYukle(); } catch { return; }
-    if (!otoCeviriAcikMi(ayar) || !hala()) return;                     // ayar kapalı → HİÇBİR istek yok
-    const c = ayar.ayar?.ceviri || {}, hedef = c.hedef || "tr", anahtar = `${c.motor || "auto"}|${c.kaynak || "auto"}|${hedef}|${m}`;
-    const kutu = el("div", { class: "ak-oto-ceviri", role: "status", "aria-live": "polite" }, "Çevriliyor…");
-    baglan(kutu);
-    try {
-      let sonuc = otoOnbellek.get(anahtar);
-      if (sonuc === undefined) {
-        otoIptal?.abort();
-        const ac = new AbortController(); otoIptal = ac;
-        const r = await ceviriYap(m, { kaynak: c.kaynak || "auto", hedef, motor: c.motor || "auto", otomatik: true, sinyal: ac.signal });
-        if (ac.signal.aborted) return;
-        sonuc = r.algilanan && r.algilanan === hedef ? null : { metin: r.metin, dil: r.algilanan || "" };      // zaten hedef dilde → gösterme
-        if (otoOnbellek.size > 100) otoOnbellek.delete(otoOnbellek.keys().next().value);
-        otoOnbellek.set(anahtar, sonuc);
+    if (sira !== otoSira || !otoCeviriAcikMi(ayar)) return;                                // ayar kapalı → HİÇBİR istek yok
+    const c0 = ayar.ayar?.ceviri || {};
+    if (!otoUygunMu(m, c0.hedef || "tr", c0.kaynak || "auto")) return;
+    otoKart?.kart.remove(); otoIptal?.abort();
+    const bu = { kart: null }; otoKart = bu;
+    const sec = (secenekler, deger, etiket) => { const s = el("select", { class: "ak-oto-dil", "aria-label": etiket }); for (const [k, v] of Object.entries(secenekler)) s.append(el("option", { value: k }, v)); s.value = deger; return s; };
+    const kaynakSec = sec({ auto: "Algıla", ...DIL_SECENEKLERI }, c0.kaynak || "auto", "Kaynak dil"), hedefSec = sec(DIL_SECENEKLERI, c0.hedef || "tr", "Hedef dil");
+    const govde = el("div", { class: "ak-oto-metin", tabindex: "0", role: "status", "aria-live": "polite" }, "Çevriliyor…");
+    const kopyaBtn = el("button", { type: "button", class: "ak-btn ak-oto-ik", "aria-label": "Çeviriyi kopyala", title: "Çeviriyi kopyala" }, "⧉");
+    const kucukBtn = el("button", { type: "button", class: "ak-btn ak-oto-ik", "aria-label": "Küçült / büyüt", title: "Küçült / büyüt" }, "▾");
+    const kapatBtn = el("button", { type: "button", class: "ak-btn ak-oto-ik", "aria-label": "Kapat", title: "Kapat" }, "✕");
+    const kart = el("div", { class: "ak-oto-kart", role: "dialog", "aria-label": "Otomatik çeviri" },
+      el("div", { class: "ak-oto-ust" }, kaynakSec, el("span", { "aria-hidden": "true" }, "→"), hedefSec, kopyaBtn, kucukBtn, kapatBtn), govde);
+    bu.kart = kart; let son = "";
+    kapatBtn.addEventListener("click", () => { kart.remove(); otoIptal?.abort(); });
+    kucukBtn.addEventListener("click", () => { const k = kart.classList.toggle("ak-oto-kucuk"); kucukBtn.textContent = k ? "▴" : "▾"; });
+    kopyaBtn.addEventListener("click", async () => { if (son) { await panoyaKopyala(son); toast("Çeviri kopyalandı.", "basari"); } });
+    q(".ak-ok-govde").append(kart);
+    const konumla = () => {                                            // mobilde alttaki işlem çubuğunun (balon) ÜSTÜNE otur; üst üste binip düğmeleri örtmesin
+      const balon = q(".ak-balon"); kart.style.bottom = "";
+      if (balon && !balon.hidden && window.matchMedia("(max-width: 720px)").matches) { const r = balon.getBoundingClientRect(); if (r.height > 0 && r.top > 0) kart.style.bottom = `${Math.max(8, window.innerHeight - r.top + 8)}px`; }
+    };
+    konumla(); requestAnimationFrame(konumla);
+    const cevir = async () => {
+      const kaynakDil = kaynakSec.value, hedef = hedefSec.value, motor = (ayar.ayar?.ceviri || {}).motor || "auto", anahtar = `${motor}|${kaynakDil}|${hedef}|${m}`;
+      otoIptal?.abort(); const ac = new AbortController(); otoIptal = ac; son = "";
+      const yaz = (metin, not) => { govde.replaceChildren(...(not ? [el("small", {}, not)] : []), metin); };
+      try {
+        let sonuc = otoOnbellek.get(anahtar);
+        if (sonuc === undefined) {
+          govde.textContent = "Çevriliyor…";
+          const r = await ceviriUzun(m, { kaynak: kaynakDil, hedef, motor, otomatik: true, sinyal: ac.signal, ilerle: (kismi, i, n) => { if (bu.kart?.isConnected && !ac.signal.aborted) { son = kismi; yaz(kismi, n > 1 ? `Çevriliyor… ${i}/${n}` : ""); } } });
+          if (ac.signal.aborted) return;
+          sonuc = { metin: r.metin, dil: r.algilanan || "", kesildi: !!r.kesildi };
+          if (otoOnbellek.size > 100) otoOnbellek.delete(otoOnbellek.keys().next().value);
+          otoOnbellek.set(anahtar, sonuc);
+        }
+        if (!bu.kart?.isConnected) return;
+        son = sonuc.metin;
+        if (kaynakDil === "auto" && sonuc.dil && sonuc.dil === hedef && hedef === "tr") { kart.remove(); return; }       // zaten Türkçe → gösterme
+        yaz(sonuc.metin, `${sonuc.dil ? `${DIL_SECENEKLERI[sonuc.dil] || sonuc.dil} → ` : ""}${DIL_SECENEKLERI[hedef] || hedef}${sonuc.kesildi ? " · metin çok uzundu, ilk 6000 karakter çevrildi" : ""}`);
+      } catch (h) {
+        if (h?.name === "AbortError" || !bu.kart?.isConnected) return;
+        govde.textContent = "Otomatik çeviri yapılamadı. Dilleri değiştirip tekrar dene ya da balondaki “Çevir” düğmesini kullan.";
       }
-      if (!hala()) return;
-      if (!sonuc) { kutu.remove(); return; }
-      kutu.textContent = "";
-      kutu.append(el("small", {}, `Çeviri${sonuc.dil ? ` (${sonuc.dil}→${hedef})` : ""}`), sonuc.metin);
-    } catch (h) {
-      if (h?.name === "AbortError" || !hala()) return;
-      kutu.textContent = "Otomatik çeviri yapılamadı (“Çevir” düğmesini dene).";
-    }
+    };
+    const kaydet = async () => {                                       // dil seçimi kalıcı (kaynak/hedef ayarı)
+      try { const a = await ayarYukle(); const c = { ...(a.ayar?.ceviri || {}), kaynak: kaynakSec.value, hedef: hedefSec.value }; await ayarKaydet({ ...a, ayar: { ...(a.ayar || {}), ceviri: c } }); } catch { /* ayar kaydedilemedi: bu çeviri yine de çalışır */ }
+    };
+    for (const s of [kaynakSec, hedefSec]) s.addEventListener("change", () => { kaydet(); cevir(); });
+    cevir();
   }
-  /** İşaretleme aracı açıkken seçim hemen tüketildiği için çeviri, balon yerine küçük bir kartta gösterilir. */
-  let otoKart = null;
-  function otoCeviriKarti(metin) {
-    otoKart?.remove(); otoKart = null;
-    const bu = {};
-    otoKart = bu;
-    otoCeviriGoster(metin, (kutu) => {
-      const kart = el("div", { class: "ak-oto-kart", role: "dialog", "aria-label": "Otomatik çeviri" });
-      const kapat = el("button", { type: "button", class: "ak-btn", "aria-label": "Kapat" }, "✕");
-      kapat.addEventListener("click", () => kart.remove());
-      kart.append(kutu, kapat);
-      bu.el = kart;
-      q(".ak-ok-govde").append(kart);
-      setTimeout(() => kart.remove(), 14000);
-    }, () => otoKart === bu);
-  }
+  const otoCeviriGoster = (ham) => { otoCeviriKarti(ham); };
 
   /** Alıntı metni: “seçim” (Yazar, Yıl, s. N) — kaynaktaki yazar/yıl bilgisinden. */
   function metniAlintiYap(metin, sayfaNo) {
@@ -1141,9 +1160,7 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
     balon.addEventListener("touchend", (e) => { const b = e.target.closest("button"); if (!b) return; e.preventDefault(); sonDokunus = Date.now(); balonEylem(b); }, { passive: false });
     balon.addEventListener("click", (e) => { if (Date.now() - sonDokunus < 700) return; const b = e.target.closest("button"); if (b) balonEylem(b); });
     q(".ak-ok-govde").append(balon);
-    otoKart?.el?.remove(); otoKart = null;
-    const buBalon = balon;
-    otoCeviriGoster(sonSecim?.metin, (kutu) => buBalon.append(kutu), () => balon === buBalon);
+    otoCeviriKarti(sonSecim?.metin);
     kanca("okuyucu:secim", { metin: String(sonSecim?.metin || "").slice(0, 2000), sayfa: secimSayfasi() });
     if (!dokunmatik) {
       balon.style.left = `${Math.max(8, Math.min(govde.width - 330, son.right - govde.left - 20))}px`;

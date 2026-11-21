@@ -10,34 +10,95 @@
 .mk-kendi { display: grid; gap: .6rem; padding: .7rem; border: 1px dashed var(--border); border-radius: 10px; } .mk-kendi[hidden] { display: none; }
 .mk-durum { margin: 0; min-height: 1.1rem; }
 
+/* ================= Transkript Stüdyosu (3 adım + sekmeli sonuç) ================= */
+.ts-kok { display: grid; gap: 1rem; max-width: 60rem; }
+.ts-giris h2 { font-size: 1.15rem; } .ts-gizlilik { font-size: .82rem; }
+.ts-adim { display: flex; align-items: center; gap: .6rem; margin-top: .4rem; } .ts-adim h2 { margin: 0; font-size: 1rem; }
+.ts-no { display: inline-grid; place-items: center; width: 1.7rem; height: 1.7rem; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; font-size: .85rem; flex: none; }
+.ts-birak { display: grid; justify-items: center; gap: .25rem; padding: 1.3rem 1rem; border: 2px dashed var(--border); border-radius: 14px; background: var(--bg); color: var(--text); font: inherit; cursor: pointer; text-align: center; min-height: 7rem; }
+.ts-birak:hover, .ts-birak.ts-ustunde { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--bg)); }
+.ts-birak-ikon { font-size: 1.8rem; }
+.ts-dosya { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .5rem; padding: .5rem .7rem; border-radius: 10px; background: color-mix(in srgb, var(--accent) 8%, transparent); overflow-wrap: anywhere; } .ts-dosya[hidden], .ts-ayarlar[hidden] { display: none; }
+.ts-kucuk { min-height: 2rem; padding: .2rem .6rem; font-size: .85rem; }
+.ts-ayarlar { display: grid; gap: .8rem; }
+.ts-oynat { display: flex; } .ts-oynatici { width: 100%; min-width: 0; }
+.ts-secimler { display: flex; flex-wrap: wrap; gap: .5rem; }
+.ts-secim { display: flex; align-items: center; gap: .5rem; padding: .6rem .9rem; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; min-height: 2.8rem; background: var(--bg); } .ts-secim:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--bg)); } .ts-secim input { accent-color: var(--accent); width: 1.1rem; height: 1.1rem; }
+.ts-aralikkutu { display: grid; gap: .6rem; padding: .7rem; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); } .ts-aralikkutu[hidden] { display: none; }
+.ts-aralikkutu-dis { display: contents; }
+.ts-kaydir { width: 100%; accent-color: var(--accent); min-height: 1.6rem; }
+.ts-aralikozet { margin: 0; font-size: .9rem; font-weight: 600; }
+.ts-izgara { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: .7rem; }
+.ts-alan { display: grid; gap: .25rem; } .ts-alan-ad { font-weight: 600; font-size: .9rem; }
+.ts-anahtar-satir { display: flex; gap: .7rem; align-items: flex-start; padding: .7rem .8rem; border: 1px solid var(--border); border-radius: 12px; cursor: pointer; background: var(--bg); } .ts-anahtar-satir span { display: grid; gap: .15rem; } .ts-anahtar-satir input { width: 1.2rem; height: 1.2rem; margin-top: .15rem; accent-color: var(--accent); flex: none; }
+.ts-gelismis { border-top: 1px dashed var(--border); padding-top: .5rem; } .ts-gelismis summary, .ts-araclar summary { cursor: pointer; font-weight: 600; font-size: .9rem; padding: .3rem 0; }
+.ts-basla-satiri { display: flex; flex-wrap: wrap; gap: .5rem; } .ts-basla { flex: 1 1 14rem; min-height: 3rem; font-size: 1rem; }
+
 .ts-studyo { display: grid; gap: .9rem; } .ts-studyo[hidden] { display: none; }
-.ts-baslikalani { display: flex; flex-wrap: wrap; gap: .5rem; } .ts-baslik { flex: 1 1 16rem; font-weight: 700; font-size: 1.05rem; }
+.ts-sonuc { gap: .7rem; }
+.ts-baslikalani { display: flex; gap: .5rem; } .ts-baslik { flex: 1 1 auto; min-width: 0; font-weight: 700; font-size: 1.1rem; } .ts-ikon { min-width: 2.6rem; padding: .3rem .5rem; flex: none; }
 .ts-meta, .ts-anahtar { margin: 0; }
-.ts-oynat { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; } .ts-oynatici { flex: 1 1 16rem; min-width: 0; width: 100%; } .ts-hiz { width: auto; min-width: 5rem; }
+.ts-durum { margin: 0; padding: .5rem .7rem; border-radius: 10px; background: color-mix(in srgb, #059669 12%, transparent); font-size: .88rem; } .ts-durum[hidden] { display: none; } .ts-durum.md-hata { background: color-mix(in srgb, #e5584a 12%, transparent); font-weight: 500; }
+.ts-ustbar { display: flex; flex-wrap: wrap; gap: .4rem; position: sticky; top: 0; z-index: 5; padding: .45rem 0; background: var(--card-bg); border-bottom: 1px solid var(--border); }
+.ts-ustbar .md-btn { min-height: 2.4rem; padding: .3rem .75rem; font-size: .9rem; }
+.ts-sekmeler { display: flex; gap: .25rem; overflow-x: auto; border-bottom: 1px solid var(--border); scrollbar-width: none; } .ts-sekmeler::-webkit-scrollbar { display: none; }
+.ts-sekme { font: inherit; font-size: .92rem; border: 0; border-bottom: 3px solid transparent; background: transparent; color: var(--muted); padding: .6rem .8rem; cursor: pointer; white-space: nowrap; min-height: 2.8rem; flex: none; }
+.ts-sekme-aktif { color: var(--text); border-bottom-color: var(--accent); font-weight: 700; }
 .ts-arac, .ts-toplu { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; } .ts-arac .md-girdi { flex: 1 1 12rem; width: auto; }
-.ts-arasay { min-width: 4rem; }
-.ts-secenekler { display: flex; flex-wrap: wrap; gap: .3rem 1.2rem; }
-.ts-liste { display: grid; gap: .35rem; margin-top: .6rem; }
+.ts-arabar .md-girdi { flex: 1 1 10rem; } .ts-arasay { min-width: 4rem; }
+.ts-araclar { border: 1px solid var(--border); border-radius: 10px; padding: .1rem .7rem .5rem; } .ts-araclar .ts-arac { margin-top: .4rem; }
+.ts-bolme[hidden] { display: none; }
+
+/* Okuma görünümü: kendi kaydırma alanı — sayfa uzamaz */
+.ts-okuma { max-height: min(70vh, 42rem); overflow-y: auto; overscroll-behavior: contain; padding: .2rem .4rem .8rem; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); font-family: Georgia, "Times New Roman", serif; font-size: 1.02rem; line-height: 1.7; }
+.ts-tur { padding: .5rem .5rem .2rem; border-left: 4px solid var(--renk, #94a3b8); margin: .7rem 0 .2rem .2rem; }
+.ts-turbaslik { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .6rem; font-family: system-ui, sans-serif; margin-bottom: .25rem; }
+.ts-turad { color: var(--renk); font-size: .95rem; }
+.ts-nokta { width: .7rem; height: .7rem; border-radius: 50%; background: var(--renk); flex: none; }
+.ts-par { margin: 0 0 .75rem; overflow-wrap: anywhere; }
+.ts-isaret { background: #f5b50066; color: inherit; border-radius: 3px; } .ts-aktifisaret { background: #f5b500; color: #000; }
+.ts-daha { margin: .6rem; width: calc(100% - 1.2rem); }
+
+/* Satırlar */
+.ts-liste { display: grid; gap: .35rem; max-height: min(70vh, 42rem); overflow-y: auto; overscroll-behavior: contain; padding: .1rem; }
 .ts-satir { display: grid; grid-template-columns: auto auto minmax(7rem, 9rem) 1fr auto; gap: .4rem; align-items: start; padding: .4rem .5rem; border: 1px solid var(--border); border-left: 4px solid var(--renk, #94a3b8); border-radius: 10px; background: var(--bg); min-width: 0; }
 .ts-satir.ts-aktif { background: color-mix(in srgb, var(--accent) 12%, var(--bg)); outline: 2px solid var(--accent); }
 .ts-satir.ts-bulundu { box-shadow: 0 0 0 2px #f5b50066; }
-.ts-zaman { font: inherit; font-size: .8rem; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); border-radius: 8px; padding: .25rem .45rem; cursor: pointer; white-space: nowrap; min-height: 2rem; }
+.ts-zaman { font: inherit; font-size: .8rem; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); border-radius: 8px; padding: .25rem .5rem; cursor: pointer; white-space: nowrap; min-height: 2rem; }
 .ts-kisi { font: inherit; font-size: .85rem; padding: .25rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); min-width: 0; min-height: 2rem; }
 .ts-metin { font: inherit; line-height: 1.5; border: 1px solid transparent; background: transparent; color: var(--text); resize: vertical; padding: .2rem .35rem; border-radius: 8px; min-width: 0; width: 100%; box-sizing: border-box; } .ts-metin:focus { border-color: var(--border); background: var(--card-bg); outline: none; }
-.ts-islem { display: flex; gap: .2rem; } .ts-islem button { border: 1px solid var(--border); background: var(--card-bg); color: var(--text); border-radius: 8px; min-width: 2rem; min-height: 2rem; cursor: pointer; }
-.ts-sec { width: 1.15rem; height: 1.15rem; margin-top: .45rem; }
+.ts-islem { display: flex; gap: .2rem; } .ts-islem button { border: 1px solid var(--border); background: var(--card-bg); color: var(--text); border-radius: 8px; min-width: 2.2rem; min-height: 2.2rem; cursor: pointer; }
+.ts-sec { width: 1.2rem; height: 1.2rem; margin-top: .45rem; }
+.ts-sayfa { align-items: center; }
+
+/* Konuşmacılar */
+.ts-oto { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; justify-content: space-between; padding: .7rem .8rem; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); margin-bottom: .7rem; } .ts-oto p { margin: .1rem 0 0; }
+.ts-konusmacilar { display: grid; gap: .8rem; }
 .ts-kizgara { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: .6rem; }
 .ts-kkart { border: 1px solid var(--border); border-top: 4px solid var(--renk); border-radius: 12px; padding: .6rem .7rem; display: grid; gap: .4rem; min-width: 0; background: var(--bg); }
-.ts-kust { display: flex; gap: .5rem; align-items: center; } .ts-nokta { width: .8rem; height: .8rem; border-radius: 50%; background: var(--renk); flex: none; } .ts-kad { min-height: 2.2rem; }
+.ts-kust { display: flex; gap: .5rem; align-items: center; } .ts-kad { min-height: 2.4rem; }
 .ts-zamanserit { position: relative; height: .7rem; border-radius: 6px; background: color-mix(in srgb, var(--muted) 18%, transparent); overflow: hidden; }
 .ts-parca { position: absolute; top: 0; bottom: 0; background: var(--renk); opacity: .9; }
 .ts-aralik { list-style: none; margin: .4rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: .3rem; max-height: 12rem; overflow: auto; }
 .ts-detay summary { cursor: pointer; font-size: .88rem; }
 .ts-tahmin .md-girdi { width: auto; }
-.ts-gecmis { display: grid; gap: .4rem; } .ts-gkayit { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .4rem; align-items: center; border: 1px solid var(--border); border-radius: 10px; padding: .5rem .7rem; } .ts-gkayit > div:first-child { display: grid; gap: .1rem; min-width: 0; }
+.ts-toplu-kutu { display: grid; gap: .3rem; } .ts-toplu .md-girdi { width: auto; flex: 1 1 10rem; }
+
+/* İndir */
+.ts-indir { display: grid; gap: .8rem; } .ts-indir h3 { margin: .3rem 0 0; font-size: .95rem; }
+.ts-secenekler { display: flex; flex-wrap: wrap; gap: .3rem 1.2rem; }
+.ts-bicimler { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: .5rem; }
+.ts-bicim { display: grid; justify-items: start; gap: .1rem; text-align: left; font: inherit; color: var(--text); border: 1px solid var(--border); border-radius: 12px; padding: .7rem .8rem; background: var(--bg); cursor: pointer; min-height: 4.2rem; } .ts-bicim:hover { border-color: var(--accent); } .ts-bicim-ikon { font-size: 1.3rem; }
+
+.ts-gecmis { display: grid; gap: .4rem; } .ts-gkayit { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .4rem; align-items: center; border: 1px solid var(--border); border-radius: 10px; padding: .5rem .7rem; } .ts-gkayit > div:first-child { display: grid; min-width: 0; }
+
 @media (max-width: 720px) {
   .ts-satir { grid-template-columns: auto 1fr auto; }
   .ts-satir .ts-kisi { grid-column: 2 / 4; } .ts-satir .ts-metin { grid-column: 1 / 4; } .ts-islem { grid-column: 3; grid-row: 1; }
+  .ts-okuma { font-size: 1rem; max-height: 62vh; } .ts-liste { max-height: 62vh; }
+  .ts-ustbar .md-btn { flex: 1 1 auto; }
+  .ts-bicimler { grid-template-columns: 1fr 1fr; }
+  .ts-izgara { grid-template-columns: 1fr; }
 }
 
 /* Kota kapsamı + kayıtlı anahtar özeti + Yetki Ayarları › Medya Kotaları */
@@ -50,3 +111,4 @@
 .mk-kayit:empty { display: none; }
 .mk-yonetim { display: grid; gap: 1rem; }
 .mk-yonetim details.mk-ayar { margin-top: 0; }
+.ts-kaydirlar { display: grid; gap: .2rem; }

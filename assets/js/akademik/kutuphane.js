@@ -961,15 +961,21 @@ function kutuphaneKur(kok, profil, owner) {
       <button type="button" role="menuitem" data-kl-islem="paylas" data-id="${esc(id)}">🔗 Bu klasörü paylaş</button>
       <button type="button" role="menuitem" data-kl-islem="sil" data-id="${esc(id)}" class="tehlike">🗑 Klasörü sil</button>`;
     document.body.append(m);
-    const r = dugme.getBoundingClientRect();
-    m.style.left = `${Math.max(8, Math.min(window.innerWidth - m.offsetWidth - 8, r.right - m.offsetWidth))}px`;
-    m.style.top = `${Math.min(window.innerHeight - m.offsetHeight - 8, r.bottom + 4)}px`;
+    dugme.setAttribute("aria-expanded", "true");
+    // Konum: düğmenin ALTINA; sığmıyorsa ÜSTÜNE (düğmeyi örtmez); iki yana da sığmıyorsa menü kendi içinde kayar. Hiçbir zaman ekran dışına taşmaz.
+    const r = dugme.getBoundingClientRect(), vh = window.innerHeight, kenar = 8;
+    const altYer = vh - r.bottom - kenar - 4, ustYer = r.top - kenar - 4;
+    const ust = m.offsetHeight > altYer && ustYer > altYer;
+    m.style.maxHeight = `${Math.max(120, ust ? ustYer : altYer)}px`; m.style.overflowY = "auto";
+    m.style.left = `${Math.max(kenar, Math.min(window.innerWidth - m.offsetWidth - kenar, r.right - m.offsetWidth))}px`;
+    m.style.top = ust ? `${Math.max(kenar, r.top - m.offsetHeight - 4)}px` : `${Math.max(kenar, Math.min(vh - m.offsetHeight - kenar, r.bottom + 4))}px`;
     m.querySelector("button")?.focus();
   }
-  function klasorMenuKapat() { document.querySelectorAll(".ak-kl-menu").forEach((x) => x.remove()); }
+  function klasorMenuKapat() { document.querySelectorAll(".ak-kl-menu").forEach((x) => x.remove()); document.querySelectorAll("[data-kl-menu][aria-expanded]").forEach((x) => x.setAttribute("aria-expanded", "false")); }
   document.addEventListener("click", (e) => { if (!e.target.closest(".ak-kl-menu, [data-kl-menu]")) klasorMenuKapat(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") klasorMenuKapat(); });
-  window.addEventListener("scroll", klasorMenuKapat, { passive: true, capture: true });
+  window.addEventListener("scroll", (e) => { if (!(e.target instanceof Element && e.target.closest?.(".ak-kl-menu"))) klasorMenuKapat(); }, { passive: true, capture: true });   // menünün kendi içinde kaydırma menüyü kapatmaz
+  window.addEventListener("resize", klasorMenuKapat);
 
   /* ---------- aranabilir klasör seçici (çok klasörde de rahat) ---------- */
 

@@ -9,7 +9,7 @@ import { gorselHazirla } from "./motor-gorsel.js";
 const BASLIK_PT = [22, 18, 15, 13, 12, 11];
 const ICERIK_GENISLIK = 595.28 - 2 * 56;
 
-export async function irDenPdf(bloklar, { baslik = "Belge", yazar = "" } = {}) {
+export async function irDenPdf(bloklar, { baslik = "Belge", yazar = "", altBilgi = "" } = {}) {
   const pm = await kutuphaneYukle("pdfmake");
 
   const gorsel = new Map();
@@ -38,6 +38,8 @@ export async function irDenPdf(bloklar, { baslik = "Belge", yazar = "" } = {}) {
       if (r.code) { o.background = "#eceff1"; o.color = o.color || "#2d3748"; }
       if (r.sup || r.sub) o.fontSize = 8;
       if (r.mark) o.background = "#fff59d";
+      if (r.renk) o.color = r.renk;                 // konuşmacı adı / zaman damgası gibi renkli parçalar
+      if (r.kucuk) o.fontSize = r.kucuk;            // pt cinsinden küçük yazı
       dizi.push(o);
     }
     return dizi.length ? dizi : [{ text: " " }];
@@ -49,8 +51,8 @@ export async function irDenPdf(bloklar, { baslik = "Belge", yazar = "" } = {}) {
     const c = [];
     for (const b of bl) {
       switch (b.t) {
-        case "h": c.push({ text: metin(b.runs), bold: true, fontSize: BASLIK_PT[b.lv - 1], margin: [0, b.lv <= 2 ? 14 : 10, 0, 6], alignment: hiza(b.align) }); break;
-        case "p": c.push({ text: metin(b.runs), margin: [0, 0, 0, 7], alignment: hiza(b.align) }); break;
+        case "h": c.push({ text: metin(b.runs), bold: true, fontSize: BASLIK_PT[b.lv - 1], margin: [0, b.lv <= 2 ? 14 : 10, 0, b.altBosluk ?? 6], alignment: hiza(b.align), headlineLevel: 1 }); break;
+        case "p": c.push({ text: metin(b.runs), margin: [0, b.ustBosluk ?? 0, 0, b.altBosluk ?? 7], alignment: hiza(b.align), ...(b.bitisikSonraki ? { headlineLevel: 1 } : {}) }); break;   // bitisikSonraki: başlık satırı sayfa sonunda yalnız kalmaz
         case "list": {
           const ogeler = b.items.map((it) => {
             const ic = uret(it.blocks);
@@ -126,7 +128,9 @@ export async function irDenPdf(bloklar, { baslik = "Belge", yazar = "" } = {}) {
     pageMargins: [56, 56, 56, 60],
     defaultStyle: { font: "Roboto", fontSize: 11, lineHeight: 1.3 },
     content: icerik.length ? icerik : [{ text: " " }],
-    footer: (sayfa, toplam) => ({ text: `${sayfa} / ${toplam}`, alignment: "center", fontSize: 8, color: "#888888", margin: [0, 24, 0, 0] }),
+    // headlineLevel işaretli blok, kendisinden sonraki içerikle aynı sayfada kalır (başlık sayfa dibinde yetim kalmaz)
+    pageBreakBefore: (dugum, sonraki) => !!dugum.headlineLevel && sonraki.length > 0 && dugum.startPosition.pageNumber !== sonraki[0].startPosition.pageNumber,
+    footer: (sayfa, toplam) => ({ columns: [{ text: altBilgi, fontSize: 8, color: "#888888", width: "*", noWrap: true }, { text: `${sayfa} / ${toplam}`, alignment: "right", fontSize: 8, color: "#888888", width: "auto" }], margin: [56, 24, 56, 0] }),
   };
   return new Promise((coz, red) => {
     try {

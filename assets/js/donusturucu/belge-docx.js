@@ -11,7 +11,7 @@ const KENAR = { top: 1134, bottom: 1134, left: 1304, right: 1304 }; // ≈2 cm /
 const ICERIK_DXA = 11906 - KENAR.left - KENAR.right;
 const MAKS_GORSEL_PX = 580;
 
-export async function irDenDocx(bloklar, { baslik = "Belge", yazar = "" } = {}) {
+export async function irDenDocx(bloklar, { baslik = "Belge", yazar = "", altBilgi = "" } = {}) {
   const D = await kutuphaneYukle("docx");
   const {
     Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, ImageRun, ExternalHyperlink,
@@ -33,6 +33,8 @@ export async function irDenDocx(bloklar, { baslik = "Belge", yazar = "" } = {}) 
     };
     if (r.code) { o.font = "Consolas"; o.shading = { type: ShadingType.CLEAR, fill: "EEF0F2", color: "auto" }; }
     if (r.mark) o.highlight = "yellow";
+    if (r.renk) o.color = r.renk.replace("#", "");   // konuşmacı adı / zaman damgası
+    if (r.kucuk) o.size = Math.round(r.kucuk * 2);   // yarım punto
     if (r.href) { o.style = "Hyperlink"; }
     return new TextRun(o);
   };
@@ -68,7 +70,7 @@ export async function irDenDocx(bloklar, { baslik = "Belge", yazar = "" } = {}) 
     for (const b of bl) {
       switch (b.t) {
         case "h":
-          cikti.push(new Paragraph({ heading: BASLIKLAR[b.lv - 1], alignment: HIZA[b.align], indent: ctx.girinti ? { left: ctx.girinti } : undefined, children: runlar(b.runs) }));
+          cikti.push(new Paragraph({ heading: BASLIKLAR[b.lv - 1], keepNext: true, alignment: HIZA[b.align], indent: ctx.girinti ? { left: ctx.girinti } : undefined, children: runlar(b.runs) }));
           break;
         case "p":
           cikti.push(new Paragraph({
@@ -76,7 +78,8 @@ export async function irDenDocx(bloklar, { baslik = "Belge", yazar = "" } = {}) 
             numbering: ctx.numara,
             indent: ctx.girinti && !ctx.numara ? { left: ctx.girinti } : undefined,
             border: ctx.alinti ? { left: { style: BorderStyle.SINGLE, size: 12, space: 8, color: "A3AEC2" } } : undefined,
-            spacing: { after: 120 },
+            keepNext: !!b.bitisikSonraki,   // konuşmacı başlığı sayfa sonunda yalnız kalmasın
+            spacing: { before: Math.round((b.ustBosluk || 0) * 20), after: b.altBosluk != null ? Math.round(b.altBosluk * 20) : 120 },
             children: runlar(b.runs, ctx.alinti ? { italics: true, color: "4B5563" } : ctx.kalin ? { bold: true } : {}),
           }));
           break;
@@ -176,7 +179,11 @@ export async function irDenDocx(bloklar, { baslik = "Belge", yazar = "" } = {}) 
       characterStyles: [{ id: "Hyperlink", name: "Hyperlink", basedOn: "DefaultParagraphFont", run: { color: "0563C1", underline: {} } }],
     },
     numbering: { config },
-    sections: [{ properties: { page: { size: { width: 11906, height: 16838 }, margin: KENAR } }, children: cocuklar }],
+    sections: [{
+      properties: { page: { size: { width: 11906, height: 16838 }, margin: KENAR } },
+      footers: altBilgi ? { default: new D.Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `${altBilgi}  ·  `, size: 16, color: "888888" }), new TextRun({ children: [D.PageNumber.CURRENT], size: 16, color: "888888" })] })] }) } : undefined,
+      children: cocuklar,
+    }],
   });
   return Packer.toBlob(doc);
 }

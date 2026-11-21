@@ -45,7 +45,7 @@ async function cihazCeviri(metin, kaynak, hedef) {
 
 /* ------------------------------ SİTE İÇİ ÇEVİRİ (çevrimiçi sağlayıcılar, açık rıza ile) ------------------------------
  * Hiçbir yeni sunucu/Worker/anahtar gerekmez: tarayıcı doğrudan genel çeviri uçlarına gider (Cloudflare kotası harcanmaz).
- * GİDEN VERİ: yalnızca seçtiğin metin (en çok 1500 karakter) + dil çifti + (her web isteğinde olduğu gibi) IP adresin. Hesap/kaynak bilgisi GİTMEZ.
+ * GİDEN VERİ: yalnızca seçtiğin metin (en çok 6000 karakter; uzun metin parça parça gönderilir) + dil çifti + (her web isteğinde olduğu gibi) IP adresin. Hesap/kaynak bilgisi GİTMEZ.
  * Sağlayıcılar: Google Çeviri (gayriresmî genel uç; en iyi kalite) · MyMemory (açık, ücretsiz çeviri belleği; kalite orta, 500 karakter parça sınırı).
  * "Otomatik": önce cihaz içi (varsa; veri çıkmaz) → Google → MyMemory. Rıza tarayıcıda saklanır (localStorage), Ayarlar'dan geri alınır. */
 const RIZA_ANAHTARI = "aea_ak_ceviri_riza_v1";
@@ -118,6 +118,22 @@ export async function ceviriYap(metin, { kaynak = "auto", hedef = "tr", motor = 
   throw new Error(`Çeviri servislerine ulaşılamadı. ${hatalar.join(" · ")}`);
 }
 
+/** Uzun metin: cümle sınırlarından ≤ 1000 karakterlik parçalara bölünür, sırayla çevrilir (tek istek limiti aşılmaz, paragraf atlamak sorun olmaz).
+ *  ilerle(kismiMetin, tamamlanan, toplam) her parçadan sonra çağrılır → arayüz çeviriyi ARTIMLI gösterebilir. En çok CEVIRI_AZAMI karakter. */
+export const CEVIRI_AZAMI = 6000;
+export async function ceviriUzun(metin, { ilerle, sinyal, ...secenek } = {}) {
+  const t = String(metin || "").trim().slice(0, CEVIRI_AZAMI);
+  const parcalar = t.length <= 1000 ? [t] : parcala(t, 1000);
+  const cikti = []; let ilk = null;
+  for (let i = 0; i < parcalar.length; i++) {
+    if (sinyal?.aborted) throw Object.assign(new Error("İptal edildi."), { name: "AbortError" });
+    const r = await ceviriYap(parcalar[i], { ...secenek, sinyal });
+    ilk ||= r; cikti.push(r.metin);
+    ilerle?.(cikti.join(" "), i + 1, parcalar.length);
+  }
+  return { ...ilk, metin: cikti.join(" "), kesildi: String(metin || "").trim().length > CEVIRI_AZAMI };
+}
+
 /* ------------------------------ DOI bulma (satır sonu/tire/boşluk bozulmalarına dayanıklı) ------------------------------ */
 const DOI_BASLANGIC = /10\.\d{4,9}\//g;
 export function doiBul(ham) {
@@ -156,7 +172,7 @@ async function crossrefDogrula(doi) {
   }
 }
 
-const DIL_SECENEKLERI = { tr: "Türkçe", en: "İngilizce", de: "Almanca", fr: "Fransızca", es: "İspanyolca", ar: "Arapça", ru: "Rusça" };
+export const DIL_SECENEKLERI = { tr: "Türkçe", en: "İngilizce", de: "Almanca", fr: "Fransızca", es: "İspanyolca", it: "İtalyanca", pt: "Portekizce", nl: "Felemenkçe", ar: "Arapça", fa: "Farsça", ru: "Rusça", uk: "Ukraynaca", pl: "Lehçe", "zh-CN": "Çince", ja: "Japonca", ko: "Korece", hi: "Hintçe" };
 const DILLER_URL = { tr: "tr", en: "en", de: "de", fr: "fr", es: "es", ar: "ar", ru: "ru" };
 
 export const KATALOG = Object.freeze({
@@ -169,7 +185,7 @@ export const KATALOG = Object.freeze({
       { anahtar: "motor", etiket: "Çeviri motoru", tur: "secim", secenekler: { auto: "Otomatik (önerilen): doğrudan Google, olmazsa MyMemory", cihaz_sonra: "Önce cihaz içi (varsa), olmazsa çevrimiçi", cihaz: "Yalnızca cihaz içi (veri çıkmaz)", google: "Yalnızca Google Çeviri", mymemory: "Yalnızca MyMemory" }, varsayilan: "auto" },
     ],
     async calistir({ metin, ayar }) {
-      const c = await ceviriYap(metin.slice(0, 1500), { kaynak: ayar.kaynak || "auto", hedef: ayar.hedef || "tr", motor: ayar.motor || "auto" });
+      const c = await ceviriUzun(metin, { kaynak: ayar.kaynak || "auto", hedef: ayar.hedef || "tr", motor: ayar.motor || "auto" });
       return { baslik: "Çeviri", metin: c.metin, not: c.yontem };
     },
   },

@@ -57,8 +57,90 @@ export function baslikOner(segmentler) {
   return (c.charAt(0).toLocaleUpperCase("tr") + c.slice(1)) + (kes ? "…" : "");
 }
 
+/* ---------------- Okunabilir belge yapısı: konuşma turları + paragraflar ----------------
+   Ham Whisper satırları (≈ 5-15 sn) duvar gibi tek metin olarak dökülürse okunmaz. Burada:
+     1) art arda aynı konuşmacının satırları TEK "tur" olur (konuşmacı yoksa ~90 sn'lik zaman bölümleri),
+     2) tur metni cümlelere bölünür (kısaltmalar: Dr., Prof., U.S., vb. cümle sonu sayılmaz),
+     3) cümleler 3'lü (≤ ~520 karakter) paragraflara gruplanır; uzun sessizlik (≥ 2,5 sn) de paragraf sınırıdır. */
+const KISALTMA = new Set(["dr", "prof", "doç", "yrd", "sn", "mr", "mrs", "ms", "st", "vs", "vb", "bkz", "örn", "no", "tel", "inc", "ltd", "co", "jr", "sr", "etc", "approx", "dept", "fig", "al", "ed", "vol", "pp", "cf", "ca", "ör", "av", "müh", "uzm", "öğr", "gör", "alb", "gen", "kur", "yzb", "bnb", "ort"]);
+export function cumleyeBol(metin) {
+  const t = String(metin).replace(/\s+/g, " ").trim(), out = []; let bas = 0;
+  const re = /[.!?…]+["”’')\]]*\s+/g; let m;
+  while ((m = re.exec(t))) {
+    const son = m.index + m[0].length, onceki = t.slice(bas, m.index + 1), sonraki = t.slice(son, son + 1);
+    const kelime = (onceki.match(/([\p{L}]+)\.?$/u) || [])[1] || "";
+    const kisaltma = m[0].trim() === "." && (KISALTMA.has(kelime.toLocaleLowerCase("tr")) || /(^|[\s(])\p{Lu}$/u.test(onceki.slice(0, -1)) || /\b\p{L}\.\p{L}$/u.test(onceki.slice(0, -1)) );
+    if (kisaltma || !sonraki || !/[\p{Lu}\p{N}"“‘'(\[]/u.test(sonraki)) continue;
+    out.push(t.slice(bas, son).trim()); bas = son;
+  }
+  if (bas < t.length) out.push(t.slice(bas).trim());
+  return out.filter(Boolean);
+}
+/** Konuşma turları: [{ k, ad, b, s, paragraflar:[{ b, m }] }] — b/s kayıt içi saniye. */
+export function turlariUret(T, { konusmaci = true, bolumSn = 90, cumleSayisi = 3, azamiKarakter = 520 } = {}) {
+  const tur = [];
+  for (const s of T.segmentler) {
+    const k = konusmaci && s.k != null && T.konusmacilar[s.k] ? s.k : null, son = tur[tur.length - 1];
+    const yeniMi = !son || son.k !== k || (k == null && s.b - son.b >= bolumSn && /[.!?…]["”’')]*$/.test(son.parcalar[son.parcalar.length - 1].m.trim()));
+    if (yeniMi) tur.push({ k, ad: k != null ? T.konusmacilar[k].ad : null, b: s.b, s: s.s, parcalar: [{ b: s.b, s: s.s, m: s.m }] });
+    else { son.parcalar.push({ b: s.b, s: s.s, m: s.m }); son.s = Math.max(son.s, s.s); }
+  }
+  for (const t of tur) {
+    // cümleleri başlangıç zamanıyla topla (cümle, ait olduğu satırın başlangıcını taşır)
+    const cumleler = []; let kuyruk = "", kuyrukB = t.b, onceS = null;
+    for (const p of t.parcalar) {
+      const sessiz = onceS != null && p.b - onceS >= 2.5;
+      if (kuyruk && sessiz) { cumleler.push({ b: kuyrukB, m: kuyruk, mola: true }); kuyruk = ""; }
+      if (!kuyruk) kuyrukB = p.b;
+      kuyruk = kuyruk ? `${kuyruk} ${p.m}` : p.m; onceS = p.s;
+      const c = cumleyeBol(kuyruk);
+      if (c.length > 1) { for (const x of c.slice(0, -1)) cumleler.push({ b: kuyrukB, m: x }); kuyruk = c[c.length - 1]; }
+    }
+    if (kuyruk) cumleler.push({ b: kuyrukB, m: kuyruk });
+    const par = []; let a = null, n = 0;
+    for (const c of cumleler) {
+      if (!a) { a = { b: c.b, m: c.m }; n = 1; } else { a.m += ` ${c.m}`; n++; }
+      if (n >= cumleSayisi || a.m.length >= azamiKarakter || c.mola) { par.push(a); a = null; n = 0; }
+    }
+    if (a) par.push(a);
+    t.paragraflar = par.length ? par : [{ b: t.b, m: t.parcalar.map((x) => x.m).join(" ") }];
+    delete t.parcalar;
+  }
+  return tur;
+}
+/** Kısa zaman: 1 saatten kısa kayıtlarda mm:ss, aksi hâlde ss:dd:ss. */
+export const kisaSaat = (sn, uzun) => (uzun ? saat(sn) : saat(sn).slice(3));
+const aralikYazi = (b, s, uzun, o, z) => (o.baslangicSn != null ? `${z(b)} – ${z(s)}` : `${kisaSaat(b, uzun)} – ${kisaSaat(s, uzun)}`);
+
+/** Belge blokları (PDF/Word için IR). TurboScribe benzeri: başlık, künye, konuşmacı + zaman aralığı başlıkları, kısa paragraflar. */
+export function belgeBloklari(T, o = {}, kunye = "") {
+  const z = (sn) => (o.baslangicSn != null ? gunSaati(o.baslangicSn + sn) : saat(sn)), uzun = (T.sure || 0) >= 3600;
+  const tur = turlariUret(T, { konusmaci: !!o.konusmaci }), bl = [];
+  bl.push({ t: "h", lv: 1, runs: [{ text: T.baslik || "Transkript" }], altBosluk: 2 });
+  if (kunye) bl.push({ t: "p", runs: [{ text: kunye, renk: "#6b7280", kucuk: 9.5 }], altBosluk: 6 });
+  const kisiler = T.konusmacilar.filter((_, i) => T.segmentler.some((s) => s.k === i));
+  if (o.konusmaci && kisiler.length) bl.push({ t: "p", runs: [{ text: "Konuşmacılar: ", b: true, renk: "#374151", kucuk: 9.5 }, { text: kisiler.map((k) => k.ad).join(" · "), renk: "#374151", kucuk: 9.5 }], altBosluk: 4 });
+  bl.push({ t: "hr" });
+  for (const t of tur) {
+    const baslik = [];
+    if (t.ad) baslik.push({ text: t.ad, b: true, renk: RENKLER[t.k % RENKLER.length] });
+    if (o.zaman) baslik.push({ text: `${t.ad ? "   " : ""}${aralikYazi(t.b, t.s, uzun, o, z)}`, renk: "#6b7280", kucuk: 9.5 });
+    if (baslik.length) bl.push({ t: "p", runs: baslik, ustBosluk: 8, altBosluk: 3, bitisikSonraki: true });
+    for (const p of t.paragraflar) {
+      const runs = [];
+      if (o.zaman && !baslik.length) runs.push({ text: `${kisaSaat(p.b, uzun)}  `, renk: "#6b7280", kucuk: 9.5 });
+      runs.push({ text: p.m });
+      bl.push({ t: "p", runs, align: "justify", altBosluk: 6 });
+    }
+  }
+  return bl;
+}
+
 function sar(t, g = 42) { const w = String(t).split(/\s+/), s = []; let a = ""; for (const k of w) { if (a && (a + " " + k).length > g) { s.push(a); a = k; } else a = a ? `${a} ${k}` : k; } if (a) s.push(a); return s.join("\n"); }
 const ad = (T, s) => (s.k != null && T.konusmacilar[s.k] ? T.konusmacilar[s.k].ad : null);
+const kacis = (v) => String(v).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const kunyeMetni = (T) => { const kel = kelimeSay(T.segmentler.map((s) => s.m).join(" ")); return [saat(T.sure || (T.segmentler.at(-1)?.s ?? 0)), `${kel.toLocaleString("tr-TR")} kelime`, T.dil ? `dil: ${T.dil}` : null].filter(Boolean).join(" · "); };
+export { kunyeMetni };
 
 /** Dışa aktarma metinleri. o = { zaman:boolean, konusmaci:boolean, baslangicSn: gün içi başlangıç (isteğe bağlı) } */
 export function metinUret(T, tur, o = {}) {
@@ -67,9 +149,15 @@ export function metinUret(T, tur, o = {}) {
   if (tur === "csv") { const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`; return "﻿" + ["baslangic,bitis,konusmaci,metin", ...S.map((s) => [saat(s.b, true), saat(s.s, true), ad(T, s) || "", s.m].map(q).join(","))].join("\r\n"); }
   if (tur === "srt") return S.map((s, i) => `${i + 1}\n${srtZaman(s.b, ",")} --> ${srtZaman(s.s, ",")}\n${sar((o.konusmaci && ad(T, s) ? `${ad(T, s)}: ` : "") + s.m)}\n`).join("\n");
   if (tur === "vtt") return "WEBVTT\n\n" + S.map((s) => `${srtZaman(s.b, ".")} --> ${srtZaman(s.s, ".")}\n${sar((o.konusmaci && ad(T, s) ? `<v ${ad(T, s)}>` : "") + s.m)}\n`).join("\n");
-  // txt / md: art arda aynı konuşmacı birleşir
-  const bloklar = []; for (const s of S) { const a = ad(T, s), son = bloklar[bloklar.length - 1]; if (o.konusmaci && son && son.a === a && a) { son.m += ` ${s.m}`; } else bloklar.push({ a, b: s.b, m: s.m }); }
-  const satir = (x) => `${o.zaman ? `[${z(x.b)}] ` : ""}${o.konusmaci && x.a ? (tur === "md" ? `**${x.a}:** ` : `${x.a}: `) : ""}${x.m}`;
-  const bas = tur === "md" ? `# ${T.baslik}\n\n` : `${T.baslik}\n${"=".repeat(Math.min(60, T.baslik.length))}\n\n`;
-  return bas + bloklar.map(satir).join(tur === "md" ? "\n\n" : "\n\n") + "\n";
+  // txt / md / html: konuşma turları + paragraflar
+  const turlar = turlariUret(T, { konusmaci: !!o.konusmaci }), uzun = (T.sure || 0) >= 3600, kunye = kunyeMetni(T);
+  const bas = (t) => [t.ad, o.zaman ? aralikYazi(t.b, t.s, uzun, o, z) : null].filter(Boolean);
+  if (tur === "html") {
+    const govde = turlar.map((t) => { const b = bas(t); return `<section>${b.length ? `<h2>${t.ad ? `<b style="color:${RENKLER[t.k % RENKLER.length]}">${kacis(t.ad)}</b>` : ""}${o.zaman ? ` <small>${kacis(aralikYazi(t.b, t.s, uzun, o, z))}</small>` : ""}</h2>` : ""}${t.paragraflar.map((p) => `<p>${o.zaman && !t.ad ? `<small>${kacis(kisaSaat(p.b, uzun))}</small> ` : ""}${kacis(p.m)}</p>`).join("")}</section>`; }).join("\n");
+    return `<!doctype html><html lang="tr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${kacis(T.baslik)}</title><style>body{font:17px/1.65 Georgia,serif;max-width:46rem;margin:2.5rem auto;padding:0 1.2rem;color:#1f2937}h1{font:700 1.8rem system-ui,sans-serif;margin:0 0 .2rem}.k{color:#6b7280;font:.85rem system-ui,sans-serif;margin:0 0 1.5rem}h2{font:600 .95rem system-ui,sans-serif;margin:1.6rem 0 .3rem}h2 small,p small{color:#6b7280;font-weight:400}p{margin:0 0 .9rem;text-align:justify}@media print{body{margin:0;max-width:none}}</style><h1>${kacis(T.baslik)}</h1><p class="k">${kacis(kunye)}</p>\n${govde}\n`;
+  }
+  const md = tur === "md", ayr = md ? "\n\n" : "\n\n";
+  const parcalar = turlar.map((t) => { const b = bas(t), baslik = b.length ? (md ? `### ${t.ad ? `**${t.ad}**` : ""}${o.zaman ? `${t.ad ? " · " : ""}${aralikYazi(t.b, t.s, uzun, o, z)}` : ""}` : (t.ad ? `${t.ad}${o.zaman ? ` (${aralikYazi(t.b, t.s, uzun, o, z)})` : ""}` : `[${aralikYazi(t.b, t.s, uzun, o, z)}]`)) : ""; return [baslik, ...t.paragraflar.map((p) => (o.zaman && !t.ad && !b.length ? `[${kisaSaat(p.b, uzun)}] ` : "") + p.m)].filter(Boolean).join("\n\n"); });
+  const ust = md ? `# ${T.baslik}\n\n_${kunye}_\n\n` : `${T.baslik}\n${"=".repeat(Math.min(60, T.baslik.length))}\n${kunye}\n\n`;
+  return ust + parcalar.join(ayr) + "\n";
 }
