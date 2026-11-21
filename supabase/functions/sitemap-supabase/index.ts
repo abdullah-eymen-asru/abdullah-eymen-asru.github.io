@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
         // icerik/supabase-yazi.md sayfasının gerçek adresi (bkz. blog.md /
         // akademik-projeler.md'deki kart linkleri ve supabase-yazi.js'teki
         // canonical) — sıra ve biçim BİREBİR aynı olmalı.
-        const adres = `${SITE_URL}${y.tur === "proje" ? "/projects/" : "/blog/"}${encodeURIComponent(y.slug)}/`; // senkronlanmış statik sayfanın temiz adresi (bkz. .github/scripts/supabase-senkron.mjs)
+        const adres = `${SITE_URL}/icerik/supabase-yazi.html?tur=${y.tur}&slug=${encodeURIComponent(y.slug)}`;
         const lastmod = y.lastmod ? `<lastmod>${xmlKacir(String(y.lastmod).slice(0, 10))}</lastmod>` : "";
         return `  <url><loc>${xmlKacir(adres)}</loc>${lastmod}</url>`;
       });

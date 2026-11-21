@@ -21,7 +21,39 @@ export function mediabunnyYukle() {
   return (mbSoz ||= import(MB_URL).catch((h) => { console.warn("mediabunny yüklenemedi; eski ses çözme yoluna dönülecek:", h); mbSoz = null; return null; }));
 }
 const iptalHatasi = () => Object.assign(new Error("İptal edildi."), { name: "AbortError" });
-const nefes = () => new Promise((r) => setTimeout(r, 0));
+/* Olay döngüsüne nefes: setTimeout(0) arka plan sekmelerinde ≥1 sn'ye (5 dk sonra dakikada 1'e) kısılır → uzun işler 2 dk yerine 5 dk sürüyordu.
+ * MessageChannel kısılmaz; sekme arka plandayken de aynı hızda çalışır. */
+const nefes = (() => {
+  let kanal = null; const bekleyen = [];
+  try { kanal = new MessageChannel(); kanal.port1.onmessage = () => { const f = bekleyen.shift(); f?.(); }; } catch { kanal = null; }
+  return () => new Promise((r) => { if (kanal) { bekleyen.push(r); kanal.port2.postMessage(0); } else setTimeout(r, 0); });
+})();
+
+/**
+ * Uzun iş sürerken sekmenin arka planda kısılmasını azaltır: (1) ekran uyku kilidi, (2) duyulmayacak kadar zayıf (≈ −54 dB, 30 Hz) sürekli ses —
+ * tarayıcılar sesli sekmeleri zamanlayıcı kısmasından muaf tutar. Kullanıcı hareketi (tıklama) içinde çağrılmalıdır. Dönen fonksiyon her şeyi bırakır.
+ * Garanti DEĞİL (tarayıcı/enerji tasarrufu karar verir) ama süreyi belirgin biçimde korur.
+ */
+export function uyanikTut() {
+  let kilit = null, ac = null, bitti = false;
+  try { navigator.wakeLock?.request?.("screen").then((k) => { if (bitti) k.release?.(); else kilit = k; }).catch(() => {}); } catch { /* destek yok */ }
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) {
+      ac = new AC(); const o = ac.createOscillator(), g = ac.createGain();
+      o.frequency.value = 30; g.gain.value = 0.002; o.connect(g); g.connect(ac.destination); o.start(); ac.resume?.().catch(() => {});
+    }
+  } catch { ac = null; }
+  return () => { bitti = true; try { kilit?.release?.(); } catch { /* yok */ } try { ac?.close?.(); } catch { /* yok */ } };
+}
+
+/** CBR MP3'ten [bas, son) sn dilimi (144 baytlık çerçeve sınırından; yeniden kodlama gerekmez). blobBas/blobSure: blob'un kayıttaki başlangıcı ve süresi (sn). */
+export function mp3Dilim(blob, blobBas, blobSure, bas, son) {
+  const CERCEVE = 144, baytSn = blob.size / Math.max(0.001, blobSure);
+  const a = Math.max(0, Math.floor(((bas - blobBas) * baytSn) / CERCEVE) * CERCEVE);
+  const b = Math.min(blob.size, Math.ceil(((son - blobBas) * baytSn) / CERCEVE) * CERCEVE);
+  return b - a > CERCEVE * 4 ? blob.slice(a, b, "audio/mpeg") : blob;
+}
 
 /** Dosyayı ÇÖZMEDEN süresini (sn) bulur; bulunamazsa 0. */
 export async function sureOku(dosya) {

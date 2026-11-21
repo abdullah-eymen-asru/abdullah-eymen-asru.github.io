@@ -99,8 +99,6 @@ permalink: "/icerik/akademik-projeler.html"
 
       const base = document.documentElement.dataset.baseurl || "";
       projeler.forEach((proje) => {
-        // Senkronlanmış (statik) kart zaten varsa yineleme — bkz. .github/scripts/supabase-senkron.mjs.
-        if (document.querySelector(`a[href$="/projects/${encodeURIComponent(proje.slug)}/"]`)) return;
         const card = document.createElement("div");
         card.className = "project-card searchable";
         const ozet = proje.ozet || "";

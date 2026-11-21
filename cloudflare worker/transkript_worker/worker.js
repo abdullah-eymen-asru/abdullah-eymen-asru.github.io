@@ -218,27 +218,36 @@ async function konusmaci(env, istek) {
       ...(dusunme ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
     },
   });
-  let son = "hata";
+  /* Yanıtı ayıkla: önce JSON; bozuksa (kesilmiş/biçimsiz) 'numara:etiket' çiftlerini ham metinden topla. */
+  const ayikla = (metin) => {
+    let o = null; try { o = JSON.parse(metin); } catch { const i = metin.indexOf("{"), k = metin.lastIndexOf("}"); if (i >= 0 && k > i) { try { o = JSON.parse(metin.slice(i, k + 1)); } catch { /* ham metne düş */ } } }
+    const kaynakMetin = o && typeof o.atamalar === "string" ? o.atamalar : (o && Array.isArray(o.atamalar) ? o.atamalar.join(",") : metin);
+    const atamalar = {}; for (const m of String(kaynakMetin).matchAll(/(\d{1,6})\s*[:=]\s*"?([A-Za-z0-9]{1,6})"?/g)) if (geceerliIdler.has(m[1])) atamalar[m[1]] = m[2];
+    const kisiler = (Array.isArray(o?.konusmacilar) ? o.konusmacilar : []).slice(0, 12).map((k) => ({ etiket: temizEtiket(k.etiket), ad: temizMetin(k.ad, 60), ozellik: temizMetin(k.ozellik, 120) })).filter((k) => k.etiket);
+    return { atamalar, kisiler };
+  };
+  const bekle = (ms) => new Promise((q) => setTimeout(q, ms));
+  let son = "Yapay zekâdan yanıt alınamadı.", sonKod = 502;
   for (const model of zincir(env.GEMINI_MODELI, GEMINI_MODELLERI)) {
-    for (const dusunme of [true, false]) {                 // bazı modeller thinkingBudget'ı reddeder → onsuz yeniden dene
-      const r = await fetch(`${GEMINI}/${encodeURIComponent(model)}:generateContent`, { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY }, body: cikti(dusunme) });
-      const j = await r.json().catch(() => null);
-      if (r.status === 429) throw new HttpHata(429, "Yapay zekâ servisi şu an yoğun ya da kota doldu; biraz sonra yeniden dene.");
+    let dusunme = true, modelYok = false;
+    for (let deneme = 0; deneme < 3 && !modelYok; deneme++) {          // geçici hatalarda (429/5xx/boş yanıt) aynı modeli en çok 3 kez dene
+      let r, j;
+      try { r = await fetch(`${GEMINI}/${encodeURIComponent(model)}:generateContent`, { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY }, body: cikti(dusunme), signal: AbortSignal.timeout(110000) }); j = await r.json().catch(() => null); }
+      catch { son = "Gemini'ye ulaşılamadı ya da yanıt zaman aşımına uğradı."; await bekle(1500 * (deneme + 1)); continue; }
       if (r.status === 401 || r.status === 403) throw new HttpHata(500, "Gemini anahtarı geçersiz ya da yetkisiz (GEMINI_API_KEY).");
-      const metin = j?.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || "";
-      if (r.ok && metin) {
-        let o; try { o = JSON.parse(metin); } catch { son = "json"; break; }
-        const atamalar = {}; for (const m of String(o.atamalar || "").matchAll(/(\d{1,6})\s*[:=]\s*([A-Za-z0-9]{1,6})/g)) if (geceerliIdler.has(m[1])) atamalar[m[1]] = m[2];
-        const kisiler = (Array.isArray(o.konusmacilar) ? o.konusmacilar : []).slice(0, 12).map((k) => ({ etiket: temizEtiket(k.etiket), ad: temizMetin(k.ad, 60), ozellik: temizMetin(k.ozellik, 120) })).filter((k) => k.etiket);
-        if (!Object.keys(atamalar).length) { son = "bos"; break; }
-        return { konusmacilar: kisiler, atamalar, model };
-      }
-      son = r.status === 404 || (r.status === 400 && /model/i.test(JSON.stringify(j?.error || ""))) ? "model" : (r.status === 400 && dusunme ? "dusunme" : "hata");
-      if (son === "model") break;                          // sıradaki model
-      if (son !== "dusunme") break;
+      if (r.status === 429) { son = "Yapay zekâ servisi şu an yoğun ya da kota doldu; biraz sonra yeniden dene."; sonKod = 429; await bekle(2500 * (deneme + 1)); continue; }
+      if (r.status >= 500) { son = `Gemini geçici olarak yanıt vermiyor (${r.status}).`; sonKod = 502; await bekle(2000 * (deneme + 1)); continue; }
+      if (r.status === 404 || (r.status === 400 && /model/i.test(JSON.stringify(j?.error || "")) && !/thinking/i.test(JSON.stringify(j?.error || "")))) { son = "Gemini modeli bulunamadı; GEMINI_MODELI ile güncel modeli yaz."; modelYok = true; continue; }
+      if (r.status === 400 && dusunme) { dusunme = false; deneme--; continue; }          // thinkingBudget'ı reddeden model → onsuz yeniden dene (deneme hakkını yeme)
+      if (!r.ok) { son = `Gemini isteği reddetti (${r.status}${j?.error?.message ? `: ${String(j.error.message).slice(0, 120)}` : ""}).`; break; }
+      const aday = j?.candidates?.[0], metin = aday?.content?.parts?.map((p) => p.text || "").join("") || "";
+      if (!metin) { son = j?.promptFeedback?.blockReason ? `Gemini bu sesi işlemeyi reddetti (${j.promptFeedback.blockReason}).` : `Gemini boş yanıt verdi (${aday?.finishReason || "bilinmiyor"}).`; await bekle(1200); continue; }
+      const { atamalar, kisiler } = ayikla(metin);
+      if (!Object.keys(atamalar).length) { son = "Gemini bu bölümde satırlara konuşmacı atayamadı."; await bekle(1200); continue; }
+      return { konusmacilar: kisiler, atamalar, model, atanan: Object.keys(atamalar).length, toplam: geceerliIdler.size };
     }
   }
-  throw new HttpHata(502, son === "model" ? "Gemini modeli bulunamadı; GEMINI_MODELI ile güncel modeli yaz." : "Yapay zekâ konuşmacıları ayıramadı; duraklama tahminini ya da elle atamayı kullan.");
+  throw new HttpHata(sonKod, son);
 }
 
 export default {

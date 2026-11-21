@@ -56,10 +56,23 @@ function sonucAyikla(o, gecerli) {
   if (!Object.keys(atamalar).length) throw new AiHatasi("Yapay zekâ bu bölümde konuşmacıları ayıramadı.");
   return { konusmacilar, atamalar };
 }
-const jsonAyikla = (metin) => {
+const jsonAyikla = (metin) => {                // bozuk/kesik JSON'da bile 'numara:etiket' çiftleri ham metinden toplanır
   const t = String(metin || "").replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim(), a = t.indexOf("{"), b = t.lastIndexOf("}");
-  try { return JSON.parse(a >= 0 && b > a ? t.slice(a, b + 1) : t); } catch { throw new AiHatasi("Yapay zekâ beklenen biçimde yanıt vermedi."); }
+  try { return JSON.parse(a >= 0 && b > a ? t.slice(a, b + 1) : t); } catch { return { atamalar: t, konusmacilar: [] }; }
 };
+const bekle = (ms) => new Promise((r) => setTimeout(r, ms));
+/** Geçici hatalarda (ağ, 429, 5xx, boş/biçimsiz yanıt) en çok 2 kez yeniden dener; kimlik/model hatalarında hemen bırakır. */
+async function tekrarDene(fn, sinyal) {
+  for (let d = 0; ; d++) {
+    try { return await fn(); }
+    catch (h) {
+      if (h?.name === "AbortError" || sinyal?.aborted) throw h;
+      const gecici = h?.durum == null || h.durum === 429 || h.durum >= 500 || /boş yanıt|ayıramadı|zaman aşımı|ulaşılamadı/.test(h?.message || "");
+      if (!gecici || d >= 2) throw h;
+      await bekle(2000 * (d + 1));
+    }
+  }
+}
 const base64 = async (blob) => { const u = new Uint8Array(await blob.arrayBuffer()); let s = ""; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
 
 async function geminiSesli({ model, anahtar, istem, blob, sinyal }) {
@@ -98,9 +111,12 @@ export async function konusmaciAyirKendi({ saglayici, model, blob, satirlar, onc
   const sesli = saglayici === "gemini";
   const istem = istemOlustur({ satirlar, onceki, sayi, sesVar: sesli });
   let metin, kullanilan = model;
-  if (sesli) metin = await geminiSesli({ model, anahtar, istem, blob, sinyal });
-  else { const r = await yorumIste({ saglayici, model, anahtar, sistem: "Sen bir konuşma çözümleme asistanısın. Yalnızca istenen JSON'u döndür.", kullanici: istem, sinyal, maksToken: 6000 }); metin = r.metin; kullanilan = r.model || model; }
-  return { ...sonucAyikla(jsonAyikla(metin), gecerli), model: kullanilan, sesli };
+  const sonuc = await tekrarDene(async () => {
+    if (sesli) metin = await geminiSesli({ model, anahtar, istem, blob, sinyal });
+    else { const r = await yorumIste({ saglayici, model, anahtar, sistem: "Sen bir konuşma çözümleme asistanısın. Yalnızca istenen JSON'u döndür.", kullanici: istem, sinyal, maksToken: 6000 }); metin = r.metin; kullanilan = r.model || model; }
+    return sonucAyikla(jsonAyikla(metin), gecerli);
+  }, sinyal);
+  return { ...sonuc, model: kullanilan, sesli };
 }
 
 /** Kasaya anahtar yaz (HavaStil ile ortak). Kasa açık değilse anlaşılır hata. */

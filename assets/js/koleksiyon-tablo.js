@@ -437,13 +437,14 @@ async function koleksiyonTablosuOlustur(config) {
 
       rows += `
         <tr class="searchable" data-search="${escapeHtml(searchTextKucuk)}"${filtreDataAttrs}>
-          <td class="col-index">${index + 1}</td>
+          <td class="col-index" data-no="${index + 1}">${index + 1}</td>
           <td><a class="koleksiyon-baslik-link" title="${escapeHtml(item.title)}" href="${escapeHtml(guvenliLink(item.url))}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.title)}</a></td>
           ${hucreler}
         </tr>`;
     });
 
     container.innerHTML = `
+      <p class="liste-filtre-ozet" aria-live="polite" hidden></p>
       <div class="tablo-kaydir"><table>
         <thead>${theadHtml}</thead>
         <tbody id="${config.containerId}-tbody">${rows}</tbody>
@@ -456,6 +457,8 @@ async function koleksiyonTablosuOlustur(config) {
     const tbody = document.getElementById(`${config.containerId}-tbody`);
     const tumSatirlar = Array.from(tbody.querySelectorAll(".searchable"));
     const paginationEl = document.getElementById(`${config.containerId}-pagination`);
+    const filtreOzetEl = container.querySelector(".liste-filtre-ozet");
+    const indexBaslik = container.querySelector("th.col-index");
     let mevcutSayfa = 1;
 
     filtreTanimlari.forEach(f => {
@@ -508,6 +511,22 @@ async function koleksiyonTablosuOlustur(config) {
       // Önce her satırı gizle, sonra sadece o sayfaya düşenleri göster
       tumSatirlar.forEach(tr => { tr.style.display = "none"; });
       eslesenler.slice(baslangic, bitis).forEach(tr => { tr.style.display = ""; });
+
+      // FİLTRE/ARAMA AKTİFKEN sıra numaraları 1..N olarak yeniden verilir (kaç kayıt olduğu görünsün);
+      // filtre yokken kayıtların kendi (orijinal) numaraları geri gelir. Üstte filtrenin ne olduğu ve sayısı yazılır.
+      const aramaMetni = (searchBox.value || "").trim();
+      const secimler = filtreTanimlari.map(f => (f.select.value ? f.select.selectedOptions[0]?.textContent : "")).filter(Boolean);
+      const filtreAktif = aramaMetni !== "" || secimler.length > 0;
+      tumSatirlar.forEach(tr => { const h = tr.querySelector(".col-index"); if (h) h.textContent = h.dataset.no; });
+      if (filtreAktif) eslesenler.forEach((tr, i) => { const h = tr.querySelector(".col-index"); if (h) h.textContent = String(i + 1); });
+      if (indexBaslik) { indexBaslik.textContent = filtreAktif ? "Sıra" : "#"; indexBaslik.title = filtreAktif ? "Filtreye uyan kayıtların sırası" : "Kaydın numarası"; }
+      if (filtreOzetEl) {
+        filtreOzetEl.hidden = !filtreAktif;
+        if (filtreAktif) {
+          const parcalar = [...secimler, ...(aramaMetni ? [`“${aramaMetni}” araması`] : [])].join(" · ");
+          filtreOzetEl.innerHTML = `<strong>${eslesenler.length.toLocaleString("tr-TR")}</strong> kayıt <span class="liste-filtre-ozet-ayrac">·</span> ${escapeHtml(parcalar)} <span class="liste-filtre-ozet-toplam">(toplam ${tumSatirlar.length.toLocaleString("tr-TR")} kayıt içinden; sıra numaraları bu filtreye göre verildi)</span>`;
+        }
+      }
 
       // "Henüz eklenmiş bir kayıt yok" / sonuç yok mesajı
       let emptyMsg = tbody.querySelector(".no-results-row");

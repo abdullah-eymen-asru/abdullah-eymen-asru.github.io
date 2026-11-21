@@ -350,9 +350,7 @@ function duzMetinOzeti(md, azamiUzunluk = 155) {
 function seoBilgisiniUygula(kayit, tur, slug, appEl) {
   const siteTitle = appEl?.dataset.siteTitle || "";
   const taban = (appEl?.dataset.siteUrl || window.location.origin).replace(/\/$/, "");
-  // Kanonik adres: senkronlanmış statik sayfanın TEMİZ adresi (/blog/<slug>/ ya da /projects/<slug>/) — bkz. .github/scripts/supabase-senkron.mjs.
-  // Bu dinamik sayfa yalnızca senkron tamamlanana kadar (ilk dakikalar) ya da senkron kapalıysa gösterilen anlık yedektir.
-  const canonicalUrl = `${taban}${relUrl(tur === "proje" ? "/projects/" : "/blog/")}${encodeURIComponent(slug)}/`;
+  const canonicalUrl = `${taban}${relUrl("/icerik/supabase-yazi.html")}?tur=${encodeURIComponent(tur)}&slug=${encodeURIComponent(slug)}`;
   const baslik = kayit.baslik || "";
   const yazar = kayit.yazar_adi || siteTitle;
   const aciklama = (kayit.ozet && String(kayit.ozet).trim()) || duzMetinOzeti(kayit.govde);

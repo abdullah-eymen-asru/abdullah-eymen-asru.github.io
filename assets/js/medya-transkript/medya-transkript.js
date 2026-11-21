@@ -16,7 +16,7 @@ import { sekmeSifirlamaKaydet } from "../core/gezinme-kilidi.js";
 import { SINIR } from "../medya-donustur/ses-ortak.js";
 import { ilerlemeKur } from "../medya-donustur/ses-ortak.js";
 import { kotaPaneli, kaynakSecici } from "../medya-kota/medya-kota.js";
-import { sureOku, sesAkisi, mp3Kodla } from "./ses-akis.js";
+import { sureOku, sesAkisi, mp3Kodla, mp3Dilim, uyanikTut } from "./ses-akis.js";
 import { kendiAnahtarlar, konusmaciAyirKendi, anahtarEkle, SAGLAYICILAR, SAGLAYICI_SIRASI } from "./konusmaci-ai.js";
 import { RENKLER, saat, gunSaniyesi, gunSaati, kelimeSay, istatistik, tahminiAyir, dolguTemizle, anahtarKelimeler, baslikOner, metinUret, turlariUret, belgeBloklari, kunyeMetni, kisaSaat } from "./transkript-mantik.js";
 
@@ -143,11 +143,17 @@ async function kur() {
   const baslangic = el("input", { class: "md-girdi", type: "text", inputmode: "numeric", placeholder: "boş bırak (isteğe bağlı) — örn. 14:30", maxlength: "8", autocomplete: "off", "aria-label": "Kaydın gerçek başlangıç saati (isteğe bağlı)" });
   mod.value = tercih.oku("mod", "orijinal"); dil.value = tercih.oku("dil", ""); kisiSayisi.value = tercih.oku("kisiSayisi", "0");
   for (const [a, g] of [["mod", mod], ["dil", dil], ["kisiSayisi", kisiSayisi]]) g.addEventListener("change", () => tercih.yaz(a, g.value));
-  kisiOto.addEventListener("change", () => { tercih.yaz("kisiOto", kisiOto.checked ? "1" : "0"); kisiSayisi.disabled = !kisiOto.checked; }); kisiSayisi.disabled = !kisiOto.checked;
+  const aiDurumGuncelle = () => { kisiSayisi.disabled = !kisiOto.checked; kisiKaynak.disabled = !kisiOto.checked; };
+  kisiOto.addEventListener("change", () => { tercih.yaz("kisiOto", kisiOto.checked ? "1" : "0"); aiDurumGuncelle(); }); aiDurumGuncelle();
   const basla = el("button", { type: "button", class: "md-btn md-birincil ts-basla", text: "▶ Yazıya dökmeye başla" }), durdur = el("button", { type: "button", class: "md-btn", text: "⏹ Durdur", hidden: true });
   basla.disabled = true;
 
-  const kurulum = el("section", { class: "md-kart ts-kurulum" },
+  /* Yapay zekâ seçimi KAYITTAN ÖNCE: hangi yapay zekâyla ayrılacağı dosya yüklenmeden belirlenir. */
+  const aiBlok = el("div", { class: "ts-aiblok" },
+    el("div", { class: "ts-adim" }, el("span", { class: "ts-no", text: "🤖", "aria-hidden": "true" }), el("h2", { text: "Yapay zekâ (konuşmacı ayrımı)" })),
+    el("label", { class: "ts-anahtar-satir" }, kisiOto, el("span", {}, el("strong", { text: "Konuşmacıları otomatik bul" }), el("small", { class: "md-soluk", text: "Yapay zekâ kimin konuştuğunu ayırır. Kapatırsan metin tek akış olur ve ses Gemini'ye hiç gönderilmez." }))),
+    alan("Hangi yapay zekâ ayırsın?", kisiKaynak), kisiKaynakIpucu, aiKutu);
+  const kurulum = el("section", { class: "md-kart ts-kurulum" }, aiBlok,
     el("div", { class: "ts-adim" }, el("span", { class: "ts-no", text: "1" }), el("h2", { text: "Kaydı seç" })), birakAlani, girdi, dosyaBilgi,
     el("div", { class: "ts-ayarlar", hidden: true },
       el("div", { class: "ts-adim" }, el("span", { class: "ts-no", text: "2" }), el("h2", { text: "Ne kadarını döküm yapalım?" })),
@@ -156,8 +162,7 @@ async function kur() {
       el("div", { class: "ts-aralikkutu-dis" }, aralikKutu), aralikOzet,
       el("div", { class: "ts-adim" }, el("span", { class: "ts-no", text: "3" }), el("h2", { text: "Ayarlar" })),
       el("div", { class: "ts-izgara" }, alan("Konuşma dili", dil, "Bilmiyorsan “Otomatik algıla” bırak."), alan("Yazı dili", mod, "Çeviri istersen metin seçtiğin dilde yazılır.")),
-      el("label", { class: "ts-anahtar-satir" }, kisiOto, el("span", {}, el("strong", { text: "Konuşmacıları otomatik bul" }), el("small", { class: "md-soluk", text: "Yapay zekâ kaydı dinleyip kimin konuştuğunu ayırır (Google Gemini; ses bu amaçla gönderilir). Kapatırsan metin tek akış olur." }))),
-      el("div", { class: "ts-izgara" }, alan("Konuşmacı sayısı", kisiSayisi, "Biliyorsan seç; daha doğru olur."), alan("Hangi yapay zekâ ayırsın?", kisiKaynak)), kisiKaynakIpucu, aiKutu,
+      el("div", { class: "ts-izgara" }, alan("Konuşmacı sayısı", kisiSayisi, "Biliyorsan seç; daha doğru olur. (Konuşmacı ayrımı yukarıdaki “Yapay zekâ” kutusundan açılır/kapatılır.)")),
       el("details", { class: "ts-gelismis" }, el("summary", { text: "Gelişmiş: kaydın gerçek başlangıç saati" }),
         el("p", { class: "md-soluk", text: "Normalde zamanlar kaydın başından sayılır (00:00:00, 00:00:12 …). Bu kayıt belirli bir saatte başladıysa (örn. toplantı 14:30'da başladı) buraya yaz; istersen çıktıda zamanlar gün saati olarak da yazılır (14:30:12). Boş bırakırsan hiçbir şey değişmez." }), baslangic),
       el("div", { class: "ts-basla-satiri" }, basla, durdur), cubuk, sureYazi), mesaj);
@@ -443,6 +448,24 @@ async function kur() {
     if (!r.ok) { const e = new Error(j.hata || `Konuşmacı ayrımı hatası (${r.status})`); e.kalici = r.status === 503 || r.status === 401 || r.status === 403 || r.status === 404; throw e; }
     return j;
   }
+  /**
+   * Bir ses parçasını (≈20 dk) ≤10 dk'lık pencerelere bölüp her biri için konuşmacı ayrımı ister (daha kısa ses = daha doğru ve zaman aşımına dayanıklı).
+   * Ses, mevcut MP3'ten bayt dilimiyle alınır (yeniden kodlama yok). Hatalı pencere diğerlerini durdurmaz (kalıcı hata hariç). Dönüş: { n: atanan satır, hatalar:[mesaj] }
+   */
+  const AYIR_SN = 600;
+  async function ayirPencereli(blob, blobBas, blobSure, segs, oturum, sinyal) {
+    const son = blobBas + blobSure; let n = 0; const hatalar = [];
+    for (let w = blobBas; w < son - 0.001;) {
+      let w2 = Math.min(son, w + AYIR_SN); if (son - w2 < 90) w2 = son;          // çok kısa artık pencere bırakma
+      const sonPencere = w2 >= son - 0.001, dilim = segs.filter((x) => x.b >= w - 0.001 && (sonPencere || x.b < w2));
+      if (dilim.length && !ayirKapali) {
+        try { n += atamalariUygula(await ayirIstegi(mp3Dilim(blob, blobBas, blobSure, w, w2), dilim, w, oturum, sinyal), dilim); }
+        catch (h) { if (h.name === "AbortError") throw h; hatalar.push(`${sureGoster(w)}–${sureGoster(w2)}: ${h.message}`); if (h.kalici) { ayirKapali = h.message; break; } }
+      }
+      w = w2;
+    }
+    return { n, hatalar };
+  }
   /** Gemini sonucunu T'ye işle: etiket → konuşmacı dizini (parçalar arası aynı kişi aynı etiket). */
   function atamalariUygula(sonuc, segs) {
     const idx = new Map(); T.konusmacilar.forEach((k, i) => { if (k.etiket) idx.set(k.etiket, i); });
@@ -465,6 +488,8 @@ async function kur() {
     let sunucu; try { sunucu = kaynak.hazirla(); } catch (h) { return bildir(h.message, true); }
     const anahtar = `${dosya.name}|${dosya.size}|${b0}|${s0}|${mod.value}|${dil.value}`;
     basla.disabled = true; durdur.hidden = false; iptal = new AbortController(); kisiMesaji("");
+    const uyanikBirak = uyanikTut();                                   // sekme arka plandayken kısılmayı azalt (tıklama içinde başlatılmalı)
+    let ayirZinciri = Promise.resolve(); const ayirHatalari = []; let ayirBekleyen = 0;
     if (!devam || devam.anahtar !== anahtar) { devam = { anahtar, sonraki: b0, segs: [], dil: null }; if (!baslikElleMi) T = { baslik: "", dil: null, sure: 0, konusmacilar: [], segmentler: [] }; else T = { ...T, konusmacilar: [], segmentler: [], dil: null }; nid = 1; ayirKapali = null; }
     else { /* yarım kalan işe devam */ }
     const toplamSn = Math.max(1, (Number.isFinite(s0) ? Math.min(s0, kayitSure || s0) : kayitSure) - b0);
@@ -483,20 +508,27 @@ async function kur() {
           const yeni = (j.segmentler || []).map((s) => yeniSeg({ b: s.b, s: s.s, m: s.m, k: null }));
           devam.segs.push(...yeni); devam.dil ||= j.dil; if (j.kota) kota.yenile(j.kota);
           T = { ...T, dil: devam.dil, sure: kayitSure || T.sure, segmentler: devam.segs };
-          if (kisiOto.checked && !ayirKapali && yeni.length) {
-            adim("Konuşmacılar ayrılıyor", 0.75);
-            try { atamalariUygula(await ayirIstegi(blob, yeni, bas, session, iptal.signal), yeni); }
-            catch (h) { if (h.name === "AbortError") throw h; if (h.kalici) ayirKapali = h.message; kisiMesaji(`Konuşmacılar otomatik ayrılamadı: ${h.message} Metin hazır; konuşmacıları “Konuşmacılar” sekmesinden atayabilirsin.`, true); }
+          if (kisiOto.checked && !ayirKapali && yeni.length) {            // ayrım, sıradaki parçanın dökümüyle PARALEL yürür (zincir: konuşmacı sürekliliği için sırayla)
+            ayirBekleyen++;
+            ayirZinciri = ayirZinciri.then(async () => {
+              try { const { hatalar } = await ayirPencereli(blob, bas, sure, yeni, session, iptal?.signal); ayirHatalari.push(...hatalar); }
+              catch (h) { if (h.name !== "AbortError") ayirHatalari.push(h.message || String(h)); }
+              finally { ayirBekleyen--; if (!stud.hidden) hepsiniCiz(); }
+            });
           }
           if (!baslikElleMi) T.baslik = baslikOner(T.segmentler);
           devam.sonraki = bas + sure; adim("Parça tamamlandı", 1);
           studyoGoster(stud.hidden ? "okuma" : null);
         },
       });
+      if (ayirBekleyen > 0) ilr.etiket = "Konuşmacılar ayrılıyor";
+      await ayirZinciri; if (iptal?.signal.aborted) throw Object.assign(new Error("İptal edildi."), { name: "AbortError" });
       if (!T.segmentler.length) throw new Error("Bu aralıkta konuşma bulunamadı. Başka bir bölüm ya da dil seçmeyi dene.");
       if (sonuc?.sure && !kayitSure) kayitSure = sonuc.sure; T.sure = ozelAralik.checked ? topSure() : (kayitSure || topSure());
-      if (kisiOto.checked && T.konusmacilar.length && !ayirKapali) kisiMesaji(`✔ ${T.konusmacilar.length} konuşmacı otomatik ayrıldı. Adlara dokunarak düzeltebilirsin (Konuşmacılar sekmesi).`);
-      else if (kisiOto.checked && !T.konusmacilar.length && !kisiDurum.textContent) kisiMesaji("Konuşmacı ayrımı sonuç vermedi; “Konuşmacılar” sekmesinden tekrar deneyebilirsin.", true);
+      const atanan = T.segmentler.filter((x) => x.k != null).length;
+      if (kisiOto.checked && ayirHatalari.length) kisiMesaji(`Konuşmacı ayrımı ${atanan ? `kısmen tamamlandı (${atanan}/${T.segmentler.length} satır atandı)` : "yapılamadı"}: ${[...new Set(ayirHatalari.map((m) => m.replace(/^[\d:–-]+:\s*/, "")))].slice(0, 2).join(" · ")} Metin hazır; “Konuşmacılar” sekmesindeki “Konuşmacıları bul” ile tekrar deneyebilir ya da elle atayabilirsin.`, true);
+      else if (kisiOto.checked && T.konusmacilar.length) kisiMesaji(`✔ ${T.konusmacilar.length} konuşmacı otomatik ayrıldı (${atanan}/${T.segmentler.length} satır). Adlara dokunarak düzeltebilirsin (Konuşmacılar sekmesi).`);
+      else if (kisiOto.checked && !kisiDurum.textContent) kisiMesaji("Konuşmacı ayrımı sonuç vermedi; “Konuşmacılar” sekmesinden tekrar deneyebilirsin.", true);
       ilr.bitir(); studyoGoster("okuma"); bildir(`✔ Transkript hazır: ${T.segmentler.length} satır. Aşağıdaki sekmelerden oku, düzenle ve indir.`); devam = null; kayitId = null;
       stud.scrollIntoView?.({ block: "start", behavior: "smooth" });
     } catch (h) {
@@ -504,27 +536,31 @@ async function kur() {
       if (h.name === "AbortError") bildir(devam?.segs.length ? `Durduruldu. ${sureGoster(devam.sonraki)} konumuna kadar olan kısım korundu; “Yazıya dökmeye başla” ile kaldığı yerden devam edebilirsin.` : "Durduruldu.");
       else bildir(`${h.message || h}${devam?.segs.length ? " — Tamamlanan kısım korundu; tekrar başlatınca kaldığı yerden devam eder." : ""}`, true);
       kota.yenile();
-    } finally { basla.disabled = !dosya; durdur.hidden = true; iptal = null; }
+    } finally { uyanikBirak(); basla.disabled = !dosya; durdur.hidden = true; iptal = null; }
   });
 
   /* Mevcut metin için konuşmacıları sonradan bul (kayıt dosyası gerekir). */
   async function konusmacilariAlgila() {
     if (!dosya) return bildir("Önce kayıt dosyasını seç (üstteki “Kayıt dosyasını bağla”).", true);
     if (!T.segmentler.length) return;
-    iptal = new AbortController(); durdur.hidden = false; kisiMesaji("");
+    iptal = new AbortController(); durdur.hidden = false; kisiMesaji(""); ayirKapali = null;
+    const uyanikBirak = uyanikTut();
     try {
       const { data: { session } } = await supabase.auth.getSession(); if (!session) throw new Error("Oturum gerekli.");
       kaydetGeri(); T.konusmacilar = []; T.segmentler.forEach((s) => { s.k = null; });
-      const bas = T.segmentler[0].b, son = topSure() + 1; let n = 0;
+      const bas = T.segmentler[0].b, son = topSure() + 1; let n = 0; const hatalarTum = [];
       ilr.baslat("Konuşmacılar ayrılıyor", 60);
       await sesAkisi(dosya, { bas, son, signal: iptal.signal, ilerle: (o) => ilr.guncelle(o * 0.9), parca: async (p) => {
         const dilim = T.segmentler.filter((s) => s.b >= p.bas - 0.01 && s.b < p.bas + p.sure); if (!dilim.length) return;
         const blob = await mp3Kodla(p.f32, { signal: iptal.signal });
-        n += atamalariUygula(await ayirIstegi(blob, dilim, p.bas, session, iptal.signal), dilim);
+        const { n: k, hatalar } = await ayirPencereli(blob, p.bas, p.sure, dilim, session, iptal.signal); n += k; hatalarTum.push(...hatalar); hepsiniCiz();
       } });
-      ilr.bitir(); hepsiniCiz(); kisiMesaji(`✔ ${T.konusmacilar.length} konuşmacı bulundu (${n} satır atandı).`); bildir("");
+      ilr.bitir(); hepsiniCiz();
+      if (hatalarTum.length) kisiMesaji(`${n ? `Kısmen tamamlandı (${n}/${T.segmentler.length} satır atandı). ` : ""}${[...new Set(hatalarTum.map((m) => m.replace(/^[\d:–-]+:\s*/, "")))].slice(0, 2).join(" · ")}`, true);
+      else kisiMesaji(`✔ ${T.konusmacilar.length} konuşmacı bulundu (${n} satır atandı).`);
+      bildir("");
     } catch (h) { ilr.bitir(); if (h.name === "AbortError") bildir("Durduruldu."); else { kisiMesaji(h.message || String(h), true); bildir(h.message || String(h), true); } hepsiniCiz(); }
-    finally { durdur.hidden = true; iptal = null; }
+    finally { uyanikBirak(); durdur.hidden = true; iptal = null; }
   }
 
   const temizle = dugme("🧹 Belleği temizle", () => { dosya = null; kayitSure = 0; devam = null; T = { baslik: "", dil: null, sure: 0, konusmacilar: [], segmentler: [] }; secili.clear(); geriAl = []; baslikElleMi = false; if (sesUrl) { URL.revokeObjectURL(sesUrl); sesUrl = null; } oynatici.removeAttribute("src"); stud.hidden = true; sirket.hidden = true; dosyaBilgi.hidden = true; ilr.bitir(); basla.disabled = true; bildir("🧹 Bellek temizlendi (yerel kayıtlar silinmez)."); });

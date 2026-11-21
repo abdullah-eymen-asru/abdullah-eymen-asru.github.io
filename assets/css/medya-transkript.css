@@ -112,3 +112,8 @@
 .mk-yonetim { display: grid; gap: 1rem; }
 .mk-yonetim details.mk-ayar { margin-top: 0; }
 .ts-kaydirlar { display: grid; gap: .2rem; }
+
+/* Yapay zekâ seçimi: dosya yüklemeden önce, en üstte */
+.ts-aiblok { display: grid; gap: .75rem; padding-bottom: 1rem; margin-bottom: 1rem; border-bottom: 1px dashed var(--md-cizgi, rgba(128,128,128,.35)); }
+.ts-aiblok .ts-no { background: transparent; font-size: 1.4rem; }
+.ts-aiblok select:disabled { opacity: .55; }
