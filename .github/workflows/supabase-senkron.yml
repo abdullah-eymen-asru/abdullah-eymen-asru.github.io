@@ -1,0 +1,51 @@
+# Supabase'te yayınlanan yazı/projeleri repoya Jekyll Markdown dosyası olarak yazar (bkz. .github/scripts/supabase-senkron.mjs).
+# Amaç: "Sadece Supabase'te yayınla" ile GitHub commit'i arasında arama motoru/akademik indeks açısından FARK bırakmamak —
+# her ikisi de temiz adresli (/blog/<slug>/), sunucuda çizilmiş, citation_* / Dublin Core / JSON-LD etiketli statik sayfa olur.
+#
+# KURULUM (bir kez): Repo Settings → Secrets and variables → Actions → New repository secret:
+#   SUPABASE_URL        (zaten supabase-ping için tanımlıysa aynı)
+#   SUPABASE_ANON_KEY   anon public anahtar (gizli değildir, herkese açık RPC'leri çağırır)
+# Repo Settings → Actions → General → Workflow permissions → "Read and write permissions".
+# Çalışma: her 30 dakikada bir + elle "Run workflow". Değişiklik varsa commit atar ve Pages build'ini kendisi tetikler.
+name: Supabase Yazılarını Siteye Senkronla
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: supabase-senkron
+  cancel-in-progress: false
+
+jobs:
+  senkron:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Supabase yayınlarını çek ve dosyalara yaz
+        id: senk
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: node .github/scripts/supabase-senkron.mjs
+      - name: Değişiklik varsa commit at
+        if: steps.senk.outputs.degisti == 'true'
+        run: |
+          git config user.name "supabase-senkron[bot]"
+          git config user.email "supabase-senkron@users.noreply.github.com"
+          git add -A _posts _projects
+          git commit -m "chore: Supabase yayınlarını senkronla"
+          git push
+      - name: Pages build'ini tetikle (GITHUB_TOKEN ile atılan push yeni workflow başlatmaz)
+        if: steps.senk.outputs.degisti == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run github-pages-deploy.yml --ref "${{ github.ref_name }}"

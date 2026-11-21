@@ -17,6 +17,7 @@ import { SINIR } from "../medya-donustur/ses-ortak.js";
 import { ilerlemeKur } from "../medya-donustur/ses-ortak.js";
 import { kotaPaneli, kaynakSecici } from "../medya-kota/medya-kota.js";
 import { sureOku, sesAkisi, mp3Kodla } from "./ses-akis.js";
+import { kendiAnahtarlar, konusmaciAyirKendi, anahtarEkle, SAGLAYICILAR, SAGLAYICI_SIRASI } from "./konusmaci-ai.js";
 import { RENKLER, saat, gunSaniyesi, gunSaati, kelimeSay, istatistik, tahminiAyir, dolguTemizle, anahtarKelimeler, baslikOner, metinUret, turlariUret, belgeBloklari, kunyeMetni, kisaSaat } from "./transkript-mantik.js";
 
 const kok = document.getElementById("ts-kok");
@@ -106,11 +107,43 @@ async function kur() {
   const dil = el("select", { class: "md-girdi", "aria-label": "Kayıttaki konuşma dili" }, ...DILLER.map(([v, a]) => el("option", { value: v, text: a })));
   const kisiOto = el("input", { type: "checkbox", checked: tercih.oku("kisiOto", "1") === "1" });
   const kisiSayisi = el("select", { class: "md-girdi", "aria-label": "Konuşmacı sayısı" }, el("option", { value: "0", text: "Sayıyı kendin bul" }), ...[1, 2, 3, 4, 5, 6, 8].map((n) => el("option", { value: String(n), text: `${n} kişi` })));
+  const alan = (ad, g, ip) => el("label", { class: "ts-alan" }, el("span", { class: "ts-alan-ad", text: ad }), g, ip ? el("small", { class: "md-soluk", text: ip }) : null);
+  /* Konuşmacı ayrımı kaynağı: sistem (Gemini, Worker) ya da KENDİ anahtarın (HavaStil şifreli kasası — oradaki anahtarlar burada da geçerlidir) */
+  const kisiKaynak = el("select", { class: "md-girdi", "aria-label": "Konuşmacı ayrımı için yapay zekâ" }, el("option", { value: "sistem", text: "Site yapay zekâsı (Gemini) — kotaya sayılır" }));
+  const kisiKaynakIpucu = el("small", { class: "md-soluk" });
+  let kayitliAi = {};
+  const aiSaglayici = el("select", { class: "md-girdi", "aria-label": "Sağlayıcı" }, ...SAGLAYICI_SIRASI.map((k) => el("option", { value: k, text: SAGLAYICILAR[k].ad })));
+  const aiAnahtar = el("input", { class: "md-girdi", type: "password", autocomplete: "off", spellcheck: "false", "aria-label": "API anahtarı" });
+  const aiModel = el("input", { class: "md-girdi", type: "text", autocomplete: "off", spellcheck: "false", "aria-label": "Model adı" });
+  const aiMesaj = el("p", { class: "md-soluk", role: "status" });
+  const aiIpucuGuncelle = () => { const S = SAGLAYICILAR[aiSaglayici.value]; aiAnahtar.placeholder = S.anahtarIpucu; aiModel.placeholder = S.varsayilan; };
+  aiSaglayici.addEventListener("change", aiIpucuGuncelle); aiIpucuGuncelle();
+  const kisiKaynakIpucuYaz = () => {
+    const v = kisiKaynak.value;
+    kisiKaynakIpucu.textContent = v === "sistem" ? "Ses, sitenin Gemini anahtarıyla işlenir (günlük kotaya sayılır)." : v === "gemini" ? "Kendi Gemini anahtarın: ses doğrudan Google'a gider, kaydı DİNLEYEREK ayırır (en doğru). Site kotasından düşmez." : `Kendi ${SAGLAYICILAR[v]?.kisa || v} anahtarın: ses gönderilmez; yalnızca döküm METNİNDEN çıkarım yapılır (Gemini'ye göre daha az kesin).`;
+  };
+  async function aiKaynaklariYukle() {
+    const { kayitli } = await kendiAnahtarlar(); kayitliAi = kayitli;
+    const secili = kisiKaynak.value || tercih.oku("kisiKaynak", "sistem");
+    kisiKaynak.replaceChildren(el("option", { value: "sistem", text: "Site yapay zekâsı (Gemini) — kotaya sayılır" }), ...SAGLAYICI_SIRASI.filter((k) => kayitli[k]).map((k) => el("option", { value: k, text: `Kendi anahtarım — ${SAGLAYICILAR[k].kisa}${k === "gemini" ? " (sesi dinler)" : " (yalnızca metin)"}` })));
+    kisiKaynak.value = [...kisiKaynak.options].some((o) => o.value === secili) ? secili : "sistem"; kisiKaynakIpucuYaz();
+  }
+  kisiKaynak.addEventListener("change", () => { tercih.yaz("kisiKaynak", kisiKaynak.value); kisiKaynakIpucuYaz(); });
+  const aiKaydet = el("button", { type: "button", class: "md-btn", text: "🔐 Şifreli kasaya kaydet" });
+  aiKaydet.addEventListener("click", async () => {
+    if (!aiAnahtar.value.trim()) { aiMesaj.textContent = "Önce API anahtarını yapıştır."; return; }
+    aiKaydet.disabled = true; aiMesaj.textContent = "Kaydediliyor…";
+    try { await anahtarEkle(aiSaglayici.value, aiAnahtar.value, aiModel.value); aiAnahtar.value = ""; await aiKaynaklariYukle(); kisiKaynak.value = aiSaglayici.value; tercih.yaz("kisiKaynak", kisiKaynak.value); kisiKaynakIpucuYaz(); aiMesaj.textContent = "✔ Kaydedildi; konuşmacı ayrımı artık bu anahtarla yapılacak. Aynı anahtar HavaStil'de de geçerlidir."; }
+    catch (h) { aiMesaj.textContent = h.message || String(h); }
+    finally { aiKaydet.disabled = false; }
+  });
+  const aiKutu = el("details", { class: "ts-gelismis" }, el("summary", { text: "🔑 Kendi API anahtarımı kullan (Gemini · ChatGPT · Claude · OpenRouter)" }),
+    el("p", { class: "md-soluk", text: "HavaStil'deki şifreli anahtar kasasıyla ORTAK: orada girdiğin anahtar burada da hazırdır. Anahtarın tarayıcında şifrelenir; bu sitenin sunucusuna düz metin olarak gitmez, istekler doğrudan sağlayıcıya yapılır. Kendi anahtarınla yapılan işler site kotasından düşmez." }),
+    el("div", { class: "ts-izgara" }, alan("Sağlayıcı", aiSaglayici), alan("Model (boşsa varsayılan)", aiModel)), alan("API anahtarı", aiAnahtar), el("div", { class: "md-eylem" }, aiKaydet), aiMesaj);
   const baslangic = el("input", { class: "md-girdi", type: "text", inputmode: "numeric", placeholder: "boş bırak (isteğe bağlı) — örn. 14:30", maxlength: "8", autocomplete: "off", "aria-label": "Kaydın gerçek başlangıç saati (isteğe bağlı)" });
   mod.value = tercih.oku("mod", "orijinal"); dil.value = tercih.oku("dil", ""); kisiSayisi.value = tercih.oku("kisiSayisi", "0");
   for (const [a, g] of [["mod", mod], ["dil", dil], ["kisiSayisi", kisiSayisi]]) g.addEventListener("change", () => tercih.yaz(a, g.value));
   kisiOto.addEventListener("change", () => { tercih.yaz("kisiOto", kisiOto.checked ? "1" : "0"); kisiSayisi.disabled = !kisiOto.checked; }); kisiSayisi.disabled = !kisiOto.checked;
-  const alan = (ad, g, ip) => el("label", { class: "ts-alan" }, el("span", { class: "ts-alan-ad", text: ad }), g, ip ? el("small", { class: "md-soluk", text: ip }) : null);
   const basla = el("button", { type: "button", class: "md-btn md-birincil ts-basla", text: "▶ Yazıya dökmeye başla" }), durdur = el("button", { type: "button", class: "md-btn", text: "⏹ Durdur", hidden: true });
   basla.disabled = true;
 
@@ -124,7 +157,7 @@ async function kur() {
       el("div", { class: "ts-adim" }, el("span", { class: "ts-no", text: "3" }), el("h2", { text: "Ayarlar" })),
       el("div", { class: "ts-izgara" }, alan("Konuşma dili", dil, "Bilmiyorsan “Otomatik algıla” bırak."), alan("Yazı dili", mod, "Çeviri istersen metin seçtiğin dilde yazılır.")),
       el("label", { class: "ts-anahtar-satir" }, kisiOto, el("span", {}, el("strong", { text: "Konuşmacıları otomatik bul" }), el("small", { class: "md-soluk", text: "Yapay zekâ kaydı dinleyip kimin konuştuğunu ayırır (Google Gemini; ses bu amaçla gönderilir). Kapatırsan metin tek akış olur." }))),
-      el("div", { class: "ts-izgara" }, alan("Konuşmacı sayısı", kisiSayisi, "Biliyorsan seç; daha doğru olur.")),
+      el("div", { class: "ts-izgara" }, alan("Konuşmacı sayısı", kisiSayisi, "Biliyorsan seç; daha doğru olur."), alan("Hangi yapay zekâ ayırsın?", kisiKaynak)), kisiKaynakIpucu, aiKutu,
       el("details", { class: "ts-gelismis" }, el("summary", { text: "Gelişmiş: kaydın gerçek başlangıç saati" }),
         el("p", { class: "md-soluk", text: "Normalde zamanlar kaydın başından sayılır (00:00:00, 00:00:12 …). Bu kayıt belirli bir saatte başladıysa (örn. toplantı 14:30'da başladı) buraya yaz; istersen çıktıda zamanlar gün saati olarak da yazılır (14:30:12). Boş bırakırsan hiçbir şey değişmez." }), baslangic),
       el("div", { class: "ts-basla-satiri" }, basla, durdur), cubuk, sureYazi), mesaj);
@@ -394,9 +427,15 @@ async function kur() {
   const dkSn = (sn) => `${p2(Math.floor(sn / 60))}:${p2(Math.floor(sn % 60))}`;
   /** Bir ses parçası + o parçanın döküm satırları → { atamalar:{id:etiket}, konusmacilar:[…] } ; hata → fırlatır (h.kalici: tekrar denemeye değmez). */
   async function ayirIstegi(blob, segs, ofset, oturum, sinyal) {
+    const satirMetni = segs.map((s) => `${s.id}|${dkSn(s.b - ofset)}|${s.m.replace(/\s+/g, " ").replace(/\|/g, "/")}`).join("\n");
+    const bilinen = T.konusmacilar.filter((k) => k.etiket).map((k) => ({ etiket: k.etiket, ad: k.adElle || k.adOto ? k.ad : "", ozellik: k.ozellik || "" }));
+    if (kisiKaynak.value !== "sistem") {                      // KENDİ anahtarın: tarayıcıdan doğrudan sağlayıcıya (Worker/kota yok)
+      try { return await konusmaciAyirKendi({ saglayici: kisiKaynak.value, model: kayitliAi[kisiKaynak.value]?.model, blob, satirlar: satirMetni, onceki: bilinen, sayi: Number(kisiSayisi.value) || 0, sinyal }); }
+      catch (h) { if (h.name === "AbortError") throw h; h.kalici = h.durum === 401 || h.durum === 403 || /bulunamadı ya da şifreli kasa/.test(h.message || ""); throw h; }
+    }
     const fd = new FormData(); fd.append("dosya", new File([blob], "parca.mp3", { type: "audio/mpeg" }));
-    fd.append("satirlar", segs.map((s) => `${s.id}|${dkSn(s.b - ofset)}|${s.m.replace(/\s+/g, " ").replace(/\|/g, "/")}`).join("\n"));
-    const bilinen = T.konusmacilar.filter((k) => k.etiket).map((k) => ({ etiket: k.etiket, ad: k.adElle || k.adOto ? k.ad : "", ozellik: k.ozellik || "" })); if (bilinen.length) fd.append("onceki", JSON.stringify(bilinen));
+    fd.append("satirlar", satirMetni);
+    if (bilinen.length) fd.append("onceki", JSON.stringify(bilinen));
     if (Number(kisiSayisi.value)) fd.append("sayi", kisiSayisi.value);
     let r, j;
     try { r = await fetch(`${WORKER}/konusmaci`, { method: "POST", headers: { Authorization: `Bearer ${oturum.access_token}` }, body: fd, signal: sinyal }); j = await r.json().catch(() => ({})); }
@@ -502,8 +541,8 @@ async function kur() {
   kok.classList.add("md-kok");
   kok.replaceChildren(
     el("div", { class: "md-kart ts-giris" }, el("h2", { text: "📝 Transkript Stüdyosu" }), el("p", { class: "md-soluk", text: "Ses ya da videoyu yazıya dök; konuşmacıları otomatik ayır; PDF, Word, altyazı ve daha fazlası olarak indir." }),
-      el("p", { class: "md-soluk ts-gizlilik", text: "🔒 Kayıt tarayıcında küçültülür; yalnızca ses Worker üzerinden Groq Whisper'a (ve konuşmacı ayrımı açıksa Google Gemini'ye) gider. Worker hiçbir şey kaydetmez." })),
+      el("p", { class: "md-soluk ts-gizlilik", text: "🔒 Kayıt tarayıcında küçültülür; yalnızca ses Worker üzerinden Groq Whisper'a gider (kendi anahtarını seçersen doğrudan Groq'a). Konuşmacı ayrımı açıksa ses Google Gemini'ye (site anahtarıyla Worker üzerinden ya da kendi anahtarınla doğrudan) gider. Worker hiçbir şey kaydetmez." })),
     kurulum, stud, kota.kok, kaynak.kok, gecmisKart, temizle);
-  gecmisCiz(); aralikOzetle();
+  gecmisCiz(); aralikOzetle(); aiKaynaklariYukle().catch(() => {});
 }
 kur().catch((h) => { console.error("medya-transkript.js:", h); if (kok) kok.replaceChildren(el("p", { class: "auth-message error", text: `Araç yüklenemedi: ${h?.message || h}` })); });

@@ -59,11 +59,38 @@
 {% endcomment %}
 {% if page.layout == "post" or page.layout == "project" %}
 {% unless henuz_yayinlanmadi or page.gizli_sayfa %}
-{% assign _citation_yazar = page.author | default: site.author | default: site.title %}
+{% comment %}
+  AKADEMİK İNDEKS ETİKETLERİ (Google Scholar · Semantic Scholar · BASE · CORE · OpenAlex · Zotero/Mendeley bağlayıcıları)
+  Bu blok HEM GitHub'a commit edilen HEM de Supabase'ten otomatik senkronlanan (bkz. .github/scripts/supabase-senkron.mjs) yazılar için
+  AYNI şekilde çalışır — çünkü ikisi de aynı _posts/_projects dosyası + aynı layout'tur.
+  Okunan front-matter alanları: title, author ("Ad Soyad; Ad Soyad" ile çoklu yazar), date, last_modified_at / guncelleme_tarihi,
+  summary (özet), venue, pdf_url, veri_url, doi, keywords (liste ya da virgüllü metin), lang.
+{% endcomment %}
+{% assign _c_yazar = page.author | default: site.author | default: site.title %}
+{% assign _c_url = page.url | absolute_url %}
+{% assign _c_dil = page.lang | default: "tr" %}
+{% assign _c_ozet = page.summary | default: page.excerpt | strip_html | strip_newlines | normalize_whitespace | truncate: 600 %}
+{% assign _c_guncel = page.last_modified_at | default: page.guncelleme_tarihi %}
 <meta name="citation_title" content="{{ page.title | escape }}">
-<meta name="citation_author" content="{{ _citation_yazar | escape }}">
+{% assign _c_yazarlar = _c_yazar | split: ";" %}
+{% for _y in _c_yazarlar %}<meta name="citation_author" content="{{ _y | strip | escape }}">
+{% endfor %}
 {% if page.date %}
 <meta name="citation_publication_date" content="{{ page.date | date: '%Y/%m/%d' }}">
+<meta name="citation_date" content="{{ page.date | date: '%Y/%m/%d' }}">
+<meta name="citation_online_date" content="{{ page.date | date: '%Y/%m/%d' }}">
+{% endif %}
+<meta name="citation_language" content="{{ _c_dil }}">
+<meta name="citation_publisher" content="{{ site.title | escape }}">
+<meta name="citation_abstract_html_url" content="{{ _c_url }}">
+<meta name="citation_fulltext_html_url" content="{{ _c_url }}">
+{% if _c_ozet != "" %}<meta name="citation_abstract" content="{{ _c_ozet | escape }}">
+{% endif %}
+{% if page.venue %}<meta name="citation_journal_title" content="{{ page.venue | escape }}">
+{% endif %}
+{% if page.doi %}<meta name="citation_doi" content="{{ page.doi | escape }}">
+{% endif %}
+{% if page.keywords %}{% if page.keywords.first %}{% assign _c_kw = page.keywords | join: "; " %}{% else %}{% assign _c_kw = page.keywords %}{% endif %}<meta name="citation_keywords" content="{{ _c_kw | escape }}">
 {% endif %}
 {% if page.pdf_url %}
 <meta name="citation_pdf_url" content="{{ page.pdf_url | absolute_url | escape }}">
@@ -71,5 +98,44 @@
 {% if page.veri_url %}
 <meta name="citation_data_url" content="{{ page.veri_url | absolute_url | escape }}">
 {% endif %}
+<meta name="DC.title" content="{{ page.title | escape }}">
+{% for _y in _c_yazarlar %}<meta name="DC.creator" content="{{ _y | strip | escape }}">
+{% endfor %}
+{% if page.date %}<meta name="DC.date" content="{{ page.date | date: '%Y-%m-%d' }}">
+{% endif %}
+<meta name="DC.type" content="Text">
+<meta name="DC.format" content="text/html">
+<meta name="DC.language" content="{{ _c_dil }}">
+<meta name="DC.publisher" content="{{ site.title | escape }}">
+<meta name="DC.identifier" content="{{ _c_url }}">
+{% if page.doi %}<meta name="DC.identifier" content="doi:{{ page.doi | escape }}">
+{% endif %}
+{% if _c_ozet != "" %}<meta name="DC.description" content="{{ _c_ozet | escape }}">
+{% endif %}
+<meta property="article:published_time" content="{{ page.date | date_to_xmlschema }}">
+{% if _c_guncel %}<meta property="article:modified_time" content="{{ _c_guncel | date_to_xmlschema }}">
+{% endif %}
+<meta property="article:author" content="{{ _c_yazar | escape }}">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "{% if page.layout == 'project' or page.akademik %}ScholarlyArticle{% else %}BlogPosting{% endif %}",
+  "mainEntityOfPage": {"@type": "WebPage", "@id": {{ _c_url | jsonify }}},
+  "url": {{ _c_url | jsonify }},
+  "headline": {{ page.title | jsonify }},
+  "name": {{ page.title | jsonify }},
+  "description": {{ _c_ozet | jsonify }},
+  "inLanguage": {{ _c_dil | jsonify }},
+  "datePublished": {{ page.date | date_to_xmlschema | jsonify }},
+  "dateModified": {{ _c_guncel | default: page.date | date_to_xmlschema | jsonify }},
+  "author": [{% for _y in _c_yazarlar %}{"@type": "Person", "name": {{ _y | strip | jsonify }}}{% unless forloop.last %}, {% endunless %}{% endfor %}],
+  "publisher": {"@type": "Organization", "name": {{ site.title | jsonify }}, "url": {{ site.url | jsonify }}}{% if page.keywords %},
+  "keywords": {{ _c_kw | jsonify }}{% endif %}{% if page.doi %},
+  "identifier": {"@type": "PropertyValue", "propertyID": "DOI", "value": {{ page.doi | jsonify }}}{% endif %}{% if page.pdf_url %},
+  "encoding": {"@type": "MediaObject", "contentUrl": {{ page.pdf_url | absolute_url | jsonify }}, "encodingFormat": "application/pdf"}{% endif %}{% if page.venue %},
+  "isPartOf": {"@type": "Periodical", "name": {{ page.venue | jsonify }}}{% endif %}{% if site.profile_image and site.profile_image != "" %},
+  "image": {{ site.profile_image | absolute_url | jsonify }}{% endif %}
+}
+</script>
 {% endunless %}
 {% endif %}

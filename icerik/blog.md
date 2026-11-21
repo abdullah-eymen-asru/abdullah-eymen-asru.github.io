@@ -558,6 +558,8 @@ window.yilSecenekleriniDoldur("notes-posts", "notes-year-filter");
 
       const base = document.documentElement.dataset.baseurl || "";
       yazilar.forEach((yazi) => {
+        // Bu yazı Supabase'ten siteye senkronlandıysa (bkz. .github/scripts/supabase-senkron.mjs) Jekyll kartı ZATEN var → yineleme.
+        if (list.querySelector(`a[href$="/blog/${encodeURIComponent(yazi.slug)}/"]`)) return;
         const card = document.createElement("div");
         card.className = "post-card searchable";
         const ozet = (yazi.govde || "").replace(/[#*`>_-]/g, "").slice(0, 180);

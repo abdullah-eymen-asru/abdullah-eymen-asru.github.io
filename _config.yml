@@ -168,6 +168,11 @@ exclude:
 # siler ve bu, zamanlanmış/gizli yazılar için gereken önizleme linkini
 # kırar. Kendi feed.xml'imiz bunun yerine "yayinda: false" alanına bakıyor.
 
+# KISA/TEMİZ ADRESLER: yazılar /blog/<slug>/, projeler /projects/<slug>/ (tarihsiz, kalıcı). Eski tarihli adresler
+# (/2026/11/21/slug.html) _plugins/eski_adres_yonlendir.rb ile yeni adrese yönlendirilir (bağlantılar kırılmaz).
+# Supabase'ten senkronlanan yazılar (bkz. .github/scripts/supabase-senkron.mjs) AYNI adres şemasını kullanır.
+permalink: /blog/:title/
+
 collections:
   projects:
     output: true

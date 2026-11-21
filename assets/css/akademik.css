@@ -504,19 +504,29 @@ html.ak-okuyucu-acik-html { overflow: hidden; overscroll-behavior: none; }
 .ak-ok-durumsatiri .ak-ok-oto:empty, .ak-ok-durumsatiri .ak-ok-durum:empty { display: none; }
 
 /* Otomatik çeviri sonucu (balon içinde / kompakt kart) */
-.ak-oto-kart { position: fixed; z-index: 60; right: 1rem; bottom: 1rem; width: min(26rem, calc(100vw - 2rem)); display: grid; gap: .35rem; padding: .5rem .6rem; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.35); box-sizing: border-box; }
+/* Çeviri kartı: balonun İÇİNDE alt satır (üst üste binme yok). Kendi içinde kayar; sayfa/balon taşmaz. */
+.ak-balon.ak-balon-ceviri { width: min(27rem, calc(100vw - 1rem)); max-width: none; flex-direction: column; align-items: stretch; box-sizing: border-box; }
+.ak-balon.ak-balon-ceviri .ak-balon-sira { justify-content: flex-start; }
+.ak-oto-kart { display: grid; gap: .35rem; width: 100%; margin-top: .3rem; padding-top: .4rem; border-top: 1px solid var(--border); box-sizing: border-box; -webkit-user-select: none; user-select: none; }
 .ak-oto-ust { display: flex; align-items: center; gap: .3rem; min-width: 0; }
-.ak-oto-dil { font: inherit; font-size: .8rem; min-width: 0; flex: 1 1 0; min-height: 2.2rem; padding: .15rem .3rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
-.ak-oto-ik { flex: none; min-width: 2.2rem; min-height: 2.2rem; padding: 0; }
-.ak-oto-metin { max-height: min(14rem, 38vh); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; font-size: .9rem; line-height: 1.45; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; padding-right: .2rem; }
+.ak-oto-dil { font: inherit; font-size: .82rem; min-width: 0; flex: 1 1 0; min-height: 2.2rem; padding: .15rem .3rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+.ak-oto-ok { flex: none; color: var(--muted); }
+.ak-oto-ik { flex: none; display: inline-grid; place-items: center; width: 2.2rem; height: 2.2rem; min-width: 2.2rem; min-height: 2.2rem; padding: 0; line-height: 1; font: inherit; font-size: 1.05rem; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+.ak-oto-ik > span { display: block; line-height: 1; transform: none; }
+.ak-oto-metin { max-height: min(13rem, 34vh); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; font-size: .9rem; line-height: 1.45; overflow-wrap: anywhere; -webkit-user-select: text; user-select: text; padding-right: .2rem; }
 .ak-oto-metin small { display: block; color: var(--muted); margin-bottom: .15rem; }
-.ak-oto-kucuk .ak-oto-metin { display: none; }
+.ak-oto-bekle { color: var(--muted); }
+.ak-oto-tekrar { font: inherit; font-size: .85rem; color: var(--accent); background: none; border: 0; padding: .3rem .2rem; cursor: pointer; text-decoration: underline; min-height: 2rem; }
 @media (max-width: 720px) {
-  /* mobil: alt panel — ekranın en çok ~⅓'ü; küçültülünce yalnızca dil çubuğu kalır */
-  .ak-oto-kart { left: .5rem; right: .5rem; width: auto; bottom: calc(.5rem + env(safe-area-inset-bottom, 0px)); border-radius: 14px; padding: .4rem .5rem; }
-  .ak-oto-metin { max-height: 24vh; font-size: .9rem; }
+  .ak-balon.ak-balon-ceviri { width: auto; }
+  .ak-oto-metin { max-height: 22vh; font-size: .9rem; }
   .ak-oto-dil { font-size: 16px; }      /* iOS: 16px altı yazı odakta sayfayı yakınlaştırır */
 }
+/* Balon düğme simgeleri: tek tip kutu → hizalı (birleştirici U̲ / S̶ karakterleri yerine CSS çizgisi) */
+.ak-balon-ik { display: inline-grid; place-items: center; width: 1.2em; height: 1.2em; line-height: 1; flex: none; }
+.ak-ik-alt { text-decoration: underline; text-underline-offset: .15em; font-weight: 700; }
+.ak-ik-ust { text-decoration: line-through; font-weight: 700; }
+.ak-balon-dugme { justify-content: center; }
 
 /* Kenar çubuğu arama */
 .ak-liste-ara { width: 100%; box-sizing: border-box; margin: 0 0 .4rem; padding: .4rem .6rem; font: inherit; color: var(--text); background: transparent; border: 1px solid var(--border); border-radius: 8px; }

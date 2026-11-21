@@ -30,7 +30,7 @@
  */
 import { requireAuthOrShowError } from "../auth/auth-guard.js";
 import { showMessage, supabase } from "../core/supabase-client.js";
-import { normallestir, enBenzerKayitlariBul } from "./benzerlik.js";
+import { normallestir, enBenzerKayitlariBul, TUR_ETIKET, vurguParcalari } from "./benzerlik.js";
 
 // ---- BURAYI DOLDUR: Worker deploy edildikten sonra aldığın URL ----
 const IZLEME_OKUMA_WORKER_URL = "https://izleme-okuma-yonetim-worker.aeymena.workers.dev";
@@ -224,27 +224,53 @@ function benzerlikKontrolEtVeGoster() {
     return;
   }
 
-  ekleBenzerKayitlar = enBenzerKayitlariBul(baslik, ekleIcinKayitlar, 0.55, 3).map((x) => x.kayit);
-  if (ekleBenzerKayitlar.length === 0) {
+  const bulunan = enBenzerKayitlariBul(baslik, ekleIcinKayitlar, 0.55, 5);
+  ekleBenzerKayitlar = bulunan.map((x) => x.kayit);
+  if (bulunan.length === 0) {
     kutu.hidden = true;
     kutu.innerHTML = "";
     return;
   }
 
+  const guclu = bulunan.some((x) => x.guclu);
   kutu.innerHTML = "";
-  kutu.className = "auth-message auth-message--warning";
-  const p = document.createElement("p");
-  p.textContent = "⚠️ Panoda buna benzeyen kayıt(lar) var — aynısını mı ekliyorsun?";
-  kutu.appendChild(p);
+  kutu.className = "iy-benzer " + (guclu ? "iy-benzer--guclu" : "iy-benzer--olasi");
+  const baslikEl = document.createElement("div");
+  baslikEl.className = "iy-benzer-baslik";
+  const ikon = document.createElement("span");
+  ikon.className = "iy-benzer-ikon";
+  ikon.textContent = guclu ? "⛔" : "⚠️";
+  const metin = document.createElement("div");
+  const b1 = document.createElement("strong");
+  b1.textContent = guclu ? "Bu kayıt panoda zaten olabilir" : "Panoda buna benzeyen kayıt(lar) var";
+  const b2 = document.createElement("small");
+  b2.textContent = `Başlığın başı, ortası ya da sonu fark etmeksizin ${bulunan.length} olası eşleşme bulundu. Aynısıysa yeniden ekleme.`;
+  metin.append(b1, b2);
+  baslikEl.append(ikon, metin);
+  kutu.appendChild(baslikEl);
   const ul = document.createElement("ul");
-  ekleBenzerKayitlar.forEach((kayit) => {
+  ul.className = "iy-benzer-liste";
+  bulunan.forEach(({ kayit, tur, oran, guclu: g }) => {
     const li = document.createElement("li");
+    li.className = g ? "iy-benzer-oge iy-benzer-oge--guclu" : "iy-benzer-oge";
     const a = document.createElement("a");
     a.href = kayit.url;
     a.target = "_blank";
     a.rel = "noopener noreferrer";
-    a.textContent = `#${kayit.number} — ${kayit.title}`;
-    li.appendChild(a);
+    const no = document.createElement("span");
+    no.className = "iy-benzer-no";
+    no.textContent = `#${kayit.number}`;
+    const ad = document.createElement("span");
+    ad.className = "iy-benzer-ad";
+    vurguParcalari(kayit.title, baslik).forEach((p) => {
+      if (p.vurgu) { const m = document.createElement("mark"); m.textContent = p.metin; ad.appendChild(m); }
+      else ad.appendChild(document.createTextNode(p.metin));
+    });
+    a.append(no, ad);
+    const rozet = document.createElement("span");
+    rozet.className = "iy-benzer-rozet iy-benzer-rozet--" + tur;
+    rozet.textContent = `${TUR_ETIKET[tur] || "Benzer"} · %${Math.round(oran * 100)}`;
+    li.append(a, rozet);
     ul.appendChild(li);
   });
   kutu.appendChild(ul);

@@ -98,7 +98,7 @@ export const cihazCeviriVarMi = () => typeof self !== "undefined" && "Translator
  *  ayar kapalıyken bu yol HİÇ çağrılmaz. sinyal: AbortSignal (eski isteği iptal etmek için). */
 export async function ceviriYap(metin, { kaynak = "auto", hedef = "tr", motor = "auto", otomatik = false, sinyal = undefined } = {}) {
   const hatalar = [];
-  const dene = async (ad, fn) => { try { return await fn(); } catch (h) { hatalar.push(`${ad}: ${h.message}`); return null; } };
+  const dene = async (ad, fn) => { try { return await fn(); } catch (h) { if (sinyal?.aborted) throw h; hatalar.push(`${ad}: ${h.name === "AbortError" ? "zaman aşımı" : h.message}`); return null; } };   // dışarıdan iptal edilmişse diğer motoru DENEME
   const onayAl = () => {
     if (cevirRizasiVarMi()) return true;
     if (typeof window.confirm === "function" && window.confirm(RIZA_METNI)) { cevirRizasiVer(); return true; }
