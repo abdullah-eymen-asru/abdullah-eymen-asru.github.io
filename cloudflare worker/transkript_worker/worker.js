@@ -183,7 +183,13 @@ const temizEtiket = (v) => String(v ?? "").replace(/[^A-Za-z0-9]/g, "").slice(0,
 const temizMetin = (v, n) => String(v ?? "").replace(/[\u0000-\u001f\u007f<>]/g, " ").replace(/\s+/g, " ").trim().slice(0, n);
 
 async function konusmaci(env, istek) {
-  await yetkiKontrol(env, istek);
+  const auth = await yetkiKontrol(env, istek);
+  // Konuşmacı ayrımı da SİSTEM Gemini anahtarını kullanır → "Sistem anahtarı açık" anahtarı ve kota bunun için de geçerlidir
+  // (eskiden bu uç hiçbirine bakmıyordu: sistem anahtarı kapalı olsa bile herkes kullanabiliyordu). Kendi Gemini anahtarı tarayıcıdan
+  // doğrudan Google'a gittiği için bu Worker'dan hiç geçmez.
+  const kotaK = await kotaDurumu(env, auth);
+  if (kotaK.sistem_anahtari_acik === false) throw new HttpHata(403, "Sistem anahtarı Site Sahibi tarafından kapatılmış: konuşmacı ayrımını yalnızca kendi Gemini anahtarınla yapabilirsin (Yapay zekâ kutusu › Kendi API anahtarım).");
+  if (kotaK.kullanici?.kalan === 0 || kotaK.genel?.kalan === 0) throw new HttpHata(429, "Günlük transkript kotası doldu; konuşmacı ayrımı da yarın yenilenir ya da kendi Gemini anahtarınla yapabilirsin.");
   if (!env.GEMINI_API_KEY) throw new HttpHata(503, "Yapay zekâ ile konuşmacı ayrımı bu sitede henüz yapılandırılmamış (GEMINI_API_KEY).");
   if (!/multipart\/form-data/i.test(istek.headers.get("Content-Type") || "")) throw new HttpHata(400, "Geçersiz istek.");
   if (Number(istek.headers.get("Content-Length") || 0) > MAX_SES_BAYT + 2 * 1024 * 1024) throw new HttpHata(413, "Ses çok büyük (en fazla 14 MB).");

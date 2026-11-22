@@ -84,7 +84,9 @@ export function ownerAyar(arac, t = ARACLAR[arac], bitti = () => {}, acik = fals
   const dak = t.birim === "saniye";
   const kul = el("input", { class: "md-girdi", type: "number", min: "0", inputmode: "numeric", "aria-label": "Kullanıcı başına günlük limit" });
   const gen = el("input", { class: "md-girdi", type: "number", min: "0", inputmode: "numeric", "aria-label": "Genel günlük limit" });
-  const kendiIzin = el("input", { type: "checkbox" }), sistemAcik = el("input", { type: "checkbox" }), kotaAktif = el("input", { type: "checkbox" });
+  const kendiIzin = el("input", { type: "checkbox", role: "switch" }), sistemAcik = el("input", { type: "checkbox", role: "switch" }), kotaAktif = el("input", { type: "checkbox", role: "switch" });
+  /* Yetki ayarlarındaki gibi KAYDIRMALI anahtar (kırmızı = kapalı, yeşil = açık). Stil: medya-transkript.css › .mk-anahtar */
+  const anahtarSatiri = (girdi, baslik, ipucu) => el("label", { class: "mk-anahtar" }, girdi, el("span", { class: "mk-anahtar-iz", "aria-hidden": "true" }), el("span", { class: "mk-anahtar-metin" }, el("strong", { text: baslik }), el("small", { class: "md-soluk", text: ipucu })));
   kotaAktif.addEventListener("change", () => { kul.disabled = gen.disabled = !kotaAktif.checked; });
   const msg = el("p", { class: "md-mesaj", role: "status" }), ozet = el("div", { class: "mk-ozet" });
   const kaydet = el("button", { type: "button", class: "md-btn md-birincil", text: "Kaydet" });
@@ -107,9 +109,9 @@ export function ownerAyar(arac, t = ARACLAR[arac], bitti = () => {}, acik = fals
   });
   const d = el("details", { class: "mk-ayar" }, el("summary", { text: "⚙️ Kota ayarları (Site Sahibi / yetkili Yönetici)" }),
     el("div", { class: "mi-satir" }, alan(`Kullanıcı başına günlük limit (${birimYazi})`, kul, "Boş = sınırsız"), alan(`Tüm site günlük limit (${birimYazi})`, gen, dak ? "Groq ücretsiz katmanı yaklaşık 28.800 sn/gün (8 saat) ses; güvenli pay için ~330 dk önerilir." : "Boş = sınırsız")),
-    el("label", { class: "mk-onay" }, kotaAktif, " Günlük kota UYGULANSIN (kapatılırsa bu araç için limit yoktur; kullanım yine de sayılır)"),
-    t.saglayici ? el("label", { class: "mk-onay" }, kendiIzin, " Üyeler kendi anahtarını/çözümleyicisini kullanabilsin (sistem kotasına sayılmaz)") : null,
-    t.saglayici ? el("label", { class: "mk-onay" }, sistemAcik, " Sistem anahtarı açık (kapatılırsa herkes yalnızca kendi anahtarıyla kullanır)") : null,
+    anahtarSatiri(kotaAktif, "Günlük kota uygulansın", "Kapatılırsa bu araç için limit yoktur; kullanım yine de sayılır."),
+    t.saglayici ? anahtarSatiri(kendiIzin, "Üyeler kendi anahtarını/çözümleyicisini kullanabilsin", "Kendi anahtarla yapılan işler sistem kotasına sayılmaz.") : null,
+    t.saglayici ? anahtarSatiri(sistemAcik, "Sistem anahtarı açık", "Kapatılırsa herkes (Site Sahibi dâhil) yalnızca kendi anahtarıyla kullanır; sistem anahtarı hiçbir uçta kullanılmaz.") : null,
     el("div", { class: "md-eylem" }, kaydet), msg, ozet);
   d.addEventListener("toggle", () => { if (d.open) yukle(); });
   if (acik) { d.open = true; yukle(); }
@@ -187,4 +189,9 @@ export function kaynakSecici(arac) {
     },
     sifirla() { anahtar.value = anahtar.value; },
   };
+}
+
+/** Aracın güncel kota/anahtar durumu (oturum gerekir). Hata olursa null → çağıran engellemez; asıl denetimi Worker yapar. */
+export async function kotaDurumuOku(arac) {
+  try { const { data, error } = await supabase.rpc("medya_kota_durumu", { p_arac: arac }); return error ? null : data; } catch { return null; }
 }

@@ -15,7 +15,7 @@ import { el, hataMetni, indir, bayt, dosyaAdiTemizle } from "../donusturucu/orta
 import { sekmeSifirlamaKaydet } from "../core/gezinme-kilidi.js";
 import { SINIR } from "../medya-donustur/ses-ortak.js";
 import { ilerlemeKur } from "../medya-donustur/ses-ortak.js";
-import { kotaPaneli, kaynakSecici } from "../medya-kota/medya-kota.js";
+import { kotaPaneli, kaynakSecici, kotaDurumuOku } from "../medya-kota/medya-kota.js";
 import { sureOku, sesAkisi, mp3Kodla, mp3Dilim, uyanikTut } from "./ses-akis.js";
 import { kendiAnahtarlar, konusmaciAyirKendi, anahtarEkle, SAGLAYICILAR, SAGLAYICI_SIRASI } from "./konusmaci-ai.js";
 import { RENKLER, saat, gunSaniyesi, gunSaati, kelimeSay, istatistik, tahminiAyir, dolguTemizle, anahtarKelimeler, baslikOner, metinUret, turlariUret, belgeBloklari, kunyeMetni, kisaSaat } from "./transkript-mantik.js";
@@ -145,8 +145,11 @@ async function kur() {
   for (const [a, g] of [["mod", mod], ["dil", dil], ["kisiSayisi", kisiSayisi]]) g.addEventListener("change", () => tercih.yaz(a, g.value));
   const aiDurumGuncelle = () => { kisiSayisi.disabled = !kisiOto.checked; kisiKaynak.disabled = !kisiOto.checked; };
   kisiOto.addEventListener("change", () => { tercih.yaz("kisiOto", kisiOto.checked ? "1" : "0"); aiDurumGuncelle(); }); aiDurumGuncelle();
-  const basla = el("button", { type: "button", class: "md-btn md-birincil ts-basla", text: "▶ Yazıya dökmeye başla" }), durdur = el("button", { type: "button", class: "md-btn", text: "⏹ Durdur", hidden: true });
+  const basla = el("button", { type: "button", class: "md-btn md-birincil ts-basla", text: "▶ Yazıya dökmeye başla" }), durdur = el("button", { type: "button", class: "md-btn", text: "⏸ Durdur", title: "Durdurursan o ana kadar bitmiş kısım korunur; aynı dosyayla “Kaldığı yerden devam et”e basınca baştan başlamaz.", hidden: true });
   basla.disabled = true;
+  const devamBilgi = el("div", { class: "ts-devam-bilgi", hidden: true }), devamYazi = el("span"), bastanBtn = el("button", { type: "button", class: "md-btn ts-kucuk", text: "↺ Baştan başla" });
+  devamBilgi.append(devamYazi, bastanBtn);
+  const yardimYazi = el("p", { class: "md-soluk ts-yardim", text: "ℹ️ Durdurursan ya da bir hata olursa o ana kadar bitmiş kısım korunur ve bu cihazda saklanır; aynı dosyayı seçip “Kaldığı yerden devam et”e basarsan baştan başlamaz. İş sürerken panelde başka sekmeye geçebilirsin (iş arkada sürer, sağ altta göstergesi çıkar); sayfayı kapatırsan kalan kısım için dosyayı yeniden seçmen yeter. Sonuçlar sen “Belleği temizle” ya da “Sil” demedikçe silinmez." });
 
   /* Yapay zekâ seçimi KAYITTAN ÖNCE: hangi yapay zekâyla ayrılacağı dosya yüklenmeden belirlenir. */
   const aiBlok = el("div", { class: "ts-aiblok" },
@@ -165,7 +168,7 @@ async function kur() {
       el("div", { class: "ts-izgara" }, alan("Konuşmacı sayısı", kisiSayisi, "Biliyorsan seç; daha doğru olur. (Konuşmacı ayrımı yukarıdaki “Yapay zekâ” kutusundan açılır/kapatılır.)")),
       el("details", { class: "ts-gelismis" }, el("summary", { text: "Gelişmiş: kaydın gerçek başlangıç saati" }),
         el("p", { class: "md-soluk", text: "Normalde zamanlar kaydın başından sayılır (00:00:00, 00:00:12 …). Bu kayıt belirli bir saatte başladıysa (örn. toplantı 14:30'da başladı) buraya yaz; istersen çıktıda zamanlar gün saati olarak da yazılır (14:30:12). Boş bırakırsan hiçbir şey değişmez." }), baslangic),
-      el("div", { class: "ts-basla-satiri" }, basla, durdur), cubuk, sureYazi), mesaj);
+      devamBilgi, el("div", { class: "ts-basla-satiri" }, basla, durdur), cubuk, sureYazi, yardimYazi), mesaj);
   const sirket = kurulum.querySelector(".ts-ayarlar");
 
   /* ---------------- ③ Sonuç alanı ---------------- */
@@ -388,8 +391,8 @@ async function kur() {
   async function gecmisCiz() {
     let l = []; try { l = (await gecmis.liste()) || []; } catch { gecmisListe.replaceChildren(el("p", { class: "md-soluk", text: "Yerel depolama bu tarayıcıda kullanılamıyor." })); return; }
     l.sort((a, b) => b.tarih - a.tarih);
-    gecmisListe.replaceChildren(...(l.length ? l.map((k) => el("div", { class: "ts-gkayit" }, el("div", {}, el("strong", { text: k.baslik || "Başlıksız transkript" }), el("small", { class: "md-soluk", text: `${new Date(k.tarih).toLocaleString("tr-TR")} · ${sureYaz(k.sure)} · ${k.T.segmentler.length} satır` })),
-      el("div", { class: "md-eylem" }, dugme("Aç", () => ac(k)), dugme("Sil", async () => { await gecmis.sil(k.id); gecmisCiz(); })))) : [el("p", { class: "md-soluk", text: "Henüz kayıt yok." })]));
+    gecmisListe.replaceChildren(...(l.length ? l.map((k) => el("div", { class: "ts-gkayit" }, el("div", {}, el("strong", { text: k.baslik || k.dosyaAdi || "Başlıksız transkript" }), k.yarim ? el("span", { class: "ts-yarim", text: "  · YARIM KALDI" }) : null, el("small", { class: "md-soluk", text: `${new Date(k.tarih).toLocaleString("tr-TR")} · ${k.yarim ? `${sureGoster(k.devam?.sonraki || 0)} konumuna kadar` : sureYaz(k.sure)} · ${k.T.segmentler.length} satır${k.yarim && k.dosyaAdi ? ` · dosya: ${k.dosyaAdi}` : ""}` })),
+      el("div", { class: "md-eylem" }, dugme("Aç", () => ac(k)), k.yarim ? dugme("Devam et (dosyayı seç)", () => girdi.click(), `“${k.dosyaAdi || "aynı dosya"}” dosyasını seç; kaldığı yerden devam eder`) : null, dugme("Sil", async () => { await gecmis.sil(k.id); gecmisCiz(); yarimDevamKontrol(); })))) : [el("p", { class: "md-soluk", text: "Henüz kayıt yok." })]));
   }
   async function kaydetYerel() { try { kayitId ||= `t${Date.now()}`; await gecmis.kaydet({ id: kayitId, baslik: T.baslik, tarih: Date.now(), sure: topSure(), T }); bildir("✔ Bu cihaza kaydedildi."); gecmisCiz(); } catch { bildir("Yerel depolamaya yazılamadı (özel pencere ya da kota).", true); } }
   function ac(k) { T = k.T; kayitId = k.id; nid = Math.max(0, ...T.segmentler.map((s) => s.id || 0)) + 1; T.segmentler.forEach((s) => { s.id ||= nid++; }); studyoGoster(); bildir("Kayıt açıldı."); }
@@ -399,11 +402,36 @@ async function kur() {
     sekmeAc(sekmeId || sekme); if (sekmeId === null && !geriAl.length) { geriBtn.disabled = true; }
   }
 
+  /* ---------------- Yarım kalan işi saklama / geri yükleme ---------------- */
+  const yarimId = (ad, boyut) => `yarim:${ad}|${boyut}`;
+  const baslaEtiketi = () => { basla.textContent = devam?.segs?.length ? `▶ Kaldığı yerden devam et (${sureGoster(devam.sonraki)}'den)` : "▶ Yazıya dökmeye başla"; };
+  function yarimDevamKontrol() {
+    const var_ = !!(devam?.segs?.length) && !!dosya;
+    devamBilgi.hidden = !var_;
+    if (var_) devamYazi.textContent = `Önceki işten ${sureGoster(devam.sonraki)} konumuna kadar ${devam.segs.length} satır hazır. “Kaldığı yerden devam et” baştan başlamaz.`;
+    baslaEtiketi();
+  }
+  async function yarimKaydet() {
+    if (!dosya || !devam?.segs?.length) return;
+    try { await gecmis.kaydet({ id: yarimId(dosya.name, dosya.size), yarim: true, dosyaAdi: dosya.name, dosyaBoyut: dosya.size, baslik: T.baslik, tarih: Date.now(), sure: topSure(), b0: aralikDegeri().bas, s0: Number.isFinite(aralikDegeri().son) ? aralikDegeri().son : null, ozel: ozelAralik.checked, mod: mod.value, dil: dil.value, devam: { anahtar: devam.anahtar, sonraki: devam.sonraki, dil: devam.dil }, T }); gecmisCiz(); } catch { /* yerel depolama kapalı: iş yine de bellekte sürer */ }
+  }
+  async function yarimSil(f) { try { await gecmis.sil(yarimId(f.name, f.size)); } catch { /* yok */ } }
+  /** Seçilen dosya için saklanmış yarım iş var mı? Varsa ayarlar + metin geri yüklenir ve kaldığı yerden devam hazırlanır. */
+  async function yarimBul(f) {
+    let k = null; try { k = (await gecmis.liste() || []).find((x) => x.id === yarimId(f.name, f.size)); } catch { return false; }
+    if (!k?.yarim || !k.T?.segmentler?.length) return false;
+    ozelAralik.checked = !!k.ozel; tumKayit.checked = !k.ozel; basGirdi.value = sureGoster(k.b0 || 0); sonGirdi.value = k.s0 ? sureGoster(k.s0) : ""; mod.value = k.mod || mod.value; dil.value = k.dil ?? dil.value; aralikOzetle();
+    T = k.T; nid = Math.max(0, ...T.segmentler.map((x) => x.id || 0)) + 1; devam = { anahtar: k.devam.anahtar, sonraki: k.devam.sonraki, segs: T.segmentler, dil: k.devam.dil };
+    studyoGoster("okuma"); yarimDevamKontrol(); bildir(`Önceki işten ${sureGoster(devam.sonraki)} konumuna kadar ${devam.segs.length} satır geri yüklendi. “Kaldığı yerden devam et”e basabilirsin.`);
+    return true;
+  }
+  bastanBtn.addEventListener("click", async () => { if (dosya) await yarimSil(dosya); devam = null; T = { baslik: "", dil: null, sure: 0, konusmacilar: [], segmentler: [] }; stud.hidden = true; nid = 1; yarimDevamKontrol(); gecmisCiz(); bildir("Baştan başlanacak."); });
+
   /* ---------------- Dosya seçimi (anında; çözme yok) ---------------- */
   async function yukle(f) {
     try {
       if (f.size > SINIR) throw new Error(`Dosya çok büyük (${bayt(f.size)}); üst sınır ${bayt(SINIR)}.`);
-      dosya = f; devam = null; ayirKapali = null; kayitSure = 0; sesBagla(f);
+      dosya = f; devam = null; ayirKapali = null; kayitSure = 0; sesBagla(f); devamBilgi.hidden = true; baslaEtiketi();
       dosyaBilgi.hidden = false; dosyaBilgi.replaceChildren(el("strong", { text: f.name }), el("span", { class: "md-soluk", text: ` · ${bayt(f.size)} · süre okunuyor…` }));
       sirket.hidden = false; basla.disabled = false; bildir("");
       kayitSure = await sureOku(f);
@@ -411,6 +439,7 @@ async function kur() {
       for (const k of [basKaydir, sonKaydir]) { k.max = String(Math.floor(kayitSure || 100)); k.disabled = !kayitSure; }
       sonKaydir.value = String(Math.floor(kayitSure || 100)); basKaydir.value = "0"; basGirdi.value = "0:00"; sonGirdi.value = ""; tumKayit.checked = true;
       aralikOzetle(); bildir("Hazır. İstersen aralığı ve ayarları değiştir, sonra “Yazıya dökmeye başla”ya bas.");
+      if (!(await yarimBul(f))) yarimDevamKontrol();
     } catch (h) { bildir(h.message, true); }
   }
   girdi.addEventListener("change", () => { if (girdi.files?.[0]) yukle(girdi.files[0]); girdi.value = ""; });
@@ -484,11 +513,15 @@ async function kur() {
   /* ---------------- Yazıya dökme hattı ---------------- */
   basla.addEventListener("click", async () => {
     if (!dosya) return;
-    const { bas: b0, son: s0 } = aralikDegeri(); if (ozelAralik.checked && !(Math.min(s0, kayitSure || s0) > b0)) return bildir("Bitiş, başlangıçtan sonra olmalı.", true);
-    let sunucu; try { sunucu = kaynak.hazirla(); } catch (h) { return bildir(h.message, true); }
+    const uyanikBirak = uyanikTut();                                   // tıklama anında başlat (tarayıcılar ses/uyku kilidini yalnızca kullanıcı hareketiyle verir); sekme arka plandayken kısılmayı azaltır
+    const { bas: b0, son: s0 } = aralikDegeri(); if (ozelAralik.checked && !(Math.min(s0, kayitSure || s0) > b0)) { uyanikBirak(); return bildir("Bitiş, başlangıçtan sonra olmalı.", true); }
+    let sunucu; try { sunucu = kaynak.hazirla(); } catch (h) { uyanikBirak(); return bildir(h.message, true); }
+    /* Sistem anahtarı Site Sahibi tarafından kapatıldıysa, ses hiç sıkıştırılmadan/yüklenmeden önce net uyar (Worker da ayrıca reddeder). */
+    const kd = await kotaDurumuOku("transkript");
+    if (kd?.sistem_anahtari_acik === false && !sunucu.kendi) { uyanikBirak(); return bildir("Sistem anahtarı Site Sahibi tarafından kapatılmış: aşağıdaki “Hangi anahtarla çalışsın?” bölümünden KENDİ Groq anahtarını seç.", true); }
+    if (kd?.sistem_anahtari_acik === false && kisiOto.checked && kisiKaynak.value === "sistem") { uyanikBirak(); return bildir("Sistem anahtarı kapalı olduğu için konuşmacı ayrımında “Site yapay zekâsı” kullanılamaz: yukarıdaki Yapay zekâ kutusundan KENDİ Gemini anahtarını seç ya da “Konuşmacıları otomatik bul”u kapat.", true); }
     const anahtar = `${dosya.name}|${dosya.size}|${b0}|${s0}|${mod.value}|${dil.value}`;
     basla.disabled = true; durdur.hidden = false; iptal = new AbortController(); kisiMesaji("");
-    const uyanikBirak = uyanikTut();                                   // sekme arka plandayken kısılmayı azalt (tıklama içinde başlatılmalı)
     let ayirZinciri = Promise.resolve(); const ayirHatalari = []; let ayirBekleyen = 0;
     if (!devam || devam.anahtar !== anahtar) { devam = { anahtar, sonraki: b0, segs: [], dil: null }; if (!baslikElleMi) T = { baslik: "", dil: null, sure: 0, konusmacilar: [], segmentler: [] }; else T = { ...T, konusmacilar: [], segmentler: [], dil: null }; nid = 1; ayirKapali = null; }
     else { /* yarım kalan işe devam */ }
@@ -517,7 +550,7 @@ async function kur() {
             });
           }
           if (!baslikElleMi) T.baslik = baslikOner(T.segmentler);
-          devam.sonraki = bas + sure; adim("Parça tamamlandı", 1);
+          devam.sonraki = bas + sure; adim("Parça tamamlandı", 1); yarimKaydet();
           studyoGoster(stud.hidden ? "okuma" : null);
         },
       });
@@ -529,14 +562,15 @@ async function kur() {
       if (kisiOto.checked && ayirHatalari.length) kisiMesaji(`Konuşmacı ayrımı ${atanan ? `kısmen tamamlandı (${atanan}/${T.segmentler.length} satır atandı)` : "yapılamadı"}: ${[...new Set(ayirHatalari.map((m) => m.replace(/^[\d:–-]+:\s*/, "")))].slice(0, 2).join(" · ")} Metin hazır; “Konuşmacılar” sekmesindeki “Konuşmacıları bul” ile tekrar deneyebilir ya da elle atayabilirsin.`, true);
       else if (kisiOto.checked && T.konusmacilar.length) kisiMesaji(`✔ ${T.konusmacilar.length} konuşmacı otomatik ayrıldı (${atanan}/${T.segmentler.length} satır). Adlara dokunarak düzeltebilirsin (Konuşmacılar sekmesi).`);
       else if (kisiOto.checked && !kisiDurum.textContent) kisiMesaji("Konuşmacı ayrımı sonuç vermedi; “Konuşmacılar” sekmesinden tekrar deneyebilirsin.", true);
-      ilr.bitir(); studyoGoster("okuma"); bildir(`✔ Transkript hazır: ${T.segmentler.length} satır. Aşağıdaki sekmelerden oku, düzenle ve indir.`); devam = null; kayitId = null;
+      ilr.bitir(); studyoGoster("okuma"); bildir(`✔ Transkript hazır: ${T.segmentler.length} satır. Aşağıdaki sekmelerden oku, düzenle ve indir.`); await yarimSil(dosya); devam = null; kayitId = null; gecmisCiz();
       stud.scrollIntoView?.({ block: "start", behavior: "smooth" });
     } catch (h) {
       ilr.bitir();
-      if (h.name === "AbortError") bildir(devam?.segs.length ? `Durduruldu. ${sureGoster(devam.sonraki)} konumuna kadar olan kısım korundu; “Yazıya dökmeye başla” ile kaldığı yerden devam edebilirsin.` : "Durduruldu.");
-      else bildir(`${h.message || h}${devam?.segs.length ? " — Tamamlanan kısım korundu; tekrar başlatınca kaldığı yerden devam eder." : ""}`, true);
+      if (devam?.segs.length) { await ayirZinciri.catch(() => {}); await yarimKaydet(); }
+      if (h.name === "AbortError") bildir(devam?.segs.length ? `⏸ Durduruldu. ${sureGoster(devam.sonraki)} konumuna kadar olan kısım korundu ve bu cihazda saklandı; “Kaldığı yerden devam et”e basarak sürdürebilirsin.` : "Durduruldu.");
+      else bildir(`${h.message || h}${devam?.segs.length ? " — Tamamlanan kısım korundu ve saklandı; “Kaldığı yerden devam et”e basınca baştan başlamaz." : ""}`, true);
       kota.yenile();
-    } finally { uyanikBirak(); basla.disabled = !dosya; durdur.hidden = true; iptal = null; }
+    } finally { uyanikBirak(); basla.disabled = !dosya; durdur.hidden = true; iptal = null; yarimDevamKontrol(); yuzenGuncelle(); }
   });
 
   /* Mevcut metin için konuşmacıları sonradan bul (kayıt dosyası gerekir). */
@@ -564,7 +598,21 @@ async function kur() {
   }
 
   const temizle = dugme("🧹 Belleği temizle", () => { dosya = null; kayitSure = 0; devam = null; T = { baslik: "", dil: null, sure: 0, konusmacilar: [], segmentler: [] }; secili.clear(); geriAl = []; baslikElleMi = false; if (sesUrl) { URL.revokeObjectURL(sesUrl); sesUrl = null; } oynatici.removeAttribute("src"); stud.hidden = true; sirket.hidden = true; dosyaBilgi.hidden = true; ilr.bitir(); basla.disabled = true; bildir("🧹 Bellek temizlendi (yerel kayıtlar silinmez)."); });
-  sekmeSifirlamaKaydet("tool-medya-transkript", () => temizle.click());
+  /* Sekme değişince iş/sonuç SİLİNMEZ (iş arkada sürer; silmek kullanıcının isteğine bağlı: “Belleği temizle” / geçmişten “Sil”). Dosya girdilerini boşaltan genel yedek zararsızdır: seçili dosya bellekte tutulur. */
+  sekmeSifirlamaKaydet("tool-medya-transkript", () => { yuzenGuncelle(); });
+
+  /* ---------------- Çalışan iş göstergesi + sayfadan ayrılma uyarısı ---------------- */
+  const yuzen = el("button", { type: "button", class: "ts-yuzen", hidden: true, "aria-live": "polite", title: "Transkript sekmesine dön" }, el("span", { class: "ts-yuzen-nokta", "aria-hidden": "true" }), el("span", { class: "ts-yuzen-metin" }, el("strong", { text: "Transkript sürüyor" }), el("small", { class: "ts-yuzen-alt" })));
+  yuzen.addEventListener("click", () => { try { location.hash = "#tool-medya"; } catch { /* yok */ } kok.scrollIntoView?.({ block: "start" }); });
+  document.body.append(yuzen);
+  function yuzenGuncelle() {
+    const calisiyor = !!iptal, gorunur = kok.offsetParent !== null;
+    yuzen.hidden = !(calisiyor && !gorunur);
+    if (!yuzen.hidden) yuzen.querySelector(".ts-yuzen-alt").textContent = `${ilr.etiket || "Çalışıyor"}${ilr.oran != null ? ` — %${Math.round(ilr.oran * 100)}` : ""} · açmak için dokun`;
+  }
+  const yuzenZaman = setInterval(() => { if (!document.body.contains(kok)) { clearInterval(yuzenZaman); yuzen.remove(); return; } yuzenGuncelle(); }, 1000);
+  window.addEventListener("beforeunload", (e) => { if (iptal) { e.preventDefault(); e.returnValue = ""; } });   // iş sürerken sayfayı kapatma/yenilemeye karşı uyar (sekme değiştirmek serbest)
+  window.addEventListener("hashchange", yuzenGuncelle);
 
   /* ---------------- Yerleşim ---------------- */
   const ustBar = el("div", { class: "ts-ustbar" },
@@ -579,6 +627,6 @@ async function kur() {
     el("div", { class: "md-kart ts-giris" }, el("h2", { text: "📝 Transkript Stüdyosu" }), el("p", { class: "md-soluk", text: "Ses ya da videoyu yazıya dök; konuşmacıları otomatik ayır; PDF, Word, altyazı ve daha fazlası olarak indir." }),
       el("p", { class: "md-soluk ts-gizlilik", text: "🔒 Kayıt tarayıcında küçültülür; yalnızca ses Worker üzerinden Groq Whisper'a gider (kendi anahtarını seçersen doğrudan Groq'a). Konuşmacı ayrımı açıksa ses Google Gemini'ye (site anahtarıyla Worker üzerinden ya da kendi anahtarınla doğrudan) gider. Worker hiçbir şey kaydetmez." })),
     kurulum, stud, kota.kok, kaynak.kok, gecmisKart, temizle);
-  gecmisCiz(); aralikOzetle(); aiKaynaklariYukle().catch(() => {});
+  gecmisCiz(); aralikOzetle(); aiKaynaklariYukle().catch(() => {}); yarimDevamKontrol();
 }
 kur().catch((h) => { console.error("medya-transkript.js:", h); if (kok) kok.replaceChildren(el("p", { class: "auth-message error", text: `Araç yüklenemedi: ${h?.message || h}` })); });

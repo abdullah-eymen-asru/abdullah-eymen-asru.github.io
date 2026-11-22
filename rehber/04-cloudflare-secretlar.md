@@ -878,6 +878,25 @@ Bunlar Cloudflare'de değil GitHub'da durur; ama "hangi secret nerede?" sorusu k
 
 Her workflow dosyasının en üstündeki yorum satırlarında kendi kurulum adımları da yazıyor; ayrıntı için oraya bak.
 
+### 6.1 Hangisi kalmalı, hangisi silinebilir? (güncel site yapısına göre)
+
+Repodaki tüm workflow'lar tarandı (`secrets.*` kullanımları): **yukarıdaki 7 secret'ın hepsi bir workflow tarafından okunuyor. Silinecek / gereksiz secret yok.** Birini silersen ilgili otomasyon sessizce çalışmaz olur:
+
+| Secret | Silersen ne olur? |
+|---|---|
+| `CLOUDFLARE_DEPLOY_HOOK_URL` | Zamanlanmış yayın (`zamanlanmis-yayin.yml`) siteyi yeniden build ettiremez; planlı yazılar zamanında görünmez. |
+| `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` | Haftalık `supabase-ping.yml` durur; ücretsiz Supabase projesi 7 gün hareketsizlikte **duraklatılabilir**. |
+| `ADMIN_DENETIM_FUNCTION_URL` + `ADMIN_DENETIM_CRON_SECRET` | Yönetici denetim kayıtlarının zaman aşımı temizliği çalışmaz. |
+| `MESAJ_KALICI_SILME_FUNCTION_URL` + `MESAJ_KALICI_SILME_CRON_SECRET` | Mesajlaşmada süresi dolan kayıtlar kalıcı silinmez. |
+
+Önemli notlar:
+
+- **`SUPABASE_ANON_KEY` GitHub'a EKLENMEZ.** Anon (public) anahtar tarayıcıda zaten herkese açık çalışır; bir workflow'un ihtiyacı yok. (Yalnızca Bölüm 4'teki Pages "kasa uç katmanı" kullanıyorsan Cloudflare Pages değişkeni olarak gerekir; o GitHub değil Cloudflare'dedir.)
+- Önceki sürümde denenen "Supabase → repo senkronu" kaldırıldı; **ona ait ek secret gerekmez** ve eklediysen silebilirsin (`supabase-senkron.yml` ile birlikte).
+- Her `*_CRON_SECRET` değeri, ilgili Supabase Edge Function secret'ıyla **birebir aynı** olmalı; biri değişirse ikisini birlikte güncelle.
+- `SUPABASE_SERVICE_ROLE_KEY` çok güçlüdür: yalnızca GitHub secret'ı olarak dursun, hiçbir dosyaya/commit'e yazma.
+- Secret'ları GitHub arayüzünde **silmek** yerine, emin değilsen önce değeri koru; workflow'lar manuel "Run workflow" ile test edilebilir.
+
 ---
 
 ## 7. Güvenlik kontrol listesi
