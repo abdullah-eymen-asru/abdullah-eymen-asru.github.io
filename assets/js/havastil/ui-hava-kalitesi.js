@@ -1,12 +1,14 @@
 /*
  * ui-hava-kalitesi.js — HavaStil › Derin analiz › "Hava kalitesi" (açılır/kapanır panel) + "Resmî ölçüm" kartı.
- * Kapalıyken tek satır: seviye + tek cümlelik öneri + veri kaynağı. Açılınca: yaşam önerileri, her kirletici için sade Türkçe ad + açıklama +
- * renkli seviye, saat saat gidişat ve verinin nereden geldiği. Ekranda ham kısaltma ya da çıplak birim YOKTUR (kirletici.js sözlüğü).
+ * Kapalıyken tek satır: seviye + tek cümlelik öneri + veri kaynağı. Açılınca: yaşam önerileri, her kirletici için sade Türkçe ad + bilimsel ad ve formül,
+ * ölçülen SAYI + birim (örn. 35 µg/m³), altı renkli bandı olan ölçek (işaretçi + her bandın gerçek eşik değeri), Dünya Sağlık Örgütü sınırıyla oran,
+ * saat saat gidişat ve verinin nereden geldiği. "İyi/orta/kötü" tek başına yetmez: her zaman sayı ve eşikler de yazılıdır.
  * Seçili gün bugünse "şu an" (istasyon varsa istasyon ölçümü), ileri günlerse model tahmininin O GÜNKÜ en yüksek saati gösterilir.
  * CSP: inline stil/işleyici yok; dinamik ölçüler CSSOM ile.
  */
 import { el, kart, bolumBasligi, ipucu, olay } from "./ui-temel.js";
-import { KIRLETICILER, SEVIYELER, seviye, rehberYuzde, doluluk, degerMetni, genelDurum, eaqiIndeks, tavsiyeler, KIRLETICI } from "./kirletici.js";
+import { KIRLETICILER, SEVIYELER, seviye, rehberYuzde, doluluk, degerSayisi, sinirlar, rehberMetni, bilimselAd, genelDurum, eaqiIndeks, tavsiyeler, KIRLETICI } from "./kirletici.js";
+import { olcumKarti } from "./ui-olcum.js";
 
 const yuvarla1 = (x) => Math.round(x * 10) / 10;
 const dakikaOnce = (iso) => {
@@ -42,25 +44,35 @@ function kaynakRozeti(k) {
   return el("span", { class: "hv-hk-kaynak", title: "Copernicus CAMS atmosfer modeli (Open-Meteo)", text: "🛰️ Model tahmini" });
 }
 
+function olcekCubugu(k, v, sv) {
+  const bantlar = SEVIYELER.map((_, i) => { const b = el("span", { class: "hv-hk-bant-parca" }); b.dataset.s = String(i); if (i === sv.idx) b.classList.add("aktif"); return b; });
+  const isaret = el("span", { class: "hv-hk-isaret", "aria-hidden": "true" }); isaret.style.left = `${Math.round(Math.min(0.985, Math.max(0.015, doluluk(k.id, v))) * 1000) / 10}%`;
+  const sn = sinirlar(k.id);
+  const etiketler = el("div", { class: "hv-hk-sinirlar", "aria-hidden": "true" }, ...sn.map((x, i) => { const e = el("span", { text: x.ust.replace(/ (µg|mg)\/m³$/, "") }); e.dataset.s = String(i); return e; }));
+  return el("div", { class: "hv-hk-olcek" },
+    el("div", { class: "hv-hk-cubuk", role: "img", "aria-label": `${k.ad}: ${sv.ad}. Seviye sınırları: ${sn.map((x) => `${x.ad} ${x.ust}`).join(", ")}` }, ...bantlar, isaret), etiketler);
+}
+
 function kirleticiKutusu(k, v, kaynak, etiket) {
-  const sv = seviye(k.id, v);
+  const sv = seviye(k.id, v), sayi = degerSayisi(k.id, v);
   const kutu = el("div", { class: "hv-hk-kirletici" });
-  if (!sv) {
-    kutu.append(el("div", { class: "hv-hk-k-ust" }, el("span", { class: "hv-hk-k-ikon", "aria-hidden": "true", text: k.ikon }), el("strong", { text: k.ad })),
+  const adBlok = el("span", { class: "hv-hk-k-adlar" }, el("strong", { text: k.ad }), el("small", { class: "hv-hk-bilimsel", text: bilimselAd(k.id) }));
+  if (!sv || !sayi) {
+    kutu.append(el("div", { class: "hv-hk-k-ust" }, el("span", { class: "hv-hk-k-ikon", "aria-hidden": "true", text: k.ikon }), adBlok),
       el("small", { class: "hv-hk-k-acik", text: k.aciklama }), el("small", { class: "hv-hk-yok", text: "Bu bölge ve gün için ölçüm ya da tahmin yok." }));
     return kutu;
   }
   kutu.dataset.s = String(sv.idx);
-  const dolu = el("span", { class: "hv-hk-dolu" }); dolu.style.width = `${Math.round(Math.max(0.04, doluluk(k.id, v)) * 100)}%`;
-  const y = rehberYuzde(k.id, v);
+  const y = rehberYuzde(k.id, v), rehber = rehberMetni(k.id);
+  const oran = y == null ? null : y <= 100 ? `Rehber sınırının %${y}'i (sınır altında)` : `Rehber sınırının ${String(Math.round(y / 10) / 10).replace(".", ",")} katı (sınır aşıldı)`;
   kutu.append(
-    el("div", { class: "hv-hk-k-ust" }, el("span", { class: "hv-hk-k-ikon", "aria-hidden": "true", text: k.ikon }), el("strong", { text: k.ad }), el("span", { class: "hv-hk-chip", text: sv.ad })),
+    el("div", { class: "hv-hk-k-ust" }, el("span", { class: "hv-hk-k-ikon", "aria-hidden": "true", text: k.ikon }), adBlok, el("span", { class: "hv-hk-chip", text: sv.ad })),
     el("small", { class: "hv-hk-k-acik", text: k.aciklama }),
-    el("span", { class: "hv-hk-cubuk", role: "img", "aria-label": `${k.ad}: ${sv.ad}` }, dolu),
-    el("small", { class: "hv-hk-k-deger", text: [y == null ? null : y <= 100 ? `Dünya Sağlık Örgütü rehber sınırının %${y}'i` : `Dünya Sağlık Örgütü rehber sınırının ${String(Math.round(y / 10) / 10).replace(".", ",")} katı`, `${etiket}: ${degerMetni(k.id, v)}`].filter(Boolean).join(" · ") }),
+    el("div", { class: "hv-hk-k-sayi" }, el("strong", { class: "hv-hk-k-buyuk", text: sayi.sayi }), el("span", { class: "hv-hk-k-birim", text: sayi.birim }), el("span", { class: "hv-hk-k-etiket", text: etiket })),
+    olcekCubugu(k, v, sv),
+    el("small", { class: "hv-hk-k-deger", text: rehber ? `Dünya Sağlık Örgütü rehber sınırı ${rehber}${oran ? ` · ${oran}` : ""}` : "Bu madde için Dünya Sağlık Örgütü rehber sınırı yoktur." }),
     el("small", { class: "hv-hk-k-kaynak" }, kaynakRozeti(kaynak)),
-    el("small", { class: "hv-ipucu", text: k.resmiIndeksYok ? "Çöl tozu için resmî bir seviye ölçeği yoktur; renkler HavaStil'in kendi ölçeğidir." : null }));
-  if (!k.resmiIndeksYok) kutu.lastElementChild.remove();
+    ...(k.resmiIndeksYok ? [el("small", { class: "hv-ipucu", text: "Çöl tozu için resmî bir seviye ölçeği yoktur; bantlar HavaStil'in kendi ölçeğidir." })] : []));
   return kutu;
 }
 
@@ -103,7 +115,7 @@ function kaynakBolumu(kalite, gd, bugunMu) {
         ? (gd.genelKaynak === "istasyon" ? "Şu anki değerler, konumuna en yakın resmî ölçüm istasyonundan alındı; istasyonun ölçmediği kirleticiler için atmosfer modeli kullanıldı." : "Konumuna yakın taze bir resmî istasyon ölçümü bulunamadı; değerler atmosfer modelinden (Copernicus CAMS) geliyor.")
         : "İleri günler yalnızca atmosfer modelinden (Copernicus CAMS) gelir; ölçüm istasyonları geleceği bilemez. Model en fazla 4 gün ileriyi verir." }),
       ...satirlar,
-      el("li", { text: "Seviyeler Avrupa Çevre Ajansı'nın 6 kademeli hava kalitesi ölçeğine, yüzdeler Dünya Sağlık Örgütü 2021 rehber sınırlarına göre hesaplanır. Karbonmonoksit için Avrupa'da ölçek yoktur; Dünya Sağlık Örgütü ve AB sınırları kullanılır." }),
+      el("li", { text: "Değerler µg/m³ (metreküp havadaki mikrogram) cinsindendir; karbonmonoksit mg/m³ (miligram). Seviyeler Avrupa Çevre Ajansı'nın 6 kademeli hava kalitesi ölçeğine, oranlar Dünya Sağlık Örgütü 2021 rehber sınırlarına göre hesaplanır. Karbonmonoksit için Avrupa'da ölçek yoktur; Dünya Sağlık Örgütü ve AB sınırları kullanılır." }),
       el("li", { text: "Kaynak sırası: önce resmî ölçüm istasyonları (OpenAQ üzerinden ülkelerin resmî ağları), olmazsa model. Anahtar ve kaynak ayarları: Doğrulama & Ayar › Ayarlar › Hava veri kaynakları." })));
 }
 
@@ -130,7 +142,8 @@ export function havaKalitesiKarti(d, tarih, bugunMu) {
     el("span", { class: "hv-hk-metin" },
       el("span", { class: "hv-hk-ad", text: bugunMu ? "Hava kalitesi" : "Hava kalitesi (tahmin)" }),
       el("strong", { class: "hv-hk-seviye", text: sv.ad }),
-      el("span", { class: "hv-hk-ozet", text: t.genel })),
+      el("span", { class: "hv-hk-ozet", text: t.genel }),
+      ...(gd.baskin && Number.isFinite(gd.degerler[gd.baskin]) ? [el("small", { class: "hv-hk-baskin-satir", text: `En yüksek: ${KIRLETICI[gd.baskin].ad} · ${degerSayisi(gd.baskin, gd.degerler[gd.baskin]).tam}` })] : [])),
     el("span", { class: "hv-hk-sag" }, kaynakRozeti(gd.genelKaynak === "istasyon" ? { tur: "istasyon", mesafeKm: kaynak?.mesafeKm } : { tur: "model" }), el("span", { class: "hv-hk-ok", "aria-hidden": "true", text: "▾" })),
     seviyeBandi(idx));
   const kutular = KIRLETICILER.map((k) => kirleticiKutusu(k, gd.degerler[k.id], gd.kaynaklar[k.id], gd.etiket));
@@ -152,25 +165,7 @@ export function havaKalitesiKarti(d, tarih, bugunMu) {
   return kok;
 }
 
-/** "Resmî ölçüm" kartı: en yakın resmî istasyonun ŞİMDİ ölçtükleri + modelle fark. Gözlem yoksa hiç çizilmez (ekran sade kalır). */
-export function gozlemKarti(d) {
-  const g = d.hava?.gozlem, h = d.hava;
-  if (!g) return null;
-  const yon = (x) => (x == null ? "" : ["kuzey", "kuzeydoğu", "doğu", "güneydoğu", "güney", "güneybatı", "batı", "kuzeybatı"][Math.round(x / 45) % 8]);
-  const kutu = (ad, deger, alt) => el("div", { class: "hv-metrik" }, el("span", { class: "hv-metrik-baslik", text: ad }), el("strong", { text: deger }), alt ? el("small", { text: alt }) : null);
-  const fark = g.sicaklik != null && Number.isFinite(h.raw) ? Math.round((g.sicaklik - h.raw) * 10) / 10 : null;
-  const farkYazi = fark == null ? null : Math.abs(fark) < 0.8 ? "Tahmin modeliyle uyumlu." : `Ölçüm, tahmin modelinden ${String(Math.abs(fark)).replace(".", ",")}° ${fark > 0 ? "daha sıcak" : "daha soğuk"}.`;
-  const kok = kart("hv-gozlem", bolumBasligi("📡 Resmî ölçüm"));
-  kok.append(
-    el("p", { class: "hv-uzman-ne", text: `${g.ad}${km(g.mesafeKm)} · ${dakikaOnce(g.zaman)} · ${g.saglayici === "mgm" ? "Meteoroloji Genel Müdürlüğü" : "havalimanı resmî rasadı"}` }),
-    el("div", { class: "hv-detay-grid" },
-      g.sicaklik != null ? kutu("Sıcaklık", `${g.sicaklik}°`, g.hissedilen != null ? `Hissedilen ${g.hissedilen}°` : null) : null,
-      g.nem != null ? kutu("Nem", `%${g.nem}`, g.cig != null ? `Çiğ noktası ${g.cig}°` : null) : null,
-      g.ruzgar != null ? kutu("Rüzgâr", `${g.ruzgar} km/s`, [g.yon != null ? `${yon(g.yon)} yönünden` : null, g.hamle ? `hamle ${g.hamle} km/s` : null].filter(Boolean).join(" · ") || null) : null,
-      g.basinc != null ? kutu("Hava basıncı", `${g.basinc} hPa`, null) : null,
-      g.gorus != null ? kutu("Görüş mesafesi", g.gorus >= 10000 ? "10 km+" : `${Math.round(g.gorus / 100) / 10} km`.replace(".", ","), null) : null),
-    ...(farkYazi ? [el("p", { class: "hv-ipucu", text: `${farkYazi} Kombin ve yağış kararı tahmin modeliyle verilir; bu kart ölçümle karşılaştırman içindir.` })] : []));
-  return kok;
-}
+/** Eski ad korunur: Derin analiz bu işlevi çağırır; kart artık ui-olcum.js'te ("Resmî ölçümle doğrulama"). */
+export const gozlemKarti = olcumKarti;
 
 export { KIRLETICI };

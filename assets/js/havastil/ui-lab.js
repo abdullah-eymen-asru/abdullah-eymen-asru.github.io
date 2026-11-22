@@ -11,6 +11,7 @@
 import { el, kart, ipucu, bolumBasligi, rozet, zamanOnce, olay } from "./ui-temel.js";
 import { hedefClo, SENARYOLAR } from "./cekirdek.js";
 import { ESIK } from "./yagis-fizigi.js";
+import { olcumKarti } from "./ui-olcum.js";
 
 const pad = (s) => String(s).padStart(2, "0");
 const sayiMetni = (v, n = 1) => (Number.isFinite(v) ? String(Math.round(v * 10 ** n) / 10 ** n) : "—");
@@ -144,7 +145,7 @@ export function dogrulaSekmesi(d, kb) {
   d.kbCiz = kb.ciz;
   return el("div", { class: "hv-sekme-govde" },
     el("p", { class: "hv-uzman-giris", text: "Bu sayfa herkese açıktır. Amaç: HavaStil'in veri uydurmadığını göstermek — ham sayılar, üç büyük modelin karşılaştırması, kararın matematiği ve haber doğrulaması tek yerde." }),
-    hamKarti(d), modelKarti(d), cloKarti(d), haberKarti(d), groqKarti(d, kb));
+    olcumKarti(d), hamKarti(d), modelKarti(d), cloKarti(d), haberKarti(d), groqKarti(d, kb));
 }
 
 /* ------------------------------ 5) Groq kota & istek takibi (yalnızca Site Sahibi + yetkili Admin) ------------------------------ */

@@ -112,5 +112,5 @@ export function ayarSekmesi(d, kb) {
       el("p", { class: "hv-ipucu", text: `Ayıklanan: ${tz.elenen.clickbait} sansasyonel · ${tz.elenen.zaman} eski/gelecek · ${tz.elenen.konum} başka yer.` }))
       : ipucu("Haber verisi henüz yok."));
 
-  return el("div", { class: "hv-sekme-govde" }, uyariKart, aiKart, aiAyarKarti(d, kb), openMeteoAyarKarti(d, kb), havaKaynaklariKarti(d, kb), radarApiKarti(), haberKart, bulutKart, gizlilik, teshis);
+  return el("div", { class: "hv-sekme-govde hv-ayar-govde" }, uyariKart, aiKart, aiAyarKarti(d, kb), openMeteoAyarKarti(d, kb), havaKaynaklariKarti(d, kb), radarApiKarti(), haberKart, bulutKart, gizlilik, teshis);
 }

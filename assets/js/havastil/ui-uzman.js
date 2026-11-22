@@ -13,7 +13,7 @@ import { gunIzgarasi } from "./ui-gun-secici.js";
 import { TERIM, uyumGoster, yayilimMetni, capeNotu, cisentiFiltresiDurumu, gunHikayesi } from "./hikaye.js";
 import { aiPaneli } from "./ui-ai.js";
 import { havaKalitesiKarti, gozlemKarti, gunDegerleri } from "./ui-hava-kalitesi.js";
-import { seviye as kirleticiSeviye, degerMetni, doluluk } from "./kirletici.js";
+import { seviye as kirleticiSeviye, degerSayisi, bilimselAd, doluluk } from "./kirletici.js";
 import { CAPE_BANTLARI, ESIK, YAGIS_SEVIYELERI, capeOrani, capeSeviye, saatAnaliz, saatMetniTam, gunAnalizleri, popYorumu, popPratik, popDenklemMetni, guvenMetni, efektifSiddet, capeHalk } from "./yagis-fizigi.js";
 
 const n1 = (x, n = 1) => String(Number(x).toFixed(n));          // v4: ondalık NOKTA (10 günlük liste ve ekran görüntüleriyle aynı biçim: 4.4 mm)
@@ -247,7 +247,7 @@ function mikroKarti(G, gi, d) {
       metrik("Yüzey basıncı", `${bas[0]} → ${bas[bas.length - 1]} hPa`, `Gün içi değişim ${isaretli(bFark)} hPa · ${basincYorumu(bFark, Math.max(3, sl.length - 1))}`, spark,
         "Düşen basınç genelde bozulan havayı (cephe, yağış), yükselen basınç açan havayı gösterir. Saatte 1 hPa'dan fazla düşüş hızlı değişimdir."),
       metrik("UV indeksi (gün zirvesi)", `${gunl?.uv ?? "—"}`, `${uv.ad} · ${uv.oneri}`, olcek(Math.min(1, (gunl?.uv ?? 0) / 11), uv.sinif), "UV, güneşin cildi yakma gücüdür: 3'ten itibaren koruma, 6'dan sonra SPF 50 ve gölge gerekir. Bulutlu havada bile geçer."),
-      metrik("Yüzey ozonu", oz ? oz.ad : "Tahmin yok", oz ? `${degerMetni("o3", ozDeger)} · ${bugunMu ? (ozVeri.kaynaklar?.o3?.tur === "istasyon" ? "yakın istasyon ölçümü" : "şu anki model değeri") : "günün en yüksek saati"}` : "Bu bölge ve gün için ölçüm ya da tahmin yok.", oz ? olcek(doluluk("o3", ozDeger), oz.sinif) : null,
+      metrik("Yüzey ozonu", oz ? oz.ad : "Tahmin yok", oz ? `${degerSayisi("o3", ozDeger)?.tam ?? "—"} (${bilimselAd("o3")}) · ${bugunMu ? (ozVeri.kaynaklar?.o3?.tur === "istasyon" ? "yakın istasyon ölçümü" : "şu anki model değeri") : "günün en yüksek saati"}` : "Bu bölge ve gün için ölçüm ya da tahmin yok.", oz ? olcek(doluluk("o3", ozDeger), oz.sinif) : null,
         "Zemin seviyesindeki ozon, güneşli sıcak günlerde trafik kirliliğinden oluşur ve solunumu zorlar. Stratosferdeki koruyucu ozon tabakasıyla ilgisi yoktur."),
       metrik("Nem ve bulut (gün ortalaması)", `%${nemOrt} · %${bulutOrt}`, `Bulut örtüsü ${bulutOrt >= 80 ? "kapalı" : bulutOrt >= 40 ? "parçalı" : "az"}`, null, "Yüksek nem soğuğu daha keskin, sıcağı daha bunaltıcı hissettirir; hissedilen sıcaklık bu yüzden ölçülenden farklıdır.")),
     okunus("Değerler seçili günün 24 saatinden hesaplanır; “şimdi” bilgisi yalnızca bugün için gösterilir."));
@@ -274,7 +274,7 @@ function matrisKarti(G, simdiT, d) {
 
 /* ------------------------------ sekme ------------------------------ */
 /** Resmî ölçüm (varsa, yalnızca bugün) + açılır Hava kalitesi paneli. */
-function havaKartlari(G, gi, d) { return [gi === 0 ? gozlemKarti(d) : null, havaKalitesiKarti(d, G.tarih, gi === 0)].filter(Boolean); }
+function havaKartlari(G, gi, d) { return [havaKalitesiKarti(d, G.tarih, gi === 0)].filter(Boolean); }
 export function derinSekmesi(d, kb) {
   if (!d.hava || !d.sonuc || !d.fizik) return kart("hv-bos", ipucu("Hava verisi yükleniyor…"));
   const gunler = gunAnalizleri(d.hava.tumSaatler, { canta: d.tercih.canta, rakim: d.hava.rakim });
@@ -296,5 +296,5 @@ export function derinSekmesi(d, kb) {
     : [popKarti(G, simdiT, d.hava), capeKarti(G, gunler, gi, d, kb), fizikKarti(G, simdiT), beklenenKarti(G), ...havaKartlari(G, gi, d), mikroKarti(G, gi, d), matrisKarti(G, simdiT, d)];
   return el("div", { class: "hv-sekme-govde" },
     el("p", { class: "hv-uzman-giris", text: "Meteoroloji ve veri meraklıları için. Günlük karar “Bugün” ve “Kombin” sekmelerinde; burada kararın arkasındaki sayılar var. Bir gün seç, tüm bölümler o güne göre değişir." }),
-    gunSecici(gunler, gi, d, kb), altSekmeler, ozetKarti(G, d.hava, gi), hikayeKarti(G), ...govde, aiPaneli(d, kb));
+    gunSecici(gunler, gi, d, kb), altSekmeler, ozetKarti(G, d.hava, gi), ...(gi === 0 ? [gozlemKarti(d)].filter(Boolean) : []), hikayeKarti(G), ...govde, aiPaneli(d, kb));
 }

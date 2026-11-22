@@ -12,10 +12,26 @@
 import { gunAnalizleri, saatAnaliz, capeSeviye, efektifSiddet, saatMetniTam } from "./yagis-fizigi.js";
 import { hedefClo } from "./cekirdek.js";
 import { gunHikayesi, cisentiFiltresiDurumu, uyumGoster } from "./hikaye.js";
+import { KIRLETICILER, seviye as kirleticiSeviye, degerSayisi, rehberYuzde, rehberMetni, bilimselAd, genelDurum } from "./kirletici.js";
+import { dogrulamaOzeti } from "./dogrulama.js";
 
 const r1 = (x) => (x == null || !Number.isFinite(Number(x)) ? null : Math.round(Number(x) * 10) / 10);
 const r2 = (x) => (x == null || !Number.isFinite(Number(x)) ? null : Math.round(Number(x) * 100) / 100);
 const TUR_AD = { yok: "yok", cise: "çisenti", genis: "yaygın düzenli yağmur", konvektif: "ani sağanak", karma: "karma", kar: "kar" };
+
+/** Hava kalitesi: her kirletici için sade ad + bilimsel ad + formül + SAYI/birim + seviye + DSÖ oranı (yapay zekâ yorumu için). Eksik değer null. */
+function kaliteVeriAlani(k) {
+  const deg = { pm25: k.pm25, pm10: k.pm10, o3: k.ozon, no2: k.no2, co: k.co, so2: k.so2, dust: k.dust };
+  const gd = genelDurum(deg);
+  return {
+    avrupa_aqi: k.aqi ?? null, genel_seviye: gd?.ad ?? null, baskin_kirletici: gd ? KIRLETICILER.find((x) => x.id === gd.baskin)?.ad : null,
+    kaynak: k.genelKaynak === "istasyon" ? "resmi istasyon ölçümü" : "model tahmini (Copernicus CAMS)", birim_notu: "µg/m³ = metreküp havadaki mikrogram; karbonmonoksit mg/m³ (miligram)",
+    kirleticiler: KIRLETICILER.map((m) => {
+      const v = deg[m.id], sv = kirleticiSeviye(m.id, v), sy = degerSayisi(m.id, v);
+      return { ad: m.ad, bilimsel_ad: bilimselAd(m.id), deger: sy ? Number(sy.sayi.replace(",", ".")) : null, birim: sy ? sy.birim : null, seviye: sv?.ad ?? null, dso_rehber_siniri: rehberMetni(m.id), dso_siniri_yuzdesi: rehberYuzde(m.id, v) };
+    }),
+  };
+}
 
 function saatSatiri(x, d) {
   const a = saatAnaliz(x);
@@ -69,7 +85,10 @@ export function gunVeriPaketi(d, gi = 0, { ekGun = 0 } = {}) {
     olcumler: (H.ham?.simdi || []).filter(([, v]) => v != null).map(([ad, deger, birim]) => ({ olcum: ad, deger, birim: birim || "" })),
     basinc_egilimi: H.basincEgilim ?? null, basinc_fark_3_saat_hpa: H.basincFark3 ?? null, basinc_fark_12_saat_hpa: H.basincFark12 ?? null,
     gorus_m: H.gorus ?? null,
-    hava_kalitesi: H.kalite ? { avrupa_aqi: H.kalite.aqi, kaba_toz: H.kalite.pm10, ince_toz: H.kalite.pm25, ozon: H.kalite.ozon, azot_gazi: H.kalite.no2, kukurt_gazi: H.kalite.so2, karbonmonoksit: H.kalite.co, col_tozu: H.kalite.dust, kaynak: H.kalite.genelKaynak === "istasyon" ? "resmi istasyon ölçümü" : "model tahmini" } : null,
+    hava_kalitesi: H.kalite ? kaliteVeriAlani(H.kalite) : null,
+    resmi_olcum: H.gozlem ? { kaynak: H.gozlem.saglayici === "mgm" ? "Meteoroloji Genel Müdürlüğü (MGM) resmî ölçümü" : "havalimanı resmî hava raporu (METAR)", istasyon: H.gozlem.ad, kod: H.gozlem.kod || null, konuma_uzaklik_km: H.gozlem.mesafeKm ?? null, olcum_zamani: H.gozlem.zaman,
+      sicaklik_c: H.gozlem.sicaklik ?? null, hissedilen_c: H.gozlem.hissedilen ?? null, nem_yuzde: H.gozlem.nem ?? null, ruzgar_kmh: H.gozlem.ruzgar ?? null, ruzgar_yonu_derece: H.gozlem.yon ?? null, basinc_hpa: H.gozlem.basinc ?? null, gorus_m: H.gozlem.gorus ?? null, yagis_mm: H.gozlem.yagis ?? null } : null,
+    olcum_dogrulama: dogrulamaOzeti(H.dogrulama),
     onumuzdeki_15_dakikalik_yagis_mm: (H.dakikalik || []).map((x) => ({ zaman: x.t, mm: x.mm })),
   };
   // Seçili gün için model karşılaştırması: her modelin saatlik ham yağış (mm) değeri (modeller arası uyumsuzluğu görmek için)
@@ -130,7 +149,21 @@ function anlikMetni(p) {
   for (const o of a.olcumler) s.push(`- ${o.olcum}: ${o.deger}${o.birim ? ` ${o.birim}` : ""}`);
   if (a.basinc_egilimi) s.push(`- Basınç eğilimi: ${a.basinc_egilimi}${a.basinc_fark_3_saat_hpa != null ? ` (son 3 saat ${a.basinc_fark_3_saat_hpa} hPa` : ""}${a.basinc_fark_12_saat_hpa != null ? `, son 12 saat ${a.basinc_fark_12_saat_hpa} hPa)` : a.basinc_fark_3_saat_hpa != null ? ")" : ""}`);
   if (a.gorus_m != null) s.push(`- Görüş mesafesi: ${a.gorus_m} m`);
-  if (a.hava_kalitesi) { const k = a.hava_kalitesi, g = (x) => (x == null ? "—" : x); s.push(`- Hava kalitesi (${k.kaynak}): Avrupa AQI ${g(k.avrupa_aqi)} · ince toz ve egzoz parçacıkları ${g(k.ince_toz)} · kaba toz ve polen ${g(k.kaba_toz)} · yüzey ozonu ${g(k.ozon)} · trafik gazı (azot) ${g(k.azot_gazi)} · kükürt gazı ${g(k.kukurt_gazi)} · karbonmonoksit ${g(k.karbonmonoksit)} · çöl tozu ${g(k.col_tozu)} (µg/m³)`); }
+  if (a.hava_kalitesi) {
+    const k = a.hava_kalitesi;
+    s.push(`- Hava kalitesi (${k.kaynak}): Avrupa AQI ${k.avrupa_aqi ?? "—"} · genel seviye: ${k.genel_seviye ?? "—"}${k.baskin_kirletici ? ` · baskın: ${k.baskin_kirletici}` : ""}`);
+    for (const m of k.kirleticiler) s.push(`  - ${m.ad} (${m.bilimsel_ad}): ${m.deger == null ? "ölçüm yok" : `${String(m.deger).replace(".", ",")} ${m.birim} — ${m.seviye}${m.dso_siniri_yuzdesi != null ? `, DSÖ rehber sınırının %${m.dso_siniri_yuzdesi}'i` : ""}`}`);
+    s.push(`  - Birim: ${k.birim_notu}`);
+  }
+  if (a.resmi_olcum) {
+    const o = a.resmi_olcum, g = (x, b = "") => (x == null ? "—" : `${x}${b}`);
+    s.push(`- Resmî ölçüm (${o.kaynak}) — ${o.istasyon}${o.kod ? ` (${o.kod})` : ""}, konuma ${g(o.konuma_uzaklik_km, " km")}, ${o.olcum_zamani}: sıcaklık ${g(o.sicaklik_c, "°C")}, hissedilen ${g(o.hissedilen_c, "°C")}, nem ${g(o.nem_yuzde, "%")}, rüzgâr ${g(o.ruzgar_kmh, " km/s")}, basınç ${g(o.basinc_hpa, " hPa")}, yağış ${g(o.yagis_mm, " mm")}`);
+  }
+  if (a.olcum_dogrulama) {
+    const dg = a.olcum_dogrulama;
+    s.push(`- Ölçüm ↔ tahmin doğrulaması (güven: ${dg.guven}, genel: ${dg.genel}): ${dg.farklar.map((f) => `${f.alan} ölçüm ${f.olcum} / model ${f.model} ${f.birim} (fark ${f.fark > 0 ? "+" : ""}${f.fark}, ${f.durum})`).join("; ")}`);
+    s.push(`  - Yağış kontrolü: ${dg.yagis}. ${dg.duzeltme ? `Sıcaklık tahmini ölçüme göre ${dg.duzeltme.sicaklik > 0 ? "+" : ""}${dg.duzeltme.sicaklik}° (hissedilen ${dg.duzeltme.hissedilen > 0 ? "+" : ""}${dg.duzeltme.hissedilen}°) düzeltildi; ${dg.duzeltme.saat} saatte sönümlenir.` : "Tahmin ölçüme göre düzeltilmedi."}`);
+  }
   if (a.onumuzdeki_15_dakikalik_yagis_mm?.length) s.push(`- Önümüzdeki 15 dakikalık yağış (mm): ${a.onumuzdeki_15_dakikalik_yagis_mm.map((x) => `${String(x.zaman).slice(11, 16)}=${x.mm}`).join(" · ")}`);
   return s.filter((x) => x !== null);
 }

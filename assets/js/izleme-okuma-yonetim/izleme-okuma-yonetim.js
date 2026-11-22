@@ -30,7 +30,7 @@
  */
 import { requireAuthOrShowError } from "../auth/auth-guard.js";
 import { showMessage, supabase } from "../core/supabase-client.js";
-import { normallestir, enBenzerKayitlariBul, TUR_ETIKET, vurguParcalari } from "./benzerlik.js";
+import { normallestir, enBenzerKayitlariBul, TUR_ETIKET, TUR_ACIKLAMA, vurguParcalari } from "./benzerlik.js";
 
 // ---- BURAYI DOLDUR: Worker deploy edildikten sonra aldığın URL ----
 const IZLEME_OKUMA_WORKER_URL = "https://izleme-okuma-yonetim-worker.aeymena.workers.dev";
@@ -224,8 +224,10 @@ function benzerlikKontrolEtVeGoster() {
     return;
   }
 
-  const bulunan = enBenzerKayitlariBul(baslik, ekleIcinKayitlar, 0.55, 5);
-  ekleBenzerKayitlar = bulunan.map((x) => x.kayit);
+  const bulunan = enBenzerKayitlariBul(baslik, ekleIcinKayitlar, 0.55, 60);
+  // Yalnızca "kopya olabilir" türleri (aynı kayıt / aynı ad farklı yıl / yazım benzerliği) eklemeyi ikinci tıklamaya bağlar;
+  // "aynı serinin başka bölümü" gibi bilgi amaçlı eşleşmeler eklemeyi ENGELLEMEZ.
+  ekleBenzerKayitlar = bulunan.filter((x) => x.onay).map((x) => x.kayit);
   if (bulunan.length === 0) {
     kutu.hidden = true;
     kutu.innerHTML = "";
@@ -233,26 +235,49 @@ function benzerlikKontrolEtVeGoster() {
   }
 
   const guclu = bulunan.some((x) => x.guclu);
+  const onayli = bulunan.some((x) => x.onay);
   kutu.innerHTML = "";
-  kutu.className = "iy-benzer " + (guclu ? "iy-benzer--guclu" : "iy-benzer--olasi");
+  kutu.className = "iy-benzer " + (guclu ? "iy-benzer--guclu" : onayli ? "iy-benzer--olasi" : "iy-benzer--bilgi");
   const baslikEl = document.createElement("div");
   baslikEl.className = "iy-benzer-baslik";
   const ikon = document.createElement("span");
   ikon.className = "iy-benzer-ikon";
-  ikon.textContent = guclu ? "⛔" : "⚠️";
+  ikon.textContent = guclu ? "⛔" : onayli ? "⚠️" : "ℹ️";
   const metin = document.createElement("div");
   const b1 = document.createElement("strong");
-  b1.textContent = guclu ? "Bu kayıt panoda zaten olabilir" : "Panoda buna benzeyen kayıt(lar) var";
+  b1.textContent = guclu ? "Bu kayıt panoda zaten var gibi görünüyor" : onayli ? "Panoda buna çok benzeyen kayıt var" : "Panoda ilgili kayıtlar var";
   const b2 = document.createElement("small");
-  b2.textContent = `Başlığın başı, ortası ya da sonu fark etmeksizin ${bulunan.length} olası eşleşme bulundu. Aynısıysa yeniden ekleme.`;
+  const aynilar = bulunan.filter((x) => x.guclu).length;
+  b2.textContent = guclu
+    ? `${aynilar} kayıt ad, yıl ve bölüm numarasıyla birebir uyuşuyor. Toplam ${bulunan.length} ilgili kayıt aşağıda; aynısıysa yeniden ekleme.`
+    : onayli
+      ? `${bulunan.length} ilgili kayıt bulundu. Aynı yapımsa yeniden ekleme; farklıysa "Yine de ekle" ile devam edebilirsin.`
+      : `${bulunan.length} ilgili kayıt bulundu (aynı seri ya da benzer ad). Bunlar kopya sayılmaz; eklemeyi engellemez.`;
   metin.append(b1, b2);
   baslikEl.append(ikon, metin);
   kutu.appendChild(baslikEl);
+
+  // Kutunun KENDİ içinde arama + kaydırma: çok sayıda sonuç sayfayı uzatmaz.
+  const araSatir = document.createElement("div");
+  araSatir.className = "iy-benzer-ara";
+  const araInput = document.createElement("input");
+  araInput.type = "search";
+  araInput.placeholder = "Bu sonuçların içinde ara…";
+  araInput.autocomplete = "off";
+  araInput.setAttribute("aria-label", "Benzer kayıtlar içinde ara");
+  const sayac = document.createElement("span");
+  sayac.className = "iy-benzer-sayac";
+  araSatir.append(araInput, sayac);
+  if (bulunan.length > 4) kutu.appendChild(araSatir);
+
   const ul = document.createElement("ul");
   ul.className = "iy-benzer-liste";
-  bulunan.forEach(({ kayit, tur, oran, guclu: g }) => {
+  ul.tabIndex = 0;
+  ul.setAttribute("aria-label", "Benzer kayıtlar listesi");
+  const ogeler = bulunan.map(({ kayit, tur, oran, guclu: g, onay, kayitYil }) => {
     const li = document.createElement("li");
-    li.className = g ? "iy-benzer-oge iy-benzer-oge--guclu" : "iy-benzer-oge";
+    li.className = "iy-benzer-oge" + (g ? " iy-benzer-oge--guclu" : onay ? " iy-benzer-oge--onay" : "");
+    li.dataset.ara = normallestir(`${kayit.title} ${kayit.number}`);
     const a = document.createElement("a");
     a.href = kayit.url;
     a.target = "_blank";
@@ -269,11 +294,29 @@ function benzerlikKontrolEtVeGoster() {
     a.append(no, ad);
     const rozet = document.createElement("span");
     rozet.className = "iy-benzer-rozet iy-benzer-rozet--" + tur;
-    rozet.textContent = `${TUR_ETIKET[tur] || "Benzer"} · %${Math.round(oran * 100)}`;
+    rozet.textContent = TUR_ETIKET[tur] || "Benzer";
+    rozet.title = `${TUR_ACIKLAMA[tur] || ""} (benzerlik %${Math.round(oran * 100)}${kayitYil ? `, kayıt yılı ${kayitYil}` : ""})`.trim();
     li.append(a, rozet);
     ul.appendChild(li);
+    return li;
   });
   kutu.appendChild(ul);
+  const bos = document.createElement("p");
+  bos.className = "iy-benzer-bos muted";
+  bos.textContent = "Aramanla eşleşen kayıt yok.";
+  bos.hidden = true;
+  kutu.appendChild(bos);
+  const sayaciGuncelle = (n) => { sayac.textContent = n === ogeler.length ? `${n} kayıt` : `${n} / ${ogeler.length} kayıt`; };
+  sayaciGuncelle(ogeler.length);
+  araInput.addEventListener("input", () => {
+    const q = normallestir(araInput.value);
+    let gorunen = 0;
+    ogeler.forEach((li) => { const goster = !q || li.dataset.ara.includes(q); li.hidden = !goster; if (goster) gorunen++; });
+    bos.hidden = gorunen > 0;
+    sayaciGuncelle(gorunen);
+  });
+  // Enter, formu göndermesin (arama kutusu formun içinde).
+  araInput.addEventListener("keydown", (e) => { if (e.key === "Enter") e.preventDefault(); });
   kutu.hidden = false;
 }
 

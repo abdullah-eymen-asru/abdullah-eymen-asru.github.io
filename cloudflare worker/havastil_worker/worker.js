@@ -12,6 +12,8 @@
  *      (kaynak adı/alan adı izin listesi); soru işaretli başlıklar elenir. 10 dk önbellek, kullanıcı başına hız sınırı. Koordinat gelmez, yalnızca ülke kodu + şehir adı.
  * 3) TEŞHİS            GET /tani        → oturum/yetki/Groq anahtarı/model adımlarını tek tek sınar (arayüzde "Bağlantıyı test et").
  * 4) SAĞLIK            GET /saglik
+ * 4b) HAVA VEKİLLERİ (v6)  GET /hava/openaq · /hava/metar · /hava/mgm  (izinli adresler; SSRF yok) ve POST /hava/anahtar  (yalnızca Site Sahibi/Yönetici: site OpenAQ anahtarını
+ *      doğrula + şifrele + kaydet / sil). Anahtar tarayıcıya ASLA dönmez; yanıtta yalnızca "kayıtlı" ve son 4 karakter vardır.
  * 5) KOTA SAYACI (v4)  Her Groq isteği havastil_groq_say() RPC'siyle sayılır (istek, token, Groq kota başlıkları); okuma: havastil_groq_kota_durumu() (yalnızca Site Sahibi + yetkili Admin).
  *
  * GÜVENLİK: Supabase JWT + havastil_yetkisi_var_mi() (kendi jetonuyla; service_role YOK). Kullanıcı başına hız sınırı. Groq anahtarı yalnızca
@@ -25,6 +27,9 @@
  *   GROQ_API_KEY                       (SECRET)
  *   OPEN_METEO_API_KEY                 (ops., SECRET) — Open-Meteo ticari anahtarı; yalnızca site-anahtarı modunda kullanılır (bkz. /openmeteo)
  *   OPENAQ_API_KEY                     (ops., SECRET) — OpenAQ SİTE anahtarı (ücretsiz: openaq.org); /hava/openaq vekili kullanır. Kullanıcı kendi anahtarını girdiyse bu gerekmez.
+ *   HAVA_ANAHTAR_SIFRESI               (ops., SECRET, ≥32 karakter) — Site anahtarını ARAYÜZDEN girebilmek için: anahtar bu sırla AES-256-GCM şifrelenip Supabase'e yalnızca
+ *                                       şifreli yazılır (migration 0147). Bir kez belirle, değiştirme (değişirse kayıtlı anahtar çözülemez; yeniden girilir).
+ *                                       Anahtar önceliği: arayüzden girilen (şifreli kayıt) → OPENAQ_API_KEY secret'ı.
  *   IP_TUZ                             (ops., SECRET) — IP özetinin tuzu (boşsa varsayılan)
  *   GROQ_MODEL                         (ops., Text) — zincirin başına eklenir
  *   HABER_KAYNAKLARI                   (ops., Text) — JSON dizi: [{"id","ad","havuz":"tr|dunya","tur":"ajans|genel","url":"https://…"}]
@@ -531,6 +536,81 @@ async function openMeteoVekili(istek, env, cors) {
  * GET /hava/mgm?yol=merkezler|sondurumlar&il=&ilce=&istno= → MGM (servis.mgm.gov.tr). Belgelenmemiş bir uç nokta: Origin başlığı Worker'dan eklenir.
  *      MGM verisi kurumun hizmet koşullarına tabidir; yönetici bunu Ayarlar'dan bilerek açar (varsayılan KAPALI). Yanıt değişirse istemci sessizce METAR'a düşer.
  * Hepsinde kısa bellek önbelleği vardır (kaynağı yormamak için). Yanıtlarda anahtar asla görünmez. */
+
+/* ---------- site anahtarı: AES-GCM ile şifreli saklama (anahtarı yalnızca bu Worker çözebilir) ---------- */
+const b64u = {
+  yaz: (u8) => btoa(String.fromCharCode(...u8)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""),
+  oku: (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (s.length % 4)) % 4)), (c) => c.charCodeAt(0)),
+};
+async function sifreAnahtari(env) {
+  const sir = String(env.HAVA_ANAHTAR_SIFRESI || "");
+  if (sir.length < 32) return null;
+  const ham = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`havastil-hava-anahtar-v1|${sir}`));
+  return crypto.subtle.importKey("raw", ham, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+}
+async function anahtarSifrele(env, acik) {
+  const k = await sifreAnahtari(env); if (!k) return null;
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, k, new TextEncoder().encode(acik)));
+  return `v1.${b64u.yaz(iv)}.${b64u.yaz(ct)}`;
+}
+async function anahtarCoz(env, sifreli) {
+  try {
+    const k = await sifreAnahtari(env); if (!k) return null;
+    const [, iv, ct] = String(sifreli).split(".");
+    return new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64u.oku(iv) }, k, b64u.oku(ct)));
+  } catch { return null; }
+}
+async function sunucuRpc(env, kim, ad, govde) {
+  const r = await fetch(`${sunucuUrl(env)}/rest/v1/rpc/${ad}`, { method: "POST", headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: kim.baslik, "Content-Type": "application/json" }, body: JSON.stringify(govde || {}) });
+  let veri = null; try { veri = await r.json(); } catch { /* boş */ }
+  return { ok: r.ok, durum: r.status, veri };
+}
+const siteAnahtarOnbellek = new Map();          // saglayici → { t, anahtar }
+/** Site anahtarı: önce arayüzden girilen (şifreli kayıt), yoksa env secret'ı. Çözülen anahtar yalnızca bellekte 10 dk tutulur. */
+async function siteAnahtariAl(env, kim, saglayici) {
+  const o = siteAnahtarOnbellek.get(saglayici);
+  if (o && Date.now() - o.t < 10 * 60 * 1000) return o.anahtar;
+  let anahtar = null;
+  try {
+    const r = await sunucuRpc(env, kim, "hava_site_anahtar_oku", { p_saglayici: saglayici });
+    if (r.ok && typeof r.veri === "string") anahtar = await anahtarCoz(env, r.veri);
+  } catch { /* tablo yok / ağ: env'e düş */ }
+  if (!anahtar && saglayici === "openaq") anahtar = env.OPENAQ_API_KEY || null;
+  siteAnahtarOnbellek.set(saglayici, { t: Date.now(), anahtar });
+  return anahtar;
+}
+const anahtarHiz = new Map();
+/** POST /hava/anahtar  { saglayici:"openaq", anahtar:"…" } ya da { saglayici:"openaq", sil:true } — yalnızca yönetici. */
+async function anahtarYonet(istek, env, cors) {
+  const kim = await kimlikDogrula(env, istek);
+  if (kim.hata) return json({ error: "Oturum doğrulanamadı.", neden: kim.hata }, 401, cors);
+  if (hizSiniri(anahtarHiz, kim.uid, 8, 10 * 60 * 1000)) return json({ error: "Çok sık deneme; birkaç dakika sonra tekrar dene.", neden: "hiz" }, 429, cors);
+  const yon = await sunucuRpc(env, kim, "_om_yonetici", {});
+  if (!yon.ok || yon.veri !== true) return json({ error: "Bu işlem yalnızca Site Sahibi ve yetkili Yönetici içindir.", neden: "yetkisiz" }, 403, cors);
+  let g; try { g = await istek.json(); } catch { return json({ error: "Geçersiz JSON.", neden: "gecersiz_json" }, 400, cors); }
+  if (g?.saglayici !== "openaq") return json({ error: "Bilinmeyen sağlayıcı.", neden: "saglayici" }, 400, cors);
+  if (g.sil === true) {
+    const r = await sunucuRpc(env, kim, "hava_site_anahtar_sil", { p_saglayici: "openaq" });
+    siteAnahtarOnbellek.delete("openaq");
+    return r.ok ? json({ ok: true, silindi: true, env_anahtari_var: !!env.OPENAQ_API_KEY }, 200, cors) : json({ error: "Silinemedi (migration 0147 çalıştırıldı mı?).", neden: "rpc" }, 502, cors);
+  }
+  if (!(await sifreAnahtari(env))) return json({ error: "Worker'da HAVA_ANAHTAR_SIFRESI secret'ı yok (en az 32 karakter). Önce onu ekle.", neden: "sifre_yok" }, 501, cors);
+  const acik = String(g.anahtar || "").trim();
+  if (!/^[A-Za-z0-9_-]{16,128}$/.test(acik)) return json({ error: "Anahtar biçimi geçersiz (16–128 harf/rakam, boşluk yok).", neden: "bicim" }, 400, cors);
+  // Kaydetmeden önce sağlayıcıda dene: yanlış anahtar kaydedilmesin.
+  let dene;
+  try { dene = await fetch("https://api.openaq.org/v3/locations?limit=1", { headers: { "X-API-Key": acik, Accept: "application/json", "User-Agent": "HavaStil/6" }, signal: AbortSignal.timeout(6000) }); }
+  catch { return json({ error: "OpenAQ'ya ulaşılamadı; anahtar denenemedi.", neden: "ag" }, 502, cors); }
+  if (dene.status === 401 || dene.status === 403) return json({ error: "OpenAQ bu anahtarı reddetti (geçersiz ya da süresi dolmuş).", neden: "anahtar_gecersiz" }, 422, cors);
+  if (!dene.ok && dene.status !== 429) return json({ error: `OpenAQ beklenmeyen yanıt verdi (HTTP ${dene.status}).`, neden: "saglayici" }, 502, cors);
+  const sifreli = await anahtarSifrele(env, acik);
+  const r = await sunucuRpc(env, kim, "hava_site_anahtar_yaz", { p_saglayici: "openaq", p_sifreli: sifreli, p_son4: acik.slice(-4) });
+  if (!r.ok) return json({ error: "Kaydedilemedi (Supabase'de 0147_hava_site_anahtari_ve_dogrulama.sql çalıştırıldı mı?).", neden: "rpc" }, 502, cors);
+  siteAnahtarOnbellek.delete("openaq");
+  return json({ ok: true, dogrulandi: dene.ok, son4: acik.slice(-4) }, 200, cors);
+}
+
 const havaHiz = new Map(), havaOnbellek = new Map();
 async function havaVekili(istek, env, cors, tur) {
   const u = await yetkiliKullanici(env, istek, cors);
@@ -539,25 +619,28 @@ async function havaVekili(istek, env, cors, tur) {
   const p = new URL(istek.url).searchParams;
   let hedef, baslik = { Accept: "application/json", "User-Agent": "HavaStil/6 (+https://abdullah-eymen-asru.github.io)" }, ttl = 120 * 1000;
   if (tur === "openaq") {
-    if (!env.OPENAQ_API_KEY) return json({ error: "Site OpenAQ anahtarı Worker'a eklenmemiş (OPENAQ_API_KEY secret).", neden: "anahtar_yok" }, 501, cors);
+    const siteAnahtari = await siteAnahtariAl(env, u.kim, "openaq");
+    if (!siteAnahtari) return json({ error: "Site OpenAQ anahtarı tanımlı değil (Ayarlar › Hava veri kaynakları'ndan gir ya da OPENAQ_API_KEY secret'ı ekle).", neden: "anahtar_yok" }, 501, cors);
     try { hedef = new URL(p.get("u") || ""); } catch { return json({ error: "Geçersiz u parametresi." }, 400, cors); }
     if (hedef.protocol !== "https:" || hedef.hostname !== "api.openaq.org" || !/^\/v3\/(locations|locations\/\d+\/latest)$/.test(hedef.pathname)) return json({ error: "Bu adres izinli değil." }, 400, cors);
-    baslik["X-API-Key"] = env.OPENAQ_API_KEY; ttl = 5 * 60 * 1000;
+    baslik["X-API-Key"] = siteAnahtari; ttl = 5 * 60 * 1000;
   } else if (tur === "metar") {
     const bb = String(p.get("bbox") || "").split(",").map(Number);
     if (bb.length !== 4 || bb.some((x) => !Number.isFinite(x)) || bb[0] < -90 || bb[2] > 90 || bb[1] < -180 || bb[3] > 180 || Math.abs(bb[2] - bb[0]) > 4 || Math.abs(bb[3] - bb[1]) > 6) return json({ error: "Geçersiz bbox." }, 400, cors);
     hedef = new URL("https://aviationweather.gov/api/data/metar"); hedef.searchParams.set("bbox", bb.map((x) => x.toFixed(2)).join(",")); hedef.searchParams.set("format", "json"); hedef.searchParams.set("hours", "4");
     ttl = 5 * 60 * 1000;
   } else {
-    const yol = p.get("yol"); if (!["merkezler", "sondurumlar"].includes(yol)) return json({ error: "yol merkezler ya da sondurumlar olmalı." }, 400, cors);
-    hedef = new URL(`https://servis.mgm.gov.tr/web/${yol}`);
-    if (yol === "merkezler") {
+    const yol = p.get("yol"); if (!["merkezler", "ililcesi", "sondurumlar"].includes(yol)) return json({ error: "yol merkezler, ililcesi ya da sondurumlar olmalı." }, 400, cors);
+    hedef = new URL(yol === "ililcesi" ? "https://servis.mgm.gov.tr/web/merkezler/ililcesi" : `https://servis.mgm.gov.tr/web/${yol}`);
+    if (yol === "merkezler" || yol === "ililcesi") {
       const il = String(p.get("il") || "").trim().slice(0, 40), ilce = String(p.get("ilce") || "").trim().slice(0, 60);
       if (il.length < 2 || /[<>"\u0000-\u001f]/.test(il + ilce)) return json({ error: "il gerekli." }, 400, cors);
-      hedef.searchParams.set("il", il); if (ilce) hedef.searchParams.set("ilce", ilce);
+      hedef.searchParams.set("il", il); if (ilce && yol === "merkezler") hedef.searchParams.set("ilce", ilce);
     } else {
-      const no = String(p.get("istno") || ""); if (!/^\d{3,8}$/.test(no)) return json({ error: "istno sayısal olmalı." }, 400, cors);
-      hedef.searchParams.set("istno", no);
+      const no = String(p.get("istno") || ""), mid = String(p.get("merkezid") || "");
+      if (/^\d{3,8}$/.test(no)) hedef.searchParams.set("istno", no);
+      else if (/^\d{3,8}$/.test(mid)) hedef.searchParams.set("merkezid", mid);
+      else return json({ error: "istno ya da merkezid sayısal olmalı." }, 400, cors);
     }
     baslik = { ...baslik, Origin: "https://www.mgm.gov.tr", Referer: "https://www.mgm.gov.tr/" }; ttl = 5 * 60 * 1000;
   }
@@ -579,12 +662,13 @@ const ASIL_ISLEYICI = {
     if (istek.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const yol = new URL(istek.url).pathname.replace(/\/+$/, "") || "/";
 
-    if (yol === "/saglik") return json({ ok: true, surum: 6, groq_anahtari_var: !!env.GROQ_API_KEY, open_meteo_anahtari_var: !!env.OPEN_METEO_API_KEY, openaq_anahtari_var: !!env.OPENAQ_API_KEY, model_sirasi: modelZinciri(env) }, 200, cors);
+    if (yol === "/saglik") return json({ ok: true, surum: 6, groq_anahtari_var: !!env.GROQ_API_KEY, open_meteo_anahtari_var: !!env.OPEN_METEO_API_KEY, openaq_anahtari_var: !!env.OPENAQ_API_KEY, anahtar_sifresi_var: String(env.HAVA_ANAHTAR_SIFRESI || "").length >= 32, model_sirasi: modelZinciri(env) }, 200, cors);
     if (yol === "/istemci" && istek.method === "GET") return json({ ip_hash: await ipOzeti(env, istek) }, 200, cors);
     if (yol === "/openmeteo" && istek.method === "GET") return openMeteoVekili(istek, env, cors);
     if (yol === "/hava/openaq" && istek.method === "GET") return havaVekili(istek, env, cors, "openaq");
     if (yol === "/hava/metar" && istek.method === "GET") return havaVekili(istek, env, cors, "metar");
     if (yol === "/hava/mgm" && istek.method === "GET") return havaVekili(istek, env, cors, "mgm");
+    if (yol === "/hava/anahtar" && istek.method === "POST") return anahtarYonet(istek, env, cors);
 
     if (yol === "/haberler" && istek.method === "GET") {
       const u = await yetkiliKullanici(env, istek, cors);

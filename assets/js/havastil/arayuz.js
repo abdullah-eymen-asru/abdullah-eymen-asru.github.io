@@ -35,13 +35,13 @@ const VARSAYILAN_KONUM = { id: "41.008,28.978", ad: "İstanbul", lat: 41.008, lo
 const LS = { tercih: "hv_tercih2", eskiTercih: "hv_tercih", bulut: "hv_bulut", silKuyrugu: "hv_bulut_sil", aiModu: "hv_ai_modu", haberAcik: "hv_haber_acik", sekme: "hv_sekme", ai: "hv_ai3_" };
 const SEKMELER = [["bugun", "Bugün", "🏠"], ["kombin", "Kombin", "🧥"], ["plan", "Saatlik plan", "🗓️"], ["derin", "Derin analiz", "🔬"], ["gunluk", "16 gün", "📅"], ["radar", "Radar", "🛰️"], ["mevsim", "Mevsimlik eğilim", "🌍"], ["haber", "Uyarılar", "🛰️"], ["dogrula", "Veri doğrulama", "🔍"], ["ayar", "Ayarlar", "⚙️"]];
 /* v6: 10 düz sekme yerine 5 ana grup + (varsa) alt sekmeler. Hiçbir özellik kaldırılmadı; yalnızca yer değiştirdi.
-   Bir gruba tıklayınca HER ZAMAN ilk alt sekme açılır: Tahmin → Derin analiz (16 gün değil), Radar & Uyarı → önce Uyarılar. */
+   Bir gruba tıklayınca HER ZAMAN ilk alt sekme açılır: Tahmin → Derin analiz (16 gün değil), Radar & Uyarı → önce Uyarılar, Doğrulama & Ayar → önce Ayarlar. */
 const GRUPLAR = [
   { id: "g-bugun", ad: "Bugün", ikon: "🏠", alt: ["bugun"] },
   { id: "g-giyim", ad: "Kombin", ikon: "🧥", alt: ["kombin", "plan"] },
   { id: "g-tahmin", ad: "Tahmin", ikon: "📈", alt: ["derin", "gunluk", "mevsim"] },
   { id: "g-harita", ad: "Radar & Uyarı", ikon: "🛰️", alt: ["haber", "radar"] },
-  { id: "g-ayar", ad: "Doğrulama & Ayar", ikon: "⚙️", alt: ["dogrula", "ayar"] },
+  { id: "g-ayar", ad: "Doğrulama & Ayar", ikon: "⚙️", alt: ["ayar", "dogrula"] },     // grup açılınca ÖNCE Ayarlar gelir
 ];
 const grupBul = (sekmeId) => GRUPLAR.find((g) => g.alt.includes(sekmeId)) || GRUPLAR[0];
 const ESKI_SEKME = { ozet: "bugun", saatlik: "derin" };      // v2'de kaydedilmiş sekme adları

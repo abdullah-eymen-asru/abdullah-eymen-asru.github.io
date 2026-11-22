@@ -27,12 +27,12 @@ const TERCIH_ANAHTARI = "hv_hk_tercih_v1";
 const ZAMAN_ASIMI_MS = 7000;
 const MGM_MAKS_KM = 60, METAR_MAKS_KM = 80;
 
-export const SAGLAYICI_ADI = { openaq: "OpenAQ (resmî istasyon ağları)", model: "Open-Meteo · Copernicus CAMS modeli", mgm: "Meteoroloji Genel Müdürlüğü (MGM)", metar: "Havalimanı resmî rasat istasyonu (METAR)" };
+export const SAGLAYICI_ADI = { openaq: "Hava kalitesi istasyonları (OpenAQ)", model: "Tahmin modeli (Open-Meteo · Copernicus CAMS)", mgm: "Meteoroloji Genel Müdürlüğü (MGM)", metar: "Havalimanı resmî hava raporu (METAR)" };
 
 /* ------------------------------ ayar (yönetici) ------------------------------ */
 export const HK_VARSAYILAN = Object.freeze({
   gozlem_sira: ["mgm", "metar"], gozlem_acik: { mgm: false, metar: true }, kalite_istasyon_acik: true,
-  openaq_site_anahtari_tanimli: false, kendi_anahtar_izni: true, yaricap_km: 25, tazelik_dk: 180, aciklama: null, migrasyonYok: true,
+  openaq_site_anahtari_tanimli: false, kendi_anahtar_izni: true, yaricap_km: 25, tazelik_dk: 180, aciklama: null, dogrulama_acik: true, duzeltme_acik: true, duzeltme_saat: 3, migrasyonYok: true,
 });
 let ayarOnbellek = null, ayarZaman = 0, ayarSoz = null;
 export function hkOnbellekSifirla() { ayarOnbellek = null; ayarZaman = 0; kendiDurum = null; }
@@ -52,7 +52,8 @@ export async function hkAyar(zorla = false) {
 export async function hkAyarKaydet(a) {
   const { error } = await supabase.rpc("hava_kaynak_ayar_kaydet", { p_ayar: {
     gozlem_sira: a.gozlem_sira, gozlem_acik: a.gozlem_acik, kalite_istasyon_acik: !!a.kalite_istasyon_acik, openaq_site_anahtari_tanimli: !!a.openaq_site_anahtari_tanimli,
-    kendi_anahtar_izni: a.kendi_anahtar_izni !== false, yaricap_km: a.yaricap_km, tazelik_dk: a.tazelik_dk, aciklama: a.aciklama || null } });
+    kendi_anahtar_izni: a.kendi_anahtar_izni !== false, yaricap_km: a.yaricap_km, tazelik_dk: a.tazelik_dk, aciklama: a.aciklama || null,
+    dogrulama_acik: a.dogrulama_acik !== false, duzeltme_acik: a.duzeltme_acik !== false, duzeltme_saat: a.duzeltme_saat || 3 } });
   if (error) throw new Error(/does not exist|schema cache|42883/i.test(error.message || "") ? "Hava kaynağı ayar tablosu kurulu değil (Supabase: 0146_hava_kaynaklari.sql)." : error.message);
   hkOnbellekSifirla();
 }
@@ -82,6 +83,33 @@ export async function kendiOpenaqKaydet(anahtar) {
   await K.anahtarKaydet("openaq", t, null); hkOnbellekSifirla();
 }
 export async function kendiOpenaqSil() { await (await kasaModulu()).anahtarSil("openaq"); hkOnbellekSifirla(); }
+
+
+/* ------------------------------ SİTE anahtarı: arayüzden girilir, YALNIZCA Worker'a gider, şifreli saklanır (migration 0147) ------------------------------ */
+async function anahtarWorker(govde) {
+  const s = await oturum(); if (!s?.access_token) throw new Error("Oturum yok; yeniden giriş yap.");
+  let r;
+  try { r = await fetch(`${HAVASTIL_WORKER_URL}/hava/anahtar`, { method: "POST", headers: { Authorization: `Bearer ${s.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify(govde), credentials: "omit", referrerPolicy: "no-referrer" }); }
+  catch { throw new Error("Worker'a ulaşılamadı; internet bağlantını ve Worker'ın yayında olduğunu kontrol et."); }
+  let j = null; try { j = await r.json(); } catch { /* boş */ }
+  if (!r.ok) throw new Error(j?.error || `İşlem başarısız (HTTP ${r.status}).`);
+  return j || {};
+}
+/** Yönetici: site OpenAQ anahtarı kayıtlı mı? { var, son4, guncelleme } — anahtarın kendisi ASLA dönmez. */
+export async function siteAnahtarDurumu() {
+  try {
+    const { data, error } = await supabase.rpc("hava_site_anahtar_durum");
+    if (error) throw error;
+    const k = (Array.isArray(data) ? data : []).find((x) => x.saglayici === "openaq");
+    return k ? { var: true, son4: k.son4 || "", guncelleme: k.guncelleme } : { var: false };
+  } catch (h) { return { var: false, hata: /does not exist|schema cache|42883|PGRST202/i.test(String(h?.message || h)) ? "Supabase'de 0147_hava_site_anahtari_ve_dogrulama.sql henüz çalıştırılmamış." : String(h?.message || h) }; }
+}
+export async function siteAnahtarKaydet(anahtar) {
+  const t = String(anahtar || "").trim();
+  if (!/^[A-Za-z0-9_\-]{16,128}$/.test(t)) throw new Error("Anahtar biçimi geçersiz: 16–128 harf/rakam olmalı, boşluk içermemeli.");
+  const j = await anahtarWorker({ saglayici: "openaq", anahtar: t }); hkOnbellekSifirla(); return j;
+}
+export async function siteAnahtarSil() { const j = await anahtarWorker({ saglayici: "openaq", sil: true }); hkOnbellekSifirla(); return j; }
 
 /** Kimin anahtarı kullanılacak: kendi (yalnızca bu kullanıcı) > site (Worker) > yok. */
 async function openaqKimlik(ayar) {
@@ -147,6 +175,30 @@ export function istasyonOzetle(konumKaydi, km, latest, tazelikDk = 180) {
   return { saglayici: "openaq", ad: konumKaydi.name || `İstasyon ${konumKaydi.id}`, mesafeKm: Math.round(km * 10) / 10, zaman, kurum: konumKaydi.provider?.name || konumKaydi.owner?.name || null, degerler };
 }
 
+
+/* ------------------------------ havalimanı adları ------------------------------ */
+/** ICAO kodu → Türkçe resmî ad (Türkiye). Bilinmeyenler hamAdlandir() ile temizlenir. */
+export const HAVALIMANI_AD = {
+  LTFM: "İstanbul Havalimanı", LTFJ: "İstanbul Sabiha Gökçen Havalimanı", LTBA: "İstanbul Atatürk Havalimanı", LTBU: "Tekirdağ Çorlu Havalimanı",
+  LTAC: "Ankara Esenboğa Havalimanı", LTAD: "Ankara Etimesgut Havalimanı", LTAI: "Antalya Havalimanı", LTFG: "Antalya Gazipaşa-Alanya Havalimanı",
+  LTFE: "Muğla Milas-Bodrum Havalimanı", LTBS: "Muğla Dalaman Havalimanı", LTBJ: "İzmir Adnan Menderes Havalimanı", LTBL: "İzmir Çiğli Havalimanı",
+  LTAF: "Adana Şakirpaşa Havalimanı", LTDA: "Hatay Havalimanı", LTAJ: "Gaziantep Oğuzeli Havalimanı", LTAN: "Konya Havalimanı", LTAU: "Kayseri Erkilet Havalimanı",
+  LTAZ: "Nevşehir Kapadokya Havalimanı", LTAR: "Sivas Nuri Demirağ Havalimanı", LTAT: "Malatya Erhaç Havalimanı", LTCC: "Diyarbakır Havalimanı",
+  LTCE: "Erzurum Havalimanı", LTCG: "Trabzon Havalimanı", LTCF: "Kars Harakani Havalimanı", LTCI: "Van Ferit Melen Havalimanı", LTCJ: "Batman Havalimanı",
+  LTCR: "Mardin Havalimanı", LTCK: "Muş Havalimanı", LTCL: "Siirt Havalimanı", LTCM: "Sinop Havalimanı", LTCN: "Kahramanmaraş Havalimanı", LTCO: "Ağrı Ahmed-i Hani Havalimanı",
+  LTCP: "Adıyaman Havalimanı", LTCS: "Şanlıurfa GAP Havalimanı", LTCD: "Erzincan Havalimanı", LTFC: "Isparta Süleyman Demirel Havalimanı", LTFD: "Balıkesir Edremit Körfez Havalimanı",
+  LTBH: "Çanakkale Havalimanı", LTBD: "Aydın Çıldır Havalimanı", LTBR: "Bursa Yenişehir Havalimanı", LTBI: "Eskişehir Anadolu Havalimanı", LTBF: "Balıkesir Merkez Havalimanı",
+  LTBG: "Bandırma Havalimanı", LTBO: "Uşak Havalimanı", LTBZ: "Kütahya Zafer Havalimanı", LTAS: "Zonguldak Çaycuma Havalimanı", LTAL: "Kastamonu Havalimanı",
+  LTAP: "Amasya Merzifon Havalimanı", LTFH: "Samsun Çarşamba Havalimanı", LTFK: "Çanakkale Gökçeada Havalimanı", LTFO: "Rize-Artvin Havalimanı", LTAH: "Afyonkarahisar Havalimanı",
+};
+/** Ham METAR adını ("Istanbul Sabiha Gokcen Intl, TR") okunur hâle getirir: ülke eki atılır, Intl/Arpt Türkçeleşir. */
+export function hamAdlandir(ham) {
+  let a = String(ham || "").split(",")[0].replace(/\b(Intl|International)\b/gi, "Uluslararası").replace(/\b(Arpt|Airport|Apt)\b/gi, "Havalimanı").replace(/\bAFB\b/gi, "Hava Üssü").replace(/\s+/g, " ").trim();
+  if (a && !/havalimanı|hava üssü/i.test(a)) a += " Havalimanı";
+  return a.slice(0, 70);
+}
+export const havalimaniAdi = (icao, ham) => HAVALIMANI_AD[String(icao || "").toUpperCase()] || hamAdlandir(ham) || String(icao || "Havalimanı");
+
 /* ------------------------------ METAR (havalimanı resmî rasatı) ------------------------------ */
 const sayiMi = (x) => (typeof x === "number" && Number.isFinite(x) ? x : null);
 const nemHesapla = (t, td) => (t == null || td == null ? null : Math.max(1, Math.min(100, Math.round(100 * Math.exp((17.625 * td) / (243.04 + td)) / Math.exp((17.625 * t) / (243.04 + t))))));
@@ -161,7 +213,7 @@ export function metarOzetle(liste, lat, lon, { maksKm = METAR_MAKS_KM, tazelikDk
   const kt = (x) => (sayiMi(x) == null ? null : Math.round(x * 1.852));
   let basinc = sayiMi(m.slp) ?? sayiMi(m.altim); if (basinc != null && basinc < 50) basinc = basinc * 33.8639;      // inHg → hPa
   let gorus = null; if (m.visib != null) { const v = parseFloat(String(m.visib).replace("+", "")); if (Number.isFinite(v)) gorus = Math.round(v * 1609.34); }
-  return { saglayici: "metar", ad: String(m.name || m.icaoId || "Havalimanı").split(",")[0].trim().slice(0, 60), kod: m.icaoId || null, mesafeKm: Math.round(en.km * 10) / 10, zaman: new Date(en.t).toISOString(),
+  return { saglayici: "metar", ad: havalimaniAdi(m.icaoId, m.name), kod: m.icaoId || null, mesafeKm: Math.round(en.km * 10) / 10, zaman: new Date(en.t).toISOString(),
     sicaklik, cig, nem: nemHesapla(sicaklik, cig), ruzgar: kt(m.wspd), yon: sayiMi(m.wdir), hamle: kt(m.wgst), basinc: basinc == null ? null : Math.round(basinc * 10) / 10, gorus };
 }
 async function metarCek(lat, lon, tazelikDk, sinyal) {
@@ -174,31 +226,60 @@ async function metarCek(lat, lon, tazelikDk, sinyal) {
 
 /* ------------------------------ MGM (yalnızca Türkiye; resmî ama belgelenmemiş uç nokta) ------------------------------ */
 const mgmSayi = (x) => (typeof x === "number" && Number.isFinite(x) && x > -9000 ? x : null);
+const mgmKonum = (m) => ({ lat: Number(m?.enlem ?? m?.lat ?? m?.latitude), lon: Number(m?.boylam ?? m?.lon ?? m?.longitude) });
+const mgmAd = (m) => [m?.ilce, m?.il].filter((x, i, a) => x && a.indexOf(x) === i).join(", ") || "MGM istasyonu";
 /** Saf: MGM merkez kaydı + son durum satırı → gözlem. -9999 = ölçüm yok. */
 export function mgmOzetle(merkez, satir, lat, lon) {
   if (!satir) return null;
-  const km = mesafeKm(lat, lon, Number(merkez?.enlem), Number(merkez?.boylam));
+  const k = mgmKonum(merkez), km = mesafeKm(lat, lon, k.lat, k.lon);
   const zaman = satir.veriZamani ? new Date(satir.veriZamani).toISOString() : null;
   if (!zaman || mgmSayi(satir.sicaklik) == null) return null;
   const basinc = mgmSayi(satir.denizeIndirgenmisBasinc) ?? mgmSayi(satir.aktuelBasinc);
-  return { saglayici: "mgm", ad: [merkez?.ilce, merkez?.il].filter((x, i, a) => x && a.indexOf(x) === i).join(", ") || "MGM istasyonu", mesafeKm: Number.isFinite(km) ? Math.round(km * 10) / 10 : null, zaman,
+  return { saglayici: "mgm", ad: mgmAd(merkez), mesafeKm: Number.isFinite(km) ? Math.round(km * 10) / 10 : null, zaman, istNo: satir.istNo ?? merkez?.sondurumIstNo ?? null,
     sicaklik: mgmSayi(satir.sicaklik), hissedilen: mgmSayi(satir.hissedilenSicaklik), nem: mgmSayi(satir.nem), cig: null, ruzgar: mgmSayi(satir.ruzgarHiz) == null ? null : Math.round(satir.ruzgarHiz),
     yon: mgmSayi(satir.ruzgarYon), hamle: null, basinc, gorus: mgmSayi(satir.gorus), yagis: mgmSayi(satir.yagis00Now) };
 }
+const dizi = (x) => (Array.isArray(x) ? x : x && typeof x === "object" ? [x] : []);
+/**
+ * Saf: konuma EN YAKIN MGM merkezlerini seçer. Önce ad eşleşmesi (ilçe adı), ama yalnızca merkezin KENDİ koordinatı konuma ≤ 15 km ise güvenilir sayılır;
+ * aksi halde ilin tüm merkezleri arasından koordinata göre en yakın üç tanesi. (Eski sürüm ilçe bulunamayınca il merkezini — İstanbul için Bakırköy —
+ * alıyordu: Ataşehir'deki kullanıcıya 22 km uzaktaki istasyon gösteriliyordu.)
+ */
+export function mgmMerkezSec(adAdaylari, hepsi, lat, lon, adKayitlari = []) {
+  const uzak = (m) => { const k = mgmKonum(m); return mesafeKm(lat, lon, k.lat, k.lon); };
+  const gecerli = (m) => m && Number.isFinite(uzak(m));
+  const adli = adKayitlari.filter(gecerli).filter((m) => uzak(m) <= 15).sort((a, b) => uzak(a) - uzak(b));
+  const tum = dizi(hepsi).filter(gecerli).sort((a, b) => uzak(a) - uzak(b));
+  const sonuc = [], gor = new Set();
+  for (const m of [...adli, ...tum]) { const k = `${m.merkezId ?? ""}|${m.sondurumIstNo ?? ""}|${m.ilce ?? ""}`; if (gor.has(k)) continue; gor.add(k); sonuc.push(m); if (sonuc.length >= 3) break; }
+  void adAdaylari;
+  return sonuc;
+}
 async function mgmCek(konum, tazelikDk, sinyal) {
-  const il = konum.il || konum.admin1 || "", ilce = konum.admin2 || konum.ilce || "";
+  const il = konum.il || konum.admin1 || "";
   if (!il) throw new Error("il adı yok");
-  let merkezler = ilce ? await workerGet("/hava/mgm", { yol: "merkezler", il, ilce }, sinyal).catch(() => null) : null;
-  if (!Array.isArray(merkezler) || !merkezler.length) merkezler = await workerGet("/hava/mgm", { yol: "merkezler", il }, sinyal);
-  const merkez = Array.isArray(merkezler) ? merkezler[0] : null;
-  const no = merkez?.sondurumIstNo ?? merkez?.merkezId;
-  if (!merkez || no == null) throw new Error("MGM merkez kaydı bulunamadı");
-  const durum = await workerGet("/hava/mgm", { yol: "sondurumlar", istno: String(no) }, sinyal);
-  const o = mgmOzetle(merkez, Array.isArray(durum) ? durum[0] : durum, konum.lat, konum.lon);
-  if (!o) throw new Error("MGM son durum verisi boş");
-  if (o.mesafeKm != null && o.mesafeKm > MGM_MAKS_KM) throw new Error(`MGM istasyonu ${o.mesafeKm} km uzakta`);
-  if (Date.now() - Date.parse(o.zaman) > tazelikDk * 60000) throw new Error("MGM verisi eski");
-  return o;
+  const adlar = [...new Set([konum.ilce, konum.admin2, konum.ad].map((x) => String(x || "").trim()).filter((x) => x && x !== il))].slice(0, 2);
+  const [tum, ...adli] = await Promise.all([
+    workerGet("/hava/mgm", { yol: "ililcesi", il }, sinyal).catch(() => null),
+    ...adlar.map((ad) => workerGet("/hava/mgm", { yol: "merkezler", il, ilce: ad }, sinyal).then(dizi).catch(() => [])),
+  ]);
+  const adayMerkezler = mgmMerkezSec(adlar, tum, konum.lat, konum.lon, adli.flat());
+  if (!adayMerkezler.length) throw new Error("MGM merkez kaydı bulunamadı");
+  let enIyi = null, sonHata = null;
+  for (const merkez of adayMerkezler) {                                    // en yakından başla; ölçümü taze ve geçerli ilk merkez kazanır
+    const no = merkez.sondurumIstNo ?? merkez.merkezId;
+    if (no == null) continue;
+    try {
+      const durum = await workerGet("/hava/mgm", { yol: "sondurumlar", ...(merkez.sondurumIstNo != null ? { istno: String(no) } : { merkezid: String(no) }) }, sinyal);
+      const o = mgmOzetle(merkez, dizi(durum)[0], konum.lat, konum.lon);
+      if (!o) { sonHata = new Error("MGM son durum verisi boş"); continue; }
+      if (o.mesafeKm != null && o.mesafeKm > MGM_MAKS_KM) { sonHata = new Error(`MGM istasyonu ${o.mesafeKm} km uzakta`); continue; }
+      if (Date.now() - Date.parse(o.zaman) > tazelikDk * 60000) { sonHata = new Error("MGM verisi eski"); continue; }
+      enIyi = o; break;
+    } catch (h) { sonHata = h; }
+  }
+  if (!enIyi) throw sonHata || new Error("MGM verisi alınamadı");
+  return enIyi;
 }
 
 /* ------------------------------ birleştirme (saf) ------------------------------ */
@@ -249,7 +330,7 @@ export async function istasyonKatmani(konum, { sinyal = null } = {}) {
       return null;
     };
     const [istasyonlar, gozlem] = await Promise.all([aq(), gz()]);
-    return { istasyonlar, gozlem, teshis };
+    return { istasyonlar, gozlem, teshis, ayar };
   } catch { return null; }
 }
 
@@ -262,7 +343,7 @@ export async function kaynakTesti(konum) {
     catch (h) { satirlar.push({ id, ad, durum: h.atla ? "atlandi" : "hata", ms: Math.round(performance.now() - t0), ayrinti: String(h?.message || h) }); }
   };
   const atla = (m) => { const e = new Error(m); e.atla = true; throw e; };
-  const gozMetni = (o) => `${o.ad}${o.mesafeKm != null ? ` · ${o.mesafeKm} km` : ""} · sıcaklık ${o.sicaklik}°, rüzgâr ${o.ruzgar ?? "—"} km/s, basınç ${o.basinc ?? "—"} hPa · ${new Date(o.zaman).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })} (resmî sayfayla karşılaştır)`;
+  const gozMetni = (o) => `${o.ad}${o.mesafeKm != null ? ` · ${o.mesafeKm} km` : ""} · sıcaklık ${o.sicaklik}°, nem ${o.nem != null ? `%${o.nem}` : "—"}, rüzgâr ${o.ruzgar ?? "—"} km/s, basınç ${o.basinc ?? "—"} hPa · ${new Date(o.zaman).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })} (resmî sayfayla karşılaştır)`;
   await Promise.all([
     dene("model", SAGLAYICI_ADI.model, async () => {
       const j = await omJson(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${konum.lat}&longitude=${konum.lon}&timezone=auto&current=european_aqi,pm2_5`);

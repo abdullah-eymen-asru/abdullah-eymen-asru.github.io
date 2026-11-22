@@ -1,8 +1,9 @@
 /**
  * kirletici.js — HavaStil · HAVA KALİTESİ SÖZLÜĞÜ (saf fonksiyonlar; DOM ve ağ yok, Node'da test edilebilir).
  * -----------------------------------------------------------------------------------------------------------------
- * Ekranda ham kısaltma (PM2.5, NO2 …) ve çıplak birim GÖSTERİLMEZ; her kirletici açık Türkçe adı + tek cümlelik açıklamasıyla anılır.
- * Kısa kimlikler (pm25, no2 …) yalnızca kodda ve veri alanlarında yaşar.
+ * Her kirletici ekranda ÖNCE sade Türkçe adı + tek cümlelik açıklamasıyla, hemen yanında BİLİMSEL adı ve kimyasal formülüyle (örn. "Azot dioksit · NO₂") anılır.
+ * Değer her zaman SAYI + BİRİM olarak yazılır (örn. "35,2 µg/m³"; karbonmonoksitte "0,45 mg/m³") ve yanında "iyi/kötü" yerine seviye sınırları gösterilir.
+ * Kısa kimlikler (pm25, no2 …) kodda ve veri alanlarında yaşar.
  *
  * SEVİYE ÖLÇEĞİ: Avrupa Çevre Ajansı (EEA) Avrupa Hava Kalitesi İndeksi (EAQI, 2023 güncellemesi) — 6 bant.
  *   Kirletici başına eşikler (µg/m³, üst sınırlar): ince toz 5/15/50/90/140 · kaba toz 15/45/120/195/270 · ozon 60/100/120/160/180 ·
@@ -20,13 +21,13 @@ export const SEVIYELER = [
 
 /** Gösterim sırası: en çok soruları yanıtlayandan en az bilinene. */
 export const KIRLETICILER = [
-  { id: "pm25", ad: "İnce Toz ve Egzoz Parçacıkları", aciklama: "Akciğerlere inen mikroskobik kirleticiler", ikon: "🫁", esik: [5, 15, 50, 90, 140], rehber: 15 },
-  { id: "pm10", ad: "Kaba Toz ve Polen", aciklama: "Solunum yollarını etkileyen havadaki partiküller", ikon: "🌾", esik: [15, 45, 120, 195, 270], rehber: 45 },
-  { id: "o3", ad: "Yüzey Ozonu", aciklama: "Güneş ışığı ve trafik gazlarıyla oluşan gaz", ikon: "☀️", esik: [60, 100, 120, 160, 180], rehber: 100 },
-  { id: "no2", ad: "Trafik ve Yakıt Gazı (Azot)", aciklama: "Araç egzozları ve ısınma kaynaklı kirlilik", ikon: "🚗", esik: [10, 25, 60, 100, 150], rehber: 25 },
-  { id: "co", ad: "Karbonmonoksit", aciklama: "Eksik yanma ve egzoz kaynaklı renksiz gaz", ikon: "🔥", esik: [2000, 4000, 10000, 20000, 30000], rehber: 4000 },
-  { id: "so2", ad: "Kükürt Gazı", aciklama: "Sanayi ve fosil yakıt kaynaklı gaz", ikon: "🏭", esik: [20, 40, 125, 190, 275], rehber: 40 },
-  { id: "dust", ad: "Çöl Tozu", aciklama: "Sahra ve çöllerden rüzgârla taşınan ince toz", ikon: "🏜️", esik: [15, 40, 80, 150, 300], rehber: null, resmiIndeksYok: true },
+  { id: "pm25", ad: "İnce Toz ve Egzoz Parçacıkları", bilimsel: "İnce partikül madde", formul: "PM₂.₅", boyut: "2,5 mikrometreden küçük", aciklama: "Akciğerlere inen mikroskobik kirleticiler", ikon: "🫁", esik: [5, 15, 50, 90, 140], rehber: 15 },
+  { id: "pm10", ad: "Kaba Toz ve Polen", bilimsel: "Kaba partikül madde", formul: "PM₁₀", boyut: "10 mikrometreden küçük", aciklama: "Solunum yollarını etkileyen havadaki partiküller", ikon: "🌾", esik: [15, 45, 120, 195, 270], rehber: 45 },
+  { id: "o3", ad: "Yüzey Ozonu", bilimsel: "Ozon", formul: "O₃", aciklama: "Güneş ışığı ve trafik gazlarıyla oluşan gaz", ikon: "☀️", esik: [60, 100, 120, 160, 180], rehber: 100 },
+  { id: "no2", ad: "Trafik ve Yakıt Gazı (Azot)", bilimsel: "Azot dioksit", formul: "NO₂", aciklama: "Araç egzozları ve ısınma kaynaklı kirlilik", ikon: "🚗", esik: [10, 25, 60, 100, 150], rehber: 25 },
+  { id: "co", ad: "Karbonmonoksit", bilimsel: "Karbon monoksit", formul: "CO", aciklama: "Eksik yanma ve egzoz kaynaklı renksiz gaz", ikon: "🔥", esik: [2000, 4000, 10000, 20000, 30000], rehber: 4000 },
+  { id: "so2", ad: "Kükürt Gazı", bilimsel: "Kükürt dioksit", formul: "SO₂", aciklama: "Sanayi ve fosil yakıt kaynaklı gaz", ikon: "🏭", esik: [20, 40, 125, 190, 275], rehber: 40 },
+  { id: "dust", ad: "Çöl Tozu", bilimsel: "Mineral toz (Sahra tozu)", formul: "toz", aciklama: "Sahra ve çöllerden rüzgârla taşınan ince toz", ikon: "🏜️", esik: [15, 40, 80, 150, 300], rehber: null, resmiIndeksYok: true },
 ];
 export const KIRLETICI = Object.fromEntries(KIRLETICILER.map((k) => [k.id, k]));
 export const ANA_KIRLETICILER = ["pm25", "pm10", "o3", "no2", "co", "so2"];
@@ -48,6 +49,24 @@ export function doluluk(id, v) {
   const alt = i === 0 ? 0 : k.esik[i - 1], ust = i === 5 ? k.esik[4] * 1.5 : k.esik[i];
   return Math.min(1, (i + Math.min(1, Math.max(0, (v - alt) / (ust - alt || 1)))) / 6);
 }
+
+const sayiYaz = (x, n) => Number(x).toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: n });
+/** Değer + birim: { sayi:"35,2", birim:"µg/m³", tam:"35,2 µg/m³" }. Karbonmonoksit mg/m³ (µg/m³ ÷ 1000) ile yazılır; diğerleri µg/m³. Değer yoksa null. */
+export function degerSayisi(id, v) {
+  if (!Number.isFinite(v)) return null;
+  const sayi = id === "co" ? sayiYaz(v / 1000, 2) : sayiYaz(v, v < 10 ? 1 : 0), birim = id === "co" ? "mg/m³" : "µg/m³";
+  return { sayi, birim, tam: `${sayi} ${birim}` };
+}
+/** Seviye sınırları (üst sınırlar) sayı + birimle: [{ ad, ust:"≤ 15 µg/m³", sinif }] — son bant "üstü". Ekranda "iyi/kötü" yerine gerçek eşikleri göstermek için. */
+export function sinirlar(id) {
+  const k = KIRLETICI[id]; if (!k) return [];
+  const b = (x) => degerSayisi(id, x).tam;
+  return SEVIYELER.map((sv, i) => ({ ad: sv.ad, sinif: sv.sinif, idx: i, ust: i < 5 ? `≤ ${b(k.esik[i])}` : `> ${b(k.esik[4])}` }));
+}
+/** "Dünya Sağlık Örgütü rehberi 15 µg/m³" ya da null. */
+export const rehberMetni = (id) => (KIRLETICI[id]?.rehber ? degerSayisi(id, KIRLETICI[id].rehber).tam : null);
+/** Ekranda başlığın yanındaki bilimsel ad: "Azot dioksit · NO₂" (ince/kaba toz için boyutla). */
+export const bilimselAd = (id) => { const k = KIRLETICI[id]; if (!k) return ""; return k.formul && k.formul !== "toz" ? `${k.bilimsel} · ${k.formul}${k.boyut ? ` (${k.boyut})` : ""}` : k.bilimsel; };
 
 /** Değerleri sade Türkçe ile yazar: "metreküpte 35 mikrogram" (karbonmonoksit için miligram). */
 export function degerMetni(id, v) {

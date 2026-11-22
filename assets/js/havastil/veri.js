@@ -12,6 +12,7 @@
  */
 import { omOmMi, omJson } from "./openmeteo.js";
 import { istasyonKatmani, kaliteBirlestir } from "./hava-kaynak.js";
+import { olcumleDogrula } from "./dogrulama.js";
 const HAVA_URL = "https://api.open-meteo.com/v1/forecast";
 const HAVA_KALITESI_URL = "https://air-quality-api.open-meteo.com/v1/air-quality";
 const GEO_URL = "https://geocoding-api.open-meteo.com/v1/search";
@@ -64,10 +65,14 @@ export async function havaGetir(lat, lon, { yenile = false, konum = null, istasy
       jsonAl(`${HAVA_KALITESI_URL}?latitude=${lat}&longitude=${lon}&timezone=auto&current=european_aqi,pm10,pm2_5,dust,ozone,nitrogen_dioxide,sulphur_dioxide,carbon_monoxide&hourly=european_aqi,pm10,pm2_5,dust,ozone,nitrogen_dioxide,sulphur_dioxide,carbon_monoxide&forecast_days=4`, 7000).catch(() => null),
       jsonAl(`${temel}&minutely_15=precipitation&forecast_minutely_15=12`, 5000).catch(() => null),             // 15 dk'lık yağış (bölgeye göre; yoksa null)
       // Resmî/yerel istasyon katmanı (hava-kaynak.js): hata ve zaman aşımı ana akışı ASLA bozmaz; sonuç yoksa model değerleri kalır.
-      istasyon && konum ? istasyonKatmani({ lat, lon, ulke: konum.ulke, il: konum.il, admin1: konum.admin1, admin2: konum.admin2 }).catch(() => null) : Promise.resolve(null),
+      istasyon && konum ? istasyonKatmani({ lat, lon, ulke: konum.ulke, il: konum.il, admin1: konum.admin1, admin2: konum.admin2, ad: konum.ad, ilce: konum.ilce }).catch(() => null) : Promise.resolve(null),
     ]);
     const veri = ozetle(ana, modeller, hk, dk);
-    if (ist) { veri.kalite = kaliteBirlestir(veri.kalite, ist.istasyonlar || []); veri.gozlem = ist.gozlem || null; veri.kaynakTeshis = ist.teshis || []; }
+    if (ist) {
+      veri.kalite = kaliteBirlestir(veri.kalite, ist.istasyonlar || []); veri.gozlem = ist.gozlem || null; veri.kaynakTeshis = ist.teshis || [];
+      // Resmî ölçüm ↔ model doğrulaması: sapmayı hesaplar; (yönetici açtıysa) yakın saatleri ölçüme doğru düzeltir; yağış ölçümü şemsiye kararına yansır. Hata ana akışı bozmaz.
+      try { if (veri.gozlem) olcumleDogrula(veri, veri.gozlem, ist.ayar || {}); } catch { /* doğrulama yoksa model değerleri kalır */ }
+    }
     else veri.kalite = kaliteBirlestir(veri.kalite, []);
     veri.kaynakUrl = `${temel}&forecast_days=${GUN_SAYISI}`;
     const t0 = Date.now();

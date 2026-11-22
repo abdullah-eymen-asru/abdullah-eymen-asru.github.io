@@ -8,6 +8,7 @@ import { havaKodu } from "./hava-kodlari.js";
 import { YAGIS_SEVIYELERI, gunParcasi, saatAnaliz } from "./yagis-fizigi.js";
 import { yagisOzeti } from "./ui-hava.js";
 import { hizliCevaplar } from "./hikaye.js";
+import { olcumSeridi } from "./ui-olcum.js";
 
 /** Sabah/öğle/akşam planından tek cümlelik "gün içi değişim" notu (hepsi aynıysa not yok: sabit bir gün). */
 function degisimNotu(s) {
@@ -106,6 +107,6 @@ function akisSeridi(d, kb) {
 export function bugunSekmesi(d, kb) {
   if (!d.hava || !d.sonuc || !d.fizik) return kart("hv-bos", ipucu("Hava verisi yükleniyor…"));
   return el("div", { class: "hv-sekme-govde" },
-    hukumKarti(d, kb), uyariBandi(d, kb), kombinOzeti(d, kb), akisSeridi(d, kb),
+    hukumKarti(d, kb), olcumSeridi(d, kb), uyariBandi(d, kb), kombinOzeti(d, kb), akisSeridi(d, kb),
     el("div", { class: "hv-btn-satir" }, olay(el("button", { type: "button", class: "hv-btn", text: "🔬 Derin analiz ve uzman görünümü" }), "click", () => kb.sekmeGit("derin"))));
 }
