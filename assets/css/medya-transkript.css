@@ -139,3 +139,10 @@
 .ts-devam-bilgi { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; margin: .5rem 0; padding: .65rem .85rem; border-radius: 12px; border: 1px solid #f5c26b; background: rgba(245,194,107,.15); font-size: .92rem; }
 .ts-devam-bilgi[hidden] { display: none; }
 .ts-yarim { color: #b36b00; font-weight: 600; }
+
+/* Bugün en çok kullananlar: açılır-kapanır + kaydırmalı (çok kullanıcıda sayfa uzamaz) */
+details.mk-ozet { display: block; border: 1px solid var(--border); border-radius: 10px; padding: .5rem .75rem; margin-top: .6rem; }
+details.mk-ozet > summary { cursor: pointer; font-weight: 700; }
+.mk-ozet .mk-ara { width: 100%; margin: .5rem 0; box-sizing: border-box; }
+.mk-ozet-liste { max-height: 16rem; overflow-y: auto; overscroll-behavior: contain; display: grid; align-content: start; gap: 0; border-top: 1px solid var(--border); }
+.mk-ozet-liste .mk-ozet-satir { min-width: 0; } .mk-ozet-ad { font-weight: 600; overflow-wrap: anywhere; }

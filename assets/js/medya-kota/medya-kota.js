@@ -88,7 +88,20 @@ export function ownerAyar(arac, t = ARACLAR[arac], bitti = () => {}, acik = fals
   /* Yetki ayarlarındaki gibi KAYDIRMALI anahtar (kırmızı = kapalı, yeşil = açık). Stil: medya-transkript.css › .mk-anahtar */
   const anahtarSatiri = (girdi, baslik, ipucu) => el("label", { class: "mk-anahtar" }, girdi, el("span", { class: "mk-anahtar-iz", "aria-hidden": "true" }), el("span", { class: "mk-anahtar-metin" }, el("strong", { text: baslik }), el("small", { class: "md-soluk", text: ipucu })));
   kotaAktif.addEventListener("change", () => { kul.disabled = gen.disabled = !kotaAktif.checked; });
-  const msg = el("p", { class: "md-mesaj", role: "status" }), ozet = el("div", { class: "mk-ozet" });
+  const msg = el("p", { class: "md-mesaj", role: "status" });
+  /* "Bugün en çok kullananlar": açılır-kapanır, sabit yükseklikte kaydırmalı, arama kutulu (e-posta ile de aranır ama ekrana yazılmaz). */
+  let kullanimSatirlari = [];
+  const aramaKutu = el("input", { class: "md-girdi mk-ara", type: "search", placeholder: "Kullanıcı ara (ad veya e-posta)…", "aria-label": "Kullanıcı ara", autocomplete: "off" });
+  const ozetBaslik = el("span", { text: "👥 Bugün en çok kullananlar" }), ozetListe = el("div", { class: "mk-ozet-liste", tabindex: "0", role: "list" });
+  const ozet = el("details", { class: "mk-ozet" }, el("summary", {}, ozetBaslik), aramaKutu, ozetListe);
+  function ozetCiz() {
+    const q = aramaKutu.value.trim().toLocaleLowerCase("tr").replace(/\s+/g, " ");
+    const norm = (x) => String(x || "").toLocaleLowerCase("tr");
+    const liste = kullanimSatirlari.filter((x) => !q || norm(x.ara).includes(q) || norm(x.ad).includes(q));
+    ozetBaslik.textContent = `👥 Bugün en çok kullananlar (${q ? `${liste.length}/` : ""}${kullanimSatirlari.length})`;
+    ozetListe.replaceChildren(...(liste.length ? liste.map((x) => el("div", { class: "mk-ozet-satir", role: "listitem" }, el("span", { class: "mk-ozet-ad", text: x.ad }), el("span", { class: "md-soluk", text: `sistem: ${deger(t.birim, x.site || 0)} · kendi anahtar: ${deger(t.birim, x.kendi || 0)} · ${x.istek} istek` }))) : [el("p", { class: "md-soluk", text: kullanimSatirlari.length ? "Aramaya uyan kullanıcı yok." : "Bugün kullanım yok." })]));
+  }
+  aramaKutu.addEventListener("input", ozetCiz);
   const kaydet = el("button", { type: "button", class: "md-btn md-birincil", text: "Kaydet" });
   const birimYazi = dak ? "dakika" : "adet";
   const alan = (et, girdi, ipucu) => el("label", { class: "mi-etiket" }, et, girdi, el("small", { class: "md-soluk", text: ipucu }));
@@ -98,8 +111,7 @@ export function ownerAyar(arac, t = ARACLAR[arac], bitti = () => {}, acik = fals
     gen.value = a.genel_gunluk == null ? "" : String(dak ? Math.round(a.genel_gunluk / 60) : a.genel_gunluk);
     kendiIzin.checked = a.kendi_anahtar_izni; sistemAcik.checked = a.sistem_anahtari_acik; kotaAktif.checked = a.kota_aktif !== false; kul.disabled = gen.disabled = !kotaAktif.checked;
     const { data: oz } = await supabase.rpc("owner_medya_kota_ozeti");
-    const satirlar = (oz || []).filter((x) => x.arac === arac);
-    ozet.replaceChildren(el("strong", { text: "Bugün en çok kullananlar" }), ...(satirlar.length ? satirlar.slice(0, 10).map((x) => el("div", { class: "mk-ozet-satir" }, el("span", { text: x.ad }), el("span", { class: "md-soluk", text: `sistem: ${deger(t.birim, x.site || 0)} · kendi anahtar: ${deger(t.birim, x.kendi || 0)} · ${x.istek} istek` }))) : [el("p", { class: "md-soluk", text: "Bugün kullanım yok." })]));
+    kullanimSatirlari = (oz || []).filter((x) => x.arac === arac); ozetCiz();
   }
   kaydet.addEventListener("click", async () => {
     const sayi = (v) => (v.trim() === "" ? null : Math.max(0, Math.round(Number(v) * (dak ? 60 : 1))));
