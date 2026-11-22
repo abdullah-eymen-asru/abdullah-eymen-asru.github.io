@@ -69,7 +69,7 @@ export function gunVeriPaketi(d, gi = 0, { ekGun = 0 } = {}) {
     olcumler: (H.ham?.simdi || []).filter(([, v]) => v != null).map(([ad, deger, birim]) => ({ olcum: ad, deger, birim: birim || "" })),
     basinc_egilimi: H.basincEgilim ?? null, basinc_fark_3_saat_hpa: H.basincFark3 ?? null, basinc_fark_12_saat_hpa: H.basincFark12 ?? null,
     gorus_m: H.gorus ?? null,
-    hava_kalitesi: H.kalite ? { avrupa_aqi: H.kalite.aqi, pm10: H.kalite.pm10, pm2_5: H.kalite.pm25, ozon: H.kalite.ozon, toz: H.kalite.dust } : null,
+    hava_kalitesi: H.kalite ? { avrupa_aqi: H.kalite.aqi, kaba_toz: H.kalite.pm10, ince_toz: H.kalite.pm25, ozon: H.kalite.ozon, azot_gazi: H.kalite.no2, kukurt_gazi: H.kalite.so2, karbonmonoksit: H.kalite.co, col_tozu: H.kalite.dust, kaynak: H.kalite.genelKaynak === "istasyon" ? "resmi istasyon ölçümü" : "model tahmini" } : null,
     onumuzdeki_15_dakikalik_yagis_mm: (H.dakikalik || []).map((x) => ({ zaman: x.t, mm: x.mm })),
   };
   // Seçili gün için model karşılaştırması: her modelin saatlik ham yağış (mm) değeri (modeller arası uyumsuzluğu görmek için)
@@ -130,7 +130,7 @@ function anlikMetni(p) {
   for (const o of a.olcumler) s.push(`- ${o.olcum}: ${o.deger}${o.birim ? ` ${o.birim}` : ""}`);
   if (a.basinc_egilimi) s.push(`- Basınç eğilimi: ${a.basinc_egilimi}${a.basinc_fark_3_saat_hpa != null ? ` (son 3 saat ${a.basinc_fark_3_saat_hpa} hPa` : ""}${a.basinc_fark_12_saat_hpa != null ? `, son 12 saat ${a.basinc_fark_12_saat_hpa} hPa)` : a.basinc_fark_3_saat_hpa != null ? ")" : ""}`);
   if (a.gorus_m != null) s.push(`- Görüş mesafesi: ${a.gorus_m} m`);
-  if (a.hava_kalitesi) s.push(`- Hava kalitesi: Avrupa AQI ${a.hava_kalitesi.avrupa_aqi} · PM10 ${a.hava_kalitesi.pm10} · PM2.5 ${a.hava_kalitesi.pm2_5} · ozon ${a.hava_kalitesi.ozon} · toz ${a.hava_kalitesi.toz}`);
+  if (a.hava_kalitesi) { const k = a.hava_kalitesi, g = (x) => (x == null ? "—" : x); s.push(`- Hava kalitesi (${k.kaynak}): Avrupa AQI ${g(k.avrupa_aqi)} · ince toz ve egzoz parçacıkları ${g(k.ince_toz)} · kaba toz ve polen ${g(k.kaba_toz)} · yüzey ozonu ${g(k.ozon)} · trafik gazı (azot) ${g(k.azot_gazi)} · kükürt gazı ${g(k.kukurt_gazi)} · karbonmonoksit ${g(k.karbonmonoksit)} · çöl tozu ${g(k.col_tozu)} (µg/m³)`); }
   if (a.onumuzdeki_15_dakikalik_yagis_mm?.length) s.push(`- Önümüzdeki 15 dakikalık yağış (mm): ${a.onumuzdeki_15_dakikalik_yagis_mm.map((x) => `${String(x.zaman).slice(11, 16)}=${x.mm}`).join(" · ")}`);
   return s.filter((x) => x !== null);
 }

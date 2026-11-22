@@ -24,6 +24,7 @@
  *   SUPABASE_URL, SUPABASE_ANON_KEY   (Text)
  *   GROQ_API_KEY                       (SECRET)
  *   OPEN_METEO_API_KEY                 (ops., SECRET) — Open-Meteo ticari anahtarı; yalnızca site-anahtarı modunda kullanılır (bkz. /openmeteo)
+ *   OPENAQ_API_KEY                     (ops., SECRET) — OpenAQ SİTE anahtarı (ücretsiz: openaq.org); /hava/openaq vekili kullanır. Kullanıcı kendi anahtarını girdiyse bu gerekmez.
  *   IP_TUZ                             (ops., SECRET) — IP özetinin tuzu (boşsa varsayılan)
  *   GROQ_MODEL                         (ops., Text) — zincirin başına eklenir
  *   HABER_KAYNAKLARI                   (ops., Text) — JSON dizi: [{"id","ad","havuz":"tr|dunya","tur":"ajans|genel","url":"https://…"}]
@@ -523,6 +524,54 @@ async function openMeteoVekili(istek, env, cors) {
   return new Response(govde, { status: yanit.status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", "X-Om-Agirlik": String(ag), ...cors } });
 }
 
+/* ============================ HAVA KAYNAKLARI VEKİLİ (v6) ============================
+ * Resmî/yerel istasyon verileri için İNCE, izin listeli vekiller (SSRF yok). Üçü de oturum + HavaStil yetkisi ister; kullanıcı başına hız sınırı vardır.
+ * GET /hava/openaq?u=<https://api.openaq.org/v3/...>  → SİTE anahtarıyla (env.OPENAQ_API_KEY, SECRET). Kullanıcı kendi anahtarını girdiyse tarayıcı OpenAQ'ya doğrudan gider, bu uç kullanılmaz.
+ * GET /hava/metar?bbox=lat0,lon0,lat1,lon1             → aviationweather.gov (NOAA) METAR JSON; anahtarsız, CORS'u olmayan tarayıcı çağrısı için vekil.
+ * GET /hava/mgm?yol=merkezler|sondurumlar&il=&ilce=&istno= → MGM (servis.mgm.gov.tr). Belgelenmemiş bir uç nokta: Origin başlığı Worker'dan eklenir.
+ *      MGM verisi kurumun hizmet koşullarına tabidir; yönetici bunu Ayarlar'dan bilerek açar (varsayılan KAPALI). Yanıt değişirse istemci sessizce METAR'a düşer.
+ * Hepsinde kısa bellek önbelleği vardır (kaynağı yormamak için). Yanıtlarda anahtar asla görünmez. */
+const havaHiz = new Map(), havaOnbellek = new Map();
+async function havaVekili(istek, env, cors, tur) {
+  const u = await yetkiliKullanici(env, istek, cors);
+  if (u.yanit) return u.yanit;
+  if (hizSiniri(havaHiz, u.kim.uid, 90, 60 * 1000)) return json({ error: "Çok sık istek.", neden: "hiz" }, 429, { ...cors, "Retry-After": "30" });
+  const p = new URL(istek.url).searchParams;
+  let hedef, baslik = { Accept: "application/json", "User-Agent": "HavaStil/6 (+https://abdullah-eymen-asru.github.io)" }, ttl = 120 * 1000;
+  if (tur === "openaq") {
+    if (!env.OPENAQ_API_KEY) return json({ error: "Site OpenAQ anahtarı Worker'a eklenmemiş (OPENAQ_API_KEY secret).", neden: "anahtar_yok" }, 501, cors);
+    try { hedef = new URL(p.get("u") || ""); } catch { return json({ error: "Geçersiz u parametresi." }, 400, cors); }
+    if (hedef.protocol !== "https:" || hedef.hostname !== "api.openaq.org" || !/^\/v3\/(locations|locations\/\d+\/latest)$/.test(hedef.pathname)) return json({ error: "Bu adres izinli değil." }, 400, cors);
+    baslik["X-API-Key"] = env.OPENAQ_API_KEY; ttl = 5 * 60 * 1000;
+  } else if (tur === "metar") {
+    const bb = String(p.get("bbox") || "").split(",").map(Number);
+    if (bb.length !== 4 || bb.some((x) => !Number.isFinite(x)) || bb[0] < -90 || bb[2] > 90 || bb[1] < -180 || bb[3] > 180 || Math.abs(bb[2] - bb[0]) > 4 || Math.abs(bb[3] - bb[1]) > 6) return json({ error: "Geçersiz bbox." }, 400, cors);
+    hedef = new URL("https://aviationweather.gov/api/data/metar"); hedef.searchParams.set("bbox", bb.map((x) => x.toFixed(2)).join(",")); hedef.searchParams.set("format", "json"); hedef.searchParams.set("hours", "4");
+    ttl = 5 * 60 * 1000;
+  } else {
+    const yol = p.get("yol"); if (!["merkezler", "sondurumlar"].includes(yol)) return json({ error: "yol merkezler ya da sondurumlar olmalı." }, 400, cors);
+    hedef = new URL(`https://servis.mgm.gov.tr/web/${yol}`);
+    if (yol === "merkezler") {
+      const il = String(p.get("il") || "").trim().slice(0, 40), ilce = String(p.get("ilce") || "").trim().slice(0, 60);
+      if (il.length < 2 || /[<>"\u0000-\u001f]/.test(il + ilce)) return json({ error: "il gerekli." }, 400, cors);
+      hedef.searchParams.set("il", il); if (ilce) hedef.searchParams.set("ilce", ilce);
+    } else {
+      const no = String(p.get("istno") || ""); if (!/^\d{3,8}$/.test(no)) return json({ error: "istno sayısal olmalı." }, 400, cors);
+      hedef.searchParams.set("istno", no);
+    }
+    baslik = { ...baslik, Origin: "https://www.mgm.gov.tr", Referer: "https://www.mgm.gov.tr/" }; ttl = 5 * 60 * 1000;
+  }
+  const anahtar = `${tur}|${hedef.pathname}${hedef.search}`, o = havaOnbellek.get(anahtar);
+  if (o && Date.now() - o.t < ttl) return new Response(o.govde, { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", "X-Onbellek": "1", ...cors } });
+  let yanit;
+  try { const k = new AbortController(), z = setTimeout(() => k.abort(), 6000); yanit = await fetch(hedef.toString(), { headers: baslik, signal: k.signal }); clearTimeout(z); }
+  catch { return json({ error: "Kaynağa ulaşılamadı.", neden: "ag" }, 502, cors); }
+  const govde = await yanit.text();
+  if (yanit.ok) { if (havaOnbellek.size > 400) havaOnbellek.clear(); havaOnbellek.set(anahtar, { t: Date.now(), govde: govde.slice(0, 400000) }); }
+  const durum = yanit.status === 401 || yanit.status === 403 ? 502 : yanit.status;      // kaynağın 401/403'ü istemcide "oturum reddedildi" sanılmasın
+  return new Response(yanit.ok ? govde : JSON.stringify({ error: `Kaynak HTTP ${yanit.status} döndü.`, neden: "kaynak" }), { status: durum, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...cors } });
+}
+
 /* ============================ ANA İŞLEYİCİ ============================ */
 const ASIL_ISLEYICI = {
   async fetch(istek, env, ctx) {
@@ -530,9 +579,12 @@ const ASIL_ISLEYICI = {
     if (istek.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const yol = new URL(istek.url).pathname.replace(/\/+$/, "") || "/";
 
-    if (yol === "/saglik") return json({ ok: true, surum: 5, groq_anahtari_var: !!env.GROQ_API_KEY, open_meteo_anahtari_var: !!env.OPEN_METEO_API_KEY, model_sirasi: modelZinciri(env) }, 200, cors);
+    if (yol === "/saglik") return json({ ok: true, surum: 6, groq_anahtari_var: !!env.GROQ_API_KEY, open_meteo_anahtari_var: !!env.OPEN_METEO_API_KEY, openaq_anahtari_var: !!env.OPENAQ_API_KEY, model_sirasi: modelZinciri(env) }, 200, cors);
     if (yol === "/istemci" && istek.method === "GET") return json({ ip_hash: await ipOzeti(env, istek) }, 200, cors);
     if (yol === "/openmeteo" && istek.method === "GET") return openMeteoVekili(istek, env, cors);
+    if (yol === "/hava/openaq" && istek.method === "GET") return havaVekili(istek, env, cors, "openaq");
+    if (yol === "/hava/metar" && istek.method === "GET") return havaVekili(istek, env, cors, "metar");
+    if (yol === "/hava/mgm" && istek.method === "GET") return havaVekili(istek, env, cors, "mgm");
 
     if (yol === "/haberler" && istek.method === "GET") {
       const u = await yetkiliKullanici(env, istek, cors);

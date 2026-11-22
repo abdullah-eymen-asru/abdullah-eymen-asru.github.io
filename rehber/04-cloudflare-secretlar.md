@@ -600,6 +600,9 @@ Panel: **Yedekleme & Verilerim → Depolama Durumu → 🔌 Worker anahtarları*
 | `GET /saglik` | Sağlık | `{ ok, surum, groq_anahtari_var, open_meteo_anahtari_var, model_sirasi }` |
 | `GET /istemci` | IP özeti | `{ ip_hash }` — çağıranın **tuzlu özeti** (ham IP dönmez/saklanmaz). Open-Meteo ücretsiz kotası IP başınadır; kota sayacı bu özetle "farklı IP = ayrı sayaç" çalışır. |
 | `GET /openmeteo?u=<url>` | Ticari anahtar vekili | **Yalnızca plan "ticari" ve `OPEN_METEO_API_KEY` tanımlıysa** kullanılır. JWT + yetki; kota sunucuda kullanıcının jetonuyla ayrılır; yalnızca Open-Meteo alan adları geçer. Ücretsiz modda istekler TARAYICIDAN doğrudan gider (Worker'ın ortak IP'si kotayı yemesin diye). |
+| `GET /hava/openaq?u=<url>` | Site OpenAQ anahtarı vekili | `OPENAQ_API_KEY` ile `api.openaq.org/v3/locations…` isteği yapar (yalnızca izinli yollar). Kullanıcı kendi anahtarını girdiyse tarayıcı doğrudan OpenAQ'ya gider, bu uç kullanılmaz. JWT + yetki; dakikada 90 istek/kullanıcı; 5 dk önbellek. |
+| `GET /hava/metar?bbox=` | Havalimanı rasadı vekili | aviationweather.gov (NOAA) METAR JSON; anahtarsız. |
+| `GET /hava/mgm?yol=merkezler\|sondurumlar` | MGM vekili | `servis.mgm.gov.tr` (belgelenmemiş uç; Origin başlığı Worker'dan eklenir). Varsayılan KAPALI: Ayarlar › Hava veri kaynakları'ndan yönetici açar. |
 
 > ⚠️ **Groq modelleri (Ağustos 2026):** `llama-3.1-8b-instant` ve `llama-3.3-70b-versatile` Groq'ta **16 Ağustos 2026'da kaldırıldı** (yerleri `openai/gpt-oss-20b` / `openai/gpt-oss-120b`). Eski Worker bu modelleri çağırdığı için "yapay zekâ çalışmıyor" durumu oluşuyordu. Yeni Worker model zinciri dener: `GROQ_MODEL` (varsa ve kaldırılmış değilse) → `openai/gpt-oss-20b` → `openai/gpt-oss-120b`. Model listesi değişirse `GROQ_MODEL` ile güncel modeli yaz; kodu değiştirmene gerek yok.
 
@@ -609,6 +612,7 @@ Panel: **Yedekleme & Verilerim → Depolama Durumu → 🔌 Worker anahtarları*
 | Variable | `SUPABASE_ANON_KEY` | `anon public` anahtarı | Bölüm 2.2 |
 | **Secret** | `GROQ_API_KEY` | `gsk_...` | [console.groq.com](https://console.groq.com) → **API Keys → Create API Key** |
 | **Secret** *(ops.)* | `OPEN_METEO_API_KEY` | Open-Meteo **ticari** API anahtarı | [open-meteo.com/en/pricing](https://open-meteo.com/en/pricing) → plan al → anahtar e-postayla gelir. Yalnızca ücretli plan alırsan gerekir (aşağıya bak). |
+| **Secret** *(ops.)* | `OPENAQ_API_KEY` | OpenAQ **site** anahtarı | [explore.openaq.org/register](https://explore.openaq.org/register) → ücretsiz hesap → API anahtarı. Değiştirmek için yalnızca bu secret'ı güncelle (kod yayını gerekmez); sonra Ayarlar › Hava veri kaynakları › "Kaynakları test et". Kullanıcılar kendi anahtarını da girebilir. |
 | **Secret** *(ops.)* | `IP_TUZ` | rastgele uzun metin | IP özetinin tuzu (kota sayacı ham IP saklamaz). Boşsa varsayılan tuz kullanılır. |
 | Variable *(ops.)* | `GROQ_MODEL` | zincirin başına eklenir | Groq'un güncel model listesi |
 | Variable *(ops.)* | `HABER_KAYNAKLARI` | varsayılan RSS listesini değiştirir | JSON dizi: `[{"id":"ntv","ad":"NTV","havuz":"tr","tur":"genel","url":"https://…"}]` (`tur`: `ajans`/`genel`; en çok 16; yalnızca `https://`) |

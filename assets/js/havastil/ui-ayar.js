@@ -8,6 +8,7 @@ import { tarayiciTespit } from "./izin-yardim.js";
 import { aiAyarKarti } from "./ui-ai.js";
 import { openMeteoAyarKarti } from "./ui-openmeteo.js";
 import { radarApiKarti } from "./ui-radar-api.js";
+import { havaKaynaklariKarti } from "./ui-hava-kaynaklari.js";
 
 function opsiyonel(ikon, ad, metin, sinif = "") {
   return el("div", { class: "hv-gizlilik-satir" }, el("span", { class: "hv-gizlilik-ikon", "aria-hidden": "true", text: ikon }), el("div", {}, el("strong", { text: ad }), el("small", { class: "hv-ipucu", text: metin })), rozet("Opsiyonel", sinif || "hv-rozet-ok"));
@@ -111,5 +112,5 @@ export function ayarSekmesi(d, kb) {
       el("p", { class: "hv-ipucu", text: `Ayıklanan: ${tz.elenen.clickbait} sansasyonel · ${tz.elenen.zaman} eski/gelecek · ${tz.elenen.konum} başka yer.` }))
       : ipucu("Haber verisi henüz yok."));
 
-  return el("div", { class: "hv-sekme-govde" }, uyariKart, aiKart, aiAyarKarti(d, kb), openMeteoAyarKarti(d, kb), radarApiKarti(), haberKart, bulutKart, gizlilik, teshis);
+  return el("div", { class: "hv-sekme-govde" }, uyariKart, aiKart, aiAyarKarti(d, kb), openMeteoAyarKarti(d, kb), havaKaynaklariKarti(d, kb), radarApiKarti(), haberKart, bulutKart, gizlilik, teshis);
 }

@@ -146,7 +146,7 @@ export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAkti
   kb.yenile = async (zorla = false) => {
     const no = ++d.yenilemeNo;
     try {
-      const h = await havaGetir(d.konum.lat, d.konum.lon, { yenile: zorla });
+      const h = await havaGetir(d.konum.lat, d.konum.lon, { yenile: zorla, konum: d.konum, istasyon: !d.vitrin && !d.misafir });
       if (no !== d.yenilemeNo) return;
       d.hava = h; hesapla(); ciz(); konumB.ciz();
       if (!d.haber || zorla) kb.haberYenile(false);

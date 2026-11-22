@@ -11,13 +11,14 @@
  * son bilinen veri "eski" etiketiyle gösterilir. Nominatim politikası gereği otomatik tamamlama YAPILMAZ (yalnız kullanıcı isterse, 1 sn aralıkla).
  */
 import { omOmMi, omJson } from "./openmeteo.js";
+import { istasyonKatmani, kaliteBirlestir } from "./hava-kaynak.js";
 const HAVA_URL = "https://api.open-meteo.com/v1/forecast";
 const HAVA_KALITESI_URL = "https://air-quality-api.open-meteo.com/v1/air-quality";
 const GEO_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
 const MODELLER = "ecmwf_ifs025,icon_seamless,gfs_seamless";
 const ONBELLEK_OMRU_MS = 30 * 60 * 1000;
-const ONBELLEK_ONEKI = "hv_hava6_";          // v6: 16 gün, kar/don/buzlanma alanları (v5: 14 gün, ham konsol, model dizileri)
+const ONBELLEK_ONEKI = "hv_hava7_";          // v7: genişletilmiş hava kalitesi (azot/kükürt/karbonmonoksit, 4 günlük saatlik) + resmî istasyon katmanı (v6: 16 gün, kar/don/buzlanma)
 export const GUN_SAYISI = 16;                 // Open-Meteo deterministik tahmin üst sınırı (forecast_days=16)
 const nokta = (x) => Number(x).toFixed(4);   // koordinat YUVARLANMAZ (kullanıcı izniyle tam hassasiyet); yalnızca önbellek anahtarı 4 ondalık
 
@@ -45,7 +46,7 @@ function gunEkle(tarih, n) {
 }
 
 /** Hava + (başarısızsa sessiz geçen) çoklu model yağış kontrolü + hava kalitesi → motorun beklediği özet. */
-export async function havaGetir(lat, lon, { yenile = false } = {}) {
+export async function havaGetir(lat, lon, { yenile = false, konum = null, istasyon = true } = {}) {
   const anahtar = `${ONBELLEK_ONEKI}${nokta(lat)}_${nokta(lon)}`;
   try {
     const k = JSON.parse(localStorage.getItem(anahtar) || "null");
@@ -54,16 +55,20 @@ export async function havaGetir(lat, lon, { yenile = false } = {}) {
 
   const temel = `${HAVA_URL}?latitude=${lat}&longitude=${lon}&timezone=auto`;
   try {
-    const [ana, modeller, hk, dk] = await Promise.all([
+    const [ana, modeller, hk, dk, ist] = await Promise.all([
       jsonAl(`${temel}&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_gusts_10m,wind_direction_10m,precipitation,relative_humidity_2m,dew_point_2m,pressure_msl,cloud_cover,is_day`
         + `&hourly=temperature_2m,apparent_temperature,weather_code,precipitation_probability,precipitation,snowfall,uv_index,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,dew_point_2m,pressure_msl,visibility,cloud_cover,shortwave_radiation,is_day,rain,showers,cape,freezing_level_height,soil_temperature_0cm,snow_depth`
         + `&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,daylight_duration,uv_index_max,precipitation_sum,snowfall_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max`
         + `&past_days=1&forecast_days=${GUN_SAYISI}`),
       jsonAl(`${temel}&hourly=precipitation&models=${MODELLER}&forecast_days=${GUN_SAYISI}`, 7000).catch(() => null),   // fail-soft: tek model
-      jsonAl(`${HAVA_KALITESI_URL}?latitude=${lat}&longitude=${lon}&timezone=auto&current=european_aqi,pm10,pm2_5,dust,ozone&hourly=dust,pm10&forecast_days=2`, 6000).catch(() => null),
+      jsonAl(`${HAVA_KALITESI_URL}?latitude=${lat}&longitude=${lon}&timezone=auto&current=european_aqi,pm10,pm2_5,dust,ozone,nitrogen_dioxide,sulphur_dioxide,carbon_monoxide&hourly=european_aqi,pm10,pm2_5,dust,ozone,nitrogen_dioxide,sulphur_dioxide,carbon_monoxide&forecast_days=4`, 7000).catch(() => null),
       jsonAl(`${temel}&minutely_15=precipitation&forecast_minutely_15=12`, 5000).catch(() => null),             // 15 dk'lık yağış (bölgeye göre; yoksa null)
+      // Resmî/yerel istasyon katmanı (hava-kaynak.js): hata ve zaman aşımı ana akışı ASLA bozmaz; sonuç yoksa model değerleri kalır.
+      istasyon && konum ? istasyonKatmani({ lat, lon, ulke: konum.ulke, il: konum.il, admin1: konum.admin1, admin2: konum.admin2 }).catch(() => null) : Promise.resolve(null),
     ]);
     const veri = ozetle(ana, modeller, hk, dk);
+    if (ist) { veri.kalite = kaliteBirlestir(veri.kalite, ist.istasyonlar || []); veri.gozlem = ist.gozlem || null; veri.kaynakTeshis = ist.teshis || []; }
+    else veri.kalite = kaliteBirlestir(veri.kalite, []);
     veri.kaynakUrl = `${temel}&forecast_days=${GUN_SAYISI}`;
     const t0 = Date.now();
     try { localStorage.setItem(anahtar, JSON.stringify({ t: t0, veri })); } catch { /* yok say */ }
@@ -177,14 +182,19 @@ function ozetleAsil(ana, modeller, hk, dk) {
   else if (yagisVerenModel === 1) rainProb = Math.max(rainProb, 40);
   const modelFarki = yagisVerenModel > 0 && yagisVerenModel < modelSayisi;
 
-  // Hava kalitesi (yoksa null): pencere içindeki en yüksek toz/PM10 + anlık Avrupa AQI
+  // Hava kalitesi (yoksa null): pencere içindeki en yüksek toz/PM10 + anlık Avrupa AQI. Yeni alanlar (azot/kükürt/karbonmonoksit) ve 4 günlük
+  // saatlik diziler Derin analiz › Hava kalitesi paneli içindir; eksik değer 0 değil null'dır (sahte "temiz" göstermemek için).
   let kalite = null;
   if (hk?.current) {
-    const ph = hk.hourly;
+    const ph = hk.hourly, c0 = hk.current;
     const idxK = ph?.time ? ph.time.map((t, k) => (t.startsWith(gun) && Number(t.slice(11, 13)) >= bas && Number(t.slice(11, 13)) <= 22 ? k : -1)).filter((k) => k >= 0) : [];
+    const yN = (x) => (Number.isFinite(x) ? Math.round(x * 10) / 10 : null);
+    const pencereEn = (anah, simdiki) => { const m = [simdiki, ...idxK.map((k) => ph?.[anah]?.[k])].filter(Number.isFinite); return m.length ? Math.max(...m) : null; };
     kalite = {
-      aqi: yuv(sayi(hk.current.european_aqi)), pm10: yuv(Math.max(sayi(hk.current.pm10), enBuyuk(idxK.map((k) => ph.pm10?.[k])))),
-      pm25: yuv(sayi(hk.current.pm2_5)), ozon: yuv(sayi(hk.current.ozone)), dust: yuv(Math.max(sayi(hk.current.dust), enBuyuk(idxK.map((k) => ph.dust?.[k])))),
+      aqi: yuv(sayi(c0.european_aqi)), pm10: yN(pencereEn("pm10", c0.pm10)), pm25: yN(c0.pm2_5), ozon: yN(c0.ozone), dust: yN(pencereEn("dust", c0.dust)),
+      no2: yN(c0.nitrogen_dioxide), so2: yN(c0.sulphur_dioxide), co: yN(c0.carbon_monoxide),
+      saatlik: ph?.time ? { t: ph.time, eaqi: ph.european_aqi || [], pm25: ph.pm2_5 || [], pm10: ph.pm10 || [], o3: ph.ozone || [], no2: ph.nitrogen_dioxide || [], so2: ph.sulphur_dioxide || [], co: ph.carbon_monoxide || [], dust: ph.dust || [] } : null,
+      model: "Open-Meteo · Copernicus CAMS",
     };
   }
 
