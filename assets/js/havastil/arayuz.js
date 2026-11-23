@@ -8,7 +8,8 @@
  */
 import { supabase } from "../core/supabase-client.js";
 import { degerlendir, SENARYOLAR, STIL_SECENEKLERI, CANTA_SECENEKLERI } from "./cekirdek.js";
-import { havaGetir, gecmisGunGetir } from "./veri.js";
+import { havaGetir, gecmisGunGetir, kaynakYenile } from "./veri.js";
+import { veriDurumu } from "./ui-zaman.js";
 import { HAVASTIL_WORKER_URL, haberTaktigi } from "./haber.js";
 import { KURALLAR } from "./taktik.js";
 import { havaKodu } from "./hava-kodlari.js";
@@ -107,8 +108,9 @@ export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAkti
     const yazi = t ? `Son güncelleme: ${new Date(t).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })} (${dk < 1 ? "az önce" : `${dk} dk önce`})${d.hava?.eski ? " · ÇEVRİMDIŞI/ESKİ VERİ" : ""}` : "Veri yükleniyor…";
     const dugme = el("button", { type: "button", class: "hv-btn hv-btn-ince", "aria-label": "Verileri yenile", text: "⟳ Yenile" });
     olay(dugme, "click", async () => { dugme.disabled = true; dugme.textContent = "Yenileniyor…"; try { await kb.yenile(true); } finally { if (dugme.isConnected) { dugme.disabled = false; dugme.textContent = "⟳ Yenile"; } } });
-    return el("div", { class: `hv-bilgi-serit${d.hava?.eski ? " eski" : ""}`, role: "status" },
+    const serit = el("div", { class: `hv-bilgi-serit${d.hava?.eski ? " eski" : ""}`, role: "status" },
       el("span", { class: "hv-bilgi-konum", text: `📍 ${ad}` }), el("span", { class: "hv-bilgi-zaman muted", text: yazi }), dugme);
+    return d.hava ? el("div", { class: "hv-bilgi-kutu" }, serit, veriDurumu(d, kb)) : serit;
   }
   function ciz() {
     sekmeBarCiz();
@@ -154,6 +156,16 @@ export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAkti
       if (no !== d.yenilemeNo) return;
       icerik.replaceChildren(el("p", { class: "hv-uyari", text: "Hava verisi alınamadı ve kayıtlı veri yok. Bağlantını kontrol edip ↻ ile tekrar dene." }));
     }
+  };
+  /** Tek bir resmî kaynak grubunu ("gozlem": MGM/METAR · "aq": hava kalitesi istasyonları) yeniden çeker; modeller çekilmez. Vitrin/misafirde hiçbir şey yapmaz. */
+  kb.kaynakYenile = async (hangi) => {
+    if (d.vitrin || d.misafir) return;
+    const no = ++d.yenilemeNo;
+    try {
+      const h = await kaynakYenile(d.konum.lat, d.konum.lon, d.konum, hangi);
+      if (no !== d.yenilemeNo) return;
+      if (h) { d.hava = h; hesapla(); ciz(); } else await kb.yenile(true);          // ham yanıt bellekte yoksa tam yenileme
+    } catch { /* ekran eski veriyi göstermeye devam eder */ }
   };
   kb.haberYenile = async (zorla = false) => {
     if (d.vitrin) { d.haber = { durum: "vitrin", uyarilar: [], uygulananlar: [], kisitlar: { kurallar: {} }, guncelleme: Date.now(), havuz: "yok" }; hesapla(); ciz(); return; }   // Worker'a HİÇ istek gitmez

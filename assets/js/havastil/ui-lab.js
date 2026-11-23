@@ -145,7 +145,7 @@ export function dogrulaSekmesi(d, kb) {
   d.kbCiz = kb.ciz;
   return el("div", { class: "hv-sekme-govde" },
     el("p", { class: "hv-uzman-giris", text: "Bu sayfa herkese açıktır. Amaç: HavaStil'in veri uydurmadığını göstermek — ham sayılar, üç büyük modelin karşılaştırması, kararın matematiği ve haber doğrulaması tek yerde." }),
-    olcumKarti(d), hamKarti(d), modelKarti(d), cloKarti(d), haberKarti(d), groqKarti(d, kb));
+    olcumKarti(d, kb), hamKarti(d), modelKarti(d), cloKarti(d), haberKarti(d), groqKarti(d, kb));
 }
 
 /* ------------------------------ 5) Groq kota & istek takibi (yalnızca Site Sahibi + yetkili Admin) ------------------------------ */

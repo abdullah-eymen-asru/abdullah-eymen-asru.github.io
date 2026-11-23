@@ -273,28 +273,60 @@ function matrisKarti(G, simdiT, d) {
 }
 
 /* ------------------------------ sekme ------------------------------ */
-/** Resmî ölçüm (varsa, yalnızca bugün) + açılır Hava kalitesi paneli. */
-function havaKartlari(G, gi, d) { return [havaKalitesiKarti(d, G.tarih, gi === 0)].filter(Boolean); }
+/* v7: tek uzun sayfa yerine BÖLÜMLER. Hiçbir kart kaldırılmadı; yalnızca temaya göre gruplandı ve her seferinde tek bölüm görünür.
+   Özet (gün özeti, hikâye, resmî ölçüm) · Yağış (ya da Kar & Don) · Fırtına enerjisi · Hava kalitesi · Yerel koşullar · Saat saat · Yorum (yapay zekâ). */
+const BOLUMLER = [
+  ["ozet", "📋", "Özet", "Günün tek bakışta özeti ve resmî ölçümle doğrulama"],
+  ["yagis", "🌧️", "Yağış", "Yağış ihtimali, miktarı ve fiziği"],
+  ["firtina", "⛈️", "Fırtına", "Fırtına enerjisi (CAPE)"],
+  ["hava", "🌬️", "Hava kalitesi", "Kirleticiler, sayılar ve kaynakları"],
+  ["yerel", "🏡", "Yerel koşullar", "Mikro-iklim değerleri"],
+  ["saat", "🕒", "Saat saat", "Seçili günün saatlik tablosu"],
+  ["yorum", "🤖", "Yorum", "Yapay zekâ yorumu"],
+];
+const BOLUM_KIMLIK = new Set(BOLUMLER.map((b) => b[0]));
+
 export function derinSekmesi(d, kb) {
   if (!d.hava || !d.sonuc || !d.fizik) return kart("hv-bos", ipucu("Hava verisi yükleniyor…"));
   const gunler = gunAnalizleri(d.hava.tumSaatler, { canta: d.tercih.canta, rakim: d.hava.rakim });
   if (!gunler.length) return kart("hv-bos", ipucu("Saatlik veri yüklenemedi; yenile (↻) ve tekrar dene."));
   const gi = Math.min(d.derinGun || 0, gunler.length - 1), G = gunler[gi], simdiT = d.hava.saatListe?.[0]?.t;
-  // v5: yağış tipine göre iki görünüm. Seçim yapılmadıysa (null) seçili günün fazına göre otomatik: kar/karışık → Kar & Don, aksi halde Yağmur.
+  // Yağış tipine göre iki görünüm. Seçim yapılmadıysa (null) seçili günün fazına göre otomatik: kar/karışık → Kar & Don, aksi halde Yağmur.
   const otomatik = G.fizik.faz === "kar" || G.fizik.faz === "karisik" || G.fizik.karZorunlu ? "kar" : "yagmur";
   const gorunum = d.derinGorunum || otomatik;
+  const kar = gorunum === "kar";
   const H = { uzmanKart, okunus, anlam, saatGrafigi, metrik, saatAnaliz };
-  // Üç net seçenek: Otomatik (günün yağış tipine göre kendisi seçer) · Yağmur · Kar & Don. Seçili olan her zaman işaretli; mobilde alt alta/tam genişlik.
+  if (d.hkAcik === undefined) d.hkAcik = true;                       // Hava kalitesi artık kendi bölümünde: açık başlar
+  const bolumler = BOLUMLER.filter(([id]) => !(kar && id === "firtina"));
+  const bolum = BOLUM_KIMLIK.has(d.derinBolum) && bolumler.some(([id]) => id === d.derinBolum) ? d.derinBolum : "ozet";
+
+  // Yağış bölümündeki üçlü seçim: Otomatik · Yağmur · Kar & Don. Seçili olan her zaman işaretli; mobilde alt alta/tam genişlik.
   const secBtn = (id, ad, secili, alt) => olay(el("button", { type: "button", class: "hv-altsekme hv-segment", role: "tab", "aria-selected": String(secili), title: alt || "" },
     el("span", { class: "hv-segment-ad", text: ad }), alt ? el("small", { class: "hv-segment-alt", text: alt }) : null), "click", () => { d.derinGorunum = id; kb.ciz(); });
   const otoAd = otomatik === "kar" ? "❄️ Kar & Don" : "🌧️ Yağmur";
-  const altSekmeler = el("div", { class: "hv-altsekmeler hv-segmentler", role: "tablist", "aria-label": "Yağış fiziği görünümü" },
+  const gorunumSecici = () => el("div", { class: "hv-altsekmeler hv-segmentler", role: "tablist", "aria-label": "Yağış fiziği görünümü" },
     secBtn(null, "🤖 Otomatik", d.derinGorunum == null, `şu an: ${otoAd}`), secBtn("yagmur", "🌧️ Yağmur Fiziği", d.derinGorunum === "yagmur"), secBtn("kar", "❄️ Kar & Don", d.derinGorunum === "kar"),
     el("small", { class: "hv-ipucu hv-segment-aciklama", text: d.derinGorunum == null ? "Otomatik: seçili günün yağış tipine bakar; kar/karışık ise Kar & Don, değilse Yağmur Fiziği gösterir." : "Elle seçtin. Günün tipine göre kendisi seçmesi için “Otomatik”e dokun." }));
-  const govde = gorunum === "kar"
-    ? [...karGorunumu(G, { simdiT, H }), ...havaKartlari(G, gi, d), mikroKarti(G, gi, d), matrisKarti(G, simdiT, d)]
-    : [popKarti(G, simdiT, d.hava), capeKarti(G, gunler, gi, d, kb), fizikKarti(G, simdiT), beklenenKarti(G), ...havaKartlari(G, gi, d), mikroKarti(G, gi, d), matrisKarti(G, simdiT, d)];
-  return el("div", { class: "hv-sekme-govde" },
-    el("p", { class: "hv-uzman-giris", text: "Meteoroloji ve veri meraklıları için. Günlük karar “Bugün” ve “Kombin” sekmelerinde; burada kararın arkasındaki sayılar var. Bir gün seç, tüm bölümler o güne göre değişir." }),
-    gunSecici(gunler, gi, d, kb), altSekmeler, ozetKarti(G, d.hava, gi), ...(gi === 0 ? [gozlemKarti(d)].filter(Boolean) : []), hikayeKarti(G), ...govde, aiPaneli(d, kb));
+
+  const ICERIK = {
+    ozet: () => [ozetKarti(G, d.hava, gi), ...(gi === 0 ? [gozlemKarti(d, kb)].filter(Boolean) : []), hikayeKarti(G)],
+    yagis: () => [gorunumSecici(), ...(kar ? karGorunumu(G, { simdiT, H }) : [popKarti(G, simdiT, d.hava), fizikKarti(G, simdiT), beklenenKarti(G)])],
+    firtina: () => [capeKarti(G, gunler, gi, d, kb)],
+    hava: () => [havaKalitesiKarti(d, G.tarih, gi === 0, kb)].filter(Boolean),
+    yerel: () => [mikroKarti(G, gi, d)],
+    saat: () => [matrisKarti(G, simdiT, d)],
+    yorum: () => [aiPaneli(d, kb)],
+  };
+  const nav = el("nav", { class: "hv-bolum-nav", "aria-label": "Derin analiz bölümleri" }, ...bolumler.map(([id, ikon, ad, ipucuYazi]) => {
+    const secili = id === bolum;
+    const b = el("button", { type: "button", class: "hv-bolum-chip", "aria-pressed": String(secili), title: ipucuYazi }, el("span", { "aria-hidden": "true", text: ikon }), el("span", { text: id === "yagis" && kar ? "Kar & Don" : ad }));
+    return olay(b, "click", () => { d.derinBolum = id; kb.ciz(); });
+  }));
+  const [, , bolumAd, bolumAciklama] = BOLUMLER.find(([id]) => id === bolum);
+  let govde;
+  try { govde = ICERIK[bolum](); } catch (h) { console.warn("Derin analiz bölümü çizilemedi:", h); govde = [ipucu("Bu bölüm çizilemedi; ⟳ ile yenile.")]; }
+  return el("div", { class: "hv-sekme-govde hv-derin" },
+    el("p", { class: "hv-uzman-giris", text: "Meteoroloji ve veri meraklıları için. Günlük karar “Bugün” ve “Kombin” sekmelerinde; burada kararın arkasındaki sayılar var. Bir gün seç, bir bölüm seç." }),
+    gunSecici(gunler, gi, d, kb), nav,
+    el("p", { class: "hv-bolum-aciklama muted", text: `${bolumAd}: ${bolumAciklama}` }), ...govde);
 }

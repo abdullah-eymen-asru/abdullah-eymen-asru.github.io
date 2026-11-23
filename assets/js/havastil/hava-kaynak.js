@@ -292,7 +292,7 @@ export function kaliteBirlestir(kalite, istasyonlar = []) {
   const degerler = {}, kaynaklar = {};
   for (const k of KIRLETICILER) {
     const ist = istasyonlar.find((s) => Number.isFinite(s.degerler?.[k.id]));
-    if (ist) { degerler[k.id] = ist.degerler[k.id]; kaynaklar[k.id] = { tur: "istasyon", ad: ist.ad, mesafeKm: ist.mesafeKm, zaman: ist.zaman, saglayici: ist.saglayici, kurum: ist.kurum || null }; continue; }
+    if (ist) { degerler[k.id] = ist.degerler[k.id]; kaynaklar[k.id] = { tur: "istasyon", ad: ist.ad, mesafeKm: ist.mesafeKm, zaman: ist.zaman, alinma: ist.alinma || null, saglayici: ist.saglayici, kurum: ist.kurum || null }; continue; }
     const m = kalite?.[MODEL_ALAN[k.id]];
     if (Number.isFinite(m)) { degerler[k.id] = m; kaynaklar[k.id] = { tur: "model" }; }
   }
@@ -301,7 +301,7 @@ export function kaliteBirlestir(kalite, istasyonlar = []) {
   const g = istasyonVar || !Number.isFinite(kalite?.aqi) ? genelDurum(degerler) : null;
   const idx = g ? g.idx : eaqiIndeks(kalite.aqi);
   return { ...(kalite || {}), degerler, kaynaklar, genelIdx: idx, baskin: g?.baskin ?? genelDurum(degerler)?.baskin ?? null, genelKaynak: istasyonVar ? "istasyon" : "model",
-    istasyonlar: istasyonlar.map((s) => ({ ad: s.ad, mesafeKm: s.mesafeKm, zaman: s.zaman, kurum: s.kurum || null, saglayici: s.saglayici })) };
+    istasyonlar: istasyonlar.map((s) => ({ ad: s.ad, mesafeKm: s.mesafeKm, zaman: s.zaman, alinma: s.alinma || null, kurum: s.kurum || null, saglayici: s.saglayici })) };
 }
 
 /* ------------------------------ ANA GİRİŞ ------------------------------ */
@@ -309,28 +309,42 @@ export function kaliteBirlestir(kalite, istasyonlar = []) {
  * Konum için resmî istasyon verilerini toplar. Asla fırlatmaz. Dönen: { istasyonlar, gozlem, teshis } ya da (oturum yok / kapalı) null.
  * teshis: [{ kaynak, ok, ms, not }] — Ayarlar › Teşhis ve yönetici testi için.
  */
-export async function istasyonKatmani(konum, { sinyal = null } = {}) {
+export async function istasyonKatmani(konum, { sinyal = null, sadece = null } = {}) {
   try {
     if (!hkTercihOku().istasyon || !(await oturum())) return null;
     const ayar = await hkAyar(), teshis = [];
-    const olc = async (kaynak, is) => { const t0 = performance.now(); try { const v = await sureli(is(), ZAMAN_ASIMI_MS + 1500, SAGLAYICI_ADI[kaynak]); teshis.push({ kaynak, ok: true, ms: Math.round(performance.now() - t0), not: "" }); return v; } catch (h) { teshis.push({ kaynak, ok: false, ms: Math.round(performance.now() - t0), not: String(h?.message || h) }); return null; } };
+    // teshis.not: hata ya da (başarıda) sonucun ne olduğu ("2 istasyon", "ölçüm alındı"); alinma: bu kaynağın çekildiği an (ms).
+    const olc = async (kaynak, is) => {
+      const t0 = performance.now();
+      try {
+        const v = await sureli(is(), ZAMAN_ASIMI_MS + 1500, SAGLAYICI_ADI[kaynak]);
+        const not = Array.isArray(v) ? (v.length ? `${v.length} istasyon` : "yakında taze ölçüm yapan istasyon yok") : v ? "ölçüm alındı" : "";
+        teshis.push({ kaynak, ok: true, ms: Math.round(performance.now() - t0), not, alinma: Date.now() }); return v;
+      } catch (h) { teshis.push({ kaynak, ok: false, ms: Math.round(performance.now() - t0), not: String(h?.message || h), alinma: Date.now() }); return null; }
+    };
     const aq = async () => {
-      if (!ayar.kalite_istasyon_acik) return [];
+      if (sadece === "gozlem") return undefined;                                    // yalnızca gözlem yenileniyor: istasyonlara dokunma
+      if (!ayar.kalite_istasyon_acik) { teshis.push({ kaynak: "openaq", ok: false, ms: 0, not: "yönetici bu kaynağı kapattı", alinma: null, kapali: true }); return []; }
       const kimlik = await openaqKimlik(ayar);
-      if (!kimlik) { teshis.push({ kaynak: "openaq", ok: false, ms: 0, not: "anahtar yok (kendi ya da site anahtarı gerekir)" }); return []; }
-      return (await olc("openaq", () => openaqIstasyonlari(konum.lat, konum.lon, kimlik, { yaricapKm: ayar.yaricap_km, tazelikDk: ayar.tazelik_dk, sinyal }))) || [];
+      if (!kimlik) { teshis.push({ kaynak: "openaq", ok: false, ms: 0, not: "anahtar yok (kendi ya da site anahtarı gerekir)", alinma: null, anahtarYok: true }); return []; }
+      const l = (await olc("openaq", () => openaqIstasyonlari(konum.lat, konum.lon, kimlik, { yaricapKm: ayar.yaricap_km, tazelikDk: ayar.tazelik_dk, sinyal }))) || [];
+      const t = Date.now(); for (const x of l) x.alinma = t;
+      return l;
     };
     const gz = async () => {
+      if (sadece === "aq") return undefined;
+      let denendi = false;
       for (const id of ayar.gozlem_sira || []) {
-        if (!ayar.gozlem_acik?.[id]) continue;
-        if (id === "mgm" && String(konum.ulke || "").toUpperCase() !== "TR") continue;
+        if (!ayar.gozlem_acik?.[id]) { teshis.push({ kaynak: id, ok: false, ms: 0, not: "yönetici bu kaynağı kapattı", alinma: null, kapali: true }); continue; }
+        if (id === "mgm" && String(konum.ulke || "").toUpperCase() !== "TR") { teshis.push({ kaynak: id, ok: false, ms: 0, not: "yalnızca Türkiye konumlarında", alinma: null, atlandi: true }); continue; }
+        denendi = true;
         const o = await olc(id, () => (id === "mgm" ? mgmCek(konum, ayar.tazelik_dk, sinyal) : metarCek(konum.lat, konum.lon, ayar.tazelik_dk, sinyal)));
-        if (o) return o;
+        if (o) { o.alinma = Date.now(); return o; }
       }
-      return null;
+      void denendi; return null;
     };
     const [istasyonlar, gozlem] = await Promise.all([aq(), gz()]);
-    return { istasyonlar, gozlem, teshis, ayar };
+    return { istasyonlar, gozlem, teshis, ayar, alinma: Date.now() };
   } catch { return null; }
 }
 

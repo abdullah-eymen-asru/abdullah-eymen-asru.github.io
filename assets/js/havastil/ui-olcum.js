@@ -10,6 +10,7 @@
  */
 import { el, kart, bolumBasligi, ipucu, olay } from "./ui-temel.js";
 import { DURUM_AD } from "./dogrulama.js";
+import { sonCekilme } from "./ui-zaman.js";
 
 const tr = (x, n = 1) => (x == null ? "—" : Number(x).toLocaleString("tr-TR", { maximumFractionDigits: n }));
 const dakikaOnce = (iso) => { const dk = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000)); return dk < 2 ? "az önce" : dk < 90 ? `${dk} dk önce` : `${Math.round(dk / 60)} sa önce`; };
@@ -69,13 +70,14 @@ function neden(g) {
 }
 
 /** Tam kart. d.hava.gozlem yoksa null (ekran sade kalır). */
-export function olcumKarti(d) {
+export function olcumKarti(d, kb) {
   const g = d.hava?.gozlem, dg = d.hava?.dogrulama;
-  if (!g) return null;
-  const kb = kaynakBilgisi(g);
-  const kok = kart(`hv-olcum ${dg ? `genel-${dg.genel.durum}` : ""}`.trim(), bolumBasligi("Resmî ölçümle doğrulama", el("span", { class: "hv-olcum-rozet", title: kb.uzun }, el("span", { "aria-hidden": "true", text: kb.ikon }), el("span", { text: kb.rozet }))));
+  if (!g || d.vitrin || d.misafir) return null;                  // vitrin/misafirde resmî ölçüm kartı HİÇ çizilmez
+  const kay = kaynakBilgisi(g);
+  const kok = kart(`hv-olcum ${dg ? `genel-${dg.genel.durum}` : ""}`.trim(), bolumBasligi("Resmî ölçümle doğrulama", el("span", { class: "hv-olcum-rozet", title: kay.uzun }, el("span", { "aria-hidden": "true", text: kay.ikon }), el("span", { text: kay.rozet }))));
   kok.append(
-    el("p", { class: "hv-olcum-konum" }, el("strong", { text: istasyonCumlesi(d, g) }), el("span", { class: "hv-olcum-zaman", text: ` · ${dakikaOnce(g.zaman)} ölçüldü · ${kb.uzun}` })),
+    el("p", { class: "hv-olcum-konum" }, el("strong", { text: istasyonCumlesi(d, g) }), el("span", { class: "hv-olcum-zaman", text: ` · ${dakikaOnce(g.zaman)} ölçüldü · ${kay.uzun}` })),
+    sonCekilme(d, kb, g.saglayici, { olcumZamani: g.zaman }),
     dg && dg.satirlar.length ? karsilastirmaTablosu(dg) : yalnizOlcum(g));
   if (dg) {
     kok.append(el("p", { class: `hv-olcum-genel ${dg.genel.durum}`, text: `${dg.genel.durum === "uyumlu" ? "✅" : dg.genel.durum === "kucuk" ? "🟡" : dg.genel.durum === "belirgin" ? "🔶" : "ℹ️"} ${dg.genel.yazi}` }));
@@ -92,7 +94,7 @@ export function olcumKarti(d) {
 /** Bugün ekranı için tek satırlık güvence şeridi. Tıklayınca Derin analiz'deki tam karta gider. */
 export function olcumSeridi(d, kb) {
   const g = d.hava?.gozlem, dg = d.hava?.dogrulama;
-  if (!g) return null;
+  if (!g || d.vitrin || d.misafir) return null;
   const k = kaynakBilgisi(g);
   const ozet = !dg ? `Ölçülen ${tr(g.sicaklik)}°` : dg.duzeltme.uygulandi ? `Tahmin ölçüme göre ${dg.duzeltme.sicaklik > 0 ? "+" : ""}${tr(dg.duzeltme.sicaklik)}° düzeltildi` : dg.genel.durum === "uyumlu" ? "Tahminle uyumlu" : dg.genel.durum === "kucuk" ? "Küçük farklar var" : dg.genel.durum === "belirgin" ? "Ölçüm tahminden ayrışıyor" : `Ölçülen ${tr(g.sicaklik)}°`;
   const kok = el("section", { class: `hv-olcum-serit ${dg ? `genel-${dg.genel.durum}` : ""}`.trim(), "aria-label": "Resmî ölçüm doğrulaması" },

@@ -46,9 +46,30 @@ function gunEkle(tarih, n) {
   return new Date(Date.UTC(y, a - 1, g + n)).toISOString().slice(0, 10);
 }
 
+/* Oturum içi (yalnızca bellek) ham yanıtlar: tek bir kaynağı (ör. MGM) yenilerken modelleri yeniden çekmeden, düzeltme ÇİFT uygulanmadan baştan hesaplamak için. */
+const HAM_YANIT = new Map();
+const onbellekAnahtari = (lat, lon, istasyon) => `${ONBELLEK_ONEKI}${istasyon ? "" : "v_"}${nokta(lat)}_${nokta(lon)}`;   // vitrin/misafir önbelleği ayrıdır: oturumlu kullanıcının resmî ölçümü oraya sızmaz
+const konumOzeti = (lat, lon, konum) => ({ lat, lon, ulke: konum.ulke, il: konum.il, admin1: konum.admin1, admin2: konum.admin2, ad: konum.ad, ilce: konum.ilce });
+
+/** Ham model yanıtları + (varsa) istasyon katmanı → motorun veri nesnesi. Her çağrı BAŞTAN hesaplar (düzeltme yinelenmez). */
+function birlestir(ham, ist, tModel, temelUrl) {
+  const veri = ozetle(ham.ana, ham.modeller, ham.hk, ham.dk);
+  veri.kaynakZamani = { model: tModel, gozlem: null, istasyon: null };
+  if (ist) {
+    veri.kalite = kaliteBirlestir(veri.kalite, ist.istasyonlar || []); veri.gozlem = ist.gozlem || null; veri.kaynakTeshis = ist.teshis || [];
+    veri.kaynakZamani.gozlem = ist.gozlemAlinma ?? ist.gozlem?.alinma ?? null;
+    veri.kaynakZamani.istasyon = ist.istasyonAlinma ?? ((ist.istasyonlar || [])[0]?.alinma ?? null);
+    // Resmî ölçüm ↔ model doğrulaması: sapmayı hesaplar; (yönetici açtıysa) yakın saatleri ölçüme doğru düzeltir; yağış ölçümü şemsiye kararına yansır. Hata ana akışı bozmaz.
+    try { if (veri.gozlem) olcumleDogrula(veri, veri.gozlem, ist.ayar || {}); } catch { /* doğrulama yoksa model değerleri kalır */ }
+  } else veri.kalite = kaliteBirlestir(veri.kalite, []);
+  veri.kaynakUrl = `${temelUrl}&forecast_days=${GUN_SAYISI}`;
+  return veri;
+}
+function onbellegeYaz(anahtar, veri, t) { try { localStorage.setItem(anahtar, JSON.stringify({ t, veri })); } catch { /* yok say */ } }
+
 /** Hava + (başarısızsa sessiz geçen) çoklu model yağış kontrolü + hava kalitesi → motorun beklediği özet. */
 export async function havaGetir(lat, lon, { yenile = false, konum = null, istasyon = true } = {}) {
-  const anahtar = `${ONBELLEK_ONEKI}${nokta(lat)}_${nokta(lon)}`;
+  const anahtar = onbellekAnahtari(lat, lon, istasyon);
   try {
     const k = JSON.parse(localStorage.getItem(anahtar) || "null");
     if (!yenile && k && Date.now() - k.t < ONBELLEK_OMRU_MS) return { ...k.veri, alinma: k.t, eski: false, onbellek: true };
@@ -65,18 +86,12 @@ export async function havaGetir(lat, lon, { yenile = false, konum = null, istasy
       jsonAl(`${HAVA_KALITESI_URL}?latitude=${lat}&longitude=${lon}&timezone=auto&current=european_aqi,pm10,pm2_5,dust,ozone,nitrogen_dioxide,sulphur_dioxide,carbon_monoxide&hourly=european_aqi,pm10,pm2_5,dust,ozone,nitrogen_dioxide,sulphur_dioxide,carbon_monoxide&forecast_days=4`, 7000).catch(() => null),
       jsonAl(`${temel}&minutely_15=precipitation&forecast_minutely_15=12`, 5000).catch(() => null),             // 15 dk'lık yağış (bölgeye göre; yoksa null)
       // Resmî/yerel istasyon katmanı (hava-kaynak.js): hata ve zaman aşımı ana akışı ASLA bozmaz; sonuç yoksa model değerleri kalır.
-      istasyon && konum ? istasyonKatmani({ lat, lon, ulke: konum.ulke, il: konum.il, admin1: konum.admin1, admin2: konum.admin2, ad: konum.ad, ilce: konum.ilce }).catch(() => null) : Promise.resolve(null),
+      istasyon && konum ? istasyonKatmani(konumOzeti(lat, lon, konum)).catch(() => null) : Promise.resolve(null),
     ]);
-    const veri = ozetle(ana, modeller, hk, dk);
-    if (ist) {
-      veri.kalite = kaliteBirlestir(veri.kalite, ist.istasyonlar || []); veri.gozlem = ist.gozlem || null; veri.kaynakTeshis = ist.teshis || [];
-      // Resmî ölçüm ↔ model doğrulaması: sapmayı hesaplar; (yönetici açtıysa) yakın saatleri ölçüme doğru düzeltir; yağış ölçümü şemsiye kararına yansır. Hata ana akışı bozmaz.
-      try { if (veri.gozlem) olcumleDogrula(veri, veri.gozlem, ist.ayar || {}); } catch { /* doğrulama yoksa model değerleri kalır */ }
-    }
-    else veri.kalite = kaliteBirlestir(veri.kalite, []);
-    veri.kaynakUrl = `${temel}&forecast_days=${GUN_SAYISI}`;
-    const t0 = Date.now();
-    try { localStorage.setItem(anahtar, JSON.stringify({ t: t0, veri })); } catch { /* yok say */ }
+    const t0 = Date.now(), ham = { ana, modeller, hk, dk };
+    const veri = birlestir(ham, ist, t0, temel);
+    HAM_YANIT.set(anahtar, { ham, ist, tModel: t0, temel });
+    onbellegeYaz(anahtar, veri, t0);
     return { ...veri, alinma: t0, eski: false, onbellek: false };
   } catch (h) {
     try {
@@ -85,6 +100,30 @@ export async function havaGetir(lat, lon, { yenile = false, konum = null, istasy
     } catch { /* yok say */ }
     throw h;
   }
+}
+
+/**
+ * Tek bir resmî kaynak grubunu yeniden çeker; hava modelini YENİDEN ÇEKMEZ ("gozlem": MGM/METAR, "aq": hava kalitesi istasyonları).
+ * Önceki ham model yanıtları bellekte yoksa (sayfa yeni açıldı) null döner; çağıran tam yenilemeye geçer.
+ */
+export async function kaynakYenile(lat, lon, konum, hangi) {
+  const anahtar = onbellekAnahtari(lat, lon, true), eski = HAM_YANIT.get(anahtar);
+  if (!eski || !konum || (hangi !== "gozlem" && hangi !== "aq")) return null;
+  const yeni = await istasyonKatmani(konumOzeti(lat, lon, konum), { sadece: hangi }).catch(() => null);
+  if (!yeni) return null;
+  const onceki = eski.ist || {};
+  const teshis = [...(onceki.teshis || []).filter((x) => (hangi === "gozlem" ? !["mgm", "metar"].includes(x.kaynak) : x.kaynak !== "openaq")), ...(yeni.teshis || [])];
+  const ist = {
+    istasyonlar: hangi === "aq" ? yeni.istasyonlar || [] : onceki.istasyonlar || [],
+    gozlem: hangi === "gozlem" ? yeni.gozlem || null : onceki.gozlem || null,
+    istasyonAlinma: hangi === "aq" ? yeni.alinma : onceki.istasyonAlinma ?? (onceki.istasyonlar || [])[0]?.alinma ?? onceki.alinma ?? null,
+    gozlemAlinma: hangi === "gozlem" ? yeni.alinma : onceki.gozlemAlinma ?? onceki.gozlem?.alinma ?? onceki.alinma ?? null,
+    teshis, ayar: yeni.ayar || onceki.ayar || {}, alinma: yeni.alinma,
+  };
+  const veri = birlestir(eski.ham, ist, eski.tModel, eski.temel);
+  eski.ist = ist;
+  onbellegeYaz(anahtar, veri, eski.tModel);
+  return { ...veri, alinma: eski.tModel, eski: false, onbellek: false };
 }
 
 /** Kayıtlı bir konumun önbellekteki son sıcaklığı (konum kartları için; ağ yok). */

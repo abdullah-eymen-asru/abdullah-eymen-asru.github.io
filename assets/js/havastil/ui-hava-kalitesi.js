@@ -9,6 +9,7 @@
 import { el, kart, bolumBasligi, ipucu, olay } from "./ui-temel.js";
 import { KIRLETICILER, SEVIYELER, seviye, rehberYuzde, doluluk, degerSayisi, sinirlar, rehberMetni, bilimselAd, genelDurum, eaqiIndeks, tavsiyeler, KIRLETICI } from "./kirletici.js";
 import { olcumKarti } from "./ui-olcum.js";
+import { sonCekilme, zamanYazisi } from "./ui-zaman.js";
 
 const yuvarla1 = (x) => Math.round(x * 10) / 10;
 const dakikaOnce = (iso) => {
@@ -41,7 +42,7 @@ function seviyeBandi(idx) {
 }
 function kaynakRozeti(k) {
   if (k?.tur === "istasyon") return el("span", { class: "hv-hk-kaynak ist", title: `${k.kurum ? `${k.kurum} · ` : ""}${k.zaman ? dakikaOnce(k.zaman) : ""}`, text: `📡 İstasyon ölçümü${km(k.mesafeKm)}` });
-  return el("span", { class: "hv-hk-kaynak", title: "Copernicus CAMS atmosfer modeli (Open-Meteo)", text: "🛰️ Model tahmini" });
+  return el("span", { class: "hv-hk-kaynak", title: "Ölçüm değil: Copernicus CAMS atmosfer modelinin hesapladığı tahmin (Open-Meteo üzerinden)", text: "🛰️ Model tahmini" });
 }
 
 function olcekCubugu(k, v, sv) {
@@ -53,7 +54,15 @@ function olcekCubugu(k, v, sv) {
     el("div", { class: "hv-hk-cubuk", role: "img", "aria-label": `${k.ad}: ${sv.ad}. Seviye sınırları: ${sn.map((x) => `${x.ad} ${x.ust}`).join(", ")}` }, ...bantlar, isaret), etiketler);
 }
 
-function kirleticiKutusu(k, v, kaynak, etiket) {
+/** Kutunun altındaki küçük not: ölçüm saati (istasyon) ya da "model tahmini" + verinin çekildiği an. İleri günlerde çekilme saati yazılmaz (tahmin zaten model). */
+function zamanNotu(kaynak, etiket, alinma) {
+  if (etiket !== "şu an") return null;
+  const t = kaynak?.tur === "istasyon" ? (kaynak.alinma || alinma) : alinma;
+  const olcum = kaynak?.tur === "istasyon" && kaynak.zaman ? `Ölçüm saati ${new Date(Date.parse(kaynak.zaman)).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })} · ` : kaynak?.tur === "istasyon" ? "" : "Hesaplanmış tahmin · ";
+  return t ? el("small", { class: "hv-hk-k-zaman muted", text: `🕒 ${olcum}çekildi ${zamanYazisi(t)}` }) : null;
+}
+
+function kirleticiKutusu(k, v, kaynak, etiket, alinma) {
   const sv = seviye(k.id, v), sayi = degerSayisi(k.id, v);
   const kutu = el("div", { class: "hv-hk-kirletici" });
   const adBlok = el("span", { class: "hv-hk-k-adlar" }, el("strong", { text: k.ad }), el("small", { class: "hv-hk-bilimsel", text: bilimselAd(k.id) }));
@@ -72,6 +81,7 @@ function kirleticiKutusu(k, v, kaynak, etiket) {
     olcekCubugu(k, v, sv),
     el("small", { class: "hv-hk-k-deger", text: rehber ? `Dünya Sağlık Örgütü rehber sınırı ${rehber}${oran ? ` · ${oran}` : ""}` : "Bu madde için Dünya Sağlık Örgütü rehber sınırı yoktur." }),
     el("small", { class: "hv-hk-k-kaynak" }, kaynakRozeti(kaynak)),
+    zamanNotu(kaynak, etiket, alinma),
     ...(k.resmiIndeksYok ? [el("small", { class: "hv-ipucu", text: "Çöl tozu için resmî bir seviye ölçeği yoktur; bantlar HavaStil'in kendi ölçeğidir." })] : []));
   return kutu;
 }
@@ -102,7 +112,35 @@ function oneriler(gd) {
     t.baskinNot ? el("p", { class: "hv-hk-baskin", text: t.baskinNot }) : null);
 }
 
-function kaynakBolumu(kalite, gd, bugunMu) {
+/** "Neden istasyon değil de model?" — teşhis kayıtlarından sade Türkçe bir cümle. Vitrin/misafirde istasyon kaynakları hakkında HİÇBİR şey söylenmez. */
+function modelNedeni(d, gd, bugunMu) {
+  if (!bugunMu || gd.genelKaynak === "istasyon" || d.vitrin || d.misafir) return null;
+  const t = (d.hava?.kaynakTeshis || []).find((x) => x.kaynak === "openaq");
+  if (!t) return "Bu oturumda resmî istasyon kaynakları kullanılmadı (kapalı ya da giriş gerekli); bu yüzden model gösteriliyor.";
+  if (t.kapali) return "Yönetici istasyon kaynağını kapattığı için model gösteriliyor.";
+  if (t.anahtarYok) return "İstasyon verisi için OpenAQ anahtarı tanımlı değil; bu yüzden model gösteriliyor. (Ayarlar › Veri kaynakları)";
+  if (!t.ok) return `İstasyon kaynağına (OpenAQ) ulaşılamadı (${t.not}); bu yüzden model gösteriliyor.`;
+  return "Konumunun yakınında şu an ölçüm yapan istasyon bulunamadı. OpenAQ'da Türkiye için istasyon sayısı sınırlıdır; bu yüzden model gösteriliyor.";
+}
+
+/** Model değerleri gösterildiğinde (ya da ileri günde) KAPALI açıklama yerine görünür kısa not + "Model tahmini nedir?" açılırı. */
+function modelBilgi(d, gd, bugunMu) {
+  const modelVar = !bugunMu || Object.values(gd.kaynaklar || {}).some((k) => k?.tur === "model");
+  if (!modelVar) return null;
+  const neden = modelNedeni(d, gd, bugunMu);
+  return el("div", { class: "hv-hk-model-bilgi" },
+    el("p", { class: "hv-hk-model-ozet" }, el("strong", { text: "🛰️ Model tahmini ne demek? " }), el("span", { text: "Ölçüm değil, Copernicus atmosfer modelinin hesapladığı tahmindir; yaklaşık 10 km'lik bölgenin genel düzeyini verir." })),
+    neden ? el("p", { class: "hv-hk-neden", text: neden }) : null,
+    el("details", { class: "hv-hk-model-nedir" }, el("summary", { text: "Ayrıntılı açıklama" }), el("ul", { class: "hv-hk-kaynak-liste" }, ...MODEL_NEDIR.map((t) => el("li", { text: t })))));
+}
+
+const MODEL_NEDIR = [
+  "Model tahmini ölçüm değildir; bilgisayarın hesapladığı bir tahmindir. Avrupa'nın Copernicus (CAMS) atmosfer servisi; uydu gözlemlerini, yer ölçümlerini ve havanın fiziğini birleştirerek her yer için kirletici miktarını hesaplar.",
+  "Yaklaşık 10–11 km'lik karelerle çalışır: bir mahalledeki yoğun trafiği ya da tek bir fabrikayı göremez, bölgenin genel düzeyini verir. Yine de 4 gün ileriyi gösterebilen tek kaynaktır.",
+  "Yakında gerçek bir istasyon varsa onun ölçümü her zaman modele tercih edilir.",
+];
+
+function kaynakBolumu(d, kb, kalite, gd, bugunMu) {
   const ist = kalite?.istasyonlar || [];
   const satirlar = [];
   if (bugunMu && ist.length) {
@@ -116,14 +154,14 @@ function kaynakBolumu(kalite, gd, bugunMu) {
         : "İleri günler yalnızca atmosfer modelinden (Copernicus CAMS) gelir; ölçüm istasyonları geleceği bilemez. Model en fazla 4 gün ileriyi verir." }),
       ...satirlar,
       el("li", { text: "Değerler µg/m³ (metreküp havadaki mikrogram) cinsindendir; karbonmonoksit mg/m³ (miligram). Seviyeler Avrupa Çevre Ajansı'nın 6 kademeli hava kalitesi ölçeğine, oranlar Dünya Sağlık Örgütü 2021 rehber sınırlarına göre hesaplanır. Karbonmonoksit için Avrupa'da ölçek yoktur; Dünya Sağlık Örgütü ve AB sınırları kullanılır." }),
-      el("li", { text: "Kaynak sırası: önce resmî ölçüm istasyonları (OpenAQ üzerinden ülkelerin resmî ağları), olmazsa model. Anahtar ve kaynak ayarları: Doğrulama & Ayar › Ayarlar › Hava veri kaynakları." })));
+      ...(d.vitrin || d.misafir ? [] : [el("li", { text: "Kaynak sırası: önce konumuna yakın ölçüm istasyonları (OpenAQ), olmazsa model. Anahtar ve kaynak ayarları: Doğrulama & Ayar › Ayarlar › Veri kaynakları." })])));
 }
 
 /**
  * Açılır "Hava kalitesi" paneli. tarih: seçili günün YYYY-MM-DD'si; bugunMu: seçili gün bugün mü.
  * Açık/kapalı durumu d.hkAcik'te tutulur (sekme yeniden çizilse de korunur); tıklama yalnızca bu paneli günceller, sayfa zıplamaz.
  */
-export function havaKalitesiKarti(d, tarih, bugunMu) {
+export function havaKalitesiKarti(d, tarih, bugunMu, kb) {
   const kalite = d.hava?.kalite;
   const gd = gunDegerleri(kalite, tarih, bugunMu);
   const kok = el("section", { class: "hv-kart hv-hk" });
@@ -146,12 +184,14 @@ export function havaKalitesiKarti(d, tarih, bugunMu) {
       ...(gd.baskin && Number.isFinite(gd.degerler[gd.baskin]) ? [el("small", { class: "hv-hk-baskin-satir", text: `En yüksek: ${KIRLETICI[gd.baskin].ad} · ${degerSayisi(gd.baskin, gd.degerler[gd.baskin]).tam}` })] : [])),
     el("span", { class: "hv-hk-sag" }, kaynakRozeti(gd.genelKaynak === "istasyon" ? { tur: "istasyon", mesafeKm: kaynak?.mesafeKm } : { tur: "model" }), el("span", { class: "hv-hk-ok", "aria-hidden": "true", text: "▾" })),
     seviyeBandi(idx));
-  const kutular = KIRLETICILER.map((k) => kirleticiKutusu(k, gd.degerler[k.id], gd.kaynaklar[k.id], gd.etiket));
+  const kutular = KIRLETICILER.map((k) => kirleticiKutusu(k, gd.degerler[k.id], gd.kaynaklar[k.id], gd.etiket, d.hava?.alinma));
   const ic = el("div", { class: "hv-hk-ic" },
+    el("div", { class: "hv-hk-cekilmeler" }, bugunMu ? sonCekilme(d, kb, "model") : null, bugunMu ? sonCekilme(d, kb, "openaq") : null),
     oneriler(gd),
+    modelBilgi(d, gd, bugunMu),
     el("div", { class: "hv-hk-izgara" }, ...kutular),
     saatSeridi(kalite, tarih, d.hava?.saatListe?.[0]?.t),
-    kaynakBolumu(kalite, gd, bugunMu));
+    kaynakBolumu(d, kb, kalite, gd, bugunMu));
   const govde = el("div", { class: "hv-hk-govde", id: govdeId, role: "region", "aria-label": "Hava kalitesi ayrıntıları" }, ic);
   if (!acik) ic.setAttribute("inert", "");
   kok.classList.toggle("acik", acik);
@@ -166,6 +206,6 @@ export function havaKalitesiKarti(d, tarih, bugunMu) {
 }
 
 /** Eski ad korunur: Derin analiz bu işlevi çağırır; kart artık ui-olcum.js'te ("Resmî ölçümle doğrulama"). */
-export const gozlemKarti = olcumKarti;
+export const gozlemKarti = (d, kb) => olcumKarti(d, kb);
 
 export { KIRLETICI };

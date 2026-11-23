@@ -1003,3 +1003,45 @@ details.hv-uye-kart[open] > summary { margin-bottom: .5rem; }
 }
 :root[data-theme="dark"] .hv-olcum-rozet { color: #bff0d3; background: #123a24; border-color: #2c7a4c; }
 :root[data-theme="dark"] .hv-olcum-fark.uyumlu { background: #123a24; color: #bff0d3; } :root[data-theme="dark"] .hv-olcum-fark.kucuk { background: #4a3a0c; color: #ffe9b8; } :root[data-theme="dark"] .hv-olcum-fark.belirgin { background: #5a1d12; color: #ffd6cb; }
+
+/* ==========================================================================
+   Tur 22 — "Son çekilme" satırı · Veri durumu listesi · Derin analiz bölüm gezintisi · model açıklaması
+   ========================================================================== */
+.hv-bilgi-kutu { display: flex; flex-direction: column; gap: .35rem; margin: 0 0 .8rem; min-width: 0; }
+.hv-bilgi-kutu .hv-bilgi-serit { margin: 0; }
+.hv-veri-durumu { border: 1px solid var(--hv-cizgi); border-radius: 12px; background: var(--hv-yuzey); padding: .1rem .8rem; min-width: 0; }
+.hv-veri-durumu > summary { cursor: pointer; padding: .55rem 0; font-size: .85rem; font-weight: 600; list-style: none; display: flex; flex-wrap: wrap; align-items: center; gap: .15rem; }
+.hv-veri-durumu > summary::-webkit-details-marker { display: none; }
+.hv-veri-durumu > summary::after { content: "▾"; margin-left: auto; color: var(--muted); transition: transform .18s ease; }
+.hv-veri-durumu[open] > summary::after { transform: rotate(180deg); }
+.hv-veri-durumu > summary:focus-visible, .hv-bolum-chip:focus-visible, .hv-yenile-btn:focus-visible { outline: 2px solid var(--hv-mavi); outline-offset: 2px; }
+.hv-vd-liste { list-style: none; margin: 0; padding: 0 0 .3rem; display: flex; flex-direction: column; }
+.hv-vd-satir { display: flex; align-items: center; gap: .6rem; padding: .5rem 0; border-top: 1px solid var(--hv-cizgi); min-width: 0; }
+.hv-vd-ikon { flex: 0 0 auto; font-size: 1.1rem; }
+.hv-vd-metin { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: .1rem; }
+.hv-vd-metin strong { font-size: .84rem; }
+.hv-vd-metin small { font-size: .76rem; color: var(--muted); line-height: 1.35; overflow-wrap: anywhere; }
+.hv-vd-satir.ok .hv-vd-metin small::before { content: "● "; color: var(--hv-yesil); }
+.hv-vd-satir.uyari .hv-vd-metin small::before { content: "● "; color: var(--hv-sari); }
+.hv-vd-satir.kapali .hv-vd-metin small::before, .hv-vd-satir.yok .hv-vd-metin small::before { content: "○ "; color: var(--muted); }
+.hv-yenile-btn { min-height: 2rem; padding: .25rem .6rem; font-size: .78rem; flex: 0 0 auto; }
+.hv-cekilme { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .35rem .7rem; margin: 0; padding: .35rem .6rem; border-radius: 10px; background: rgba(120, 130, 150, .09); font-size: .78rem; color: var(--muted); }
+.hv-cekilme-yazi { min-width: 0; overflow-wrap: anywhere; }
+.hv-hk-cekilmeler { display: flex; flex-direction: column; gap: .35rem; }
+.hv-hk-cekilmeler:empty { display: none; }
+.hv-hk-k-zaman { font-size: .72rem; line-height: 1.35; }
+.hv-hk-neden { color: var(--text); font-weight: 600; }
+.hv-hk-model-nedir { margin-top: .4rem; border: 1px dashed var(--hv-cizgi); border-radius: 10px; padding: .1rem .7rem; }
+.hv-hk-model-nedir > summary { cursor: pointer; padding: .45rem 0; font-size: .84rem; font-weight: 600; }
+
+/* Derin analiz bölüm gezintisi: sarar (yatay kaydırma yok), seçili olan dolu renkli ve aria-pressed ile de işaretli */
+.hv-bolum-nav { display: flex; flex-wrap: wrap; gap: .4rem; margin: .1rem 0 .2rem; }
+.hv-bolum-chip { display: inline-flex; align-items: center; gap: .35rem; padding: .45rem .8rem; min-height: 2.5rem; border-radius: 999px; border: 1px solid var(--hv-cizgi); background: var(--bg); color: var(--text); font: inherit; font-size: .84rem; font-weight: 600; cursor: pointer; }
+.hv-bolum-chip[aria-pressed="true"] { background: var(--hv-mavi); border-color: var(--hv-mavi); color: #fff; }
+.hv-bolum-aciklama { margin: 0 0 .2rem; font-size: .8rem; }
+.hv-derin { display: flex; flex-direction: column; gap: .8rem; }
+@media (max-width: 480px) { .hv-bolum-chip { flex: 1 1 calc(50% - .4rem); justify-content: center; } .hv-vd-satir { align-items: flex-start; } }
+@media (prefers-reduced-motion: reduce) { .hv-veri-durumu > summary::after { transition: none; } }
+.hv-hk-model-bilgi { display: flex; flex-direction: column; gap: .3rem; padding: .6rem .75rem; border-radius: 12px; border: 1px dashed var(--hv-cizgi); background: rgba(74, 163, 255, .07); font-size: .82rem; line-height: 1.45; }
+.hv-hk-model-bilgi p { margin: 0; }
+.hv-hk-model-bilgi .hv-hk-model-nedir { margin: 0; border: 0; padding: 0; }

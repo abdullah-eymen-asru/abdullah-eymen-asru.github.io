@@ -24,7 +24,7 @@ const tarihYaz = (iso) => { try { return new Date(iso).toLocaleString("tr-TR", {
 
 export function havaKaynaklariKarti(d, kb) {
   const kok = kart("hv-hvk-kart", bolumBasligi("📡 Veri kaynakları"));
-  if (d.vitrin || d.misafir) { kok.append(ipucu("Giriş yaptığında resmî ölçümleri ve kendi hava kalitesi anahtarını burada yönetebilirsin. Misafirlerde yalnızca tahmin modeli (Open-Meteo / Copernicus) kullanılır.")); return kok; }
+  if (d.vitrin || d.misafir) { kok.append(ipucu("Bu görünümde hava verileri herkese açık tahmin modelinden gelir. Ek veri kaynakları için giriş yapman gerekir.")); return kok; }
 
   const durum = el("p", { class: "hv-hvk-durum", role: "status", "aria-live": "polite" });
   const mesaj = (m, hata = false) => { durum.textContent = m; durum.classList.toggle("hata", hata); durum.classList.toggle("basari", !hata && !!m); };
@@ -122,7 +122,7 @@ export function havaKaynaklariKarti(d, kb) {
 
     /* --- 3) hava kalitesi istasyonları --- */
     const kaliteSurgu = surgu({ ad: "Hava kalitesi için resmî istasyonlar", simge: "🌬️", acik: !!ayar.kalite_istasyon_acik,
-      aciklama: "Hava kalitesini (toz, ozon, azot gazı…) konuma en yakın resmî ölçüm istasyonundan alır. Kapalıysa ya da istasyon yoksa tahmin modeli kullanılır.",
+      aciklama: "Hava kalitesini (toz, ozon, azot gazı…) konuma en yakın ölçüm istasyonundan alır (OpenAQ). Dikkat: OpenAQ'da Türkiye için istasyon sayısı sınırlıdır; yakınında istasyon yoksa ya da kapalıysa Copernicus tahmin modeli kullanılır. Bu normaldir, hata değildir.",
       onDegis: (v) => degistir((y) => { y.kalite_istasyon_acik = v; }, `Hava kalitesi istasyonları ${v ? "açıldı" : "kapatıldı"}.`) });
     const kendiSurgu = surgu({ ad: "Kullanıcılar kendi anahtarını girebilsin", simge: "🔑", acik: ayar.kendi_anahtar_izni !== false,
       aciklama: "Açıkken her kullanıcı kendi ücretsiz OpenAQ anahtarını girebilir; girdiği anahtar yalnızca onun için kullanılır. Girmeyenler sitenin ortak anahtarını kullanır.",
