@@ -86,7 +86,7 @@ export function gunVeriPaketi(d, gi = 0, { ekGun = 0 } = {}) {
     basinc_egilimi: H.basincEgilim ?? null, basinc_fark_3_saat_hpa: H.basincFark3 ?? null, basinc_fark_12_saat_hpa: H.basincFark12 ?? null,
     gorus_m: H.gorus ?? null,
     hava_kalitesi: H.kalite ? kaliteVeriAlani(H.kalite) : null,
-    resmi_olcum: H.gozlem ? { kaynak: H.gozlem.saglayici === "mgm" ? "Meteoroloji Genel Müdürlüğü (MGM) resmî ölçümü" : "havalimanı resmî hava raporu (METAR)", istasyon: H.gozlem.ad, kod: H.gozlem.kod || null, konuma_uzaklik_km: H.gozlem.mesafeKm ?? null, olcum_zamani: H.gozlem.zaman,
+    resmi_olcum: H.gozlem ? { kaynak: H.gozlem.saglayici === "mgm" ? "Meteoroloji Genel Müdürlüğü (MGM) resmî ölçümü" : "havalimanı resmî hava raporu (METAR)", istasyon: H.gozlem.ad, kod: H.gozlem.kod || null, resmi_kaynak_sayfasi: H.gozlem.resmiUrl || null, konuma_uzaklik_km: H.gozlem.mesafeKm ?? null, olcum_zamani: H.gozlem.zaman,
       sicaklik_c: H.gozlem.sicaklik ?? null, hissedilen_c: H.gozlem.hissedilen ?? null, nem_yuzde: H.gozlem.nem ?? null, ruzgar_kmh: H.gozlem.ruzgar ?? null, ruzgar_yonu_derece: H.gozlem.yon ?? null, basinc_hpa: H.gozlem.basinc ?? null, gorus_m: H.gozlem.gorus ?? null, yagis_mm: H.gozlem.yagis ?? null } : null,
     olcum_dogrulama: dogrulamaOzeti(H.dogrulama),
     onumuzdeki_15_dakikalik_yagis_mm: (H.dakikalik || []).map((x) => ({ zaman: x.t, mm: x.mm })),

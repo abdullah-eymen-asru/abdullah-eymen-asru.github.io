@@ -53,6 +53,9 @@ export const VARSAYILAN_CONFIG = Object.freeze({
   notlar: { aktif: true, filtreCipleri: true },
   mesajlar: { aktif: true }, // Sohbet / Mesajlar (örnek sohbetler; gönderme/silme salt-okunur toast'a takılır)
   sistem: { aktif: true },
+  araclar: { aktif: true }, // Araçlar: PDF & Belge Çalışma Alanı + Medya Araçları (salt-okunur; sunucuya giden eylemler toast'a takılır) — migration 0149
+  yorumlar: { aktif: true }, // Yorumlarım (örnek yorumlar; düzenle/sil salt-okunur) — migration 0149
+  durum: { aktif: true }, // Sistem Durumu: tamamen ÖRNEK, ağ isteği yok — migration 0149
   havastil: { aktif: true, misafir: true }, // HavaStil vitrini (İstanbul; konum kaydetme ve Mod B kapalı) — migration 0101; misafir: oturumsuz ziyaretçi /panel/havastil/'e doğrudan girer — migration 0102
 });
 
@@ -65,6 +68,10 @@ export const DEMO_SEKMELERI = Object.freeze({
   "users-mesajlar": "mesajlar",
   "sys-metrik": "sistem",
   "tool-havastil": "havastil",
+  "tool-calisma-alani": "araclar",
+  "tool-medya": "araclar",
+  "me-yorumlarim": "yorumlar",
+  "sys-durum": "durum",
 });
 
 /* ------------------------------ bayrak ------------------------------ */
@@ -177,7 +184,7 @@ export async function demoCikisYap(supabaseUrl, anonAnahtar) {
 function birlestir(taban, gelen) {
   const cikti = JSON.parse(JSON.stringify(taban));
   if (!gelen || typeof gelen !== "object") return cikti;
-  for (const bolum of ["hub", "pdf", "arsiv", "notlar", "mesajlar", "sistem", "havastil"]) {
+  for (const bolum of ["hub", "pdf", "arsiv", "notlar", "mesajlar", "sistem", "havastil", "araclar", "yorumlar", "durum"]) {
     const g = gelen[bolum];
     if (!g || typeof g !== "object") continue;
     for (const alan of Object.keys(cikti[bolum])) {

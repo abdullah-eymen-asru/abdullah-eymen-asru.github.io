@@ -9,7 +9,7 @@
 import { el, kart, bolumBasligi, ipucu, olay } from "./ui-temel.js";
 import { KIRLETICILER, SEVIYELER, seviye, rehberYuzde, doluluk, degerSayisi, sinirlar, rehberMetni, bilimselAd, genelDurum, eaqiIndeks, tavsiyeler, KIRLETICI } from "./kirletici.js";
 import { olcumKarti } from "./ui-olcum.js";
-import { sonCekilme, zamanYazisi } from "./ui-zaman.js";
+import { sonCekilme, zamanYazisi, resmiSiteBaglantisi } from "./ui-zaman.js";
 
 const yuvarla1 = (x) => Math.round(x * 10) / 10;
 const dakikaOnce = (iso) => {
@@ -144,7 +144,7 @@ function kaynakBolumu(d, kb, kalite, gd, bugunMu) {
   const ist = kalite?.istasyonlar || [];
   const satirlar = [];
   if (bugunMu && ist.length) {
-    for (const s of ist.slice(0, 3)) satirlar.push(el("li", { text: `${s.ad}${km(s.mesafeKm)} · ${s.zaman ? dakikaOnce(s.zaman) : ""}${s.kurum ? ` · ${s.kurum}` : ""}` }));
+    for (const s of ist.slice(0, 3)) satirlar.push(el("li", {}, el("span", { text: `${s.ad}${km(s.mesafeKm)} · ${s.zaman ? dakikaOnce(s.zaman) : ""}${s.kurum ? ` · ${s.kurum}` : ""} ` }), resmiSiteBaglantisi({ saglayici: s.saglayici || "openaq", resmiUrl: s.resmiUrl }, { kisa: true, sinif: "hv-resmi-link hv-resmi-link--satir" })));
   }
   return el("details", { class: "hv-hk-kaynak-bolum" },
     el("summary", { text: "Bu veriler nereden geliyor?" }),

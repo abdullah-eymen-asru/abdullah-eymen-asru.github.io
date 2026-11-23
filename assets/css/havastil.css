@@ -1045,3 +1045,13 @@ details.hv-uye-kart[open] > summary { margin-bottom: .5rem; }
 .hv-hk-model-bilgi { display: flex; flex-direction: column; gap: .3rem; padding: .6rem .75rem; border-radius: 12px; border: 1px dashed var(--hv-cizgi); background: rgba(74, 163, 255, .07); font-size: .82rem; line-height: 1.45; }
 .hv-hk-model-bilgi p { margin: 0; }
 .hv-hk-model-bilgi .hv-hk-model-nedir { margin: 0; border: 0; padding: 0; }
+
+/* Tur 23 — resmî kaynağa doğrulama bağlantıları */
+.hv-resmi-link { display: inline-flex; align-items: center; gap: .25rem; color: var(--hv-mavi); font-weight: 600; font-size: .78rem; text-decoration: none; border-bottom: 1px dashed currentColor; width: fit-content; min-height: 1.5rem; }
+.hv-resmi-link:hover { border-bottom-style: solid; }
+.hv-resmi-link:focus-visible { outline: 2px solid var(--hv-mavi); outline-offset: 2px; border-radius: 3px; }
+.hv-resmi-link--buyuk { font-size: .86rem; padding: .4rem .75rem; border: 1px solid var(--hv-mavi); border-radius: 999px; min-height: 2.25rem; }
+.hv-resmi-link--buyuk:hover { background: rgba(74, 163, 255, .12); }
+.hv-resmi-link--satir { margin-top: .1rem; }
+.hv-olcum-dogrula { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .75rem; margin: .1rem 0 .3rem; }
+.hv-olcum-dogrula small { font-size: .76rem; line-height: 1.35; }

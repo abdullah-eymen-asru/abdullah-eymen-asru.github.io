@@ -172,7 +172,7 @@ export function istasyonOzetle(konumKaydi, km, latest, tazelikDk = 180) {
     degerler[kimlikAdi] = Math.round(v * 10) / 10;
     if (!zaman || Date.parse(t) > Date.parse(zaman)) zaman = t;
   }
-  return { saglayici: "openaq", ad: konumKaydi.name || `İstasyon ${konumKaydi.id}`, mesafeKm: Math.round(km * 10) / 10, zaman, kurum: konumKaydi.provider?.name || konumKaydi.owner?.name || null, degerler };
+  return { saglayici: "openaq", ad: konumKaydi.name || `İstasyon ${konumKaydi.id}`, resmiUrl: konumKaydi.id != null ? `https://explore.openaq.org/locations/${encodeURIComponent(konumKaydi.id)}` : null, mesafeKm: Math.round(km * 10) / 10, zaman, kurum: konumKaydi.provider?.name || konumKaydi.owner?.name || null, degerler };
 }
 
 
@@ -213,7 +213,7 @@ export function metarOzetle(liste, lat, lon, { maksKm = METAR_MAKS_KM, tazelikDk
   const kt = (x) => (sayiMi(x) == null ? null : Math.round(x * 1.852));
   let basinc = sayiMi(m.slp) ?? sayiMi(m.altim); if (basinc != null && basinc < 50) basinc = basinc * 33.8639;      // inHg → hPa
   let gorus = null; if (m.visib != null) { const v = parseFloat(String(m.visib).replace("+", "")); if (Number.isFinite(v)) gorus = Math.round(v * 1609.34); }
-  return { saglayici: "metar", ad: havalimaniAdi(m.icaoId, m.name), kod: m.icaoId || null, mesafeKm: Math.round(en.km * 10) / 10, zaman: new Date(en.t).toISOString(),
+  return { saglayici: "metar", ad: havalimaniAdi(m.icaoId, m.name), kod: m.icaoId || null, resmiUrl: m.icaoId ? `https://aviationweather.gov/data/metar/?ids=${encodeURIComponent(m.icaoId)}&hours=3` : null, mesafeKm: Math.round(en.km * 10) / 10, zaman: new Date(en.t).toISOString(),
     sicaklik, cig, nem: nemHesapla(sicaklik, cig), ruzgar: kt(m.wspd), yon: sayiMi(m.wdir), hamle: kt(m.wgst), basinc: basinc == null ? null : Math.round(basinc * 10) / 10, gorus };
 }
 async function metarCek(lat, lon, tazelikDk, sinyal) {
@@ -228,6 +228,21 @@ async function metarCek(lat, lon, tazelikDk, sinyal) {
 const mgmSayi = (x) => (typeof x === "number" && Number.isFinite(x) && x > -9000 ? x : null);
 const mgmKonum = (m) => ({ lat: Number(m?.enlem ?? m?.lat ?? m?.latitude), lon: Number(m?.boylam ?? m?.lon ?? m?.longitude) });
 const mgmAd = (m) => [m?.ilce, m?.il].filter((x, i, a) => x && a.indexOf(x) === i).join(", ") || "MGM istasyonu";
+/** MGM'nin KENDİ sitesindeki ilgili il/ilçe sayfası: aynı canlı gözlemi orada görüp kıyaslayabilmen için (yeni sekmede açılır). */
+export function mgmResmiUrl(m) {
+  const il = String(m?.il || "").trim(), ilce = String(m?.ilce || "").trim();
+  if (!il) return "https://www.mgm.gov.tr/tahmin/il-ve-ilceler.aspx";
+  return `https://www.mgm.gov.tr/tahmin/il-ve-ilceler.aspx?il=${encodeURIComponent(il)}${ilce && ilce.toLocaleLowerCase("tr") !== il.toLocaleLowerCase("tr") ? `&ilce=${encodeURIComponent(ilce)}` : ""}`;
+}
+/** Gözlem/istasyon kaydı → resmî kaynağa doğrulama bağlantısı { url, yazi, kurum } ya da null. */
+export function resmiBaglanti(g) {
+  if (!g || !g.saglayici) return null;
+  if (g.saglayici === "mgm") return { url: g.resmiUrl || mgmResmiUrl({ il: g.il, ilce: g.ilce }), yazi: "MGM'nin resmî sitesinde doğrula", kurum: "Meteoroloji Genel Müdürlüğü (mgm.gov.tr)" };
+  if (g.saglayici === "metar") return g.kod ? { url: g.resmiUrl || `https://aviationweather.gov/data/metar/?ids=${encodeURIComponent(g.kod)}&hours=3`, yazi: "Resmî havalimanı raporunu aç", kurum: "ABD Ulusal Hava Servisi · Aviation Weather Center (aviationweather.gov)" } : null;
+  if (g.saglayici === "openaq") return g.resmiUrl ? { url: g.resmiUrl, yazi: "İstasyonu OpenAQ'da aç", kurum: "OpenAQ (openaq.org)" } : null;
+  return null;
+}
+
 /** Saf: MGM merkez kaydı + son durum satırı → gözlem. -9999 = ölçüm yok. */
 export function mgmOzetle(merkez, satir, lat, lon) {
   if (!satir) return null;
@@ -235,7 +250,7 @@ export function mgmOzetle(merkez, satir, lat, lon) {
   const zaman = satir.veriZamani ? new Date(satir.veriZamani).toISOString() : null;
   if (!zaman || mgmSayi(satir.sicaklik) == null) return null;
   const basinc = mgmSayi(satir.denizeIndirgenmisBasinc) ?? mgmSayi(satir.aktuelBasinc);
-  return { saglayici: "mgm", ad: mgmAd(merkez), mesafeKm: Number.isFinite(km) ? Math.round(km * 10) / 10 : null, zaman, istNo: satir.istNo ?? merkez?.sondurumIstNo ?? null,
+  return { saglayici: "mgm", ad: mgmAd(merkez), il: merkez?.il || null, ilce: merkez?.ilce || null, resmiUrl: mgmResmiUrl(merkez), mesafeKm: Number.isFinite(km) ? Math.round(km * 10) / 10 : null, zaman, istNo: satir.istNo ?? merkez?.sondurumIstNo ?? null,
     sicaklik: mgmSayi(satir.sicaklik), hissedilen: mgmSayi(satir.hissedilenSicaklik), nem: mgmSayi(satir.nem), cig: null, ruzgar: mgmSayi(satir.ruzgarHiz) == null ? null : Math.round(satir.ruzgarHiz),
     yon: mgmSayi(satir.ruzgarYon), hamle: null, basinc, gorus: mgmSayi(satir.gorus), yagis: mgmSayi(satir.yagis00Now) };
 }
@@ -292,7 +307,7 @@ export function kaliteBirlestir(kalite, istasyonlar = []) {
   const degerler = {}, kaynaklar = {};
   for (const k of KIRLETICILER) {
     const ist = istasyonlar.find((s) => Number.isFinite(s.degerler?.[k.id]));
-    if (ist) { degerler[k.id] = ist.degerler[k.id]; kaynaklar[k.id] = { tur: "istasyon", ad: ist.ad, mesafeKm: ist.mesafeKm, zaman: ist.zaman, alinma: ist.alinma || null, saglayici: ist.saglayici, kurum: ist.kurum || null }; continue; }
+    if (ist) { degerler[k.id] = ist.degerler[k.id]; kaynaklar[k.id] = { tur: "istasyon", ad: ist.ad, mesafeKm: ist.mesafeKm, zaman: ist.zaman, alinma: ist.alinma || null, saglayici: ist.saglayici, kurum: ist.kurum || null, resmiUrl: ist.resmiUrl || null }; continue; }
     const m = kalite?.[MODEL_ALAN[k.id]];
     if (Number.isFinite(m)) { degerler[k.id] = m; kaynaklar[k.id] = { tur: "model" }; }
   }
@@ -301,7 +316,7 @@ export function kaliteBirlestir(kalite, istasyonlar = []) {
   const g = istasyonVar || !Number.isFinite(kalite?.aqi) ? genelDurum(degerler) : null;
   const idx = g ? g.idx : eaqiIndeks(kalite.aqi);
   return { ...(kalite || {}), degerler, kaynaklar, genelIdx: idx, baskin: g?.baskin ?? genelDurum(degerler)?.baskin ?? null, genelKaynak: istasyonVar ? "istasyon" : "model",
-    istasyonlar: istasyonlar.map((s) => ({ ad: s.ad, mesafeKm: s.mesafeKm, zaman: s.zaman, alinma: s.alinma || null, kurum: s.kurum || null, saglayici: s.saglayici })) };
+    istasyonlar: istasyonlar.map((s) => ({ ad: s.ad, mesafeKm: s.mesafeKm, zaman: s.zaman, alinma: s.alinma || null, kurum: s.kurum || null, saglayici: s.saglayici, resmiUrl: s.resmiUrl || null })) };
 }
 
 /* ------------------------------ ANA GİRİŞ ------------------------------ */

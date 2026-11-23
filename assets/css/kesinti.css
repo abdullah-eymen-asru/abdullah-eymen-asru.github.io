@@ -80,3 +80,33 @@
 .sd-rozet-m { display: inline-flex; justify-content: center; align-items: center; width: 1.3em; height: 1.3em; border-radius: 50%; font-size: .75rem; font-weight: 700; color: #fff; }
 .sd-rozet-ok { background: #1f9d55; } .sd-rozet-uyari { background: #e0a800; } .sd-rozet-hata { background: #d64538; }
 .sd-rehber summary { cursor: pointer; font-weight: 600; padding: .35rem 0; }
+
+/* ---- Sistem Durumu › HavaStil sağlığı (ayrı, varsayılan kapalı bölüm; mevcut kartlara dokunmaz) ---- */
+.sd-hv { border: 1px solid var(--border, #ccc); border-radius: 14px; background: var(--card-bg, var(--bg, #fff)); min-width: 0; }
+.sd-hv > summary { cursor: pointer; list-style: none; display: flex; flex-wrap: wrap; align-items: center; gap: .2rem .4rem; padding: .8rem 1rem; }
+.sd-hv > summary::-webkit-details-marker { display: none; }
+.sd-hv > summary::after { content: "▾"; margin-left: auto; color: var(--muted, #666); transition: transform .18s ease; }
+.sd-hv[open] > summary::after { transform: rotate(180deg); }
+.sd-hv > summary:focus-visible, .sd-hv-yeniden:focus-visible, .sd-hv-link:focus-visible { outline: 2px solid var(--accent, #1d5fd1); outline-offset: 2px; }
+.sd-hv-alt { font-size: .82rem; }
+.sd-hv-rozet { font-size: .76rem; font-weight: 700; padding: .12rem .55rem; border-radius: 999px; color: #fff; background: #8a8a8a; }
+.sd-hv-rozet--ok { background: #1f9d55; } .sd-hv-rozet--uyari { background: #b98600; } .sd-hv-rozet--hata { background: #d64538; }
+.sd-hv-govde { display: grid; gap: .9rem; padding: 0 1rem 1rem; }
+.sd-hv-giris { margin: 0; font-size: .82rem; }
+.sd-hv-grup h4 { margin: 0 0 .3rem; font-size: .92rem; }
+.sd-hv-grup h4 small { font-weight: 400; font-size: .78rem; }
+.sd-hv-liste { list-style: none; margin: 0; padding: 0; display: grid; }
+.sd-hv-satir { display: grid; grid-template-columns: 1.6rem minmax(0, 1fr) auto; gap: .6rem; align-items: start; padding: .55rem 0; border-top: 1px solid var(--border, #ddd); }
+.sd-hv-isaret { width: 1.35rem; height: 1.35rem; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: .72rem; font-weight: 700; color: #fff; background: #8a8a8a; margin-top: .1rem; }
+.sd-hv-ok .sd-hv-isaret { background: #1f9d55; } .sd-hv-uyari .sd-hv-isaret { background: #b98600; } .sd-hv-hata .sd-hv-isaret { background: #d64538; } .sd-hv-bekle .sd-hv-isaret { background: #1d5fd1; }
+.sd-hv-metin { display: flex; flex-direction: column; gap: .12rem; min-width: 0; }
+.sd-hv-metin strong { font-size: .88rem; }
+.sd-hv-metin small { font-size: .78rem; line-height: 1.4; color: var(--muted, #666); overflow-wrap: anywhere; }
+.sd-hv-sonuc { color: var(--text, #111) !important; }
+.sd-hv-hata .sd-hv-sonuc { color: #c0392b !important; font-weight: 600; }
+.sd-hv-oneri { border-left: 3px solid #b98600; padding-left: .5rem; }
+.sd-hv-hata .sd-hv-oneri { border-left-color: #d64538; }
+.sd-hv-link { font-size: .76rem; color: var(--accent, #1d5fd1); width: fit-content; }
+.sd-hv-yeniden { font: inherit; min-width: 2.2rem; min-height: 2.2rem; border-radius: 8px; border: 1px solid var(--border, #ccc); background: transparent; color: var(--text, #111); cursor: pointer; }
+.sd-hv-yeniden:hover { border-color: var(--accent, #1d5fd1); }
+@media (prefers-reduced-motion: reduce) { .sd-hv > summary::after { transition: none; } }

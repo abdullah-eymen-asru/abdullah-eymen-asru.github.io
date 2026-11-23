@@ -284,7 +284,14 @@ const RPC_SABIT = {
   is_owner: false,
   is_admin: false,
   sistem_export_yetkisi_var_mi: false,
-  donusturucu_yetkisi_var_mi: false,
+  donusturucu_yetkisi_var_mi: true, // Araçlar vitrini: tarayıcıda çalışan araçlar açık (sunucuya giden her şey ağ kalkanında durur)
+  arac_yetkisi_var_mi: true,
+  donusturucu_yonetim_yetkisi_var_mi: false, // yönetim/kota ekranları demoda YOK
+  _yorum_moderator: false,
+  yorumlarim_listele: [
+    { id: 9001, metin: "Bu yazıdaki yöntem açıklaması çok anlaşılırdı, teşekkürler.", tarih: once(2), gizli: false, anonim: false, rumuz: null, duzenlendi: false, icerik_anahtari: "/" },
+    { id: 9002, metin: "Örnek bir yorum: kaynakça bölümüne bir iki kaynak daha eklenebilir.", tarih: once(6), gizli: false, anonim: false, rumuz: null, duzenlendi: true, icerik_anahtari: "/" },
+  ],
   hukuki_metin_yetkisi_var_mi: false,
   hesap_silme_inceleme_yetkisi_var_mi: false,
   yetki_ayarlari_yonetim_yetkisi_var_mi: false,

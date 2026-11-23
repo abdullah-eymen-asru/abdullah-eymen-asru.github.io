@@ -10,6 +10,7 @@
  * CSP: inline stil/işleyici yok.
  */
 import { el, olay } from "./ui-temel.js";
+import { resmiBaglanti } from "./hava-kaynak.js";
 
 const SAAT = (ms) => new Date(ms).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
 export function zamanYazisi(ms) {
@@ -18,6 +19,13 @@ export function zamanYazisi(ms) {
   const once = dk < 1 ? "az önce" : dk < 90 ? `${dk} dk önce` : dk < 1440 ? `${Math.round(dk / 60)} sa önce` : `${Math.round(dk / 1440)} gün önce`;
   const bugunMu = new Date(ms).toDateString() === new Date().toDateString();
   return `${bugunMu ? "" : `${new Date(ms).toLocaleDateString("tr-TR", { day: "numeric", month: "short" })} `}${SAAT(ms)} (${once})`;
+}
+
+/** Resmî kaynağın KENDİ sayfasına bağlantı ("↗" yeni sekmede açılır). Veri nereden çekildiyse orada doğrulanabilsin. Bağlantı yoksa null. */
+export function resmiSiteBaglantisi(g, { sinif = "hv-resmi-link", kisa = false } = {}) {
+  const b = resmiBaglanti(g);
+  if (!b || !/^https:\/\//.test(b.url)) return null;
+  return el("a", { class: sinif, href: b.url, target: "_blank", rel: "noopener noreferrer", title: `${b.kurum} — veriyi kaynağında kendin gör`, "aria-label": `${b.yazi} (yeni sekmede açılır)` }, el("span", { text: kisa ? "Resmî site ↗" : `${b.yazi} ↗` }));
 }
 
 const AD = { model: "Hava tahmini ve hava kalitesi modeli", mgm: "Meteoroloji Genel Müdürlüğü (MGM)", metar: "Havalimanı resmî raporu (METAR)", openaq: "Hava kalitesi istasyonları (OpenAQ)", haber: "Uyarılar ve haberler" };
@@ -85,6 +93,15 @@ function durumSatiri(d, kaynak) {
   return { sinif: "yok", yazi: kaynak === "metar" && d.hava?.gozlem ? "Gerekmedi (daha öncelikli kaynak yanıt verdi)" : "Denenmedi" };
 }
 
+/** Satırın altındaki "resmî sitede aç" bağlantısı: gözlem bu kaynaktansa kayda özel sayfa (örn. Ataşehir istasyonu), değilse kaynağın genel sayfası. */
+const GENEL_SAYFA = { mgm: "https://www.mgm.gov.tr/tahmin/il-ve-ilceler.aspx", metar: "https://aviationweather.gov/data/metar/", openaq: "https://explore.openaq.org/" };
+function resmiSatirBaglantisi(d, kaynak) {
+  if (!GENEL_SAYFA[kaynak]) return null;
+  const g = d.hava?.gozlem?.saglayici === kaynak ? d.hava.gozlem : kaynak === "openaq" ? (d.hava?.kalite?.istasyonlar || [])[0] : null;
+  const ozel = g ? resmiSiteBaglantisi(g, { sinif: "hv-resmi-link hv-resmi-link--satir" }) : null;
+  return ozel || el("a", { class: "hv-resmi-link hv-resmi-link--satir", href: GENEL_SAYFA[kaynak], target: "_blank", rel: "noopener noreferrer", "aria-label": "Resmî kaynağın sitesini aç (yeni sekmede açılır)" }, el("span", { text: "Resmî siteyi aç ↗" }));
+}
+
 /** Sayfanın üstündeki açılır liste. Her satır: kaynak adı · durum · son çekilme · yenile. */
 export function veriDurumu(d, kb) {
   const kaynaklar = kapaliMi(d) ? ["model"] : ["model", "mgm", "metar", "openaq", "haber"];
@@ -93,7 +110,7 @@ export function veriDurumu(d, kb) {
     const yenilenebilir = k === "model" || k === "haber" ? true : dur.sinif !== "kapali";
     return el("li", { class: `hv-vd-satir ${dur.sinif}` },
       el("span", { class: "hv-vd-ikon", "aria-hidden": "true", text: IKON[k] }),
-      el("span", { class: "hv-vd-metin" }, el("strong", { text: AD[k] }), el("small", { text: `${dur.yazi}${t ? ` · ${zamanYazisi(t)}` : ""}` })),
+      el("span", { class: "hv-vd-metin" }, el("strong", { text: AD[k] }), el("small", { text: `${dur.yazi}${t ? ` · ${zamanYazisi(t)}` : ""}` }), resmiSatirBaglantisi(d, k)),
       yenilenebilir ? yenileDugmesi(d, kb, k, { kisa: true }) : null);
   });
   const kok = el("details", { class: "hv-veri-durumu" },

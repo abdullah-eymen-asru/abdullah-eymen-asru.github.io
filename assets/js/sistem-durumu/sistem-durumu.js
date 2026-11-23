@@ -6,6 +6,8 @@
  * CSP: inline stil/olay yok, innerHTML yok.
  */
 import { supabase } from "../core/supabase-client.js";
+import { havastilSaglikBolumu } from "./havastil-saglik.js";
+import { isDemoMode } from "../demo/demo-durum.js";
 import { workerJson } from "../sistem-yedek/ortak.js";
 import { durum as kd, saglikKontrol, kuyrukOzet, kuyrukTemizle, kesintiOlay, kesintiOturumu, depoOzeti, onbellekTemizle, kasaOlustur, kasaSil, kasaVarMi } from "../core/kesinti.js";
 
@@ -196,7 +198,10 @@ async function kaliciKur(oturum) {
 
   if (yonetici) import("../r2-arsiv/depolama.js").then((m) => m.depolamaGostergesiKur(r2Yer, { esitle: false, sahip: rol === "owner" })).catch(() => {});
   if (yonetici) import("../sistem-yedek/r2-kota.js").then((m) => m.r2KotaKartiKur(r2Yer, { baslik: "R2 kullanımı (bu ay) — tüm kovalar" })).catch(() => {});
-  return { r2Yer, workerKutu, renderKutu, kesintiRehberi, rol, yonetici, workerIzin };
+  /* HavaStil sağlığı: kendi ayrı, varsayılan kapalı bölümü; yalnızca HavaStil'i kullanabilen hesaplara (Worker çağrıları o yetkiyi ister). Demo'da çizilmez. */
+  let havastil = null;
+  if (!isDemoMode && oturum) { try { const { data } = await supabase.rpc("havastil_yetkisi_var_mi"); if (data === true) havastil = havastilSaglikBolumu({ supabase, oturum }); } catch { /* HavaStil yoksa bölüm de yok */ } }
+  return { r2Yer, workerKutu, renderKutu, kesintiRehberi, rol, yonetici, workerIzin, havastil };
 }
 
 async function ciz() {
@@ -290,7 +295,7 @@ async function ciz() {
   const alt = el("p", { class: "kst-alt", text: `Son kontrol: ${new Date().toLocaleTimeString("tr-TR")}. Tüm kontroller doğrudan tarayıcından yapılır; Cloudflare kotası harcanmaz. Sayfa açıkken 60 sn'de bir otomatik yenilenir.` });
 
   kalici ||= await kaliciKur(oturum);
-  const { r2Yer, workerKutu, renderKutu, kesintiRehberi, rol, yonetici, workerIzin } = kalici;
+  const { r2Yer, workerKutu, renderKutu, kesintiRehberi, rol, yonetici, workerIzin, havastil } = kalici;
 
   kok.replaceChildren(ozet,
     el("h3", { class: "sd-bolum-baslik", text: "Çekirdek servisler" }), el("div", { class: "sd-izgara" }, ...kartlar.slice(0, 3)),
@@ -298,11 +303,17 @@ async function ciz() {
     el("h3", { class: "sd-bolum-baslik", text: "Bu cihaz" }), el("div", { class: "sd-izgara" }, ...cihaz), await cihazVerileriKarti(oturum),
     ...(yonetici || workerIzin ? [el("h3", { class: "sd-bolum-baslik", text: yonetici ? "Kotalar & Worker'lar" : "Worker sınaması" }), ...(yonetici ? [r2Yer] : []), workerKutu, ...(yonetici ? [renderKutu] : [])]
       : [el("p", { class: "kst-alt", text: "Cloudflare Worker sınaması sistem kotasını harcadığı için varsayılan olarak yalnızca yönetici ve site sahibine açıktır; site sahibi Yetki Ayarları'ndan rolüne açabilir. Yukarıdaki kontroller herkes için ücretsizdir." })]), alt);
+  if (havastil) kok.append(el("h3", { class: "sd-bolum-baslik", text: "HavaStil" }), havastil);   // AYNI düğüm: 60 sn'lik yenilemede durumunu korur
   if (yonetici) kok.append(kesintiRehberi);
 }
 
 let zaman = null;
 function planla() { clearTimeout(zaman); zaman = setTimeout(async () => { if (!document.hidden && kok && kok.offsetParent !== null) await ciz().catch(() => {}); planla(); }, 60000); }
-ciz().catch((h) => { if (kok) kok.textContent = `Durum okunamadı: ${h.message}`; });
-planla();
-kesintiOlay("kesinti-durum", () => { /* sonraki turda tazelenir */ });
+if (isDemoMode) {
+  // Vitrin: ağ isteği YOK; tamamen örnek, salt okunur görünüm (gerçek servis/kota/anahtar bilgisi sızmaz).
+  import("../demo/demo-sistem-durumu.js").then((m) => m.demoSistemDurumuCiz(kok)).catch(() => {});
+} else {
+  ciz().catch((h) => { if (kok) kok.textContent = `Durum okunamadı: ${h.message}`; });
+  planla();
+  kesintiOlay("kesinti-durum", () => { /* sonraki turda tazelenir */ });
+}

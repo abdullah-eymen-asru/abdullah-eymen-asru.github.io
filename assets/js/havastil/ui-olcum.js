@@ -10,7 +10,7 @@
  */
 import { el, kart, bolumBasligi, ipucu, olay } from "./ui-temel.js";
 import { DURUM_AD } from "./dogrulama.js";
-import { sonCekilme } from "./ui-zaman.js";
+import { sonCekilme, resmiSiteBaglantisi } from "./ui-zaman.js";
 
 const tr = (x, n = 1) => (x == null ? "—" : Number(x).toLocaleString("tr-TR", { maximumFractionDigits: n }));
 const dakikaOnce = (iso) => { const dk = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000)); return dk < 2 ? "az önce" : dk < 90 ? `${dk} dk önce` : `${Math.round(dk / 60)} sa önce`; };
@@ -77,6 +77,7 @@ export function olcumKarti(d, kb) {
   const kok = kart(`hv-olcum ${dg ? `genel-${dg.genel.durum}` : ""}`.trim(), bolumBasligi("Resmî ölçümle doğrulama", el("span", { class: "hv-olcum-rozet", title: kay.uzun }, el("span", { "aria-hidden": "true", text: kay.ikon }), el("span", { text: kay.rozet }))));
   kok.append(
     el("p", { class: "hv-olcum-konum" }, el("strong", { text: istasyonCumlesi(d, g) }), el("span", { class: "hv-olcum-zaman", text: ` · ${dakikaOnce(g.zaman)} ölçüldü · ${kay.uzun}` })),
+    el("div", { class: "hv-olcum-dogrula" }, resmiSiteBaglantisi(g, { sinif: "hv-resmi-link hv-resmi-link--buyuk" }), el("small", { class: "muted", text: "Açılan sayfada aynı anki resmî değeri görüp yukarıdakiyle karşılaştırabilirsin." })),
     sonCekilme(d, kb, g.saglayici, { olcumZamani: g.zaman }),
     dg && dg.satirlar.length ? karsilastirmaTablosu(dg) : yalnizOlcum(g));
   if (dg) {
@@ -100,6 +101,7 @@ export function olcumSeridi(d, kb) {
   const kok = el("section", { class: `hv-olcum-serit ${dg ? `genel-${dg.genel.durum}` : ""}`.trim(), "aria-label": "Resmî ölçüm doğrulaması" },
     el("span", { class: "hv-olcum-rozet", title: k.uzun }, el("span", { "aria-hidden": "true", text: k.ikon }), el("span", { text: k.rozet })),
     el("span", { class: "hv-olcum-serit-metin" }, el("strong", { text: ozet }), el("small", { text: ` ${String(g.ad).split(",")[0]}${g.mesafeKm != null ? ` · ${kmYaz(g.mesafeKm)}` : ""} · ${dakikaOnce(g.zaman)}` })));
+  const rl = resmiSiteBaglantisi(g, { kisa: true }); if (rl) kok.append(rl);
   if (kb?.sekmeGit) kok.append(olay(el("button", { type: "button", class: "hv-baglanti", text: "Karşılaştır" }), "click", () => { kb.sekmeGit("derin"); }));
   return kok;
 }

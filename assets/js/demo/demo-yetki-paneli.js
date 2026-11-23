@@ -41,6 +41,9 @@ const BOLUMLER = [
   { yol: "notlar.aktif", baslik: "🗒️ Notlar", aciklama: "Sahte, şifreli not örnekleri.", alt: [["notlar.filtreCipleri", "Filtreleme Çipleri / Etiket Arama"]] },
   { yol: "mesajlar.aktif", baslik: "💬 Sohbet / Mesajlar", aciklama: "Örnek sohbetler (salt-okunur): demo hesabı mesajları görür, gönderemez/silemez." },
   { yol: "sistem.aktif", baslik: "📊 Sistem / Metrik", aciklama: "Statik vitrin grafikleri." },
+  { yol: "araclar.aktif", baslik: "🧰 Araçlar (PDF & Belge · Medya)", aciklama: "PDF & Belge Çalışma Alanı ile Medya Araçları açılır. Tarayıcıda çalışan işlemler denenebilir; yükleme/kaydetme/sunucu işlemleri kaydedilmez." },
+  { yol: "yorumlar.aktif", baslik: "💬 Yorumlarım", aciklama: "Örnek yorumlar (salt-okunur): düzenleme ve silme kaydedilmez." },
+  { yol: "durum.aktif", baslik: "🩺 Sistem Durumu", aciklama: "Örnek (statik) durum sayfası; gerçek servislere istek yapılmaz, gerçek bilgi gösterilmez." },
   // v5: HavaStil vitrini artık arayüzden yönetilir (eskiden "SQL ile kapat" gerekiyordu). 'misafir' anahtarı sayfa anahtarından BAĞIMSIZDIR.
   { yol: "havastil.aktif", baslik: "🌦️ HavaStil (Giyim Danışmanı)", aciklama: "Demo menüsünde İstanbul vitrini: 16 günlük saatlik plan, kar/don analizi, veri doğrulama. Konum kaydı ve yapay zekâ (Mod B) her zaman kilitli.", bagimsizAlt: true, alt: [["havastil.misafir", "Oturumsuz misafir erişimi (/panel/havastil/ doğrudan açılır, giriş sayfasına yönlendirmez)"]] },
 ];
