@@ -39,10 +39,10 @@ const BOLUMLER = [
   { yol: "pdf.aktif", baslik: "📖 PDF Kütüphanesi & Okuyucu", aciklama: "Örnek PDF'li kütüphane ve okuyucu.", alt: [["pdf.duzenlemeAraclari", "PDF Düzenleme Araçları Çubuğu"]] },
   { yol: "arsiv.aktif", baslik: "🗄️ Arşiv & Dosya Gezgini", aciklama: "Sahte klasör/dosya ağacı.", alt: [["arsiv.zipInceleme", "Örnek ZIP İnceleme"]] },
   { yol: "notlar.aktif", baslik: "🗒️ Notlar", aciklama: "Sahte, şifreli not örnekleri.", alt: [["notlar.filtreCipleri", "Filtreleme Çipleri / Etiket Arama"]] },
-  { yol: "mesajlar.aktif", baslik: "💬 Sohbet / Mesajlar", aciklama: "Örnek sohbetler (salt-okunur): demo hesabı mesajları görür, gönderemez/silemez." },
+  { yol: "mesajlar.aktif", baslik: "💬 Sohbet / Mesajlar", aciklama: "YALNIZCA 'demo' rollü hesabı olanlar için: gerçek mesajlaşma (yalnızca kendi sohbetleri). Hesapsız vitrinde görünmez." },
   { yol: "sistem.aktif", baslik: "📊 Sistem / Metrik", aciklama: "Statik vitrin grafikleri." },
-  { yol: "araclar.aktif", baslik: "🧰 Araçlar (PDF & Belge · Medya)", aciklama: "PDF & Belge Çalışma Alanı ile Medya Araçları açılır. Tarayıcıda çalışan işlemler denenebilir; yükleme/kaydetme/sunucu işlemleri kaydedilmez." },
-  { yol: "yorumlar.aktif", baslik: "💬 Yorumlarım", aciklama: "Örnek yorumlar (salt-okunur): düzenleme ve silme kaydedilmez." },
+  { yol: "araclar.aktif", baslik: "🧰 Araçlar (PDF & Belge · Medya)", aciklama: "PDF & Belge Çalışma Alanı ile Medya Araçları yalnızca GEZİLİR: dosya seçme, çözümleme, dönüştürme, indirme kapalıdır; hiçbir kota harcanmaz." },
+  { yol: "yorumlar.aktif", baslik: "💬 Yorumlarım", aciklama: "YALNIZCA 'demo' rollü hesabı olanlar için: sitede yorum yazma ve Yorumlarım (yalnızca kendi yorumları). Hesapsız vitrinde görünmez." },
   { yol: "durum.aktif", baslik: "🩺 Sistem Durumu", aciklama: "Örnek (statik) durum sayfası; gerçek servislere istek yapılmaz, gerçek bilgi gösterilmez." },
   // v5: HavaStil vitrini artık arayüzden yönetilir (eskiden "SQL ile kapat" gerekiyordu). 'misafir' anahtarı sayfa anahtarından BAĞIMSIZDIR.
   { yol: "havastil.aktif", baslik: "🌦️ HavaStil (Giyim Danışmanı)", aciklama: "Demo menüsünde İstanbul vitrini: 16 günlük saatlik plan, kar/don analizi, veri doğrulama. Konum kaydı ve yapay zekâ (Mod B) her zaman kilitli.", bagimsizAlt: true, alt: [["havastil.misafir", "Oturumsuz misafir erişimi (/panel/havastil/ doğrudan açılır, giriş sayfasına yönlendirmez)"]] },

@@ -1055,3 +1055,13 @@ details.hv-uye-kart[open] > summary { margin-bottom: .5rem; }
 .hv-resmi-link--satir { margin-top: .1rem; }
 .hv-olcum-dogrula { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .75rem; margin: .1rem 0 .3rem; }
 .hv-olcum-dogrula small { font-size: .76rem; line-height: 1.35; }
+
+/* ---- Tur 24: hava kalitesi — veri yolu şeridi + değer başına kaynak bağlantısı ---- */
+.hv-hk-yol { display: grid; gap: .35rem; padding: .6rem .75rem; border: 1px solid var(--border, #ccc); border-radius: 12px; min-width: 0; }
+.hv-hk-yol-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: stretch; gap: .35rem; }
+.hv-hk-yol-adim { display: flex; flex-direction: column; gap: .05rem; min-width: 0; padding: .35rem .6rem; border-radius: 10px; background: var(--card-bg, rgba(127,127,127,.08)); border: 1px solid var(--border, #ddd); }
+.hv-hk-yol-adim strong { font-size: .84rem; } .hv-hk-yol-adim small { font-size: .74rem; color: var(--muted, #666); }
+.hv-hk-yol-ok { align-self: center; color: var(--muted, #666); }
+.hv-hk-baglanti { font-size: .76rem; color: var(--accent, #1d5fd1); text-decoration: underline; text-underline-offset: 2px; width: fit-content; }
+.hv-hk-baglanti:focus-visible { outline: 2px solid var(--accent, #1d5fd1); outline-offset: 2px; }
+.hv-hk-k-kaynak { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .6rem; }

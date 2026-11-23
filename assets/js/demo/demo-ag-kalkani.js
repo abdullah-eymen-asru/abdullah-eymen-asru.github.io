@@ -53,6 +53,9 @@ function urlCoz(girdi) {
 export function istekEngelliMi(url) {
   if (!url) return false;
   if (url.origin === window.location.origin) return false;
+  // Demo ÜYESİ (gerçek 'demo' rollü hesap) kendi verisini dışa/içe aktarabilsin: yalnızca Sistem Yedek Worker'ı açılır (kendi oturum jetonuyla,
+  // sunucuda yalnızca KENDİ kapsamı). Diğer tüm Worker/R2/GitHub adresleri demo üyesinde de kapalı kalır.
+  if (demoUyeMi() && /^sistem-yedek-worker\.[a-z0-9-]+\.workers\.dev$/i.test(url.hostname)) return false;
   return ENGELLI_HOST.some((r) => r.test(url.hostname));
 }
 

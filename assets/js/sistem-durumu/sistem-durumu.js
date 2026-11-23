@@ -76,8 +76,7 @@ async function kaliciKur(oturum) {
   let rol = null;
   try { const uid = oturum?.user?.id; if (uid) rol = (await supabase.from("profiles").select("role").eq("id", uid).maybeSingle()).data?.role || null; } catch { /* yok say */ }
   const yonetici = rol === "admin" || rol === "owner";
-  let workerIzin = yonetici;
-  if (!yonetici && rol) { try { const { data } = await supabase.rpc("ozellik_erisimi_var_mi", { p_ozellik: "sistem_durumu_worker", p_rol: rol }); workerIzin = data === true; } catch { workerIzin = false; } }
+  const workerIzin = yonetici;   // Worker/kota harcayan her sınama YALNIZCA Site Sahibi ve Admin (üyelere özellik anahtarıyla bile açılmaz)
 
   /* ---- Cloudflare Worker'lar: sınama (yalnızca düğmeyle) + bugünkü (UTC) kullanım / günlük sert sınır ---- */
   const workerKutu = el("div", { class: "sd-kart" }, el("h3", { text: "Cloudflare Worker'lar" }),
@@ -200,7 +199,7 @@ async function kaliciKur(oturum) {
   if (yonetici) import("../sistem-yedek/r2-kota.js").then((m) => m.r2KotaKartiKur(r2Yer, { baslik: "R2 kullanımı (bu ay) — tüm kovalar" })).catch(() => {});
   /* HavaStil sağlığı: kendi ayrı, varsayılan kapalı bölümü; yalnızca HavaStil'i kullanabilen hesaplara (Worker çağrıları o yetkiyi ister). Demo'da çizilmez. */
   let havastil = null;
-  if (!isDemoMode && oturum) { try { const { data } = await supabase.rpc("havastil_yetkisi_var_mi"); if (data === true) havastil = havastilSaglikBolumu({ supabase, oturum }); } catch { /* HavaStil yoksa bölüm de yok */ } }
+  if (!isDemoMode && oturum) { try { const { data } = await supabase.rpc("havastil_yetkisi_var_mi"); if (data === true) havastil = havastilSaglikBolumu({ supabase, oturum, yonetici }); } catch { /* HavaStil yoksa bölüm de yok */ } }
   return { r2Yer, workerKutu, renderKutu, kesintiRehberi, rol, yonetici, workerIzin, havastil };
 }
 
@@ -301,8 +300,8 @@ async function ciz() {
     el("h3", { class: "sd-bolum-baslik", text: "Çekirdek servisler" }), el("div", { class: "sd-izgara" }, ...kartlar.slice(0, 3)),
     el("h3", { class: "sd-bolum-baslik", text: "Bağımlı dış servisler" }), el("div", { class: "sd-izgara" }, ...kartlar.slice(3)),
     el("h3", { class: "sd-bolum-baslik", text: "Bu cihaz" }), el("div", { class: "sd-izgara" }, ...cihaz), await cihazVerileriKarti(oturum),
-    ...(yonetici || workerIzin ? [el("h3", { class: "sd-bolum-baslik", text: yonetici ? "Kotalar & Worker'lar" : "Worker sınaması" }), ...(yonetici ? [r2Yer] : []), workerKutu, ...(yonetici ? [renderKutu] : [])]
-      : [el("p", { class: "kst-alt", text: "Cloudflare Worker sınaması sistem kotasını harcadığı için varsayılan olarak yalnızca yönetici ve site sahibine açıktır; site sahibi Yetki Ayarları'ndan rolüne açabilir. Yukarıdaki kontroller herkes için ücretsizdir." })]), alt);
+    ...(yonetici || workerIzin ? [el("h3", { class: "sd-bolum-baslik", text: "Kotalar & Worker'lar" }), ...(yonetici ? [r2Yer] : []), workerKutu, ...(yonetici ? [renderKutu] : [])]
+      : [el("p", { class: "kst-alt", text: "Worker ve kota harcayan sınamalar yalnızca site sahibi ve yöneticiler içindir. Yukarıdaki kontroller herkes için ücretsizdir ve kendi verilerinle çalışır." })]), alt);
   if (havastil) kok.append(el("h3", { class: "sd-bolum-baslik", text: "HavaStil" }), havastil);   // AYNI düğüm: 60 sn'lik yenilemede durumunu korur
   if (yonetici) kok.append(kesintiRehberi);
 }

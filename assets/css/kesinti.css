@@ -110,3 +110,20 @@
 .sd-hv-yeniden { font: inherit; min-width: 2.2rem; min-height: 2.2rem; border-radius: 8px; border: 1px solid var(--border, #ccc); background: transparent; color: var(--text, #111); cursor: pointer; }
 .sd-hv-yeniden:hover { border-color: var(--accent, #1d5fd1); }
 @media (prefers-reduced-motion: reduce) { .sd-hv > summary::after { transition: none; } }
+
+/* ---- Tur 24: HavaStil sağlığı — sekmeli, kompakt (sayfa uzamaz) ---- */
+.sd-hv-sekmeler { display: flex; gap: .4rem; overflow-x: auto; padding-bottom: .25rem; scrollbar-width: thin; }
+.sd-hv-sekme { font: inherit; font-size: .84rem; display: inline-flex; align-items: center; gap: .35rem; white-space: nowrap; min-height: 2.3rem; padding: .25rem .75rem; border-radius: 999px; border: 1px solid var(--border, #ccc); background: transparent; color: var(--text, #111); cursor: pointer; }
+.sd-hv-sekme.aktif { background: var(--accent, #1d5fd1); border-color: var(--accent, #1d5fd1); color: #fff; }
+.sd-hv-sekme:focus-visible { outline: 2px solid var(--accent, #1d5fd1); outline-offset: 2px; }
+.sd-hv-nokta { width: .55rem; height: .55rem; border-radius: 50%; background: #8a8a8a; }
+.sd-hv-sekme--ok .sd-hv-nokta { background: #1f9d55; } .sd-hv-sekme--uyari .sd-hv-nokta { background: #e0a800; } .sd-hv-sekme--hata .sd-hv-nokta { background: #e5483b; } .sd-hv-sekme--bekle .sd-hv-nokta { background: #5b8def; }
+.sd-hv-panel { display: grid; gap: .5rem; min-width: 0; }
+.sd-hv-grup-ac { margin: 0; font-size: .8rem; }
+.sd-hv-liste { max-height: 26rem; overflow-y: auto; }
+.sd-hv-detay { font-size: .78rem; }
+.sd-hv-detay > summary { cursor: pointer; width: fit-content; color: var(--accent, #1d5fd1); font-size: .76rem; padding: .1rem 0; }
+.sd-hv-detay[open] > summary { margin-bottom: .2rem; }
+.sd-hv-detay p { margin: .15rem 0; color: var(--muted, #666); line-height: 1.4; }
+.sd-hv-adimlar { margin: .2rem 0 .3rem; padding-left: 1.2rem; display: grid; gap: .15rem; line-height: 1.4; }
+.sd-hv-hata .sd-hv-detay > summary { color: #e5483b; font-weight: 700; }

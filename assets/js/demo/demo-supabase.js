@@ -250,6 +250,11 @@ const UYE_GERCEK_RPC = new Set([
   "baslat_konusma",
   "mesaj_hedef_listesi_getir",
   "mesaj_kisi_bilgileri",
+  // Yorumlar (migration 0150): demo üyesi GERÇEKTEN yorum yazabilir; yalnızca KENDİ yorumunu düzenler/siler (RPC içinde auth.uid() denetimi). Moderasyon RPC'leri YOK.
+  "yorum_listele", "yorum_ekle", "yorum_duzenle", "yorum_sil", "yorum_takma_ad_degistir", "yorumlarim_listele",
+  // Kendi verini dışa/içe aktar (migration 0150): yalnızca kendi kapsamı; R2'ye yazma ve hassas tablolar sunucuda kapalı.
+  "sistem_export_uye_yetkisi_var_mi", "sistem_export_baslat", "sistem_export_tablo_listesi", "sistem_export_tablo_oku", "sistem_export_tamamla",
+  "mesaj_yedek_ice_aktar", "mesaj_yedek_mesaj_ekle", "yorum_geri_yukle", "yorum_yanit_bagla", "uye_geri_yukleme_tablolari", "uye_geri_yukle_tablo",
   "konusmayi_kendimden_gizle",
   "mesaji_kendimden_gizle",
 ]);

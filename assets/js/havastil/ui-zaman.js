@@ -94,12 +94,12 @@ function durumSatiri(d, kaynak) {
 }
 
 /** Satırın altındaki "resmî sitede aç" bağlantısı: gözlem bu kaynaktansa kayda özel sayfa (örn. Ataşehir istasyonu), değilse kaynağın genel sayfası. */
-const GENEL_SAYFA = { mgm: "https://www.mgm.gov.tr/tahmin/il-ve-ilceler.aspx", metar: "https://aviationweather.gov/data/metar/", openaq: "https://explore.openaq.org/" };
+const GENEL_SAYFA = { model: "https://open-meteo.com/en/docs", mgm: "https://www.mgm.gov.tr/tahmin/il-ve-ilceler.aspx", metar: "https://aviationweather.gov/data/metar/", openaq: "https://explore.openaq.org/" };
 function resmiSatirBaglantisi(d, kaynak) {
   if (!GENEL_SAYFA[kaynak]) return null;
   const g = d.hava?.gozlem?.saglayici === kaynak ? d.hava.gozlem : kaynak === "openaq" ? (d.hava?.kalite?.istasyonlar || [])[0] : null;
   const ozel = g ? resmiSiteBaglantisi(g, { sinif: "hv-resmi-link hv-resmi-link--satir" }) : null;
-  return ozel || el("a", { class: "hv-resmi-link hv-resmi-link--satir", href: GENEL_SAYFA[kaynak], target: "_blank", rel: "noopener noreferrer", "aria-label": "Resmî kaynağın sitesini aç (yeni sekmede açılır)" }, el("span", { text: "Resmî siteyi aç ↗" }));
+  return ozel || el("a", { class: "hv-resmi-link hv-resmi-link--satir", href: GENEL_SAYFA[kaynak], target: "_blank", rel: "noopener noreferrer", "aria-label": "Resmî kaynağın sitesini aç (yeni sekmede açılır)" }, el("span", { text: kaynak === "model" ? "Open-Meteo (Copernicus CAMS) ↗" : "Resmî siteyi aç ↗" }));
 }
 
 /** Sayfanın üstündeki açılır liste. Her satır: kaynak adı · durum · son çekilme · yenile. */

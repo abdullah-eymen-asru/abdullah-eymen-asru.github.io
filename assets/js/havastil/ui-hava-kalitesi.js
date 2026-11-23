@@ -35,6 +35,29 @@ export function gunDegerleri(kalite, tarih, bugunMu) {
   return { degerler, kaynaklar, etiket: "gün içi en yüksek", genelIdx: g?.idx ?? null, baskin: g?.baskin ?? null, genelKaynak: "model" };
 }
 
+/** Open-Meteo hava kalitesi API'sindeki değişken adları. Bağlantı herkese açık, anahtarsız JSON'dur: "veriyi kaynağında gör". */
+const OM_AD = { pm25: "pm2_5", pm10: "pm10", o3: "ozone", no2: "nitrogen_dioxide", co: "carbon_monoxide", so2: "sulphur_dioxide", dust: "dust" };
+function modelUrl(d, id) {
+  const lat = Number(d?.konum?.lat), lon = Number(d?.konum?.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || !OM_AD[id]) return null;
+  return `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}&current=${OM_AD[id]}&timezone=auto`;
+}
+const disBaglanti = (url, yazi, aria) => el("a", { class: "hv-hk-baglanti", href: url, target: "_blank", rel: "noopener noreferrer", "aria-label": `${aria || yazi} (yeni sekmede açılır)` }, el("span", { text: `${yazi} ↗` }));
+
+/** "Veri yolu": değerler nereden, hangi yoldan geliyor — tek satırlık, taşmayan modern şerit (her adım kaynağına bağlantılı). */
+function veriYolu(d, gd, bugunMu) {
+  const istasyon = bugunMu && gd.genelKaynak === "istasyon";
+  const adim = (ad, alt, url) => el("li", { class: "hv-hk-yol-adim" }, el("strong", { text: ad }), el("small", { text: alt }), url ? disBaglanti(url[0], url[1]) : null);
+  const ok = () => el("li", { class: "hv-hk-yol-ok", "aria-hidden": "true", text: "→" });
+  const kaynakAdimlari = istasyon
+    ? [adim("Ölçüm istasyonu", "gerçek ölçüm", ["https://explore.openaq.org/", "OpenAQ"]), ok(), adim("OpenAQ", "ölçümleri toplar", ["https://docs.openaq.org/", "API belgesi"])]
+    : [adim("Copernicus CAMS", "atmosfer modeli (AB)", ["https://atmosphere.copernicus.eu/", "Copernicus"]), ok(), adim("Open-Meteo", "modeli API ile sunar", ["https://open-meteo.com/en/docs/air-quality-api", "Hava kalitesi API'si"])];
+  return el("div", { class: "hv-hk-yol" },
+    el("strong", { class: "hv-hk-alt-baslik", text: "Veri yolu" }),
+    el("ol", { class: "hv-hk-yol-liste" }, ...kaynakAdimlari, ok(), adim("HavaStil", "sana gösterir")),
+    el("small", { class: "muted", text: istasyon ? "Ölçülemeyen kirleticiler Open-Meteo üzerinden Copernicus modelinden tamamlanır." : "Model çözünürlüğü: Avrupa'da yaklaşık 11 km, diğer bölgelerde yaklaşık 45 km. Open-Meteo, Copernicus'un verisini aracısız sunar; ayrı bir ölçüm değildir." }));
+}
+
 function seviyeBandi(idx) {
   const b = el("span", { class: "hv-hk-bant", "aria-hidden": "true" });
   SEVIYELER.forEach((_, i) => { const p = el("span", { class: i === idx ? "aktif" : null }); p.dataset.s = String(i); b.append(p); });
@@ -62,7 +85,7 @@ function zamanNotu(kaynak, etiket, alinma) {
   return t ? el("small", { class: "hv-hk-k-zaman muted", text: `🕒 ${olcum}çekildi ${zamanYazisi(t)}` }) : null;
 }
 
-function kirleticiKutusu(k, v, kaynak, etiket, alinma) {
+function kirleticiKutusu(k, v, kaynak, etiket, alinma, d) {
   const sv = seviye(k.id, v), sayi = degerSayisi(k.id, v);
   const kutu = el("div", { class: "hv-hk-kirletici" });
   const adBlok = el("span", { class: "hv-hk-k-adlar" }, el("strong", { text: k.ad }), el("small", { class: "hv-hk-bilimsel", text: bilimselAd(k.id) }));
@@ -80,7 +103,8 @@ function kirleticiKutusu(k, v, kaynak, etiket, alinma) {
     el("div", { class: "hv-hk-k-sayi" }, el("strong", { class: "hv-hk-k-buyuk", text: sayi.sayi }), el("span", { class: "hv-hk-k-birim", text: sayi.birim }), el("span", { class: "hv-hk-k-etiket", text: etiket })),
     olcekCubugu(k, v, sv),
     el("small", { class: "hv-hk-k-deger", text: rehber ? `Dünya Sağlık Örgütü rehber sınırı ${rehber}${oran ? ` · ${oran}` : ""}` : "Bu madde için Dünya Sağlık Örgütü rehber sınırı yoktur." }),
-    el("small", { class: "hv-hk-k-kaynak" }, kaynakRozeti(kaynak)),
+    el("small", { class: "hv-hk-k-kaynak" }, kaynakRozeti(kaynak),
+      kaynak?.tur === "istasyon" ? resmiSiteBaglantisi({ saglayici: "openaq", resmiUrl: kaynak.resmiUrl, ad: kaynak.ad }, { sinif: "hv-hk-baglanti", kisa: true }) : (modelUrl(d, k.id) ? disBaglanti(modelUrl(d, k.id), "Open-Meteo'da gör", `${k.ad} verisini Open-Meteo'da gör`) : null)),
     zamanNotu(kaynak, etiket, alinma),
     ...(k.resmiIndeksYok ? [el("small", { class: "hv-ipucu", text: "Çöl tozu için resmî bir seviye ölçeği yoktur; bantlar HavaStil'in kendi ölçeğidir." })] : []));
   return kutu;
@@ -184,9 +208,10 @@ export function havaKalitesiKarti(d, tarih, bugunMu, kb) {
       ...(gd.baskin && Number.isFinite(gd.degerler[gd.baskin]) ? [el("small", { class: "hv-hk-baskin-satir", text: `En yüksek: ${KIRLETICI[gd.baskin].ad} · ${degerSayisi(gd.baskin, gd.degerler[gd.baskin]).tam}` })] : [])),
     el("span", { class: "hv-hk-sag" }, kaynakRozeti(gd.genelKaynak === "istasyon" ? { tur: "istasyon", mesafeKm: kaynak?.mesafeKm } : { tur: "model" }), el("span", { class: "hv-hk-ok", "aria-hidden": "true", text: "▾" })),
     seviyeBandi(idx));
-  const kutular = KIRLETICILER.map((k) => kirleticiKutusu(k, gd.degerler[k.id], gd.kaynaklar[k.id], gd.etiket, d.hava?.alinma));
+  const kutular = KIRLETICILER.map((k) => kirleticiKutusu(k, gd.degerler[k.id], gd.kaynaklar[k.id], gd.etiket, d.hava?.alinma, d));
   const ic = el("div", { class: "hv-hk-ic" },
-    el("div", { class: "hv-hk-cekilmeler" }, bugunMu ? sonCekilme(d, kb, "model") : null, bugunMu ? sonCekilme(d, kb, "openaq") : null),
+    el("div", { class: "hv-hk-cekilmeler" }, bugunMu ? sonCekilme(d, kb, gd.genelKaynak === "istasyon" ? "openaq" : "model") : null),   // TEK satır: gösterilen verinin kaynağı neyse onu yeniler
+    veriYolu(d, gd, bugunMu),
     oneriler(gd),
     modelBilgi(d, gd, bugunMu),
     el("div", { class: "hv-hk-izgara" }, ...kutular),

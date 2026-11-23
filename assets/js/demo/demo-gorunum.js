@@ -17,6 +17,29 @@ const KRITIK = [
   "#nt-yedek-sifreli-btn", "#nt-kurtarma-yenile-btn",
 ].join(",");
 
+/* Araçlar (PDF & Belge Çalışma Alanı, Medya Araçları): vitrin YALNIZCA gezilir. Dosya seçme / sürükle-bırak / işle / indir / çözümle düğmeleri
+ * hiçbir işlem başlatmaz (ses çözümleme, dönüştürme, transkript, indirme dahil: işlemci, bellek ve Worker/Render kotası harcanmaz). */
+const ARAC_ALANI = '[data-ca-kabuk], [data-ca-pane], #view-tool-calisma-alani, #view-tool-medya';
+const ARAC_GECIS = '[data-ca-kat], [data-ca-arac], [role="tab"], summary, select, option';
+const ARAC_ETKILESIM = 'button, label:has(input[type="file"]), input[type="file"], a[download], [role="button"]';
+function aracKalkaniKur() {
+  const engelle = (e) => { e.preventDefault(); e.stopImmediatePropagation(); demoBildir("Araçlar vitrin modunda yalnızca gezilebilir: dosya seçme ve işleme kapalıdır, hiçbir şey çözümlenmez ya da kaydedilmez."); };
+  document.addEventListener("click", (e) => {
+    const h = e.target instanceof Element ? e.target : null;
+    if (!h || !h.closest(ARAC_ALANI) || h.closest(ARAC_GECIS) || !h.closest(ARAC_ETKILESIM)) return;
+    engelle(e);
+  }, true);
+  for (const ad of ["drop", "paste", "change"]) {
+    document.addEventListener(ad, (e) => {
+      const h = e.target instanceof Element ? e.target : null;
+      if (!h || !h.closest(ARAC_ALANI)) return;
+      if (ad === "change" && !(h instanceof HTMLInputElement && h.type === "file")) return;
+      engelle(e);
+    }, true);
+  }
+  document.addEventListener("dragover", (e) => { const h = e.target instanceof Element ? e.target : null; if (h?.closest(ARAC_ALANI)) e.preventDefault(); }, true);
+}
+
 const el = (tag, ozellik = {}, ...cocuk) => {
   const n = document.createElement(tag);
   for (const [k, v] of Object.entries(ozellik)) {
@@ -104,6 +127,7 @@ function zipKartiKur() {
 
 export function demoGorunumuKur() {
   bandKur();
+  aracKalkaniKur();
   altOzellikleriUygula();
   zipKartiKur();
   // Kritik eylem kalkanı: capture fazı → hedef düğmenin kendi dinleyicisinden ÖNCE çalışır.

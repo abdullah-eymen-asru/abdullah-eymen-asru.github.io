@@ -74,6 +74,9 @@ export const DEMO_SEKMELERI = Object.freeze({
   "sys-durum": "durum",
 });
 
+/** Yalnızca demo ÜYESİNE (gerçek hesap) açılan sekmeler: gerçek mesaj/yorum yazılır, anonim ziyaretçiye hiç gösterilmez. */
+const UYE_GEREKLI = new Set(["users-mesajlar", "me-yorumlarim"]);
+
 /* ------------------------------ bayrak ------------------------------ */
 let bellekBayragi = false;
 
@@ -307,6 +310,9 @@ export function demoSekmeAcikMi(sekmeId, cfg = aktifConfig) {
   // "Panelim" (hesap ayarları: ad, e-posta, şifre, 2FA, oturumlar, KVKK, hesabı silme) yalnızca GERÇEK 'demo' rollü
   // hesapta açıktır; anonim "hesapsız demo" ziyaretçisinde yoktur (kendi hesabı olmadığı için anlamsız).
   if (sekmeId === "me-panel") return demoUyeMi();
+  // Mesajlaşma, yorum ve KENDİ verini yedekle/geri yükle: yalnızca GERÇEK 'demo' rollü hesapta. Anonim (hesapsız) vitrinde YOK.
+  if (sekmeId === "sys-yedek") return demoUyeMi();
+  if (UYE_GEREKLI.has(sekmeId)) { const b = DEMO_SEKMELERI[sekmeId]; return demoUyeMi() && !!b && cfg[b]?.aktif === true; }
   const bolum = DEMO_SEKMELERI[sekmeId];
   return !!bolum && cfg[bolum]?.aktif === true;
 }
