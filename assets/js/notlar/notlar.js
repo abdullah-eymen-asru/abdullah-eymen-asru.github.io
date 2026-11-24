@@ -57,6 +57,43 @@ const TURLER = {
   fikir: { ad: "Fikir" },
 };
 
+const TUR_IPUCU = {
+  genel: "Başka türe girmeyen, sınıflandırmak istemediğin notlar",
+  ders: "Ders notları ve ders hazırlığı",
+  sunum: "Sunum ve konuşma taslakları",
+  proje: "Proje planı ve çalışma notları",
+  etkinlik: "Etkinlik, seminer, konferans",
+  toplanti: "Toplantı notları ve kararlar",
+  kaynak: "Okuduğun kitap veya makalenin notları",
+  fikir: "Henüz şekillenmemiş fikirler",
+};
+for (const [k, v] of Object.entries(TURLER)) v.ipucu = TUR_IPUCU[k] || "";
+/** Hazır (varsayılan) listeler: kullanıcı kendi listesini bunların üstüne kurar. "genel" ve "gelen" silinemez (her notun varsayılanı). */
+const TUR_HAZIR = structuredClone(TURLER);
+const DURUM_HAZIR = structuredClone(DURUMLAR);
+const KORUNAN_TUR = "genel";
+const KORUNAN_DURUM = "gelen";
+const bosTanim = () => ({ turler: [], durumlar: [], silinenTur: [], silinenDurum: [] });
+function tanimTemizle(v) {
+  const d = bosTanim();
+  const liste = (a) => (Array.isArray(a) ? a.filter((x) => x && typeof x.id === "string" && typeof x.ad === "string").map((x) => ({ id: x.id.slice(0, 40), ad: x.ad.slice(0, 60), ipucu: String(x.ipucu || "").slice(0, 120) })) : []);
+  d.turler = liste(v?.turler);
+  d.durumlar = liste(v?.durumlar);
+  d.silinenTur = Array.isArray(v?.silinenTur) ? v.silinenTur.filter((k) => k in TUR_HAZIR && k !== KORUNAN_TUR) : [];
+  d.silinenDurum = Array.isArray(v?.silinenDurum) ? v.silinenDurum.filter((k) => k in DURUM_HAZIR && k !== KORUNAN_DURUM) : [];
+  return d;
+}
+/** Kullanıcının kendi tür/durum listesini (hazırlar − silinenler + eklediklerin) canlı TURLER/DURUMLAR nesnelerine uygular. */
+function tanimlariUygula() {
+  const t = S.tanim;
+  for (const k of Object.keys(TURLER)) delete TURLER[k];
+  for (const k of Object.keys(DURUMLAR)) delete DURUMLAR[k];
+  for (const [k, v] of Object.entries(TUR_HAZIR)) if (!t.silinenTur.includes(k)) TURLER[k] = { ...v };
+  for (const x of t.turler) TURLER[x.id] = { ad: x.ad, ipucu: x.ipucu || "Kendi eklediğin tür", ozel: true };
+  for (const [k, v] of Object.entries(DURUM_HAZIR)) if (!t.silinenDurum.includes(k)) DURUMLAR[k] = { ...v };
+  for (const x of t.durumlar) DURUMLAR[x.id] = { ad: x.ad, ipucu: x.ipucu || "Kendi eklediğin durum", ozel: true };
+}
+
 const SIRALAMA_AD = { guncelleme: "Son düzenlenen", olusturma: "Oluşturulma", baslik: "Başlık (A–Z)", tarih: "Konu tarihi" };
 const SIRALAMA = {
   guncelleme: (a, b) => b.guncelleme.localeCompare(a.guncelleme),
@@ -90,6 +127,8 @@ const S = {
   session: null,
   notlar: new Map(), // id -> not modeli
   klasorler: new Map(), // id -> klasör modeli
+  tanim: { turler: [], durumlar: [], silinenTur: [], silinenDurum: [] }, // kullanıcıya özel tür/durum listesi (şifreli kayıt)
+  tanimSatir: null,
   gorunum: "tum", // tum | son | sabit | arsiv | cop | klasor
   konum: null, // gorunum === "klasor" iken klasör id'si
   acik: new Set(), // ağaçta açık klasörler
@@ -361,6 +400,10 @@ function modelOlustur(id, satir, yuk) {
   return m;
 }
 
+function tanimModeli(id, satir, yuk) {
+  return { tur: "tanim", id, rev: satir?.rev ?? 0, olusturma: satir?.created_at || new Date().toISOString(), guncelleme: satir?.updated_at || new Date().toISOString(), silindiAt: null, veri: tanimTemizle(yuk) };
+}
+
 function klasorModeli(id, satir, yuk) {
   const m = {
     tur: "klasor",
@@ -380,7 +423,9 @@ function klasorModeli(id, satir, yuk) {
 
 /** Şifreli zarfın içine giren yük. v3: v2 + kategori, tarih, arsiv (eski okuyucular fazlalığı yok sayar). */
 const yukuHazirla = (m) =>
-  m.tur === "klasor"
+  m.tur === "tanim"
+    ? { v: 2, tur: "tanim", ...m.veri }
+    : m.tur === "klasor"
     ? { v: 2, tur: "klasor", ad: m.ad, ust: m.ust, simge: m.simge, sabit: m.sabit }
     : {
         v: 3,
@@ -436,6 +481,12 @@ async function cakismadaOnayVeYenidenDene(m) {
 }
 
 function haritayaIsle(m) {
+  if (m.tur === "tanim") {
+    S.tanimSatir = m;
+    S.tanim = tanimTemizle(m.veri);
+    tanimlariUygula();
+    return;
+  }
   aramaIndeksiKur(m);
   if (m.tur === "klasor") {
     S.klasorler.set(m.id, m);
@@ -483,9 +534,23 @@ async function notlariYukle({ sessiz = false } = {}) {
   S.notlar.clear();
   S.klasorler.clear();
   S.bozukSayisi = 0;
+  const cozulen = [];
   for (const satir of tum) {
     try {
-      const yuk = await Kasa.notuCoz(satir.ciphertext, satir.iv, satir.id);
+      cozulen.push([satir, await Kasa.notuCoz(satir.ciphertext, satir.iv, satir.id)]);
+    } catch {
+      S.bozukSayisi++;
+    }
+  }
+  // Önce kullanıcının tür/durum listesi: notlar bu listeye göre çözümlenir.
+  S.tanimSatir = null;
+  S.tanim = bosTanim();
+  const tn = cozulen.find(([, y]) => y?.tur === "tanim");
+  if (tn) haritayaIsle(tanimModeli(tn[0].id, tn[0], tn[1]));
+  else tanimlariUygula();
+  for (const [satir, yuk] of cozulen) {
+    if (yuk?.tur === "tanim") continue;
+    try {
       haritayaIsle(yuk?.tur === "klasor" ? klasorModeli(satir.id, satir, yuk) : modelOlustur(satir.id, satir, yuk));
     } catch {
       S.bozukSayisi++;
@@ -672,12 +737,33 @@ function etiketFiltresiniDoldur() {
   if (!sec.value) S.filtre.etiket = "";
 }
 
+/** Tür/Durum seçicilerini (filtre + editör) güncel listeyle yeniden kurar; seçili değerler korunur. */
+function turDurumSecenekleriniKur() {
+  const kur = (id, bas, harita) => {
+    const sec = $(id); if (!sec) return;
+    const onceki = sec.value;
+    sec.replaceChildren(...(bas ? [el("option", { value: "", text: bas })] : []), ...Object.entries(harita).map(([k, v]) => el("option", { value: k, text: v.ad })));
+    sec.value = [...sec.options].some((o) => o.value === onceki) ? onceki : bas ? "" : sec.options[0]?.value || "";
+  };
+  kur("nt-durum-filtre", "Durum", DURUMLAR);
+  kur("nt-tur-filtre", "Tür", TURLER);
+  kur("nt-tur-sec", null, TURLER);
+  kur("nt-durum-sec", null, DURUMLAR);
+  if (!(S.filtre.tur in TURLER)) S.filtre.tur = "";
+  if (!(S.filtre.durum in DURUMLAR)) S.filtre.durum = "";
+  secimIpuclariniGuncelle();
+}
+
+function secimIpuclariniGuncelle() {
+  const t = $("nt-tur-ipucu"), d = $("nt-durum-ipucu"), k = $("nt-klasor-ipucu");
+  if (t) t.textContent = TURLER[$("nt-tur-sec")?.value]?.ipucu || "Notun ne tür içerik olduğunu belirler.";
+  if (d) d.textContent = DURUMLAR[$("nt-durum-sec")?.value]?.ipucu || "Notun hangi aşamada olduğunu belirler.";
+  if (k) k.textContent = "Notun bulunduğu yer. Klasörler iç içe olabilir.";
+}
+
 function filtreSecenekleriniKur() {
-  $("nt-durum-filtre").replaceChildren(el("option", { value: "", text: "Durum" }), ...Object.entries(DURUMLAR).map(([k, v]) => el("option", { value: k, text: v.ad })));
-  $("nt-tur-filtre").replaceChildren(el("option", { value: "", text: "Tür" }), ...Object.entries(TURLER).map(([k, v]) => el("option", { value: k, text: v.ad })));
+  turDurumSecenekleriniKur();
   $("nt-sirala").replaceChildren(...Object.entries(SIRALAMA_AD).map(([k, v]) => el("option", { value: k, text: `Sırala: ${v}` })));
-  $("nt-tur-sec").replaceChildren(...Object.entries(TURLER).map(([k, v]) => el("option", { value: k, text: v.ad })));
-  $("nt-durum-sec").replaceChildren(...Object.entries(DURUMLAR).map(([k, v]) => el("option", { value: k, text: v.ad })));
   $("nt-sablon").replaceChildren(el("option", { value: "", text: "Şablon ekle…" }), ...Object.entries(Bicim.SABLONLAR).map(([k, v]) => el("option", { value: k, text: v.ad })));
 }
 
@@ -989,8 +1075,8 @@ function satirCiz(m, tokenler) {
   vurguluMetin(ozet, ozetUret(m, tokenler), tokenler);
 
   const rozetler = el("div", { class: "nt-satir-alt" });
-  rozetler.append(el("span", { class: `nt-rozet nt-tur-${m.kategori}`, text: TURLER[m.kategori].ad }));
-  if (m.durum !== "devam") rozetler.append(el("span", { class: `nt-durum nt-durum-${m.durum}`, text: DURUMLAR[m.durum].ad, title: DURUMLAR[m.durum].ipucu }));
+  rozetler.append(el("span", { class: `nt-rozet nt-tur-${m.kategori}`, text: (TURLER[m.kategori] || TURLER.genel).ad }));
+  if (m.durum !== "devam") rozetler.append(el("span", { class: `nt-durum nt-durum-${m.durum}`, text: (DURUMLAR[m.durum] || DURUMLAR.gelen).ad, title: (DURUMLAR[m.durum] || DURUMLAR.gelen).ipucu }));
   if (m.tarih) rozetler.append(el("span", { class: "nt-meta-oge" }, ikon("calendar"), konuTarihiYaz(m.tarih)));
   const klasorAdi = (genelAramaMi() || S.gorunum !== "klasor") && notKlasoru(m) ? yolMetni(notKlasoru(m)) : "";
   if (klasorAdi) rozetler.append(el("span", { class: "nt-meta-oge nt-meta-klasor", title: klasorAdi }, ikon("folder"), klasorAdi));
@@ -1195,7 +1281,7 @@ async function topluTasi() {
 async function topluDurum(d) {
   const notlar = secilenNotlar();
   for (const m of notlar) await hizliGuncelle(S.notlar.get(m.id) || m, { durum: d });
-  bildir(`${notlar.length} not “${DURUMLAR[d].ad}” yapıldı.`);
+  bildir(`${notlar.length} not “${(DURUMLAR[d] || DURUMLAR.gelen).ad}” yapıldı.`);
 }
 
 async function topluCope() {
@@ -1650,20 +1736,123 @@ async function klasorSilIcerikYukari(k) {
   const mesaj = icerik
     ? `“${k.ad}” klasörü silinecek. İçindeki ${altlar.length ? `${altlar.length} alt klasör` : ""}${altlar.length && notlar.length ? " ve " : ""}${notlar.length ? `${notlar.length} not` : ""} silinmez; ${hedef} taşınır.`
     : `“${k.ad}” klasörü silinsin mi? (Boş klasör çöp kutusuna gider.)`;
-  if (!window.confirm(mesaj)) return;
+  if (!window.confirm(mesaj)) return false;
   try {
     for (const a of altlar) await hizliGuncelle(a, { ust: ust || null });
     for (const n of notlar) await hizliGuncelle(n, { klasor: ust || null });
     await topluSilindiAyarla([S.klasorler.get(k.id) || k], new Date().toISOString());
   } catch (h) {
     console.error(h);
-    return bildir("Klasör silinemedi: " + (h.message || h), "error");
+    bildir("Klasör silinemedi: " + (h.message || h), "error");
+    return false;
   }
   if (S.gorunum === "klasor" && S.konum === k.id) {
     if (ust) S.konum = ust;
     else { S.gorunum = "tum"; S.konum = null; }
   }
   bildir(icerik ? `“${k.ad}” silindi; içindekiler ${hedef} taşındı.` : `“${k.ad}” silindi.`);
+  listeyiCiz();
+  return true;
+}
+
+/** Editördeki "Klasör" kutusunun yanındaki çöp düğmesi: seçili klasörü siler, notlar bir üst klasöre çıkar. */
+async function duzenleyicidenKlasorSil() {
+  const sec = $("nt-klasor-sec");
+  const k = sec?.value ? S.klasorler.get(sec.value) : null;
+  if (!k) return bildir("Silmek için önce listeden bir klasör seç. “Ana klasör” silinemez.", "warning");
+  const ust = klasorUstu(k);
+  if (!(await klasorSilIcerikYukari(k))) return;
+  if (S.duz && S.duz.klasor === k.id) S.duz.klasor = ust;
+  klasorSecenekleriDoldur(sec, { secili: ust, kok: "Ana klasör" });
+  kirlendi();
+}
+
+/* ---- Kullanıcıya özel Tür / Durum listeleri (şifreli, hesabına bağlı) ---- */
+async function tanimiKaydet() {
+  const veri = structuredClone(S.tanim);
+  try {
+    const m = S.tanimSatir ? { ...S.tanimSatir, veri } : tanimModeli(crypto.randomUUID(), null, veri);
+    let yeni;
+    try {
+      yeni = await modeliKaydet(m, !S.tanimSatir);
+    } catch (h) {
+      if (!(h instanceof CakismaHatasi)) throw h;
+      const { data } = await supabase.from("notlar").select("rev").eq("id", m.id).maybeSingle();
+      yeni = await modeliKaydet({ ...m, rev: data?.rev ?? m.rev }, false);
+    }
+    S.tanimSatir = yeni;
+    return true;
+  } catch (h) {
+    console.error(h);
+    bildir("Liste kaydedilemedi: " + (h.message || h), "error");
+    return false;
+  }
+}
+
+const TANIM_AYAR = {
+  tur: { ad: "tür", Ad: "Tür", sec: "nt-tur-sec", harita: () => TURLER, hazir: TUR_HAZIR, ozel: "turler", silinen: "silinenTur", korunan: KORUNAN_TUR, nesne: (n) => (n.kategori), ayarla: (n, v) => { n.kategori = v; }, ornek: "ör. Tez, Staj, Kişisel" },
+  durum: { ad: "durum", Ad: "Durum", sec: "nt-durum-sec", harita: () => DURUMLAR, hazir: DURUM_HAZIR, ozel: "durumlar", silinen: "silinenDurum", korunan: KORUNAN_DURUM, nesne: (n) => n.durum, ayarla: (n, v) => { n.durum = v; }, ornek: "ör. Bekliyor, Gözden geçir" },
+};
+
+async function tanimEkle(tip) {
+  const a = TANIM_AYAR[tip];
+  const girdi = el("input", { type: "text", maxlength: "40", autocomplete: "off", placeholder: a.ornek, "aria-label": `Yeni ${a.ad} adı` });
+  const aciklama = el("input", { type: "text", maxlength: "100", autocomplete: "off", placeholder: "Ne anlama geldiğini kısaca yaz (isteğe bağlı)", "aria-label": "Açıklama" });
+  const geri = new Set();
+  const silinenler = S.tanim[a.silinen];
+  const geriAlani = silinenler.length
+    ? el("div", { class: "nt-geri-alan" }, el("small", { class: "muted", text: "Silinen hazır seçenekleri geri getir:" }),
+        ...silinenler.map((k) => { const c = el("input", { type: "checkbox" }); c.addEventListener("change", () => (c.checked ? geri.add(k) : geri.delete(k))); return el("label", { class: "nt-geri-oge" }, c, el("span", { text: a.hazir[k].ad })); }))
+    : null;
+  const tamam = await diyalog({
+    baslik: `Yeni ${a.ad} ekle`,
+    tamam: "Ekle",
+    govde: el("div", { class: "form-field" }, el("label", { text: `${a.Ad} adı` }), girdi, el("label", { text: "Açıklama" }), aciklama, ...(geriAlani ? [geriAlani] : [])),
+    dogrula: () => {
+      if (girdi.value.trim() || geri.size) return true;
+      girdi.focus();
+      return false;
+    },
+  });
+  if (!tamam) return;
+  const ad = girdi.value.trim().replace(/\s+/g, " ").slice(0, 40);
+  let sonId = null;
+  for (const k of geri) { S.tanim[a.silinen] = S.tanim[a.silinen].filter((x) => x !== k); sonId = k; }
+  if (ad) {
+    const var_ = Object.values(a.harita()).some((v) => katla(v.ad) === katla(ad));
+    if (var_) bildir(`“${ad}” zaten listede var.`, "warning");
+    else {
+      sonId = `ozel-${crypto.randomUUID().slice(0, 8)}`;
+      S.tanim[a.ozel].push({ id: sonId, ad, ipucu: aciklama.value.trim().slice(0, 100) });
+    }
+  }
+  tanimlariUygula();
+  turDurumSecenekleriniKur();
+  if (sonId && sonId in a.harita()) { $(a.sec).value = sonId; secimIpuclariniGuncelle(); if (S.duz) kirlendi(); }
+  if (await tanimiKaydet()) bildir(`${a.Ad} listesi güncellendi.`);
+  listeyiCiz();
+}
+
+async function tanimSil(tip) {
+  const a = TANIM_AYAR[tip];
+  const id = $(a.sec).value;
+  const oge = a.harita()[id];
+  if (!oge) return;
+  if (id === a.korunan) return bildir(`“${oge.ad}” silinemez: her notun varsayılan seçeneğidir. Silmek istediğin başka bir seçeneği seç.`, "warning");
+  const kullanan = [...S.notlar.values()].filter((n) => a.nesne(n) === id);
+  const yedek = a.harita()[a.korunan]?.ad || "varsayılan";
+  if (!window.confirm(`“${oge.ad}” ${a.ad} listenden silinsin mi?${kullanan.length ? `\n\nBunu kullanan ${kullanan.length} not silinmez; “${yedek}” olarak görünür.` : ""}`)) return;
+  if (oge.ozel) S.tanim[a.ozel] = S.tanim[a.ozel].filter((x) => x.id !== id);
+  else S.tanim[a.silinen].push(id);
+  tanimlariUygula();
+  for (const n of kullanan) a.ayarla(n, a.korunan);
+  if (S.duz && a.nesne(S.duz) === id) a.ayarla(S.duz, a.korunan);
+  if (S.filtre[tip === "tur" ? "tur" : "durum"] === id) S.filtre[tip === "tur" ? "tur" : "durum"] = "";
+  turDurumSecenekleriniKur();
+  $(a.sec).value = a.korunan;
+  secimIpuclariniGuncelle();
+  if (S.duz) kirlendi();
+  if (await tanimiKaydet()) bildir(`“${oge.ad}” silindi.`);
   listeyiCiz();
 }
 
@@ -2282,8 +2471,9 @@ function duzenleyiciAc(m, secenek = {}) {
   $("nt-etiketler").value = S.duz.etiketler.join(", ");
   editoreIcerikKur(S.duz);
   klasorSecenekleriDoldur($("nt-klasor-sec"), { secili: klasorVarMi(S.duz.klasor) ? S.duz.klasor : null, kok: "Ana klasör" });
-  $("nt-tur-sec").value = S.duz.kategori;
-  $("nt-durum-sec").value = S.duz.durum;
+  $("nt-tur-sec").value = S.duz.kategori in TURLER ? S.duz.kategori : KORUNAN_TUR;
+  $("nt-durum-sec").value = S.duz.durum in DURUMLAR ? S.duz.durum : KORUNAN_DURUM;
+  secimIpuclariniGuncelle();
   $("nt-tarih").value = S.duz.tarih;
   $("nt-editor-menu-btn").hidden = S.duzYeni;
   durumYaz(S.duzYeni ? "Yeni not — yazmaya başla, kendiliğinden kaydedilir." : `Son güncelleme: ${tarihYaz(S.duz.guncelleme)}`);
@@ -3302,6 +3492,13 @@ function baglantilariKur() {
   $("nt-nav-btn").addEventListener("click", () => navAc(!$("nt-duzen").classList.contains("nt-nav-acik")));
   $("nt-nav-perde").addEventListener("click", navKapat);
   $("nt-klasor-yeni")?.addEventListener("click", duzenleyicidenKlasorOlustur);
+  $("nt-klasor-sil")?.addEventListener("click", duzenleyicidenKlasorSil);
+  $("nt-tur-yeni")?.addEventListener("click", () => tanimEkle("tur"));
+  $("nt-tur-sil")?.addEventListener("click", () => tanimSil("tur"));
+  $("nt-durum-yeni")?.addEventListener("click", () => tanimEkle("durum"));
+  $("nt-durum-sil")?.addEventListener("click", () => tanimSil("durum"));
+  $("nt-tur-sec")?.addEventListener("change", secimIpuclariniGuncelle);
+  $("nt-durum-sec")?.addEventListener("change", secimIpuclariniGuncelle);
   $("nt-odak-btn").addEventListener("click", () => odakAcKapa());
   $("nt-editor-menu-btn").addEventListener("click", (o) => {
     o.stopPropagation();

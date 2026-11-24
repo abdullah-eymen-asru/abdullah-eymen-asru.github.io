@@ -105,7 +105,11 @@ export function ayristir(baslik) {
   ekle(govde, "ana");
   // " - ", " / ", " | " ile ayrılan parçalar (yıl-yalnız ya da sayı-yalnız parçalar cekirdek() tarafından atılır)
   const parcalar = govde.split(/\s[-–—|]\s|\s*\/\s*/).map((p) => p.trim()).filter(Boolean);
-  if (parcalar.length > 1) parcalar.forEach((p) => ekle(p, "ana"));
+  if (parcalar.length > 1) parcalar.forEach((p) => {
+    ekle(p, "ana");
+    const ikili = p.split(/\s*:\s+/);
+    if (ikili.length > 1) { const ilk = cekirdek(ikili[0]); if (ilk && (ilk.belirteclar.size >= 2 || ilk.anahtar.length >= 6)) ekle(ikili[0], "ana", true); }
+  });
   // "Ad: Alt başlık" → yalnızca ana ad, en az iki anlamlı kelime ya da 6+ harf ise (tek kısa kelimeyle yanlış eşleşme olmasın)
   const iki = govde.split(/\s*:\s+/);
   if (iki.length > 1) { const ilk = cekirdek(iki[0]); if (ilk && (ilk.belirteclar.size >= 2 || ilk.anahtar.length >= 6)) ekle(iki[0], "ana", true); }
@@ -220,14 +224,39 @@ export const TUR_ACIKLAMA = {
   onek: "Yazmaya devam ettikçe daralır.",
 };
 
-/** Başlıkta yazılanla örtüşen KELİMELERİ [{metin, vurgu}] parçalarına ayırır (arayüzde <mark> için). Tire ve iki nokta ayracı korunur. */
+/**
+ * Başlıkta yazılanla örtüşen kısımları [{metin, vurgu}] parçalarına ayırır (arayüzde <mark> için).
+ * Kelimeler VE yıl/sayılar eşleşir; yazılanla yan yana gelen kelimelerin arasındaki noktalama (":", "-", ",", boşluk…) ile
+ * yılın parantezi de vurgulanır, böylece "Hunger Games: Catching Fire (2013)" tek parça olarak görünür. Bitişik vurgular birleştirilir.
+ * Noktalama yazılmamış olsa da eşleşir (karşılaştırma noktalamasızdır).
+ */
 export function vurguParcalari(baslik, yazilan) {
   const qn = normallestir(yazilan).split(" ").filter(Boolean);
-  const qk = new Set(qn.filter((t) => anlamli(t) && (harfli(t) || qn.length === 1)));
+  const qk = new Set(qn.filter((t) => /\d/.test(t) || anlamli(t) || qn.length === 1));
   const qSon = qn[qn.length - 1] || "";
-  return String(baslik || "").split(/([\s\-–—:,.'’/]+)/).filter((p) => p !== "").map((p) => {
-    const n = normallestir(p);
-    const vurgu = !!n && harfli(n) && (qk.has(n) || (qSon.length >= 3 && harfli(qSon) && n.startsWith(qSon) && qk.has(qSon)));
-    return { metin: p, vurgu };
+  const ham = String(baslik || "").split(/([\p{L}\p{N}]+(?:['’][\p{L}]+)?)/u).filter((p) => p !== "");
+  const kelimeMi = (p) => /^[\p{L}\p{N}]/u.test(p);
+  const parcalar = ham.map((p) => {
+    if (!kelimeMi(p)) return { metin: p, vurgu: false, ayrac: true };
+    const n = normallestir(p).replace(/\s+/g, "");
+    const yilMiP = yilMi(n);
+    const vurgu = !!n && (qk.has(n) || (qSon.length >= 3 && harfli(qSon) && n.startsWith(qSon) && qk.has(qSon)) || (yilMiP && qn.includes(n)));
+    return { metin: p, vurgu, yil: yilMiP };
   });
+  parcalar.forEach((p, i) => {
+    if (!p.ayrac) return;
+    const onceki = parcalar[i - 1], sonraki = parcalar[i + 1];
+    const t = p.metin;
+    if (onceki?.vurgu && sonraki?.vurgu && /^[\s:;,.\-–—/&'’|()\[\]]+$/.test(t)) p.vurgu = true;   // kelimeler arası noktalama / parantez
+    else if (sonraki?.vurgu && sonraki.yil && /[(\[]\s*$/.test(t)) p.parantezSol = true;      // "(" + yıl
+    else if (onceki?.vurgu && onceki.yil && /^\s*[)\]]/.test(t)) p.parantezSag = true;       // yıl + ")"
+  });
+  const sonuc = [];
+  const ekle = (metin, vurgu) => { if (!metin) return; const son = sonuc[sonuc.length - 1]; if (son && son.vurgu === vurgu) son.metin += metin; else sonuc.push({ metin, vurgu }); };
+  for (const p of parcalar) {
+    if (p.parantezSol) { const m = p.metin.match(/^(.*?)([(\[])(\s*)$/s); if (m) { ekle(m[1], false); ekle(m[2] + m[3], true); continue; } }
+    if (p.parantezSag) { const m = p.metin.match(/^(\s*[)\]])(.*)$/s); if (m) { ekle(m[1], true); ekle(m[2], false); continue; } }
+    ekle(p.metin, p.vurgu);
+  }
+  return sonuc;
 }

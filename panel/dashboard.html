@@ -11,11 +11,11 @@ permalink: "/panel/dashboard.html"
 <link rel="stylesheet" href="{{ '/assets/css/github-yonetim.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/izleme-okuma-yonetim.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/dashboard.css' | relative_url }}">
-<link rel="stylesheet" href="{{ '/assets/css/notlar.css' | relative_url }}?v=2411">
+<link rel="stylesheet" href="{{ '/assets/css/notlar.css' | relative_url }}?v=2412">
 <link rel="stylesheet" href="{{ '/assets/css/r2-arsiv.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/akademik.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/sistem-yedek.css' | relative_url }}">
-<link rel="stylesheet" href="{{ '/assets/css/kesinti.css' | relative_url }}?v=2411">
+<link rel="stylesheet" href="{{ '/assets/css/kesinti.css' | relative_url }}?v=2412">
 <link rel="stylesheet" href="{{ '/assets/css/donusturucu.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/belge-tarayici.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/metadata-temizleyici.css' | relative_url }}">
@@ -1922,7 +1922,7 @@ permalink: "/panel/dashboard.html"
         <nav id="nt-gorunumler" class="nt-gorunumler" aria-label="Görünümler"></nav>
         <div class="nt-nav-baslik">
           <span>Klasörler</span>
-          <button type="button" id="nt-klasor-btn" class="nt-btn nt-btn-ikon nt-btn-kucuk" aria-label="Yeni klasör" title="Yeni klasör"><span class="nt-ikon" data-ikon="folder-plus"></span></button>
+          <button type="button" id="nt-klasor-btn" class="nt-btn nt-btn-kucuk nt-klasor-yeni-btn" aria-label="Yeni klasör oluştur" title="Yeni klasör oluştur"><span class="nt-ikon" data-ikon="folder-plus"></span><span>Yeni</span></button>
         </div>
         <div id="nt-agac" class="nt-agac" role="tree" aria-label="Klasör ağacı"></div>
         <nav id="nt-nav-alt" class="nt-gorunumler nt-nav-alt" aria-label="Arşiv ve çöp"></nav>
@@ -2020,9 +2020,33 @@ permalink: "/panel/dashboard.html"
             <textarea id="nt-baslik" class="nt-baslik-girdi" rows="1" maxlength="200" autocomplete="off" spellcheck="true" placeholder="Başlıksız not"></textarea>
 
             <div class="nt-meta-satiri">
-              <div class="nt-alan nt-alan-klasor"><label for="nt-klasor-sec"><span>Klasör</span></label><div class="nt-klasor-satir"><select id="nt-klasor-sec" aria-label="Notun klasörü"></select><button type="button" id="nt-klasor-yeni" class="nt-btn nt-btn-kucuk" title="Yeni klasör (seçili klasörün altına)" aria-label="Yeni klasör oluştur">＋ Klasör</button></div></div>
-              <label class="nt-alan"><span>Tür</span><select id="nt-tur-sec"></select></label>
-              <label class="nt-alan"><span>Durum</span><select id="nt-durum-sec"></select></label>
+              <div class="nt-alan nt-alan-yonet">
+                <label for="nt-klasor-sec"><span>Klasör</span></label>
+                <div class="nt-yonet-satir">
+                  <select id="nt-klasor-sec" aria-label="Klasör"></select>
+                  <button type="button" id="nt-klasor-yeni" class="nt-btn nt-yonet-btn" title="Yeni klasör oluştur (seçili klasörün altına)" aria-label="Yeni klasör oluştur (seçili klasörün altına)"><span class="nt-ikon" data-ikon="folder-plus"></span></button>
+                  <button type="button" id="nt-klasor-sil" class="nt-btn nt-yonet-btn nt-yonet-sil" title="Seçili klasörü sil (içindekiler bir üst klasöre çıkar)" aria-label="Seçili klasörü sil (içindekiler bir üst klasöre çıkar)"><span class="nt-ikon" data-ikon="trash"></span></button>
+                </div>
+                <small class="nt-alan-ipucu" id="nt-klasor-ipucu"></small>
+              </div>
+              <div class="nt-alan nt-alan-yonet">
+                <label for="nt-tur-sec"><span>Tür</span></label>
+                <div class="nt-yonet-satir">
+                  <select id="nt-tur-sec" aria-label="Tür"></select>
+                  <button type="button" id="nt-tur-yeni" class="nt-btn nt-yonet-btn" title="Yeni tür ekle" aria-label="Yeni tür ekle"><span class="nt-ikon" data-ikon="plus"></span></button>
+                  <button type="button" id="nt-tur-sil" class="nt-btn nt-yonet-btn nt-yonet-sil" title="Seçili türü sil" aria-label="Seçili türü sil"><span class="nt-ikon" data-ikon="trash"></span></button>
+                </div>
+                <small class="nt-alan-ipucu" id="nt-tur-ipucu"></small>
+              </div>
+              <div class="nt-alan nt-alan-yonet">
+                <label for="nt-durum-sec"><span>Durum</span></label>
+                <div class="nt-yonet-satir">
+                  <select id="nt-durum-sec" aria-label="Durum"></select>
+                  <button type="button" id="nt-durum-yeni" class="nt-btn nt-yonet-btn" title="Yeni durum ekle" aria-label="Yeni durum ekle"><span class="nt-ikon" data-ikon="plus"></span></button>
+                  <button type="button" id="nt-durum-sil" class="nt-btn nt-yonet-btn nt-yonet-sil" title="Seçili durumu sil" aria-label="Seçili durumu sil"><span class="nt-ikon" data-ikon="trash"></span></button>
+                </div>
+                <small class="nt-alan-ipucu" id="nt-durum-ipucu"></small>
+              </div>
               <label class="nt-alan"><span>Konu tarihi</span><input id="nt-tarih" type="date" title="Dersin, sunumun ya da etkinliğin tarihi"></label>
               <label class="nt-alan nt-alan-etiket"><span>Etiketler</span><input id="nt-etiketler" type="text" autocomplete="off" placeholder="virgülle ayır: sosyoloji, vize"></label>
             </div>

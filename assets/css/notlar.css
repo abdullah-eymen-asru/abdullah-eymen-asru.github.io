@@ -620,3 +620,29 @@
   .nt-liste-kaydirma { overscroll-behavior: auto; -webkit-overflow-scrolling: touch; }
 }
 .nt-duzen[data-panel="editor"] .nt-nav-perde { position: fixed; }
+
+/* ---------- Tur 27: klasör / tür / durum yönetimi (editör) ---------- */
+.nt-meta-satiri { grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 12px 14px; }
+.nt-alan > label > span { font-size: 0.72rem; font-weight: 600; color: var(--muted); }
+.nt-alan > label { display: block; }
+.nt-yonet-satir { display: flex; gap: 6px; align-items: stretch; min-width: 0; }
+.nt-yonet-satir select { flex: 1 1 auto; min-width: 0; }
+.nt-yonet-btn { flex: none; width: 32px; height: 32px; padding: 0; display: inline-grid; place-items: center; border-radius: 8px; border: 1px solid var(--nt-cizgi); background: var(--nt-yuzey); color: var(--text); cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
+.nt-yonet-btn svg { width: 16px; height: 16px; }
+.nt-yonet-btn:hover { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--nt-yuzey)); }
+.nt-yonet-sil:hover { border-color: var(--nt-tehlike); color: var(--nt-tehlike); background: color-mix(in srgb, var(--nt-tehlike) 10%, var(--nt-yuzey)); }
+.nt-yonet-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.nt-alan-ipucu { font-size: 0.72rem; line-height: 1.35; color: var(--muted); }
+.nt-klasor-yeni-btn { display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; height: 30px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--nt-cizgi)); background: color-mix(in srgb, var(--accent) 8%, transparent); cursor: pointer; }
+.nt-klasor-yeni-btn:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.nt-klasor-yeni-btn svg { width: 15px; height: 15px; }
+.nt-geri-alan { display: grid; gap: 6px; margin-top: 10px; }
+.nt-geri-oge { display: flex; gap: 8px; align-items: center; font-size: 0.9rem; }
+@media (max-width: 900px) {
+  .nt-meta-satiri { grid-template-columns: minmax(0, 1fr); }
+  .nt-alan select, .nt-alan input { height: 42px; font-size: 1rem; }
+  .nt-yonet-btn { width: 42px; height: 42px; }
+  .nt-yonet-btn svg { width: 18px; height: 18px; }
+  .nt-klasor-yeni-btn { height: 38px; }
+  .nt-alan-ipucu { font-size: 0.78rem; }
+}
