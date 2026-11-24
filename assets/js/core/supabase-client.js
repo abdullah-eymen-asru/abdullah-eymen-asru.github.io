@@ -249,6 +249,40 @@ export function turkceOtpHatasi(message) {
 }
 
 /**
+ * Şifre kuralı — Supabase "Password requirements: Letters and digits" ve
+ * "Minimum password length: 8" ayarıyla AYNI olmalı (sunucu yine de kontrol eder;
+ * bu, kullanıcıya hatayı sunucuya gitmeden Türkçe göstermek içindir).
+ * Geçerliyse null, değilse Türkçe hata metni döner.
+ */
+export function sifreKuraliHatasi(sifre) {
+  const s = String(sifre ?? "");
+  if (s.length < 8) return "Şifre en az 8 karakter olmalı.";
+  if (!/\p{L}/u.test(s) || !/\d/.test(s)) return "Şifre en az bir harf ve bir rakam içermeli.";
+  return null;
+}
+
+/**
+ * updateUser({password}) hatasını anlaşılır Türkçeye çevirir (ham İngilizce göstermez).
+ */
+export function turkceSifreHatasi(error) {
+  const kod = error?.code || "";
+  const m = error?.message || "";
+  if (kod === "weak_password" || /weak|should contain|at least/i.test(m)) {
+    return "Şifre yeterince güçlü değil: en az 8 karakter, en az bir harf ve bir rakam içermeli.";
+  }
+  if (kod === "same_password" || /different from the old/i.test(m)) {
+    return "Yeni şifre eski şifrenle aynı olamaz.";
+  }
+  if (kod === "reauthentication_needed" || /reauthentication/i.test(m)) {
+    return "Güvenlik için yakın zamanda giriş yapman gerekiyor. Çıkış yapıp tekrar giriş yap, sonra şifreni değiştir.";
+  }
+  if (kod === "over_request_rate_limit" || /rate limit/i.test(m)) {
+    return "Çok sık denedin. Biraz bekleyip tekrar dene.";
+  }
+  return m;
+}
+
+/**
  * Büyük/küçük harf duyarsız arama için Türkçe'ye uygun harf küçültme.
  * JS'in düz toLowerCase()'i "İ" (noktalı büyük İ) harfini Türkçe kuralına
  * göre değil, Unicode varsayılanına göre çevirir ("i̇" gibi iki karakterlik

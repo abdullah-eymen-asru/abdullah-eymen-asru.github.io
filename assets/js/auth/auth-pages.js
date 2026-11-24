@@ -13,6 +13,8 @@ import {
   KAYITLAR_KAPALI_ISARETI,
   kayitlarAcikMi,
   turkceOtpHatasi,
+  sifreKuraliHatasi,
+  turkceSifreHatasi,
   oturumHatirlamaTercihiniKaydet,
 } from "../core/supabase-client.js";
 import { girisSonrasi, cevrimdisiGiris, kasaVarMi } from "../core/kesinti.js";
@@ -689,8 +691,9 @@ export async function initKayitPage() {
       showMessage(msg, "Şifreler birbiriyle eşleşmiyor.");
       return;
     }
-    if (password.length < 8) {
-      showMessage(msg, "Şifre en az 8 karakter olmalı.");
+    const sifreHatasi = sifreKuraliHatasi(password);
+    if (sifreHatasi) {
+      showMessage(msg, sifreHatasi);
       return;
     }
     if (!firstName || !lastName) {
@@ -1101,8 +1104,9 @@ export function initSifreGuncellePage() {
       showMessage(msg, "Şifreler birbiriyle eşleşmiyor.");
       return;
     }
-    if (password.length < 8) {
-      showMessage(msg, "Şifre en az 8 karakter olmalı.");
+    const sifreHatasi = sifreKuraliHatasi(password);
+    if (sifreHatasi) {
+      showMessage(msg, sifreHatasi);
       return;
     }
 
@@ -1129,7 +1133,7 @@ export function initSifreGuncellePage() {
       if (error.message.includes("Auth session missing")) {
         suresiDolmusEkraniGoster();
       } else {
-        showMessage(msg, "Şifre güncellenemedi: " + error.message);
+        showMessage(msg, "Şifre güncellenemedi: " + turkceSifreHatasi(error));
       }
       return;
     }

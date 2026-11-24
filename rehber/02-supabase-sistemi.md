@@ -874,6 +874,23 @@ Kod, Supabase'e şu adresleri gönderir (`assets/js/auth/auth-pages.js`, `assets
 
 ---
 
+## Auth → Providers → Email Ayarları (24.11.2026)
+
+| Ayar | Değer | Neden |
+|---|---|---|
+| Enable email provider | AÇIK | Kayıt/giriş buna bağlı |
+| Secure email change | AÇIK | Panel e-posta değişiminde eski+yeni adrese kod akışı buna dayanır |
+| Secure password change | KAPALI | Açılırsa 24 saatten eski oturum şifre değiştiremez; Google ile gelip ilk şifre belirleyen üyeler de zorlanır |
+| Require current password | KAPALI | Şifre değiştirme formunda "mevcut şifre" alanı yok; açılırsa Google-only üyeler kilitlenir |
+| Prevent leaked passwords | KAPALI | Yalnızca Pro planda var |
+| Minimum password length | 8 | Site formlarıyla aynı |
+| Password requirements | Letters and digits | Sitedeki `sifreKuraliHatasi()` ile aynı kural |
+| Email OTP expiration | 3600 | Advisor `auth_otp_long_expiry` uyarısı 3600 üstünü işaretler |
+| Email OTP length | 8 | Site kod alanları buna uygun, değiştirme |
+| Enable magic links and email OTP | AÇIK (varsayılan) | Onay/sıfırlama e-postaları bunu kullanır |
+
+Şifre kuralı değişirse `assets/js/core/supabase-client.js` içindeki `sifreKuraliHatasi()` de güncellenmelidir.
+
 ## Güvenlik Özeti — Neden Güvenli?
 
 - **RLS her yerde açık.** `profiles`, `special_content`, `content_access`,

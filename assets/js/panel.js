@@ -9,7 +9,7 @@
  * genelindeki "Hakkımda" metninin sadece admin panelinden yönetilmesi
  * istendiği için). Ad Soyad hâlâ düzenlenebilir.
  */
-import { supabase, showMessage, showSpamNotice, escapeHtml, turkceOtpHatasi, guncelOnaySurumleri } from "./core/supabase-client.js";
+import { supabase, showMessage, showSpamNotice, escapeHtml, turkceOtpHatasi, sifreKuraliHatasi, turkceSifreHatasi, guncelOnaySurumleri } from "./core/supabase-client.js";
 import { requireAuthOrShowError } from "./auth/auth-guard.js";
 // NOT (TAŞINDI): Mesajlaşma (wireUserChat) artık bu sayfada değil — bkz.
 // panel/mesajlar.md + assets/js/mesajlar.js. "Yöneticiyle Mesajlaş" linki
@@ -330,8 +330,9 @@ function wirePasswordChange() {
       showMessage(msg, "Yeni şifreler eşleşmiyor.");
       return;
     }
-    if (yeniSifre.length < 8) {
-      showMessage(msg, "Şifre en az 8 karakter olmalı.");
+    const sifreHatasi = sifreKuraliHatasi(yeniSifre);
+    if (sifreHatasi) {
+      showMessage(msg, sifreHatasi);
       return;
     }
 
@@ -340,7 +341,7 @@ function wirePasswordChange() {
     submitBtn.disabled = false;
 
     if (error) {
-      showMessage(msg, "Şifre değiştirilemedi: " + error.message);
+      showMessage(msg, "Şifre değiştirilemedi: " + turkceSifreHatasi(error));
       return;
     }
 
