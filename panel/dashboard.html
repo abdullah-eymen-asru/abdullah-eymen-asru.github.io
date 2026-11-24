@@ -11,7 +11,7 @@ permalink: "/panel/dashboard.html"
 <link rel="stylesheet" href="{{ '/assets/css/github-yonetim.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/izleme-okuma-yonetim.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/dashboard.css' | relative_url }}">
-<link rel="stylesheet" href="{{ '/assets/css/notlar.css' | relative_url }}?v=2412">
+<link rel="stylesheet" href="{{ '/assets/css/notlar.css' | relative_url }}?v=2413">
 <link rel="stylesheet" href="{{ '/assets/css/r2-arsiv.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/akademik.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/sistem-yedek.css' | relative_url }}">
@@ -2019,6 +2019,11 @@ permalink: "/panel/dashboard.html"
             <label for="nt-baslik" class="nt-gizli">Başlık</label>
             <textarea id="nt-baslik" class="nt-baslik-girdi" rows="1" maxlength="200" autocomplete="off" spellcheck="true" placeholder="Başlıksız not"></textarea>
 
+            <details id="nt-meta-detay" class="nt-meta-detay">
+              <summary class="nt-meta-ozet" aria-label="Not bilgileri: klasör, tür, durum, tarih, etiketler. Düzenlemek için aç.">
+                <span id="nt-meta-ozet-metin" class="nt-meta-ozet-metin"></span>
+                <span class="nt-meta-ozet-eylem"><span class="nt-meta-ac-yazi">Düzenle</span><span class="nt-meta-kapat-yazi">Gizle</span><span class="nt-meta-ok" aria-hidden="true">▾</span></span>
+              </summary>
             <div class="nt-meta-satiri">
               <div class="nt-alan nt-alan-yonet">
                 <label for="nt-klasor-sec"><span>Klasör</span></label>
@@ -2050,6 +2055,7 @@ permalink: "/panel/dashboard.html"
               <label class="nt-alan"><span>Konu tarihi</span><input id="nt-tarih" type="date" title="Dersin, sunumun ya da etkinliğin tarihi"></label>
               <label class="nt-alan nt-alan-etiket"><span>Etiketler</span><input id="nt-etiketler" type="text" autocomplete="off" placeholder="virgülle ayır: sosyoloji, vize"></label>
             </div>
+            </details>
 
             <div id="nt-govde" class="nt-yazi" contenteditable="true" role="textbox" aria-multiline="true"
                  aria-label="Not metni" lang="tr" spellcheck="true"

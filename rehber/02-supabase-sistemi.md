@@ -849,6 +849,31 @@ kurabiliriz.
 
 ---
 
+## Redirect URL'leri ve Supabase Danışman (Advisor) Uyarıları
+
+### Authentication › URL Configuration — ne olmalı?
+Kod, Supabase'e şu adresleri gönderir (`assets/js/auth/auth-pages.js`, `assets/js/panel.js`). **Redirect URLs listesinde bunların her biri bulunmalı:**
+
+| Adres | Ne için kullanılır |
+|---|---|
+| `https://abdullah-eymen-asru.github.io/hesap/giris.html` | Google ile giriş ve e-posta doğrulama dönüşü |
+| `https://abdullah-eymen-asru.github.io/hesap/kayit.html` | Google ile **kayıt** dönüşü (listede eksikse bu akış Site URL'ye düşer) |
+| `https://abdullah-eymen-asru.github.io/hesap/sifre-guncelle.html` | Şifre sıfırlama e-postasındaki bağlantı |
+| `https://abdullah-eymen-asru.github.io/panel/dashboard.html` | Panelden Google hesabı bağlama (`linkIdentity`) dönüşü |
+
+**Öneri (en dar liste):** `**` joker karakterli girdileri (`.../**`) kaldırıp yukarıdaki 4 adresi tek tek tut. Joker, o alan adındaki *her* sayfaya token'lı yönlendirmeye izin verir; gerekmeyen izin açık kapıdır. Aynı 4 adresi `pages.dev` yedek sitesi **gerçekten kullanılıyorsa** onun için de tut; kullanılmıyorsa `pages.dev` girdilerinin hepsini sil.
+**Silinecekler:** `.../panel/panel.html` (eski, yalnızca yönlendirme sayfası; artık hiçbir akış oraya dönmüyor), `http://localhost:4000/panel.html` (yanlış yol; yerelde Jekyll ile deniyorsan onun yerine `http://localhost:4000/hesap/giris.html`, `.../hesap/kayit.html`, `.../hesap/sifre-guncelle.html`, `.../panel/dashboard.html` koy, denemiyorsan sil).
+**Site URL** alanı `https://abdullah-eymen-asru.github.io` olmalı (sonunda `/` olmadan). Yeni bir auth sayfası eklersen önce bu listeye ekle, yoksa Supabase kullanıcıyı Site URL'ye atar.
+
+### Danışman (Advisor) uyarıları — hangisi neden kalır?
+`supabase/migrations/0151_supabase_guvenlik_ve_performans_onerileri.sql` yapılabilecek her şeyi güvenli biçimde uygular (RLS politikaları, `(select auth.uid())`, yabancı anahtar indeksleri, sabit `search_path`, tetikleyici fonksiyon yetkileri, bucket listeleme, `btree_gist`). Geriye kalanlar **bilerek** böyledir:
+- **`anon_security_definer_function_executable` (26) ve `authenticated_security_definer_function_executable` (~329):** Uygulama bu RPC'leri doğrudan çağırır; her biri içinde rol/yetki denetimi yapar. `anon` listesindeki 26 fonksiyon herkese açık sayfalar (yorum listesi, duyurular, demo ayarı, paylaşım bağlantısı, Substack/sitemap) ve RLS yardımcıları (`is_admin`, `is_owner`…) içindir; yalnızca doğru/yanlış ya da zaten herkese açık veri döndürürler. Hepsini kapatmak siteyi bozar.
+- **`extension_in_public` (`pg_net`):** Supabase'in yönettiği bir eklenti, taşınamaz. Güvenle yok sayılabilir.
+- **`unused_index` (INFO):** Yeni eklenen yabancı anahtar indeksleri henüz kullanılmadığı için çıkar. Silme: silersen "unindexed foreign key" uyarısı geri gelir. Veri büyüdükçe (silme/join) bu indeksler iş görür. Yok say.
+- **Elle yapılacak (SQL ile olmaz):** Authentication › Providers › Email › *OTP expiry* ≤ 3600 sn; Authentication › Passwords › *Leaked password protection* (Pro plan ister; ücretsiz planda kapalı kalır).
+
+---
+
 ## Güvenlik Özeti — Neden Güvenli?
 
 - **RLS her yerde açık.** `profiles`, `special_content`, `content_access`,
@@ -900,6 +925,11 @@ istemedim.
 ## 📝 Değişiklik Geçmişi (Changelog)
 
 Bu bölüm, siteye/Supabase kullanıcı sistemine sonradan yapılan düzeltmelerin tarih sırasıyla özetidir — hangi sorun bildirildi, kök nedeni neydi, nasıl çözüldü ve (varsa) senin elle yapman gereken adım neydi. Eskiden kökte ayrı `DEGISIKLIKLER_*.md` dosyaları halinde duruyordu, artık tek doğruluk kaynağı burası — en yeni turu en üstte bulursun.
+
+### 🗓️ 24.11.2026 — Supabase Advisor düzeltmeleri, Notlarım düzeni
+- Migration `0151`: RLS "açık reddet" politikaları, `FOR ALL` politikalarının bölünmesi, `(select auth.uid())`, yabancı anahtar indeksleri, sabit `search_path`, bucket listeleme daraltma, `btree_gist` taşıma, tetikleyici ve yönetim RPC'lerinde `anon` yetkisi kaldırma.
+- Redirect URL'ler için öneri listesi (yukarıdaki bölüm).
+- Notlarım: Klasör/Tür/Durum kullanıcıya özel liste, katlanır "Not bilgileri", mobilde yapışkan çubuk ofseti.
 
 ### 🗓️ 20.09.2026 — "GitHub yerine Supabase'te depola" anahtarı, arama motoru indekslemesi ve yazar taklidi açığı
 

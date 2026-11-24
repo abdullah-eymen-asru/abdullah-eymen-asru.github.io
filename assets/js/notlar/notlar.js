@@ -754,11 +754,30 @@ function turDurumSecenekleriniKur() {
   secimIpuclariniGuncelle();
 }
 
+/** Katlanmış "Not bilgileri" satırının özet metni: klasör · tür · durum · tarih · etiketler. */
+function metaOzetiniGuncelle() {
+  const hedef = $("nt-meta-ozet-metin");
+  if (!hedef || !S.duz) return;
+  const klasor = $("nt-klasor-sec")?.value ? yolMetni($("nt-klasor-sec").value) : "Ana klasör";
+  const tur = TURLER[$("nt-tur-sec")?.value]?.ad || "Genel";
+  const durum = DURUMLAR[$("nt-durum-sec")?.value]?.ad || "Gelen kutusu";
+  const tarih = $("nt-tarih")?.value ? new Date($("nt-tarih").value + "T12:00:00").toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: "numeric" }) : "";
+  const et = ($("nt-etiketler")?.value || "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, 4).map((x) => `#${x}`).join(" ");
+  hedef.replaceChildren(
+    el("span", { class: "nt-meta-parca", text: `📁 ${klasor}` }),
+    el("span", { class: "nt-meta-parca", text: tur }),
+    el("span", { class: "nt-meta-parca", text: durum }),
+    ...(tarih ? [el("span", { class: "nt-meta-parca", text: tarih })] : []),
+    ...(et ? [el("span", { class: "nt-meta-parca nt-meta-etiket", text: et })] : [])
+  );
+}
+
 function secimIpuclariniGuncelle() {
   const t = $("nt-tur-ipucu"), d = $("nt-durum-ipucu"), k = $("nt-klasor-ipucu");
   if (t) t.textContent = TURLER[$("nt-tur-sec")?.value]?.ipucu || "Notun ne tür içerik olduğunu belirler.";
   if (d) d.textContent = DURUMLAR[$("nt-durum-sec")?.value]?.ipucu || "Notun hangi aşamada olduğunu belirler.";
   if (k) k.textContent = "Notun bulunduğu yer. Klasörler iç içe olabilir.";
+  metaOzetiniGuncelle();
 }
 
 function filtreSecenekleriniKur() {
@@ -804,7 +823,16 @@ function klasoreGit(id) {
   listeyiCiz();
 }
 
+/** Dar ekranda siteye ait yapışkan üst şerit (hamburger + sekme adı) varsa, editörün yapışkan çubuğu onun ALTINA yapışsın. */
+function ustOfsetiniOlc() {
+  const tb = document.querySelector(".dash-topbar");
+  const h = tb && getComputedStyle(tb).display !== "none" ? Math.round(tb.getBoundingClientRect().height) + 14 : 0;
+  $("nt-duzen")?.style.setProperty("--nt-ust-ofset", `${h}px`);
+}
+window.addEventListener("resize", () => { try { ustOfsetiniOlc(); } catch { /* yok say */ } });
+
 function panelGoster(p) {
+  ustOfsetiniOlc();
   $("nt-duzen").dataset.panel = p;
 }
 
@@ -2475,6 +2503,7 @@ function duzenleyiciAc(m, secenek = {}) {
   $("nt-durum-sec").value = S.duz.durum in DURUMLAR ? S.duz.durum : KORUNAN_DURUM;
   secimIpuclariniGuncelle();
   $("nt-tarih").value = S.duz.tarih;
+  metaOzetiniGuncelle();
   $("nt-editor-menu-btn").hidden = S.duzYeni;
   durumYaz(S.duzYeni ? "Yeni not — yazmaya başla, kendiliğinden kaydedilir." : `Son güncelleme: ${tarihYaz(S.duz.guncelleme)}`);
 
@@ -3497,6 +3526,13 @@ function baglantilariKur() {
   $("nt-tur-sil")?.addEventListener("click", () => tanimSil("tur"));
   $("nt-durum-yeni")?.addEventListener("click", () => tanimEkle("durum"));
   $("nt-durum-sil")?.addEventListener("click", () => tanimSil("durum"));
+  const meta = $("nt-meta-detay");
+  if (meta) {
+    try { meta.open = localStorage.getItem("nt-meta-acik") === "1"; } catch { /* depolama kapalı */ }
+    meta.addEventListener("toggle", () => { try { localStorage.setItem("nt-meta-acik", meta.open ? "1" : "0"); } catch { /* yok say */ } });
+    meta.addEventListener("input", metaOzetiniGuncelle);
+    meta.addEventListener("change", metaOzetiniGuncelle);
+  }
   $("nt-tur-sec")?.addEventListener("change", secimIpuclariniGuncelle);
   $("nt-durum-sec")?.addEventListener("change", secimIpuclariniGuncelle);
   $("nt-odak-btn").addEventListener("click", () => odakAcKapa());
