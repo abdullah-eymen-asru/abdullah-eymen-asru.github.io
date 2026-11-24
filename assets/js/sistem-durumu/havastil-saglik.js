@@ -134,12 +134,34 @@ function kontroller(ctx) {
   return L;
 }
 
-/** Worker + resmî kaynaklar: Worker kotasını harcar → yalnızca düğmeyle. */
+/** Kullanıcının kendi oturum jetonuyla Worker çağrısı (yalnızca site sahibi/yönetici sınamalarında kullanılır). */
+async function jetonlu(supabase, yol) {
+  const jeton = (await supabase.auth.getSession()).data?.session?.access_token; const t0 = performance.now();
+  try {
+    const r = await fetch(`${WORKER}${yol}`, { headers: { Authorization: `Bearer ${jeton}` }, cache: "no-store", credentials: "omit", referrerPolicy: "no-referrer", signal: AbortSignal.timeout(20000) });
+    return { ok: r.ok, durum: r.status, ms: Math.round(performance.now() - t0), veri: await r.json().catch(() => null) };
+  } catch (h) { return { ok: false, durum: 0, ms: Math.round(performance.now() - t0), hata: h.name === "TimeoutError" ? "zaman aşımı" : "ulaşılamadı" }; }
+}
+
+/**
+ * Worker + resmî kaynaklar: HER SATIR KENDİ BAŞINA, TEK sınamadır (⟳ yalnızca o satırın isteğini atar). Toplu "hepsini sına" YOKTUR → gereksiz Worker kotası harcanmaz.
+ * `kota`: satırda gösterilen dürüst maliyet notu.
+ */
 function workerKontrolleri(ctx) {
-  const { konum } = ctx;
+  const { konum, supabase } = ctx;
   const L = [];
+  const kaynakSatiri = (id, ad, ne, baglanti, bozulursa, kota) => L.push({ id: `w-${id}`, grup: "worker", ad, ne, baglanti, bozulursa, kota,
+    dene: async () => {
+      const hk = await import("../havastil/hava-kaynak.js");
+      const sonuc = await hk.kaynakTesti(konum, [id]).catch((h) => [{ id, durum: "hata", ayrinti: h.message }]);
+      const r = sonuc.find((x) => x.id === id);
+      if (!r) return { ok: false, ms: 0, yazi: "Sınama sonucu alınamadı" };
+      // OpenAQ'nın "bölgede istasyon yok" yanıtı arıza değil kapsama sınırıdır → uyarı.
+      const kapsam = id === "openaq" && r.durum === "hata" && /istasyon yok/.test(r.ayrinti || "");
+      return { ok: r.durum !== "hata" || kapsam, uyari: r.durum === "atlandi" || kapsam, ms: r.ms, yazi: r.ayrinti };
+    } });
   L.push({ id: "w-saglik", grup: "worker", ad: "HavaStil Worker'ı (Cloudflare)", ne: "Resmî kaynakları, haberleri ve yapay zekâyı sunucu tarafında aracılık eden Worker.", baglanti: ["https://www.cloudflarestatus.com", "Cloudflare durumu"],
-    bozulursa: "MGM, havalimanı, OpenAQ, haber ve yapay zekâ çalışmaz; yalnızca tahmin modeli kalır.",
+    bozulursa: "MGM, havalimanı, OpenAQ, haber ve yapay zekâ çalışmaz; yalnızca tahmin modeli kalır.", kota: "1 Worker isteği",
     dene: async () => {
       const r = await sonda(`${WORKER}/saglik`); const j = r.veri;
       if (!r.ok || !j) return { ok: false, ms: r.ms, yazi: `Ulaşılamadı (${r.hata || `HTTP ${r.durum}`}). Worker silinmiş/kapatılmış ya da günlük kotası dolmuş olabilir.` };
@@ -149,14 +171,22 @@ function workerKontrolleri(ctx) {
       if (j.surum != null && j.surum < 6) eks.push(`Worker sürümü eski (${j.surum}); yeniden yayınla`);
       return { ok: true, uyari: eks.length > 0 || yavasMi(r), ms: r.ms, yazi: `Çalışıyor · sürüm ${j.surum ?? "?"}${eks.length ? ` · dikkat: ${eks.join("; ")}` : " · gerekli sırlar tanımlı"}` };
     } });
-  const gerekli = (m) => async () => m;
-  const kaynak = (id, ad, ne, baglanti, bozulursa) => L.push({ id: `w-${id}`, grup: "worker", ad, ne, baglanti, bozulursa, resmi: id, dene: gerekli(null) });
-  kaynak("mgm", "Meteoroloji Genel Müdürlüğü (MGM) — resmî ölçüm", "Konumuna en yakın MGM istasyonunun anlık ölçümü; tahminle karşılaştırma ve düzeltme.", ["https://www.mgm.gov.tr/tahmin/il-ve-ilceler.aspx?il=%C4%B0stanbul&ilce=Ata%C5%9Fehir", "MGM'de Ataşehir"], "Resmî ölçümle doğrulama çalışmaz; model değerleri olduğu gibi kalır. (MGM belgelenmemiş bir uç nokta kullanır; alan adları değişebilir.)");
-  kaynak("metar", "Havalimanı resmî raporu (METAR · NOAA)", "Yakın havalimanının resmî hava raporu (sıcaklık, rüzgâr, basınç).", ["https://aviationweather.gov/data/metar/?ids=LTFJ&hours=3", "Sabiha Gökçen METAR"], "Havalimanı ölçümü gelmez; MGM ya da model kullanılır.");
-  kaynak("openaq", "Hava kalitesi istasyonları (OpenAQ)", "Konumuna yakın ölçüm istasyonlarının kirletici değerleri. Türkiye'de istasyon sayısı sınırlıdır.", ["https://explore.openaq.org/", "OpenAQ haritası"], "İstasyon verisi gelmez; hava kalitesi için Copernicus modeli kullanılır (bu normaldir).");
-  L.push({ id: "w-haber", grup: "worker", ad: "Uyarılar ve haberler (Worker havuzu)", ne: "Hava uyarıları ve yerel haber başlıkları.", bozulursa: "Uyarı/haber şeridi boş kalır; tahmin etkilenmez.", haber: true, dene: gerekli(null) });
-  L.push({ id: "w-ai", grup: "worker", ad: "Yapay zekâ yorumu (Groq · Worker)", ne: "Tahmini ve ölçümü yorumlayan yapay zekâ. Sınama çok kısa bir istek yapar (günlük hakkından 1 düşer).", baglanti: ["https://status.groq.com", "Groq durumu"], bozulursa: "Yapay zekâ yorumu gelmez; sayısal analiz ve öneriler etkilenmez.", yapayZeka: true, dene: gerekli(null) });
-  void konum;
+  kaynakSatiri("mgm", "Meteoroloji Genel Müdürlüğü (MGM) — resmî ölçüm", "Konumuna en yakın MGM istasyonunun anlık ölçümü; tahminle karşılaştırma ve düzeltme.", ["https://www.mgm.gov.tr/tahmin/il-ve-ilceler.aspx?il=%C4%B0stanbul&ilce=Ata%C5%9Fehir", "MGM'de Ataşehir"], "MGM ölçümü gelmez; tahmin model verisiyle çalışır.", "1–3 Worker isteği");
+  kaynakSatiri("metar", "Havalimanı resmî raporu (METAR · NOAA)", "Yakın havalimanının resmî hava raporu (sıcaklık, rüzgâr, basınç).", ["https://aviationweather.gov/data/metar/?ids=LTFJ&hours=3", "Sabiha Gökçen METAR"], "Havalimanı ölçümü gelmez; MGM ya da model kullanılır.", "1 Worker isteği");
+  kaynakSatiri("openaq", "Hava kalitesi istasyonları (OpenAQ)", "Konumuna yakın ölçüm istasyonlarının kirletici değerleri. Türkiye'de istasyon sayısı sınırlıdır.", ["https://explore.openaq.org/", "OpenAQ haritası"], "İstasyon verisi gelmez; hava kalitesi için Copernicus modeli kullanılır (bu normaldir).", "1–2 Worker isteği");
+  L.push({ id: "w-haber", grup: "worker", ad: "Uyarılar ve haberler (Worker havuzu)", ne: "Hava uyarıları ve yerel haber başlıkları.", bozulursa: "Uyarı/haber şeridi boş kalır; tahmin etkilenmez.", kota: "1 Worker isteği",
+    dene: async () => {
+      const r = await jetonlu(supabase, "/haberler?havuz=tr"); const n = r.veri?.haberler?.length, kay = r.veri?.kaynaklar || [], kotu = kay.filter((x) => x.durum !== "ok").length;
+      if (!r.ok || n == null) return { ok: false, ms: r.ms, yazi: `Yanıt alınamadı (${r.durum === 401 ? "oturum/yetki" : r.hata || `HTTP ${r.durum}`})` };
+      return { ok: !(kotu === kay.length && kay.length), uyari: kotu > 0, ms: r.ms, yazi: `Çalışıyor · ${n} başlık · ${kay.length - kotu}/${kay.length} kaynak yanıt veriyor${kotu ? " (bazı haber siteleri yanıt vermedi; normaldir)" : ""}` };
+    } });
+  L.push({ id: "w-ai", grup: "worker", ad: "Yapay zekâ yorumu (Groq · Worker)", ne: "Tahmini ve ölçümü yorumlayan yapay zekâ. Sınama çok kısa bir istek yapar.", baglanti: ["https://status.groq.com", "Groq durumu"], bozulursa: "Yapay zekâ yorumu üretilmez; diğer her şey çalışır.", kota: "1 Worker isteği + günlük Groq hakkından 1",
+    dene: async () => {
+      const r = await jetonlu(supabase, "/tani"); const adim = r.veri?.adimlar || [];
+      const groq = adim.find((a) => a.ad === "Groq çağrısı") || adim.find((a) => a.ad === "Groq anahtarı"), kotu = adim.find((a) => !a.ok);
+      if (!r.ok || !adim.length) return { ok: false, ms: r.ms, yazi: r.durum === 429 ? "Çok sık sınadın; bir dakika bekle" : `Yanıt alınamadı (${r.hata || `HTTP ${r.durum}`})` };
+      return kotu ? { ok: false, ms: r.ms, yazi: `${kotu.ad}: ${kotu.ayrinti}` } : { ok: true, ms: r.ms, yazi: groq?.ayrinti || "Çalışıyor" };
+    } });
   return L;
 }
 
@@ -210,15 +240,14 @@ export function havastilSaglikBolumu({ supabase, oturum, yonetici = false }) {
   const sekmeBar = el("div", { class: "sd-hv-sekmeler", role: "tablist", "aria-label": "HavaStil servis grupları" });
   const panel = el("section", { class: "sd-hv-panel", role: "tabpanel" });
   const altEylem = el("div", { class: "sd-eylemler" });
-  const yenileBtn = el("button", { type: "button", class: "sd-btn", text: "⟳ Ücretsiz kontrolleri yeniden sına" });
-  const workerBtn = el("button", { type: "button", class: "sd-btn", text: "☁️ Worker ve resmî kaynakları sına" });
+  const yenileBtn = el("button", { type: "button", class: "sd-btn sd-hv-btn", text: "⟳ Bu sekmeyi yenile" });
 
   function sekmeleriCiz() {
     sekmeBar.replaceChildren(...gruplar.map(([id, ikon, ad]) => {
       const sev = grupSev(id);
       const b = el("button", { type: "button", role: "tab", class: `sd-hv-sekme sd-hv-sekme--${sev}${id === aktif ? " aktif" : ""}`, "aria-selected": id === aktif ? "true" : "false", title: `${ad}: ${sev === "ok" ? "sağlıklı" : sev === "uyari" ? "uyarı var" : sev === "hata" ? "sorun var" : "sınanmadı/sınanıyor"}` },
         el("span", { "aria-hidden": "true", text: ikon }), el("span", { text: ad }), el("i", { class: "sd-hv-nokta", "aria-hidden": "true" }));
-      b.addEventListener("click", () => { aktif = id; tumunuCiz(); });
+      b.addEventListener("click", () => { aktif = id; tumunuCiz(); grubuIlkSina(id); });
       return b;
     }));
   }
@@ -226,7 +255,7 @@ export function havastilSaglikBolumu({ supabase, oturum, yonetici = false }) {
     const d = durum.get(k.id) || { sev: "yok", yazi: "Henüz sınanmadı" };
     const sorunlu = d.sev === "hata" || d.sev === "uyari";
     const b = el("button", { type: "button", class: "sd-hv-yeniden", "aria-label": `${k.ad} yeniden sına`, title: "Yalnız bu satırı yeniden sına", text: "⟳" });
-    b.addEventListener("click", () => (k.grup === "worker" && k.id !== "w-saglik" ? workerSina() : bir(k)));
+    b.addEventListener("click", () => bir(k));
     const adimlar = sorunlu ? cozumun(k) : [];
     const det = el("details", { class: "sd-hv-detay" },
       el("summary", { text: sorunlu ? "Ne yapmalı?" : "Ayrıntı" }),
@@ -241,16 +270,17 @@ export function havastilSaglikBolumu({ supabase, oturum, yonetici = false }) {
       el("div", { class: "sd-hv-metin" },
         el("strong", { text: k.ad }),
         el("small", { class: "sd-hv-sonuc", role: "status", text: d.yazi + (d.ms != null && d.sev !== "bekle" && d.ms > 0 ? ` · ${d.ms} ms` : "") }),
+        k.kota ? el("small", { class: "sd-hv-kota", text: `⟳ başına kota: ${k.kota}` }) : null,
         det),
       b);
   }
   function panelCiz() {
     const g = GRUPLAR.find(([id]) => id === aktif) || GRUPLAR[0];
     const liste = grubunListesi(g[0]);
-    altEylem.replaceChildren(g[0] === "worker" ? workerBtn : yenileBtn);
+    altEylem.replaceChildren(...(g[0] === "worker" ? [] : [yenileBtn]));
     panel.replaceChildren(el("p", { class: "muted sd-hv-grup-ac", text: g[3] }),
       el("ul", { class: "sd-hv-liste" }, ...liste.map(satirCiz)),
-      ...(g[0] === "worker" ? [el("p", { class: "muted sd-hv-grup-ac", text: "Worker sınaması: Worker'a + haber ve yapay zekâ için birkaç istek atar (yapay zekâ günlük hakkından 1 düşer). Yalnız site sahibi ve yöneticiler çalıştırabilir." })] : []),
+      ...(g[0] === "worker" ? [el("p", { class: "muted sd-hv-grup-ac", text: "Her satırın ⟳ düğmesi yalnızca o satırı, tek sınamayla çalıştırır; toplu sınama yoktur. Maliyet her satırda yazar. Yalnız site sahibi ve yöneticiler çalıştırabilir." })] : []),
       altEylem);
   }
   function ozetGuncelle() {
@@ -265,6 +295,7 @@ export function havastilSaglikBolumu({ supabase, oturum, yonetici = false }) {
   function tumunuCiz() { ozetGuncelle(); sekmeleriCiz(); panelCiz(); }
 
   async function bir(k) {
+    if (k.grup === "worker" && !yonetici) return;                         // arayüz + sunucu ikisi de denetler
     durum.set(k.id, { sev: "bekle", yazi: "Sınanıyor…" }); tumunuCiz();
     try {
       const s = await k.dene();
@@ -274,77 +305,31 @@ export function havastilSaglikBolumu({ supabase, oturum, yonetici = false }) {
     tumunuCiz();
   }
 
-  /** Resmî kaynaklar + haber + yapay zekâ: Worker KOTASI harcar → yalnızca site sahibi/yönetici, yalnızca düğmeyle. (Sunucu da kendi yetkisini denetler.) */
-  async function workerSina() {
-    if (!yonetici || workerBtn.disabled) return;
-    workerBtn.disabled = true; workerBtn.textContent = "Sınanıyor…";
-    try {
-      await bir(workerListesi[0]);
-      const ayakta = durum.get("w-saglik")?.sev !== "hata";
-      for (const k of workerListesi.slice(1)) durum.set(k.id, { sev: "bekle", yazi: ayakta ? "Sınanıyor…" : "Worker yanıt vermediği için sınanmadı" });
-      tumunuCiz();
-      if (ayakta) {
-        const hk = await import("../havastil/hava-kaynak.js");
-        const sonuc = await hk.kaynakTesti(konum).catch((h) => [{ id: "hepsi", durum: "hata", ayrinti: h.message }]);
-        for (const id of ["mgm", "metar", "openaq"]) {
-          const k = workerListesi.find((x) => x.id === `w-${id}`), r = sonuc.find((x) => x.id === id);
-          if (!k) continue;
-          durum.set(k.id, !r ? { sev: "hata", yazi: "Sınama sonucu alınamadı" } : { sev: r.durum === "ok" ? "ok" : r.durum === "atlandi" ? "uyari" : "hata", yazi: r.ayrinti, ms: r.ms });
-          if (id === "openaq" && r?.durum === "hata" && /istasyon yok/.test(r.ayrinti || "")) durum.set(k.id, { sev: "uyari", yazi: r.ayrinti, ms: r.ms });   // kapsama sınırı, arıza değil
-        }
-        tumunuCiz();
-        await Promise.all([haberSina(), yzSina()]);
-      }
-    } finally { workerBtn.disabled = false; workerBtn.textContent = "☁️ Worker ve resmî kaynakları sına"; tumunuCiz(); }
+    const sinananlar = new Set();                                              // bir kez sınanan gruplar (sekme ilk açılışında tembel sınama)
+  async function grubuSina(id) {
+    if (calisiyor || id === "worker") return; calisiyor = true; yenileBtn.disabled = true; yenileBtn.textContent = "Sınanıyor…"; sinananlar.add(id);
+    await Promise.all(grubunListesi(id).map((k) => bir(k)));
+    yenileBtn.disabled = false; yenileBtn.textContent = "⟳ Bu sekmeyi yenile"; calisiyor = false; tumunuCiz();
   }
-  async function jetonlu(yol) {
-    const jeton = (await supabase.auth.getSession()).data?.session?.access_token; const t0 = performance.now();
-    try {
-      const r = await fetch(`${WORKER}${yol}`, { headers: { Authorization: `Bearer ${jeton}` }, cache: "no-store", credentials: "omit", referrerPolicy: "no-referrer", signal: AbortSignal.timeout(20000) });
-      return { ok: r.ok, durum: r.status, ms: Math.round(performance.now() - t0), veri: await r.json().catch(() => null) };
-    } catch (h) { return { ok: false, durum: 0, ms: Math.round(performance.now() - t0), hata: h.name === "TimeoutError" ? "zaman aşımı" : "ulaşılamadı" }; }
-  }
-  async function haberSina() {
-    const k = workerListesi.find((x) => x.id === "w-haber"); const r = await jetonlu("/haberler?havuz=tr");
-    const n = r.veri?.haberler?.length, kay = (r.veri?.kaynaklar || []);
-    const kotu = kay.filter((x) => x.durum !== "ok").length;
-    durum.set(k.id, r.ok && n != null ? { sev: kotu === kay.length && kay.length ? "hata" : kotu ? "uyari" : "ok", yazi: `Çalışıyor · ${n} başlık · ${kay.length - kotu}/${kay.length} kaynak yanıt veriyor${kotu ? " (bazı haber siteleri yanıt vermedi; normaldir)" : ""}`, ms: r.ms }
-      : { sev: "hata", yazi: `Yanıt alınamadı (${r.durum === 401 ? "oturum/yetki" : r.hata || `HTTP ${r.durum}`})`, ms: r.ms });
-    tumunuCiz();
-  }
-  async function yzSina() {
-    const k = workerListesi.find((x) => x.id === "w-ai"); const r = await jetonlu("/tani"); const adim = r.veri?.adimlar || [];
-    const groq = adim.find((a) => a.ad === "Groq çağrısı") || adim.find((a) => a.ad === "Groq anahtarı"), kotu = adim.find((a) => !a.ok);
-    durum.set(k.id, r.ok && adim.length ? (kotu ? { sev: "hata", yazi: `${kotu.ad}: ${kotu.ayrinti}`, ms: r.ms } : { sev: "ok", yazi: groq?.ayrinti || "Çalışıyor", ms: r.ms })
-      : { sev: "hata", yazi: r.durum === 429 ? "Çok sık sınadın; bir dakika bekle" : `Yanıt alınamadı (${r.hata || `HTTP ${r.durum}`})`, ms: r.ms });
-    tumunuCiz();
-  }
-
-  const AGIR = new Set(["harita", "konum", "ai"]);                               // üçüncü taraf sunucular: yalnızca bölüm açılınca ya da düğmeyle
-  async function hepsiniSina({ hafif = false } = {}) {
-    if (calisiyor) return; calisiyor = true; yenileBtn.disabled = true; yenileBtn.textContent = "Sınanıyor…";
-    await Promise.all(kontrolListesi.filter((k) => !hafif || !AGIR.has(k.grup)).map((k) => bir(k)));
-    yenileBtn.disabled = false; yenileBtn.textContent = "⟳ Ücretsiz kontrolleri yeniden sına"; calisiyor = false; tumunuCiz();
-  }
-  yenileBtn.addEventListener("click", () => hepsiniSina());
-  workerBtn.addEventListener("click", () => workerSina());
+  const grubuIlkSina = (id) => { if (id !== "worker" && !sinananlar.has(id)) grubuSina(id); };
+  yenileBtn.addEventListener("click", () => grubuSina(aktif));
 
   async function kur() {
     // Sınama noktası: kullanıcının İLK kayıtlı konumu (yoksa Ataşehir): her kullanıcı KENDİ verisiyle sınar.
     try { const { data } = await supabase.from("havastil_konumlari").select("*").order("sira", { ascending: true }).limit(1); const k = data?.[0];
       if (k && Number.isFinite(Number(k.lat ?? k.enlem)) && Number.isFinite(Number(k.lon ?? k.boylam))) konum = { ...ATAS, ad: k.ad || k.name || "Kayıtlı konum", lat: Number(k.lat ?? k.enlem), lon: Number(k.lon ?? k.boylam), ulke: k.ulke || k.country_code || "TR" };
     } catch { /* sınama noktası Ataşehir kalır */ }
-    kontrolListesi = kontroller({ konum, supabase }); workerListesi = workerKontrolleri({ konum });
+    kontrolListesi = kontroller({ konum, supabase }); workerListesi = workerKontrolleri({ konum, supabase });
     gov.replaceChildren(
-      el("p", { class: "muted sd-hv-giris", text: `Sınama noktası: ${konum.ad}${yonetici ? "" : " (senin kayıtlı konumun)"}. Bu sekmelerdeki kontroller tarayıcından yapılır ve sunucu kotasını harcamaz. ⟳ yalnız o satırı yeniden sınar.` }),
+      el("p", { class: "muted sd-hv-giris", text: `Sınama noktası: ${konum.ad}${yonetici ? "" : " (senin kayıtlı konumun)"}. Bu sekmelerdeki kontroller tarayıcından yapılır ve Worker kotasını harcamaz; her sekme ilk açıldığında bir kez sınanır. ⟳ yalnız o satırı yeniden sınar.` }),
       sekmeBar, panel,
       ...(yonetici ? [] : [el("p", { class: "muted sd-hv-giris", text: "Worker, MGM, havalimanı, haber ve yapay zekâ sınamaları sunucu kotası harcadığı için yalnızca site sahibi ve yöneticiler tarafından çalıştırılabilir." })]));
     tumunuCiz();
   }
-  let ilk = false, agirYapildi = false;
+  let ilk = false;
   async function baslat(hafif) {
-    if (!ilk) { ilk = true; await kur(); await hepsiniSina({ hafif: true }); }
-    if (!hafif && !agirYapildi) { agirYapildi = true; await Promise.all(kontrolListesi.filter((k) => AGIR.has(k.grup)).map((k) => bir(k))); }
+    if (!ilk) { ilk = true; await kur(); await Promise.all(["db", "cihaz"].map((g) => grubuSina(g).catch(() => {}))); }   // kendi altyapımız: ucuz; rozet dolsun
+    if (!hafif) grubuIlkSina(aktif);                                          // bölüm açılınca YALNIZ görünen sekme sınanır
   }
   kok.addEventListener("toggle", () => { if (kok.open) baslat(false).catch(() => {}); });
   setTimeout(() => { if (oturum) baslat(true).catch(() => {}); }, 1500);   // kapalıyken yalnız hafif (kendi altyapımız) kontroller; rozet dolsun

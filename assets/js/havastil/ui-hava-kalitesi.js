@@ -7,7 +7,7 @@
  * CSP: inline stil/işleyici yok; dinamik ölçüler CSSOM ile.
  */
 import { el, kart, bolumBasligi, ipucu, olay } from "./ui-temel.js";
-import { KIRLETICILER, SEVIYELER, seviye, rehberYuzde, doluluk, degerSayisi, sinirlar, rehberMetni, bilimselAd, genelDurum, eaqiIndeks, tavsiyeler, KIRLETICI } from "./kirletici.js";
+import { KIRLETICILER, SEVIYELER, seviye, seviyeIndeks, rehberYuzde, doluluk, degerSayisi, sinirlar, rehberMetni, bilimselAd, genelDurum, eaqiIndeks, tavsiyeler, KIRLETICI } from "./kirletici.js";
 import { olcumKarti } from "./ui-olcum.js";
 import { sonCekilme, zamanYazisi, resmiSiteBaglantisi } from "./ui-zaman.js";
 
@@ -110,21 +110,50 @@ function kirleticiKutusu(k, v, kaynak, etiket, alinma, d) {
   return kutu;
 }
 
+/** Gün boyu saat saat hava kalitesi: genel seviye (renk) ya da seçilen kirleticinin GERÇEK değeri ve birimi (µg/m³; karbonmonoksit mg/m³). */
 function saatSeridi(kalite, tarih, simdiT) {
   const s = kalite?.saatlik; if (!s?.t) return null;
   const idx = s.t.map((t, i) => (t.startsWith(tarih) ? i : -1)).filter((i) => i >= 0);
   if (idx.length < 6) return null;
-  const sutunlar = idx.map((i) => {
-    const v = s.eaqi?.[i], sx = eaqiIndeks(v), c = el("span", { class: `hv-hk-saat${s.t[i] === simdiT ? " simdi" : ""}`, title: `${s.t[i].slice(11, 16)} · ${sx == null ? "veri yok" : SEVIYELER[sx].ad}` });
-    if (sx == null) c.classList.add("bos"); else { c.dataset.s = String(sx); c.style.height = `${18 + ((sx + 1) / 6) * 82}%`; }
-    return c;
-  });
+  const maddeler = [{ id: "eaqi", ad: "Genel seviye" }, ...KIRLETICILER.filter((k) => Array.isArray(s[k.id]) && idx.some((i) => Number.isFinite(s[k.id][i]))).map((k) => ({ id: k.id, ad: k.kisa || k.ad }))];
+  let secili = "eaqi";
+  const kok = el("div", { class: "hv-hk-gidisat" });
   const etk = (i) => s.t[idx[Math.min(i, idx.length - 1)]].slice(11, 13);
-  return el("div", { class: "hv-hk-gidisat" },
-    el("strong", { class: "hv-hk-alt-baslik", text: "Gün boyunca hava kalitesi" }),
-    el("div", { class: "hv-hk-saatler", role: "img", "aria-label": "Saat saat hava kalitesi seviyesi" }, ...sutunlar),
-    el("div", { class: "hv-hk-saat-etiket" }, el("span", { text: `${etk(0)}:00` }), el("span", { text: `${etk(6)}:00` }), el("span", { text: `${etk(12)}:00` }), el("span", { text: `${etk(18)}:00` }), el("span", { text: `${etk(23)}:00` })),
-    el("small", { class: "hv-ipucu", text: "Yüksek sütun = daha kötü hava. Renk ne kadar sıcaksa (yeşilden kırmızıya) kirlilik o kadar fazladır." }));
+  const saatYazi = (i) => s.t[i].slice(11, 16);
+
+  function ciz() {
+    const eaqi = secili === "eaqi", k = KIRLETICI[secili];
+    const deger = (i) => (eaqi ? s.eaqi?.[i] : s[secili]?.[i]);
+    const sev = (i) => (eaqi ? eaqiIndeks(deger(i)) : seviyeIndeks(secili, deger(i)));
+    const yaz = (i) => { const v = deger(i); if (!Number.isFinite(v)) return null; return eaqi ? `Avrupa AQI ${Math.round(v)}` : degerSayisi(secili, v)?.tam; };
+    const sutunlar = idx.map((i) => {
+      const sx = sev(i), t = yaz(i);
+      const c = el("span", { class: `hv-hk-saat${s.t[i] === simdiT ? " simdi" : ""}`, title: `${saatYazi(i)} · ${t ? `${t} · ${SEVIYELER[sx].ad}` : "veri yok"}` });
+      if (sx == null) c.classList.add("bos"); else { c.dataset.s = String(sx); c.style.height = `${18 + ((sx + 1) / 6) * 82}%`; }
+      return c;
+    });
+    const gecerli = idx.filter((i) => Number.isFinite(deger(i)));
+    const enYuksek = gecerli.reduce((m, i) => (m == null || deger(i) > deger(m) ? i : m), null);
+    const enDusuk = gecerli.reduce((m, i) => (m == null || deger(i) < deger(m) ? i : m), null);
+    const simdiI = idx.find((i) => s.t[i] === simdiT);
+    const ozet = gecerli.length ? el("p", { class: "hv-hk-saat-ozet" },
+      simdiI != null && yaz(simdiI) ? el("span", {}, el("b", { text: "Şu an " }), yaz(simdiI)) : null,
+      el("span", {}, el("b", { text: "En yüksek " }), `${saatYazi(enYuksek)} · ${yaz(enYuksek)}`),
+      el("span", {}, el("b", { text: "En düşük " }), `${saatYazi(enDusuk)} · ${yaz(enDusuk)}`)) : el("p", { class: "hv-ipucu", text: "Bu madde için saatlik veri yok." });
+    // Birimli saat saat değerler (yatay kaydırılabilir; sayfa taşmaz)
+    const liste = el("ol", { class: "hv-hk-saat-degerler", "aria-label": `Saat saat değerler (${eaqi ? "Avrupa AQI" : k?.id === "co" ? "mg/m³" : "µg/m³"})` },
+      ...idx.map((i) => { const v = deger(i), t = Number.isFinite(v) ? (eaqi ? String(Math.round(v)) : degerSayisi(secili, v)?.sayi) : "—";
+        return el("li", { class: s.t[i] === simdiT ? "simdi" : "" }, el("small", { text: saatYazi(i) }), el("strong", { text: t }), el("small", { class: "muted", text: eaqi ? "AQI" : degerSayisi(secili, 1)?.birim || "" })); }));
+    const chipler = el("div", { class: "hv-hk-saat-chip", role: "group", "aria-label": "Gösterilecek madde" }, ...maddeler.map((m) => olay(el("button", { type: "button", class: `hv-hk-chip-btn${m.id === secili ? " aktif" : ""}`, "aria-pressed": String(m.id === secili), text: m.ad }), "click", () => { secili = m.id; ciz(); })));
+    kok.replaceChildren(
+      el("strong", { class: "hv-hk-alt-baslik", text: "Gün boyunca hava kalitesi" }), chipler,
+      el("div", { class: "hv-hk-saatler", role: "img", "aria-label": `Saat saat ${eaqi ? "hava kalitesi seviyesi" : `${k?.ad || secili} değeri`}` }, ...sutunlar),
+      el("div", { class: "hv-hk-saat-etiket" }, el("span", { text: `${etk(0)}:00` }), el("span", { text: `${etk(6)}:00` }), el("span", { text: `${etk(12)}:00` }), el("span", { text: `${etk(18)}:00` }), el("span", { text: `${etk(23)}:00` })),
+      ozet, liste,
+      el("small", { class: "hv-ipucu", text: eaqi ? "Yüksek sütun = daha kötü hava. Renk ne kadar sıcaksa (yeşilden kırmızıya) kirlilik o kadar fazladır." : `Sütun yüksekliği ${k?.ad || "maddenin"} seviyesini gösterir; sayılar ${degerSayisi(secili, 1)?.birim} cinsinden o saatin değeridir.` }));
+  }
+  ciz();
+  return kok;
 }
 
 function oneriler(gd) {

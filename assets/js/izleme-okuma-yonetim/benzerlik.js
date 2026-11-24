@@ -30,8 +30,11 @@ import { kucukHarfeCevirTr } from "../core/supabase-client.js";
 
 const KATLA = { "ı": "i", "ş": "s", "ç": "c", "ğ": "g", "ö": "o", "ü": "u", "â": "a", "î": "i", "û": "u", "ê": "e", "ô": "o", "œ": "oe", "æ": "ae", "ø": "o", "ß": "ss", "đ": "d", "ł": "l" };
 /** Karşılaştırmada yok sayılan kelimeler (yalnızca bağlaç/artikel; anlamlı ad kelimeleri değil). */
-const DUR = new Set(["the", "of", "and", "a", "an", "in", "on", "to", "for", "de", "la", "le", "el", "ve", "bir", "ile", "ya", "da", "bu", "o", "part", "bolum", "sezon", "season", "cilt", "vol", "film", "dizi", "movie"]);
+const DUR = new Set(["chapter", "volume", "the", "of", "and", "a", "an", "in", "on", "to", "for", "de", "la", "le", "el", "ve", "bir", "ile", "ya", "da", "bu", "o", "part", "bolum", "sezon", "season", "cilt", "vol", "film", "dizi", "movie"]);
 const ROMEN = { ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8, ix: 9, x: 10 };
+/** "Part Two", "Bölüm İki" gibi yazıyla verilen devam numaraları (yalnızca part/bölüm/chapter/cilt sözcüğünden sonra). */
+const YAZI_NO = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, bir: 1, iki: 2, uc: 3, dort: 4, bes: 5, alti: 6, yedi: 7, sekiz: 8, dokuz: 9, on: 10 };
+const NO_ONEK = ["part", "bolum", "chapter", "cilt", "vol", "volume", "sezon", "season"];
 const YIL_ENUST = new Date().getFullYear() + 1;
 
 /** Karşılaştırma biçimi: küçük harf (tr) + aksan katlama + noktalama → boşluk. Parantez içi KORUNUR. */
@@ -53,9 +56,10 @@ function devamNoAyir(tokenler) {
   let son = t[t.length - 1], no = null;
   if (/^\d{1,2}$/.test(son) && Number(son) >= 1 && Number(son) <= 30) no = Number(son);
   else if (ROMEN[son] && t.length >= 2) no = ROMEN[son];
+  else if (YAZI_NO[son] && t.length >= 3 && NO_ONEK.includes(t[t.length - 2])) no = YAZI_NO[son];
   if (no == null) return { belirteclar: t, no: null };
   t.pop();
-  if (DUR.has(t[t.length - 1]) && ["part", "bolum", "sezon", "season", "cilt", "vol"].includes(t[t.length - 1])) t.pop();
+  if (DUR.has(t[t.length - 1]) && NO_ONEK.includes(t[t.length - 1])) t.pop();
   return { belirteclar: t, no };
 }
 
@@ -93,10 +97,10 @@ export function ayristir(baslik) {
   if (kelimeler.length > 1 && yilMi(kelimeler[kelimeler.length - 1])) { yil = yil ?? Number(kelimeler.pop()); govde = kelimeler.join(" "); }
 
   const varyantlar = [], goruldu = new Set();
-  const ekle = (metin, kaynak) => {
+  const ekle = (metin, kaynak, kisaltilmis = false) => {
     const c = cekirdek(metin); if (!c) return;
     const k = c.anahtar + "|" + (c.no ?? ""); if (goruldu.has(k)) return; goruldu.add(k);
-    varyantlar.push({ ...c, kaynak });
+    varyantlar.push({ ...c, kaynak, kisaltilmis });
   };
   ekle(govde, "ana");
   // " - ", " / ", " | " ile ayrılan parçalar (yıl-yalnız ya da sayı-yalnız parçalar cekirdek() tarafından atılır)
@@ -104,7 +108,7 @@ export function ayristir(baslik) {
   if (parcalar.length > 1) parcalar.forEach((p) => ekle(p, "ana"));
   // "Ad: Alt başlık" → yalnızca ana ad, en az iki anlamlı kelime ya da 6+ harf ise (tek kısa kelimeyle yanlış eşleşme olmasın)
   const iki = govde.split(/\s*:\s+/);
-  if (iki.length > 1) { const ilk = cekirdek(iki[0]); if (ilk && (ilk.belirteclar.size >= 2 || ilk.anahtar.length >= 6)) ekle(iki[0], "ana"); }
+  if (iki.length > 1) { const ilk = cekirdek(iki[0]); if (ilk && (ilk.belirteclar.size >= 2 || ilk.anahtar.length >= 6)) ekle(iki[0], "ana", true); }
   // parantez içi alternatif/özgün ad (oyuncu adı olabilir: yalnızca TAM eşleşmede kullanılır)
   parantezler.forEach((p) => p && ekle(p, "alt"));
   return { yil, varyantlar };
@@ -133,6 +137,8 @@ const kesisim = (A, B) => { let n = 0; A.forEach((x) => { if (B.has(x)) n++; });
 function ciftKarsilastir(q, v, qYil, vYil, sonKelimeYarim) {
   if (q.anahtar === v.anahtar) {
     if (!noUyumlu(q.no, v.no)) return { tur: "seri", oran: 0.62 };
+    // Biri "Ad: Alt başlık"tan kısaltılmış ana ad ise (The Hunger Games ↔ The Hunger Games: Catching Fire) bu KOPYA DEĞİL, serinin başka yapımıdır.
+    if (q.kisaltilmis || v.kisaltilmis) return { tur: q.kisaltilmis && v.kisaltilmis ? "seri" : q.kisaltilmis ? "kapsar" : "icerir", oran: 0.6 };
     if (v.kaynak === "alt" && q.belirteclar.size < 2 && q.anahtar.length < 8) return null;     // kısa tek kelime parantez içi (oyuncu/yan ad) ile "aynı" sayılmaz
     if (qYil && vYil && qYil !== vYil) return { tur: "ayniYil", oran: 0.88 };
     return { tur: "ayni", oran: qYil && vYil ? 1 : 0.97 };

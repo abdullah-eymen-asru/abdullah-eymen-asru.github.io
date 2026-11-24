@@ -11,11 +11,11 @@ permalink: "/panel/dashboard.html"
 <link rel="stylesheet" href="{{ '/assets/css/github-yonetim.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/izleme-okuma-yonetim.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/dashboard.css' | relative_url }}">
-<link rel="stylesheet" href="{{ '/assets/css/notlar.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/css/notlar.css' | relative_url }}?v=2411">
 <link rel="stylesheet" href="{{ '/assets/css/r2-arsiv.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/akademik.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/sistem-yedek.css' | relative_url }}">
-<link rel="stylesheet" href="{{ '/assets/css/kesinti.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/css/kesinti.css' | relative_url }}?v=2411">
 <link rel="stylesheet" href="{{ '/assets/css/donusturucu.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/belge-tarayici.css' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/metadata-temizleyici.css' | relative_url }}">
@@ -2020,7 +2020,7 @@ permalink: "/panel/dashboard.html"
             <textarea id="nt-baslik" class="nt-baslik-girdi" rows="1" maxlength="200" autocomplete="off" spellcheck="true" placeholder="Başlıksız not"></textarea>
 
             <div class="nt-meta-satiri">
-              <label class="nt-alan"><span>Klasör</span><select id="nt-klasor-sec" aria-label="Notun klasörü"></select></label>
+              <div class="nt-alan nt-alan-klasor"><label for="nt-klasor-sec"><span>Klasör</span></label><div class="nt-klasor-satir"><select id="nt-klasor-sec" aria-label="Notun klasörü"></select><button type="button" id="nt-klasor-yeni" class="nt-btn nt-btn-kucuk" title="Yeni klasör (seçili klasörün altına)" aria-label="Yeni klasör oluştur">＋ Klasör</button></div></div>
               <label class="nt-alan"><span>Tür</span><select id="nt-tur-sec"></select></label>
               <label class="nt-alan"><span>Durum</span><select id="nt-durum-sec"></select></label>
               <label class="nt-alan"><span>Konu tarihi</span><input id="nt-tarih" type="date" title="Dersin, sunumun ya da etkinliğin tarihi"></label>

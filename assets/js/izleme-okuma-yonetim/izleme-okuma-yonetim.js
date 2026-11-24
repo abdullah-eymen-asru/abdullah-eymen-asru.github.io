@@ -190,6 +190,8 @@ async function ekleIcinKayitlariYukle() {
   } catch (_err) {
     ekleIcinKayitlar = [];
   }
+  // Liste, kullanıcı yazmaya başladıktan SONRA gelmiş olabilir: uyarıyı yeniden hesapla.
+  try { benzerlikKontrolEtVeGoster(); } catch (_e) { /* uyarı yalnızca kolaylık */ }
 }
 
 function ekleOnayGeriAl() {
@@ -437,6 +439,8 @@ function ekleFormGonderimiBagla() {
       const issueLink = document.getElementById("iy-basari-issue-link");
       issueLink.href = sonuc.issue.url;
       basariKutu.hidden = false;
+      // Yeni eklenen kayıt hemen benzerlik kontrolüne katılsın (aynı başlığı arka arkaya tekrar eklemeyi önler).
+      ekleIcinKayitlar = [...ekleIcinKayitlar, { title, number: sonuc.issue.number }];
 
       form.reset();
       ekleBenzerUyarisiniGizle();

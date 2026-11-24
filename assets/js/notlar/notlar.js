@@ -799,7 +799,8 @@ function klasorMenuOgeleri(k) {
     { ad: k.sabit ? "Sabitlemeyi kaldır" : "Sabitle", islem: () => kayitSabitle(k) },
     { ad: "Başka klasöre taşı…", islem: () => tasimaDiyalogu(k) },
     { ad: "Dışa aktar…", islem: () => disaAktarAc("klasor", k) },
-    { ad: "Çöpe at", islem: () => klasorCopeAt(k), tehlike: true },
+    { ad: "Klasörü sil (içindekiler yukarı çıkar)", islem: () => klasorSilIcerikYukari(k), tehlike: true },
+    { ad: "Klasörü içindekilerle çöpe at", islem: () => klasorCopeAt(k), tehlike: true },
   ];
 }
 
@@ -1586,10 +1587,24 @@ async function klasorOlustur(ustId = S.konum) {
     haritayaIsle(await modeliKaydet(m, true));
     bildir(`“${sonuc.ad}” klasörü oluşturuldu.`);
     listeyiCiz();
+    return m;
   } catch (h) {
     console.error(h);
     bildir("Klasör oluşturulamadı: " + (h.message || h), "error");
+    return null;
   }
+}
+
+/** Not düzenleyicisinin içinden klasör (veya seçili klasörün altına alt klasör) oluşturur ve notu oraya koyar. */
+async function duzenleyicidenKlasorOlustur() {
+  const sec = $("nt-klasor-sec");
+  if (!sec || !S.duz) return;
+  const m = await klasorOlustur(sec.value || null);
+  if (!m) return;
+  klasorSecenekleriDoldur(sec, { secili: m.id, kok: "Ana klasör" });
+  sec.value = m.id;
+  S.duz.klasor = m.id;
+  kirlendi();
 }
 
 async function klasorDuzenle(k) {
@@ -1622,6 +1637,33 @@ async function klasorCopeAt(k) {
   }
   bildir(`“${k.ad}” çöpe taşındı. Sen silene kadar durur.`);
   etiketFiltresiniDoldur();
+  listeyiCiz();
+}
+
+/** Klasörü siler; içindeki notlar ve alt klasörler bir üst klasöre (en son Ana klasöre) çıkar. */
+async function klasorSilIcerikYukari(k) {
+  const ust = klasorUstu(k);
+  const altlar = altKlasorler(k.id);
+  const notlar = [...S.notlar.values()].filter((n) => !n.silindiAt && n.klasor === k.id);
+  const hedef = ust ? `“${yolMetni(ust)}” klasörüne` : "Ana klasöre";
+  const icerik = altlar.length + notlar.length;
+  const mesaj = icerik
+    ? `“${k.ad}” klasörü silinecek. İçindeki ${altlar.length ? `${altlar.length} alt klasör` : ""}${altlar.length && notlar.length ? " ve " : ""}${notlar.length ? `${notlar.length} not` : ""} silinmez; ${hedef} taşınır.`
+    : `“${k.ad}” klasörü silinsin mi? (Boş klasör çöp kutusuna gider.)`;
+  if (!window.confirm(mesaj)) return;
+  try {
+    for (const a of altlar) await hizliGuncelle(a, { ust: ust || null });
+    for (const n of notlar) await hizliGuncelle(n, { klasor: ust || null });
+    await topluSilindiAyarla([S.klasorler.get(k.id) || k], new Date().toISOString());
+  } catch (h) {
+    console.error(h);
+    return bildir("Klasör silinemedi: " + (h.message || h), "error");
+  }
+  if (S.gorunum === "klasor" && S.konum === k.id) {
+    if (ust) S.konum = ust;
+    else { S.gorunum = "tum"; S.konum = null; }
+  }
+  bildir(icerik ? `“${k.ad}” silindi; içindekiler ${hedef} taşındı.` : `“${k.ad}” silindi.`);
   listeyiCiz();
 }
 
@@ -3259,6 +3301,7 @@ function baglantilariKur() {
   $("nt-klasor-btn").addEventListener("click", () => klasorOlustur(S.gorunum === "klasor" ? S.konum : null));
   $("nt-nav-btn").addEventListener("click", () => navAc(!$("nt-duzen").classList.contains("nt-nav-acik")));
   $("nt-nav-perde").addEventListener("click", navKapat);
+  $("nt-klasor-yeni")?.addEventListener("click", duzenleyicidenKlasorOlustur);
   $("nt-odak-btn").addEventListener("click", () => odakAcKapa());
   $("nt-editor-menu-btn").addEventListener("click", (o) => {
     o.stopPropagation();

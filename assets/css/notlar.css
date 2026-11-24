@@ -420,7 +420,7 @@
 .nt-nav-perde { position: absolute; inset: 0; z-index: 40; background: rgba(8, 10, 14, 0.45); }
 @media (max-width: 1279px) {
   .nt-duzen { grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); }
-  .nt-nav { position: absolute; top: 0; bottom: 0; left: -300px; z-index: 20; width: 280px; background: var(--card-bg); box-shadow: none; transition: left 0.18s ease; }
+  .nt-nav { position: absolute; top: 0; bottom: 0; left: -300px; z-index: 50; width: 280px; background: var(--card-bg); box-shadow: none; transition: left 0.18s ease; }
   .nt-duzen.nt-nav-acik .nt-nav { left: 0; box-shadow: 12px 0 32px rgba(0, 0, 0, 0.25); }
   .nt-kok .nt-sadece-orta { display: inline-flex; }
 }
@@ -601,3 +601,22 @@
 .nt-diyalog-form .auth-message { margin: 0; overflow-wrap: anywhere; }
 #nt-kilit-uyari { padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--tag-bg); border-radius: 6px; }
 #nt-kp-ac-btn { margin-top: 4px; }
+
+/* ---------- Tur 26: Notlarım düzeltmeleri ---------- */
+.nt-alan-klasor > label { display: block; }
+.nt-klasor-satir { display: flex; gap: 6px; align-items: stretch; }
+.nt-klasor-satir select { flex: 1 1 auto; min-width: 0; }
+.nt-klasor-satir .nt-btn { flex: none; white-space: nowrap; min-height: 2.4rem; }
+.nt-nav-perde[hidden] { display: none; }
+@media (max-width: 1279px) { .nt-nav-perde { z-index: 40; } .nt-nav { z-index: 50; } }
+/* Dar ekranda editör açıkken sayfa kendi kaydırılsın: "sayfa içinde sayfa" kalmasın */
+@media (max-width: 900px) {
+  .nt-duzen[data-panel="editor"] { height: auto; min-height: 0; overflow: visible; isolation: auto; }
+  .nt-duzen[data-panel="editor"] .nt-editor, .nt-duzen[data-panel="editor"] .nt-editor > form { overflow: visible; min-height: 0; }
+  .nt-duzen[data-panel="editor"] .nt-yazi-kolon { overflow: visible; overscroll-behavior: auto; }
+  .nt-duzen[data-panel="editor"] .nt-editor-ust { position: sticky; top: var(--dash-header-h, 0px); z-index: 30; }
+  .nt-duzen[data-panel="editor"] .nt-nav { position: fixed; }
+  .nt-klasor-satir { flex-wrap: wrap; }
+  .nt-liste-kaydirma { overscroll-behavior: auto; -webkit-overflow-scrolling: touch; }
+}
+.nt-duzen[data-panel="editor"] .nt-nav-perde { position: fixed; }

@@ -364,9 +364,11 @@ export async function istasyonKatmani(konum, { sinyal = null, sadece = null } = 
 }
 
 /* ------------------------------ yönetici/kullanıcı testi (ayar kapalı olsa bile her kaynağı dener) ------------------------------ */
-export async function kaynakTesti(konum) {
+/** ids: yalnızca bu kaynak kimlikleri sınanır (örn. ["mgm"]) → "tek sınama = en az Worker isteği". Verilmezse hepsi. */
+export async function kaynakTesti(konum, ids = null) {
   const ayar = await hkAyar(true), satirlar = [];
   const dene = async (id, ad, is) => {
+    if (ids && !ids.includes(id)) return;
     const t0 = performance.now();
     try { const ayrinti = await sureli(is(), ZAMAN_ASIMI_MS + 1500, ad); satirlar.push({ id, ad, durum: "ok", ms: Math.round(performance.now() - t0), ayrinti }); }
     catch (h) { satirlar.push({ id, ad, durum: h.atla ? "atlandi" : "hata", ms: Math.round(performance.now() - t0), ayrinti: String(h?.message || h) }); }

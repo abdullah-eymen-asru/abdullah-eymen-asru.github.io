@@ -102,7 +102,7 @@ export function olcumSeridi(d, kb) {
     el("span", { class: "hv-olcum-rozet", title: k.uzun }, el("span", { "aria-hidden": "true", text: k.ikon }), el("span", { text: k.rozet })),
     el("span", { class: "hv-olcum-serit-metin" }, el("strong", { text: ozet }), el("small", { text: ` ${String(g.ad).split(",")[0]}${g.mesafeKm != null ? ` · ${kmYaz(g.mesafeKm)}` : ""} · ${dakikaOnce(g.zaman)}` })));
   const rl = resmiSiteBaglantisi(g, { kisa: true }); if (rl) kok.append(rl);
-  if (kb?.sekmeGit) kok.append(olay(el("button", { type: "button", class: "hv-baglanti", text: "Karşılaştır" }), "click", () => { kb.sekmeGit("derin"); }));
+  if (kb?.sekmeGit) kok.append(olay(el("button", { type: "button", class: "hv-baglanti", text: "Karşılaştır" }), "click", () => { kb.sekmeGit("dogrula"); }));
   return kok;
 }
 void ipucu;

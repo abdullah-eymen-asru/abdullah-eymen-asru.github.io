@@ -212,3 +212,11 @@ Kurulum: Supabase’de `0113_site_duyurulari_ve_havastil_ai_kasasi.sql` (kasa ta
 - **HavaStil sağlığı:** servis grupları sekmeli (sayfa uzamaz); her satırda "Ne yapmalı?" adımları ve "Kaynak ↗" bağlantısı. Düzeltilen yanlış alarmlar: `havastil_tercihleri` tablosunda `id` sütunu yok (sayım `*` ile), RainViewer karo ve NASA GIBS sondaları sitenin kullandığı gerçek adreslerle yapılıyor.
 - **Hava kalitesi:** tek "Son çekilme/Yenile" satırı (gösterilen verinin kaynağı neyse onu yeniler); "Veri yolu" şeridi (Copernicus CAMS → Open-Meteo → HavaStil ya da istasyon → OpenAQ) ve her değerde "Open-Meteo'da gör ↗" / istasyon bağlantısı.
 - **Demo:** Araçlar yalnızca gezilir (dosya seçme/sürükleme/işleme/indirme engelli); Mesajlar, Yorumlarım ve "Yedekleme & Verilerim" yalnızca 'demo' rollü gerçek hesaba görünür. SQL: `0150_demo_uye_yorum_ve_kendi_veri_aktarimi.sql` (isteğe bağlı; çalıştırılmazsa demo hesabı yorum yazamaz ve kendi verisini aktaramaz).
+
+## Tur 26 notları
+- **Sistem Durumu:** HavaStil sağlık kartı modern sekmelerle yeniden tasarlandı (masaüstü + mobil). Worker toplu sınaması kaldırıldı; her Worker satırı tek istek ve satırda "başına kota" yazar. "Bu sekmeyi yenile" yalnızca açık sekmeyi sınar; ücretsiz tarayıcı sınamaları sekme açılınca tembel çalışır. Worker sekmesi yalnızca Site Sahibi/Admin.
+- **Doğrulama:** MGM "Karşılaştır" artık yalnızca Ayar › Doğrula sekmesini açar.
+- **Hava kalitesi:** "Gün boyunca hava kalitesi" madde seçicilidir (Genel seviye + her kirletici); saat saat gerçek değer µg/m³ (CO mg/m³) birimiyle gösterilir.
+- **Notlarım:** gri perde/tıklanmayan düğme hatası (çekmece z-index'i perdenin altında kalıyordu) düzeltildi; mobilde editör sayfa ile birlikte kayar; not düzenleyicide "＋ Klasör" (alt klasör destekli); "Klasörü sil" içindekileri bir üst klasöre taşır.
+- **İzleme/Okuma benzerlik:** "Ad: Alt başlık" kısaltması artık kopya sayılmaz; "Part Two" = 2; yeni eklenen kayıt hemen kontrole girer.
+- **Demo üye:** gerçek 'demo' rollü hesap Yorumlarım'ı görür ve yorum yazar; anonim demo göremez/yazamaz.
