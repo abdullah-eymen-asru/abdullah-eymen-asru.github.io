@@ -249,16 +249,59 @@ export function turkceOtpHatasi(message) {
 }
 
 /**
- * Şifre kuralı — Supabase "Password requirements: Letters and digits" ve
- * "Minimum password length: 8" ayarıyla AYNI olmalı (sunucu yine de kontrol eder;
- * bu, kullanıcıya hatayı sunucuya gitmeden Türkçe göstermek içindir).
- * Geçerliyse null, değilse Türkçe hata metni döner.
+ * Şifre kuralı — Supabase "Minimum password length: 8" ve "Password requirements:
+ * Lowercase, uppercase letters, digits and symbols" ayarıyla AYNI olmalı.
+ * Sunucu yine de kontrol eder; bu, hatayı sunucuya gitmeden Türkçe göstermek içindir.
+ * Sembol: Supabase'in kabul ettiği klavye özel karakterleri (. @ ! # $ % ^ & * ( ) _ + - = [ ] { } ; ' : " | \ < > ? , / ` ~).
  */
+export const SIFRE_KURALLARI = [
+  { id: "uzunluk", metin: "En az 8 karakter", sinama: (s) => s.length >= 8 },
+  { id: "kucuk", metin: "En az bir küçük harf (a-z)", sinama: (s) => /[a-z]/.test(s) },
+  { id: "buyuk", metin: "En az bir büyük harf (A-Z)", sinama: (s) => /[A-Z]/.test(s) },
+  { id: "rakam", metin: "En az bir rakam (0-9)", sinama: (s) => /[0-9]/.test(s) },
+  { id: "sembol", metin: "En az bir özel karakter (. @ ! # $ % & * _ - + = ? vb.)", sinama: (s) => /[!-\/:-@\[-`{-~]/.test(s) },
+];
+
+export const SIFRE_KURALI_OZET =
+  "Şifre en az 8 karakter olmalı ve küçük harf, büyük harf, rakam ve özel karakter (. @ ! # $ % & * _ - + = ? vb.) içermeli.";
+
 export function sifreKuraliHatasi(sifre) {
   const s = String(sifre ?? "");
-  if (s.length < 8) return "Şifre en az 8 karakter olmalı.";
-  if (!/\p{L}/u.test(s) || !/\d/.test(s)) return "Şifre en az bir harf ve bir rakam içermeli.";
-  return null;
+  return SIFRE_KURALLARI.every((k) => k.sinama(s)) ? null : SIFRE_KURALI_OZET;
+}
+
+/**
+ * Sayfadaki [data-sifre-kural="<input id>"] kutularını kurar: kural listesini yazar
+ * ve kullanıcı yazdıkça her maddeyi ✓ / • olarak işaretler (CSP uyumlu, innerHTML yok).
+ */
+function sifreKuraliKutulariniKur() {
+  document.querySelectorAll("[data-sifre-kural]").forEach((kutu) => {
+    if (kutu.dataset.kurulu) return;
+    kutu.dataset.kurulu = "1";
+    const girdi = document.getElementById(kutu.dataset.sifreKural);
+    const baslik = document.createElement("p");
+    baslik.className = "sifre-kural-baslik";
+    baslik.textContent = "Şifre şunları içermeli:";
+    const liste = document.createElement("ul");
+    liste.className = "sifre-kural-liste";
+    const ogeler = SIFRE_KURALLARI.map((k) => {
+      const li = document.createElement("li");
+      li.textContent = k.metin;
+      liste.append(li);
+      return [k, li];
+    });
+    kutu.append(baslik, liste);
+    const guncelle = () => {
+      const deger = girdi ? girdi.value : "";
+      for (const [k, li] of ogeler) li.classList.toggle("sifre-kural-tamam", !!deger && k.sinama(deger));
+    };
+    girdi?.addEventListener("input", guncelle);
+    guncelle();
+  });
+}
+if (typeof document !== "undefined") {
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", sifreKuraliKutulariniKur);
+  else sifreKuraliKutulariniKur();
 }
 
 /**
@@ -268,7 +311,7 @@ export function turkceSifreHatasi(error) {
   const kod = error?.code || "";
   const m = error?.message || "";
   if (kod === "weak_password" || /weak|should contain|at least/i.test(m)) {
-    return "Şifre yeterince güçlü değil: en az 8 karakter, en az bir harf ve bir rakam içermeli.";
+    return "Şifre yeterince güçlü değil. " + SIFRE_KURALI_OZET;
   }
   if (kod === "same_password" || /different from the old/i.test(m)) {
     return "Yeni şifre eski şifrenle aynı olamaz.";

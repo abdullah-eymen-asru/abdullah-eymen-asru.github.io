@@ -81,7 +81,8 @@ permalink: "/hesap/kayit.html"
     </div>
     <div class="form-field">
       <label for="password">Şifre</label>
-      <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required>
+      <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" aria-describedby="password-kural" required>
+      <div class="sifre-kural" data-sifre-kural="password" id="password-kural"></div>
     </div>
     <div class="form-field">
       <label for="password_again">Şifre (Tekrar)</label>
