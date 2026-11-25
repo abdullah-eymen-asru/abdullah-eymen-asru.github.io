@@ -9,7 +9,7 @@
  * genelindeki "Hakkımda" metninin sadece admin panelinden yönetilmesi
  * istendiği için). Ad Soyad hâlâ düzenlenebilir.
  */
-import { supabase, showMessage, showSpamNotice, escapeHtml, turkceOtpHatasi, sifreKuraliHatasi, turkceSifreHatasi, guncelOnaySurumleri } from "./core/supabase-client.js";
+import { supabase, showMessage, showSpamNotice, escapeHtml, turkceOtpHatasi, sifreKuraliHatasi, turkceSifreHatasi, ZAYIF_SIFRE_BAYRAGI, SIFRE_KURALI_OZET, guncelOnaySurumleri } from "./core/supabase-client.js";
 import { requireAuthOrShowError } from "./auth/auth-guard.js";
 // NOT (TAŞINDI): Mesajlaşma (wireUserChat) artık bu sayfada değil — bkz.
 // panel/mesajlar.md + assets/js/mesajlar.js. "Yöneticiyle Mesajlaş" linki
@@ -316,9 +316,34 @@ function wireEmailChange(profile) {
   });
 }
 
+/* Eski şifreyle girenlere (giriş engellenmez) uyarı: Ana Ekran'da bir şerit + şifre formunda mesaj. */
+function zayifSifreUyarisiGoster(msg) {
+  let var_ = false;
+  try { var_ = sessionStorage.getItem(ZAYIF_SIFRE_BAYRAGI) === "1"; } catch { /* yok say */ }
+  if (!var_) return;
+  const metin = "Şifren güncel güvenlik kurallarına uymuyor. " + SIFRE_KURALI_OZET + " Hesabın çalışmaya devam ediyor; lütfen şifreni değiştir.";
+  if (msg) showMessage(msg, metin, "warning");
+  const hub = document.getElementById("view-me-hub");
+  const kok = document.getElementById("hub-kok");
+  if (hub && kok && !document.getElementById("zayif-sifre-serit")) {
+    const serit = document.createElement("div");
+    serit.id = "zayif-sifre-serit";
+    serit.className = "auth-message auth-message--warning";
+    const yazi = document.createElement("span");
+    yazi.textContent = metin + " ";
+    const baglanti = document.createElement("a");
+    baglanti.href = "#me-panel";
+    baglanti.dataset.dashGit = "me-panel";
+    baglanti.textContent = "Şifreyi şimdi değiştir";
+    serit.append(yazi, baglanti);
+    hub.insertBefore(serit, kok);
+  }
+}
+
 function wirePasswordChange() {
   const form = document.getElementById("sifre-degistir-form");
   const msg = document.getElementById("sifre-message");
+  zayifSifreUyarisiGoster(msg);
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -365,6 +390,8 @@ function wirePasswordChange() {
     const { error: signOutError } = await supabase.auth.signOut({ scope: "others" });
     if (signOutError) console.error("Diğer oturumlardan çıkış yapılamadı:", signOutError);
 
+    try { sessionStorage.removeItem(ZAYIF_SIFRE_BAYRAGI); } catch { /* yok say */ }
+    document.getElementById("zayif-sifre-serit")?.remove();
     showMessage(msg, "Şifre değiştirildi. Diğer cihazlardaki oturumların kapatıldı.", "success");
     form.reset();
     // "Bağlı Hesaplar" bölümündeki "E-posta + Şifre: ayarlı" rozeti ve

@@ -13,12 +13,12 @@ permalink: "/hesap/sifre-guncelle.html"
   <form id="sifre-guncelle-form" novalidate>
     <div class="form-field">
       <label for="password">Yeni Şifre</label>
-      <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" aria-describedby="password-kural" required>
+      <input id="password" name="password" type="password" autocomplete="new-password" minlength="12" aria-describedby="password-kural" required>
       <div class="sifre-kural" data-sifre-kural="password" id="password-kural"></div>
     </div>
     <div class="form-field">
       <label for="password_again">Yeni Şifre (Tekrar)</label>
-      <input id="password_again" name="password_again" type="password" autocomplete="new-password" minlength="8" required>
+      <input id="password_again" name="password_again" type="password" autocomplete="new-password" minlength="12" required>
     </div>
     <button type="submit" class="btn-primary">Şifreyi Güncelle</button>
   </form>

@@ -883,7 +883,7 @@ Kod, Supabase'e şu adresleri gönderir (`assets/js/auth/auth-pages.js`, `assets
 | Secure password change | KAPALI | Açılırsa 24 saatten eski oturum şifre değiştiremez; Google ile gelip ilk şifre belirleyen üyeler de zorlanır |
 | Require current password | KAPALI | Şifre değiştirme formunda "mevcut şifre" alanı yok; açılırsa Google-only üyeler kilitlenir |
 | Prevent leaked passwords | KAPALI | Yalnızca Pro planda var |
-| Minimum password length | 8 | Site formlarıyla aynı |
+| Minimum password length | 12 | Site formlarıyla aynı (`SIFRE_KURALLARI`). Kural yalnızca şifre belirlerken/değiştirirken uygulanır; eski şifreyle GİRİŞ engellenmez, üye panelde uyarı görür |
 | Password requirements | Lowercase, uppercase letters, digits and symbols (recommended) | Sitedeki `SIFRE_KURALLARI` / `sifreKuraliHatasi()` ile aynı kural; kayıt, şifre sıfırlama ve panel şifre değiştirme formlarında canlı ✓ listesi gösterilir |
 | Email OTP expiration | 3600 | Advisor `auth_otp_long_expiry` uyarısı 3600 üstünü işaretler |
 | Email OTP length | 8 | Site kod alanları buna uygun, değiştirme |

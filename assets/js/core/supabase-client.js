@@ -249,13 +249,13 @@ export function turkceOtpHatasi(message) {
 }
 
 /**
- * Şifre kuralı — Supabase "Minimum password length: 8" ve "Password requirements:
+ * Şifre kuralı — Supabase "Minimum password length: 12" ve "Password requirements:
  * Lowercase, uppercase letters, digits and symbols" ayarıyla AYNI olmalı.
  * Sunucu yine de kontrol eder; bu, hatayı sunucuya gitmeden Türkçe göstermek içindir.
  * Sembol: Supabase'in kabul ettiği klavye özel karakterleri (. @ ! # $ % ^ & * ( ) _ + - = [ ] { } ; ' : " | \ < > ? , / ` ~).
  */
 export const SIFRE_KURALLARI = [
-  { id: "uzunluk", metin: "En az 8 karakter", sinama: (s) => s.length >= 8 },
+  { id: "uzunluk", metin: "En az 12 karakter", sinama: (s) => s.length >= 12 },
   { id: "kucuk", metin: "En az bir küçük harf (a-z)", sinama: (s) => /[a-z]/.test(s) },
   { id: "buyuk", metin: "En az bir büyük harf (A-Z)", sinama: (s) => /[A-Z]/.test(s) },
   { id: "rakam", metin: "En az bir rakam (0-9)", sinama: (s) => /[0-9]/.test(s) },
@@ -263,7 +263,17 @@ export const SIFRE_KURALLARI = [
 ];
 
 export const SIFRE_KURALI_OZET =
-  "Şifre en az 8 karakter olmalı ve küçük harf, büyük harf, rakam ve özel karakter (. @ ! # $ % & * _ - + = ? vb.) içermeli.";
+  "Şifre en az 12 karakter olmalı ve küçük harf, büyük harf, rakam ve özel karakter (. @ ! # $ % & * _ - + = ? vb.) içermeli.";
+
+export const ZAYIF_SIFRE_BAYRAGI = "zayifSifreUyari";
+
+/** Giriş başarılı olunca çağrılır: eski (yeni kurala uymayan) şifreyle girenlere panelde uyarı gösterilsin diye bayrak bırakır. Girişi ENGELLEMEZ. */
+export function eskiSifreUyarisiniIsaretle(sifre) {
+  try {
+    if (sifreKuraliHatasi(sifre)) sessionStorage.setItem(ZAYIF_SIFRE_BAYRAGI, "1");
+    else sessionStorage.removeItem(ZAYIF_SIFRE_BAYRAGI);
+  } catch { /* depolama kapalıysa uyarı atlanır */ }
+}
 
 export function sifreKuraliHatasi(sifre) {
   const s = String(sifre ?? "");
