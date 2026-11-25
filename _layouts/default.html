@@ -159,6 +159,9 @@
     worker-src 'self' blob:;
     object-src 'none';
 ">
+  <!-- Cloudflare Turnstile Site Key (herkese açık; secret DEĞİL). _config.yml -> turnstile_sitekey. Boşsa bot koruması
+       istemcide kapalıdır. Kullanım: assets/js/auth/turnstile.js (Supabase Auth Captcha'ya token ekler). -->
+  <meta name="turnstile-sitekey" content="{{ site.turnstile_sitekey | escape }}">
   <title>{{ page.title | default: site.title }}{% unless page.url == '/' or page.url == '/index.html' %} · {{ site.title }}{% endunless %}</title>
 
   {% if site.profile_image and site.profile_image != "" %}
@@ -363,7 +366,7 @@
         ayırt etmeden düz metin olarak tarar; yorum içine yazılan bir Liquid
         etiketi yine de ÇALIŞTIRILIR ve buradaki gibi tüm sayfa gövdesini
         </head> kapanmadan bu satıra basıp sayfayı bozar. -->
-  <link rel="stylesheet" href="{{ '/assets/css/auth.css' | relative_url }}?v=2511">
+  <link rel="stylesheet" href="{{ '/assets/css/auth.css' | relative_url }}?v=2611">
   {% endif %}
 
   {% if page.uye_ayarlari_css %}

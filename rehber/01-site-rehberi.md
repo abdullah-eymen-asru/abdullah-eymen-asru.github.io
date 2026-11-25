@@ -21,7 +21,7 @@ dosyaları) konularına göre 4 klasöre ayrılmıştır:
 
 | Klasör | İçerik | Örnek URL |
 |---|---|---|
-| `hesap/` | Giriş, kayıt, şifre sıfırlama akışı | `/hesap/giris.html` |
+| `hesap/` | Giriş, kayıt, şifre sıfırlama akışı (tek kart + Giriş/Kayıt sekmesi; Cloudflare Turnstile bot korumalı) | `/hesap/giris.html` |
 | `panel/` | Oturum açmış kullanıcı sayfaları (panel, admin, GitHub içerik yönetimi, özel içerik) | `/panel/panel.html` |
 | `icerik/` | Herkese açık içerik listeleri (blog, akademik projeler, izlediklerim, okuduklarim) | `/icerik/blog.html` |
 | `kurumsal/` | İletişim, gizlilik politikası | `/kurumsal/iletisim.html` |

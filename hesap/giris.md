@@ -6,56 +6,69 @@ auth_css: true
 permalink: "/hesap/giris.html"
 ---
 
-<div class="auth-box">
-  <h1>Giriş Yap</h1>
-  <div id="auth-message" class="auth-message" hidden></div>
+<div class="auth-box auth-kart">
+  <nav class="auth-sekmeler" aria-label="Hesap işlemleri">
+    <a href="{{ '/hesap/giris.html' | relative_url }}" aria-current="page">Giriş Yap</a>
+    <a href="{{ '/hesap/kayit.html' | relative_url }}">Kayıt Ol</a>
+  </nav>
 
-  <button id="google-giris-btn" type="button" class="btn-google">
-    Google ile Giriş Yap
-  </button>
-  <div class="auth-divider">veya e-posta ile</div>
+  <h1>Tekrar hoş geldin</h1>
+  <p class="auth-alt-baslik">Hesabına e-posta ve şifrenle ya da Google ile gir.</p>
+
+  <div id="auth-message" class="auth-message" hidden></div>
 
   <form id="giris-form" novalidate>
     <div class="form-field">
       <label for="email">E-posta</label>
-      <input id="email" name="email" type="email" autocomplete="email" required>
+      <input id="email" name="email" type="email" autocomplete="email" inputmode="email" required>
     </div>
     <div class="form-field">
-      <label for="password">Şifre</label>
+      <div class="auth-etiket-satiri">
+        <label for="password">Şifre</label>
+        <a class="auth-kucuk-link" href="{{ '/hesap/sifremi-unuttum.html' | relative_url }}">Şifremi unuttum</a>
+      </div>
       <input id="password" name="password" type="password" autocomplete="current-password" required>
     </div>
-    <div class="form-field">
-      <label class="csp-flex-gap8-center-row">
+
+    <div class="auth-secenekler">
+      <label class="auth-onay-satiri" for="remember-me">
         <input id="remember-me" name="remember_me" type="checkbox" checked>
         <span>Oturumumu hatırla</span>
       </label>
-    </div>
-    <div class="form-field">
-      <label class="csp-flex-gap8-center-row">
+      <label class="auth-onay-satiri" for="offline-kasa">
         <input id="offline-kasa" name="offline_kasa" type="checkbox" checked>
         <span>Sunucu kesintisinde bu cihazdan girebileyim</span>
       </label>
-      <small class="muted">Parolanla şifrelenmiş bir kopya yalnızca bu cihazda tutulur; sunucu kapalıyken e-posta + parolanla kısıtlı moda girersin. Ortak/paylaşılan cihazlarda işaretleme. 2FA açık hesaplarda uygulanmaz.</small>
+      <details class="auth-ipucu">
+        <summary>Bu ne demek?</summary>
+        <p>Parolanla şifrelenmiş bir kopya yalnızca bu cihazda tutulur; sunucu kapalıyken e-posta + parolanla kısıtlı moda girersin. Ortak/paylaşılan cihazlarda işaretleme. 2FA açık hesaplarda uygulanmaz.</p>
+      </details>
     </div>
+
+    <!-- Cloudflare Turnstile (görünmez; yalnızca şüphe varsa kutu çıkar). Bkz. assets/js/auth/turnstile.js -->
+    <div id="turnstile-kutu" class="auth-turnstile"></div>
+    <p id="turnstile-durum" class="auth-turnstile-durum" role="status" hidden></p>
+
     <button type="submit" class="btn-primary">Giriş Yap</button>
   </form>
 
+  <div class="auth-divider"><span>veya</span></div>
+
+  <button id="google-giris-btn" type="button" class="btn-google">
+    <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+    <span>Google ile Giriş Yap</span>
+  </button>
+
   <div id="demo-giris-kutu" hidden>
-  <div class="auth-divider">veya</div>
-  <button id="demo-giris-btn" type="button" class="btn-demo">🎭 Canlı Demo / Vitrin Modu</button>
-  <p class="muted demo-giris-not">Hesap gerekmez. Örnek verilerle, salt-okunur olarak platformu dene; gerçek verilere erişilmez. Sana özel bir demo hesabı verildiyse yukarıdaki formla da girebilirsin; seni otomatik olarak aynı vitrin moduna alırız.</p>
+    <button id="demo-giris-btn" type="button" class="btn-demo">🎭 Canlı Demo / Vitrin Modu</button>
+    <p class="muted demo-giris-not">Hesap gerekmez. Örnek verilerle, salt-okunur olarak platformu dene; gerçek verilere erişilmez. Sana özel bir demo hesabı verildiyse yukarıdaki formla da girebilirsin.</p>
   </div>
-  <p id="demo-kapali-not" class="muted demo-giris-not" hidden>Hesapsız (herkese açık) demo şu an kapalı. Sana bir demo hesabı verildiyse yukarıdaki forma e-posta ve şifrenle giriş yap; seni otomatik olarak salt-okunur vitrin moduna alırız.</p>
+  <p id="demo-kapali-not" class="muted demo-giris-not" hidden>Herkese açık demo şu an kapalı. Sana özel bir demo hesabı verildiyse yukarıdan e-posta ve şifrenle giriş yap; seni otomatik olarak salt-okunur vitrin moduna alırız.</p>
   <p id="demo-depo-not" class="auth-message auth-message--error" hidden>Tarayıcın oturum depolamasına izin vermediği için demo hesabın açılamadı. Gizli sekmeyi/çerez kısıtını kapatıp tekrar dene.</p>
 
-  <div class="auth-links">
-    <a href="{{ '/hesap/kayit.html' | relative_url }}">Hesabın yok mu? Kayıt ol</a>
-    <a href="{{ '/hesap/sifremi-unuttum.html' | relative_url }}">Şifremi unuttum</a>
-  </div>
-  <div class="auth-links">
+  <p class="auth-alt-linkler">
     <a href="{{ '/hesap/hesap-onayla.html' | relative_url }}">Hesabını onaylamadın mı? Kodla onayla</a>
-    <span></span>
-  </div>
+  </p>
 </div>
 
 <link rel="stylesheet" href="{{ '/assets/css/demo.css' | relative_url }}">

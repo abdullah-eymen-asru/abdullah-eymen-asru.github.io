@@ -49,6 +49,10 @@ profile_image: "/assets/profile.webp"   # örn: "/assets/profil.jpg" - fotoğraf
 # "/assets/cv/abdullah-eymen-asru-cv.pdf") ya da dış bir URL (örn. Google
 # Drive/Dropbox paylaşım linki, https://... ile başlamalı) olabilir.
 cv_url: ""
+# Cloudflare Turnstile (bot koruması) — giriş / kayıt / şifre sıfırlama. SADECE herkese açık "Site Key" buraya yazılır.
+# "Secret Key" ASLA buraya yazılmaz: yalnızca Supabase Dashboard > Authentication > Attack Protection > Captcha secret.
+# Boş bırakılırsa istemci tarafı kapalı kalır (Supabase'de captcha AÇIKSA giriş/kayıt reddedilir — bkz. rehber/02-supabase-sistemi.md).
+turnstile_sitekey: ""   # örn: "0x4AAAAAAA...." (Cloudflare Dashboard > Turnstile > widget > Site Key)
 cloudflare_worker_url: "https://izleme-okuma-api.aeymena.workers.dev"   # Cloudflare Worker'ı deploy edince buraya yapıştır
 mirror_site_url: "https://abdullah-eymen-asru.pages.dev"   # İkincil/yedek kopya   # Aynı sitenin Cloudflare Pages'teki yedek kopyası
 

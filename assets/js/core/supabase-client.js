@@ -21,6 +21,7 @@ import { isDemoMode, configiBaslat, demoUyeMi, gercekAgFetch } from "../demo/dem
 import { demoSupabase, demoUyeSupabaseKur } from "../demo/demo-supabase.js";
 import { workerKapisiKur } from "./worker-kapi.js";
 import { oturumKoruyucuKur } from "./oturum-koruyucu.js";
+import { captchaKur, captchaSayfaHazirla } from "../auth/turnstile.js";
 // KESİNTİ DAYANIKLILIĞI (bkz. kesinti.js): Supabase erişilemezse okuma önbelleği + yazma kuyruğu + anlık (Cloudflare kotasız) sağlık izleme.
 import { kesintiFetchOlustur, kesintiKur } from "./kesinti.js";
 
@@ -138,6 +139,11 @@ export const supabase = !isDemoMode
     // global.fetch: ağ kalkanından ÖNCE yakalanmış gerçek fetch — yalnızca Supabase'e (Auth/PostgREST) gider.
     ? demoUyeSupabaseKur(createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { ...gercekIstemciSecenekleri, global: { fetch: gercekAgFetch } }))
     : demoSupabase;
+
+// BOT KORUMASI (Cloudflare Turnstile ↔ Supabase Auth Captcha; bkz. auth/turnstile.js): signInWithPassword / signUp /
+// resetPasswordForEmail / resend / signInWithOtp çağrılarına `captchaToken` KENDİLİĞİNDEN eklenir; çağıran kodlar değişmez.
+// _config.yml'de turnstile_sitekey boşsa hiçbir şey yapmaz. Demo'da (sahte istemci) çalışmaz.
+if (!isDemoMode) { try { captchaKur(supabase); captchaSayfaHazirla(); } catch (h) { console.warn("turnstile kurulamadı:", h); } }
 
 // KESİNTİ MODÜLÜ: auth yamaları + sağlık izleme + çubuk arayüzü. oturumKoruyucuKur'dan ÖNCE kurulur (signOut sarmalı sırası: koruyucu → kesinti).
 if (!isDemoMode) { try { kesintiKur(supabase); } catch (h) { console.warn("kesinti kurulamadı:", h); } }

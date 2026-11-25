@@ -264,6 +264,8 @@ ayarları secret değildir, herkese açık görünebilir bilgilerdir, bu yüzden
 | `GITHUB_PAT` | `cloudflare worker/github_icerik_yonetim_worker/worker.js` | Bkz. Bölüm 6, adım 3 | Worker → **Settings → Variables and Secrets** (Secret/Encrypt olarak) |
 | `SUPABASE_SERVICE_ROLE_KEY` | `cloudflare worker/github_icerik_yonetim_worker/worker.js` (ve diğer Worker'ların — `r2_imza_worker`, `r2_arsiv_worker`, `izleme_okuma_yonetim_worker`; hangisine ne girileceği için bkz. [☁️ Cloudflare Secret & Ayarlar](./04-cloudflare-secretlar.md)) | Supabase Dashboard → **Project Settings → API** | İlgili Worker'ın **Settings → Variables and Secrets** (Secret/Encrypt olarak) |
 
+**Turnstile:** Site Key (`_config.yml` → `turnstile_sitekey`) herkese açıktır; **Secret Key** ise sitede/GitHub'da/Worker'da DEĞİL, yalnızca Supabase Dashboard → Authentication → Attack Protection → *Captcha secret* alanında tutulur (doğrulamayı Supabase yapar).
+
 Bu projede kullanılan diğer üçüncü parti servisler (Google Analytics,
 giscus, Google Forms) API anahtarı değil, herkese açık/genel amaçlı ID'ler
 kullanır; bunları `_config.yml` veya ilgili `.md` dosyasına doğrudan
@@ -282,6 +284,7 @@ yazman güvenlidir, GitHub Secrets'a eklemene gerek yoktur.
 6. GitHub İçerik Yönetimi'ni kullanacaksan Worker'ı kur (Bölüm 6)
 6b. Substack kullanacaksan feed proxy Worker'ını kur (Bölüm 6b)
 6c. Diğer Worker'lar (R2 dosya arşivi/imza, not ekleri, izleme/okuma, admin bildirimleri) için [☁️ Cloudflare Secret & Ayarlar](./04-cloudflare-secretlar.md) rehberini izle
+6d. Giriş/kayıt için bot koruması istiyorsan Cloudflare Turnstile'ı kur: [🔐 Supabase Sistemi → Bot Koruması](./02-supabase-sistemi.md#bot-koruması--cloudflare-turnstile-giriş--kayıt--şifre-sıfırlama-25112026) (önce `_config.yml` → `turnstile_sitekey` + deploy, SONRA Supabase'te Captcha secret)
 7. GitHub Pages'i de kullanacaksan repo **Settings → Pages → Build and
    deployment → Source** kısmını **"GitHub Actions"** olarak seç (ARTIK
    "Deploy from a branch" DEĞİL — proje `.github/workflows/

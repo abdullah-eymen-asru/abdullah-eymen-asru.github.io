@@ -6,8 +6,8 @@ auth_css: true
 permalink: "/hesap/sifre-guncelle.html"
 ---
 
-<div class="auth-box">
-  <h1>Yeni Şifre Belirle</h1>
+<div class="auth-box auth-kart">
+  <h1>Yeni şifre belirle</h1>
   <div id="auth-message" class="auth-message" hidden></div>
 
   <form id="sifre-guncelle-form" novalidate>

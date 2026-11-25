@@ -6,24 +6,27 @@ auth_css: true
 permalink: "/hesap/sifremi-unuttum.html"
 ---
 
-<div class="auth-box">
-  <h1>Şifremi Unuttum</h1>
-  <p class="muted">E-posta adresini gir, sana bir şifre sıfırlama bağlantısı gönderelim.</p>
+<div class="auth-box auth-kart">
+  <a class="auth-geri" href="{{ '/hesap/giris.html' | relative_url }}">← Girişe dön</a>
+
+  <h1>Şifreni sıfırla</h1>
+  <p class="auth-alt-baslik">E-posta adresini yaz; sana bir şifre sıfırlama bağlantısı gönderelim.</p>
+
   <div id="auth-message" class="auth-message" hidden></div>
   <div id="auth-spam-notice" class="auth-spam-notice" hidden></div>
 
   <form id="sifremi-unuttum-form" novalidate>
     <div class="form-field">
       <label for="email">E-posta</label>
-      <input id="email" name="email" type="email" autocomplete="email" required>
+      <input id="email" name="email" type="email" autocomplete="email" inputmode="email" required>
     </div>
+
+    <!-- Cloudflare Turnstile (görünmez; yalnızca şüphe varsa kutu çıkar). Bkz. assets/js/auth/turnstile.js -->
+    <div id="turnstile-kutu" class="auth-turnstile"></div>
+    <p id="turnstile-durum" class="auth-turnstile-durum" role="status" hidden></p>
+
     <button type="submit" class="btn-primary">Sıfırlama Bağlantısı Gönder</button>
   </form>
-
-  <div class="auth-links">
-    <a href="{{ '/hesap/giris.html' | relative_url }}">Girişe dön</a>
-    <span></span>
-  </div>
 </div>
 
 <script type="module">

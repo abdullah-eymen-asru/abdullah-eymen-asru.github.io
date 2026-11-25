@@ -23,6 +23,7 @@
  */
 import { supabase, showMessage, kucukHarfeCevirTr, guvenliDisUrlMi } from "../core/supabase-client.js";
 import { requireAuthOrShowError } from "../auth/auth-guard.js";
+import { captchaKur } from "../auth/turnstile.js";
 import * as Kasa from "./kasa.js";
 import * as Kit from "../kurtarma-kiti/kit.js";
 import { kodSor, kitKartiAc, cssYukle as kitCssYukle } from "../kurtarma-kiti/kit-arayuz.js";
@@ -2950,6 +2951,7 @@ async function girisParolasiniDogrula(parola) {
   const gecici = window.supabase.createClient(supabase.supabaseUrl, supabase.supabaseKey, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
+  captchaKur(gecici); // Supabase captcha açıkken bu ikinci istemcinin parola sınaması da Turnstile token'ı ister (görünmez)
   const { error } = await gecici.auth.signInWithPassword({ email: S.session.user.email, password: parola });
   if (!error) await gecici.auth.signOut({ scope: "local" }).catch(() => {});
   return !error;
