@@ -18,7 +18,8 @@
  *   bırakılırsa giriş/kayıt "captcha verification process failed" ile reddedilir — bkz. rehber/02-supabase-sistemi.md.
  *
  * KULLANICI DENEYİMİ:
- *   - Widget `appearance: "interaction-only"`: Cloudflare şüphe duymazsa HİÇ görünmez; yalnızca gerekirse kutu çıkar.
+ *   - Giriş/kayıt/şifre sıfırlama sayfalarında widget görünür ("Doğrulanıyor → Başarılı!") ama Managed modda tıklama
+ *     GEREKTİRMEZ; diğer sayfalarda (görünmez yedek kutu) yalnızca Cloudflare etkileşim isterse kutu çıkar.
  *   - Giriş/kayıt sayfalarında sayfa açılır açılmaz arka planda çözülür (token submit'ten önce hazırdır).
  *   - Token TEK KULLANIMLIKTIR: her auth çağrısından sonra widget sıfırlanır, bir sonraki deneme için yenisi hazırlanır.
  *   - Turnstile yüklenemezse (reklam engelleyici, ağ yok) çağrı token'sız gönderilir: çevrimdışı/kesinti giriş
@@ -117,7 +118,9 @@ function widgetHazirla() {
       w.kutu = kutuBul();
       w.id = ts.render(w.kutu, {
         sitekey: turnstileSiteKey(),
-        appearance: "interaction-only", // şüphe yoksa HİÇ görünmez → sürtünme yok
+        // Sayfadaki kutuda widget GÖRÜNÜR ("Doğrulanıyor… → Başarılı!"; Managed modda tıklama GEREKMEZ), kullanıcı korumanın
+        // çalıştığını görür. Sayfasız (yedek) kutuda yalnızca etkileşim gerekirse görünür.
+        appearance: w.kutu.id === SAYFA_KUTUSU_ID ? "always" : "interaction-only",
         theme: temaAl(),
         language: "tr",
         size: w.kutu.id === SAYFA_KUTUSU_ID ? "flexible" : "normal",

@@ -51,7 +51,7 @@ supabase/
 assets/
   js/supabase-client.js                    <- Ortak Supabase istemcisi (URL/KEY burada) + showSpamNotice() yardımcısı
   js/auth-guard.js                         <- Korumalı sayfa mantığı
-  js/auth-pages.js                         <- Giriş/Kayıt/Şifre/Hesap Onayla sayfaları mantığı
+  js/auth/auth-pages.js                    <- Giriş/Kayıt/Şifre/Hesap Onayla sayfaları mantığı (25.11.2026'da kayıp dosya yeniden yazıldı)
   js/auth/turnstile.js                     <- Cloudflare Turnstile ↔ Supabase Auth Captcha köprüsü (görünmez token ekleme)
   js/panel.js                              <- /panel/panel.html mantığı (e-posta değiştirme dahil)
   js/admin.js                              <- /panel/admin.html mantığı
@@ -771,6 +771,7 @@ kurabiliriz.
 ## Adım 8 — Test Kontrol Listesi
 
 - [ ] (Turnstile açıkken) `/hesap/giris.html`, `/hesap/kayit.html` ve `/hesap/sifremi-unuttum.html`: form gönderiminde ekstra bir tıklama istenmeden işlem tamamlanıyor mu? Üst üste iki kez deneyince (token yenilenmesi) ikincisi de geçiyor mu?
+- [ ] Giriş sayfasında formun üstünde Turnstile kutusu "Başarılı!" gösteriyor mu? (Cloudflare panelindeki siteverify uyarısı ilk başarılı denemeden sonra kapanır.)
 - [ ] Tarayıcı konsolunda `challenges.cloudflare.com` için CSP/engelleme hatası yok mu? Google ile giriş hâlâ çalışıyor mu?
 - [ ] `/hesap/kayit.html`'den e-posta ile kayıt ol → doğrulama e-postası geldi mi? → kayıt sonrası SPAM uyarısı göründü mü?
 - [ ] E-postadaki linke tıkla → `/hesap/giris.html`'den giriş yapabiliyor musun?
@@ -897,7 +898,7 @@ Kod, Supabase'e şu adresleri gönderir (`assets/js/auth/auth-pages.js`, `assets
 
 ## Bot Koruması — Cloudflare Turnstile (Giriş / Kayıt / Şifre Sıfırlama) (25.11.2026)
 
-Giriş, kayıt ve "şifremi unuttum" formları **Cloudflare Turnstile** ile bot/kaba kuvvet saldırılarına karşı korunur. Kullanıcıdan **hiçbir şey yapması istenmez**: widget `interaction-only` modundadır, Cloudflare şüphe duymadıkça görünmez bile; yalnızca şüpheli bir trafikte küçük bir onay kutusu çıkar.
+Giriş, kayıt ve "şifremi unuttum" formları **Cloudflare Turnstile** ile bot/kaba kuvvet saldırılarına karşı korunur. Formda küçük bir Turnstile kutusu görünür ("Doğrulanıyor… → Başarılı!"); **Managed** modda kullanıcıdan tıklama istenmez, yalnızca şüpheli trafikte bir onay kutusu çıkar. (Giriş/kayıt/şifre sıfırlama dışındaki sayfalarda, ör. Notlar'ın parola sınaması, widget görünmez çalışır.)
 
 ### Nasıl çalışır? (mimari)
 
@@ -908,6 +909,7 @@ Supabase Auth ──(Captcha secret ile)──► Cloudflare siteverify ──�
 ```
 
 - Token'ı doğrulayan **Supabase'in kendisidir**. Secret yalnızca Supabase Dashboard'da durur; sitede, Worker'larda veya GitHub'da **secret yoktur**, ekstra Worker/proxy gerekmez (statik site mimarisi bozulmaz).
+- Cloudflare panelindeki *"Siteverify isn't being called"* uyarısı, Supabase'te Captcha **AÇIK + Secret kayıtlıyken** siteden ilk giriş/kayıt/şifre-sıfırlama denemesi yapılana kadar görünür; deneme yapılınca (siteverify'ı Supabase çağırır) kendiliğinden kapanır. Sitede kendi siteverify'ını çağıracak bir Worker/endpoint YOKTUR ve gerekmez: korunan formların hepsi doğrudan Supabase Auth'a gider.
 - Token'ı ekleyen tek yer `assets/js/auth/turnstile.js` → `captchaKur()`'dur; `supabase-client.js` bunu ortak istemciye bir kez uygular. Yani `auth-pages.js`, `sistem-durumu.js` gibi çağıran kodlar değişmez ve **ileride eklenecek yeni auth çağrıları da otomatik korunur**. Notlar'ın "giriş parolasını doğrula" adımındaki geçici istemci de `captchaKur()` ile korunur.
 - Token tek kullanımlıktır: her istekten sonra widget sıfırlanır, bir sonraki deneme için arka planda yenisi hazırlanır. Giriş/kayıt/şifre sıfırlama sayfaları açılır açılmaz token'ı önceden çözer, yani kullanıcı submit'e bastığında genelde bekleme olmaz.
 
@@ -932,6 +934,8 @@ Supabase Auth ──(Captcha secret ile)──► Cloudflare siteverify ──�
 |---|---|---|
 | "captcha verification process failed" / "Güvenlik doğrulaması tamamlanamadı…" | Supabase'te captcha AÇIK ama `_config.yml`'de `turnstile_sitekey` boş/yanlış, ya da Supabase'teki Secret başka widget'a ait | Site Key ve Secret **aynı widget'ın** çifti olmalı; `_config.yml`'i düzelt + deploy et |
 | Widget hiç yüklenmiyor, aynı hata | Reklam/içerik engelleyici `challenges.cloudflare.com`'u engelliyor, ya da CSP bu adresi engelliyor | Engelleyiciyi bu site için kapat. CSP'de `script-src https:` ve `frame-src https:` zaten izinli; sıkılaştırdıysan `https://challenges.cloudflare.com`'u iki yönergeye de ekle |
+| Konsolda `Blocked a frame with origin "https://challenges.cloudflare.com"…` ve `…/challenge-platform/…/pat/… 401` | Safari'de Turnstile'ın kendi iç iletişimi / Private Access Token denemesi | **Zararsızdır**, giriş/kayıt'ı etkilemez; yok sayabilirsin |
+| Konsolda `Refused to connect to data:` | CSP `connect-src`'ta `data:` yoktu | 25.11.2026'da `_layouts/default.html` ve `_headers` CSP'sine `data:` eklendi (deploy sonrası kaybolur) |
 | Cloudflare hata kodu `110200` (domain not allowed) | Siteyi açtığın adres widget'ın Hostname listesinde yok | Cloudflare → Turnstile → widget → Hostname Management'a o adresi ekle |
 | Bazı ziyaretçilerde kutu çıkıyor | Normaldir: Cloudflare o ziyaretçiyi şüpheli buldu | Bir işlem gerekmez, kutuyu onaylaması yeterli |
 | Admin "e-posta değiştir"den sonra bildirim maili gitmedi (`bildirim_maili_gonderildi: false`) | Edge Function'daki `resetPasswordForEmail` (sunucu tarafı) de captcha ister; token olmadığı için reddedilebilir | E-posta değişikliği yine tamamlanır (kod bu hatayı zaten yakalar). Bildirim maili gerekliyse kullanıcıya "Şifremi unuttum"dan kendisi gönderebilir; bu çağrıyı kendi test ettiğinde sonucu kontrol et |
@@ -997,11 +1001,16 @@ istemedim.
 
 Bu bölüm, siteye/Supabase kullanıcı sistemine sonradan yapılan düzeltmelerin tarih sırasıyla özetidir — hangi sorun bildirildi, kök nedeni neydi, nasıl çözüldü ve (varsa) senin elle yapman gereken adım neydi. Eskiden kökte ayrı `DEGISIKLIKLER_*.md` dosyaları halinde duruyordu, artık tek doğruluk kaynağı burası — en yeni turu en üstte bulursun.
 
+### 🗓️ 25.11.2026 (2) — ACİL DÜZELTME: giriş/kayıt/Google butonları çalışmıyordu
+- **Sorun:** Canlı sitede `assets/js/auth/auth-pages.js` **404** idi (dosya repoda yoktu). Giriş, kayıt, Google, şifre sıfırlama ve hesap onayla sayfalarının TÜM JavaScript'i bu dosyadadır; bu yüzden hiçbir buton çalışmıyordu. (Tek eksik dosya buydu: tüm `import`/`<script>` bağlantıları tarandı.)
+- **Çözüm:** `auth-pages.js` migration'lardaki (handle_new_user meta verisi, `kvkk_onayini_ver`, `yedek_kod_ile_2fa_kaldir`, `KAYITLAR_KAPALI`), `supabase-client.js`, `kesinti.js` (çevrimdışı giriş), `auth-guard.js` (AAL2) sözleşmelerine göre **yeniden yazıldı**: e-posta+şifre giriş, Google giriş/kayıt (rıza OAuth'tan ÖNCE denetlenir; rızasız oluşan boş hesap silinir), 2FA + yedek kod, çevrimdışı giriş kasası, kayıt (KVKK/yurt dışı rıza meta verisi), şifremi unuttum, kodla hesap onayı, şifre güncelleme. Kayıp dosyanın eski bir yedeği (ör. başka bilgisayar/yerel klasör) varsa karşılaştırıp eksik bir özellik görürsen haber ver.
+- **Turnstile:** sayfadaki widget artık görünür (tıklamasız). CSP'ye `connect-src data:` eklendi (Turnstile iç çağrısı engelleniyordu). 2FA adımı için `giris.md`'ye `#mfa-adimi` bloğu eklendi.
+
 ### 🗓️ 25.11.2026 — Giriş/Kayıt ekranları sadeleştirildi + Cloudflare Turnstile
 - **Sorun:** Giriş sayfasında kayıt/şifre/onay/demo bağlantıları ve uzun açıklamalar yan yana olduğu için ne yapılacağı belli değildi; butonlar birbirinden ayırt edilemiyordu.
 - **Çözüm:** Tek kart + üstte **Giriş Yap / Kayıt Ol** sekmesi, tek belirgin ana buton, Google ve demo ikincil/sessiz, "Şifremi unuttum" şifre alanının yanında, nadir bağlantılar (kodla onayla) altta küçük. Uzun "çevrimdışı giriş" açıklaması "Bu ne demek?" ile açılır. Kayıt'ta KVKK onayı formun içinde, gönder butonunun hemen üstünde. Tüm formlar mobilde tek sütun; stiller yalnızca `.auth-kart` kapsamındadır (panel/admin görünümü değişmedi).
 - **Bot koruması:** Cloudflare Turnstile eklendi (bkz. yukarıdaki "Bot Koruması" bölümü). **Senin yapman gerekenler:** Cloudflare'de widget oluştur → Site Key'i `_config.yml`'e yaz → deploy → Supabase'te Captcha secret'ı gir. Anahtar boşsa site eskisi gibi çalışır.
-- Değişmeyenler: tüm form `id`'leri ve `auth-pages.js` aynen korundu (davranış değişmedi).
+- Form `id`'leri korundu (`auth-pages.js` bunlara bağlıdır).
 
 ### 🗓️ 24.11.2026 — Supabase Advisor düzeltmeleri, Notlarım düzeni
 - Migration `0151`: RLS "açık reddet" politikaları, `FOR ALL` politikalarının bölünmesi, `(select auth.uid())`, yabancı anahtar indeksleri, sabit `search_path`, bucket listeleme daraltma, `btree_gist` taşıma, tetikleyici ve yönetim RPC'lerinde `anon` yetkisi kaldırma.

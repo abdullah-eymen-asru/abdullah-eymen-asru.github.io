@@ -17,6 +17,7 @@ permalink: "/hesap/giris.html"
 
   <div id="auth-message" class="auth-message" hidden></div>
 
+  <div id="giris-adimi">
   <form id="giris-form" novalidate>
     <div class="form-field">
       <label for="email">E-posta</label>
@@ -65,6 +66,31 @@ permalink: "/hesap/giris.html"
   </div>
   <p id="demo-kapali-not" class="muted demo-giris-not" hidden>Herkese açık demo şu an kapalı. Sana özel bir demo hesabı verildiyse yukarıdan e-posta ve şifrenle giriş yap; seni otomatik olarak salt-okunur vitrin moduna alırız.</p>
   <p id="demo-depo-not" class="auth-message auth-message--error" hidden>Tarayıcın oturum depolamasına izin vermediği için demo hesabın açılamadı. Gizli sekmeyi/çerez kısıtını kapatıp tekrar dene.</p>
+
+  </div><!-- #giris-adimi -->
+
+  <!-- İKİ ADIMLI DOĞRULAMA (2FA): şifre doğru ama hesapta TOTP varsa initGirisPage() bunu açar (auth-pages.js -> mfaKoduIste). -->
+  <div id="mfa-adimi" hidden>
+    <h2 class="auth-adim-baslik">İki adımlı doğrulama</h2>
+    <p class="auth-alt-baslik">Authenticator uygulamandaki 6 haneli kodu gir.</p>
+    <form id="mfa-form" novalidate>
+      <div class="form-field">
+        <label for="mfa-kod">Doğrulama kodu</label>
+        <input id="mfa-kod" name="mfa_kod" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" required>
+      </div>
+      <button type="submit" class="btn-primary">Doğrula</button>
+    </form>
+    <button type="button" id="mfa-yedek-ac" class="auth-link-btn">Authenticator'a erişemiyorum, yedek kod kullan</button>
+    <form id="yedek-kod-form" novalidate hidden>
+      <p class="auth-alt-baslik">Yedek kod girmek hesabındaki iki adımlı doğrulamayı <strong>kaldırır</strong>. Girişten sonra panelden yeniden kurmanı öneririz.</p>
+      <div class="form-field">
+        <label for="yedek-kod">Yedek kod</label>
+        <input id="yedek-kod" name="yedek_kod" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
+      </div>
+      <button type="submit" class="btn-primary">Yedek kodu kullan</button>
+    </form>
+    <button type="button" id="mfa-iptal" class="auth-link-btn">Vazgeç ve çıkış yap</button>
+  </div>
 
   <p class="auth-alt-linkler">
     <a href="{{ '/hesap/hesap-onayla.html' | relative_url }}">Hesabını onaylamadın mı? Kodla onayla</a>
