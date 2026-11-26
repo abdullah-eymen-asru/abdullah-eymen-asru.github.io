@@ -9,7 +9,7 @@
 // Bot koruması (Turnstile/captcha) admin API'sini etkilemez; yetki denetimi aşağıdaki rol kontrolüdür.
 //
 // GÜVENLİK: (1) çağıranın token'ı doğrulanır, (2) rol veritabanından okunur (admin/owner), (3) davet rolü seçilebilir
-// (user/special_user/editor/manager; "admin" yalnızca Site Sahibi; "owner"/"demo" asla; migration 0154), (4) Site Sahibi ayarları (açık/kapalı, tarih penceresi, toplam/günlük sınır) + mutlak günlük tavan 500,
+// (user/special_user/editor/manager; "admin" yalnızca Site Sahibi; "owner" asla; "demo" admin+owner; migration 0154/0155), (4) Site Sahibi ayarları (açık/kapalı, tarih penceresi, toplam/günlük sınır) + mutlak günlük tavan 500,
 // (5) redirect adresi istemciden alınmaz; yalnızca izinli Origin + sabit yol kullanılır.
 //
 // Deploy:  supabase functions deploy admin-invite-user
@@ -28,8 +28,8 @@ const ALLOWED_ORIGINS = [
   "http://localhost:4000",
 ];
 const MUTLAK_GUNLUK_TAVAN = 500; // "sınırsız" ayarında bile geçerli güvenlik tavanı (kişi başı / 24 saat)
-// Davetle verilebilecek roller. 'admin' yalnızca Site Sahibi tarafından verilebilir; 'owner'/'demo' davetle ASLA verilmez.
-const ROL_HERKES = ["user", "special_user", "editor", "manager"];
+// Davetle verilebilecek roller (admin + Site Sahibi): user, special_user, editor, manager, demo. 'admin' yalnızca Site Sahibi; 'owner' davetle ASLA verilmez.
+const ROL_HERKES = ["user", "special_user", "editor", "manager", "demo"];
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 function corsHeaders(origin: string | null) {
