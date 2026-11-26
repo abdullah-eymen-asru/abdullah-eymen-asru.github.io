@@ -34,11 +34,11 @@ permalink: "/hesap/giris.html"
 
     <div class="auth-secenekler">
       <label class="auth-onay-satiri" for="remember-me">
-        <input id="remember-me" name="remember_me" type="checkbox" checked>
+        <input id="remember-me" name="remember_me" type="checkbox" class="ui-surgu" data-ui-sessiz checked>
         <span>Oturumumu hatırla</span>
       </label>
       <label class="auth-onay-satiri" for="offline-kasa">
-        <input id="offline-kasa" name="offline_kasa" type="checkbox" checked>
+        <input id="offline-kasa" name="offline_kasa" type="checkbox" class="ui-surgu" data-ui-sessiz checked>
         <span>Sunucu kesintisinde bu cihazdan girebileyim</span>
       </label>
       <details class="auth-ipucu">

@@ -97,8 +97,13 @@ function kutuphaneKur(kok, profil, owner) {
           <h3>Kayıt</h3>
           <p class="ak-alt">Vurgu, yorum ve çizimlerin her değişiklikte <strong>otomatik</strong> hesabına kaydedilir (Kaydet'e basmana gerek yok). PDF dosyasının kendisi ise okuyucuyu kapatırken tek seferde güncellenir; böylece depolama (R2) işlem kotası boşa harcanmaz.</p>
         </section>
-        <div class="ak-motor" data-ak-motor></div>
-        <div class="ak-motor ak-eklentiler" data-ak-eklentiler></div>
+        <details class="ui-cekmece">
+          <summary>Gelişmiş seçenekler</summary>
+          <div class="ui-cekmece-icerik">
+            <div class="ak-motor" data-ak-motor></div>
+            <div class="ak-motor ak-eklentiler" data-ak-eklentiler></div>
+          </div>
+        </details>
       </div>
 
       <div class="ak-zot" data-ak-zot>
@@ -126,7 +131,7 @@ function kutuphaneKur(kok, profil, owner) {
             <label>Yıl (başlangıç) <input type="number" data-f="yilBas" min="0" max="3000" inputmode="numeric"></label>
             <label>Yıl (bitiş) <input type="number" data-f="yilSon" min="0" max="3000" inputmode="numeric"></label>
             <label>Görünürlük <select data-f="gorunurluk"><option value="">Tümü</option>${Object.entries(GORUNURLUK).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></label>
-            <label class="ak-onay"><input type="checkbox" data-f="pdfli"> Yalnız PDF'li</label>
+            <label class="ak-onay"><input type="checkbox" class="ui-surgu" data-f="pdfli"> Yalnız PDF'li</label>
             <button type="button" class="ak-btn" data-act="filtre-temizle">Filtreleri temizle</button>
           </section>
           <div class="ak-cipler" data-ak-cipler></div>
@@ -169,7 +174,7 @@ function kutuphaneKur(kok, profil, owner) {
     }
     if (hata) {
       q("[data-ak-ozet]").textContent = "";
-      q("[data-ak-liste]").innerHTML = `<p class="ak-bos ak-hata">Kaynaklar yüklenemedi: ${esc(hata.message)}. Migration 0072'nin uygulandığından ve bu özelliğin rolün için açık olduğundan emin ol.</p>`;
+      q("[data-ak-liste]").innerHTML = `<p class="ak-bos ak-hata">Kaynaklar yüklenemedi. Sayfayı yenile; sorun sürerse yöneticiyle iletişime geç.</p>`;
       return;
     }
     await klasorYukle(hedef);
@@ -280,7 +285,7 @@ function kutuphaneKur(kok, profil, owner) {
     ]);
     let k = k0;
     if (k.error && /silindi_tarihi|42703/.test(k.error.message || "")) { d.copYok = true; k = await hepsiniAl(() => supabase.from("akademik_koleksiyonlar").select("id,ust_id,ad,sira,user_id").eq("user_id", uid).order("ad")); }
-    if (k.error || o.error) { d.klasorler = []; d.ogeler = new Map(); d.klasorHata = (k.error || o.error).message; return; }
+    if (k.error || o.error) { d.klasorler = []; d.ogeler = new Map(); console.error(k.error || o.error); d.klasorHata = "Klasörler yüklenemedi."; return; }
     d.klasorler = k.data;
     d.ogeler = new Map();
     for (const r of o.data) { if (!d.ogeler.has(r.koleksiyon_id)) d.ogeler.set(r.koleksiyon_id, new Set()); d.ogeler.get(r.koleksiyon_id).add(r.kaynak_id); }
@@ -320,7 +325,7 @@ function kutuphaneKur(kok, profil, owner) {
       <li role="treeitem"><div class="ak-kl${d.klasor === "__yok" ? " aktif" : ""}" data-kl="__yok" style="--sev:0"><span class="ak-kl-ok bos"></span><button type="button" class="ak-kl-ad" data-klasor="__yok"><span aria-hidden="true">📥</span> <span class="ak-kl-metin">Klasörsüz</span> <span class="ak-kl-say">${yok}</span></button></div></li>
     </ul>
     ${edit ? `<button type="button" class="ak-btn ak-agac-yeni" data-act="klasor-yeni">＋ Yeni klasör</button>` : ""}
-    ${d.klasorHata ? `<p class="ak-bos ak-hata">Klasörler yüklenemedi: ${esc(d.klasorHata)}. Migration 0117'nin uygulandığından emin ol.</p>` : ""}`;
+    ${d.klasorHata ? `<p class="ak-bos ak-hata">${esc(d.klasorHata)} Sayfayı yenilemeyi dene.</p>` : ""}`;
     const ad = d.klasor === "" ? "Tüm kaynaklar" : d.klasor === "__yok" ? "Klasörsüz" : klasorYolu(d.klasor) || "Tüm kaynaklar";
     q("[data-ak-agac-ad]").textContent = ad;
     const cd = q("[data-act=\"cop-ac\"]"); if (cd) cd.hidden = !edit || !!d.copYok;
@@ -331,21 +336,21 @@ function kutuphaneKur(kok, profil, owner) {
         const ad = (prompt(islem === "alt" ? `“${d.klasorler.find((k) => k.id === id)?.ad}” içine yeni klasör adı:` : "Yeni klasör adı:") || "").trim();
         if (!ad) return;
         const { data, error } = await supabase.from("akademik_koleksiyonlar").insert({ ad: ad, ust_id: islem === "alt" ? id : null, user_id: profil.id }).select().single();
-        if (error) throw new Error(error.message);
+        if (error) { console.error(error); throw new Error("İşlem tamamlanamadı. Lütfen tekrar dene."); }
         if (islem === "alt") d.acik.add(id);
         d.klasorler.push(data); d.klasor = data.id;
       } else if (islem === "ad") {
         const k = d.klasorler.find((x) => x.id === id); const ad = (prompt("Klasör adı:", k?.ad || "") || "").trim();
         if (!ad || ad === k?.ad) return;
         const { error } = await supabase.from("akademik_koleksiyonlar").update({ ad: ad }).eq("id", id);
-        if (error) throw new Error(error.message);
+        if (error) { console.error(error); throw new Error("İşlem tamamlanamadı. Lütfen tekrar dene."); }
         k.ad = ad;
       } else if (islem === "sil") {
         const k = d.klasorler.find((x) => x.id === id);
         if (!confirm(`“${k?.ad}” klasörü ve alt klasörleri çöp kutusuna taşınsın mı?\nİçindeki kaynaklar SİLİNMEZ. Çöp kutusundan geri yükleyebilirsin.`)) return;
         const idler = altKlasorler(id), zaman = new Date().toISOString();
         const { error } = d.copYok ? await supabase.from("akademik_koleksiyonlar").delete().eq("id", id) : await supabase.from("akademik_koleksiyonlar").update({ silindi_tarihi: zaman }).in("id", idler);
-        if (error) throw new Error(error.message);
+        if (error) { console.error(error); throw new Error("İşlem tamamlanamadı. Lütfen tekrar dene."); }
         await klasorYukle(profil.id); if (d.klasor === id) d.klasor = "";
       }
       agacCiz(); ciz();
@@ -355,7 +360,7 @@ function kutuphaneKur(kok, profil, owner) {
     const { error } = ekle
       ? await supabase.from("akademik_koleksiyon_ogeleri").upsert({ koleksiyon_id: klasorId, kaynak_id: kaynakId, user_id: profil.id }, { onConflict: "koleksiyon_id,kaynak_id", ignoreDuplicates: true })
       : await supabase.from("akademik_koleksiyon_ogeleri").delete().eq("koleksiyon_id", klasorId).eq("kaynak_id", kaynakId);
-    if (error) throw new Error(error.message);
+    if (error) { console.error(error); throw new Error("İşlem tamamlanamadı. Lütfen tekrar dene."); }
     if (!d.ogeler.has(klasorId)) d.ogeler.set(klasorId, new Set());
     if (ekle) d.ogeler.get(klasorId).add(kaynakId); else d.ogeler.get(klasorId).delete(kaynakId);
   }
@@ -428,7 +433,7 @@ function kutuphaneKur(kok, profil, owner) {
     if (!uyeModu() || d.uyelerYuklu === d.kapsam) return;
     const { data, error } = await supabase.rpc(owner ? "owner_akademik_uyeleri_getir" : "akademik_paylasilan_uyeler");
     d.uyeler = data || []; d.uyelerYuklu = d.kapsam;
-    if (error) q("[data-ak-uye-liste]").innerHTML = `<li class="ak-bos ak-hata">Üyeler yüklenemedi: ${esc(error.message)}${owner ? "" : ". Migration 0117 uygulanmış olmalı."}</li>`;
+    if (error) q("[data-ak-uye-liste]").innerHTML = `<li class="ak-bos ak-hata">Üyeler yüklenemedi. Lütfen tekrar dene.</li>`;
     else uyeGorunumu();
   }
 
@@ -505,7 +510,7 @@ function kutuphaneKur(kok, profil, owner) {
   async function notlariYukle(k) {
     const yer = dlg("detay").querySelector("[data-ak-notlar]");
     const { data, error } = await supabase.from("akademik_notlar").select("*").eq("kaynak_id", k.id).order("sayfa", { nullsFirst: true }).order("created_at");
-    if (error) { yer.textContent = `Notlar yüklenemedi: ${error.message}`; return; }
+    if (error) { console.error(error); yer.textContent = "Notlar yüklenemedi. Lütfen tekrar dene."; return; }
     const hepsi = data || [];
     const serbest = hepsi.filter((n) => !n.ek_id);
     const aciklama = hepsi.filter((n) => n.ek_id);
@@ -567,16 +572,16 @@ function kutuphaneKur(kok, profil, owner) {
         const sayfa = Number(yer.querySelector('[data-nt="sayfa"]').value) || null;
         const tur = yer.querySelector('[data-nt="tur"]').value;
         const { error } = await supabase.from("akademik_notlar").insert(tur === "alinti" ? { kaynak_id: k.id, tur, sayfa, metin } : { kaynak_id: k.id, tur, sayfa, yorum: metin });
-        if (error) toast(`Eklenemedi: ${error.message}`, "hata"); else notlariYukle(k);
+        if (error) toast("Eklenemedi. Lütfen tekrar dene.", "hata"); else notlariYukle(k);
       } else if (t === "sil" && n) {
         if (!confirm("Bu not silinsin mi?")) return;
         const { error } = await supabase.from("akademik_notlar").delete().eq("id", n.id);
-        if (error) toast(error.message, "hata"); else notlariYukle(k);
+        if (error) { console.error(error); toast("İşlem tamamlanamadı. Lütfen tekrar dene.", "hata"); } else notlariYukle(k);
       } else if (t === "duzenle" && n) {
         const yeni = prompt("Notu düzenle:", n.metin || n.yorum || "");
         if (yeni === null) return;
         const { error } = await supabase.from("akademik_notlar").update(n.tur === "alinti" ? { metin: yeni } : { yorum: yeni }).eq("id", n.id);
-        if (error) toast(error.message, "hata"); else notlariYukle(k);
+        if (error) { console.error(error); toast("İşlem tamamlanamadı. Lütfen tekrar dene.", "hata"); } else notlariYukle(k);
       }
     }
   });
@@ -741,7 +746,7 @@ function kutuphaneKur(kok, profil, owner) {
       try {
         const baslik = dosya.name.replace(/\.pdf$/i, "").replace(/[_]+/g, " ").trim().slice(0, 900) || "Başlıksız";
         const { data, error } = await supabase.from("akademik_kaynaklar").insert({ baslik, tur: "makale" }).select().single();
-        if (error) throw new Error(error.message);
+        if (error) { console.error(error); throw new Error("İşlem tamamlanamadı. Lütfen tekrar dene."); }
         await pdfYukle(data.id, dosya, { dosyaAdi: dosya.name, ilerleme: (o) => { li.textContent = `${dosya.name} — %${Math.round(o * 100)}`; } });
         const ice = await yuklemeSonrasi(data.id, dosya);
         li.textContent = `✓ ${dosya.name}${ice ? ` — ${ice} açıklama içe alındı` : ""}`;
@@ -761,7 +766,7 @@ function kutuphaneKur(kok, profil, owner) {
       let id = onbellek.get(anahtar) || d.klasorler.find((k) => (k.ust_id || null) === ust && k.ad.toLocaleLowerCase("tr") === ad.toLocaleLowerCase("tr"))?.id;
       if (!id) {
         const { data, error } = await supabase.from("akademik_koleksiyonlar").insert({ ad: ad, ust_id: ust, user_id: profil.id }).select().single();
-        if (error) throw new Error(error.message);
+        if (error) { console.error(error); throw new Error("İşlem tamamlanamadı. Lütfen tekrar dene."); }
         d.klasorler.push(data); id = data.id;
       }
       onbellek.set(anahtar, id); ust = id;
@@ -844,7 +849,7 @@ function kutuphaneKur(kok, profil, owner) {
       const yeni = dl.querySelector('input[name="yeniust"]:checked')?.value || null;
       try {
         const { error } = await supabase.from("akademik_koleksiyonlar").update({ ust_id: yeni }).eq("id", id);
-        if (error) throw new Error(error.message);
+        if (error) { console.error(error); throw new Error("İşlem tamamlanamadı. Lütfen tekrar dene."); }
         k.ust_id = yeni; if (yeni) d.acik.add(yeni);
         dl.close(); agacCiz(); ciz();
       } catch (h) { toast(`Taşınamadı: ${h.message}`, "hata"); }
@@ -882,11 +887,11 @@ function kutuphaneKur(kok, profil, owner) {
           <p class="ak-pz-sayi" data-pz-sayi role="status"></p></div></div>
         <div class="ak-pz-adim"><span class="ak-pz-no">2</span><div><strong>Kim açabilsin?</strong>
           <div class="ak-kart-secim" role="radiogroup" aria-label="Erişim">${Object.entries(ERISIM).map(([k, [ik, b, a]]) => `<label class="ak-secenek"><input type="radio" name="erisim" value="${k}" ${k === "link" ? "checked" : ""}><span class="ak-secenek-ic"><span class="ak-secenek-ik" aria-hidden="true">${ik}</span><span><strong>${b}</strong><small>${a}</small></span></span></label>`).join("")}</div></div></div>
-        <div class="ak-pz-adim"><span class="ak-pz-no">3</span><div><label class="ak-anahtar"><input type="checkbox" data-pz-pdf checked> <span><strong>PDF'ler okunabilsin</strong><small>Okuma Cloudflare R2'den yapılır; depolama alanını büyütmez, çıkış (egress) ücretsizdir. Yalnızca okuma işlemi sayılır; ücretsiz kotalar çok yüksektir.</small></span></label>
+        <div class="ak-pz-adim"><span class="ak-pz-no">3</span><div><label class="ak-anahtar"><input type="checkbox" class="ui-surgu" data-ui-sessiz data-pz-pdf checked> <span><strong>PDF'ler okunabilsin</strong><small>Okuma Cloudflare R2'den yapılır; depolama alanını büyütmez, çıkış (egress) ücretsizdir. Yalnızca okuma işlemi sayılır; ücretsiz kotalar çok yüksektir.</small></span></label>
           <details class="ak-pz-gelismis"><summary>Gelişmiş</summary>
             <label>Başlık <input data-pz-baslik maxlength="120" value="${esc(profil.ad ? `${profil.ad} — Akademik Kütüphane` : "Akademik kütüphanem")}"></label>
             <label>Açıklama <textarea data-pz-aciklama maxlength="600" rows="2" placeholder="Bu koleksiyon ne hakkında? (isteğe bağlı)"></textarea></label>
-            <label class="ak-anahtar"><input type="checkbox" data-pz-ozel checked> <span><strong>“Özel” işaretli kaynakları da göster</strong><small>Kapatırsan yalnızca “Özel” dışı kaynaklar paylaşılır.</small></span></label>
+            <label class="ak-anahtar"><input type="checkbox" class="ui-surgu" data-ui-sessiz data-pz-ozel checked> <span><strong>“Özel” işaretli kaynakları da göster</strong><small>Kapatırsan yalnızca “Özel” dışı kaynaklar paylaşılır.</small></span></label>
             <label>Bitiş tarihi (isteğe bağlı) <input type="date" data-pz-bitis></label></details></div></div>
         <button type="button" class="ak-btn ak-btn-birincil ak-pz-olustur" data-pz-olustur>Bağlantı oluştur</button>
       </section>
@@ -1014,12 +1019,12 @@ function kutuphaneKur(kok, profil, owner) {
       const b = e.target.closest("[data-cop-islem]"); if (!b) return; e.preventDefault(); hataYaz("");
       const islem = b.dataset.copIslem, kid = b.closest("[data-cop-kaynak]")?.dataset.copKaynak, fid = b.closest("[data-cop-klasor]")?.dataset.copKlasor;
       try {
-        if (islem === "geri-kaynak") { const { error } = await supabase.from("akademik_kaynaklar").update({ silindi_tarihi: null }).eq("id", kid); if (error) throw new Error(error.message); toast("Kaynak geri yüklendi.", "basari"); }
+        if (islem === "geri-kaynak") { const { error } = await supabase.from("akademik_kaynaklar").update({ silindi_tarihi: null }).eq("id", kid); if (error) { console.error(error); throw new Error("İşlem tamamlanamadı. Lütfen tekrar dene."); } toast("Kaynak geri yüklendi.", "basari"); }
         else if (islem === "geri-klasor") {
           const f = klasorler.find((x) => x.id === fid);
           const grup = klasorler.filter((x) => x.silindi_tarihi === f.silindi_tarihi).map((x) => x.id);          // aynı anda silinen alt klasörler birlikte döner
           const ustCopte = f.ust_id && klasorler.some((x) => x.id === f.ust_id && !grup.includes(x.id));
-          const { error } = await supabase.from("akademik_koleksiyonlar").update({ silindi_tarihi: null }).in("id", grup); if (error) throw new Error(error.message);
+          const { error } = await supabase.from("akademik_koleksiyonlar").update({ silindi_tarihi: null }).in("id", grup); if (error) { console.error(error); throw new Error("İşlem tamamlanamadı. Lütfen tekrar dene."); }
           if (ustCopte) { const { error: e2 } = await supabase.from("akademik_koleksiyonlar").update({ ust_id: null }).eq("id", fid); if (e2) throw new Error(e2.message); }
           toast(ustCopte ? "Klasör geri yüklendi (üst klasörü çöpte olduğu için en üste konuldu)." : "Klasör geri yüklendi.", "basari");
         } else if (islem === "sil-kaynak") {
@@ -1027,7 +1032,7 @@ function kutuphaneKur(kok, profil, owner) {
           await kaynakKaliciSil(k); toast("Kalıcı olarak silindi.", "basari");
         } else if (islem === "sil-klasor") {
           const f = klasorler.find((x) => x.id === fid); if (!confirm(`“${f.ad}” klasörü KALICI olarak silinsin mi? (İçindeki kaynaklar silinmez.)`)) return;
-          const { error } = await supabase.from("akademik_koleksiyonlar").delete().eq("id", fid); if (error) throw new Error(error.message); toast("Klasör kalıcı olarak silindi.", "basari");
+          const { error } = await supabase.from("akademik_koleksiyonlar").delete().eq("id", fid); if (error) { console.error(error); throw new Error("İşlem tamamlanamadı. Lütfen tekrar dene."); } toast("Klasör kalıcı olarak silindi.", "basari");
         } else if (islem === "bosalt") {
           if (!kaynaklar.length && !klasorler.length) return;
           if (!confirm(`Çöp kutusundaki ${kaynaklar.length} kaynak ve ${klasorler.length} klasör KALICI olarak silinsin mi? Geri alınamaz.`)) return;
@@ -1096,7 +1101,7 @@ function kutuphaneKur(kok, profil, owner) {
       else if (is === "etiket") {
         const girdi = (prompt("Eklenecek etiket(ler) — virgülle ayır:") || "").split(",").map((s) => s.trim()).filter(Boolean);
         if (!girdi.length) return;
-        for (const k of liste) { const yeni = [...new Set([...(k.etiketler || []), ...girdi])]; const { error } = await supabase.from("akademik_kaynaklar").update({ etiketler: yeni }).eq("id", k.id); if (error) throw new Error(error.message); k.etiketler = yeni; }
+        for (const k of liste) { const yeni = [...new Set([...(k.etiketler || []), ...girdi])]; const { error } = await supabase.from("akademik_kaynaklar").update({ etiketler: yeni }).eq("id", k.id); if (error) { console.error(error); throw new Error("İşlem tamamlanamadı. Lütfen tekrar dene."); } k.etiketler = yeni; }
         facetleriDoldur(); ciz(); toast("Etiketler eklendi.", "basari");
       } else if (is === "sil") {
         if (!confirm(d.copYok ? `${liste.length} kaynak, PDF'leri ve notlarıyla kalıcı olarak silinsin mi?` : `${liste.length} kaynak çöp kutusuna taşınsın mı? (Geri yüklenebilir.)`)) return;
@@ -1109,13 +1114,13 @@ function kutuphaneKur(kok, profil, owner) {
   async function kaynakSilSessiz(k) {
     if (d.copYok) return kaynakKaliciSil(k);
     const { error } = await supabase.from("akademik_kaynaklar").update({ silindi_tarihi: new Date().toISOString() }).eq("id", k.id);
-    if (error) throw new Error(error.message);
+    if (error) { console.error(error); throw new Error("İşlem tamamlanamadı. Lütfen tekrar dene."); }
   }
   /** KALICI silme: R2'deki PDF + satır (notlar/açıklamalar zincirleme gider). */
   async function kaynakKaliciSil(k) {
     if (k.pdf_r2_yolu) await workerJson(`/pdf/${k.id}`, { method: "DELETE" });
     const { error } = await supabase.from("akademik_kaynaklar").delete().eq("id", k.id);
-    if (error) throw new Error(error.message);
+    if (error) { console.error(error); throw new Error("İşlem tamamlanamadı. Lütfen tekrar dene."); }
   }
 
   /* ---------- yinelenenleri bul + birleştir (Zotero "Yinelenen Eserler") ---------- */
@@ -1157,11 +1162,11 @@ function kutuphaneKur(kok, profil, owner) {
       const e1 = await supabase.from("akademik_kaynaklar").update({ pdf_r2_yolu: null, pdf_dosya_adi: null, pdf_boyut_bayt: null }).eq("id", dg.id); if (e1.error) throw new Error(e1.error.message);
       Object.assign(yama, { pdf_r2_yolu: dg.pdf_r2_yolu, pdf_dosya_adi: dg.pdf_dosya_adi, pdf_boyut_bayt: dg.pdf_boyut_bayt, pdf_rev: dg.pdf_rev });
     }
-    if (Object.keys(yama).length) { const { error } = await supabase.from("akademik_kaynaklar").update(yama).eq("id", asil.id); if (error) throw new Error(error.message); Object.assign(asil, yama); }
+    if (Object.keys(yama).length) { const { error } = await supabase.from("akademik_kaynaklar").update(yama).eq("id", asil.id); if (error) { console.error(error); throw new Error("İşlem tamamlanamadı. Lütfen tekrar dene."); } Object.assign(asil, yama); }
     const { data: og } = await supabase.from("akademik_koleksiyon_ogeleri").select("koleksiyon_id").eq("kaynak_id", dg.id).eq("user_id", profil.id);
     if (og?.length) await supabase.from("akademik_koleksiyon_ogeleri").upsert(og.map((o) => ({ koleksiyon_id: o.koleksiyon_id, kaynak_id: asil.id, user_id: profil.id })), { onConflict: "koleksiyon_id,kaynak_id", ignoreDuplicates: true });
     await supabase.from("akademik_notlar").update({ kaynak_id: asil.id }).eq("kaynak_id", dg.id).is("ek_id", null);
-    const { error } = d.copYok ? await supabase.from("akademik_kaynaklar").delete().eq("id", dg.id) : await supabase.from("akademik_kaynaklar").update({ silindi_tarihi: new Date().toISOString() }).eq("id", dg.id); if (error) throw new Error(error.message);
+    const { error } = d.copYok ? await supabase.from("akademik_kaynaklar").delete().eq("id", dg.id) : await supabase.from("akademik_kaynaklar").update({ silindi_tarihi: new Date().toISOString() }).eq("id", dg.id); if (error) { console.error(error); throw new Error("İşlem tamamlanamadı. Lütfen tekrar dene."); }
   }
 
   /* ---------- etiket yöneticisi ---------- */
@@ -1181,7 +1186,7 @@ function kutuphaneKur(kok, profil, owner) {
       try {
         for (const k of d.kayitlar.filter((x) => benim(x) && (x.etiketler || []).includes(eski))) {
           const dizi = [...new Set((k.etiketler || []).flatMap((t) => (t === eski ? (yeni ? [yeni] : []) : [t])))];
-          const { error } = await supabase.from("akademik_kaynaklar").update({ etiketler: dizi }).eq("id", k.id); if (error) throw new Error(error.message); k.etiketler = dizi;
+          const { error } = await supabase.from("akademik_kaynaklar").update({ etiketler: dizi }).eq("id", k.id); if (error) { console.error(error); throw new Error("İşlem tamamlanamadı. Lütfen tekrar dene."); } k.etiketler = dizi;
         }
         facetleriDoldur(); ciz(); dl.close(); etiketYoneticisi();
       } catch (h) { toast(`İşlem başarısız: ${h.message}`, "hata"); }
@@ -1348,7 +1353,7 @@ function kutuphaneKur(kok, profil, owner) {
     if (ks && ks !== d.kapsam) kapsamDegistir(ks);
     if (e.target.closest("[data-ak-dz]") && !e.target.closest("input, li")) q("[data-ak-pdf]").click();
   });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") menuKapat(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { menuKapat(); const f = q("[data-ak-filtre]"); if (f && !f.hidden) { f.hidden = true; q("[data-act=\"filtre-ac\"]")?.setAttribute("aria-expanded", "false"); } } });
   q("[data-uye-ara]").addEventListener("input", debounce(() => uyeGorunumu(), 120));
   const filtreDegisti = (e) => {
     const ad = e.target.dataset?.f;

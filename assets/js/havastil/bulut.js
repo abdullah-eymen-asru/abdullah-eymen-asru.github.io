@@ -139,5 +139,6 @@ export function bulutHataMetni(h) {
   if (/23505|duplicate key/i.test(m)) return "⚠️ Aynı isimde başka bir konumun var; ismi değiştir.";
   if (/Oturum yok|JWT|401/i.test(m)) return "⚠️ Oturum süresi dolmuş olabilir; yeniden giriş yap. Konum bu cihazda tutuldu.";
   if (/fetch|network|Failed|Load failed/i.test(m)) return "⚠️ Bağlantı yok: konum bu cihazda tutuldu, bağlanınca hesabınla eşitlenecek.";
-  return `⚠️ Hesapla eşitlenemedi (${h?.message || h}). Konum bu cihazda tutuldu.`;
+  console.error(h);
+  return "⚠️ Hesapla eşitlenemedi. Konum bu cihazda tutuldu.";
 }

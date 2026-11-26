@@ -27,7 +27,7 @@ function yagisCubugu(f) {
   return el("div", { class: "hv-olcer-kutu" },
     el("div", { class: "hv-olcer", role: "img", "aria-label": `Yağış seviyesi: ${f.seviyeAd}` }, ...hucreler),
     el("p", { class: "hv-olcer-yazi" }, el("strong", { text: f.seviyeAd }), f.aralik ? el("span", { text: ` · ${f.gun === "yarın" ? "yarın " : ""}${f.aralik}` }) : null),
-    f.kar?.var ? el("p", { class: "hv-ipucu", text: `❄️ ≈ ${f.kar.toplamCm} cm taze kar (SLR 1:10 → ${f.kar.slrAralik.islak} cm · 1:15 → ${f.kar.slrAralik.kuru} cm)${f.buzlanma.maxSeviye >= 2 ? ` · 🧊 gizli buzlanma: ${f.buzlanma.ad}` : ""}` }) : f.seviye > 0 ? el("p", { class: "hv-ipucu", text: f.benzetme }) : f.buzlanma?.maxSeviye >= 2 ? el("p", { class: "hv-ipucu", text: `🧊 Gizli buzlanma: ${f.buzlanma.ad} (yüzey ${f.buzlanma.enDusukYuzey}°C)` }) : null);
+    f.kar?.var ? el("p", { class: "hv-ipucu", text: `❄️ ≈ ${f.kar.toplamCm} cm taze kar (${f.kar.slrAralik.islak}–${f.kar.slrAralik.kuru} cm arası olabilir)${f.buzlanma.maxSeviye >= 2 ? ` · 🧊 gizli buzlanma: ${f.buzlanma.ad}` : ""}` }) : f.seviye > 0 ? el("p", { class: "hv-ipucu", text: f.benzetme }) : f.buzlanma?.maxSeviye >= 2 ? el("p", { class: "hv-ipucu", text: `🧊 Gizli buzlanma: ${f.buzlanma.ad} (yüzey ${f.buzlanma.enDusukYuzey}°C)` }) : null);
 }
 
 function sicaklikSatiri(d) {

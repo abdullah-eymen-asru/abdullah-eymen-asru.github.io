@@ -134,7 +134,7 @@ async function basla() {
       const kutular = {};
       ISLEMLER.forEach(([k, e]) => {
         const lbl = el("label", "ra-iz-kutu");
-        const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!deger[k]; kutular[k] = cb;
+        const cb = document.createElement("input"); cb.type = "checkbox"; cb.className = "ui-surgu"; cb.setAttribute("data-ui-sessiz", ""); cb.checked = !!deger[k]; kutular[k] = cb;
         cb.addEventListener("change", async () => {
           cb.disabled = true;
           await kaydet(tur, hedef, { oku: kutular.oku.checked, yukle: kutular.yukle.checked, sil: kutular.sil.checked });

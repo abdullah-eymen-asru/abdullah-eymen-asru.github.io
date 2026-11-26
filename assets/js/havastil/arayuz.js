@@ -346,7 +346,7 @@ export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAkti
     } catch (h) {
       console.warn("HavaStil eşitleme:", h);
       konumB.durumYaz(bulutHataMetni(h), "hata");
-      return /does not exist|42P01|PGRST|schema cache|column/i.test(h?.message || "") ? "Gerekli migration (0099–0104) henüz çalıştırılmamış." : `Senkron başlatılamadı: ${h.message || h}`;
+      return /does not exist|42P01|PGRST|schema cache|column/i.test(h?.message || "") ? "Hesap eşitleme şu an kullanılamıyor." : (console.error(h), "Eşitleme başlatılamadı. Lütfen tekrar dene.");
     } finally { esitlemede = false; }
   };
   /** Açılış: karar verilmişse uygula; ilk kez ise önceki rızayı kanıtla (bulutta kayıt var → bu cihazda da aç), yoksa tek dokunuşluk davet göster. */
@@ -378,7 +378,7 @@ export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAkti
     d.bulut = false; lsYaz(LS.bulut, false);
     d.konumlar = d.konumlar.map(({ bid, ...r }) => r); K.listeyiYaz(d.konumlar);
     if (window.confirm("Hesabında saklanan HavaStil konumları ve tercihleri de silinsin mi? (Bu cihazdakiler kalır.)")) {
-      try { await bulutTumunuSil(); lsYaz(LS.silKuyrugu, []); return "Bulut verisi silindi."; } catch (h) { return `Silinemedi: ${h.message || h}`; }
+      try { await bulutTumunuSil(); lsYaz(LS.silKuyrugu, []); return "Bulut verisi silindi."; } catch (h) { console.error(h); return "Silinemedi. Lütfen tekrar dene."; }
     }
     return "Senkron kapatıldı; bulut verisi hesabında duruyor.";
   };
@@ -395,7 +395,7 @@ export async function havastilKur(kok, { bagimsiz = false, vitrin = demoModuAkti
       d.planGecmis = { tarih, durum: "ok", ...g };
     } catch (h) {
       if (no !== d.gecmisNo) return;
-      d.planGecmis = { tarih, durum: "hata", hata: h?.message || String(h) };
+      console.error(h); d.planGecmis = { tarih, durum: "hata", hata: "Plan kaydedilemedi." };
     }
     ciz();
   };

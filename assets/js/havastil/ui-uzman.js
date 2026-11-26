@@ -161,7 +161,7 @@ function capeKarti(G, gunler, gi, d, kb) {
       el("div", { class: "hv-skala-seritler", role: "img", "aria-label": `CAPE ${f.capeMax} J/kg: ${f.capeSeviye.ad}` }, ...CAPE_BANTLARI.map((b) => el("span", { class: `hv-skala-bant ${b.sinif}${b.skor === f.capeSeviye.skor ? " aktif" : ""}` })), isaret),
       el("div", { class: "hv-skala-etiketler" }, ...CAPE_BANTLARI.map((b) => el("small", { text: b.alt === 0 ? "0" : b.alt >= 4000 ? "4000+" : String(b.alt) })))),
     el("h3", { class: "hv-alt-baslik", text: `${gunEtiketi(G.tarih, gi)} saat saat` }), grafik,
-    el("h3", { class: "hv-alt-baslik", text: "Önümüzdeki günler (günlük en yüksek CAPE)" }),
+    el("h3", { class: "hv-alt-baslik", text: "Önümüzdeki günler (günlük en yüksek fırtına enerjisi — CAPE)" }),
     el("div", { class: "hv-cape-gunler", role: "group", "aria-label": "Günlük en yüksek CAPE" }, ...gunCubuk),
     el("div", { class: "hv-cape-lejant" }, ...CAPE_BANTLARI.map((b) => el("div", { class: `hv-cape-lejant-satir ${b.sinif}` },
       el("span", { class: "hv-cape-lejant-nokta", "aria-hidden": "true" }), el("div", {}, el("strong", { text: `${b.alt}${Number.isFinite(b.ust) ? "–" + b.ust : "+"} J/kg · ${b.ad}` }), el("small", { text: `${b.aciklama} ${b.oneri}` }))))),

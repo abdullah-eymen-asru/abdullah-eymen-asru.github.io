@@ -1,0 +1,164 @@
+/* ortak-arayuz.css
+ * Tüm sayfalarda ortak: tasarım değişkenleri, sürgülü anahtar (.ui-surgu),
+ * açılır çekmece (.ui-cekmece), buton yükleniyor durumu ve "Uygulandı" geri bildirimi.
+ * Mevcut sınıfları (.ya-mini-toggle, .gy-toggle) BOZMAZ; yalnızca yeni sınıflar ekler.
+ */
+:root {
+  --ui-radius: 12px;
+  --ui-radius-kucuk: 8px;
+  --ui-bosluk: 0.75rem;
+  --ui-golge: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --ui-surgu-kapali: #c0392b;
+  --ui-surgu-acik: #1e6b3a;
+  --ui-gecis: 0.2s ease;
+}
+
+/* ---------- Sürgülü anahtar: <input type="checkbox" class="ui-surgu"> ----------
+ * Gerçek checkbox kalır (klavye: Boşluk, ekran okuyucu, mevcut change dinleyicileri çalışır);
+ * yalnızca görünümü sürgüye dönüşür. Kırmızı = kapalı, yeşil = açık (Yetki Ayarları ile aynı). */
+html input[type="checkbox"].ui-surgu {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  flex: none;
+  box-sizing: border-box;
+  width: 44px;
+  height: 26px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ui-surgu-kapali);
+  cursor: pointer;
+  vertical-align: middle;
+  transition: background-color var(--ui-gecis);
+}
+html input[type="checkbox"].ui-surgu::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: transform var(--ui-gecis);
+}
+html input[type="checkbox"].ui-surgu:checked { background: var(--ui-surgu-acik); }
+html input[type="checkbox"].ui-surgu:checked::before { transform: translateX(18px); }
+html input[type="checkbox"].ui-surgu:disabled { opacity: 0.45; cursor: default; }
+html input[type="checkbox"].ui-surgu:focus-visible { outline: 2px solid var(--accent, #2563eb); outline-offset: 2px; }
+@media (pointer: coarse) {
+  html input[type="checkbox"].ui-surgu { width: 50px; height: 30px; }
+  html input[type="checkbox"].ui-surgu::before { width: 24px; height: 24px; }
+  html input[type="checkbox"].ui-surgu:checked::before { transform: translateX(20px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  html input[type="checkbox"].ui-surgu,
+  html input[type="checkbox"].ui-surgu::before { transition: none; }
+}
+
+/* Sürgü + metin satırı */
+label.ui-surgu-satir {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-bosluk);
+  cursor: pointer;
+  min-height: 2.75rem;
+  flex-wrap: wrap;
+}
+label.ui-surgu-satir > span { min-width: 0; flex: 1 1 12rem; overflow-wrap: anywhere; }
+
+/* "Uygulandı" geri bildirimi */
+.ui-uygulandi {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--ui-surgu-acik);
+  animation: ui-uygulandi-gelis 0.18s ease-out;
+}
+@keyframes ui-uygulandi-gelis { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+
+/* ---------- Açılır çekmece: <details class="ui-cekmece"> ---------- */
+details.ui-cekmece {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  margin: var(--ui-bosluk) 0;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.3));
+  border-radius: var(--ui-radius);
+  background: var(--card-bg, transparent);
+}
+details.ui-cekmece > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-bosluk);
+  padding: 0.7rem 1rem;
+  min-height: 2.75rem;
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none;
+  border-radius: var(--ui-radius);
+}
+details.ui-cekmece > summary::-webkit-details-marker { display: none; }
+details.ui-cekmece > summary::after {
+  content: "";
+  flex: none;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform var(--ui-gecis);
+}
+details.ui-cekmece[open] > summary::after { transform: rotate(-135deg); }
+details.ui-cekmece > summary:focus-visible { outline: 2px solid var(--accent, #2563eb); outline-offset: 2px; }
+details.ui-cekmece > .ui-cekmece-icerik { padding: 0 1rem 1rem; overflow: hidden; }
+details.ui-cekmece > .ui-cekmece-icerik > :first-child { margin-top: 0; }
+@media (prefers-reduced-motion: reduce) {
+  details.ui-cekmece > summary::after { transition: none; }
+}
+
+/* ---------- Buton yükleniyor durumu ---------- */
+button.ui-yukleniyor,
+.ui-yukleniyor[role="button"] {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.75;
+}
+button.ui-yukleniyor::after {
+  content: "";
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  margin-left: 0.5em;
+  vertical-align: -0.1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: ui-don 0.7s linear infinite;
+}
+@keyframes ui-don { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { button.ui-yukleniyor::after { animation-duration: 2s; } }
+
+/* ---------- Durum / tekrar dene kutusu ---------- */
+.ui-durum {
+  box-sizing: border-box;
+  max-width: 100%;
+  margin: var(--ui-bosluk) 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.3));
+  border-radius: var(--ui-radius-kucuk);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+.ui-durum.hata { border-color: var(--ui-surgu-kapali); }
+.ui-durum button { margin-left: auto; }

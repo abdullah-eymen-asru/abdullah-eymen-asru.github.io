@@ -231,8 +231,40 @@ async function wkKapaliMi() {
   return wkDurum.kapali;
 }
 const WK_IZINLI_ORIGIN = /^(https:\/\/(abdullah-eymen-asru\.(github\.io|pages\.dev))|http:\/\/localhost(:\d+)?)$/;
+// GÜVENLİK: IP başına hız sınırı (en iyi çaba). Aynı IP'den dakikada WK_HIZ_LIMIT'ten
+// fazla istek gelirse 429 döner; bot ve kota tüketme saldırılarının ilk savunması.
+// Bellek içi tutulur (her Worker örneği için ayrı) — kalıcı/küresel sınır için
+// Cloudflare "Rate Limiting Rules" kuralını panelden ayrıca açman önerilir.
+const WK_HIZ_LIMIT = 120;
+const WK_HIZ_PENCERE_MS = 60000;
+const wkHizKayit = new Map();
+function wkHizAsildiMi(istek) {
+  if (istek.method === "OPTIONS") return false;
+  const ip = istek.headers.get("CF-Connecting-IP") || "bilinmiyor";
+  const simdi = Date.now();
+  if (wkHizKayit.size > 5000) {
+    for (const [k, v] of wkHizKayit) if (simdi - v.t > WK_HIZ_PENCERE_MS) wkHizKayit.delete(k);
+    if (wkHizKayit.size > 5000) wkHizKayit.clear();
+  }
+  const k = wkHizKayit.get(ip);
+  if (!k || simdi - k.t > WK_HIZ_PENCERE_MS) { wkHizKayit.set(ip, { t: simdi, n: 1 }); return false; }
+  k.n += 1;
+  return k.n > WK_HIZ_LIMIT;
+}
 export default {
   async fetch(istek, env, ctx) {
+    if (wkHizAsildiMi(istek)) {
+      const origin = istek.headers.get("Origin") || "";
+      return new Response(JSON.stringify({ error: "Çok fazla istek gönderdin. Bir dakika bekleyip tekrar dene." }), {
+        status: 429,
+        headers: {
+          "Content-Type": "application/json",
+          "Retry-After": "60",
+          "Cache-Control": "no-store",
+          ...(WK_IZINLI_ORIGIN.test(origin) ? { "Access-Control-Allow-Origin": origin, Vary: "Origin" } : {}),
+        },
+      });
+    }
     if (istek.method !== "OPTIONS" && (await wkKapaliMi())) {
       const origin = istek.headers.get("Origin") || "";
       return new Response(JSON.stringify({ error: "Bu servis geçici olarak kapatıldı.", kapali: true }), {

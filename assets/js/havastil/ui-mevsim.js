@@ -66,13 +66,13 @@ export function mevsimSekmesi(d, kb) {
         el("small", { class: "hv-ipucu", text: `Kaynak: Open-Meteo Climate API (${IKLIM_MODELLERI.join(", ")} ortalaması${d.iklim.onbellek ? " · önbellekten" : ""}).` }));
     } catch (h) {
       if (benim !== no) return;
-      sonuc.replaceChildren(el("p", { class: "hv-uyari", text: "İklim eğilimi şu an alınamadı (ağ ya da Open-Meteo Climate API). Biraz sonra tekrar dene." }), olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "↻ Tekrar dene" }), "click", () => { d.iklim = null; yukle(); }));
+      sonuc.replaceChildren(el("p", { class: "hv-uyari", text: "İklim eğilimi şu an alınamadı. Biraz sonra tekrar dene." }), olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "↻ Tekrar dene" }), "click", () => { d.iklim = null; yukle(); }));
       console.warn("HavaStil iklim:", h);
     }
   }
   yukle();
   return el("div", { class: "hv-sekme-govde" }, kart("hv-mevsim-kart", bolumBasligi("🌍 Mevsimlik eğilim (16 gün ötesi)"),
-    el("p", { class: "hv-uyari", text: "16 günün ötesi için saatlik/günlük hava tahmini verilemez (atmosfer kaotiktir; Open-Meteo deterministik sınırı 16 gündür). Burada yalnızca iklim modellerinin seçilen ay için gösterdiği GENEL eğilim var: normalden ne kadar sıcak/soğuk ve yağışlı/kurak." }),
+    el("p", { class: "hv-uyari", text: "16 günden ötesi için kesin tahmin yapılamaz. Burada yalnızca seçtiğin ay için genel eğilim var: normalden ne kadar sıcak/soğuk, yağışlı/kurak." }),
     el("div", { class: "hv-mevsim-secim" }, ayS, yilS), hizli, sonuc,
     rozet(`${d.konum.ad} · iklim ızgarası kabadır (≈ 25 km)`)));
 }

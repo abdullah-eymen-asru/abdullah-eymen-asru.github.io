@@ -340,6 +340,9 @@
        başına ayrı ayrı bağlamaya gerek kalmasın diye <head>'de "defer" ile
        tek seferde yükleniyor (defer: DOM ayrıştırması bitince, ama
        DOMContentLoaded'dan hemen önce çalışır). -->
+  <!-- Ortak arayüz: sürgülü anahtar, açılır çekmece, buton yükleniyor durumu, zaman aşımlı fetch yardımcısı. -->
+  <link rel="stylesheet" href="{{ '/assets/css/ortak-arayuz.css' | relative_url }}?v=1">
+  <script defer src="{{ '/assets/js/core/ortak-arayuz.js' | relative_url }}?v=1"></script>
   <link rel="stylesheet" href="{{ '/assets/css/sifre-goster.css' | relative_url }}?v=1">
   <script defer src="{{ '/assets/js/auth/sifre-goster.js' | relative_url }}"></script>
   <!-- Çerez onay şeridi/paneli mantığı — bkz. assets/js/core/site-islemleri.js başındaki tasarım notları. -->
@@ -827,7 +830,7 @@
 
       <div class="cerez-kategori">
         <div class="cerez-kategori-baslik">
-          <label><input type="checkbox" checked disabled aria-readonly="true"> Zorunlu</label>
+          <label class="ui-surgu-satir"><input type="checkbox" class="ui-surgu" checked disabled aria-readonly="true"> <span>Zorunlu</span></label>
           <span class="cerez-rozet">Her zaman açık</span>
         </div>
         <p class="muted">
@@ -841,7 +844,7 @@
       {% if site.google_analytics_id and site.google_analytics_id != "" %}
       <div class="cerez-kategori">
         <div class="cerez-kategori-baslik">
-          <label><input type="checkbox" id="cerez-analitik-kutu"> Analitik</label>
+          <label class="ui-surgu-satir"><input type="checkbox" class="ui-surgu" data-ui-sessiz id="cerez-analitik-kutu"> <span>Analitik</span></label>
         </div>
         <p class="muted">
           Google Analytics ile anonimleştirilmiş ziyaretçi istatistikleri
@@ -855,7 +858,7 @@
       {% if site.adsense_client_id and site.adsense_client_id != "" %}
       <div class="cerez-kategori">
         <div class="cerez-kategori-baslik">
-          <label><input type="checkbox" id="cerez-reklam-kutu"> Reklam</label>
+          <label class="ui-surgu-satir"><input type="checkbox" class="ui-surgu" data-ui-sessiz id="cerez-reklam-kutu"> <span>Reklam</span></label>
         </div>
         <p class="muted">
           Google AdSense ile reklam gösterilmesini ve reklamların ilgi
@@ -873,7 +876,7 @@
       {% if site.giscus.repo_id and site.giscus.repo_id != "GISCUS_REPO_ID_BURAYA" %}
       <div class="cerez-kategori">
         <div class="cerez-kategori-baslik">
-          <label><input type="checkbox" id="cerez-islevsel-kutu"> İşlevsel / Üçüncü Taraf</label>
+          <label class="ui-surgu-satir"><input type="checkbox" class="ui-surgu" data-ui-sessiz id="cerez-islevsel-kutu"> <span>İşlevsel / Üçüncü Taraf</span></label>
         </div>
         <p class="muted">
           Blog/proje sayfalarındaki Giscus (GitHub Discussions tabanlı)

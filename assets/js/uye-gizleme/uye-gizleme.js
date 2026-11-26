@@ -10,14 +10,14 @@ export async function anahtarlariEkle(liste, profil) {
   // Geçici körlük (üstte, bir kez)
   if (!korlukEklendi && !document.getElementById("uya-korluk")) {
     const { data: acik } = await supabase.rpc("owner_blind_mode", { p_ayarla: null });
-    const kutu = el("label", "uya-korluk"); kutu.id = "uya-korluk"; const c = el("input"); c.type = "checkbox"; c.checked = acik === true; c.setAttribute("role", "switch");
+    const kutu = el("label", "uya-korluk"); kutu.id = "uya-korluk"; const c = el("input"); c.type = "checkbox"; c.className = "ui-surgu"; c.setAttribute("data-ui-sessiz", ""); c.checked = acik === true; c.setAttribute("role", "switch");
     c.addEventListener("change", async () => { c.disabled = true; const r = await supabase.rpc("owner_blind_mode", { p_ayarla: c.checked }); c.disabled = false; if (r.error) { c.checked = !c.checked; window.alert(r.error.message); } else window.location.reload(); });
     kutu.append(c, el("span", null, " 🕶 Geçici körlük: açıkken sen de gizli üyeleri ve hareketlerini göremezsin; kapatınca hepsi anında geri gelir."));
     liste.parentElement.insertBefore(kutu, liste); korlukEklendi = true;
   }
   liste.querySelectorAll(".uya-kart[data-id]").forEach((kart) => {
     if (kart.querySelector(".uya-gizle")) return;
-    const id = kart.getAttribute("data-id"); const l = el("label", "uya-gizle"), c = el("input"); c.type = "checkbox"; c.setAttribute("role", "switch"); c.checked = gizliler.has(id);
+    const id = kart.getAttribute("data-id"); const l = el("label", "uya-gizle"), c = el("input"); c.type = "checkbox"; c.className = "ui-surgu"; c.setAttribute("data-ui-sessiz", ""); c.setAttribute("role", "switch"); c.checked = gizliler.has(id);
     c.addEventListener("change", async () => { c.disabled = true; const r = await supabase.rpc("owner_uye_gizle", { p_user_id: id, p_gizli: c.checked }); c.disabled = false;
       if (r.error) { c.checked = !c.checked; window.alert(r.error.message); } else { if (c.checked) gizliler.add(id); else gizliler.delete(id); kart.classList.toggle("uya-gizli", c.checked); } });
     l.append(c, el("span", null, " 🙈 Siteden gizle (yalnızca sen görürsün)")); kart.classList.toggle("uya-gizli", c.checked); kart.append(l);

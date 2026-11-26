@@ -393,7 +393,8 @@ async function alanlariDoldur(token, project, projectDbId, itemId, alanlar) {
       }
       sonuclar.push({ alan: alanAdi, basarili: true });
     } catch (err) {
-      sonuclar.push({ alan: alanAdi, basarili: false, hata: err.message });
+      console.error("Alan yazma hatası:", alanAdi, err);
+      sonuclar.push({ alan: alanAdi, basarili: false, hata: "İşlem tamamlanamadı." });
     }
   }
   return sonuclar;
@@ -542,7 +543,8 @@ const ASIL_ISLEYICI = {
       const userData = await userRes.json();
       userId = userData.id;
     } catch (err) {
-      return jsonYanit({ message: "Oturum doğrulanamadı: " + err.message }, 401, corsHeaders);
+      console.error("Oturum doğrulama hatası:", err);
+      return jsonYanit({ message: "Oturum doğrulanamadı. Lütfen yeniden giriş yapın." }, 401, corsHeaders);
     }
 
     // 2) ROL KONTROLÜ — SADECE 'owner'. Dosya başındaki mimari notuna bak:
@@ -688,7 +690,7 @@ const ASIL_ISLEYICI = {
         );
       } catch (err) {
         console.error("Worker hatası (/kayit-ekle):", err);
-        return jsonYanit({ message: "Kayıt eklenemedi: " + err.message }, 502, corsHeaders);
+        return jsonYanit({ message: "Kayıt eklenemedi. Lütfen tekrar deneyin." }, 502, corsHeaders);
       }
     }
 
@@ -723,7 +725,7 @@ const ASIL_ISLEYICI = {
         return jsonYanit({ count: items.length, items }, 200, corsHeaders);
       } catch (err) {
         console.error("Worker hatası (/liste):", err);
-        return jsonYanit({ message: "Liste alınamadı: " + err.message }, 502, corsHeaders);
+        return jsonYanit({ message: "Liste alınamadı. Lütfen tekrar deneyin." }, 502, corsHeaders);
       }
     }
 
@@ -806,7 +808,7 @@ const ASIL_ISLEYICI = {
         );
       } catch (err) {
         console.error("Worker hatası (/kayit-guncelle):", err);
-        return jsonYanit({ message: err.message }, 502, corsHeaders);
+        return jsonYanit({ message: "Kayıt güncellenemedi. Lütfen tekrar deneyin." }, 502, corsHeaders);
       }
     }
 
@@ -849,8 +851,40 @@ async function wkKapaliMi() {
   return wkDurum.kapali;
 }
 const WK_IZINLI_ORIGIN = /^(https:\/\/(abdullah-eymen-asru\.(github\.io|pages\.dev))|http:\/\/localhost(:\d+)?)$/;
+// GÜVENLİK: IP başına hız sınırı (en iyi çaba). Aynı IP'den dakikada WK_HIZ_LIMIT'ten
+// fazla istek gelirse 429 döner; bot ve kota tüketme saldırılarının ilk savunması.
+// Bellek içi tutulur (her Worker örneği için ayrı) — kalıcı/küresel sınır için
+// Cloudflare "Rate Limiting Rules" kuralını panelden ayrıca açman önerilir.
+const WK_HIZ_LIMIT = 120;
+const WK_HIZ_PENCERE_MS = 60000;
+const wkHizKayit = new Map();
+function wkHizAsildiMi(istek) {
+  if (istek.method === "OPTIONS") return false;
+  const ip = istek.headers.get("CF-Connecting-IP") || "bilinmiyor";
+  const simdi = Date.now();
+  if (wkHizKayit.size > 5000) {
+    for (const [k, v] of wkHizKayit) if (simdi - v.t > WK_HIZ_PENCERE_MS) wkHizKayit.delete(k);
+    if (wkHizKayit.size > 5000) wkHizKayit.clear();
+  }
+  const k = wkHizKayit.get(ip);
+  if (!k || simdi - k.t > WK_HIZ_PENCERE_MS) { wkHizKayit.set(ip, { t: simdi, n: 1 }); return false; }
+  k.n += 1;
+  return k.n > WK_HIZ_LIMIT;
+}
 export default {
   async fetch(istek, env, ctx) {
+    if (wkHizAsildiMi(istek)) {
+      const origin = istek.headers.get("Origin") || "";
+      return new Response(JSON.stringify({ error: "Çok fazla istek gönderdin. Bir dakika bekleyip tekrar dene." }), {
+        status: 429,
+        headers: {
+          "Content-Type": "application/json",
+          "Retry-After": "60",
+          "Cache-Control": "no-store",
+          ...(WK_IZINLI_ORIGIN.test(origin) ? { "Access-Control-Allow-Origin": origin, Vary: "Origin" } : {}),
+        },
+      });
+    }
     if (istek.method !== "OPTIONS" && (await wkKapaliMi())) {
       const origin = istek.headers.get("Origin") || "";
       return new Response(JSON.stringify({ error: "Bu servis geçici olarak kapatıldı.", kapali: true }), {

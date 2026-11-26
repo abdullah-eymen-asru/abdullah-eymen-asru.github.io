@@ -284,7 +284,7 @@ async function kur() {
     try {
       const { data: sahip } = await supabase.rpc("is_owner"); if (sahip !== true) return;
       const { data: a } = await supabase.rpc("r2_medya_ayar_oku"); let durum = a || { acik: true, gorsel_otomatik: true };
-      const onay = (etiket, ipucu, anahtarAdi) => { const l = el("label", "ym-onay"), c = el("input"); c.type = "checkbox"; c.checked = durum[anahtarAdi] !== false;
+      const onay = (etiket, ipucu, anahtarAdi) => { const l = el("label", "ym-onay"), c = el("input"); c.type = "checkbox"; c.className = "ui-surgu"; c.setAttribute("data-ui-sessiz", ""); c.checked = durum[anahtarAdi] !== false;
         c.addEventListener("change", async () => { c.disabled = true; const r = await supabase.rpc("r2_medya_ayar_yaz", { p_acik: anahtarAdi === "acik" ? c.checked : null, p_gorsel_otomatik: anahtarAdi === "gorsel_otomatik" ? c.checked : null });
           c.disabled = false; if (r.error) { c.checked = !c.checked; bildir(r.error.message, true); } else { durum = r.data; bildir("✔ Ayar kaydedildi (en geç 1 dakika içinde tüm ziyaretçilerde etkili olur)."); } });
         const t = el("span"); t.append(el("strong", null, etiket), el("small", "ym-soluk", ` — ${ipucu}`)); l.append(c, t); return l; };

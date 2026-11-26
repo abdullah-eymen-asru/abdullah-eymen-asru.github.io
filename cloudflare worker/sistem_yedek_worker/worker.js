@@ -927,7 +927,8 @@ export default {
       if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return json({ error: "Worker yapılandırması eksik (SUPABASE_URL, SUPABASE_ANON_KEY)." }, 500, cors);
       const k = istek.headers.get("Authorization") || "";
       if (!k.startsWith("Bearer ")) return json({ error: "Oturum gerekli." }, 401, cors);
-      try { return await uyeTemizle(env, k, istek, cors); } catch (hata) { return json({ error: "Beklenmeyen hata: " + (hata?.message || hata) }, 500, cors); }
+      try { return await uyeTemizle(env, k, istek, cors); } catch (hata) { console.error("Yedek worker hatası:", hata);
+      return json({ error: "Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin." }, 500, cors); }
     }
     if (istek.method === "POST" || istek.method === "PUT") {
       if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return json({ error: "Worker yapılandırması eksik (SUPABASE_URL, SUPABASE_ANON_KEY)." }, 500, cors);

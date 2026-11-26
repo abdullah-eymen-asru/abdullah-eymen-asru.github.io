@@ -322,7 +322,7 @@ export function baglantilarGorunumuKur({ kok, bildir, yonetici = false }) {
     const dur = el("p", "ra-meta"); dur.setAttribute("role", "status");
     const ciz2 = () => {
       satirlarKap.replaceChildren(...alanlar.map((a, i) => {
-        const s = el("div", "ra-satir-ici"); const ad = metinGirdi(a.ad, "Ad", 60), url = metinGirdi(a.url, "https://alan-adi.com", 200); const ak = el("input"); ak.type = "checkbox"; ak.checked = a.aktif !== false;
+        const s = el("div", "ra-satir-ici"); const ad = metinGirdi(a.ad, "Ad", 60), url = metinGirdi(a.url, "https://alan-adi.com", 200); const ak = el("input"); ak.type = "checkbox"; ak.className = "ui-surgu"; ak.setAttribute("data-ui-sessiz", ""); ak.checked = a.aktif !== false;
         ad.disabled = url.disabled = ak.disabled = !yonetici; ad.addEventListener("input", () => { a.ad = ad.value; }); url.addEventListener("input", () => { a.url = url.value.trim().replace(/\/+$/, ""); }); ak.addEventListener("change", () => { a.aktif = ak.checked; });
         const kal = btn("✕", "ra-ikon-btn", () => { alanlar.splice(i, 1); ciz2(); }, { "aria-label": "Alan adını kaldır" }); kal.disabled = !yonetici || alanlar.length < 2;
         const lab = el("label", "ra-meta"); lab.append(ak, document.createTextNode(" etkin")); s.append(ad, url, lab, kal); return s;
