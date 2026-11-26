@@ -288,6 +288,12 @@ export async function captchaTokenAl() {
         bekleniyorYazildi = true;
         durumYaz("Güvenlik doğrulaması yapılıyor…");
       }
+      // Kalıcı hata (otomatik denemeler tükendi, hata metni + "Yeniden dene" zaten gösteriliyor): 30 sn bekletme, hemen bırak.
+      if (w.hata && w.otoYeniden >= 2 && gecen > 1500) {
+        clearInterval(t);
+        coz(undefined);
+        return;
+      }
       if (gecen > (w.etkilesim ? 120000 : 30000)) {
         clearInterval(t);
         durumYaz("");

@@ -1791,3 +1791,5 @@ Bu dosya, bildirdiğin 5 sorun için yapılan değişikliklerin özetidir. Deği
 
 
 - 26.11.2026 (2): Davet 'açık' anahtarı gerçek sürgülü anahtar yapıldı; CSP'den gereksiz `data:` kaldırıldı; Turnstile 600xxx hata metni parmak izi koruması + Google ipucuyla güncellendi; rehberdeki hatalı `data:` açıklaması düzeltildi.
+
+- 26.11.2026 (3): **Davette rol seçimi.** Davet formunda "Hesap yetkisi" seçilir (Üye / Özel Üye / Editör / İçerik Sorumlusu; "Yönetici" yalnızca Site Sahibi'nde görünür). Kurallar: admin `admin` ve üstünü veremez, `owner`/`demo` davetle HİÇ verilmez. Üç katmanlı denetim: (1) panel seçeneği gizler, (2) Edge Function `admin-invite-user` (yeniden deploy gerekir) 403 döner, (3) `handle_new_user` (migration **0154**) `admin` rolünü yalnızca davet eden hâlâ Site Sahibi ise uygular, aksi hâlde `user` yapar. Davet listesinde rol rozeti görünür. **Yapılacaklar:** migration 0154'ü çalıştır + `supabase functions deploy admin-invite-user`. Turnstile: kalıcı hata olunca giriş/kayıt artık 30 sn beklemeden hata metnini + "Yeniden dene" düğmesini gösterir.

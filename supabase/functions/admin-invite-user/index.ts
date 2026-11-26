@@ -8,8 +8,8 @@
 // NEDEN EDGE FUNCTION? `auth.admin.inviteUserByEmail` service_role ister; anahtar tarayıcıya konamaz.
 // Bot koruması (Turnstile/captcha) admin API'sini etkilemez; yetki denetimi aşağıdaki rol kontrolüdür.
 //
-// GÜVENLİK: (1) çağıranın token'ı doğrulanır, (2) rol veritabanından okunur (admin/owner), (3) davet yalnızca
-// normal "user" rolüyle açılır — rol yükseltme mevcut RPC'lerle yapılır, (4) Site Sahibi ayarları (açık/kapalı, tarih penceresi, toplam/günlük sınır) + mutlak günlük tavan 500,
+// GÜVENLİK: (1) çağıranın token'ı doğrulanır, (2) rol veritabanından okunur (admin/owner), (3) davet rolü seçilebilir
+// (user/special_user/editor/manager; "admin" yalnızca Site Sahibi; "owner"/"demo" asla; migration 0154), (4) Site Sahibi ayarları (açık/kapalı, tarih penceresi, toplam/günlük sınır) + mutlak günlük tavan 500,
 // (5) redirect adresi istemciden alınmaz; yalnızca izinli Origin + sabit yol kullanılır.
 //
 // Deploy:  supabase functions deploy admin-invite-user
@@ -28,6 +28,8 @@ const ALLOWED_ORIGINS = [
   "http://localhost:4000",
 ];
 const MUTLAK_GUNLUK_TAVAN = 500; // "sınırsız" ayarında bile geçerli güvenlik tavanı (kişi başı / 24 saat)
+// Davetle verilebilecek roller. 'admin' yalnızca Site Sahibi tarafından verilebilir; 'owner'/'demo' davetle ASLA verilmez.
+const ROL_HERKES = ["user", "special_user", "editor", "manager"];
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 function corsHeaders(origin: string | null) {
@@ -52,16 +54,19 @@ Deno.serve(async (req) => {
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!token) return yanit({ error: "Oturum token'ı eksik." }, 401);
 
-  let eposta = "", ad = "", soyad = "";
+  let eposta = "", ad = "", soyad = "", rol = "user";
   try {
     const b = await req.json();
     eposta = typeof b?.eposta === "string" ? b.eposta.trim().toLowerCase() : "";
     ad = temizAd(b?.ad);
     soyad = temizAd(b?.soyad);
+    if (b?.rol !== undefined) rol = typeof b.rol === "string" ? b.rol : "";
   } catch {
     return yanit({ error: "Geçersiz istek gövdesi." }, 400);
   }
   if (!eposta || eposta.length > 254 || !EMAIL_REGEX.test(eposta)) return yanit({ error: "Geçerli bir e-posta gir." }, 400);
+
+  if (!ROL_HERKES.includes(rol) && rol !== "admin") return yanit({ error: "Geçersiz rol." }, 400);
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
 
@@ -72,6 +77,11 @@ Deno.serve(async (req) => {
   const { data: profil, error: pErr } = await admin.from("profiles").select("role").eq("id", callerId).single();
   if (pErr || (profil?.role !== "admin" && profil?.role !== "owner")) {
     return yanit({ error: "Yetkisiz işlem: yalnızca yönetici/Site Sahibi davet gönderebilir." }, 403);
+  }
+
+  // Rol yükseltme koruması: admin (owner DEĞİL) 'admin' veya üstünü veremez.
+  if (rol === "admin" && profil.role !== "owner") {
+    return yanit({ error: "Yönetici rolünü yalnızca Site Sahibi verebilir." }, 403);
   }
 
   // Site Sahibi ayarları (migration 0153): açık/kapalı, tarih penceresi, toplam ve günlük sınır. NULL = sınırsız.
@@ -104,10 +114,10 @@ Deno.serve(async (req) => {
   if (mevcut) return yanit({ error: "Bu e-posta ile zaten bir hesap var. Kullanıcı 'Şifremi unuttum' ile girebilir." }, 409);
 
   // Davet kaydı (kayıtlar kapalıyken handle_new_user bunu görüp hesap açılmasına izin verir)
-  const { error: dErr } = await admin.from("kullanici_davetleri").insert({ eposta, davet_eden: callerId });
+  const { error: dErr } = await admin.from("kullanici_davetleri").insert({ eposta, davet_eden: callerId, rol });
   if (dErr) {
     console.error("davet kaydı yazılamadı (migration 0152 çalıştı mı?):", dErr);
-    return yanit({ error: "Davet kaydı oluşturulamadı. Migration 0152'nin çalıştırıldığından emin ol." }, 500);
+    return yanit({ error: "Davet kaydı oluşturulamadı. Migration 0152 ve 0154'ün çalıştırıldığından emin ol." }, 500);
   }
 
   const veri: Record<string, string> = {};
@@ -129,5 +139,5 @@ Deno.serve(async (req) => {
       : "Davet gönderilemedi: " + m;
     return yanit({ error: hata }, 502);
   }
-  return yanit({ success: true, eposta });
+  return yanit({ success: true, eposta, rol });
 });

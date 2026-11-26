@@ -749,6 +749,17 @@ permalink: "/panel/dashboard.html"
               <label for="davet-soyad">Soyad (isteğe bağlı)</label>
               <input id="davet-soyad" type="text" autocomplete="off" maxlength="60">
             </div>
+            <div class="form-field">
+              <label for="davet-rol">Hesap yetkisi (davetli bu rolle açılır)</label>
+              <select id="davet-rol">
+                <option value="user" selected>Üye</option>
+                <option value="special_user">Özel Üye</option>
+                <option value="editor">Editör</option>
+                <option value="manager">İçerik Sorumlusu</option>
+                <option value="admin" hidden disabled>Yönetici (yalnızca Site Sahibi)</option>
+              </select>
+              <p class="muted">Yönetici ve üstü yetkiyi yalnızca Site Sahibi verebilir.</p>
+            </div>
             <button type="submit" class="btn-primary csp-w-auto">Daveti Gönder</button>
           </form>
           <div id="davet-message" class="auth-message" hidden></div>

@@ -710,7 +710,7 @@ function davetListesiniCiz() {
     strong.textContent = d.ad ? `${d.ad} · ${d.eposta}` : d.eposta;
     const rozet = document.createElement("span");
     rozet.className = "davet-durum-rozet";
-    rozet.textContent = durum;
+    rozet.textContent = `${durum} · ${ROL_ETIKETLERI[d.rol] || ROL_ETIKETLERI.user}`;
     const tarih = document.createElement("div");
     tarih.className = "muted";
     tarih.textContent = new Date(d.olusturma).toLocaleString("tr-TR");
@@ -808,6 +808,11 @@ function wireDavet() {
     }
   }, { once: true });
   document.getElementById("davet-arama")?.addEventListener("input", davetListesiniCiz);
+  // "Yönetici" seçeneği yalnızca Site Sahibi'ne açılır (gerçek denetim Edge Function + handle_new_user'dadır).
+  if (GIRIS_YAPAN_PROFIL?.role === "owner") {
+    const opt = document.querySelector('#davet-rol option[value="admin"]');
+    if (opt) { opt.hidden = false; opt.disabled = false; opt.textContent = "Yönetici"; }
+  }
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -824,6 +829,7 @@ function wireDavet() {
           eposta,
           ad: document.getElementById("davet-ad").value.trim(),
           soyad: document.getElementById("davet-soyad").value.trim(),
+          rol: document.getElementById("davet-rol")?.value || "user",
         }),
       });
       const body = await res.json().catch(() => ({}));
