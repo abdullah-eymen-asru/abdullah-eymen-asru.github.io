@@ -51,7 +51,7 @@ supabase/
 assets/
   js/supabase-client.js                    <- Ortak Supabase istemcisi (URL/KEY burada) + showSpamNotice() yardımcısı
   js/auth-guard.js                         <- Korumalı sayfa mantığı
-  js/auth/auth-pages.js                    <- Giriş/Kayıt/Şifre/Hesap Onayla sayfaları mantığı (25.11.2026'da kayıp dosya yeniden yazıldı)
+  js/auth/auth-pages.js                    <- Giriş/Kayıt/Şifre/Hesap Onayla sayfaları mantığı
   js/auth/turnstile.js                     <- Cloudflare Turnstile ↔ Supabase Auth Captcha köprüsü (görünmez token ekleme)
   js/panel.js                              <- /panel/panel.html mantığı (e-posta değiştirme dahil)
   js/admin.js                              <- /panel/admin.html mantığı
@@ -879,8 +879,7 @@ Kod, Supabase'e şu adresleri gönderir (`assets/js/auth/auth-pages.js`, `assets
 
 ---
 
-## Auth → Providers → Email Ayarları (24.11.2026)
-
+## Auth → Providers → Email Ayarları
 | Ayar | Değer | Neden |
 |---|---|---|
 | Enable email provider | AÇIK | Kayıt/giriş buna bağlı |
@@ -896,8 +895,7 @@ Kod, Supabase'e şu adresleri gönderir (`assets/js/auth/auth-pages.js`, `assets
 
 Şifre kuralı değişirse `assets/js/core/supabase-client.js` içindeki `SIFRE_KURALLARI` da güncellenmelidir. Formlarda kural kutusu `<div data-sifre-kural="<input id>">` ile eklenir; stil `auth.css` içindedir.
 
-## Bot Koruması — Cloudflare Turnstile (Giriş / Kayıt / Şifre Sıfırlama) (25.11.2026)
-
+## Bot Koruması — Cloudflare Turnstile (Giriş / Kayıt / Şifre Sıfırlama)
 Giriş, kayıt ve "şifremi unuttum" formları **Cloudflare Turnstile** ile bot/kaba kuvvet saldırılarına karşı korunur. Formda küçük bir Turnstile kutusu görünür ("Doğrulanıyor… → Başarılı!"); **Managed** modda kullanıcıdan tıklama istenmez, yalnızca şüpheli trafikte bir onay kutusu çıkar. (Giriş/kayıt/şifre sıfırlama dışındaki sayfalarda, ör. Notlar'ın parola sınaması, widget görünmez çalışır.)
 
 ### Nasıl çalışır? (mimari)
@@ -935,7 +933,7 @@ Supabase Auth ──(Captcha secret ile)──► Cloudflare siteverify ──�
 | "captcha verification process failed" / "Güvenlik doğrulaması tamamlanamadı…" | Supabase'te captcha AÇIK ama `_config.yml`'de `turnstile_sitekey` boş/yanlış, ya da Supabase'teki Secret başka widget'a ait | Site Key ve Secret **aynı widget'ın** çifti olmalı; `_config.yml`'i düzelt + deploy et |
 | Widget hiç yüklenmiyor, aynı hata | Reklam/içerik engelleyici `challenges.cloudflare.com`'u engelliyor, ya da CSP bu adresi engelliyor | Engelleyiciyi bu site için kapat. CSP'de `script-src https:` ve `frame-src https:` zaten izinli; sıkılaştırdıysan `https://challenges.cloudflare.com`'u iki yönergeye de ekle |
 | Konsolda `Blocked a frame with origin "https://challenges.cloudflare.com"…` ve `…/challenge-platform/…/pat/… 401` | Safari'de Turnstile'ın kendi iç iletişimi / Private Access Token denemesi | **Zararsızdır**, giriş/kayıt'ı etkilemez; yok sayabilirsin |
-| Konsolda `Refused to connect to data:` | CSP `connect-src`'ta `data:` yoktu | Mesaj Cloudflare'in KENDİ iframe'inden gelir (kendi CSP'si); site CSP'si ile ilgisi yok. 25.11'de eklenen `connect-src data:` 26.11'de GERİ ALINDI. Kaldırılamaz, işlevi etkilemez |
+| Konsolda `Refused to connect to data:`, `NaN`, `Object` | Cloudflare'in kendi iframe'inden gelir | Zararsızdır; site kodundan kaldırılamaz (bkz. "Turnstile — Tema, Mobil ve Konsol Mesajları") |
 | Cloudflare hata kodu `110200` (domain not allowed) | Siteyi açtığın adres widget'ın Hostname listesinde yok | Cloudflare → Turnstile → widget → Hostname Management'a o adresi ekle |
 | Bazı ziyaretçilerde kutu çıkıyor | Normaldir: Cloudflare o ziyaretçiyi şüpheli buldu | Bir işlem gerekmez, kutuyu onaylaması yeterli |
 | Admin "e-posta değiştir"den sonra bildirim maili gitmedi (`bildirim_maili_gonderildi: false`) | Edge Function'daki `resetPasswordForEmail` (sunucu tarafı) de captcha ister; token olmadığı için reddedilebilir | E-posta değişikliği yine tamamlanır (kod bu hatayı zaten yakalar). Bildirim maili gerekliyse kullanıcıya "Şifremi unuttum"dan kendisi gönderebilir; bu çağrıyı kendi test ettiğinde sonucu kontrol et |
@@ -949,14 +947,13 @@ Supabase Auth ──(Captcha secret ile)──► Cloudflare siteverify ──�
 
 ---
 
-## Kullanıcı Davet Etme (26.11.2026)
-
+## Kullanıcı Davet Etme
 Panel → **Üye Ayarları → ✉ Kullanıcı Davet Et**. Yönetici/Site Sahibi bir e-posta girer; Supabase davet maili gönderir. Kişi linke tıklar →
-`/hesap/sifre-guncelle.html` (başlık "Hesabını oluştur") → şifresini belirler → giriş yapınca KVKK/açık rıza modalı çıkar. Hesap "Üye" rolüyle açılır.
+`/hesap/sifre-guncelle.html` (başlık "Hesabını oluştur") → şifresini belirler → giriş yapınca KVKK/açık rıza modalı çıkar. Hesap, formda seçilen rolle açılır (varsayılan Üye).
 **Kayıtlar kapalıyken de çalışır** (davet tablosu sayesinde; istemci verisine güvenilmez).
 
 **Kurulum (bir kez):**
-1. SQL Editor'de sırayla `supabase/migrations/0152_kullanici_davetleri.sql` ve `0153_davet_ayarlari_ve_arama.sql` çalıştır.
+1. SQL Editor'de sırayla `supabase/migrations/` altındaki `0152_kullanici_davetleri.sql`, `0153_davet_ayarlari_ve_arama.sql`, `0154_davet_rol_secimi.sql` ve `0155_davet_demo_rolu.sql` dosyalarını çalıştır.
 2. Edge Function'ı deploy et: `supabase functions deploy admin-invite-user` (Dashboard → Edge Functions → *Deploy a new function* ile `index.ts` içeriğini yapıştırarak da olur; ad birebir `admin-invite-user` olmalı).
 3. **Fonksiyonun adresini ayrıca bir yere eklemen GEREKMEZ.** Adres Supabase'in standart kalıbıdır:
    `https://<PROJE-REF>.supabase.co/functions/v1/admin-invite-user`. Bu adres `assets/js/uye-ayarlari.js` içindeki `ADMIN_INVITE_FUNCTION_URL` sabitinde zaten yazılı
@@ -973,28 +970,19 @@ Panel → **Üye Ayarları → ✉ Kullanıcı Davet Et**. Yönetici/Site Sahibi
 - **Gelişmiş sınırlar:** başlangıç/bitiş tarihi (belirli tarihler arası), ya da "şimdiden itibaren N gün/hafta/ay" ile bitişi hesaplama; toplam davet sınırı; yönetici başına günlük sınır. **Boş bırakılan her alan = sınırsız** (varsayılan). Güvenlik için sınırsız günlük ayarda bile mutlak tavan: yönetici başına 24 saatte 500 davet.
 - Sınırlar sunucuda (Edge Function) ve veritabanında uygulanır; tarayıcıdan atlatılamaz.
 
-**Diğer sınırlar:** zaten hesabı olan e-postaya davet gitmez ("Şifremi unuttum" kullanır); davet edilen kişi linke hiç tıklamadıysa aynı e-postaya yeniden davet için önce Üye listesinden o bekleyen hesabı sil. Rol yükseltme mevcut rol araçlarıyla yapılır (davet her zaman "Üye" açar).
+**Diğer sınırlar:** zaten hesabı olan e-postaya davet gitmez ("Şifremi unuttum" kullanır); davet edilen kişi linke hiç tıklamadıysa aynı e-postaya yeniden davet için önce Üye listesinden o bekleyen hesabı sil. **Davet rolü:** Üye, Özel Üye, Editör, İçerik Sorumlusu, Demo seçilebilir; **Yönetici yalnızca Site Sahibi tarafından** verilebilir; Site Sahibi rolü davetle hiç verilmez. Bu kural arayüzde, Edge Function'da ve veritabanında ayrı ayrı uygulanır.
 
-## Güvenlik Taraması ve Düzeltmeler (26.11.2026)
+## Turnstile — Tema, Mobil ve Konsol Mesajları
 
-- CSP'ye `form-action 'self'` (meta + `_headers`) ve `frame-ancestors 'self'` (`_headers`) eklendi: form gönderimi başka alana yönlendirilemez, site iframe'e alınamaz.
-- Şifre/API anahtarı göster düğmesi artık 20 sn sonra, form gönderilince ve sekme gizlenince alanı otomatik tekrar gizler.
-- Taranan ve temiz bulunanlar: kodda gizli anahtar/PAT yok, açık yönlendirme (`donus`) yalnızca aynı kökene izin veriyor, `target=_blank` bağlantılarında `noopener` var, auth modüllerinde kullanıcı verisiyle `innerHTML` yok.
-- Bilinen kalan risk: `script-src` hâlâ `https:` kabul ediyor (tüm sayfalarda harici CDN'ler için). Daraltmak için kullanılan her CDN'i tek tek listeleyip test etmek gerekir; bu turda kırma riski nedeniyle dokunulmadı.
+- **Tema:** widget site temasını (açık/koyu) izler. Doğrulama bittikten sonra tema değişirse yeniden doğrulama istenmez; geçerli token korunur.
+- **Mobil/zayıf ağ:** `api.js` sayfa açılırken önceden indirilir; hata olursa 2 kez otomatik yeniden denenir, olmazsa hata koduyla "Yeniden dene" düğmesi çıkar. Kod `110200` = alan adı widget'ta yetkili değil; `600010`/`3000xx` = cihaz, ağ veya engelleyici sorunu.
+- **Konsol mesajları:** `NaN`, `{}`, `Object`, `console.trace`, `Refused to connect to data:`, `Blocked a frame…`, `/pat/` 401, preload, Permissions-Policy, çerez uyarıları gibi mesajlar `challenges.cloudflare.com` iframe'inin içinden gelir (Cloudflare'in kendi kodu ve kendi CSP'si). Site kodundan kaldırılamaz ve doğrulamayı bozmaz. `cloud.umami.is` hatası, tarayıcının analitik betiğini engellemesidir.
+- **Kod 600010 (Mullvad/Tor/Firefox "parmak izi koruması"):** tarayıcı canvas/WebGL okumasını ve üçüncü taraf çerezini engellediği için Cloudflare'in kontrolü tamamlanamaz. Çözüm: siteyi korumadan muaf tut, başka tarayıcı dene ya da **Google ile giriş** yap (captcha gerektirmez).
+- **pages.dev ile github.io farklı görünüyorsa:** biri eski sürümde kalmıştır; ikisine de aynı dosyaları deploy et ve Turnstile widget Hostname listesinde ikisini de tut.
 
-## Turnstile — Tema, Mobil ve Konsol Mesajları (26.11.2026)
-
-- **Tema:** widget site temasını (açık/koyu) izler. Doğrulama HENÜZ bitmemişken tema değişirse yeni temayla yeniden çizilir; doğrulama BİTTİKTEN sonra tema değişirse **yeniden doğrulama yapılmaz** (geçerli token korunur, widget CSS ile yeni temaya uyarlanır; güvenlik etkisi yoktur çünkü token zaten tek kullanımlıktır ve Supabase'te doğrulanır). Token kullanılınca bir sonraki doğrulama güncel temayla gelir.
-- **Mobil:** Cloudflare'e erken bağlanılır, giriş/kayıt/şifre sayfalarında `api.js` sayfa açılırken indirilir; hata olursa 2 kez otomatik yeniden denenir, olmazsa **hata koduyla** "Yeniden dene" düğmesi çıkar (kod 110200 = alan adı widget'ta yetkili değil; 600010/3000xx = cihaz/ağ/engelleyici sorunu).
-- **Konsolda `NaN` / `{}` / `Object` / `console.trace` / "Refused to connect to data:" / `/pat/` 401 / preload / Permissions-Policy / `window.styleMedia` / `patchWorkers.js` / çerez uyarıları**: hepsi `challenges.cloudflare.com` iframe'inin içinden gelir (Cloudflare'in kendi kodu ve kendi CSP'si); site kodundan kaldırılamaz ve doğrulamayı bozmaz. (Önceki sürümde bunun site CSP'sindeki `data:` eksikliğinden olduğu yazılmıştı; bu YANLIŞTI, `data:` geri alındı.) `cloud.umami.is` hatası ise Mullvad/engelleyicinin analitik betiğini engellemesidir.
-- **Kod 600010 (Mullvad/Tor/Firefox Resist Fingerprinting):** tarayıcı canvas/WebGL okumasını ve üçüncü taraf çerezi engellediği için Cloudflare'in tarayıcı kontrolü tamamlanamaz. Bu Cloudflare + parmak izi koruması sınırlamasıdır. Çözüm: siteyi korumadan muaf tutmak, başka tarayıcı veya **Google ile giriş** (Supabase'de captcha gerektirmez). Hata kutusunda artık bu yönlendirme ve her zaman "Yeniden dene" düğmesi çıkar.
-- **pages.dev ile github.io farklı görünüyor:** iki site ayrı deploy edilir; biri eski sürümde kalmıştır. İkisine de AYNI dosyaları yükle ve Turnstile widget Hostname listesinde ikisi de olsun.
-- **"Blocked a frame with origin challenges.cloudflare.com…" (Safari):** Cloudflare'in kendi iframe'inden gelen, işlevi etkilemeyen bir uyarıdır; site kodundan kaldırılamaz.
-
-## İzlediklerim/Okuduklarım — "Something went wrong" (GraphQL) (26.11.2026)
-
-Güncelleme tüm panoyu (50'lik sayfalar × alan değerleri) çekip GitHub'da zaman aşımına düşüyordu. Worker artık tek issue'nun item'ını hafif sorguyla buluyor ve geçici GitHub hatalarında 3 kez yeniden deniyor.
-**`cloudflare worker/izleme_okuma_yonetim_worker/worker.js` dosyasını Cloudflare'e yeniden deploy etmen gerekir** (`wrangler deploy` veya paneldeki Quick edit).
+## İzlediklerim/Okuduklarım — "Something went wrong" (GraphQL)
+Worker, tek issue'nun proje öğesini hafif sorguyla bulur ve geçici GitHub hatalarında 3 kez yeniden dener.
+Worker kodunu (`cloudflare worker/izleme_okuma_yonetim_worker/worker.js`) değiştirirsen Cloudflare'e yeniden deploy et (`wrangler deploy` veya paneldeki Quick edit).
 
 ## Güvenlik Özeti — Neden Güvenli?
 
@@ -1044,754 +1032,28 @@ istemedim.
 
 ---
 
-## 📝 Değişiklik Geçmişi (Changelog)
-
-Bu bölüm, siteye/Supabase kullanıcı sistemine sonradan yapılan düzeltmelerin tarih sırasıyla özetidir — hangi sorun bildirildi, kök nedeni neydi, nasıl çözüldü ve (varsa) senin elle yapman gereken adım neydi. Eskiden kökte ayrı `DEGISIKLIKLER_*.md` dosyaları halinde duruyordu, artık tek doğruluk kaynağı burası — en yeni turu en üstte bulursun.
-
-### 🗓️ 26.11.2026 — Turnstile tema/mobil, şifre göster, GraphQL hatası, kullanıcı daveti
-
-Turnstile temayı izliyor + mobil yeniden deneme/hata kodu; sonradan oluşturulan tüm şifre/API anahtarı alanlarında göz düğmesi (Notlar, Mesajlar, Havastil, Transkript…); izleme/okuma güncelleme hatası düzeltildi (Worker yeniden deploy); yönetici daveti (migration 0152/0153 + `admin-invite-user`; davet ayarları, arama, kaydırmalı liste; doğrulama bittikten sonra tema değişince yeniden doğrulama yok); gizlilik politikası/KVKK/çerez panelinde Turnstile bilgilendirmesi (KVKK sürüm numarası DEĞİŞMEDİ, yeniden onay istenmez); CSP `form-action`.
-
-### 🗓️ 25.11.2026 (2) — ACİL DÜZELTME: giriş/kayıt/Google butonları çalışmıyordu
-- **Sorun:** Canlı sitede `assets/js/auth/auth-pages.js` **404** idi (dosya repoda yoktu). Giriş, kayıt, Google, şifre sıfırlama ve hesap onayla sayfalarının TÜM JavaScript'i bu dosyadadır; bu yüzden hiçbir buton çalışmıyordu. (Tek eksik dosya buydu: tüm `import`/`<script>` bağlantıları tarandı.)
-- **Çözüm:** `auth-pages.js` migration'lardaki (handle_new_user meta verisi, `kvkk_onayini_ver`, `yedek_kod_ile_2fa_kaldir`, `KAYITLAR_KAPALI`), `supabase-client.js`, `kesinti.js` (çevrimdışı giriş), `auth-guard.js` (AAL2) sözleşmelerine göre **yeniden yazıldı**: e-posta+şifre giriş, Google giriş/kayıt (rıza OAuth'tan ÖNCE denetlenir; rızasız oluşan boş hesap silinir), 2FA + yedek kod, çevrimdışı giriş kasası, kayıt (KVKK/yurt dışı rıza meta verisi), şifremi unuttum, kodla hesap onayı, şifre güncelleme. Kayıp dosyanın eski bir yedeği (ör. başka bilgisayar/yerel klasör) varsa karşılaştırıp eksik bir özellik görürsen haber ver.
-- **Turnstile:** sayfadaki widget artık görünür (tıklamasız). CSP'ye `connect-src data:` eklendi (Turnstile iç çağrısı engelleniyordu). 2FA adımı için `giris.md`'ye `#mfa-adimi` bloğu eklendi.
-
-### 🗓️ 25.11.2026 — Giriş/Kayıt ekranları sadeleştirildi + Cloudflare Turnstile
-- **Sorun:** Giriş sayfasında kayıt/şifre/onay/demo bağlantıları ve uzun açıklamalar yan yana olduğu için ne yapılacağı belli değildi; butonlar birbirinden ayırt edilemiyordu.
-- **Çözüm:** Tek kart + üstte **Giriş Yap / Kayıt Ol** sekmesi, tek belirgin ana buton, Google ve demo ikincil/sessiz, "Şifremi unuttum" şifre alanının yanında, nadir bağlantılar (kodla onayla) altta küçük. Uzun "çevrimdışı giriş" açıklaması "Bu ne demek?" ile açılır. Kayıt'ta KVKK onayı formun içinde, gönder butonunun hemen üstünde. Tüm formlar mobilde tek sütun; stiller yalnızca `.auth-kart` kapsamındadır (panel/admin görünümü değişmedi).
-- **Bot koruması:** Cloudflare Turnstile eklendi (bkz. yukarıdaki "Bot Koruması" bölümü). **Senin yapman gerekenler:** Cloudflare'de widget oluştur → Site Key'i `_config.yml`'e yaz → deploy → Supabase'te Captcha secret'ı gir. Anahtar boşsa site eskisi gibi çalışır.
-- Form `id`'leri korundu (`auth-pages.js` bunlara bağlıdır).
-
-### 🗓️ 24.11.2026 — Supabase Advisor düzeltmeleri, Notlarım düzeni
-- Migration `0151`: RLS "açık reddet" politikaları, `FOR ALL` politikalarının bölünmesi, `(select auth.uid())`, yabancı anahtar indeksleri, sabit `search_path`, bucket listeleme daraltma, `btree_gist` taşıma, tetikleyici ve yönetim RPC'lerinde `anon` yetkisi kaldırma.
-- Redirect URL'ler için öneri listesi (yukarıdaki bölüm).
-- Notlarım: Klasör/Tür/Durum kullanıcıya özel liste, katlanır "Not bilgileri", mobilde yapışkan çubuk ofseti.
-
-### 🗓️ 20.09.2026 — "GitHub yerine Supabase'te depola" anahtarı, arama motoru indekslemesi ve yazar taklidi açığı
-
-**İstek:** İçerik ekleme formunda (blog + akademik proje), "Yayında" kapalıyken içerik gizli olarak Supabase'e gitsin; altında "GitHub yerine Supabase'te depola" anahtarı olsun — açıksa içerik GitHub'a hiç commit edilmesin ama sitede görünsün ve arama motorlarınca indekslensin.
-
-**Bulunan durum:** Akış (migration 0015, eski 🅲️ butonu) zaten vardı; eksik olanlar şunlardı:
-1. Üç ayrı buton (🅰️/🅱️/🅲️) vardı, anahtar yoktu.
-2. **İndeksleme fiilen çalışmıyordu:** `supabase-yazi.html` tek bir şablon olduğu için her yazı için canonical/`<title>`/description AYNI (içeriksiz kabuk sayfa) üretiliyordu ve yazılar sitemap'te yoktu.
-3. **Yazar taklidi açığı:** Worker, bir admin'in başka bir admin/owner adına yayın yapmasını sadece GitHub'a giden yazmalarda (Seçenek A/B) engelliyordu; Supabase-only yayın Worker'a uğramadan doğrudan tabloya yazdığı için bu kural orada YOKTU (`taslak_admin_onay_koru` sadece "adına yayınla" bayraklı satırları koruyor).
-4. Aynı (tur, slug) ile birden çok yayında satır olursa `sadece_supabase_yazi_getir()` `limit 1` ile rastgele birini döndürürdü.
-
-**Çözüm:**
-- **Panel** (`panel/github-yonetim.md`, `github-yonetim.js`): "Yayında"nın altına "GitHub yerine Supabase'te depola" anahtarı. Açıksa ana buton "Sadece Supabase'te Yayınla" olur (eski Seçenek C akışı, GitHub'a commit yok); 🅱️ gizlenir; ayrı 🅲️ butonu kalktı. Mevcut bir `sadece_supabase` kaydı düzenlenirken anahtar açık gelir. İstemci tarafı "başkası adına yazma" kontrolü C yolunu da kapsıyor. Slug çakışması anlaşılır bir mesajla gösteriliyor.
-- **SEO** (`supabase-yazi.js`): içerik yüklenince yazıya özel canonical (ana site adresi, `?tur=&slug=`), `<title>`, description, Open Graph/Twitter, Scholar `citation_*` ve JSON-LD yazılır; kayıt yoksa `noindex` (geçici RPC hatasında değil).
-- **Sitemap:** `supabase/functions/sitemap-supabase` (herkese açık, `verify_jwt=false`) + `robots.txt`'te ikinci `Sitemap:` satırı.
-- **Feed:** `supabase/functions/feed-supabase` tam metinli Atom feed'i üretir; `_config.yml` `supabase_feed_url` doluysa `<head>`'de otomatik keşifle ilan edilir (statik `feed.xml`/`rss.xml` bu içerikleri bilemez).
-- **Migration 0055:** `taslak_yazar_taklit_koru` tetikleyicisi (owner olmayan biri, "adına yayınla" akışına girmeden owner/admin adına yayında satır oluşturamaz), `uq_taslak_icerikler_sadece_supabase_slug` benzersiz indeksi (çakışan veri varsa oluşturmaz ve NOTICE verir), hafif `sadece_supabase_sitemap_listele()` ve `sadece_supabase_feed_listele(p_limit)` RPC'leri.
-
-**Senin yapman gerekenler (SIRAYLA):**
-1. `supabase/migrations/0055_supabase_yayin_guvenlik_ve_seo_rpc.sql` dosyasını SQL Editor'e yapıştırıp **Run** et (NOTICE çakışan slug listeliyorsa onları düzeltip bloğu tekrar çalıştır).
-2. `supabase functions deploy sitemap-supabase` ve `supabase functions deploy feed-supabase`.
-3. Siteyi her zamanki gibi yayınla (push).
-4. Search Console'da ikinci sitemap adresini (`robots.txt`'teki) gönder.
-
-**Bilinen sınırlar:** Sayfa hâlâ tarayıcıda oluşturuluyor (Google JavaScript'i çalıştırır ama statik sayfa kadar hızlı/kesin indekslemez; Supabase Edge Function'ları HTML döndüremediği için sunucu tarafı render bu mimaride mümkün değil). Bir `sadece_supabase` yazıyı sonradan GitHub'a taşırsan eski `?tur=&slug=` adresi "bulunamadı" (noindex) olur — arama motorlarında eski adres zamanla düşer.
-
----
-
-### 🗓️ 29.08.2026 (2. Tur) — AdSense hazırlığı: Otomatik Reklamlar + yazı-içi manuel blok + yazı bazında aç/kapat
-
-İstek: siteyi herhangi bir AdSense reklamı ekleyebilmeye hazırlamak;
-"Otomatik Reklamlar" (Google yerleşimi kendi seçer) VE manuel reklam
-blokları BİRLİKTE; KVKK/GDPR çerez onayına (mevcut Zorunlu/Analitik/
-İşlevsel sistemine) YENİ bir "Reklam" kategorisi olarak bağlı, onaysız hiç
-yüklenmesin; GitHub yönetim panelinden YAZI BAZINDA açık/kapalı
-seçilebilsin.
-
-**Nasıl çalışıyor — GA ile AYNI "varsayılan kapalı" deseni:** `_config.yml`'e
-`adsense_client_id` (boşsa TÜM reklam sistemi devre dışı) ve
-`adsense_slot_icerik_alt` (manuel yazı-içi reklam biriminin slot ID'si,
-boşsa sadece Otomatik Reklamlar çalışır) eklendi. `_layouts/default.html`
-sayfa açılışında OTOMATİK hiçbir şey yüklemez, sadece bir
-`window.__cerezReklamYukle` fonksiyonu tanımlar; bu fonksiyon SADECE
-ziyaretçi "Reklam" kategorisini onayladığında (ya da daha önce onaylamışsa
-sayfa açılışında) `assets/js/core/site-islemleri.js` tarafından çağrılır —
-tıpkı Google Analytics'in zaten çalıştığı yöntemle.
-
-**Yeni "Reklam" çerez kategorisi:** `site-islemleri.js`'teki tercih modeli
-(analitik, işlevsel) üçüncü bir alana (`reklam`) genişletildi;
-`CEREZ_SURUM` "1"den "2"ye çıkarıldı — bu YENİ bir izin istendiği için,
-v1'de onay vermiş ziyaretçilere de şerit yeniden gösterilip reklam dahil
-net bir tercih soruluyor. Çerez paneline (bkz. `_layouts/default.html`)
-Analytics'in hemen altına aynı görünümde bir "Reklam" kategorisi eklendi
-(sadece `adsense_client_id` doluysa görünür). Giscus'un kendi "yorumları
-etkinleştir" kısayolu (`_includes/comments.html`) artık ziyaretçinin
-reklam tercihini de bozmadan koruyor.
-
-**Sayfa uygunluğu:** `/panel/`, `/hesap/`, `/onizleme/` sayfalarında reklam
-script'i hiçbir zaman tanımlanmaz bile (giriş/admin/önizleme sayfalarında
-reklam olmamalı). Bir yazı/projenin front-matter'ında `reklam: false` varsa
-o SAYFANIN kendisinde de (Otomatik Reklamlar dahil) hiç yüklenmez.
-
-**Yazı bazında aç/kapat (panel):** `panel/github-yonetim.md`'ye "Yayında"
-anahtarının hemen altına aynı görünümde bir "Reklam" anahtarı eklendi.
-GitHub'a commit edilen içerikler için tercih doğrudan front-matter'da
-(`reklam: false`, sadece kapalıyken yazılır) tutulur. Taslak
-(`taslak_icerikler`) aşamasında ya da "Sadece Supabase'te Yayınla" ile
-GitHub'a hiç commit edilmeden kalan içerikler için de aynı tercih artık
-korunuyor (bkz. migration 0033) — taslak düzenlenirken, GitHub'a
-yayınlanırken (`taslagiYayinla`) ve GitHub'dan taslağa geri alınırken
-(`gitDenTaslagaTasi`) kaybolmuyor.
-
-**Manuel yazı-içi blok:** yeni `_includes/reklam-yazi-alt.html`,
-`_layouts/post.html` ve `_layouts/project.html`'de yorumlardan hemen önce
-ekleniyor (sadece `adsense_slot_icerik_alt` doluysa ve o yazının/projenin
-`reklam` alanı `false` değilse).
-
-**"Sadece Supabase'te Yayınla" içerikleri (`icerik/supabase-yazi.html`):**
-bu şablon TEK olduğu için (hangi içerik gösterileceği ancak çalışma
-zamanında bir RPC ile belli oluyor) front-matter tabanlı Liquid kontrolü
-mümkün değil — `icerik/supabase-yazi.md` sayfa açılışındaki OTOMATİK
-tetiklemeyi `window.__reklamOtomatikYuklemeKapali` ile bilerek engelliyor,
-`assets/js/github-yonetim/supabase-yazi.js` kaydı çektikten SONRA
-`reklam !== false` ise reklam bloğunu kendisi ekleyip
-`window.__cerezReklamYukle()`'yi çağırıyor. Ayrıca `reklamUygula()`'ya bir
-`otomatikMi` parametresi eklendi: bu erteleme SADECE sayfa açılışında
-daha önce kaydedilmiş bir tercihin otomatik "replay"inde uygulanır; ziyaretçi
-sayfadayken AKTİF olarak "Kabul Et"e tıklarsa (insan tepki süresi içinde
-kayıt RPC'si zaten tamamlanmış olacağından) hemen uygulanır — aksi hâlde
-tıklamadan sonra reklamın hiç görünmemesi gibi ayrı bir hataya yol açardı.
-
-#### Değişen dosyalar
-- `_config.yml`
-- `assets/js/core/site-islemleri.js`
-- `_layouts/default.html`
-- `_layouts/post.html`, `_layouts/project.html`
-- `_includes/comments.html`
-- `icerik/supabase-yazi.md`
-- `assets/js/github-yonetim/supabase-yazi.js`
-- `panel/github-yonetim.md`
-- `assets/js/github-yonetim/github-yonetim.js`
-
-#### Eklenen dosyalar
-- `_includes/reklam-yazi-alt.html`
-- `supabase/migrations/0033_reklam_icerik_bazinda_ac_kapat.sql` ⚠️ **YENİ — Supabase SQL Editor'de çalıştırman gerekiyor.**
-
-#### Uygulama adımları
-1. **Supabase Dashboard > SQL Editor**'de `0033_reklam_icerik_bazinda_ac_kapat.sql`'i çalıştır.
-2. AdSense hesabın onaylandığında `_config.yml`'deki `adsense_client_id`'yi (ve istersen `adsense_slot_icerik_alt`'ı) doldurup siteyi yayınla — boş bıraktığın sürece reklam sisteminin TAMAMI (çerez kategorisi dahil) görünmez kalır.
-3. Test: `adsense_client_id`'yi geçici bir değerle doldurup bir yazıda "Reklam" anahtarını kapat, o yazıda reklam script'inin (Ağ sekmesinde `adsbygoogle.js` isteği) hiç atılmadığını, başka bir yazıda ise (çerez onayı verildikten sonra) atıldığını doğrula.
-
----
-
-### 🗓️ 29.08.2026 — GÜVENLİK TARAMASI: 3 gerçek açık bulundu ve düzeltildi
-
-Genel bir güvenlik taraması istendi. Üçü de gerçek, istismar edilebilir açıktı (teorik değil):
-
-**1) KRİTİK — admin, owner hesabını tamamen ele geçirebiliyordu (ve başka bir
-admin'i de aynı yoldan ele geçirebiliyordu).**
-`supabase/functions/admin-change-email/index.ts` hedefin KİM olduğuna hiç
-bakmıyordu — sıradan bir admin, "Kullanıcılar & Roller" sayfasındaki
-(herkese açık, hiç gizlenmeyen) "E-posta Değiştir" butonuyla owner'ın
-e-postasını kendi kontrolündeki bir adrese çevirip (`email_confirm:true`
-ile ANINDA uygulanıyor, hiçbir onay beklenmiyor) ardından o adrese giden
-şifre sıfırlama linkiyle owner hesabını tamamen ele geçirebilirdi. Sorulan
-takip sorusu üzerine ("admin sadece kendi altındaki üyeleri mi
-değiştirebiliyor?") AYNI açığın owner'a ek olarak BAŞKA bir admin için de
-geçerli olduğu fark edildi. Düzeltme: fonksiyon artık hedef admin VEYA
-owner ise VE çağıran owner DEĞİLSE (kendi hesabı hariç) reddediyor —
-`admin_set_user_role()`'daki (migration 0024) "bir admin başka bir admin'in
-rolünü doğrudan değiştiremez" emsaliyle AYNI kural; panelde de buton artık
-admin'in VE owner'ın kartında (kendi satırın hariç) admin'den gizleniyor
-(`assets/js/uye-ayarlari.js`).
-
-**2) YÜKSEK — askıya alınan admin, veritabanı seviyesinde HÂLÂ tam
-yetkiliydi.** migration 0021, is_admin()'i "askıya alınca HER YERDE anında
-yetkisiz kalınır" garantisiyle tanımlamıştı ama bu YANLIŞTI: `is_editor_or_
-admin()`, `is_manager_or_admin()`, `has_content_access()`,
-`is_admin_or_owner_gorebilir()` ve `admin_force_signout_user()`
-fonksiyonlarının HİÇBİRİ `is_suspended`'a bakmıyordu. Yani askıya alınmış
-bir admin, panelin kendisini kullanamasa da, Supabase API'sine (RLS
-politikaları bu fonksiyonları kullanıyor) doğrudan istek atarak içerik
-yazma/silme, özel içerik erişimi, Admin Güvenliği listelerini görme ve
-başka kullanıcıları zorla çıkışa zorlama yetkilerini korumaya devam
-ediyordu. Düzeltme: bu beş fonksiyona da is_admin()'deki AYNI
-`coalesce(is_suspended,false)=false` kontrolü eklendi (bkz. migration 0032).
-
-**3) ORTA — Cloudflare Worker'lar da askıya almayı görmezden geliyordu.**
-`github_icerik_yonetim_worker.js` (GitHub içerik yönetimi) ve
-`r2_storage_worker.js` (özel dosya indirme) kendi rol kontrollerini
-Supabase RLS'den BAĞIMSIZ, doğrudan service_role ile yapıyor ve
-is_suspended'ı hiç sormuyordu — yukarıdaki (2) numaralı düzeltme bile bu
-ikisini kapsamıyordu. İkisine de is_suspended kontrolü eklendi.
-
-#### Değişen dosyalar
-- `supabase/functions/admin-change-email/index.ts`
-- `assets/js/uye-ayarlari.js`
-- `cloudflare worker/github_icerik_yonetim_worker/worker.js`
-- `cloudflare worker/r2_storage_worker/worker.js`
-- `rehber/02-supabase-sistemi.md` (bu changelog girdisi)
-
-#### Eklenen dosyalar
-- `supabase/migrations/0032_askiya_alinan_admin_tum_yerlerde_yetkisiz.sql` ⚠️ **YENİ — Supabase SQL Editor'de çalıştırman gerekiyor.**
-
-#### Uygulama adımları
-1. **Supabase Dashboard > SQL Editor**'de `0032_askiya_alinan_admin_tum_yerlerde_yetkisiz.sql`'i çalıştır.
-2. **Cloudflare Dashboard**'da `github_icerik_yonetim_worker` ve `r2_storage_worker`'ın kodunu bu güncel haliyle yeniden deploy et (Worker'lar ayrı deploy edilir, GitHub Pages/statik site yayınıyla otomatik güncellenmez).
-3. Geri kalan dosyalar (Edge Function, panel JS) her zamanki gibi yayınla — `admin-change-email` bir Supabase Edge Function olduğu için `supabase functions deploy admin-change-email` ile (ya da Dashboard'dan) ayrıca deploy edilmesi gerekir.
-
----
-
-### 🗓️ 28.08.2026 (2. Tur) — BUG FİX: `requireAuth({role:'owner'})` fiilen admin'i de içeri alıyordu
-
-Bir önceki tur eklenen "Üyelik Kayıtları" bölümünü ".sadece-owner" ile
-admin'den gizlerken fark edildi: `auth-guard.js` içindeki `roleOk`
-hesabında "admin her zaman geçer" kuralı KOŞULSUZDU — yani
-`requireAuth({role:'owner'})` isteyen bir sayfa (ör.
-`panel/izleme-okuma-yonetim.md`, o dosyanın kendi yorumunda "sadece owner,
-admin dahi giremez" dediği halde) aslında admin'i de içeri alıyordu.
-Sadece client-side bir kontrol olduğu için (gerçek kısıt zaten veritabanı/
-RPC tarafında owner'a kilitliydi) bu bir güvenlik açığı değildi, ama
-sayfanın kendi belgelediği davranışla çelişiyordu. Artık "admin her zaman
-geçer" kuralı SADECE istenen rol tam olarak `'owner'` (ya da `['owner']`)
-olduğunda devre dışı — diğer tüm `requireAuth({role:...})` çağrılarının
-davranışı (admin'in editor/manager/special_user/admin sayfalarına girmesi)
-değişmedi.
-
-#### Değişen dosyalar
-- `assets/js/auth/auth-guard.js`
-
----
-
-### 🗓️ 28.08.2026 — Üyelik kayıtlarını açma/kapatma yetkisi (sadece Site Sahibi)
-
-İstek: "Sadece site sahibinin yetkisinde olacak bir yetki: siteye üye
-alımlarını kapatıp açabilme. Kapalıyken veri tabanına yeni kayıt düşmesin
-— Google ile veya normal şekilde kayıt olurken engellenip bir uyarı ekranı
-çıksın. Sadece daha önceden zaten üye olanlar girebilsin."
-
-**Nasıl çalışıyor:** `site_settings` tablosuna bir `kayitlar_acik` (boolean,
-varsayılan `true`) kolonu eklendi. Asıl/bağlayıcı kilit veritabanı
-tarafında: `handle_new_user()` trigger'ı (auth.users'a her yeni satır
-eklendiğinde — e-posta/şifre kaydında da, hiç kayıtlı olmayan bir Google
-hesabıyla ilk kez gelindiğinde de tetiklenir) artık en başta bu bayrağa
-bakıyor; kapalıysa exception fırlatıp TÜM işlemi (auth.users'a yazılan
-satır dahil) geri alıyor — yani kapalıyken hiçbir yoldan yeni bir hesap
-satırı oluşmuyor. Bu trigger sadece **yeni** satırlarda çalıştığı için
-daha önceden (kayıtlar açıkken) zaten oluşmuş hesapların girişi hiç
-etkilenmiyor.
-
-`hesap/kayit.html` artık sayfa açılır açılmaz bu bayrağı okuyup
-(anonim ziyaretçiye de açık bir select politikasıyla) kapalıysa formu ve
-"Google ile Kayıt Ol" butonunu hiç göstermiyor, yerine bir uyarı ekranı
-gösteriyor — bu sadece kullanıcı deneyimi katmanı, asıl kilit yukarıdaki
-trigger'da. `hesap/giris.html` tarafında da, hiç kayıtlı olmayan bir Google
-hesabıyla "Giriş Yap"a tıklanıp trigger tarafından reddedilen özel durum
-ayrıca ele alınıp "bu Google hesabıyla kayıtlı kullanıcı bulunamadı ve
-üyelik kayıtları şu anda kapalı" gibi anlaşılır bir mesaja çevriliyor.
-
-**Yetki sadece Site Sahibi'nde:** `site_settings` tablosunun genel UPDATE
-politikası admin+owner'a (`is_admin()`) açık olduğu için (Hakkımda metni
-gibi diğer alanlar admin tarafından da düzenlenebilsin diye), RLS tek
-başına "bu KOLONU sadece owner değiştirebilsin" ayrımını yapamıyor —
-`prevent_role_self_escalation` (migration 0001) ile AYNI desende, sadece
-`kayitlar_acik` kolonu değiştiğinde `is_owner()` kontrolü yapan ayrı bir
-trigger eklendi. Panel de doğrudan `update` yerine, sadece owner'ın
-çağırabildiği `owner_kayitlari_ac_kapat(acik)` RPC'sini kullanıyor.
-Kontrol paneldeki **Admin Güvenliği** sayfasına, mevcut ".sadece-owner"
-deseniyle (owner-dışı adminlerden tamamen gizlenen) yeni bir "👥 Üyelik
-Kayıtları" bölümü olarak eklendi.
-
-#### Değişen dosyalar
-- `assets/js/core/supabase-client.js` (`kayitlarAcikMi()` yardımcı fonksiyonu + `KAYITLAR_KAPALI_ISARETI` sabiti eklendi)
-- `assets/js/auth/auth-pages.js` (`initKayitPage` kayıtlar kapalıyken formu gizliyor; `initGirisPage`'deki Google dönüşü hata dalı bu durumu ayırt ediyor)
-- `hesap/kayit.md` (form + Google butonu `#kayit-aktif-alan` içine alındı, `#kayit-kapali-uyari` uyarı kutusu eklendi)
-- `panel/admin-guvenlik.md` (owner-only "👥 Üyelik Kayıtları" bölümü)
-- `assets/js/admin-guvenlik.js` (durumu okuma + aç/kapat butonlarının bağlanması)
-- `rehber/02-supabase-sistemi.md` (bu changelog girdisi)
-
-#### Eklenen dosyalar
-- `supabase/migrations/0031_uyelik_kayitlarini_ac_kapat.sql` ⚠️ **YENİ — Supabase SQL Editor'de çalıştırman gerekiyor (0001-0030'dan sonra).**
-
-#### Uygulama adımları (senin yapman gerekenler)
-1. **Supabase Dashboard > SQL Editor**'de `0031_uyelik_kayitlarini_ac_kapat.sql`'i çalıştır.
-2. Geri kalan dosyalar statik (JS/Markdown) olduğu için siteyi her zamanki gibi yayınlaman yeterli.
-3. Test etmek için: owner hesabınla `/panel/admin-guvenlik.html`'e git, "👥 Üyelik Kayıtları" bölümünden "Kayıtları Kapat"a bas; sonra `/hesap/kayit.html`'i (mümkünse gizli sekmede) aç — formun yerine uyarı ekranını görmelisin. "Kayıtları Aç" ile geri aç.
-
----
-
-### 🗓️ 17.08.2026 (4. Tur) — Admin artık Site Sahibi'nde değişiklik yapamaz, silme yetkisi sadece owner'da
-
-İstek: "Yönetici olanlar kendisinin üstü olan site sahibinde değişiklik
-yapamasın, silemesin veritabanında. Sadece e posta kurtarma seçeneği
-kalsın. Hatta site sahibi dışında kimse herhangi bir üyeyi silemesin."
-
-**§ A — Admin, Site Sahibi'nin profilini değiştiremez:** `profiles`
-tablosunun UPDATE RLS politikası şimdiye kadar `auth.uid() = id or
-is_admin()` idi — `is_admin()` hem `admin` hem `owner` rolünü kapsadığı
-için (migration 0021), herhangi bir admin owner'ın satırını (ör. Ad/Soyad)
-doğrudan güncelleyebiliyordu. Artık bir admin (owner DEĞİL) sadece
-`role <> 'owner'` olan satırları güncelleyebiliyor; owner'ın kendi
-satırına sadece kendisi (ya da başka bir owner) yazabilir. **Bilinçli
-istisna:** `admin-change-email` Edge Function'ı service_role ile çalıştığı
-için bu RLS'ten etkilenmiyor — kilitli kalmış (eski e-postasına erişimi
-olmayan) Site Sahibi dahil herkes için "e-posta kurtarma" admin
-panelinden hâlâ yapılabiliyor, istendiği gibi TEK istisna olarak
-bırakıldı.
-
-**§ B — Başka birini silme yetkisi sadece owner'da:** Eskiden hem
-`admin` hem `owner` rolündeki herkes `delete-account` Edge Function'ı
-üzerinden başka bir kullanıcıyı (hatta owner'ı bile) silebiliyordu. Artık
-**SADECE owner** kendisi dışında birini silebilir; sıradan bir admin artık
-hiç kimseyi (kendisi hariç) silemez. Herkesin **kendi** hesabını silme
-hakkı (kişisel bir hak) dokunulmadan duruyor.
-
-#### Değişen dosyalar
-- `supabase/functions/delete-account/index.ts` (başkasını silme yetkisi `admin`+`owner`'dan sadece `owner`'a daraltıldı)
-- `assets/js/uye-ayarlari.js` (Site Sahibi'nin kartındaki Ad/Soyad kutuları owner-dışı adminler için salt-okunur; "Sil" butonu artık sadece owner'a gösteriliyor)
-- `rehber/02-supabase-sistemi.md` (bu changelog girdisi)
-
-#### Eklenen dosyalar
-- `supabase/migrations/0027_admin_site_sahibini_degistiremez_sadece_owner_siler.sql` ⚠️ **YENİ — Supabase SQL Editor'de çalıştırman gerekiyor (0001-0026'dan sonra).**
-
-#### Uygulama adımları (senin yapman gerekenler)
-1. **Supabase Dashboard > SQL Editor**'de `0027_admin_site_sahibini_degistiremez_sadece_owner_siler.sql`'i çalıştır.
-2. `delete-account` fonksiyonunu yeniden deploy et:
-   ```
-   supabase functions deploy delete-account
-   ```
-3. Geri kalan dosyalar statik (JS) olduğu için siteyi her zamanki gibi yayınlaman yeterli.
-
----
-
-### 🗓️ 17.08.2026 (3. Tur) — "Admin adına" onayı sadece hedef admine (+ Site Sahibi'ne) daraltıldı
-
-İstek: "İçerik editörü bir admin adına yazı yazacaksa sadece o admin onay
-verebilsin (Site Sahibi de onay verebilsin). Aynı şekilde bir admin başka
-bir admin için yazı yazabilsin ama sadece o admin kabul/red edebilsin (Site
-Sahibi de kabul/red edebilsin)."
-
-**Önceki davranış (migration 0016/0023):** "Admin adına yayınla" onayı
-`public.is_admin()` true dönen **HERHANGİ** bir admin/owner tarafından
-verilebiliyordu — yani X admin'i adına yazılan bir taslağı Y admin'i de
-onaylayabiliyordu, hatta onay olmadan bile herhangi bir admin içeriği
-doğrudan yayına alabiliyordu (fiili yayın engeli sadece "çağıran admin mi"
-diye bakıyordu, "hedef admin mi" diye bakmıyordu).
-
-**Yeni davranış:** Bir "admin adına yayınla" talebini artık **SADECE**
-içeriğin adına yazıldığı o admin'in kendisi (`yazar_id === giriş yapan`)
-YA DA Site Sahibi (owner) onaylayabilir/reddedebilir/doğrudan yayınlayabilir.
-Hedef olmayan başka bir admin taslağı görebilir ama "Onayla"/"Reddet"
-butonlarını göremez; RPC'yi doğrudan çağırırsa ya da UPDATE ile bypass
-etmeye çalışırsa veritabanı tetikleyicisi isteği reddeder/durumu
-`beklemede`ye zorlar. "Site Sahibi adına" (`sahip_adina_talep`) akışına
-dokunulmadı — o hâlâ owner'ın tek başına kararı ya da adminlerin mutlak
-çoğunluk oyuyla sonuçlanıyor (ayrı, kasıtlı bir tasarım).
-
-#### Değişen dosyalar
-- `assets/js/github-yonetim/github-yonetim.js` ("Onayla"/"Reddet" butonları ve yayınlama kilidi artık sadece hedef admin/owner'a gösteriliyor/çalışıyor; `adminTaslakOnayla` istemci tarafı koruması ve rozet/tooltip metinleri güncellendi)
-- `rehber/02-supabase-sistemi.md` (bu changelog girdisi)
-
-#### Eklenen dosyalar
-- `supabase/migrations/0026_admin_adina_onay_sadece_hedef_admin.sql` ⚠️ **YENİ — Supabase SQL Editor'de çalıştırman gerekiyor (0001-0025'ten sonra).**
-
----
-
-### 🗓️ 17.08.2026 (2. Tur) — Admin yetki devri kısıtlaması, denetim vakası silme ve hedef e-postası
-
-Üç ayrı istek/bildirimi kapsayan tur:
-
-1. **Adminler artık kimseyi "admin" yapamaz, sadece Site Sahibi (owner)
-   yapabilir** — `admin_set_user_role()` şimdiye kadar herhangi bir admin'in
-   başka bir üyeyi doğrudan `admin` yapmasına (ve zaten admin olan birinin
-   rolünü doğrudan değiştirmesine) izin veriyordu; bu, migration 0021'in
-   TÜM "karşılıklı denetim" (askıya alma + oylama/owner kararı) mimarisini
-   by-pass eden bir arka kapıydı. Artık bir admin'i **düşürmenin de tek
-   yolu** Admin Güvenliği sayfasındaki askıya alma + oylama/owner kararı
-   akışı — owner her iki kısıttan da muaf.
-2. **Denetim vakaları artık tek tek silinebiliyor — sadece owner.** Yeni
-   `denetim_vakasi_sil()` RPC'si (owner-only) tek bir vakayı (ve oylarını)
-   siler; açık ("askıda") vakalar silinemez. Audit log satırları
-   silinmiyor (denetim_id null'a düşer), silme işleminin kendisi de ayrıca
-   loglanıyor. Vaka listesi artık sayfalanıyor (10'ar) — çok vakalı
-   kurulumlarda sayfa taşmasın diye.
-3. **Denetim vakalarında hedef adminin e-postası da görünüyor** — isminin
-   yanında, "kim düşürüldü/askıya alındı" netleşsin diye
-   (`denetim_vakalarini_listele()` artık `hedef_email` de döndürüyor).
-
-(Not: "yetkisi düşen kişi anında normal üye olur, girebilir ama yetkisiz
-olur" davranışı zaten migration 0021'de vardı — `_admin_denetim_sonuclandir()`
-kalıcı düşürmede role'ü `'user'`e çekiyor, force-signout yapmıyor. 1.
-maddedeki kısıtlama sayesinde artık bu davranış bir admin'i düşürmenin TEK
-yolu olduğu için her durumda garanti ediliyor.)
-
-#### Değişen dosyalar
-- `assets/js/uye-ayarlari.js` (rol seçim kutusu: owner değilseniz "Yönetici" seçeneği yok ve zaten admin olan bir kart tamamen kilitli + açıklama notu; RPC hatası artık mesajıyla birlikte gösteriliyor ve seçim eski değerine dönüyor)
-- `assets/css/uye-ayarlari.css` (yeni `.uya-rol-notu` stili + admin-guvenlik.md'nin `.uya-kart` listeleri için boşluk düzeltmesi)
-- `assets/js/admin-guvenlik.js` (vaka listesi sayfalandı; her vaka kartında hedef e-postası + sadece owner'a görünen "🗑️ Vakayı Sil" butonu eklendi)
-- `panel/admin-guvenlik.md` (`uye_ayarlari_css: true` eklendi + sayfalama alanı + açıklama metni)
-- `rehber/02-supabase-sistemi.md` (bu changelog girdisi)
-
-#### Eklenen dosyalar
-- `supabase/migrations/0024_admin_yetki_devri_kisitlama_ve_vaka_silme.sql` ⚠️ **YENİ — Supabase SQL Editor'de çalıştırman gerekiyor (0001-0023'ten sonra).**
-
----
-
-### 🗓️ 17.08.2026 — Site Sahibi adına yayın onayı, owner rol yönetimi bug'ı ve özel içerik erişim hiyerarşisi
-
-Üç ayrı istek/bildirimi kapsayan tur:
-
-1. İçerik Sorumlusu (manager) ve Editör artık admin adına olduğu gibi
-   **Site Sahibi (owner) adına** da içerik yazıp onaya gönderebiliyor.
-   Admin adına taleplerde değişen bir şey yok (herhangi bir admin/owner
-   onayı yeterli). Site Sahibi adına taleplerde ise YA site sahibinin tek
-   başına onayı YA DA **adminlerin mutlak çoğunluğunun** (toplam admin
-   sayısının floor(n/2)+1'i) onay oyu yeterli.
-2. **BUG DÜZELTMESİ:** Site Sahibi, üye ayarlarında rol değiştirirken hata
-   alıyordu (ve kimseyi admin bile yapamıyordu). Kök neden:
-   `prevent_role_self_escalation()` tetikleyicisi (migration 0001) rolü
-   değiştirenin `profiles.role`'ünün TAM OLARAK `'admin'` string'ine eşit
-   olup olmadığına bakıyordu — migration 0021 `'owner'` rolünü eklerken bu
-   tetikleyiciyi güncellemeyi unutmuştu (migration 0022'nin "eksik yerler"
-   taraması da bunu atlamış). Ayrıca: owner artık kendi yetkisini
-   düşürebiliyor (uyarı penceresiyle) ve başka birini owner yapabiliyor
-   (RPC zaten migration 0021'de vardı, arayüzü bu turda eklendi).
-3. Özel içerik (`special_content`) ve R2 storage dosyaları artık SADECE
-   admin/owner/manager için değil, **role='user' (sıradan Üye) HARİÇ
-   HERKES** (special_user, editor, manager, admin, owner) için otomatik
-   görünür/indirilebilir — istenen hiyerarşi: Site Sahibi > Yönetici >
-   İçerik Sorumlusu > Editör > Özel Üye > Üye.
-
-#### Değişen dosyalar
-- `assets/js/uye-ayarlari.js` (giriş yapan profil artık saklanıyor; owner'a "👑 Site Sahibi Yap" ve kendi kartında "⚠️ Kendi Yetkimi Düşür" butonları eklendi)
-- `assets/js/github-yonetim/github-yonetim.js` ("Admin adına yayınla" hedef listesi owner'ları da kapsıyor; kaydetme akışına `sahip_adina_talep` desteği eklendi; Site Sahibi onay rozeti + owner'ın tek başına onay/red butonları + adminlerin oy ver/red ver butonları + canlı oy sayacı eklendi)
-- `panel/github-yonetim.md` ("Admin adına yayınla" etiketi "Admin/Site Sahibi adına yayınla" oldu)
-- `cloudflare worker/r2_storage_worker/worker.js` (blanket erişim kontrolü `role !== 'admin/manager/owner'` yerine `role !== 'user'` oldu — Supabase RLS'deki `has_content_access()` ile senkron)
-- `rehber/02-supabase-sistemi.md` (bu changelog girdisi)
-
-#### Eklenen dosyalar
-- `supabase/migrations/0023_rol_hiyerarsisi_onay_akislari_ve_erisim_duzeltmeleri.sql` ⚠️ **YENİ — Supabase SQL Editor'de çalıştırman gerekiyor.**
-
-#### Ne değişti, neden
-
-**§ B (owner rol değişikliği bug'ı) — en kritik olan bu.** `prevent_role_self_escalation()`
-artık literal `'admin'` karşılaştırması yerine `public.is_admin()` kullanıyor
-(admin VEYA owner VEYA askıda değil). Bu TEK satırlık değişiklik hem "hata
-alıyorum" hem "kimseyi admin yapamıyorum" şikayetlerinin ikisini de
-çözüyor — ikisi de aynı kök nedenden kaynaklanıyordu.
-
-**§ A (Site Sahibi adına yayın).** `taslak_icerikler` tablosuna
-`sahip_adina_talep` / `sahip_onay_durumu` / `sahip_onaylayan_id` /
-`sahip_onay_tarihi` kolonları eklendi (mevcut `admin_*` kolonlarının
-birebir eşi, ama AYRI — bir satır aynı anda hem admin hem owner adına
-OLAMAZ, `taslak_tek_talep_turu` kısıtı bunu zorluyor). Adminlerin oyları
-yeni `sahip_onay_oylari` tablosunda tutuluyor (aynı `admin_denetim_oylari`
-deseni). Çoğunluk hesaplaması TOPLAM admin sayısı üzerinden yapılıyor
-(sadece oy kullananlar üzerinden değil) — bu yüzden "mutlak çoğunluk".
-Panelde: owner için tek başına "✅ Onayla (Site Sahibi)" / "❌ Reddet (Site
-Sahibi)" butonları, sıradan adminler için "👍 Onay Ver" / "👎 Red Ver"
-(çoğunluğa ulaşılınca sunucu otomatik sonuçlandırıyor) butonları ve canlı
-"(X onay / Y red — gerekli: Z)" sayacı var.
-
-**§ C (owner kendi kendini düşürme + başkasını owner yapma).**
-`admin_set_user_role()` bilhassa `role='owner'` olan satırları reddediyor
-(bir admin'in owner'ı düşürebilmesini engellemek için) — bu owner'ın
-KENDİSİNİN de bu yoldan kendini düşürememesi anlamına geliyordu. Yeni
-`owner_kendi_rolunu_dusur(p_yeni_rol)` RPC'si (SADECE `auth.uid()`
-üzerinde çalışır) + `uye-ayarlari.js`'teki iki aşamalı `confirm()`/`prompt()`
-uyarı penceresi bunu çözüyor. `owner_rolu_ver()` RPC'si zaten migration
-0021'de vardı ama hiçbir arayüz onu çağırmıyordu — "👑 Site Sahibi Yap"
-butonu bu turda eklendi.
-
-**§ D (özel içerik erişim hiyerarşisi).** `has_content_access()` artık
-`role <> 'user'` olan HERKESE blanket (content_access ataması aranmadan)
-erişim veriyor. Bu fonksiyon hem `special_content` RLS politikasında hem
-`'ozel-dosyalar'` storage bucket politikasında zaten kullanıldığı için TEK
-bir değişiklik hem içerik sayfasını hem Supabase Storage indirmeyi otomatik
-kapsıyor. R2 Worker'ın (Cloudflare, Supabase RLS'den BAĞIMSIZ) kendi rol
-kontrolü ayrı bir kod tabanında olduğu için orası ayrıca (aynı mantıkla)
-güncellendi — ikisi senkron değilse dosya panelde görünüp indirme linkinde
-403 dönebilir ya da tam tersi olabilir, bu yüzden ikisi HER ZAMAN birlikte
-güncellenmeli.
-
-### 🗓️ 15.08.2026 — "Yayında değil" içerik artık GitHub'a değil, Supabase'e gidiyor
-
-İstediğin değişiklik: blog/akademik proje taslakları "Yayında" kapalıyken
-artık GitHub'a HİÇ commit edilmiyor, sadece Supabase'de duruyor (özel
-linki bilen görebilir); "Yayınla" deyince Supabase'den GitHub'a taşınıp
-Supabase'den siliniyor; "Yayından Kaldır" deyince tam tersi oluyor.
-
-#### Değişen dosyalar
-- `assets/js/github-yonetim/github-yonetim.js` (kaydetme/yayınlama/yayından kaldırma/silme/düzenleme akışlarının tamamı Supabase'i de kapsayacak şekilde yeniden yazıldı)
-- `panel/github-yonetim.md` (dosya kendisi değişmedi, önceki turdaki "📁 Klasörler" sekmesiyle uyumlu çalışacak şekilde JS'teki değişiklikler test edildi)
-- `rehber/01-site-rehberi.md` (Bölüm 9'a güncelleme notu, Bölüm 10'a "Supabase Taslak Sistemi" alt başlığı eklendi)
-
-#### Eklenen dosyalar
-- `supabase/migrations/0013_taslak_icerikler_supabase_taslak_sistemi.sql` ⚠️ **YENİ — Supabase SQL Editor'de çalıştırman gerekiyor.**
-- `onizleme/index.md` — yeni Jekyll sayfası, `/onizleme/` adresinde (gizli ön izleme linklerinin gerçekte açıldığı yer)
-- `assets/js/github-yonetim/onizleme.js` — `/onizleme/` sayfasının mantığı, Supabase'teki `taslak_onizleme_getir` RPC'sini çağırır
-
-#### Ne değişti, neden
-
-**Eski davranış:** "Yayında" kapatıldığında panel yine `_posts/`/`_projects/`
-altına bir dosya commit ediyordu — `yayinda: false` + tahmin edilemez bir
-`permalink` ile. Dosya GitHub deposunun (public bir repo) git geçmişinde
-gerçekten duruyordu; "gizli" olması tamamen adresin paylaşılmamasına
-dayanıyordu. İstediğin değişiklik tam olarak bunu ortadan kaldırmak.
-
-**Yeni davranış:** `taslak_icerikler` adında yeni bir Supabase tablosu
-(migration 0013) eklendi. RLS ile SADECE admin rolündeki hesaplar
-okuyup/yazabiliyor. Anonim bir ziyaretçinin (ön izleme linkine sahip
-olsa bile) tabloyu LİSTELEYEMEMESİ için ayrı bir `taslak_onizleme_getir(p_tur,
-p_kod)` RPC'si eklendi — bu fonksiyon `SECURITY DEFINER` olduğu için
-RLS'i by-pass eder ama SADECE tur+kod tam eşleşen TEK satırı, SADECE
-görüntüleme için gereken alanlarla döndürür.
-
-Yeni ön izleme linki formatı: `/onizleme/?tur=blog&kod=XXXXXXXX` (eskisi:
-`/blog/on-izleme-XXXXXXXX/`). Daha önce paylaşılmış eski formatlı linkler
-artık çalışmaz — ama bu linkler zaten sadece `deneme3.md` ve
-`ornek-zamanlanmis-yazi.md` gibi depoda duran örnek/test dosyalarındaydı,
-gerçek bir taslağın linki değildi. `assets/js/github-yonetim/github-yonetim.js`, eski
-sistemden kalma (hâlâ `yayinda: false` ile GitHub'da duran) bir dosya
-bulursa kartında "Supabase'e Taşı" butonu gösterir — bu butona basmak o
-dosyayı da yeni sisteme (Supabase'e) taşır.
-
-##### Yapman gereken
-1. **Supabase Dashboard → SQL Editor**'e git, `supabase/migrations/0013_taslak_icerikler_supabase_taslak_sistemi.sql` dosyasının TAMAMINI yapıştırıp **Run**'a bas.
-2. Geri kalan tüm dosyalar (JS/MD) statik olduğu için, siteyi her zamanki gibi yayınlaman (GitHub Pages / Cloudflare Pages push) yeterli — ekstra bir adım gerekmiyor.
-3. İstersen `_posts/2026/2026-08-14-deneme3.md` ve `_posts/2026/2026-08-15-ornek-zamanlanmis-yazi.md` gibi eski sistemden kalma örnek/test dosyalarını `/panel/github-yonetim.html` → "Mevcut İçerikler" listesinden "Supabase'e Taşı" ile yeni sisteme taşıyabilir ya da elle silebilirsin — dokunmazsan da bozulan bir şey olmaz, sadece eski yöntemle "gizli" kalmaya devam ederler.
-
-### 🗓️ 12.08.2026 (2 sorun)
-
-Bu dosya, bildirdiğin 2 sorun için yapılan değişikliklerin özetidir.
-
-#### Değişen dosyalar
-- `assets/css/auth.css`
-- `panel/admin.md`
-- `panel/github-yonetim.md` (aynı hatayı taşıdığı için, istemesen de düzelttim — aşağıda 1. maddede açıklandı)
-- `supabase/migrations/0004_mesajlasma_ve_temizlik.sql`
-
-Yeni migration YOK — bu turda veritabanı şeması değişmedi, sadece mevcut
-`0004` dosyasının kendisi düzeltildi (aşağıya bkz).
-
----
-
-#### 1) "Panelim" / "Admin Paneli" karışık/iç içe geçmiş görünüyordu
-
-**Kök neden:** `panel/admin.md`, sayfayı solda sabit (sticky) bir menü +
-sağda içerik olacak şekilde iki sütunlu bir grid'e (`.admin-layout {
-grid-template-columns: 220px 1fr }`) bölüyordu. Bu grid'in içindeki
-"Mesajlar" bölümü ise `.panel-section--wide` adlı, sayfayı normal 860px'lik
-`.wrap` sınırının dışına taşırıp **viewport'a göre ortalayan** bir CSS
-tekniği kullanıyordu (`margin-left: calc(50% - 50vw + 2vw)`). Bu teknik
-SADECE elemanın ebeveyni tam simetrik ortalanmışsa doğru sonuç verir — ama
-admin sayfasında ebeveyn (`.admin-content`), 220px'lik sol menü yüzünden
-artık simetrik değildi. Sonuç: "Mesajlar" kutusu sayfanın soluna doğru
-kayıyor, diğer kartlarla hizası bozuluyor, sticky sidebar da kaydırma
-sırasında bağımsız davranıp genel görünümü "iç içe geçmiş/karışık" hale
-getiriyordu (ekran kaydında gördüğüm tam olarak buydu).
-
-`panel/github-yonetim.md` (GitHub İçerik Yönetimi paneli) da **aynı**
-iki sütunlu yapıyı kullanıyordu — sen bahsetmemiş olsan da ileride aynı
-sorunu yaşamaman için onu da düzelttim.
-
-**Çözüm:** Her iki sayfayı da, zaten düzgün çalışan `panel/panel.md`
-(Panelim) ile birebir aynı, **tek sütunlu, normal yukarıdan-aşağıya akan**
-düzene çevirdim:
-- Sol sidebar kaldırıldı. Yerine üstte, **sticky OLMAYAN**, yatay bir
-  "sekme" şeridi (`.admin-tabs`) kondu — tıklayınca ilgili bölüme yumuşak
-  kaydırma (smooth scroll) yine çalışıyor, JS tarafında hiçbir değişiklik
-  gerekmedi.
-- Tüm bölümler artık `panel.md`'deki gibi tek bir `.panel-grid` içinde,
-  aynı hizada, kart kart alt alta diziliyor. "Mesajlar" bölümündeki geniş
-  görünüm artık doğru şekilde ortalanıyor çünkü ebeveyni tekrar simetrik.
-- `assets/css/auth.css`: `.admin-layout` / `.admin-nav` / `.admin-content`
-  kuralları kaldırıldı, yerine sade `.admin-tabs` stili eklendi. Ayrıca bir
-  bölüme anchor/link ile atlarken sticky header'ın başlığı KAPATMAMASI
-  için tüm `.panel-section`'lara `scroll-margin-top` eklendi (önceden bu
-  değer admin sayfasında 16px'ti, bu bazen başlığın header'ın altında
-  gizlenmesine yol açabiliyordu).
-
-#### 2) Migration hatası: `column "conversation_user_id" does not exist`
-
-**Kök neden:** `supabase/migrations/0006_konusma_bazli_mesajlasma.sql`,
-`messages` tablosunu eski `conversation_user_id` modelinden yeni
-`conversation_id` modeline taşıyor ve eski kolonu **tamamen siliyor**.
-Sen (muhtemelen daha önce 0001→0009'u sırayla çalıştırdığın, önceki
-tur özetlerinde de görülen) veritabanın zaten bu yeni şemaya
-yükseltilmiş haldeyken `0004`'ü tek başına tekrar çalıştırdın. `0004`
-içinde `create table if not exists public.messages (...)` tablo zaten
-var olduğu için hiçbir şey yapmıyor (atlıyor), ama hemen ardından gelen
-`create index ... (conversation_user_id, ...)` ve RLS politikaları hâlâ
-**artık var olmayan** bu kolonu referans alıyordu — hata tam da bu yüzden
-çıkıyordu.
-
-**Çözüm:** `0004`'teki mesajlaşma kurulum bloğunu, projenin kendi `0006`
-dosyasındaki idempotent yaklaşımıyla aynı mantıkla koruma altına aldım:
-artık önce `messages` tablosunda `conversation_id` kolonu olup olmadığına
-bakıyor.
-- **Varsa** (yani veritabanı zaten `0006`'ya/sonrasına yükseltilmiş):
-  index/politika kurulumu tamamen ATLANIYOR — `0006` bunları zaten doğru
-  şekilde kurmuş durumda, `0004`'ün tekrar dokunmasına gerek yok. Bu
-  durumda konsolda sadece bilgilendirici bir `NOTICE` görürsün, hata
-  almazsın.
-- **Yoksa** (sıfırdan kurulum ya da `0006` henüz çalıştırılmamış eski bir
-  veritabanı): eskisi gibi, orijinal `conversation_user_id` şemasıyla
-  tabloyu/index'i/politikaları kurar.
-
-Yani artık `0004`'ü — veritabanının hangi aşamada olduğuna bakmaksızın —
-güvenle (tekrar tekrar) çalıştırabilirsin.
-
-##### Yapman gereken
-Sadece `assets/css/auth.css`, `panel/admin.md` ve `panel/github-yonetim.md`
-dosyalarını yayınlaman (GitHub Pages / Cloudflare Pages push) yeterli —
-CSS/HTML olduğu için ekstra bir adım gerekmiyor. `0004` SQL dosyasını
-tekrar çalıştırmana GEREK YOK (veritabanın zaten güncel); dosya sadece
-ileride biri bu dosyayı yeniden çalıştırırsa artık hata vermesin diye
-düzeltildi.
-
-### 🗓️ 11.08.2026 — 2. Tur (6 sorun)
-
-Bu dosya, ikinci turda bildirdiğin 6 sorun için yapılan değişikliklerin özetidir.
-
-#### En son değişen dosyalar (bu turda)
-- `_layouts/default.html`
-- `assets/css/auth.css`
-- `assets/js/admin.js`
-- `assets/js/auth/auth-guard.js`
-- `assets/js/auth/auth-pages.js`
-- `assets/js/github-yonetim/github-yonetim.js`
-- `assets/js/auth/nav-auth.js`
-- `assets/js/ozel-icerik.js`
-- `assets/js/panel.js`
-- `assets/style.css`
-- `hesap/giris.md`
-- `hesap/hesap-onayla.md`
-- `hesap/kayit.md`
-- `hesap/sifre-guncelle.md`
-- `hesap/sifremi-unuttum.md`
-- `panel/admin.md`
-- `panel/github-yonetim.md`
-- `panel/ozel-icerik.md`
-- `panel/panel.md`
-- `supabase/functions/admin-change-email/index.ts`
-
-#### Bu turda eklenen yeni dosyalar
-- `supabase/migrations/0008_email_isim_senkron_ve_kvkk_temizlik.sql` (bir önceki turdan — henüz çalıştırmadıysan mutlaka çalıştır)
-- `supabase/migrations/0009_admin_zorla_cikis_ve_bildirim.sql` ⚠️ **YENİ — Supabase SQL Editor'de çalıştırman gerekiyor.**
-
----
-
-#### 1) Çıkış butonu → sadece `panel.html#` ekliyor, çıkış olmuyor
-**Kök neden:** `panel.js`, `admin.js` ve `github-yonetim.js`'in `init()` fonksiyonları TEK bir sıralı `await` zinciriydi. Zincirdeki herhangi bir adım (ör. mesajlaşma widget'ı kurulumu) beklenmedik bir hata fırlatırsa, **o adımdan SONRAKİ her şey hiç çalışmıyordu.** `wireLogout()` en sonda çağrıldığı için çıkışa hiç bağlanmıyordu — buton görünüyordu ama tıklanınca sadece `href="#"`'in native tarayıcı davranışı (adres çubuğuna `#` eklenmesi) gerçekleşiyordu.
-**Çözüm:** Üç dosyada da `init()`'i yeniden yapılandırdım — her bölüm artık kendi try/catch'i içinde, birbirinden bağımsız kuruluyor. `panel.js`'te ayrıca `wireLogout()`'u en başa aldım (kritik olduğu için en garantili yer).
-
-#### 2) Panellerde "Yükleniyor..." takılı kalması
-Aynı kök neden (yukarıdaki 1. madde) — bir bölüm patlayınca ondan sonraki TÜM bölümler (KVKK, Özel İçerikler, Mesajlar) sonsuza dek "Yükleniyor..." durumunda kalıyordu. Aynı düzeltmeyle çözüldü; artık bir bölüm hata verse bile diğerleri normal yükleniyor, hatalı bölüm konsola (F12 → Console) hangi bölüm olduğunu yazıyor.
-
-#### 3) Sayfa kaymaları / iç içe geçme / mesajlaşma modern görünmüyor / buton bazı tarayıcılarda görünmüyor
-**Kök neden (hepsinin ortak kaynağı):** `auth.css`, sayfaların Markdown **gövdesi içinde** (`</head>`'den SONRA, `<body>` içinde) `<link>` ile yükleniyordu — bu geçersiz HTML'dir ve bazı tarayıcılarda (ve tarayıcı uzantılarında) `<body>` içindeki `<link>` etiketleri ya hiç yüklenmiyor ya da farklı/geç önceklilikle yükleniyordu. Bu da tarayıcıya göre değişen görünüm sorunlarının (buton yazısı kayboluyor, mesajlaşma modern görünmüyor) asıl sebebiydi.
-**Çözüm:** `auth.css`'i `_layouts/default.html`'in gerçek `<head>`'ine taşıdım; hangi sayfanın bunu yükleyeceğini front-matter'daki `auth_css: true` bayrağıyla kontrol ediyoruz (9 sayfa güncellendi: giriş, kayıt, şifre sayfaları, panel, admin, vb.).
-**Ek düzeltme (sayfa kaymaları):** `.panel-section--wide` (mesajlaşma bölümünü genişleten) kuralı `100vw` tabanlı bir ortalama tekniği kullanıyordu — bu, dikey kaydırma çubuğunun kapladığı alan yüzünden yatay taşmaya ve "kayma" hissine yol açıyordu. `body { overflow-x: hidden }` eklendi ve teknik, viewport yerine ebeveyne göre hesaplayan daha güvenli bir versiyona çevrildi. `.panel-grid`'e eksik olan `grid-template-columns` ve taşma önleyici `min-width:0` kuralları da eklendi.
-
-#### 4) Ad-Soyad "rol kısmında" görünmüyor / kullanıcı güncellese de sistemde değişmiyor
-- Panelim'deki üst satıra (`e-posta · Rol: ... · Çıkış Yap`) Ad-Soyad eklendi — artık `Ad Soyad · e-posta · Rol: ... · Çıkış Yap` şeklinde görünüyor.
-- Kaydet butonuna basınca bu üst satır artık **sayfa yenilenmeden anında** güncelleniyor (önceden sadece ilk açılışta dolduruluyordu, bu da "değişmiyor" izlenimi veriyordu — oysa veritabanı doğru güncelleniyordu, sadece ekran yansıtmıyordu).
-- Kaydetme isteğine `.select().single()` eklendi: RLS bir sebeple satırı döndürmezse artık "kaydedildi" diye YANLIŞLIKLA bildirim gösterilmiyor, gerçek bir hata mesajı çıkıyor.
-- **Admin panelindeki kullanıcı tablosuna gerçek zamanlı (Supabase Realtime) güncelleme eklendi** — bir kullanıcı kendi panelinden ismini değiştirdiğinde, admin paneli açıksa 600ms içinde otomatik tazeleniyor (F5 gerekmiyor).
-
-#### 5) Admin e-posta değiştirince eski oturumlardan çıkış yapılmıyor / bildirim gitmiyor
-Supabase'in "şu kullanıcıyı ID ile tüm cihazlardan çıkışa zorla" diye hazır bir admin fonksiyonu yok (`auth.admin.signOut()` kullanıcının kendi JWT'sini ister, admin'de bu yok). Yeni migration'da (`0009`) `admin_force_signout_user()` adında bir veritabanı fonksiyonu ekledim — bu, service_role yetkisiyle kullanıcının `auth.refresh_tokens` ve `auth.sessions` kayıtlarını iptal ediyor (mevcut access token en geç 1 saat içinde, refresh token'lar ise anında geçersiz olur). `admin-change-email` fonksiyonu artık e-postayı değiştirdikten hemen sonra bunu otomatik çağırıyor.
-
-Bildirim maili için: ekstra bir SMTP kurulumu istemediğin için, Supabase'in kendi dahili mail sistemini (`resetPasswordForEmail`) kullanıyoruz — bu, "Reset Password" e-posta şablonu üzerinden **gerçekten** postalanıyor (Dashboard'dan şablon metnini "e-postan güncellendi" şeklinde özelleştirebilirsin). *(Not: İlk denemede `generateLink()` kullanmıştım ama bu fonksiyonun mail GÖNDERMEDİĞİNİ, sadece bir link ÜRETTİĞİNİ fark edip düzelttim — bu ayrıntıyı burada belirtiyorum çünkü şeffaf olmak istiyorum.)*
-
-#### 6) Ek olarak bulduğum/düzelttiğim hatalar
-- **Hesap silme sonrası yanlış hata mesajı:** Hem `panel.js` hem `admin.js`'te, hesap Edge Function tarafından başarıyla silindikten SONRA çağrılan `supabase.auth.signOut()` hata verirse, kod bunu "Hesap silinemedi" diye YANLIŞ gösteriyordu — oysa hesap gerçekten silinmişti. Ayrı try/catch'e alındı.
-- **`nav-auth.js`'de memory leak:** Üstteki "Hesabım ▾" menüsü her açılıp kapandığında (ya da başka bir sekmede giriş/çıkış yapıldığında) `document`'a "dışarı tıklayınca kapat" ve "Escape ile kapat" için YENİ event listener'lar ekleniyordu, eskiler hiç temizlenmiyordu. Artık menü DOM'dan kalktığında bu dinleyiciler kendini temizliyor.
-- **`ozel-icerik.js` ve `github-yonetim.js`:** Aynı "bir hata her şeyi durdurur" riskine karşı dayanıklı hale getirildi (bkz. madde 1-2).
-
----
-
-#### Uygulama adımları (senin yapman gerekenler)
-1. **Supabase Dashboard > SQL Editor**'e git:
-   - Eğer `0008_email_isim_senkron_ve_kvkk_temizlik.sql`'i daha önce çalıştırmadıysan, önce onu çalıştır.
-   - Ardından **`0009_admin_zorla_cikis_ve_bildirim.sql`**'i çalıştır (bu turun asıl yeni migration'ı).
-2. `admin-change-email` fonksiyonunu yeniden deploy et (içeriği değişti):
-   ```
-   supabase functions deploy admin-change-email
-   ```
-3. İstersen Dashboard > Authentication > Emails > **Reset Password** şablonunu, "E-postanız site yöneticisi tarafından güncellendi" gibi bir metinle özelleştirebilirsin (zorunlu değil, varsayılan şablon da işlevsel çalışır).
-4. Geri kalan tüm dosyalar (CSS/JS/HTML/MD) statik olduğu için, siteyi her zamanki gibi yayınlaman (GitHub Pages / Cloudflare Pages push) yeterli.
-
-**Not:** `0009` migration'ı çalıştırılmadan admin panelinden e-posta değiştirirsen, işlem yine de başarıyla tamamlanır (sadece "eski oturumları sonlandırma" adımı sessizce atlanır ve konsola bir uyarı yazılır) — hiçbir şeyi bozmaz, ama madde 5'in tam çalışması için migration'ın çalıştırılmış olması gerekir.
-
-### 🗓️ 11.08.2026 — 1. Tur (5 sorun)
-
-Bu dosya, bildirdiğin 5 sorun için yapılan değişikliklerin özetidir. Değişen/eklenen dosyalar:
-
-#### Değişen dosyalar
-- `assets/css/auth.css`
-- `assets/js/admin.js`
-- `assets/js/auth/auth-guard.js`
-- `assets/js/auth/auth-pages.js`
-- `assets/js/auth/nav-auth.js`
-- `assets/js/panel.js`
-- `hesap/kayit.md`
-- `panel/panel.md`
-- `supabase/functions/admin-change-email/index.ts`
-
-#### Eklenen dosya
-- `supabase/migrations/0008_email_isim_senkron_ve_kvkk_temizlik.sql` ⚠️ **Bunu Supabase Dashboard > SQL Editor'de çalıştırman gerekiyor.**
-
----
-
-#### 1) Panelim ekranındaki "Çıkış Yap" çalışmıyordu
-**Neden:** `supabase.auth.signOut()` bazı durumlarda (oturum zaten geçersiz/süresi dolmuş) hata fırlatıyordu; kodda try/catch olmadığı için hata sessizce oluşuyor ve yönlendirme (`window.location.href`) hiç çalışmıyordu.
-**Çözüm:** `panel.js` ve `nav-auth.js`'deki çıkış fonksiyonlarına try/catch/finally eklendi — hata olsa bile kullanıcı artık anasayfaya yönlendiriliyor.
-
-#### 2) "Yöneticiyle Mesajlaş" butonunun yazısı görünmüyordu
-**Neden:** CSS özgüllük çakışması. `assets/style.css`'teki `a:visited { color: var(--accent) }` kuralı, `.btn-primary { color:#fff }` kuralından daha yüksek özgüllüğe sahipti (pseudo-class bir class'a eşdeğerdir). Link "ziyaret edilmiş" sayılınca metin rengi tekrar mavi (`--accent`) oluyor, mavi arka plan üstünde mavi yazı görünmez hale geliyordu.
-**Çözüm:** `auth.css`'te `.btn-primary:visited` ve `.btn-secondary:visited` kuralları eklendi.
-
-#### 3) Admin ile e-posta değiştirilince eski mail her yerde kalıyordu
-**Neden:** `auth.users` tablosu için sadece **yeni kayıt (INSERT)** trigger'ı vardı; e-posta **güncellenince (UPDATE)** `public.profiles.email` kolonunu senkron eden hiçbir mekanizma yoktu. Admin panel, Supabase Table Editor ve kullanıcı paneli hepsi `profiles` tablosundan okuduğu için hepsi eski adresi göstermeye devam ediyordu. Ayrıca `admin-change-email` fonksiyonunun kodu ile yorumu çelişiyordu: yorumda "anında değişir" yazıyordu ama kod `email_confirm` parametresini göndermiyordu.
-**Çözüm:**
-- Yeni migration'da `on_auth_user_updated` trigger'ı eklendi — `auth.users.email` her değiştiğinde `profiles.email` otomatik senkronize olur.
-- `admin-change-email` fonksiyonuna `email_confirm: true` eklendi (gerçekten anında, mail beklemeden değişir) ve ekstra güvence olarak `profiles.email`'i de doğrudan günceller.
-
-#### 4) Ad-Soyad her yerde otomatik güncellenmiyordu / tek alan
-**Neden:** `full_name` tek parça bir metin alanıydı, ayrı Ad/Soyad yoktu.
-**Çözüm:**
-- Migration'da `first_name` ve `last_name` ayrı sütunlar olarak eklendi. `full_name` artık bu ikisinden **otomatik türeyen** (generated) bir alan — elle yazılamaz, her zaman güncel.
-- Kayıt formu (`hesap/kayit.md`) ve Panelim profil formu (`panel/panel.md`) artık Ad ve Soyad'ı ayrı input olarak alıyor.
-- Admin panelindeki kullanıcı tablosuna da Ad/Soyad için ayrı, doğrudan düzenlenebilir iki kutu eklendi (`admin.js`) — admin panelden değiştirsin ya da kullanıcı kendi panelinden değiştirsin, her ikisi de aynı `first_name`/`last_name` kolonlarını günceller, dolayısıyla her yerde anında tutarlıdır.
-- `on_auth_user_updated` trigger'ı, Google hesabı ismi değişirse ve kullanıcı panelden hiç kendi ismini girmemişse bunu da senkronize eder (kullanıcı kendi ismini bir kez girdiyse üzerine yazılmaz).
-
-#### 5) Google ile girişte KVKK onayı olmadan hesap oluşuyordu
-**Neden:** "Google ile Giriş Yap" akışında KVKK kontrolü OAuth **başladıktan sonra** yapılıyordu (Google'ın kendi ekranında KVKK sorulamadığı için). Kontrol `kvkk_onay_verildi = false` bulursa kod sadece `signOut()` yapıyordu — hesabı (auth.users + profiles) hiç **silmiyordu**. Bu yüzden reddedilen/tamamlanmamış girişler veritabanında kalıcı olarak "user" rolüyle kalıyordu (ekran görüntülerindeki iki hesap gibi).
-**Çözüm:**
-- `auth-pages.js`'e `kvkkOnaysizHesabiSilVeCikis()` fonksiyonu eklendi — artık KVKK onayı olmayan bir girişte hesap, mevcut `delete-account` Edge Function'ı üzerinden **gerçekten siliniyor**, sadece çıkış yapılmıyor.
-- Migration'da, **bugüne kadar** bu şekilde birikmiş, KVKK onayı olmayan ve 1 saatten eski hesaplar (admin rolündekiler hariç) tek seferlik temizlendi.
-
----
-
-#### Uygulama adımları (senin yapman gerekenler)
-1. **Supabase Dashboard > SQL Editor**'e git, `supabase/migrations/0008_email_isim_senkron_ve_kvkk_temizlik.sql` dosyasının tamamını yapıştırıp **Run**'a bas.
-2. `supabase/functions/admin-change-email/index.ts` dosyasını yeniden deploy et:
-   ```
-   supabase functions deploy admin-change-email
-   ```
-3. Geri kalan tüm dosyalar (CSS/JS/HTML) statik olduğu için, siteyi her zamanki gibi yayınlaman (GitHub Pages / Cloudflare Pages push) yeterli — ekstra bir adım gerekmiyor.
-
-**Not:** Migration çalıştığında konsolda `NOTICE: KVKK onayı verilmemiş N adet yetim hesap silindi.` gibi bir mesaj göreceksin — bu, ekran görüntülerindeki KVKK onayı olmayan hesapların temizlendiğini doğrular.
-
----
-
-[⬅️ README'ye dön](../README.md)
-
-[📖 Site Rehberi](./01-site-rehberi.md) · **🔐 Supabase Sistemi** · [🍴 Fork Kurulumu](./03-fork-kurulumu.md) · [☁️ Cloudflare Secret & Ayarlar](./04-cloudflare-secretlar.md) · [🔄 Dönüştürücü & Belge Düzenleyici](./05-donusturucu.md) · [📑 Belge Tarayıcı & Sıkıştırma](./06-belge-tarayici.md)
-
----
-
-
-- 26.11.2026 (2): Davet 'açık' anahtarı gerçek sürgülü anahtar yapıldı; CSP'den gereksiz `data:` kaldırıldı; Turnstile 600xxx hata metni parmak izi koruması + Google ipucuyla güncellendi; rehberdeki hatalı `data:` açıklaması düzeltildi.
-
-- 26.11.2026 (3): **Davette rol seçimi.** Davet formunda "Hesap yetkisi" seçilir (Üye / Özel Üye / Editör / İçerik Sorumlusu; "Yönetici" yalnızca Site Sahibi'nde görünür). Kurallar: admin `admin` ve üstünü veremez, `owner`/`demo` davetle HİÇ verilmez. Üç katmanlı denetim: (1) panel seçeneği gizler, (2) Edge Function `admin-invite-user` (yeniden deploy gerekir) 403 döner, (3) `handle_new_user` (migration **0154**) `admin` rolünü yalnızca davet eden hâlâ Site Sahibi ise uygular, aksi hâlde `user` yapar. Davet listesinde rol rozeti görünür. **Yapılacaklar:** migration 0154'ü çalıştır + `supabase functions deploy admin-invite-user`. Turnstile: kalıcı hata olunca giriş/kayıt artık 30 sn beklemeden hata metnini + "Yeniden dene" düğmesini gösterir.
-
-- 26.11.2026 (4): **Davette Demo rolü.** Admin ve Site Sahibi, davet formunda "Demo (vitrin, salt-okunur)" rolünü seçebilir (demo hesap hiçbir veriyi okuyamaz/yazamaz; sonradan yönetici `admin_demo_cikar` ile normal role çıkarabilir). Kurallar değişmedi: `admin` yalnızca Site Sahibi, `owner` davetle asla. **Yapılacaklar:** migration **0155**'i çalıştır (0154'ten sonra) + `supabase functions deploy admin-invite-user`.
+## Yetki Hiyerarşisi ve Önemli Kurallar
+
+**Hiyerarşi:** Site Sahibi > Yönetici > İçerik Sorumlusu > Editör > Özel Üye > Üye. Ayrıca salt-okunur **Demo** rolü vardır. Özel içerik ve R2 dosyaları **Üye hariç herkese** açıktır.
+
+**Rol yönetimi**
+- Rolü yalnızca `admin_set_user_role()` değiştirir. Yönetici, başkasını Yönetici yapamaz ve başka bir yöneticinin rolünü doğrudan değiştiremez (bunun yolu Admin Güvenliği sayfasındaki askıya alma/oylama akışıdır).
+- Site Sahibi hesabı hiçbir yönetici tarafından değiştirilemez veya silinemez; silme yetkisi yalnızca Site Sahibi'ndedir. Site Sahibi başka birini Site Sahibi yapabilir ve kendi yetkisini düşürebilir (uyarı penceresiyle).
+- Demo rolünü Üye Ayarları'ndan yalnızca Site Sahibi atar; yönetici demo üyeyi normal role çıkarabilir. Davet ederken demo rolünü yönetici de verebilir.
+
+**Başkası adına yayın**
+- Editör ve İçerik Sorumlusu, bir yönetici ya da Site Sahibi adına içerik gönderebilir.
+- Yönetici adına gönderilen içeriği yalnızca o yönetici veya Site Sahibi onaylar/reddeder.
+- Site Sahibi adına gönderilen içeriği Site Sahibi tek başına ya da yöneticilerin mutlak çoğunluğu onaylar.
+
+**Üyelik kayıtlarını kapatma (yalnızca Site Sahibi)**
+- `site_settings.kayitlar_acik` kapalıyken `handle_new_user` yeni hesap oluşturulmasını veritabanı seviyesinde engeller (e-posta ve Google dahil). Mevcut üyeler girmeye devam eder; kayıt sayfası uyarı ekranı gösterir. Geçerli davetle gelenler kapalıyken de hesap açabilir.
+
+**Gizli içerik ve Supabase'te depolama**
+- Blog/proje formunda "Yayında" kapalıysa içerik GitHub'a commit edilmez; yalnızca Supabase'teki `taslak_icerikler` tablosunda durur (RLS ile yalnızca yöneticiler; ön izleme `/onizleme/` sayfasında, tam eşleşen kodla). "Yayınla" içeriği GitHub'a taşır, "Yayından Kaldır" geri alır (ayrıntı: `01-site-rehberi.md`, Bölüm 10).
+- **"GitHub yerine Supabase'te depola"** anahtarı açıksa içerik hiç commit edilmeden sitede (`icerik/supabase-yazi.html`) görünür. Arama motoru için `supabase/functions/sitemap-supabase` ve `feed-supabase` fonksiyonları kullanılır: migration `0055`'i çalıştır, iki fonksiyonu `supabase functions deploy` ile yayınla, `robots.txt`'teki ikinci sitemap adresini Search Console'a gönder. Sayfa tarayıcıda oluşturulduğu için statik sayfa kadar hızlı indekslenmeyebilir.
+
+**Reklam (AdSense) — varsayılan kapalı**
+- `_config.yml` → `adsense_client_id` boşsa reklam sistemi (çerez kategorisi dahil) tamamen devre dışıdır. `adsense_slot_icerik_alt` doluysa yazı sonuna manuel blok eklenir; boşsa yalnızca Otomatik Reklamlar çalışır.
+- Reklam, ziyaretçi çerez panelinde **Reklam** kategorisini onaylamadan yüklenmez. `/panel/`, `/hesap/`, `/onizleme/` sayfalarında hiç yüklenmez.
+- Yazı bazında kapatmak için panelde "Reklam" anahtarını kapat (front-matter `reklam: false`). Bu tercihin taslaklarda da korunması için migration `0033`'ü çalıştırmış ol.

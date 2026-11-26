@@ -242,21 +242,7 @@ rolüne açıktır (bkz. worker.js'teki `_includes/hakkimda-*.md` yol kısıtı)
 
 ## 9. Zamanlanmış ve gizli yazılar/projeler
 
-> **📌 Güncelleme:** `/panel/github-yonetim.html` paneli artık "Yayında"
-> anahtarı kapalıyken içeriği bu bölümde anlatıldığı gibi `yayinda: false`
-> + tahmin edilemez bir `permalink` ile GitHub'a HİÇ commit ETMİYOR —
-> içerik bunun yerine sadece Supabase'teki `taslak_icerikler` tablosunda
-> duruyor, GitHub'a hiç dokunulmuyor (bkz. Bölüm 10'daki "Supabase Taslak
-> Sistemi" alt başlığı ve `rehber/02-supabase-sistemi.md`). Aşağıdaki
-> `yayinda: false` + `permalink` yöntemi hâlâ ÇALIŞIR (Jekyll seviyesinde
-> hiçbir şey kaldırılmadı) ve **sadece** ileri tarihli otomatik yayınlama
-> senaryosu için (`yayinda: true` + gelecek `date`) hâlâ birebir
-> kullanılıyor — ama panel artık kalıcı/süresiz gizli içerik için bu
-> yöntemi ÜRETMİYOR, çünkü dosya reponun herkese açık git geçmişinde
-> durmaya devam ediyordu (sadece adresi paylaşılmadığı için "gizli"
-> sayılıyordu). Dosyayı elle (GitHub arayüzünden veya Git ile) düzenleyen
-> biri isterse aşağıdaki yöntemi yine de kullanabilir, ama artık önerilen
-> yol değil.
+> **📌 Not:** Panel, "Yayında" kapalıyken içeriği GitHub'a commit etmez; yalnızca Supabase'teki `taslak_icerikler` tablosunda tutar (bkz. Bölüm 10, "Supabase Taslak Sistemi"). Aşağıdaki `yayinda: false` + `permalink` yöntemi Jekyll seviyesinde çalışmaya devam eder ve ileri tarihli otomatik yayın (`yayinda: true` + gelecek `date`) için kullanılır; ancak dosya git geçmişinde kaldığından kalıcı gizli içerik için önerilmez.
 
 Bir yazıyı ya da akademik projeyi GitHub'a hemen ekleyip, sitede **istediğin
 tarihe kadar veya sen izin verene kadar** görünmemesini sağlayabilirsin.
@@ -457,7 +443,7 @@ durmaz.**
   alınır, bir süre sonra tekrar "Yayından Kaldır" ile gizlenirse **daha
   önce paylaşılan aynı link** geri döner.
 - **Eski sistemden kalma, hâlâ GitHub'da `yayinda: false` olarak duran
-  bir dosya bulunursa** (bkz. Bölüm 9'daki güncelleme notu), kartında
+  bir dosya bulunursa** (bkz. Bölüm 10, "Supabase Taslak Sistemi"), kartında
   "Yeniden Yayınla" yerine **"Supabase'e Taşı"** butonu görünür — bu da
   aynı "GitHub'dan Supabase'e taşı" işlemini yapar, böylece o içerik de
   artık reponun herkese açık git geçmişinde durmaz.

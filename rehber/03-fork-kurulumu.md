@@ -284,7 +284,7 @@ yazman güvenlidir, GitHub Secrets'a eklemene gerek yoktur.
 6. GitHub İçerik Yönetimi'ni kullanacaksan Worker'ı kur (Bölüm 6)
 6b. Substack kullanacaksan feed proxy Worker'ını kur (Bölüm 6b)
 6c. Diğer Worker'lar (R2 dosya arşivi/imza, not ekleri, izleme/okuma, admin bildirimleri) için [☁️ Cloudflare Secret & Ayarlar](./04-cloudflare-secretlar.md) rehberini izle
-6d. Giriş/kayıt için bot koruması istiyorsan Cloudflare Turnstile'ı kur: [🔐 Supabase Sistemi → Bot Koruması](./02-supabase-sistemi.md#bot-koruması--cloudflare-turnstile-giriş--kayıt--şifre-sıfırlama-25112026) (önce `_config.yml` → `turnstile_sitekey` + deploy, SONRA Supabase'te Captcha secret)
+6d. Giriş/kayıt için bot koruması istiyorsan Cloudflare Turnstile'ı kur: [🔐 Supabase Sistemi → Bot Koruması](./02-supabase-sistemi.md#bot-koruması--cloudflare-turnstile-giriş--kayıt--şifre-sıfırlama) (önce `_config.yml` → `turnstile_sitekey` + deploy, SONRA Supabase'te Captcha secret)
 7. GitHub Pages'i de kullanacaksan repo **Settings → Pages → Build and
    deployment → Source** kısmını **"GitHub Actions"** olarak seç (ARTIK
    "Deploy from a branch" DEĞİL — proje `.github/workflows/

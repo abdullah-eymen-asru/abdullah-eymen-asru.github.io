@@ -11,7 +11,7 @@
 
 | [📖 Site Rehberi](rehber/01-site-rehberi.md) | [🔐 Supabase Sistemi](rehber/02-supabase-sistemi.md) | [🍴 Fork Kurulumu](rehber/03-fork-kurulumu.md) | [☁️ Cloudflare Secret & Ayarlar](rehber/04-cloudflare-secretlar.md) |
 |---|---|---|---|
-| Hangi dosya ne işe yarar, neyi nerede değiştiririm? Tema, yorumlar, izlediklerim/okuduklarım tablosu, hesabım menüsü ve güvenlik notları da bu sekmede. | Supabase kurulum adımları, RLS, sorun giderme, e-posta/2FA/dosya paylaşımı akışları **ve en son yapılan düzeltmelerin değişiklik geçmişi (changelog)**. | Bu depoyu fork edip kendi sitene uyarlamak istersen atman gereken adımlar. | Hangi Cloudflare Worker'a hangi secret/değişken girilir, değer nereden bulunur; Pages build ve `LANG` ayarları. |
+| Hangi dosya ne işe yarar, neyi nerede değiştiririm? Tema, yorumlar, izlediklerim/okuduklarım tablosu, hesabım menüsü ve güvenlik notları da bu sekmede. | Supabase kurulum adımları, RLS, sorun giderme, e-posta/2FA/dosya paylaşımı akışları, yetki kuralları. | Bu depoyu fork edip kendi sitene uyarlamak istersen atman gereken adımlar. | Hangi Cloudflare Worker'a hangi secret/değişken girilir, değer nereden bulunur; Pages build ve `LANG` ayarları. |
 
 > 🧰 Ek rehberler: [🔄 Dönüştürücü & Belge Düzenleyici](rehber/05-donusturucu.md) · [📑 Belge Tarayıcı & Sıkıştırma](rehber/06-belge-tarayici.md) · [🌦️ HavaStil](rehber/07-havastil.md)
 
