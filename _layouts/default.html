@@ -151,6 +151,7 @@
     default-src 'self' https:;
     script-src 'self' https: 'wasm-unsafe-eval';
     base-uri 'self';
+    form-action 'self';
     connect-src 'self' https: wss: data:;
     img-src 'self' data: https: blob:;
     media-src 'self' data: https: blob:;
@@ -162,6 +163,14 @@
   <!-- Cloudflare Turnstile Site Key (herkese açık; secret DEĞİL). _config.yml -> turnstile_sitekey. Boşsa bot koruması
        istemcide kapalıdır. Kullanım: assets/js/auth/turnstile.js (Supabase Auth Captcha'ya token ekler). -->
   <meta name="turnstile-sitekey" content="{{ site.turnstile_sitekey | escape }}">
+  {% if site.turnstile_sitekey and site.turnstile_sitekey != "" %}
+  <!-- Mobil/yavaş ağda Turnstile gecikmesini azaltmak için Cloudflare'e erken bağlan; giriş/kayıt/şifre-sıfırlama sayfalarında
+       api.js de sayfa ayrıştırılırken (modüller yüklenmeden) indirilir. Diğer sayfalarda turnstile.js ihtiyaç olunca yükler. -->
+  <link rel="preconnect" href="https://challenges.cloudflare.com" crossorigin>
+  {% if page.turnstile_onyukle %}
+  <script async defer src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"></script>
+  {% endif %}
+  {% endif %}
   <title>{{ page.title | default: site.title }}{% unless page.url == '/' or page.url == '/index.html' %} · {{ site.title }}{% endunless %}</title>
 
   {% if site.profile_image and site.profile_image != "" %}
@@ -331,6 +340,7 @@
        başına ayrı ayrı bağlamaya gerek kalmasın diye <head>'de "defer" ile
        tek seferde yükleniyor (defer: DOM ayrıştırması bitince, ama
        DOMContentLoaded'dan hemen önce çalışır). -->
+  <link rel="stylesheet" href="{{ '/assets/css/sifre-goster.css' | relative_url }}?v=1">
   <script defer src="{{ '/assets/js/auth/sifre-goster.js' | relative_url }}"></script>
   <!-- Çerez onay şeridi/paneli mantığı — bkz. assets/js/core/site-islemleri.js başındaki tasarım notları. -->
   <script defer src="{{ '/assets/js/core/site-islemleri.js' | relative_url }}"></script>
@@ -821,9 +831,10 @@
           <span class="cerez-rozet">Her zaman açık</span>
         </div>
         <p class="muted">
-          Oturum açma durumu, tema (açık/koyu) tercihi ve site içi temel
-          işlevler için gereklidir; kapatılamaz çünkü site bunlarsız
-          çalışmaz.
+          Oturum açma durumu, tema (açık/koyu) tercihi, site içi temel
+          işlevler ve giriş/kayıt formlarını botlara karşı koruyan Cloudflare
+          Turnstile güvenlik doğrulaması için gereklidir; kapatılamaz çünkü
+          site bunlarsız çalışmaz veya güvenle kullanılamaz.
         </p>
       </div>
 

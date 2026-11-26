@@ -3,6 +3,7 @@ layout: default
 title: "Şifremi Unuttum"
 yayinda: true
 auth_css: true
+turnstile_onyukle: true
 permalink: "/hesap/sifremi-unuttum.html"
 ---
 

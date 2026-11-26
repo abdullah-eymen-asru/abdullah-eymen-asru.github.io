@@ -3,6 +3,7 @@ layout: default
 title: "Giriş Yap"
 yayinda: true
 auth_css: true
+turnstile_onyukle: true
 permalink: "/hesap/giris.html"
 ---
 

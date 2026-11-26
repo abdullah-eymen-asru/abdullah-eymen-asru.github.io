@@ -949,6 +949,40 @@ Supabase Auth ──(Captcha secret ile)──► Cloudflare siteverify ──�
 
 ---
 
+## Kullanıcı Davet Etme (26.11.2026)
+
+Panel → **Üye Ayarları → ✉ Kullanıcı Davet Et**. Yönetici/Site Sahibi bir e-posta girer; Supabase davet maili gönderir. Kişi linke tıklar →
+`/hesap/sifre-guncelle.html` (başlık "Hesabını oluştur") → şifresini belirler → giriş yapınca KVKK/açık rıza modalı çıkar. Hesap "Üye" rolüyle açılır.
+**Kayıtlar kapalıyken de çalışır** (davet tablosu sayesinde; istemci verisine güvenilmez).
+
+**Kurulum (bir kez):**
+1. SQL Editor'de `supabase/migrations/0152_kullanici_davetleri.sql` çalıştır.
+2. `supabase functions deploy admin-invite-user`
+3. Authentication → URL Configuration → Redirect URLs'te `/hesap/sifre-guncelle.html` (3 alan adı için) olmalı (şifre sıfırlama zaten kullanıyor).
+4. Authentication → Emails → **Invite user** şablonunu istersen Türkçeleştir. Varsayılan Supabase SMTP'si saatlik mail sınırına sahiptir; yoğun kullanımda özel SMTP (Resend vb.) bağla.
+
+**Sınırlar:** günde 20 davet/yönetici; davet 7 gün geçerli; zaten hesabı olan e-postaya davet gitmez ("Şifremi unuttum" kullanır); davet edilen kişi linke hiç tıklamadıysa
+aynı e-postaya yeniden davet için önce Üye listesinden o bekleyen hesabı silmen gerekir. Rol yükseltme mevcut rol araçlarıyla yapılır (davet her zaman "Üye" açar).
+
+## Güvenlik Taraması ve Düzeltmeler (26.11.2026)
+
+- CSP'ye `form-action 'self'` (meta + `_headers`) ve `frame-ancestors 'self'` (`_headers`) eklendi: form gönderimi başka alana yönlendirilemez, site iframe'e alınamaz.
+- Şifre/API anahtarı göster düğmesi artık 20 sn sonra, form gönderilince ve sekme gizlenince alanı otomatik tekrar gizler.
+- Taranan ve temiz bulunanlar: kodda gizli anahtar/PAT yok, açık yönlendirme (`donus`) yalnızca aynı kökene izin veriyor, `target=_blank` bağlantılarında `noopener` var, auth modüllerinde kullanıcı verisiyle `innerHTML` yok.
+- Bilinen kalan risk: `script-src` hâlâ `https:` kabul ediyor (tüm sayfalarda harici CDN'ler için). Daraltmak için kullanılan her CDN'i tek tek listeleyip test etmek gerekir; bu turda kırma riski nedeniyle dokunulmadı.
+
+## Turnstile — Tema, Mobil ve Konsol Mesajları (26.11.2026)
+
+- **Tema:** widget artık site temasını (açık/koyu) izler; tema düğmesine basınca yeni temayla yeniden çizilir.
+- **Mobil:** Cloudflare'e erken bağlanılır, giriş/kayıt/şifre sayfalarında `api.js` sayfa açılırken indirilir; hata olursa 2 kez otomatik yeniden denenir, olmazsa **hata koduyla** "Yeniden dene" düğmesi çıkar (kod 110200 = alan adı widget'ta yetkili değil; 600010/3000xx = cihaz/ağ/engelleyici sorunu).
+- **Konsolda `NaN` / `{}` / `Object` + "Refused to connect to data:"**: Cloudflare iç iframe'inin `data:` bağlantısını CSP engelliyordu. `connect-src ... data:` ile çözüldü; **bu değişikliği deploy ettikten sonra tarayıcıda sert yenile (Cmd+Shift+R)**.
+- **"Blocked a frame with origin challenges.cloudflare.com…" (Safari):** Cloudflare'in kendi iframe'inden gelen, işlevi etkilemeyen bir uyarıdır; site kodundan kaldırılamaz.
+
+## İzlediklerim/Okuduklarım — "Something went wrong" (GraphQL) (26.11.2026)
+
+Güncelleme tüm panoyu (50'lik sayfalar × alan değerleri) çekip GitHub'da zaman aşımına düşüyordu. Worker artık tek issue'nun item'ını hafif sorguyla buluyor ve geçici GitHub hatalarında 3 kez yeniden deniyor.
+**`cloudflare worker/izleme_okuma_yonetim_worker/worker.js` dosyasını Cloudflare'e yeniden deploy etmen gerekir** (`wrangler deploy` veya paneldeki Quick edit).
+
 ## Güvenlik Özeti — Neden Güvenli?
 
 - **RLS her yerde açık.** `profiles`, `special_content`, `content_access`,
@@ -1000,6 +1034,10 @@ istemedim.
 ## 📝 Değişiklik Geçmişi (Changelog)
 
 Bu bölüm, siteye/Supabase kullanıcı sistemine sonradan yapılan düzeltmelerin tarih sırasıyla özetidir — hangi sorun bildirildi, kök nedeni neydi, nasıl çözüldü ve (varsa) senin elle yapman gereken adım neydi. Eskiden kökte ayrı `DEGISIKLIKLER_*.md` dosyaları halinde duruyordu, artık tek doğruluk kaynağı burası — en yeni turu en üstte bulursun.
+
+### 🗓️ 26.11.2026 — Turnstile tema/mobil, şifre göster, GraphQL hatası, kullanıcı daveti
+
+Turnstile temayı izliyor + mobil yeniden deneme/hata kodu; sonradan oluşturulan tüm şifre/API anahtarı alanlarında göz düğmesi (Notlar, Mesajlar, Havastil, Transkript…); izleme/okuma güncelleme hatası düzeltildi (Worker yeniden deploy); yönetici daveti (migration 0152 + `admin-invite-user`); gizlilik politikası/KVKK/çerez panelinde Turnstile bilgilendirmesi (KVKK sürüm numarası DEĞİŞMEDİ, yeniden onay istenmez); CSP `form-action`.
 
 ### 🗓️ 25.11.2026 (2) — ACİL DÜZELTME: giriş/kayıt/Google butonları çalışmıyordu
 - **Sorun:** Canlı sitede `assets/js/auth/auth-pages.js` **404** idi (dosya repoda yoktu). Giriş, kayıt, Google, şifre sıfırlama ve hesap onayla sayfalarının TÜM JavaScript'i bu dosyadadır; bu yüzden hiçbir buton çalışmıyordu. (Tek eksik dosya buydu: tüm `import`/`<script>` bağlantıları tarandı.)

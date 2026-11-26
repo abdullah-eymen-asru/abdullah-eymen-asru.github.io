@@ -29,8 +29,20 @@
     '<path d="M10.6 5.1A10.7 10.7 0 0 1 12 5c7 0 10.5 7 10.5 7a13.4 13.4 0 0 1-3.1 3.9M6.5 6.6C3.4 8.6 1.5 12 1.5 12s3.5 7 10.5 7a10.4 10.4 0 0 0 4.2-.9"/>' +
     '<path d="M9.9 9.9A3 3 0 0 0 12 15a3 3 0 0 0 2.1-.9"/></svg>';
 
+  const OTOMATIK_GIZLE_MS = 20000; // gösterilen değer en fazla 20 sn açık kalır (omuz üstü/ekran paylaşımı riski)
+  const acikAlanlar = new Set();
+
+  function gizle(girdi, buton) {
+    girdi.type = "password";
+    buton.setAttribute("aria-pressed", "false");
+    buton.setAttribute("aria-label", "Şifreyi göster");
+    buton.innerHTML = GOZ_ACIK_SVG;
+    acikAlanlar.delete(girdi);
+  }
+
   function sifreAlaniniSar(girdi) {
     if (girdi.dataset.sifreGosterHazir) return; // aynı alan iki kez sarılmasın
+    if (!girdi.parentNode) return; // henüz DOM'a eklenmemiş: eklenince MutationObserver yeniden dener
     girdi.dataset.sifreGosterHazir = "1";
 
     const sarmalayici = document.createElement("div");
@@ -47,24 +59,48 @@
     buton.innerHTML = GOZ_ACIK_SVG;
     sarmalayici.appendChild(buton);
 
+    let zamanlayici = null;
     buton.addEventListener("click", () => {
-      const suAnGosteriliyor = girdi.type === "text";
-      girdi.type = suAnGosteriliyor ? "password" : "text";
-      const yeniGosterimDurumu = !suAnGosteriliyor;
-      buton.setAttribute("aria-pressed", String(yeniGosterimDurumu));
-      buton.setAttribute("aria-label", yeniGosterimDurumu ? "Şifreyi gizle" : "Şifreyi göster");
-      buton.innerHTML = yeniGosterimDurumu ? GOZ_KAPALI_SVG : GOZ_ACIK_SVG;
+      clearTimeout(zamanlayici);
+      if (girdi.type === "text") {
+        gizle(girdi, buton);
+      } else {
+        girdi.type = "text";
+        buton.setAttribute("aria-pressed", "true");
+        buton.setAttribute("aria-label", "Şifreyi gizle");
+        buton.innerHTML = GOZ_KAPALI_SVG;
+        acikAlanlar.add(girdi);
+        zamanlayici = setTimeout(() => gizle(girdi, buton), OTOMATIK_GIZLE_MS);
+      }
       girdi.focus({ preventScroll: true });
+    });
+    // Form gönderilince/sekme gizlenince alan otomatik tekrar gizlenir.
+    girdi.form?.addEventListener("submit", () => { clearTimeout(zamanlayici); gizle(girdi, buton); }, true);
+    girdi.__sifreGizle = () => { clearTimeout(zamanlayici); gizle(girdi, buton); };
+  }
+
+  function alt_agaciTara(kok) {
+    if (!kok || kok.nodeType !== 1) return;
+    if (kok.matches?.('input[type="password"]')) sifreAlaniniSar(kok);
+    kok.querySelectorAll?.('input[type="password"]').forEach(sifreAlaniniSar);
+  }
+
+  function baslat() {
+    alt_agaciTara(document.body);
+    // Panel/Havastil/Mesajlar/Transkript gibi bölümler alanlarını JS ile SONRADAN oluşturur
+    // (diyaloglar, kasa kurulum/kilit açma, API anahtarı girişleri): sayfa yüklendikten sonra
+    // eklenen her şifre alanı da otomatik yakalanır.
+    new MutationObserver((kayitlar) => {
+      for (const k of kayitlar) k.addedNodes.forEach(alt_agaciTara);
+    }).observe(document.body, { childList: true, subtree: true });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) [...acikAlanlar].forEach((g) => g.__sifreGizle?.());
     });
   }
 
-  function tumSifreAlanlariniSar() {
-    document.querySelectorAll('input[type="password"]').forEach(sifreAlaniniSar);
-  }
-
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", tumSifreAlanlariniSar);
+    document.addEventListener("DOMContentLoaded", baslat);
   } else {
-    tumSifreAlanlariniSar();
+    baslat();
   }
 })();

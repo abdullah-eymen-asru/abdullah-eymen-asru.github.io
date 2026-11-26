@@ -651,7 +651,7 @@ function duzenlemeFormGonderimiBagla() {
       await listeyiYukle();
       duzenlemeFormunuKapat();
     } catch (err) {
-      showMessage(messageEl, "Kayıt güncellenemedi: " + err.message, "error");
+      showMessage(messageEl, "Kayıt güncellenemedi: " + String(err.message || err).replace(/^Kayıt güncellenemedi:\s*/i, ""), "error");
     } finally {
       submitBtn.disabled = false;
       submitBtn.textContent = "💾 Güncelle";

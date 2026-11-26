@@ -719,7 +719,14 @@ export async function initSifreGuncellePage() {
   const dinleyici = supabase.auth.onAuthStateChange((olay, oturum) => {
     if (olay === "PASSWORD_RECOVERY" || (olay === "SIGNED_IN" && oturum)) hazir = true;
   });
-  const linkVar = /type=recovery|access_token|code=/.test(ILK_HASH + ILK_SORGU);
+  const linkVar = /type=recovery|type=invite|access_token|code=/.test(ILK_HASH + ILK_SORGU);
+  if (/type=invite/.test(ILK_HASH + ILK_SORGU)) {
+    // Yönetici davetiyle gelen kişi (admin-invite-user): aynı sayfa, davete uygun başlık.
+    const h1 = document.querySelector(".auth-kart h1");
+    if (h1) h1.textContent = "Hesabını oluştur: şifreni belirle";
+    const gonder = form.querySelector('button[type="submit"]');
+    if (gonder) gonder.textContent = "Şifreyi Belirle ve Devam Et";
+  }
   const hataVar = donusHatasiniGoster(msg);
   if (linkVar && !hataVar) {
     for (let i = 0; i < 20 && !hazir; i++) {

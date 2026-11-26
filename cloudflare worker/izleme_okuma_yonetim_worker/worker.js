@@ -94,22 +94,57 @@ function jsonYanit(body, status, corsHeaders) {
   });
 }
 
-async function githubGraphql(token, query, variables) {
-  const res = await fetch("https://api.github.com/graphql", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      "User-Agent": "portfolyo-site-izleme-okuma-yonetim-worker",
-    },
-    body: JSON.stringify({ query, variables }),
-  });
+// GitHub GraphQL, ağır/yoğun anlarda "Something went wrong while executing your query on <zaman>. Please include `<id>`
+// when reporting this issue." (veya 502/503/504, secondary rate limit) gibi GEÇİCİ sunucu hataları döndürür; aynı istek
+// birkaç yüz ms sonra genellikle geçer. Bu yüzden geçici hatalarda 3 denemeye kadar artan bekleyişle tekrar denenir.
+// Kalıcı hatalar (geçersiz girdi, yetki, bulunamadı) HEMEN fırlatılır. Mutasyonlar bu tür hatada çoğunlukla işlenmemiştir;
+// tekrar edilmeleri idempotent'tir (aynı alan değerini yeniden yazmak/aynı issue'yu aynı başlığa güncellemek zararsız).
+const GECICI_HATA_RE = /something went wrong while executing|timeout|timed out|rate limit|abuse|temporar|try again|502|503|504/i;
+const bekle = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function githubGraphql(token, query, variables, deneme = 1) {
+  const MAKS_DENEME = 3;
+  let res;
+  try {
+    res = await fetch("https://api.github.com/graphql", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "User-Agent": "portfolyo-site-izleme-okuma-yonetim-worker",
+      },
+      body: JSON.stringify({ query, variables }),
+    });
+  } catch (ag) {
+    if (deneme < MAKS_DENEME) {
+      await bekle(500 * deneme);
+      return githubGraphql(token, query, variables, deneme + 1);
+    }
+    throw new Error("GitHub'a ulaşılamadı (ağ hatası). Biraz sonra tekrar dene.");
+  }
   if (!res.ok) {
+    if ([502, 503, 504].includes(res.status) && deneme < MAKS_DENEME) {
+      await bekle(600 * deneme);
+      return githubGraphql(token, query, variables, deneme + 1);
+    }
     throw new Error(`GitHub API hatası: ${res.status} ${res.statusText}`);
   }
   const json = await res.json();
   if (json.errors) {
-    throw new Error("GraphQL hatası: " + JSON.stringify(json.errors));
+    const metin = JSON.stringify(json.errors);
+    if (GECICI_HATA_RE.test(metin) && deneme < MAKS_DENEME) {
+      await bekle(700 * deneme);
+      return githubGraphql(token, query, variables, deneme + 1);
+    }
+    if (GECICI_HATA_RE.test(metin)) {
+      // İstek kimliği (örn. 270D:343C…) GitHub destek kaydı için faydalı; ham JSON'u kullanıcıya dökmeyiz.
+      const kimlik = /`([0-9A-F:]{10,})`/i.exec(metin)?.[1];
+      throw new Error(
+        "GitHub geçici olarak yanıt veremedi (birkaç deneme yapıldı). Bir dakika sonra tekrar dene." +
+          (kimlik ? ` [GitHub istek kimliği: ${kimlik}]` : "")
+      );
+    }
+    throw new Error("GraphQL hatası: " + metin);
   }
   return json.data;
 }
@@ -378,14 +413,14 @@ const PROJE_ITEMS_QUERY = `
 query($login: String!, $number: Int!, $cursor: String) {
   user(login: $login) {
     projectV2(number: $number) {
-      items(first: 100, after: $cursor) {
+      items(first: 50, after: $cursor) {
         pageInfo { hasNextPage endCursor }
         nodes {
           id
           content {
             ... on Issue { number title url body state }
           }
-          fieldValues(first: 30) {
+          fieldValues(first: 20) {
             nodes {
               ... on ProjectV2ItemFieldTextValue { text field { ... on ProjectV2FieldCommon { name } } }
               ... on ProjectV2ItemFieldNumberValue { number field { ... on ProjectV2FieldCommon { name } } }
@@ -446,6 +481,19 @@ async function projeItemleriGetir(token, projectNumber) {
   }
   return items;
 }
+
+// Güncelleme için TEK bir issue'nun proje-item kimliğini hafif bir sorguyla bulur (tüm panoyu — 100'lük sayfalar ×
+// alan değerleri — çekmek GitHub'da "Something went wrong" zaman aşımlarının ana sebebiydi).
+const ISSUE_PROJE_ITEMI_QUERY = `
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    issue(number: $number) {
+      id number title url
+      projectItems(first: 20) { nodes { id project { number } } }
+    }
+  }
+}
+`;
 
 const UPDATE_ISSUE_MUTATION = `
 mutation($issueId: ID!, $title: String, $body: String) {
@@ -700,16 +748,16 @@ const ASIL_ISLEYICI = {
       }
 
       try {
-        // a) Issue'nun node ID'sini bul (updateIssue mutasyonu ID ister, numara değil).
-        const issueData = await githubGraphql(
-          env.GITHUB_TOKEN,
-          `query($owner: String!, $name: String!, $number: Int!) {
-            repository(owner: $owner, name: $name) { issue(number: $number) { id } }
-          }`,
-          { owner: REPO_OWNER, name: REPO_NAME, number }
-        );
-        const issueId = issueData.repository?.issue?.id;
+        // a) Issue'nun node ID'sini VE bu panodaki item kimliğini tek hafif sorguda bul.
+        const issueData = await githubGraphql(env.GITHUB_TOKEN, ISSUE_PROJE_ITEMI_QUERY, {
+          owner: REPO_OWNER,
+          name: REPO_NAME,
+          number,
+        });
+        const issueDugumu = issueData.repository?.issue;
+        const issueId = issueDugumu?.id;
         if (!issueId) throw new Error(`#${number} numaralı issue bulunamadı.`);
+        const hafifItem = issueDugumu.projectItems?.nodes?.find((n) => n?.project?.number === projectConfig.number);
 
         // b) Başlık ve/veya açıklama verildiyse güncelle (ikisi de opsiyonel
         //    — sadece alan değerlerini güncellemek isteyen bir istek de
@@ -726,10 +774,14 @@ const ASIL_ISLEYICI = {
           guncelIssue = updateData.updateIssue.issue;
         }
 
-        // c) Proje bilgisini al, issue'nun panodaki item ID'sini bul.
+        // c) Proje bilgisini (field tanımları) al; item kimliği (a)'da bulunduysa tüm panoyu ÇEKMEYİZ.
         const project = await projeBilgisiGetir(env.GITHUB_TOKEN, projectConfig.number);
-        const tumItems = await projeItemleriGetir(env.GITHUB_TOKEN, projectConfig.number);
-        const hedefItem = tumItems.find((it) => it.number === number);
+        let hedefItem = hafifItem ? { itemId: hafifItem.id, url: issueDugumu.url, title: issueDugumu.title } : null;
+        if (!hedefItem) {
+          // Yedek: hafif sorgu item'ı döndürmediyse (nadir) eski yola düş.
+          const tumItems = await projeItemleriGetir(env.GITHUB_TOKEN, projectConfig.number);
+          hedefItem = tumItems.find((it) => it.number === number);
+        }
         if (!hedefItem) {
           throw new Error(`#${number} numaralı kayıt bu panoda bulunamadı (panoya eklenmemiş olabilir).`);
         }
@@ -754,7 +806,7 @@ const ASIL_ISLEYICI = {
         );
       } catch (err) {
         console.error("Worker hatası (/kayit-guncelle):", err);
-        return jsonYanit({ message: "Kayıt güncellenemedi: " + err.message }, 502, corsHeaders);
+        return jsonYanit({ message: err.message }, 502, corsHeaders);
       }
     }
 

@@ -3,6 +3,7 @@ layout: default
 title: "Kayıt Ol"
 yayinda: true
 auth_css: true
+turnstile_onyukle: true
 permalink: "/hesap/kayit.html"
 ---
 

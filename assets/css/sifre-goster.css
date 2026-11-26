@@ -1,0 +1,37 @@
+/* Şifre/API anahtarı göster-gizle (göz) düğmesi — bkz. assets/js/auth/sifre-goster.js.
+   Site genelinde (auth.css yüklenmeyen sayfalar dahil) çalışsın diye ayrı dosya; layout'tan her sayfada yüklenir.
+   Sınıf-bazlı (.form-field vb. kapsayıcıya bağımlı DEĞİL): JS ile sonradan oluşturulan alanlar da doğru görünür. */
+.sifre-goster-sarmalayici {
+  position: relative;
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+}
+.sifre-goster-sarmalayici > input {
+  width: 100%;
+  box-sizing: border-box;
+  padding-right: 46px !important;
+}
+.sifre-goster-btn {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted, #6b7280);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.sifre-goster-btn:hover { color: var(--text, #111); background: var(--bg, rgba(127,127,127,.12)); }
+.sifre-goster-btn:focus-visible { outline: 2px solid var(--accent, #3b82f6); outline-offset: 1px; }
+.sifre-goster-btn svg { width: 18px; height: 18px; display: block; }

@@ -680,6 +680,33 @@ permalink: "/panel/dashboard.html"
           </div>
         </div>
 
+        <!-- Kullanıcı davet et (Edge Function admin-invite-user, migration 0152). Davetli maildeki linkle şifresini belirler;
+             kayıtlar kapalı olsa bile hesap açılabilir. Wiring: uye-ayarlari.js -> wireDavet(). -->
+        <details class="panel-section csp-mt-16" id="davet-kutu">
+          <summary><strong>✉ Kullanıcı Davet Et</strong></summary>
+          <p class="muted">Girdiğin e-postaya Supabase üzerinden davet maili gider. Kişi linke tıklayıp şifresini belirler, ardından
+            KVKK/açık rıza onayını verir. Hesap normal "Üye" rolüyle açılır; rolü sonra aşağıdaki listeden değiştirebilirsin.
+            Davet linki sınırlı süre geçerlidir; günde en fazla 20 davet gönderilebilir.</p>
+          <form id="davet-form" novalidate>
+            <div class="form-field">
+              <label for="davet-eposta">E-posta</label>
+              <input id="davet-eposta" type="email" autocomplete="off" inputmode="email" required>
+            </div>
+            <div class="form-field">
+              <label for="davet-ad">Ad (isteğe bağlı)</label>
+              <input id="davet-ad" type="text" autocomplete="off" maxlength="60">
+            </div>
+            <div class="form-field">
+              <label for="davet-soyad">Soyad (isteğe bağlı)</label>
+              <input id="davet-soyad" type="text" autocomplete="off" maxlength="60">
+            </div>
+            <button type="submit" class="btn-primary csp-w-auto">Daveti Gönder</button>
+          </form>
+          <div id="davet-message" class="auth-message" hidden></div>
+          <h3 class="csp-mt-16">Son davetler</h3>
+          <div id="davet-liste" class="muted">Yükleniyor...</div>
+        </details>
+
         <p id="uya-sonuc-sayisi" class="muted uya-sonuc-sayisi"></p>
 
         <div id="uya-liste" class="uya-liste"><p class="muted">Yükleniyor...</p></div>

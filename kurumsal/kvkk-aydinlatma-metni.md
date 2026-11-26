@@ -5,7 +5,7 @@ permalink: "/kurumsal/kvkk-aydinlatma-metni.html"
 ---
 
 <h1>KVKK Aydınlatma Metni</h1>
-<p class="meta">Son güncelleme: Ekim 2026 · Sürüm: <span data-hukuki-surum="kvkk">v1.1</span></p>
+<p class="meta">Son güncelleme: Kasım 2026 · Sürüm: <span data-hukuki-surum="kvkk">v1.1</span></p>
 
 <div class="project-body">
 <p>
@@ -59,6 +59,12 @@ permalink: "/kurumsal/kvkk-aydinlatma-metni.html"
     erişim ve kötüye kullanım tespiti) amacıyla, kimlik doğrulama
     altyapısı (Supabase Auth) tarafından işlem bazında otomatik olarak
     işlenir.</li>
+  <li><strong>Bot koruması (Cloudflare Turnstile) doğrulama verisi:</strong> giriş, kayıt ve şifre
+    sıfırlama sırasında formun bir insan tarafından kullanıldığını doğrulamak için IP adresiniz ve
+    tarayıcı/cihazın teknik sinyalleri, tek kullanımlık bir doğrulama jetonu üretmek üzere
+    Cloudflare tarafından işlenir; jeton, kimlik doğrulama altyapısı (Supabase Auth) tarafından
+    kontrol edilir. Amaç yalnızca hesap güvenliğidir (hukuki sebep: veri sorumlusunun meşru menfaati,
+    KVKK m. 5/2-f); veri bu amaç dışında kullanılmaz.</li>
   <li><strong>Yetkilendirme verisi:</strong> hesabınızın rolü (Üye, Özel
     Üye, Editör, İçerik Sorumlusu, Yönetici veya Site Sahibi) ve size
     atanmış özel içeriklere erişim kayıtları (hangi içeriğe ne zaman erişim

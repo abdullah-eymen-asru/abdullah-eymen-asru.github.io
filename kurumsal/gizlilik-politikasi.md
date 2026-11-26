@@ -5,7 +5,7 @@ permalink: "/kurumsal/gizlilik-politikasi.html"
 ---
 
 <h1>Gizlilik Politikası</h1>
-<p class="meta">Son güncelleme: Ekim 2026</p>
+<p class="meta">Son güncelleme: Kasım 2026</p>
 
 <div class="project-body">
 <p>
@@ -106,6 +106,15 @@ permalink: "/kurumsal/gizlilik-politikasi.html"
         GitHub İçerik Yönetimi panelindeki bağlantı ayarları.
         <code>localStorage</code> ile yalnızca kendi cihazınızda saklanır,
         hiçbir sunucuya gönderilmez, üçüncü taraflarla paylaşılmaz.
+        <br><strong>Bot koruması (Cloudflare Turnstile):</strong> giriş, kayıt ve şifre sıfırlama
+        gibi hesap işlemlerinde otomatik (bot) saldırıları engellemek için Cloudflare'in
+        Turnstile doğrulaması çalışır. Doğrulama sırasında IP adresiniz ile tarayıcı/cihaz
+        teknik sinyalleriniz Cloudflare tarafından yalnızca insan–bot ayrımı yapmak için
+        işlenir; bu sitede reklam veya profilleme amacıyla kullanılmaz. Cloudflare'in kendi
+        gizlilik politikası ayrıca geçerlidir.
+        Güvenlik amaçlı zorunlu bir işlemdir (KVKK m. 5/2-f, meşru menfaat); bu yüzden ayrı bir onay
+        gerektirmez ve kapatılamaz. Hesap işlemi yapmayan ziyaretçilerde, sayfa
+        Turnstile'ı yalnızca bir hesap formu kullanıldığında yükler.
       </td>
       <td>Hayır — site bunlarsız çalışmaz.</td>
     </tr>
@@ -189,9 +198,10 @@ permalink: "/kurumsal/gizlilik-politikasi.html"
   <li><strong>Supabase</strong> — üyelik, kimlik doğrulama ve veritabanı
     (bkz. <a href="{{ '/kurumsal/acik-riza-metni.html' | relative_url }}">Açık Rıza Metni</a>).</li>
   <li><strong>Cloudflare</strong> — siteyi barındırma (Cloudflare Pages),
-    sunucu tarafı işlemler (Cloudflare Workers) ve dosya depolama
-    (Cloudflare R2). Cloudflare, sayfayı sunarken teknik gereklilik olarak IP
-    adresi gibi bağlantı bilgilerini işleyebilir.</li>
+    sunucu tarafı işlemler (Cloudflare Workers), dosya depolama
+    (Cloudflare R2) ve giriş/kayıt formlarının bot korumasını sağlayan
+    <strong>Cloudflare Turnstile</strong> (bkz. § 3). Cloudflare, sayfayı sunarken ve doğrulama
+    yaparken teknik gereklilik olarak IP adresi gibi bağlantı bilgilerini işleyebilir.</li>
   <li><strong>GitHub</strong> — sitenin kaynak deposu, yedek barındırma
     (GitHub Pages). Yorumlar GitHub'da değil, bu sitenin kendi veritabanında tutulur.</li>
   <li><strong>Google</strong> — Google Analytics, Google AdSense ve Google

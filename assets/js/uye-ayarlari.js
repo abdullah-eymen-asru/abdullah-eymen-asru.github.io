@@ -23,6 +23,8 @@ import { requireAuthOrShowError } from "./auth/auth-guard.js";
 
 const DELETE_ACCOUNT_FUNCTION_URL =
   "https://eahvcirspmvntffzphye.supabase.co/functions/v1/delete-account";
+const ADMIN_INVITE_FUNCTION_URL =
+  "https://eahvcirspmvntffzphye.supabase.co/functions/v1/admin-invite-user";
 const ADMIN_CHANGE_EMAIL_FUNCTION_URL =
   "https://eahvcirspmvntffzphye.supabase.co/functions/v1/admin-change-email";
 
@@ -61,6 +63,7 @@ async function init() {
   wireSayfaBoyutu();
   wireAdminEmailChange();
   wireDisaAktar();
+  wireDavet();
 
   // KARARLILIK: loadUsers() önceden try/catch'siz çağrılıyordu — beklenmedik
   // bir hata (ör. bir Supabase çağrısı istisna fırlatırsa) fırlarsa,
@@ -683,6 +686,76 @@ function adminEpostaKutusunuAc({ id, email, isim }) {
   kutu.scrollIntoView({ behavior: "smooth", block: "center" });
   document.getElementById("admin-eposta-yeni")?.focus();
 }
+
+/* ---------------------------------------------------------------------- */
+/* KULLANICI DAVET ET (Edge Function admin-invite-user · migration 0152)      */
+/* ---------------------------------------------------------------------- */
+async function davetListesiniYukle() {
+  const kutu = document.getElementById("davet-liste");
+  if (!kutu) return;
+  try {
+    const { data, error } = await supabase.rpc("admin_davetleri_listele");
+    if (error) throw error;
+    if (!data?.length) {
+      kutu.textContent = "Henüz davet yok.";
+      return;
+    }
+    kutu.textContent = "";
+    const ul = document.createElement("ul");
+    for (const d of data) {
+      const li = document.createElement("li");
+      const durum = d.kullanildi ? "kabul edildi" : new Date(d.son_kullanma) < new Date() ? "süresi doldu" : "bekliyor";
+      li.textContent = `${d.eposta} — ${durum} (${new Date(d.olusturma).toLocaleDateString("tr-TR")})`;
+      ul.appendChild(li);
+    }
+    kutu.appendChild(ul);
+  } catch (e) {
+    kutu.textContent = "Liste alınamadı (migration 0152 çalıştı mı?).";
+  }
+}
+
+function wireDavet() {
+  const form = document.getElementById("davet-form");
+  const msg = document.getElementById("davet-message");
+  if (!form || form.dataset.hazir) return;
+  form.dataset.hazir = "1";
+  document.getElementById("davet-kutu")?.addEventListener("toggle", (e) => {
+    if (e.target.open) davetListesiniYukle();
+  }, { once: true });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const eposta = document.getElementById("davet-eposta").value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(eposta)) return showMessage(msg, "Geçerli bir e-posta gir.");
+    const btn = form.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(ADMIN_INVITE_FUNCTION_URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eposta,
+          ad: document.getElementById("davet-ad").value.trim(),
+          soyad: document.getElementById("davet-soyad").value.trim(),
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `Sunucu hatası (${res.status})`);
+      showMessage(msg, `Davet gönderildi: ${eposta}`, "success");
+      form.reset();
+      davetListesiniYukle();
+    } catch (err) {
+      const ag = err instanceof TypeError;
+      showMessage(msg, ag
+        ? "Sunucuya ulaşılamadı: Edge Function 'admin-invite-user' deploy edilmemiş ya da bu adres fonksiyonun CORS listesinde olmayabilir."
+        : err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}
+
 
 function wireAdminEmailChange() {
   const form = document.getElementById("admin-eposta-degistir-form");
