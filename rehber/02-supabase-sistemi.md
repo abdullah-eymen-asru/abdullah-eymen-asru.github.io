@@ -935,7 +935,7 @@ Supabase Auth ──(Captcha secret ile)──► Cloudflare siteverify ──�
 | "captcha verification process failed" / "Güvenlik doğrulaması tamamlanamadı…" | Supabase'te captcha AÇIK ama `_config.yml`'de `turnstile_sitekey` boş/yanlış, ya da Supabase'teki Secret başka widget'a ait | Site Key ve Secret **aynı widget'ın** çifti olmalı; `_config.yml`'i düzelt + deploy et |
 | Widget hiç yüklenmiyor, aynı hata | Reklam/içerik engelleyici `challenges.cloudflare.com`'u engelliyor, ya da CSP bu adresi engelliyor | Engelleyiciyi bu site için kapat. CSP'de `script-src https:` ve `frame-src https:` zaten izinli; sıkılaştırdıysan `https://challenges.cloudflare.com`'u iki yönergeye de ekle |
 | Konsolda `Blocked a frame with origin "https://challenges.cloudflare.com"…` ve `…/challenge-platform/…/pat/… 401` | Safari'de Turnstile'ın kendi iç iletişimi / Private Access Token denemesi | **Zararsızdır**, giriş/kayıt'ı etkilemez; yok sayabilirsin |
-| Konsolda `Refused to connect to data:` | CSP `connect-src`'ta `data:` yoktu | 25.11.2026'da `_layouts/default.html` ve `_headers` CSP'sine `data:` eklendi (deploy sonrası kaybolur) |
+| Konsolda `Refused to connect to data:` | CSP `connect-src`'ta `data:` yoktu | Mesaj Cloudflare'in KENDİ iframe'inden gelir (kendi CSP'si); site CSP'si ile ilgisi yok. 25.11'de eklenen `connect-src data:` 26.11'de GERİ ALINDI. Kaldırılamaz, işlevi etkilemez |
 | Cloudflare hata kodu `110200` (domain not allowed) | Siteyi açtığın adres widget'ın Hostname listesinde yok | Cloudflare → Turnstile → widget → Hostname Management'a o adresi ekle |
 | Bazı ziyaretçilerde kutu çıkıyor | Normaldir: Cloudflare o ziyaretçiyi şüpheli buldu | Bir işlem gerekmez, kutuyu onaylaması yeterli |
 | Admin "e-posta değiştir"den sonra bildirim maili gitmedi (`bildirim_maili_gonderildi: false`) | Edge Function'daki `resetPasswordForEmail` (sunucu tarafı) de captcha ister; token olmadığı için reddedilebilir | E-posta değişikliği yine tamamlanır (kod bu hatayı zaten yakalar). Bildirim maili gerekliyse kullanıcıya "Şifremi unuttum"dan kendisi gönderebilir; bu çağrıyı kendi test ettiğinde sonucu kontrol et |
@@ -986,7 +986,9 @@ Panel → **Üye Ayarları → ✉ Kullanıcı Davet Et**. Yönetici/Site Sahibi
 
 - **Tema:** widget site temasını (açık/koyu) izler. Doğrulama HENÜZ bitmemişken tema değişirse yeni temayla yeniden çizilir; doğrulama BİTTİKTEN sonra tema değişirse **yeniden doğrulama yapılmaz** (geçerli token korunur, widget CSS ile yeni temaya uyarlanır; güvenlik etkisi yoktur çünkü token zaten tek kullanımlıktır ve Supabase'te doğrulanır). Token kullanılınca bir sonraki doğrulama güncel temayla gelir.
 - **Mobil:** Cloudflare'e erken bağlanılır, giriş/kayıt/şifre sayfalarında `api.js` sayfa açılırken indirilir; hata olursa 2 kez otomatik yeniden denenir, olmazsa **hata koduyla** "Yeniden dene" düğmesi çıkar (kod 110200 = alan adı widget'ta yetkili değil; 600010/3000xx = cihaz/ağ/engelleyici sorunu).
-- **Konsolda `NaN` / `{}` / `Object` + "Refused to connect to data:"**: Cloudflare iç iframe'inin `data:` bağlantısını CSP engelliyordu. `connect-src ... data:` ile çözüldü; **bu değişikliği deploy ettikten sonra tarayıcıda sert yenile (Cmd+Shift+R)**.
+- **Konsolda `NaN` / `{}` / `Object` / `console.trace` / "Refused to connect to data:" / `/pat/` 401 / preload / Permissions-Policy / `window.styleMedia` / `patchWorkers.js` / çerez uyarıları**: hepsi `challenges.cloudflare.com` iframe'inin içinden gelir (Cloudflare'in kendi kodu ve kendi CSP'si); site kodundan kaldırılamaz ve doğrulamayı bozmaz. (Önceki sürümde bunun site CSP'sindeki `data:` eksikliğinden olduğu yazılmıştı; bu YANLIŞTI, `data:` geri alındı.) `cloud.umami.is` hatası ise Mullvad/engelleyicinin analitik betiğini engellemesidir.
+- **Kod 600010 (Mullvad/Tor/Firefox Resist Fingerprinting):** tarayıcı canvas/WebGL okumasını ve üçüncü taraf çerezi engellediği için Cloudflare'in tarayıcı kontrolü tamamlanamaz. Bu Cloudflare + parmak izi koruması sınırlamasıdır. Çözüm: siteyi korumadan muaf tutmak, başka tarayıcı veya **Google ile giriş** (Supabase'de captcha gerektirmez). Hata kutusunda artık bu yönlendirme ve her zaman "Yeniden dene" düğmesi çıkar.
+- **pages.dev ile github.io farklı görünüyor:** iki site ayrı deploy edilir; biri eski sürümde kalmıştır. İkisine de AYNI dosyaları yükle ve Turnstile widget Hostname listesinde ikisi de olsun.
 - **"Blocked a frame with origin challenges.cloudflare.com…" (Safari):** Cloudflare'in kendi iframe'inden gelen, işlevi etkilemeyen bir uyarıdır; site kodundan kaldırılamaz.
 
 ## İzlediklerim/Okuduklarım — "Something went wrong" (GraphQL) (26.11.2026)
@@ -1787,3 +1789,5 @@ Bu dosya, bildirdiğin 5 sorun için yapılan değişikliklerin özetidir. Deği
 
 ---
 
+
+- 26.11.2026 (2): Davet 'açık' anahtarı gerçek sürgülü anahtar yapıldı; CSP'den gereksiz `data:` kaldırıldı; Turnstile 600xxx hata metni parmak izi koruması + Google ipucuyla güncellendi; rehberdeki hatalı `data:` açıklaması düzeltildi.

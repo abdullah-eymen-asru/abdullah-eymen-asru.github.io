@@ -692,8 +692,14 @@ permalink: "/panel/dashboard.html"
           <!-- SADECE Site Sahibi (owner): davetleri aç/kapat + gelişmiş sınırlar. Gerçek yetki: owner_davet_ayarlari_kaydet RPC (migration 0153). -->
           <div id="davet-ayar-kutu" class="csp-mt-16" hidden>
             <label class="gy-toggle-satir" for="davet-acik-kutu">
-              <span>Davet gönderme açık</span>
-              <input id="davet-acik-kutu" type="checkbox" role="switch" checked>
+              <span class="gy-toggle">
+                <input id="davet-acik-kutu" type="checkbox" role="switch" checked>
+                <span class="gy-toggle-track"><span class="gy-toggle-thumb"></span></span>
+              </span>
+              <span class="gy-toggle-metin">
+                <strong>Davet gönderme açık</strong>
+                <span class="muted">Kapatırsan yeni davet gönderilemez; mevcut davetler geçerliliğini korur.</span>
+              </span>
             </label>
             <details class="csp-mt-16" id="davet-gelismis">
               <summary><strong>Gelişmiş sınırlar</strong> <span class="muted">(boş bırakılan her alan = sınırsız)</span></summary>

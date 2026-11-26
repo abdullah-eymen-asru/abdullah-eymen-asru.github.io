@@ -130,6 +130,7 @@ function durumYaz(metin, yenidenDeneDugmesi = false) {
     b.type = "button";
     b.className = "auth-link-btn";
     b.textContent = "Yeniden dene";
+    b.setAttribute("data-turnstile-yeniden", "1");
     b.addEventListener("click", () => {
       w.otoYeniden = 0;
       durumYaz("");
@@ -147,7 +148,7 @@ function hataMetni(kod) {
   }
   if (/^(1102|1103|1104)/.test(k)) return `Turnstile yapılandırma hatası (kod ${k}). Site Key'i kontrol et.`;
   if (/^(6000|6001|6002)/.test(k) || /^(3000|3001)/.test(k)) {
-    return `Güvenlik doğrulaması bu cihazda tamamlanamadı (kod ${k}). Tarayıcı saatini/VPN-Gizli Aktarım'ı ve içerik engelleyicileri kontrol et.`;
+    return `Güvenlik doğrulaması bu tarayıcıda tamamlanamadı (kod ${k}). Parmak izi koruması (Mullvad/Tor/Brave/Firefox "fingerprinting" koruması), VPN, üçüncü taraf çerez engeli veya içerik engelleyici Cloudflare kutusunu bozuyor olabilir; bu siteyi bu korumalardan muaf tut ya da başka bir tarayıcı dene. Google ile giriş bu doğrulamayı gerektirmez.`;
   }
   return `Güvenlik doğrulaması şu an yapılamadı${k ? ` (kod ${k})` : ""}.`;
 }
