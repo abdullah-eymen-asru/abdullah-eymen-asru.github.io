@@ -224,26 +224,41 @@ function widgetHazirla() {
   return w.hazirSozu;
 }
 
+/** Widget'ı kaldırıp güncel temayla yeniden çizer (token yokken / token tüketildiğinde). */
+function yenidenCiz() {
+  try {
+    window.turnstile.remove(w.id);
+  } catch {
+    /* zaten kaldırılmış */
+  }
+  w.id = null;
+  w.token = null;
+  w.hata = false;
+  w.otoYeniden = 0;
+  w.kutu?.classList.remove("auth-turnstile--ters");
+  try {
+    widgetCiz(window.turnstile);
+  } catch {
+    w.hazirSozu = null; // bir sonraki captchaTokenAl yeniden dener
+  }
+}
+
 /** Site teması (açık/koyu) değişince widget'ı yeni temayla yeniden çizer: Turnstile temayı yalnızca render'da alır. */
 let temaGozlemcisi = null;
 function temaIzle() {
   if (temaGozlemcisi || typeof MutationObserver === "undefined") return;
   temaGozlemcisi = new MutationObserver(() => {
-    if (w.id === null || !window.turnstile || temaAl() === w.tema) return;
-    try {
-      window.turnstile.remove(w.id);
-    } catch {
-      /* zaten kaldırılmış */
+    if (w.id === null || !window.turnstile) return;
+    const yeni = temaAl();
+    if (w.token) {
+      // Doğrulama ZATEN tamamlandı: widget'ı yeniden çizmek yeni bir doğrulama başlatırdı. Token geçerliliğini korur, yalnızca
+      // görünümü CSS ile yeni temaya uydururuz (içerik değişmez, güvenlik etkisi yok). Gerçek yeniden çizim, token
+      // kullanılıp sıfırlandığında (captchaSifirla) yeni temayla yapılır.
+      w.kutu?.classList.toggle("auth-turnstile--ters", w.tema !== yeni);
+      return;
     }
-    w.id = null;
-    w.token = null;
-    w.hata = false;
-    w.otoYeniden = 0;
-    try {
-      widgetCiz(window.turnstile);
-    } catch {
-      w.hazirSozu = null; // bir sonraki captchaTokenAl yeniden dener
-    }
+    if (yeni === w.tema) return;
+    yenidenCiz();
   });
   temaGozlemcisi.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 }
@@ -285,7 +300,9 @@ export async function captchaTokenAl() {
 export function captchaSifirla() {
   try {
     w.token = null;
-    if (w.id !== null && window.turnstile) window.turnstile.reset(w.id);
+    if (w.id === null || !window.turnstile) return;
+    if (w.tema !== temaAl()) yenidenCiz(); // doğrulama sırasında tema değişmişse yeni token'ı güncel temayla iste
+    else window.turnstile.reset(w.id);
   } catch {
     /* widget yoksa/kaldırıldıysa sessizce geç */
   }

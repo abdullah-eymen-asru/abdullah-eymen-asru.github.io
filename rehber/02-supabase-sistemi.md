@@ -956,13 +956,24 @@ Panel → **Üye Ayarları → ✉ Kullanıcı Davet Et**. Yönetici/Site Sahibi
 **Kayıtlar kapalıyken de çalışır** (davet tablosu sayesinde; istemci verisine güvenilmez).
 
 **Kurulum (bir kez):**
-1. SQL Editor'de `supabase/migrations/0152_kullanici_davetleri.sql` çalıştır.
-2. `supabase functions deploy admin-invite-user`
-3. Authentication → URL Configuration → Redirect URLs'te `/hesap/sifre-guncelle.html` (3 alan adı için) olmalı (şifre sıfırlama zaten kullanıyor).
-4. Authentication → Emails → **Invite user** şablonunu istersen Türkçeleştir. Varsayılan Supabase SMTP'si saatlik mail sınırına sahiptir; yoğun kullanımda özel SMTP (Resend vb.) bağla.
+1. SQL Editor'de sırayla `supabase/migrations/0152_kullanici_davetleri.sql` ve `0153_davet_ayarlari_ve_arama.sql` çalıştır.
+2. Edge Function'ı deploy et: `supabase functions deploy admin-invite-user` (Dashboard → Edge Functions → *Deploy a new function* ile `index.ts` içeriğini yapıştırarak da olur; ad birebir `admin-invite-user` olmalı).
+3. **Fonksiyonun adresini ayrıca bir yere eklemen GEREKMEZ.** Adres Supabase'in standart kalıbıdır:
+   `https://<PROJE-REF>.supabase.co/functions/v1/admin-invite-user`. Bu adres `assets/js/uye-ayarlari.js` içindeki `ADMIN_INVITE_FUNCTION_URL` sabitinde zaten yazılı
+   (diğer fonksiyonlarla aynı proje ref'i: `eahvcirspmvntffzphye`). Proje ref'in değişirse yalnızca o sabitleri güncelle.
+   `config.toml`'a satır eklemek de gerekmez: fonksiyon varsayılan olarak "JWT doğrula" modunda çalışır (giriş yapmış oturum şart), ayrıca içeride rol (admin/owner) denetlenir.
+4. CORS: fonksiyon yalnızca `ALLOWED_ORIGINS` listesindeki adreslerden çağrılır (`index.ts` başı). Sitenin adresi değişirse/yeni alan adı eklenirse oraya da ekle ve yeniden deploy et.
+5. Authentication → URL Configuration → Redirect URLs'te `/hesap/sifre-guncelle.html` (kullandığın her alan adı için) olmalı (şifre sıfırlama zaten kullanıyor).
+6. Authentication → Emails → **Invite user** şablonunu istersen Türkçeleştir. Varsayılan Supabase SMTP'si saatlik çok düşük mail sınırına sahiptir; çok sayıda davet için özel SMTP (Resend vb.) bağla. "Sınırsız" ayarı senin tarafındaki sınırı kaldırır; Supabase'in kendi mail/oran sınırları geçerli kalır.
 
-**Sınırlar:** günde 20 davet/yönetici; davet 7 gün geçerli; zaten hesabı olan e-postaya davet gitmez ("Şifremi unuttum" kullanır); davet edilen kişi linke hiç tıklamadıysa
-aynı e-postaya yeniden davet için önce Üye listesinden o bekleyen hesabı silmen gerekir. Rol yükseltme mevcut rol araçlarıyla yapılır (davet her zaman "Üye" açar).
+**Paneldeki kullanım:** Üye Ayarları → Kullanıcı Davet Et. Alttaki **Davetler** listesi kaydırmalıdır ve e-posta ya da isimle aranır (kabul edildi / bekliyor / süresi doldu rozetleriyle).
+
+**Davet ayarları (yalnızca Site Sahibi görür ve değiştirir; yönetici yalnızca durum özetini görür):**
+- **Davet gönderme açık** kaydırmalı düğmesi: kapatınca hiçbir yönetici davet gönderemez (kayıtları kapatmaya benzer; kayıt kapatmadan bağımsızdır).
+- **Gelişmiş sınırlar:** başlangıç/bitiş tarihi (belirli tarihler arası), ya da "şimdiden itibaren N gün/hafta/ay" ile bitişi hesaplama; toplam davet sınırı; yönetici başına günlük sınır. **Boş bırakılan her alan = sınırsız** (varsayılan). Güvenlik için sınırsız günlük ayarda bile mutlak tavan: yönetici başına 24 saatte 500 davet.
+- Sınırlar sunucuda (Edge Function) ve veritabanında uygulanır; tarayıcıdan atlatılamaz.
+
+**Diğer sınırlar:** zaten hesabı olan e-postaya davet gitmez ("Şifremi unuttum" kullanır); davet edilen kişi linke hiç tıklamadıysa aynı e-postaya yeniden davet için önce Üye listesinden o bekleyen hesabı sil. Rol yükseltme mevcut rol araçlarıyla yapılır (davet her zaman "Üye" açar).
 
 ## Güvenlik Taraması ve Düzeltmeler (26.11.2026)
 
@@ -973,7 +984,7 @@ aynı e-postaya yeniden davet için önce Üye listesinden o bekleyen hesabı si
 
 ## Turnstile — Tema, Mobil ve Konsol Mesajları (26.11.2026)
 
-- **Tema:** widget artık site temasını (açık/koyu) izler; tema düğmesine basınca yeni temayla yeniden çizilir.
+- **Tema:** widget site temasını (açık/koyu) izler. Doğrulama HENÜZ bitmemişken tema değişirse yeni temayla yeniden çizilir; doğrulama BİTTİKTEN sonra tema değişirse **yeniden doğrulama yapılmaz** (geçerli token korunur, widget CSS ile yeni temaya uyarlanır; güvenlik etkisi yoktur çünkü token zaten tek kullanımlıktır ve Supabase'te doğrulanır). Token kullanılınca bir sonraki doğrulama güncel temayla gelir.
 - **Mobil:** Cloudflare'e erken bağlanılır, giriş/kayıt/şifre sayfalarında `api.js` sayfa açılırken indirilir; hata olursa 2 kez otomatik yeniden denenir, olmazsa **hata koduyla** "Yeniden dene" düğmesi çıkar (kod 110200 = alan adı widget'ta yetkili değil; 600010/3000xx = cihaz/ağ/engelleyici sorunu).
 - **Konsolda `NaN` / `{}` / `Object` + "Refused to connect to data:"**: Cloudflare iç iframe'inin `data:` bağlantısını CSP engelliyordu. `connect-src ... data:` ile çözüldü; **bu değişikliği deploy ettikten sonra tarayıcıda sert yenile (Cmd+Shift+R)**.
 - **"Blocked a frame with origin challenges.cloudflare.com…" (Safari):** Cloudflare'in kendi iframe'inden gelen, işlevi etkilemeyen bir uyarıdır; site kodundan kaldırılamaz.
@@ -1037,7 +1048,7 @@ Bu bölüm, siteye/Supabase kullanıcı sistemine sonradan yapılan düzeltmeler
 
 ### 🗓️ 26.11.2026 — Turnstile tema/mobil, şifre göster, GraphQL hatası, kullanıcı daveti
 
-Turnstile temayı izliyor + mobil yeniden deneme/hata kodu; sonradan oluşturulan tüm şifre/API anahtarı alanlarında göz düğmesi (Notlar, Mesajlar, Havastil, Transkript…); izleme/okuma güncelleme hatası düzeltildi (Worker yeniden deploy); yönetici daveti (migration 0152 + `admin-invite-user`); gizlilik politikası/KVKK/çerez panelinde Turnstile bilgilendirmesi (KVKK sürüm numarası DEĞİŞMEDİ, yeniden onay istenmez); CSP `form-action`.
+Turnstile temayı izliyor + mobil yeniden deneme/hata kodu; sonradan oluşturulan tüm şifre/API anahtarı alanlarında göz düğmesi (Notlar, Mesajlar, Havastil, Transkript…); izleme/okuma güncelleme hatası düzeltildi (Worker yeniden deploy); yönetici daveti (migration 0152/0153 + `admin-invite-user`; davet ayarları, arama, kaydırmalı liste; doğrulama bittikten sonra tema değişince yeniden doğrulama yok); gizlilik politikası/KVKK/çerez panelinde Turnstile bilgilendirmesi (KVKK sürüm numarası DEĞİŞMEDİ, yeniden onay istenmez); CSP `form-action`.
 
 ### 🗓️ 25.11.2026 (2) — ACİL DÜZELTME: giriş/kayıt/Google butonları çalışmıyordu
 - **Sorun:** Canlı sitede `assets/js/auth/auth-pages.js` **404** idi (dosya repoda yoktu). Giriş, kayıt, Google, şifre sıfırlama ve hesap onayla sayfalarının TÜM JavaScript'i bu dosyadadır; bu yüzden hiçbir buton çalışmıyordu. (Tek eksik dosya buydu: tüm `import`/`<script>` bağlantıları tarandı.)

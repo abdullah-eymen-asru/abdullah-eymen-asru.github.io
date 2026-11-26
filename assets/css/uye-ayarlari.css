@@ -316,3 +316,10 @@
 .uya-korluk { border: 1px dashed var(--border); border-radius: 10px; padding: .5rem .8rem; margin-bottom: .6rem; }
 .uya-gizle input, .uya-korluk input { inline-size: 2.4rem; block-size: 1.3rem; accent-color: var(--accent); }
 .uya-kart.uya-gizli { opacity: .65; outline: 2px dashed var(--border); }
+
+/* Davet kutusu (panel › Üye Ayarları): taşmayı önlemek için sınırlı yükseklikte kaydırmalı liste */
+.davet-liste { max-height: 260px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--border, rgba(127,127,127,.3)); border-radius: 10px; padding: 6px 12px; }
+.davet-liste ul { list-style: none; margin: 0; padding: 0; }
+.davet-liste li { padding: 8px 0; border-bottom: 1px solid var(--border, rgba(127,127,127,.2)); overflow-wrap: anywhere; font-size: .92rem; }
+.davet-liste li:last-child { border-bottom: none; }
+.davet-durum-rozet { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .75rem; border: 1px solid currentColor; margin-left: 6px; }

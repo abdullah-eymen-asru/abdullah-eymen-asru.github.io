@@ -690,28 +690,109 @@ function adminEpostaKutusunuAc({ id, email, isim }) {
 /* ---------------------------------------------------------------------- */
 /* KULLANICI DAVET ET (Edge Function admin-invite-user · migration 0152)      */
 /* ---------------------------------------------------------------------- */
+let DAVETLER = [];
+
+function davetListesiniCiz() {
+  const kutu = document.getElementById("davet-liste");
+  if (!kutu) return;
+  const q = kucukHarfeCevirTr(document.getElementById("davet-arama")?.value || "").trim();
+  const liste = q ? DAVETLER.filter((d) => kucukHarfeCevirTr(`${d.eposta} ${d.ad || ""}`).includes(q)) : DAVETLER;
+  kutu.textContent = "";
+  if (!liste.length) {
+    kutu.textContent = DAVETLER.length ? "Aramaya uyan davet yok." : "Henüz davet yok.";
+    return;
+  }
+  const ul = document.createElement("ul");
+  for (const d of liste) {
+    const li = document.createElement("li");
+    const durum = d.kullanildi ? "kabul edildi" : new Date(d.son_kullanma) < new Date() ? "süresi doldu" : "bekliyor";
+    const strong = document.createElement("strong");
+    strong.textContent = d.ad ? `${d.ad} · ${d.eposta}` : d.eposta;
+    const rozet = document.createElement("span");
+    rozet.className = "davet-durum-rozet";
+    rozet.textContent = durum;
+    const tarih = document.createElement("div");
+    tarih.className = "muted";
+    tarih.textContent = new Date(d.olusturma).toLocaleString("tr-TR");
+    li.append(strong, rozet, tarih);
+    ul.appendChild(li);
+  }
+  kutu.appendChild(ul);
+}
+
 async function davetListesiniYukle() {
   const kutu = document.getElementById("davet-liste");
   if (!kutu) return;
   try {
     const { data, error } = await supabase.rpc("admin_davetleri_listele");
     if (error) throw error;
-    if (!data?.length) {
-      kutu.textContent = "Henüz davet yok.";
-      return;
-    }
-    kutu.textContent = "";
-    const ul = document.createElement("ul");
-    for (const d of data) {
-      const li = document.createElement("li");
-      const durum = d.kullanildi ? "kabul edildi" : new Date(d.son_kullanma) < new Date() ? "süresi doldu" : "bekliyor";
-      li.textContent = `${d.eposta} — ${durum} (${new Date(d.olusturma).toLocaleDateString("tr-TR")})`;
-      ul.appendChild(li);
-    }
-    kutu.appendChild(ul);
+    DAVETLER = data || [];
+    davetListesiniCiz();
   } catch (e) {
-    kutu.textContent = "Liste alınamadı (migration 0152 çalıştı mı?).";
+    kutu.textContent = "Liste alınamadı (migration 0152 ve 0153 çalıştı mı?).";
   }
+}
+
+const tarihYerele = (iso) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const z = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}`;
+};
+
+async function davetAyarlariniYukle() {
+  const ozet = document.getElementById("davet-durum");
+  try {
+    const { data, error } = await supabase.rpc("davet_ayarlari_getir");
+    if (error) throw error;
+    const a = Array.isArray(data) ? data[0] : data;
+    if (!a) return;
+    const parca = [a.davetler_acik ? "🟢 Davetler açık" : "🔴 Davetler kapalı"];
+    parca.push(a.baslangic || a.bitis
+      ? `Dönem: ${a.baslangic ? new Date(a.baslangic).toLocaleString("tr-TR") : "başlangıç yok"} → ${a.bitis ? new Date(a.bitis).toLocaleString("tr-TR") : "bitiş yok"}`
+      : "Süre sınırı yok");
+    parca.push(a.toplam_limit ? `Toplam: ${a.toplam_gonderilen}/${a.toplam_limit}` : `Toplam: sınırsız (${a.toplam_gonderilen} gönderildi)`);
+    parca.push(a.gunluk_limit ? `Günlük: ${a.gunluk_limit}` : "Günlük: sınırsız (tavan 500)");
+    if (ozet) ozet.textContent = parca.join(" · ");
+    document.getElementById("davet-acik-kutu").checked = a.davetler_acik !== false;
+    document.getElementById("davet-baslangic").value = tarihYerele(a.baslangic);
+    document.getElementById("davet-bitis").value = tarihYerele(a.bitis);
+    document.getElementById("davet-toplam").value = a.toplam_limit ?? "";
+    document.getElementById("davet-gunluk").value = a.gunluk_limit ?? "";
+  } catch {
+    if (ozet) ozet.textContent = "Davet ayarları alınamadı (migration 0153 çalıştı mı?).";
+  }
+}
+
+function wireDavetAyarlari() {
+  const kutu = document.getElementById("davet-ayar-kutu");
+  if (!kutu || GIRIS_YAPAN_PROFIL?.role !== "owner") return; // yalnızca Site Sahibi görür (gerçek yetki: RPC)
+  kutu.hidden = false;
+  const msg = document.getElementById("davet-ayar-message");
+  document.getElementById("davet-sure-uygula")?.addEventListener("click", () => {
+    const n = parseInt(document.getElementById("davet-sure-sayi").value, 10);
+    if (!n || n < 1) return showMessage(msg, "Geçerli bir süre gir.");
+    const birim = document.getElementById("davet-sure-birim").value;
+    const bit = new Date();
+    if (birim === "ay") bit.setMonth(bit.getMonth() + n);
+    else bit.setDate(bit.getDate() + n * (birim === "hafta" ? 7 : 1));
+    document.getElementById("davet-bitis").value = tarihYerele(bit.toISOString());
+    if (!document.getElementById("davet-baslangic").value) document.getElementById("davet-baslangic").value = tarihYerele(new Date().toISOString());
+  });
+  document.getElementById("davet-ayar-kaydet")?.addEventListener("click", async () => {
+    const tarih = (id) => { const v = document.getElementById(id).value; return v ? new Date(v).toISOString() : null; };
+    const sayi = (id) => { const v = document.getElementById(id).value.trim(); return v === "" ? null : parseInt(v, 10); };
+    const { error } = await supabase.rpc("owner_davet_ayarlari_kaydet", {
+      p_acik: document.getElementById("davet-acik-kutu").checked,
+      p_baslangic: tarih("davet-baslangic"),
+      p_bitis: tarih("davet-bitis"),
+      p_toplam: sayi("davet-toplam"),
+      p_gunluk: sayi("davet-gunluk"),
+    });
+    if (error) return showMessage(msg, error.message);
+    showMessage(msg, "Davet ayarları kaydedildi.", "success");
+    davetAyarlariniYukle();
+  });
 }
 
 function wireDavet() {
@@ -720,8 +801,13 @@ function wireDavet() {
   if (!form || form.dataset.hazir) return;
   form.dataset.hazir = "1";
   document.getElementById("davet-kutu")?.addEventListener("toggle", (e) => {
-    if (e.target.open) davetListesiniYukle();
+    if (e.target.open) {
+      davetListesiniYukle();
+      davetAyarlariniYukle();
+      wireDavetAyarlari();
+    }
   }, { once: true });
+  document.getElementById("davet-arama")?.addEventListener("input", davetListesiniCiz);
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();

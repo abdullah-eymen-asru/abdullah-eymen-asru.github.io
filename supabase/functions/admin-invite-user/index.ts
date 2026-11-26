@@ -9,7 +9,7 @@
 // Bot koruması (Turnstile/captcha) admin API'sini etkilemez; yetki denetimi aşağıdaki rol kontrolüdür.
 //
 // GÜVENLİK: (1) çağıranın token'ı doğrulanır, (2) rol veritabanından okunur (admin/owner), (3) davet yalnızca
-// normal "user" rolüyle açılır — rol yükseltme mevcut RPC'lerle yapılır, (4) kötüye kullanım sınırı: kişi başı 20 davet/24 saat,
+// normal "user" rolüyle açılır — rol yükseltme mevcut RPC'lerle yapılır, (4) Site Sahibi ayarları (açık/kapalı, tarih penceresi, toplam/günlük sınır) + mutlak günlük tavan 500,
 // (5) redirect adresi istemciden alınmaz; yalnızca izinli Origin + sabit yol kullanılır.
 //
 // Deploy:  supabase functions deploy admin-invite-user
@@ -27,7 +27,7 @@ const ALLOWED_ORIGINS = [
   "https://abdullah-eymen-asru.github.io",
   "http://localhost:4000",
 ];
-const GUNLUK_LIMIT = 20;
+const MUTLAK_GUNLUK_TAVAN = 500; // "sınırsız" ayarında bile geçerli güvenlik tavanı (kişi başı / 24 saat)
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 function corsHeaders(origin: string | null) {
@@ -74,14 +74,30 @@ Deno.serve(async (req) => {
     return yanit({ error: "Yetkisiz işlem: yalnızca yönetici/Site Sahibi davet gönderebilir." }, 403);
   }
 
-  // Kötüye kullanım sınırı
+  // Site Sahibi ayarları (migration 0153): açık/kapalı, tarih penceresi, toplam ve günlük sınır. NULL = sınırsız.
+  const { data: ay } = await admin.from("davet_ayarlari").select("*").eq("id", 1).maybeSingle();
+  if (ay) {
+    if (ay.davetler_acik === false) return yanit({ error: "Davet gönderme Site Sahibi tarafından kapatılmış." }, 403);
+    const simdi = Date.now();
+    if (ay.baslangic && simdi < new Date(ay.baslangic).getTime())
+      return yanit({ error: "Davet dönemi henüz başlamadı (" + new Date(ay.baslangic).toLocaleString("tr-TR") + ")." }, 403);
+    if (ay.bitis && simdi > new Date(ay.bitis).getTime())
+      return yanit({ error: "Davet dönemi sona erdi (" + new Date(ay.bitis).toLocaleString("tr-TR") + ")." }, 403);
+    if (ay.toplam_limit) {
+      const { count: toplam } = await admin.from("kullanici_davetleri").select("id", { count: "exact", head: true });
+      if ((toplam ?? 0) >= ay.toplam_limit) return yanit({ error: `Toplam davet sınırına (${ay.toplam_limit}) ulaşıldı.` }, 429);
+    }
+  }
+  const gunlukSinir = Math.min(ay?.gunluk_limit ?? MUTLAK_GUNLUK_TAVAN, MUTLAK_GUNLUK_TAVAN);
+
+  // Kötüye kullanım sınırı (sınırsız ayarlansa bile mutlak tavan: ele geçirilmiş yönetici hesabı mail bombardımanı yapamasın)
   const dun = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
   const { count } = await admin
     .from("kullanici_davetleri")
     .select("id", { count: "exact", head: true })
     .eq("davet_eden", callerId)
     .gte("olusturma", dun);
-  if ((count ?? 0) >= GUNLUK_LIMIT) return yanit({ error: `24 saatte en fazla ${GUNLUK_LIMIT} davet gönderilebilir.` }, 429);
+  if ((count ?? 0) >= gunlukSinir) return yanit({ error: `24 saatte en fazla ${gunlukSinir} davet gönderilebilir.` }, 429);
 
   // Zaten kayıtlı mı?
   const { data: mevcut } = await admin.from("profiles").select("id").ilike("email", eposta).maybeSingle();

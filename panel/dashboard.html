@@ -686,7 +686,50 @@ permalink: "/panel/dashboard.html"
           <summary><strong>✉ Kullanıcı Davet Et</strong></summary>
           <p class="muted">Girdiğin e-postaya Supabase üzerinden davet maili gider. Kişi linke tıklayıp şifresini belirler, ardından
             KVKK/açık rıza onayını verir. Hesap normal "Üye" rolüyle açılır; rolü sonra aşağıdaki listeden değiştirebilirsin.
-            Davet linki sınırlı süre geçerlidir; günde en fazla 20 davet gönderilebilir.</p>
+            Davet linki sınırlı süre geçerlidir. Varsayılan olarak davet sayısı ve süresi sınırsızdır; sınırları yalnızca Site Sahibi koyabilir.</p>
+          <p id="davet-durum" class="muted"></p>
+
+          <!-- SADECE Site Sahibi (owner): davetleri aç/kapat + gelişmiş sınırlar. Gerçek yetki: owner_davet_ayarlari_kaydet RPC (migration 0153). -->
+          <div id="davet-ayar-kutu" class="csp-mt-16" hidden>
+            <label class="gy-toggle-satir" for="davet-acik-kutu">
+              <span>Davet gönderme açık</span>
+              <input id="davet-acik-kutu" type="checkbox" role="switch" checked>
+            </label>
+            <details class="csp-mt-16" id="davet-gelismis">
+              <summary><strong>Gelişmiş sınırlar</strong> <span class="muted">(boş bırakılan her alan = sınırsız)</span></summary>
+              <div class="form-field">
+                <label for="davet-baslangic">Davet dönemi başlangıcı</label>
+                <input id="davet-baslangic" type="datetime-local">
+              </div>
+              <div class="form-field">
+                <label for="davet-bitis">Davet dönemi bitişi</label>
+                <input id="davet-bitis" type="datetime-local">
+              </div>
+              <div class="form-field">
+                <label for="davet-sure-sayi">Ya da şimdiden itibaren süre</label>
+                <div class="csp-flex-gap10">
+                  <input id="davet-sure-sayi" type="number" min="1" max="3650" placeholder="örn. 30">
+                  <select id="davet-sure-birim" aria-label="Süre birimi">
+                    <option value="gun">gün</option>
+                    <option value="hafta">hafta</option>
+                    <option value="ay">ay</option>
+                  </select>
+                  <button type="button" id="davet-sure-uygula" class="btn-secondary csp-w-auto">Bitişi hesapla</button>
+                </div>
+              </div>
+              <div class="form-field">
+                <label for="davet-toplam">Toplam davet sınırı (tüm zamanlar)</label>
+                <input id="davet-toplam" type="number" min="1" placeholder="boş = sınırsız">
+              </div>
+              <div class="form-field">
+                <label for="davet-gunluk">Günlük sınır (yönetici başına, 24 saat; en çok 500)</label>
+                <input id="davet-gunluk" type="number" min="1" max="500" placeholder="boş = sınırsız (tavan 500)">
+              </div>
+              <p class="muted">Not: Supabase'in ücretsiz yerleşik e-posta servisi saatte çok az mail gönderir; çok sayıda davet için özel SMTP bağlaman gerekir (rehber).</p>
+            </details>
+            <button type="button" id="davet-ayar-kaydet" class="btn-primary csp-w-auto csp-mt-16">Ayarları Kaydet</button>
+            <div id="davet-ayar-message" class="auth-message" hidden></div>
+          </div>
           <form id="davet-form" novalidate>
             <div class="form-field">
               <label for="davet-eposta">E-posta</label>
@@ -703,8 +746,11 @@ permalink: "/panel/dashboard.html"
             <button type="submit" class="btn-primary csp-w-auto">Daveti Gönder</button>
           </form>
           <div id="davet-message" class="auth-message" hidden></div>
-          <h3 class="csp-mt-16">Son davetler</h3>
-          <div id="davet-liste" class="muted">Yükleniyor...</div>
+          <h3 class="csp-mt-16">Davetler</h3>
+          <div class="form-field">
+            <input id="davet-arama" aria-label="Davetlerde ara" type="search" placeholder="E-posta veya isimle ara…" autocomplete="off">
+          </div>
+          <div id="davet-liste" class="muted davet-liste" tabindex="0" aria-label="Davet listesi">Yükleniyor...</div>
         </details>
 
         <p id="uya-sonuc-sayisi" class="muted uya-sonuc-sayisi"></p>
