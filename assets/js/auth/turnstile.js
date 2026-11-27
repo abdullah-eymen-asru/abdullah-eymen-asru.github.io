@@ -36,7 +36,6 @@ const DURUM_ID = "turnstile-durum";
 /** Supabase'in captcha istediği auth metodları. resetPasswordForEmail'in imzası farklıdır (email, {redirectTo, captchaToken}). */
 const KORUNAN_METODLAR = ["signInWithPassword", "signUp", "signInWithOtp", "resend", "resetPasswordForEmail"];
 
-import { hata as trHata } from "../core/hata-metni.js";
 export const CAPTCHA_HATA_METNI =
   "Güvenlik doğrulaması tamamlanamadı. Reklam/içerik engelleyiciyi bu site için kapatıp sayfayı yenile ve tekrar dene.";
 
@@ -361,10 +360,10 @@ export function captchaKur(istemci) {
 
       try {
         const sonuc = await orijinal.apply(auth, yeniArgs);
-        if (sonuc && captchaHatasiMi(sonuc.error)) trHata(sonuc.error) = CAPTCHA_HATA_METNI;
+        if (sonuc && captchaHatasiMi(sonuc.error)) sonuc.error.message = CAPTCHA_HATA_METNI;
         return sonuc;
       } catch (h) {
-        if (captchaHatasiMi(h)) trHata(h) = CAPTCHA_HATA_METNI;
+        if (captchaHatasiMi(h)) h.message = CAPTCHA_HATA_METNI;
         throw h;
       } finally {
         if (token) captchaSifirla(); // kullanılan token geçersiz; bir sonraki deneme için yenisini hazırla
