@@ -19,6 +19,7 @@ import { kotaPaneli, kaynakSecici, kotaDurumuOku } from "../medya-kota/medya-kot
 import { sureOku, sesAkisi, mp3Kodla, mp3Dilim, uyanikTut } from "./ses-akis.js";
 import { kendiAnahtarlar, konusmaciAyirKendi, anahtarEkle, SAGLAYICILAR, SAGLAYICI_SIRASI } from "./konusmaci-ai.js";
 import { RENKLER, saat, gunSaniyesi, gunSaati, kelimeSay, istatistik, tahminiAyir, dolguTemizle, anahtarKelimeler, baslikOner, metinUret, turlariUret, belgeBloklari, kunyeMetni, kisaSaat } from "./transkript-mantik.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const kok = document.getElementById("ts-kok");
 const WORKER = "https://transkript-worker.aeymena.workers.dev";
@@ -134,7 +135,7 @@ async function kur() {
     if (!aiAnahtar.value.trim()) { aiMesaj.textContent = "Önce API anahtarını yapıştır."; return; }
     aiKaydet.disabled = true; aiMesaj.textContent = "Kaydediliyor…";
     try { await anahtarEkle(aiSaglayici.value, aiAnahtar.value, aiModel.value); aiAnahtar.value = ""; await aiKaynaklariYukle(); kisiKaynak.value = aiSaglayici.value; tercih.yaz("kisiKaynak", kisiKaynak.value); kisiKaynakIpucuYaz(); aiMesaj.textContent = "✔ Kaydedildi; konuşmacı ayrımı artık bu anahtarla yapılacak. Aynı anahtar HavaStil'de de geçerlidir."; }
-    catch (h) { aiMesaj.textContent = h.message || String(h); }
+    catch (h) { aiMesaj.textContent = trHata(h); }
     finally { aiKaydet.disabled = false; }
   });
   const aiKutu = el("details", { class: "ts-gelismis" }, el("summary", { text: "🔑 Kendi API anahtarımı kullan (Gemini · ChatGPT · Claude · OpenRouter)" }),
@@ -314,7 +315,7 @@ async function kur() {
       if (tur === "docx") { const { irDenDocx } = await import("../donusturucu/belge-docx.js"); indir(await irDenDocx(bl, { baslik: tamT().baslik, altBilgi: tamT().baslik }), `${adTaban()}.docx`); }
       else { const { irDenPdf } = await import("../donusturucu/belge-pdf.js"); indir(await irDenPdf(bl, { baslik: tamT().baslik, altBilgi: tamT().baslik }), `${adTaban()}.pdf`); }
       bildir(`✔ ${tur.toUpperCase()} indirildi.`);
-    } catch (h) { bildir(`Dışa aktarılamadı: ${h.message || h}`, true); }
+    } catch (h) { bildir(`Dışa aktarılamadı: ${trHata(h)}`, true); }
   }
   const kopyala = async () => { try { await navigator.clipboard.writeText(metinUret(tamT(), "txt", secenek())); bildir("✔ Panoya kopyalandı."); } catch { bildir("Pano erişimi reddedildi.", true); } };
   const bicim = (ikon, ad, ac, t) => { const b = el("button", { type: "button", class: "ts-bicim" }, el("span", { class: "ts-bicim-ikon", text: ikon, "aria-hidden": "true" }), el("strong", { text: ad }), el("small", { class: "md-soluk", text: ac })); b.addEventListener("click", () => disaAktar(t)); return b; };
@@ -441,7 +442,7 @@ async function kur() {
       sonKaydir.value = String(Math.floor(kayitSure || 100)); basKaydir.value = "0"; basGirdi.value = "0:00"; sonGirdi.value = ""; tumKayit.checked = true;
       aralikOzetle(); bildir("Hazır. İstersen aralığı ve ayarları değiştir, sonra “Yazıya dökmeye başla”ya bas.");
       if (!(await yarimBul(f))) yarimDevamKontrol();
-    } catch (h) { bildir(h.message, true); }
+    } catch (h) { bildir(trHata(h), true); }
   }
   girdi.addEventListener("change", () => { if (girdi.files?.[0]) yukle(girdi.files[0]); girdi.value = ""; });
   durdur.addEventListener("click", () => iptal?.abort());
@@ -490,7 +491,7 @@ async function kur() {
       const sonPencere = w2 >= son - 0.001, dilim = segs.filter((x) => x.b >= w - 0.001 && (sonPencere || x.b < w2));
       if (dilim.length && !ayirKapali) {
         try { n += atamalariUygula(await ayirIstegi(mp3Dilim(blob, blobBas, blobSure, w, w2), dilim, w, oturum, sinyal), dilim); }
-        catch (h) { if (h.name === "AbortError") throw h; hatalar.push(`${sureGoster(w)}–${sureGoster(w2)}: ${h.message}`); if (h.kalici) { ayirKapali = h.message; break; } }
+        catch (h) { if (h.name === "AbortError") throw h; hatalar.push(`${sureGoster(w)}–${sureGoster(w2)}: ${trHata(h)}`); if (h.kalici) { ayirKapali = trHata(h); break; } }
       }
       w = w2;
     }
@@ -516,7 +517,7 @@ async function kur() {
     if (!dosya) return;
     const uyanikBirak = uyanikTut();                                   // tıklama anında başlat (tarayıcılar ses/uyku kilidini yalnızca kullanıcı hareketiyle verir); sekme arka plandayken kısılmayı azaltır
     const { bas: b0, son: s0 } = aralikDegeri(); if (ozelAralik.checked && !(Math.min(s0, kayitSure || s0) > b0)) { uyanikBirak(); return bildir("Bitiş, başlangıçtan sonra olmalı.", true); }
-    let sunucu; try { sunucu = kaynak.hazirla(); } catch (h) { uyanikBirak(); return bildir(h.message, true); }
+    let sunucu; try { sunucu = kaynak.hazirla(); } catch (h) { uyanikBirak(); return bildir(trHata(h), true); }
     /* Sistem anahtarı Site Sahibi tarafından kapatıldıysa, ses hiç sıkıştırılmadan/yüklenmeden önce net uyar (Worker da ayrıca reddeder). */
     const kd = await kotaDurumuOku("transkript");
     if (kd?.sistem_anahtari_acik === false && !sunucu.kendi) { uyanikBirak(); return bildir("Sistem anahtarı Site Sahibi tarafından kapatılmış: aşağıdaki “Hangi anahtarla çalışsın?” bölümünden KENDİ Groq anahtarını seç.", true); }
@@ -546,7 +547,7 @@ async function kur() {
             ayirBekleyen++;
             ayirZinciri = ayirZinciri.then(async () => {
               try { const { hatalar } = await ayirPencereli(blob, bas, sure, yeni, session, iptal?.signal); ayirHatalari.push(...hatalar); }
-              catch (h) { if (h.name !== "AbortError") ayirHatalari.push(h.message || String(h)); }
+              catch (h) { if (h.name !== "AbortError") ayirHatalari.push(trHata(h)); }
               finally { ayirBekleyen--; if (!stud.hidden) hepsiniCiz(); }
             });
           }
@@ -570,7 +571,7 @@ async function kur() {
       durduruldu = true;
       if (devam?.segs.length) { await ayirZinciri.catch(() => {}); await yarimKaydet(); }
       if (h.name === "AbortError") bildir(devam?.segs.length ? `⏸ Durduruldu. ${sureGoster(devam.sonraki)} konumuna kadar olan kısım korundu ve bu cihazda saklandı; “Devam ettir”e basarak sürdürebilirsin.` : "Durduruldu.");
-      else bildir(`${h.message || h}${devam?.segs.length ? " — Tamamlanan kısım korundu ve saklandı; “Devam ettir”e basınca baştan başlamaz." : ""}`, true);
+      else bildir(`${trHata(h)}${devam?.segs.length ? " — Tamamlanan kısım korundu ve saklandı; “Devam ettir”e basınca baştan başlamaz." : ""}`, true);
       kota.yenile();
     } finally { uyanikBirak(); basla.disabled = !dosya; durdur.hidden = true; iptal = null; yarimDevamKontrol(); yuzenGuncelle(); }
   });
@@ -595,7 +596,7 @@ async function kur() {
       if (hatalarTum.length) kisiMesaji(`${n ? `Kısmen tamamlandı (${n}/${T.segmentler.length} satır atandı). ` : ""}${[...new Set(hatalarTum.map((m) => m.replace(/^[\d:–-]+:\s*/, "")))].slice(0, 2).join(" · ")}`, true);
       else kisiMesaji(`✔ ${T.konusmacilar.length} konuşmacı bulundu (${n} satır atandı).`);
       bildir("");
-    } catch (h) { ilr.bitir(); if (h.name === "AbortError") bildir("Durduruldu."); else { kisiMesaji(h.message || String(h), true); bildir(h.message || String(h), true); } hepsiniCiz(); }
+    } catch (h) { ilr.bitir(); if (h.name === "AbortError") bildir("Durduruldu."); else { kisiMesaji(trHata(h), true); bildir(trHata(h), true); } hepsiniCiz(); }
     finally { uyanikBirak(); durdur.hidden = true; iptal = null; }
   }
 
@@ -631,4 +632,4 @@ async function kur() {
     kurulum, stud, kota.kok, kaynak.kok, gecmisKart, temizle);
   gecmisCiz(); aralikOzetle(); aiKaynaklariYukle().catch(() => {}); yarimDevamKontrol();
 }
-kur().catch((h) => { console.error("medya-transkript.js:", h); if (kok) kok.replaceChildren(el("p", { class: "auth-message error", text: `Araç yüklenemedi: ${h?.message || h}` })); });
+kur().catch((h) => { console.error("medya-transkript.js:", h); if (kok) kok.replaceChildren(el("p", { class: "auth-message error", text: `Araç yüklenemedi: ${trHata(h)}` })); });

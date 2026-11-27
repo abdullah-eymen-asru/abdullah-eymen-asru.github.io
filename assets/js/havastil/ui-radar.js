@@ -15,6 +15,7 @@ import { gorunenAd } from "./konumlar.js";
 import { dogrulamaKutusu } from "./ui-radar-dogrula.js";
 import { radarKaynakOku } from "./radar-kaynak.js";
 import { omJson, omOnizle, omSonKota, PENCERE_ADI } from "./openmeteo.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const LEAFLET_SURUM = "1.9.4";
 const CDN = `https://cdnjs.cloudflare.com/ajax/libs/leaflet/${LEAFLET_SURUM}`;
@@ -355,7 +356,7 @@ export function radarSekmesi(d, kb) {
       if (neden !== "koru") durum.t = durum.arsivModu ? 0 : durum.simdiIdx;
       yukleDugme.hidden = true; zamanKur(); alanKat?.planla();
       durumYaz(`Tahmin: ${iz.nLat * iz.nLon} nokta · ${iz.etiket} · ${saatYaz(iz.alinma, false)} itibarıyla${iz.not ? ` · ${iz.not}` : ""}`);
-    } catch (h) { if (h.name !== "AbortError") durumYaz(h.message || "Tahmin yüklenemedi.", true); }
+    } catch (h) { if (h.name !== "AbortError") durumYaz(trHata(h, "Tahmin yüklenemedi."), true); }
     finally { yukleDugme.disabled = false; kotaYaz(); }
   }
   /* kota / maliyet satırı: yükleme öncesi tahmini ağırlık + kalan günlük hak + kaynak (ücretsiz IP · site anahtarı · kendi anahtarın) */
@@ -406,7 +407,7 @@ export function radarSekmesi(d, kb) {
     if (tur === "gozlem") {
       yukleDugme.hidden = true; durumYaz("Radar verisi alınıyor…");
       try { await gozlemYukle(); if (durum.katman !== id) return; gozlemKareleriKur(); gozlemKareGoster(); zamanKur(); durumYaz("Canlı radar · son ~2 saat (gözlem). Gelecek saatler için “Gelecek saatler” düğmesi."); }
-      catch (h) { durumYaz(`${h.message} (RainViewer erişilemiyor olabilir)`, true); }
+      catch (h) { durumYaz(`${trHata(h)} (RainViewer erişilemiyor olabilir)`, true); }
     } else {
       alanKat = alanKatmani(L, map, durum); alanKat.addTo(map);
       if (id === "ruzgar" || id === "hamle") { parcKat = parcacikKatmani(L, map, durum); parcKat.addTo(map); }
@@ -489,7 +490,7 @@ export function radarSekmesi(d, kb) {
   olay(hazirSec, "change", () => { ozelKutu.hidden = hazirSec.value !== "ozel"; aralikHata.hidden = true; });
   olay(aralikUygula, "click", () => {
     try { durum.aralik = aralikOku(); aralikHata.hidden = true; }
-    catch (h) { aralikHata.textContent = h.message; aralikHata.hidden = false; return; }
+    catch (h) { aralikHata.textContent = trHata(h); aralikHata.hidden = false; return; }
     arsivKapat.hidden = hazirSec.value === "on3";
     aralikDegisti();
   });
@@ -514,7 +515,7 @@ export function radarSekmesi(d, kb) {
     });
     bolgeKutu.querySelector('[data-id="konum"]').classList.add("aktif");
     efsaneCiz(); katmanDegis("radar"); kotaYaz();
-  }).catch((h) => durumYaz(h.message, true));
+  }).catch((h) => durumYaz(trHata(h), true));
 
   canli = { anahtar, kok, boyutTazele() { try { map?.invalidateSize(); } catch { /* yok say */ } }, durdur() { kapali = true; oynat(false); yukluSinyal?.abort(); try { map?.remove(); } catch { /* yok say */ } map = null; } };
   return kok;

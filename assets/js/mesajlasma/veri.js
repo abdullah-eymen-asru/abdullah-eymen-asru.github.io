@@ -5,6 +5,7 @@
 import { supabase } from "../core/supabase-client.js";
 import { isDemoMode } from "../demo/demo-durum.js";
 import * as S from "./sifre.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 export const E2EE_AKTIF = !isDemoMode; // demo hesapta mock/paylaşımlı veri: eski (düz) yol
 const ROL = { owner: "Site Sahibi", admin: "Yönetici", manager: "İçerik Sorumlusu", editor: "İçerik Editörü", special_user: "Özel Üye", user: "Üye", demo: "Demo Üye" };
@@ -103,7 +104,7 @@ let YANIT_DESTEGI = true;
 export async function mesajlariYukle(sohbet) {
   const oku = (kolon) => supabase.from("messages").select(kolon).eq("conversation_id", sohbet.id).order("created_at", { ascending: true }).limit(500);
   let { data, error } = await oku(YANIT_DESTEGI ? "id, sender_id, body, sifreli, created_at, yanit_id" : "id, sender_id, body, sifreli, created_at");
-  if (error && YANIT_DESTEGI && /yanit_id|42703/.test(`${error.code} ${error.message}`)) { YANIT_DESTEGI = false; ({ data, error } = await oku("id, sender_id, body, sifreli, created_at")); }
+  if (error && YANIT_DESTEGI && /yanit_id|42703/.test(`${error.code} ${trHata(error)}`)) { YANIT_DESTEGI = false; ({ data, error } = await oku("id, sender_id, body, sifreli, created_at")); }
   if (error) throw error;
   const key = await S.sohbetAnahtari(sohbet.id);
   const kisiler = await kisiBilgileri((data || []).map((m) => m.sender_id));
@@ -164,7 +165,7 @@ export async function mesajGonder(sohbet, metin, yanitId = null) {
     const satir = { conversation_id: sohbet.id, sender_id: (await supabase.auth.getUser()).data.user.id, body, sifreli: true };
     if (yanitId && YANIT_DESTEGI) satir.yanit_id = yanitId; // yalnızca hedef mesajın kimliği (düz); alıntı metni istemcide çözülür
     let { data, error } = await supabase.from("messages").insert(satir).select("id").single();
-    if (error && satir.yanit_id && /yanit_id|42703/.test(`${error.code} ${error.message}`)) { YANIT_DESTEGI = false; delete satir.yanit_id; ({ data, error } = await supabase.from("messages").insert(satir).select("id").single()); }
+    if (error && satir.yanit_id && /yanit_id|42703/.test(`${error.code} ${trHata(error)}`)) { YANIT_DESTEGI = false; delete satir.yanit_id; ({ data, error } = await supabase.from("messages").insert(satir).select("id").single()); }
     if (error) throw error;
     S.eksikZarflariTamamla(sohbet.id);
     return data;

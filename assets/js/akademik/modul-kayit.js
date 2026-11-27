@@ -25,6 +25,7 @@
  *   modulKaydet({ id: "ornek", ad: "Örnek", surum: "1.0.0", apiMin: 2, kancalar: { "okuyucu:secim": (yuk, ctx) => {…} } });
  */
 
+import { hata as trHata } from "../core/hata-metni.js";
 export const API_SURUMU = 2;                         // çekirdek modül sözleşmesi; uyumsuz değişiklikte artırılır
 export const CEKIRDEK_SURUMU = "2026.11.20";
 const KAPALI_ANAHTAR = "aea_ak_modul_kapali";
@@ -50,7 +51,7 @@ export function modulKaydet(tanim) {
     moduller.set(tanim.id, { tanim: Object.freeze({ ...tanim }), durum, neden, hata: 0, sonHata: "" });
     bildir();
     return { ok: durum === "etkin", neden };
-  } catch (h) { return { ok: false, neden: String(h?.message || h) }; }
+  } catch (h) { return { ok: false, neden: String(trHata(h)) }; }
 }
 
 /** Kanca çalıştırır; her etkin modülün işleyicisi yalıtılmıştır. Sonuçlar dizisi döner (hatalı işleyiciler atlanır). */
@@ -67,7 +68,7 @@ export async function kancaCalistir(ad, yuk, ctx = {}) {
       ]);
       if (sonuc !== undefined) sonuclar.push({ modul: id, sonuc });
     } catch (h) {
-      m.hata++; m.sonHata = String(h?.message || h);
+      m.hata++; m.sonHata = String(trHata(h));
       console.warn(`[modül:${id}] ${ad} hatası (${m.hata}/${HATA_ESIGI}):`, h);
       if (m.hata >= HATA_ESIGI) { m.durum = "askida"; m.neden = `art arda hata: ${m.sonHata}`; bildir(); }
     }

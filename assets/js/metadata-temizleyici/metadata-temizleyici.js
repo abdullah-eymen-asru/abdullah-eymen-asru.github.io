@@ -10,6 +10,7 @@ import { supabase } from "../core/supabase-client.js";
 import { el, hataMetni } from "../donusturucu/ortak.js";
 import { metadataKartiYap } from "./arayuz.js";
 import { sekmeSifirlamaKaydet } from "../core/gezinme-kilidi.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const kok = document.getElementById("mt-kok");
 
@@ -34,5 +35,5 @@ async function kur() {
 
 kur().catch((h) => {
   console.error("metadata-temizleyici.js:", h);
-  if (kok) kok.replaceChildren(el("p", { class: "auth-message error", text: `Araç yüklenemedi: ${h?.message || h}` }));
+  if (kok) kok.replaceChildren(el("p", { class: "auth-message error", text: `Araç yüklenemedi: ${trHata(h)}` }));
 });

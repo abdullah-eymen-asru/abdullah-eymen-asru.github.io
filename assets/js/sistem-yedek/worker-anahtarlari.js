@@ -17,6 +17,7 @@
  */
 import { supabase } from "../core/supabase-client.js";
 import { el, dugme, silOnayiIste, hataMetni, tarihMetni, workerJson } from "./ortak.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 /**
  * "Kapat" düğmesinin akıllı onay penceresi (mobil dostu <dialog>): Standart (503) ya da Sert (workers.dev'i kes) seçilir.
@@ -109,7 +110,7 @@ export function workerAnahtarKarti() {
           } else rozet = { metin: "Cloudflare'e iletildi (durum geri okunamadı)", sinif: "uyari" };
         } catch (h) {
           rozet = { metin: "Sert katman uygulanamadı", sinif: "kritik" };
-          sertUyari = `Sert katman uygulanamadı: ${h.message || h}`;
+          sertUyari = `Sert katman uygulanamadı: ${trHata(h)}`;
         }
       }
       const { error } = await supabase.rpc("worker_anahtari_ayarla", { p_ad: satir.ad, p_acik: acik });
@@ -261,7 +262,7 @@ export function workerAnahtarKarti() {
     } catch (h) {
       govde.replaceChildren(el("p", { class: "auth-message error", text: /does not exist|42P01|PGRST205|schema cache/i.test(h?.message || "")
         ? (console.warn("Gerekli migration (0088) henüz çalıştırılmamış."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.")
-        : `Anahtarlar okunamadı: ${h.message || h}` }));
+        : `Anahtarlar okunamadı: ${trHata(h)}` }));
     } finally { yenile.disabled = false; }
   }
 

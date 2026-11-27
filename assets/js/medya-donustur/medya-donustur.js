@@ -8,6 +8,7 @@ import { supabase } from "../core/supabase-client.js";
 import { el, hataMetni, indir, bayt, adsizAl } from "../donusturucu/ortak.js";
 import { sekmeSifirlamaKaydet } from "../core/gezinme-kilidi.js";
 import { lameYukle, sesCoz, monoOrnekle, mp3Kodla, sleep, SINIR, ilerlemeKur } from "./ses-ortak.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const kok = document.getElementById("md-kok");
 
@@ -29,7 +30,7 @@ async function kur() {
       if (f.size > SINIR) throw new Error(`Dosya çok büyük (${bayt(f.size)}); üst sınır ${bayt(SINIR)}.`);
       ilr.baslat("Ses çözülüyor", Math.max(2, f.size / (12 * 1024 * 1024))); dosya = f; buf = await sesCoz(f); ilr.bitir();
       bilgi.textContent = `${f.name} · ${bayt(f.size)} · ${Math.round(buf.duration / 60 * 10) / 10} dk`; donusturBtn.disabled = false; bildir("Hazır.");
-    } catch (h) { ilr.bitir(); bildir(h.message, true); dosya = null; buf = null; donusturBtn.disabled = true; }
+    } catch (h) { ilr.bitir(); bildir(trHata(h), true); dosya = null; buf = null; donusturBtn.disabled = true; }
   }
   girdi.addEventListener("change", () => { if (girdi.files?.[0]) yukle(girdi.files[0]); girdi.value = ""; });
   donusturBtn.addEventListener("click", async () => {
@@ -37,7 +38,7 @@ async function kur() {
     try { ilr.baslat("Hazırlanıyor (mono'ya indiriliyor)", Math.max(2, buf.duration / 40)); const lame = await lameYukle(), f32 = await monoOrnekle(buf); await sleep();
       const blob = mp3Kodla(lame, f32, Number(kbps.value), (p) => ilr.guncelle(p, "MP3 kodlanıyor")); ilr.bitir();
       indir(blob, `${adsizAl(dosya.name)}_${kbps.value}kbps.mp3`); bildir(`✔ ${bayt(dosya.size)} → ${bayt(blob.size)} (mono ${kbps.value} kbps MP3).`); }
-    catch (h) { ilr.bitir(); bildir(h.message || String(h), true); } finally { donusturBtn.disabled = false; }
+    catch (h) { ilr.bitir(); bildir(trHata(h), true); } finally { donusturBtn.disabled = false; }
   });
   const temizle = el("button", { type: "button", class: "md-btn", text: "🧹 Belleği temizle" });
   temizle.addEventListener("click", () => { dosya = null; buf = null; ilr.bitir(); donusturBtn.disabled = true; bilgi.textContent = "Dosya tarayıcında işlenir."; bildir("🧹 Bellek temizlendi."); });
@@ -46,4 +47,4 @@ async function kur() {
   kok.replaceChildren(el("div", { class: "md-kart" }, el("p", { class: "md-soluk", text: "🔒 Dönüştürme tamamen tarayıcıda yapılır; dosyan hiçbir yere gönderilmez. Konuşmayı yazıya dökmek için “Transkript Stüdyosu” sekmesini kullan." }), sec, girdi, bilgi),
     el("div", { class: "md-kart" }, el("h2", { text: "MP3'e küçült" }), kbps, donusturBtn), temizle, cubuk, sureYazi, mesaj);
 }
-kur().catch((h) => { console.error("medya-donustur.js:", h); if (kok) kok.replaceChildren(el("p", { class: "auth-message error", text: `Araç yüklenemedi: ${h?.message || h}` })); });
+kur().catch((h) => { console.error("medya-donustur.js:", h); if (kok) kok.replaceChildren(el("p", { class: "auth-message error", text: `Araç yüklenemedi: ${trHata(h)}` })); });

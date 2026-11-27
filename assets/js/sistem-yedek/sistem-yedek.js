@@ -26,6 +26,7 @@ import { gezginCiz } from "./gezgin.js";
 import { icAktarCiz } from "./ice-aktar.js";
 import { kisiselVeriCiz } from "./kisisel-veri.js";
 import { r2CopCiz, kilitliKasalariCiz } from "./r2-cop.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const ROLLER = { owner: "Site Sahibi", admin: "Yönetici", manager: "İçerik Sorumlusu", editor: "Editör", special_user: "Özel Üye", user: "Üye" };
 
@@ -437,5 +438,5 @@ async function kur() {
 kur().catch((h) => {
   console.error("sistem-yedek.js:", h);
   const m = document.getElementById("sy-mesaj");
-  if (m) showMessage(m, `Modül yüklenemedi: ${h.message || h}`, "error");
+  if (m) showMessage(m, `Modül yüklenemedi: ${trHata(h)}`, "error");
 });

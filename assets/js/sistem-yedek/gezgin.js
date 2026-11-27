@@ -17,6 +17,7 @@ import {
   R2_KAYNAK_ADLARI, SISTEM_YEDEK_WORKER_URL,
 } from "./ortak.js";
 import { tabloBilgisi, KATEGORILER } from "./depolama.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const sayi = (n) => Number(n || 0).toLocaleString("tr-TR");
 const KILIT_METNI = {
@@ -231,7 +232,7 @@ function veritabaniPaneli(mesaj) {
           await yukle();
           yukleTablolarSessiz();
         } catch (h) {
-          if (islem) { try { await supabase.rpc("sistem_islem_bitir", { p_id: islem, p_basarili: false, p_ozet: { hata: String(h?.message || h).slice(0, 200) } }); } catch { /* best-effort */ } }
+          if (islem) { try { await supabase.rpc("sistem_islem_bitir", { p_id: islem, p_basarili: false, p_ozet: { hata: String(trHata(h)).slice(0, 200) } }); } catch { /* best-effort */ } }
           durum.textContent = `Silinemedi: ${hataMetni(h)}`;
         }
       });
@@ -307,7 +308,7 @@ function veritabaniPaneli(mesaj) {
       secili.clear();
     } catch (h) {
       if (islem) {
-        try { await supabase.rpc("sistem_islem_bitir", { p_id: islem, p_basarili: false, p_ozet: { hata: String(h?.message || h).slice(0, 300) } }); } catch { /* günlük best-effort */ }
+        try { await supabase.rpc("sistem_islem_bitir", { p_id: islem, p_basarili: false, p_ozet: { hata: String(trHata(h)).slice(0, 300) } }); } catch { /* günlük best-effort */ }
       }
       mesaj(`Silinemedi (hiçbir tablo değişmedi): ${hataMetni(h)}`);
     } finally {
@@ -371,7 +372,7 @@ function r2Paneli(mesaj) {
         try {
           const g = await workerJson("/r2/kuyruk-isle", { yontem: "POST" });
           mesaj(`Kuyruk işlendi: ${sayi(g.silinen)} nesne silindi, ${sayi(g.kalan)} kaldı.`, g.kalan ? "error" : "success");
-        } catch (h) { mesaj(`Kuyruk işlenemedi: ${h.message}`); }
+        } catch (h) { mesaj(`Kuyruk işlenemedi: ${trHata(h)}`); }
         await kuyrukBandi();
       });
       kuyrukKutu.replaceChildren(el("div", { class: "sy-bilgi sy-bilgi--uyari" }, ikon("uyari"),
@@ -414,7 +415,7 @@ function r2Paneli(mesaj) {
       d.nesneler = devam ? [...d.nesneler, ...g.nesneler] : g.nesneler;
       d.imlec = g.imlec;
     } catch (h) {
-      mesaj(`Gezgin yüklenemedi: ${h.message}`);
+      mesaj(`Gezgin yüklenemedi: ${trHata(h)}`);
     } finally {
       if (d) { d.yukleniyor = false; gezginCiz(); }
     }
@@ -463,9 +464,9 @@ function r2Paneli(mesaj) {
       mesaj(`${sayi(silinen)} nesne silindi.`, "success");
     } catch (h) {
       if (islem) {
-        try { await supabase.rpc("sistem_islem_bitir", { p_id: islem, p_basarili: false, p_ozet: { silinen, hata: String(h.message || h).slice(0, 300) } }); } catch { /* best-effort */ }
+        try { await supabase.rpc("sistem_islem_bitir", { p_id: islem, p_basarili: false, p_ozet: { silinen, hata: String(trHata(h)).slice(0, 300) } }); } catch { /* best-effort */ }
       }
-      mesaj(`Silme tamamlanamadı (${sayi(silinen)} nesne silindi): ${h.message || h}`);
+      mesaj(`Silme tamamlanamadı (${sayi(silinen)} nesne silindi): ${trHata(h)}`);
     } finally {
       if (d) d.calisiyor = false;
     }
@@ -498,7 +499,7 @@ function r2Paneli(mesaj) {
           const g = await workerJson(`/r2/boyut?b=${d.kaynak}&o=${encodeURIComponent(k.onek)}`);
           d.boyutlar.set(k.onek, `${sayi(g.adet)} nesne · ${bayt(g.bayt)}${g.kismi ? " (kısmi tarama)" : ""}`);
           gezginCiz();
-        } catch (h) { mesaj(`Boyut alınamadı: ${h.message}`); hesapla.disabled = false; }
+        } catch (h) { mesaj(`Boyut alınamadı: ${trHata(h)}`); hesapla.disabled = false; }
       });
       return el("li", { class: "sy-gz-nesne sy-gz-nesne--klasor" }, ac, sonuc ? el("span", { class: "muted", text: sonuc }) : hesapla);
     });

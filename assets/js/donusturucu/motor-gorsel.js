@@ -6,6 +6,7 @@
  */
 import { baytlariOku, dataUrlBaytlari, baytlardanDataUrl, IOS_MU, uzantiAl } from "./ortak.js";
 import { kutuphaneYukle } from "./cdn.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const MAKS_ALAN = () => (IOS_MU() ? 16_000_000 : 120_000_000);
 
@@ -45,12 +46,12 @@ export async function gorselCoz(blob, ad = "") {
     try { nativeOk = await createImageBitmap(blob); } catch { /* yerel çözüm yok */ }
     if (nativeOk) return { cizilebilir: nativeOk, w: nativeOk.width, h: nativeOk.height, kapat: () => nativeOk.close?.() };
     let heic2any;
-    try { heic2any = await kutuphaneYukle("heic2any"); } catch (h) { throw new Error(`HEIC çözücü yüklenemedi: ${h.message}`); }
+    try { heic2any = await kutuphaneYukle("heic2any"); } catch (h) { throw new Error(`HEIC çözücü yüklenemedi: ${trHata(h)}`); }
     try {
       const sonuc = await heic2any({ blob, toType: "image/png" });
       kaynak = Array.isArray(sonuc) ? sonuc[0] : sonuc;
     } catch (h) {
-      throw new Error(`HEIC çözülemedi. Sitenin CSP'sinde 'wasm-unsafe-eval' yoksa WebAssembly engellenir (rehber/05-donusturucu.md). Ayrıntı: ${h?.message || h}`);
+      throw new Error(`HEIC çözülemedi. Sitenin CSP'sinde 'wasm-unsafe-eval' yoksa WebAssembly engellenir (rehber/05-donusturucu.md). Ayrıntı: ${trHata(h)}`);
     }
   }
   const svg = uzanti === "svg" || blob.type === "image/svg+xml";

@@ -23,6 +23,7 @@
  * -----------------------------------------------------------------------
  */
 import { supabase, showMessage } from "../core/supabase-client.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const OZELLIK = "notlar_modulu";
 const ROL_ETIKETI = {
@@ -152,7 +153,7 @@ function bolumKur(anahtar, cfg, mesaj) {
       await Promise.all([etkinleriYukle(), aramayiYenile()]);
     } catch (hata) {
       console.error(hata);
-      showMessage(mesaj, `Kaydedilemedi: ${hata.message || hata}`, "error");
+      showMessage(mesaj, `Kaydedilemedi: ${trHata(hata)}`, "error");
     } finally {
       dugme.disabled = false;
     }
@@ -185,7 +186,7 @@ function bolumKur(anahtar, cfg, mesaj) {
     }
     const { data, error } = await supabase.rpc(cfg.aramaRpc, { p_ozellik: OZELLIK, p_arama: metin });
     if (sira !== sonArama) return; // daha yeni bir arama başladı, bu sonuç bayat
-    if (error) return void sonuclar.replaceChildren(el("p", { class: "muted", text: `Aranamadı: ${error.message}` }));
+    if (error) return void sonuclar.replaceChildren(el("p", { class: "muted", text: `Aranamadı: ${trHata(error)}` }));
     sonuclar.replaceChildren(
       ...(data?.length
         ? data.map((k) => kisiSatiri(k, !!k[cfg.durumAlani]))

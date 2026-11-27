@@ -12,6 +12,7 @@ import { pdfAcSecenekleri } from "../donusturucu/pdf-yukle.js";
 import { supabase } from "../core/supabase-client.js";
 import { el, bayt, workerFetch, hataMetni, dugme } from "../sistem-yedek/ortak.js";
 import { AkisliZip, aliciOlustur } from "../sistem-yedek/zip-yazici.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const ONIZLENEBILIR = /^image\/(png|jpe?g|webp|gif)$/i;
 const temizYol = (s) => String(s || "").replace(/\\/g, "/").replace(/^\/+/, "").split("/").filter((p) => p && p !== "..").join("/");
@@ -69,7 +70,7 @@ export function dosyaPaneliKur(kok, uye, mesaj) {
         alan.replaceChildren(el("p", { class: "muted", text: "Bu tür önizlenemez; indirerek aç." }));
       }
     } catch (h) {
-      alan.replaceChildren(el("p", { class: "auth-message error", text: `Önizleme başarısız: ${h.message || h}` }));
+      alan.replaceChildren(el("p", { class: "auth-message error", text: `Önizleme başarısız: ${trHata(h)}` }));
     } finally { btn.disabled = false; }
   }
 
@@ -82,7 +83,7 @@ export function dosyaPaneliKur(kok, uye, mesaj) {
       const a = el("a", { href: u, download: dosyaAdi(d) });
       document.body.append(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(u), 30000);
-    } catch (h) { mesaj(`İndirilemedi: ${h.message || h}`); }
+    } catch (h) { mesaj(`İndirilemedi: ${trHata(h)}`); }
   }
 
   function karti(d) {
@@ -127,7 +128,7 @@ export function dosyaPaneliKur(kok, uye, mesaj) {
           await zip.akisEkle(temizYol(`${d.klasor || ""}${dosyaAdi(d)}`) || dosyaAdi(d), r.body, { sinyal: denetci.signal });
         } catch (h) {
           if (h?.name === "AbortError") throw h;
-          hatalar.push(`${d.ad}: ${h.message || h}`);
+          hatalar.push(`${d.ad}: ${trHata(h)}`);
         }
       }
       if (hatalar.length) await zip.dosyaEkle("HATALAR.txt", hatalar.join("\n"));
@@ -143,7 +144,7 @@ export function dosyaPaneliKur(kok, uye, mesaj) {
       mesaj(`ZIP hazır: ${ad} (${bayt(sonuc.boyut)}).${hatalar.length ? ` ${hatalar.length} dosya alınamadı (HATALAR.txt).` : ""}`, hatalar.length ? "error" : "success");
     } catch (h) {
       if (zip) { try { await zip.iptal(); } catch { /* yok say */ } }
-      if (islem) { try { await supabase.rpc("sistem_islem_bitir", { p_id: islem, p_basarili: false, p_ozet: { hata: String(h.message || h).slice(0, 200) } }); } catch { /* best-effort */ } }
+      if (islem) { try { await supabase.rpc("sistem_islem_bitir", { p_id: islem, p_basarili: false, p_ozet: { hata: String(trHata(h)).slice(0, 200) } }); } catch { /* best-effort */ } }
       mesaj(h?.name === "AbortError" ? "ZIP indirme iptal edildi." : `ZIP oluşturulamadı: ${hataMetni(h)}`);
     } finally {
       denetci = null; iptalBtn.hidden = true; ozetGuncelle();

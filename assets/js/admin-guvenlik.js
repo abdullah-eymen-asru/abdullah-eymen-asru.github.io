@@ -41,6 +41,7 @@ import { supabase, showMessage, escapeHtml } from "./core/supabase-client.js";
 import { tekKanal } from "./core/realtime.js";
 import { requireAuthOrShowError } from "./auth/auth-guard.js";
 import { el, tarihMetni, uyeAdi, uyeBilgileri, bilgiSatiri, ROL_ETIKETI } from "./gatekeeper/degisiklik-kaydi.js";
+import { hata as trHata } from "./core/hata-metni.js";
 
 const DURUM_ETIKETLERI = {
   askida: "🔴 Askıda — karar bekleniyor",
@@ -144,7 +145,7 @@ function wireKayitlarToggle() {
     btn.disabled = false;
 
     if (error) {
-      showMessage(msg, "Değiştirilemedi: " + error.message, "error");
+      showMessage(msg, "Değiştirilemedi: " + trHata(error), "error");
       return;
     }
 
@@ -204,7 +205,7 @@ function wireKilitModuToggle() {
     btn.disabled = false;
 
     if (error) {
-      showMessage(msg, "Değiştirilemedi: " + error.message, "error");
+      showMessage(msg, "Değiştirilemedi: " + trHata(error), "error");
       return;
     }
 
@@ -266,7 +267,7 @@ async function loadDenetimKayitlari() {
   }
 
   if (error) {
-    kutu.replaceChildren(el("p", { class: "muted", text: `Denetim kaydı yüklenemedi: ${error.message}` }));
+    kutu.replaceChildren(el("p", { class: "muted", text: `Denetim kaydı yüklenemedi: ${trHata(error)}` }));
     renderDenetimSayfalama(0, 0);
     return;
   }
@@ -337,7 +338,7 @@ function denetimKayitOgesi(k, { vurgulu = false } = {}) {
       const { error } = await supabase.rpc("owner_denetim_kaydi_sil", { p_id: k.id });
       if (error) {
         d.disabled = false;
-        alert("Kayıt silinemedi: " + error.message);
+        alert("Kayıt silinemedi: " + trHata(error));
         return;
       }
       await loadDenetimKayitlari();
@@ -475,7 +476,7 @@ function wireDenetimKaydiKontrolleri() {
     otuzGunBtn.disabled = false;
 
     if (error) {
-      showMessage(msg, "Temizlenemedi: " + error.message, "error");
+      showMessage(msg, "Temizlenemedi: " + trHata(error), "error");
       return;
     }
     showMessage(msg, `${data ?? 0} kayıt silindi.`, "success");
@@ -501,7 +502,7 @@ function wireDenetimKaydiKontrolleri() {
     hepsiBtn.disabled = false;
 
     if (error) {
-      showMessage(msg, "Temizlenemedi: " + error.message, "error");
+      showMessage(msg, "Temizlenemedi: " + trHata(error), "error");
       return;
     }
     showMessage(msg, `${data ?? 0} kayıt silindi.`, "success");
@@ -567,7 +568,7 @@ async function loadAdminListesi() {
 
   const { data, error } = await supabase.rpc("guvenlik_admin_listesi_getir");
   if (error) {
-    kutu.innerHTML = `<p class="muted">Liste yüklenemedi: ${escapeHtml(error.message)}</p>`;
+    kutu.innerHTML = `<p class="muted">Liste yüklenemedi: ${escapeHtml(trHata(error))}</p>`;
     return;
   }
   ADMIN_LISTESI = data || [];
@@ -623,7 +624,7 @@ function wireAskiyaAlForm() {
     });
 
     if (error) {
-      showMessage(msg, "Askıya alma başarısız: " + error.message, "error");
+      showMessage(msg, "Askıya alma başarısız: " + trHata(error), "error");
       return;
     }
 
@@ -642,7 +643,7 @@ async function loadVakalar() {
 
   const { data, error } = await supabase.rpc("denetim_vakalarini_listele");
   if (error) {
-    kutu.innerHTML = `<p class="muted">Vakalar yüklenemedi: ${escapeHtml(error.message)}</p>`;
+    kutu.innerHTML = `<p class="muted">Vakalar yüklenemedi: ${escapeHtml(trHata(error))}</p>`;
     renderVakaSayfalama(0, 0);
     return;
   }
@@ -767,7 +768,7 @@ function wireVakaOlaylari(kutu) {
         p_oy: btn.dataset.oy,
       });
       if (error) {
-        alert("Oy kaydedilemedi: " + error.message);
+        alert("Oy kaydedilemedi: " + trHata(error));
         return;
       }
       await Promise.all([loadAdminListesi(), loadVakalar()]);
@@ -787,7 +788,7 @@ function wireVakaOlaylari(kutu) {
       btn.disabled = false;
 
       if (error) {
-        alert("Oy geri alınamadı: " + error.message);
+        alert("Oy geri alınamadı: " + trHata(error));
         return;
       }
       await Promise.all([loadAdminListesi(), loadVakalar()]);
@@ -808,7 +809,7 @@ function wireVakaOlaylari(kutu) {
         p_karar: karar,
       });
       if (error) {
-        alert("Owner kararı uygulanamadı: " + error.message);
+        alert("Owner kararı uygulanamadı: " + trHata(error));
         return;
       }
       await Promise.all([loadAdminListesi(), loadVakalar()]);
@@ -832,7 +833,7 @@ function wireVakaOlaylari(kutu) {
       btn.disabled = false;
 
       if (error) {
-        alert("Vaka silinemedi: " + error.message);
+        alert("Vaka silinemedi: " + trHata(error));
         return;
       }
       await loadVakalar();

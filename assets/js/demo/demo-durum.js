@@ -19,6 +19,7 @@ const UYE_BAYRAK = "aea_demo_uye"; // GERÇEK, 'demo' rolündeki üye girişi (a
 const CFG_ONBELLEK = "aea_demo_cfg";
 const CFG_TTL_MS = 90 * 1000;
 
+import { hata as trHata } from "../core/hata-metni.js";
 export const DEMO_MESAJI =
   "Bu işlem vitrin modunda salt-okunur olarak çalışmaktadır. Değişiklikler kaydedilmez ve gerçek sunucuya iletilmez.";
 
@@ -358,7 +359,7 @@ export function demoBildir(mesaj = DEMO_MESAJI, { sureMs = 5200 } = {}) {
   else document.addEventListener("DOMContentLoaded", kur, { once: true });
 }
 
-/** Salt-okunur hata nesnesi (modüller error.message'ı ekrana basar). */
+/** Salt-okunur hata nesnesi (modüller trHata(error)'ı ekrana basar). */
 export function demoHatasi() {
   return { message: DEMO_MESAJI, code: "DEMO_READONLY", details: null, hint: null, status: 403 };
 }

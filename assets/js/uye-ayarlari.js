@@ -20,6 +20,7 @@
 import { supabase, showMessage, escapeHtml, kucukHarfeCevirTr, kullaniciAramayaUyuyorMu } from "./core/supabase-client.js";
 import { tekKanal } from "./core/realtime.js";
 import { requireAuthOrShowError } from "./auth/auth-guard.js";
+import { hata as trHata } from "./core/hata-metni.js";
 
 const DELETE_ACCOUNT_FUNCTION_URL =
   "https://eahvcirspmvntffzphye.supabase.co/functions/v1/delete-account";
@@ -105,7 +106,7 @@ async function wireDisaAktar() {
       modul.uyeDisaAktarAc({ yazar: GIRIS_YAPAN_PROFIL?.full_name || "" });
     } catch (hata) {
       console.error("uye-ayarlari.js: dışa aktarma açılamadı:", hata);
-      window.alert("Dışa aktarma açılamadı: " + (hata.message || hata));
+      window.alert("Dışa aktarma açılamadı: " + (trHata(hata)));
     }
   });
 }
@@ -123,7 +124,7 @@ async function loadUsers() {
     .order("created_at", { ascending: false });
 
   if (error) {
-    liste.innerHTML = `<p class="muted">Üyeler yüklenemedi: ${escapeHtml(error.message)}</p>`;
+    liste.innerHTML = `<p class="muted">Üyeler yüklenemedi: ${escapeHtml(trHata(error))}</p>`;
     return;
   }
 
@@ -497,7 +498,7 @@ function wireKartOlaylari(liste) {
         // sadece "Hata!" değil, asıl sebebi de göster ve seçim kutusunu
         // eski değerine geri al (aksi halde arayüz, RPC'nin reddettiği
         // değeri seçili gösterip yanıltıcı olurdu).
-        alert("Rol değiştirilemedi: " + error.message);
+        alert("Rol değiştirilemedi: " + trHata(error));
         const kullaniciEski = TUM_KULLANICILAR.find((u) => u.id === userId);
         if (kullaniciEski) select.value = kullaniciEski.role;
         return;
@@ -587,7 +588,7 @@ async function sahipYap(userId, isim, btn) {
   btn.disabled = false;
 
   if (error) {
-    alert("Site Sahibi yapılamadı: " + error.message);
+    alert("Site Sahibi yapılamadı: " + trHata(error));
     return;
   }
   const kullanici = TUM_KULLANICILAR.find((u) => u.id === userId);
@@ -620,7 +621,7 @@ async function kendiYetkimiDusur(btn) {
   btn.disabled = false;
 
   if (error) {
-    alert("Yetki düşürülemedi: " + error.message);
+    alert("Yetki düşürülemedi: " + trHata(error));
     return;
   }
   // Kendi rolü artık owner değil — panel bu sayfayı kullanmaya devam
@@ -661,7 +662,7 @@ async function uyeyiSil(userId, email) {
       window.location.href = "/panel/dashboard.html#sys-silme-onayi";
     }
   } catch (err) {
-    alert("Üye silinemedi: " + err.message);
+    alert("Üye silinemedi: " + trHata(err));
   }
 }
 
@@ -789,7 +790,7 @@ function wireDavetAyarlari() {
       p_toplam: sayi("davet-toplam"),
       p_gunluk: sayi("davet-gunluk"),
     });
-    if (error) return showMessage(msg, error.message);
+    if (error) return showMessage(msg, trHata(error));
     showMessage(msg, "Davet ayarları kaydedildi.", "success");
     davetAyarlariniYukle();
   });
@@ -841,7 +842,7 @@ function wireDavet() {
       const ag = err instanceof TypeError;
       showMessage(msg, ag
         ? "Sunucuya ulaşılamadı: Edge Function 'admin-invite-user' deploy edilmemiş ya da bu adres fonksiyonun CORS listesinde olmayabilir."
-        : err.message);
+        : trHata(err));
     } finally {
       btn.disabled = false;
     }
@@ -915,8 +916,8 @@ function wireAdminEmailChange() {
       showMessage(
         msg,
         agHatasiMi
-          ? `E-posta değiştirilemedi: sunucuya ulaşılamadı (${err.message}). Olası nedenler: Edge Function henüz deploy edilmemiş olabilir, ya da bu sitenin adresi fonksiyonun izin verilen listesinde olmayabilir (CORS). Bkz. README → "admin-change-email 'Load failed' Hatası Alıyorum".`
-          : "E-posta değiştirilemedi: " + err.message
+          ? `E-posta değiştirilemedi: sunucuya ulaşılamadı (${trHata(err)}). Olası nedenler: Edge Function henüz deploy edilmemiş olabilir, ya da bu sitenin adresi fonksiyonun izin verilen listesinde olmayabilir (CORS). Bkz. README → "admin-change-email 'Load failed' Hatası Alıyorum".`
+          : "E-posta değiştirilemedi: " + trHata(err)
       );
     } finally {
       submitBtn.disabled = false;

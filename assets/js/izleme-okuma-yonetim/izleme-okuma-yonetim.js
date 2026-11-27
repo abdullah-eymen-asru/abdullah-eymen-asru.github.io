@@ -31,6 +31,7 @@
 import { requireAuthOrShowError } from "../auth/auth-guard.js";
 import { showMessage, supabase } from "../core/supabase-client.js";
 import { normallestir, enBenzerKayitlariBul, TUR_ETIKET, TUR_ACIKLAMA, vurguParcalari } from "./benzerlik.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 // ---- BURAYI DOLDUR: Worker deploy edildikten sonra aldığın URL ----
 const IZLEME_OKUMA_WORKER_URL = "https://izleme-okuma-yonetim-worker.aeymena.workers.dev";
@@ -69,7 +70,7 @@ async function workerRequest(path, options = {}) {
   });
   const body = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new Error(body?.message || `İstek başarısız (${res.status}).`);
+    throw new Error(trHata(body, `İstek başarısız (${res.status}).`));
   }
   return body;
 }
@@ -370,7 +371,7 @@ async function ekleFormunuKoleksiyonaGoreKur() {
     fields.forEach((alan) => container.appendChild(alanGirdiElemaniOlustur(alan, "iy-alan")));
   } catch (err) {
     container.innerHTML = "";
-    showMessage(messageEl, "Alanlar yüklenemedi: " + err.message, "error");
+    showMessage(messageEl, "Alanlar yüklenemedi: " + trHata(err), "error");
   }
 }
 
@@ -445,7 +446,7 @@ function ekleFormGonderimiBagla() {
       form.reset();
       ekleBenzerUyarisiniGizle();
     } catch (err) {
-      showMessage(messageEl, "Kayıt eklenemedi: " + err.message, "error");
+      showMessage(messageEl, "Kayıt eklenemedi: " + trHata(err), "error");
     } finally {
       submitBtn.disabled = false;
       // Hata durumunda "Yine de ekle" onayı hâlâ geçerli olmalı (kullanıcı
@@ -561,7 +562,7 @@ async function listeyiYukle() {
     listeyiFiltreleVeCiz();
   } catch (err) {
     container.innerHTML = "";
-    showMessage(document.getElementById("iy-duzenle-message"), "Liste yüklenemedi: " + err.message, "error");
+    showMessage(document.getElementById("iy-duzenle-message"), "Liste yüklenemedi: " + trHata(err), "error");
     document.getElementById("iy-duzenle-message").hidden = false;
   }
 }
@@ -594,7 +595,7 @@ async function duzenlemeFormunuAc(item) {
     });
   } catch (err) {
     alanlarContainer.innerHTML = "";
-    showMessage(messageEl, "Alanlar yüklenemedi: " + err.message, "error");
+    showMessage(messageEl, "Alanlar yüklenemedi: " + trHata(err), "error");
   }
 }
 
@@ -651,7 +652,7 @@ function duzenlemeFormGonderimiBagla() {
       await listeyiYukle();
       duzenlemeFormunuKapat();
     } catch (err) {
-      showMessage(messageEl, "Kayıt güncellenemedi: " + String(err.message || err).replace(/^Kayıt güncellenemedi:\s*/i, ""), "error");
+      showMessage(messageEl, trHata(err, "Kayıt güncellenemedi."), "error");
     } finally {
       submitBtn.disabled = false;
       submitBtn.textContent = "💾 Güncelle";

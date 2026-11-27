@@ -22,6 +22,7 @@ import { MESAJ_YEDEK_YOLU, mesajYedegiMi, mesajYedegiKodluMu, mesajYedeginiIceAk
 import { kodSor } from "../kurtarma-kiti/kit-arayuz.js";
 import * as Rewrap from "../kurtarma-kiti/yeniden-zarfla.js"; // farklı hesap/altyapı: Yedek Kurtarma Kodu + yeniden zarflama (2026-10)
 import { el, bayt, hataMetni, workerFetch, dugme, ikon, onayIste, r2AnahtarGecerli, R2_KAYNAK_ADLARI } from "./ortak.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 // FK BAĞIMLILIK SIRASI (ebeveyn → çocuk). Sunucu RPC'si her satırı UPSERT eder (INSERT … ON CONFLICT (pk) DO UPDATE | DO NOTHING):
 // yeniden çalıştırma / kısmi yedek çakışmada patlamaz. Listede olmayan tablolar en sona (999) gider; FK hatası alanlar sonraki turda yeniden denenir.
@@ -100,7 +101,7 @@ async function analizEt(dosyalar, sema, ilerleme, ctx = {}) {
 
   async function jsonIsle(ad, blob, etiket) {
     let satirlar;
-    try { satirlar = await jsonSatirlari(blob); } catch (h) { notlar.push(`${etiket}: atlandı — ${h.message}`); return; }
+    try { satirlar = await jsonSatirlari(blob); } catch (h) { notlar.push(`${etiket}: atlandı — ${trHata(h)}`); return; }
     const kokAd = ad.split("/").pop().replace(/\.json$/i, "");
     if (Rewrap.OZEL_TABLOLAR.includes(kokAd) && /(^|\/)(veritabani|akademik)\/json\//.test(ad)) (ozel[kokAd] ||= []).push(...satirlar);
     if (!satirlar.length) { bosTablolar.push(kokAd); return; }
@@ -119,7 +120,7 @@ async function analizEt(dosyalar, sema, ilerleme, ctx = {}) {
     const ad = f.name;
     if (/\.zip$/i.test(ad)) {
       let z;
-      try { z = await zipAc(f); } catch (h) { notlar.push(`${ad}: ${h.message}`); continue; }
+      try { z = await zipAc(f); } catch (h) { notlar.push(`${ad}: ${trHata(h)}`); continue; }
       const manifestG = z.bul("r2/MANIFEST.json");
       const anaYorumVar = !!z.bul("veritabani/json/yorumlar.json");   // yazı/sayfa bazlı yorum dosyaları yalnızca ana dosya yoksa okunur (çift yazım olmasın)
       const yedekMi = !!z.bul("manifest.json") || !!manifestG || z.girisler.some((g) => /^(veritabani|notlar|akademik)\/json\//.test(g.ad));
@@ -135,7 +136,7 @@ async function analizEt(dosyalar, sema, ilerleme, ctx = {}) {
             if (!r2AnahtarGecerli(e.kaynak, e.anahtar)) { notlar.push(`MANIFEST: ${e.anahtar} bilinen anahtar biçimi değil (korumalı) — atlanacak.`); continue; }
             r2.push({ kaynak: e.kaynak, anahtar: yeniAnahtar(e.kaynak, e.anahtar, ctx), eskiAnahtar: e.anahtar, ad: e.anahtar.split("/").pop(), boyut: g.usize, al: () => z.oku(g) });
           }
-        } catch (h) { notlar.push(`r2/MANIFEST.json okunamadı: ${h.message}`); }
+        } catch (h) { notlar.push(`r2/MANIFEST.json okunamadı: ${trHata(h)}`); }
       }
       let sqlVar = false;
       for (const g of z.girisler) {
@@ -146,7 +147,7 @@ async function analizEt(dosyalar, sema, ilerleme, ctx = {}) {
         if (/^yorumlar\/.+\.json$/i.test(g.ad)) {
           if (anaYorumVar || /INDEKS\.json$/i.test(g.ad)) continue;
           try { const o = JSON.parse(await z.metin(g)); if (Array.isArray(o?.yorumlar) && o.yorumlar.length && sema.some((x) => x.tablo === "yorumlar")) tabloEkle("yorumlar", o.yorumlar, `${ad} › ${g.ad}`, "dosya adı"); }
-          catch (h) { notlar.push(`${ad} › ${g.ad}: okunamadı — ${h.message}`); }
+          catch (h) { notlar.push(`${ad} › ${g.ad}: okunamadı — ${trHata(h)}`); }
           continue;
         }
         if (/\.json$/i.test(g.ad)) {
@@ -435,7 +436,7 @@ export async function icAktarCiz(kok, mesaj, { uye = false } = {}) {
           if (g.durum === "atlandi") rapor.dosyalar.atlandi += 1; else rapor.dosyalar.yazildi += 1;
         } catch (h) {
           if (h?.name === "AbortError") throw h;
-          rapor.dosyalar.hata.push(`${r.ad}: ${h.message || h}`);
+          rapor.dosyalar.hata.push(`${r.ad}: ${trHata(h)}`);
         }
       }
       if (rSec.length) logla(`✓ R2: ${rapor.dosyalar.yazildi} yazıldı · ${rapor.dosyalar.atlandi} zaten vardı · ${rapor.dosyalar.hata.length} hata`);
@@ -444,7 +445,7 @@ export async function icAktarCiz(kok, mesaj, { uye = false } = {}) {
       raporCiz(rapor);
       mesaj(hatali ? `Geri yükleme bitti; ${hatali} kayıt/dosya aktarılamadı (raporda).` : "Geri yükleme tamamlandı.", hatali ? "error" : "success");
     } catch (h) {
-      if (islem) { try { await supabase.rpc("sistem_islem_bitir", { p_id: islem, p_basarili: false, p_ozet: { hata: String(h.message || h).slice(0, 300) } }); } catch { /* best-effort */ } }
+      if (islem) { try { await supabase.rpc("sistem_islem_bitir", { p_id: islem, p_basarili: false, p_ozet: { hata: String(trHata(h)).slice(0, 300) } }); } catch { /* best-effort */ } }
       raporCiz(rapor);
       mesaj(h?.name === "AbortError" ? "Geri yükleme iptal edildi (o ana dek yazılanlar kalır; işlem tekrarlanabilir)." : `Geri yükleme durdu: ${hataMetni(h)}`);
     } finally {

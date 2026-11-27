@@ -5,6 +5,7 @@
  * Kendi yorumunu herkes düzenler/siler; yönetim yalnızca gizler/siler. CSP: inline stil/olay yok; innerHTML yok.
  */
 import { supabase } from "../core/supabase-client.js";
+import { hata as trHata } from "../core/hata-metni.js";
 const kok = document.getElementById("yy-kok");
 function el(t, c, m) { const e = document.createElement(t); if (c) e.className = c; if (m != null) e.textContent = m; return e; }
 function dg(m, c, f) { const b = el("button", `yk-btn ${c || ""}`.trim(), m); b.type = "button"; if (f) b.addEventListener("click", f); return b; }
@@ -40,7 +41,7 @@ async function kur() {
     const q = norm(durum.ara).trim(), eslesen = q ? [...indeks.values()].filter((y) => norm(y.baslik).includes(q)).map((y) => y.url) : [];
     const arg = { p_ara: durum.ara || null, p_anahtarlar: eslesen.length ? eslesen : null };
     const { data, error } = durum.ana === "benim" ? await supabase.rpc("yorumlarim_listele", arg) : await supabase.rpc("yorum_yonetim_listele", arg);
-    if (error) { alan.replaceChildren(el("p", "yk-soluk", error.message)); veri = []; return; }
+    if (error) { alan.replaceChildren(el("p", "yk-soluk", trHata(error))); veri = []; return; }
     veri = data || []; ciz();
   }
   function yorumSatiri(y) {
@@ -48,11 +49,11 @@ async function kur() {
     k.append(el("div", "yk-ust", `${durum.ana === "yonetim" ? `${y.ad}${y.anonim ? " (anonim yazdı)" : ""}${y.rumuz ? " (takma ad)" : ""} · ` : ""}${tarih(y.tarih)}${y.duzenlendi ? ` (Düzenlendi - ${y.duzenlendi})` : ""}${y.ust_id ? " · ↳ yanıt" : ""}${y.gizli ? " · 🙈 gizli" : ""}`), m, e);
     const git = el("a", "yk-btn yk-kucuk", "↗ Yoruma git"); git.href = `${y.icerik_anahtari}#yorum-${y.id}`; e.append(git);
     if (durum.ana === "benim") {
-      e.append(dg("✏️ Düzenle", "yk-kucuk", () => { const t = el("textarea", "yk-girdi"); t.value = y.metin; t.rows = 4; m.replaceWith(t); e.replaceChildren(dg("Kaydet", "yk-birincil yk-kucuk", async () => { const r = await supabase.rpc("yorum_duzenle", { p_id: y.id, p_metin: t.value }); if (r.error) bildir(r.error.message, true); else { bildir("✔ Güncellendi."); await yukle(); } }), dg("Vazgeç", "yk-kucuk", ciz)); }),
-        dg("🗑 Sil", "yk-kucuk yk-tehlike", async () => { if (!window.confirm("Yorumun silinsin mi?")) return; const r = await supabase.rpc("yorum_sil", { p_id: y.id }); if (r.error) bildir(r.error.message, true); else await yukle(); }));
+      e.append(dg("✏️ Düzenle", "yk-kucuk", () => { const t = el("textarea", "yk-girdi"); t.value = y.metin; t.rows = 4; m.replaceWith(t); e.replaceChildren(dg("Kaydet", "yk-birincil yk-kucuk", async () => { const r = await supabase.rpc("yorum_duzenle", { p_id: y.id, p_metin: t.value }); if (r.error) bildir(trHata(r.error), true); else { bildir("✔ Güncellendi."); await yukle(); } }), dg("Vazgeç", "yk-kucuk", ciz)); }),
+        dg("🗑 Sil", "yk-kucuk yk-tehlike", async () => { if (!window.confirm("Yorumun silinsin mi?")) return; const r = await supabase.rpc("yorum_sil", { p_id: y.id }); if (r.error) bildir(trHata(r.error), true); else await yukle(); }));
     } else {
-      e.append(dg(y.gizli ? "👁 Göster" : "🙈 Gizle", "yk-kucuk", async () => { const r = await supabase.rpc("yorum_gizle", { p_id: y.id, p_gizli: !y.gizli }); if (r.error) bildir(r.error.message, true); else await yukle(); }),
-        dg("🗑 Sil", "yk-kucuk yk-tehlike", async () => { if (!window.confirm("Bu yorum kalıcı olarak silinsin mi?")) return; const r = await supabase.rpc("yorum_sil", { p_id: y.id }); if (r.error) bildir(r.error.message, true); else await yukle(); }));
+      e.append(dg(y.gizli ? "👁 Göster" : "🙈 Gizle", "yk-kucuk", async () => { const r = await supabase.rpc("yorum_gizle", { p_id: y.id, p_gizli: !y.gizli }); if (r.error) bildir(trHata(r.error), true); else await yukle(); }),
+        dg("🗑 Sil", "yk-kucuk yk-tehlike", async () => { if (!window.confirm("Bu yorum kalıcı olarak silinsin mi?")) return; const r = await supabase.rpc("yorum_sil", { p_id: y.id }); if (r.error) bildir(trHata(r.error), true); else await yukle(); }));
     }
     return k;
   }
@@ -76,7 +77,7 @@ async function kur() {
   let z; ara.addEventListener("input", () => { clearTimeout(z); z = setTimeout(() => { durum.ara = ara.value.trim(); yukle(); }, 300); });
   const kutu = el("details", "yk-kutu"); kutu.append(el("summary", null, "🏷 Takma ad"));
   const takma = el("input", "yk-girdi"); takma.type = "text"; takma.maxLength = 40; takma.placeholder = "Yeni takma ad (boş = adıma dön)"; takma.setAttribute("aria-label", "Takma ad");
-  const takmaBtn = dg("🏷 Takma adı uygula", "yk-kucuk", async () => { const r = await supabase.rpc("yorum_takma_ad_degistir", { p_ad: takma.value }); if (r.error) bildir(r.error.message, true); else { bildir(`✔ ${r.data} yorumda görünen ad güncellendi (anonim yorumlar değişmez).`); await yukle(); } });
+  const takmaBtn = dg("🏷 Takma adı uygula", "yk-kucuk", async () => { const r = await supabase.rpc("yorum_takma_ad_degistir", { p_ad: takma.value }); if (r.error) bildir(trHata(r.error), true); else { bildir(`✔ ${r.data} yorumda görünen ad güncellendi (anonim yorumlar değişmez).`); await yukle(); } });
   const arac2 = el("div", "yk-arac"); arac2.append(takma, takmaBtn);
   kutu.append(el("p", "yk-soluk", "Takma adın, anonim olmayan tüm yorumlarında görünür; istediğin zaman değiştirebilirsin. Yorumlarını yedeklemek/geri yüklemek için Yedekleme & Verilerim bölümünü kullan."), arac2);
   sekmeCiz(); kok.replaceChildren(anaCubuk, kutu, turCubuk, arac, alan, mesaj); await yukle();

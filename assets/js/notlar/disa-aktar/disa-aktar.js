@@ -22,6 +22,7 @@ import { htmlMarkdown } from "../bicim.js";
 import { adTemizle, zamanDamgasi, yerelIso, insanTarih, dosyaAdi, htmlBloklari, bloklariGuvenceyleUret, bloklariMetneCevir, kunyeSatirlari } from "./ir.js";
 import { pdfUret } from "./pdf.js";
 import { docxUret } from "./docx.js";
+import { hata as trHata } from "../../core/hata-metni.js";
 
 export const BICIMLER = [
   { id: "md", ad: "Markdown", uzanti: "md", klasor: "Markdown", ipucu: "Başlık bilgisi dosyanın başında; ekler yanında" },
@@ -365,7 +366,7 @@ export async function paketle(kayitlar, ctx, secenek) {
         try {
           await zip.dosyaEkle(`${ekKlasoru}/${ekAdlari.get(ek.id)}`, await ekBayt(ek), new Date(k.guncelleme));
         } catch (h) {
-          atlanan.push(`${k.baslik || "Başlıksız not"} → ${ek.ad}: ${h.message || h}`);
+          atlanan.push(`${k.baslik || "Başlıksız not"} → ${ek.ad}: ${trHata(h)}`);
           ekAdlari.delete(ek.id);
         }
       }
@@ -394,7 +395,7 @@ export async function paketle(kayitlar, ctx, secenek) {
         dizin.push({ k, bicim: bi, yol: yazilan.slice(kok.length + 1) });
       } catch (h) {
         console.error(h);
-        atlanan.push(`${k.baslik || "Başlıksız not"} (${bi.ad}): ${h.message || h}`);
+        atlanan.push(`${k.baslik || "Başlıksız not"} (${bi.ad}): ${trHata(h)}`);
       }
       yapilan++;
       bildir("");
@@ -579,7 +580,7 @@ export function disaAktarDiyalogu({ kapsamlar, ctx, baslangic = {}, kok = docume
       } catch (h) {
         console.error(h);
         hata.hidden = false;
-        hata.textContent = "Dışa aktarılamadı: " + (h.message || h);
+        hata.textContent = "Dışa aktarılamadı: " + (trHata(h));
         ilerleme.hidden = true;
         indirBtn.disabled = false;
         vazgecBtn.disabled = false;

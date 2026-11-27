@@ -6,13 +6,14 @@
 import { el, dugme } from "../donusturucu/ortak.js";
 import { kaynakTuvaliAl, otomatikKose, VARSAYILAN_KOSELER } from "./tarama.js";
 import { tuvalBirak } from "./bellek-kalkani.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const ETIKET = ["Sol üst köşe", "Sağ üst köşe", "Sağ alt köşe", "Sol alt köşe"];
 const LUP = 128; const ZOOM = 4;
 
 export async function koseDuzenle(oge) {
   let kaynak = null;
-  try { kaynak = await kaynakTuvaliAl(oge.blob, oge.ad, oge.dondur || 0, 1600); } catch (h) { throw new Error(`Görsel açılamadı: ${h.message || h}`); }
+  try { kaynak = await kaynakTuvaliAl(oge.blob, oge.ad, oge.dondur || 0, 1600); } catch (h) { throw new Error(`Görsel açılamadı: ${trHata(h)}`); }
   const { tuval, w, h } = kaynak;
   let kose = (oge.kose || VARSAYILAN_KOSELER()).map(([x, y]) => [x, y]);
 

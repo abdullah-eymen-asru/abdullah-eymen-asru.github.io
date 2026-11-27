@@ -8,6 +8,7 @@
 import { supabase } from "../core/supabase-client.js";
 import { dosyalariTopla, kuyrukKur } from "../r2-arsiv/yukleme.js";
 import { worker, boyutYaz } from "../r2-arsiv/ortak.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const KOK = "Özel Makaleler";
 function el(t, c, m) { const e = document.createElement(t); if (c) e.className = c; if (m != null) e.textContent = m; return e; }
@@ -19,7 +20,7 @@ let panel = null, ciz = () => {};
 
 async function kokuGaranti() {
   const { error } = await supabase.rpc("r2_arsiv_klasor_olustur", { p_klasor_yolu: "", p_ad: KOK });
-  if (error && !/zaten var/i.test(error.message || "")) throw new Error(error.message);
+  if (error && !/zaten var/i.test(error.message || "")) throw new Error(trHata(error));
 }
 const klasorYolu = () => `${[KOK, ...durum.yol].join("/")}/`;
 
@@ -62,7 +63,7 @@ async function kur(form) {
       const gen = el("button", "oz-agac-ac", kids.length ? "▸" : "•"); gen.type = "button"; gen.disabled = !kids.length; gen.setAttribute("aria-label", `${etiket} alt klasörlerini genişlet`); gen.setAttribute("aria-expanded", "false");
       gen.addEventListener("click", () => { ac = !ac; alt.hidden = !ac; gen.textContent = ac ? "▾" : "▸"; gen.setAttribute("aria-expanded", String(ac)); });
       const ad = el("span", "oz-agac-ad", `📁 ${etiket}`), tamam = dg("Buraya taşı", "oz-kucuk oz-birincil", async () => {
-        try { const { error } = await supabase.rpc("r2_arsiv_tasi", { p_id: k.id, p_hedef_yol: yol }); if (error) throw new Error(error.message); await yenile(); bildir(`“${k.ad}” taşındı → ${etiket}.`); eslemeBaslat(); } catch (h) { bildir(h.message, true); } });
+        try { const { error } = await supabase.rpc("r2_arsiv_tasi", { p_id: k.id, p_hedef_yol: yol }); if (error) throw new Error(trHata(error)); await yenile(); bildir(`“${k.ad}” taşındı → ${etiket}.`); eslemeBaslat(); } catch (h) { bildir(trHata(h), true); } });
       tamam.disabled = !!engelli; if (engelli) tamam.title = yol === simdiki ? "Dosya zaten bu klasörde" : "Klasör kendi içine taşınamaz";
       satir.append(gen, ad, tamam); kids.forEach((c) => alt.append(dugum(c, c.slice(yol.length).replace(/\/$/, ""))));
       const sar = el("div", "oz-agac-dugum"); sar.append(satir, alt); return sar;
@@ -89,11 +90,11 @@ async function kur(form) {
         li.append(ac, dg("↪ Taşı", "oz-kucuk", () => tasiKutusu(li, k), { title: "Klasörü başka klasöre taşı" }), dg("🗑", "oz-kucuk oz-tehlike", async () => {
           // Varsayılan: klasör kalkar, içindekiler BİR ÜST klasöre çıkar. İstersen hepsi silinir.
           if (window.confirm(`“${k.ad}” klasörü silinsin mi?\n\nTamam: klasör kalkar, içindeki dosya ve klasörler bir üst klasöre taşınır (silinmez).\nİptal: bir sonraki adımda içindekilerle birlikte silme seçeneği sunulur.`)) {
-            try { const { error } = await supabase.rpc("r2_arsiv_klasor_sil_tasi", { p_id: k.id }); if (error) throw new Error(error.message); await yenile(); bildir("Klasör silindi; içindekiler bir üst klasöre taşındı."); } catch (h) { bildir(h.message, true); }
+            try { const { error } = await supabase.rpc("r2_arsiv_klasor_sil_tasi", { p_id: k.id }); if (error) throw new Error(trHata(error)); await yenile(); bildir("Klasör silindi; içindekiler bir üst klasöre taşındı."); } catch (h) { bildir(trHata(h), true); }
             return;
           }
           if (!window.confirm(`“${k.ad}” klasörü ve İÇİNDEKİ TÜM dosyalar R2'den silinsin mi? Geri alınamaz.`)) return;
-          try { await worker("/sil", { id: k.id }); await yenile(); bildir("Klasör ve içindekiler silindi."); } catch (h) { bildir(h.message, true); }
+          try { await worker("/sil", { id: k.id }); await yenile(); bildir("Klasör ve içindekiler silindi."); } catch (h) { bildir(trHata(h), true); }
         }, { "aria-label": `${k.ad} klasörünü sil`, title: "Klasörü sil (içindekiler üst klasöre çıkar)" }));
       } else {
         const c = el("input"); c.type = "checkbox"; c.checked = durum.secili.has(k.id); c.setAttribute("aria-label", `${k.ad} dosyasını bu makaleye ekle`);
@@ -101,7 +102,7 @@ async function kur(form) {
         const lab = el("label", "oz-dosya"); lab.append(c, el("span", "oz-ad", `📄 ${k.ad}`), el("small", "oz-soluk", boyutYaz(k.boyut)));
         li.append(lab, dg("↪ Taşı", "oz-kucuk", () => tasiKutusu(li, k), { title: "Dosyayı başka klasöre taşı" }), dg("🗑", "oz-kucuk oz-tehlike", async () => {
           if (!window.confirm(`“${k.ad}” R2'den silinsin mi? Geri alınamaz.`)) return;
-          try { await worker("/sil", { id: k.id }); durum.secili.delete(k.id); await yenile(); cizSecim(); bildir("Dosya silindi."); } catch (h) { bildir(h.message, true); }
+          try { await worker("/sil", { id: k.id }); durum.secili.delete(k.id); await yenile(); cizSecim(); bildir("Dosya silindi."); } catch (h) { bildir(trHata(h), true); }
         }, { "aria-label": `${k.ad} dosyasını sil` }));
       }
       liste.append(li);
@@ -121,7 +122,7 @@ async function kur(form) {
     dg("📁 Yeni klasör", "", async () => {
       const ad = window.prompt("Klasör adı:"); if (ad === null) return; const t = ad.trim(); if (!adGecerli(t)) { bildir("Geçerli bir ad yaz ('/' ve '\\' kullanılamaz).", true); return; }
       try { await kokuGaranti(); const ust = [KOK, ...durum.yol].join("/") + "/"; const { error } = await supabase.rpc("r2_arsiv_klasor_olustur", { p_klasor_yolu: durum.yol.length ? ust.slice(0, -1) + "/" : `${KOK}/`, p_ad: t });
-        if (error) throw new Error(error.message); await yenile(); bildir("Klasör oluşturuldu."); } catch (h) { bildir(h.message, true); }
+        if (error) throw new Error(trHata(error)); await yenile(); bildir("Klasör oluşturuldu."); } catch (h) { bildir(trHata(h), true); }
     }),
     dg("📤 Dosya yükle (her format, birden çok)", "oz-birincil", () => dosyaGirdi.click()));   // tıklama hemen dosya seçiciyi açar (tarayıcılar async sonrası click()'i engeller)
   async function klasorHazirla() {                                 // alt klasör zincirinin var olduğundan emin ol
@@ -131,14 +132,14 @@ async function kur(form) {
     try {
       bildir("Klasör hazırlanıyor…"); await kokuGaranti(); await klasorHazirla(); bildir("");
       await kuyruk.ekle(await dosyalariTopla({ files: dosyaGirdi.files }));
-    } catch (h) { bildir(h.message || String(h), true); }
+    } catch (h) { bildir(trHata(h), true); }
     dosyaGirdi.value = "";
   });
 
   ic.append(el("p", "oz-soluk", "Dosyalar siteden R2'ye yüklenir; Cloudflare'e girmen gerekmez. Dosyaları işaretle: makaleye erişimi olan üyeler makale sayfasından indirir. Büyük dosyalar için üstteki “harici link” alanı da kullanılabilir."),
     yol, arac, dosyaGirdi, kuyrukListe, kuyrukOzet, kuyrukTemizle, liste, secimKutu, mesaj);
   hedef.insertAdjacentElement("afterend", panel);
-  ciz(); kokuGaranti().then(yenile).catch((h) => bildir(h.message, true));
+  ciz(); kokuGaranti().then(yenile).catch((h) => bildir(trHata(h), true));
 }
 
 /* admin.js olayları */
@@ -152,7 +153,7 @@ document.addEventListener("ozel-icerik:sifirla", () => { durum.secili.clear(); d
 document.addEventListener("ozel-icerik:kaydedildi", (e) => {
   const idler = [...durum.secili.keys()];
   if (!idler.length && !durum.duzenlenen) return;                                   // yeni makale + hiç ek yok → yazacak bir şey yok
-  e.detail.isler.push((async () => { const { error } = await supabase.rpc("ozel_icerik_dosya_ata", { p_content_id: e.detail.id, p_arsiv_idler: idler }); if (error) throw new Error(error.message); })());
+  e.detail.isler.push((async () => { const { error } = await supabase.rpc("ozel_icerik_dosya_ata", { p_content_id: e.detail.id, p_arsiv_idler: idler }); if (error) throw new Error(trHata(error)); })());
 });
 
 /* Form <template> klonu olduğundan gözlemle; her görünüşünde paneli yeniden ekle. */

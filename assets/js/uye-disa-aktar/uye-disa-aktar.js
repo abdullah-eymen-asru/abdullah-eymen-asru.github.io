@@ -10,6 +10,7 @@
  * -----------------------------------------------------------------------
  */
 import { supabase } from "../core/supabase-client.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 function el(etiket, ozellikler = {}, ...cocuklar) {
   const d = document.createElement(etiket);
@@ -112,7 +113,7 @@ export function uyeDisaAktarAc({ bildir = () => {}, yazar = "" } = {}) {
       sonucCiz();
       if (!sonSonuclar.length) sonucListe.replaceChildren(el("li", { class: "muted", text: aramaMetin ? "Eşleşen üye yok (yetki kapsamın dışındakiler görünmez)." : "Kapsamında üye yok." }));
     } catch (h) {
-      sonucListe.replaceChildren(el("li", { class: "muted", text: /does not exist|42883|PGRST202|schema cache/i.test(h?.message || "") ? (console.warn("Üye araması için 0110 migration'ı çalıştırılmalı; toplu indirme yine çalışır."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.") : `Arama yapılamadı: ${h?.message || h}` }));
+      sonucListe.replaceChildren(el("li", { class: "muted", text: /does not exist|42883|PGRST202|schema cache/i.test(h?.message || "") ? (console.warn("Üye araması için 0110 migration'ı çalıştırılmalı; toplu indirme yine çalışır."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.") : `Arama yapılamadı: ${trHata(h)}` }));
       daha.hidden = true;
     }
   };
@@ -166,7 +167,7 @@ export function uyeDisaAktarAc({ bildir = () => {}, yazar = "" } = {}) {
     } catch (h) {
       console.error(h);
       hata.hidden = false;
-      hata.textContent = "Dışa aktarılamadı: " + (h.message || h);
+      hata.textContent = "Dışa aktarılamadı: " + (trHata(h));
       durum.textContent = "";
     } finally {
       indirBtn.disabled = false;

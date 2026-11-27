@@ -24,6 +24,7 @@ function adGuvenli(ad, yedek = "belge.pdf") {
 import { pdfjsAl, pdfLibAl, pdfAcSecenekleri } from "../donusturucu/pdf-yukle.js";
 import { ZipYazici } from "../notlar/disa-aktar/zip.js";
 import { sekmeSifirlamaKaydet } from "../core/gezinme-kilidi.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const kok = document.getElementById("pb-kok");
 const SINIR = 300 * 1024 * 1024;
@@ -82,13 +83,13 @@ async function kur() {
       const u8 = new Uint8Array(await dosya.arrayBuffer());
       let doc;
       try { doc = await lib.PDFDocument.load(u8, { updateMetadata: false }); }
-      catch (h) { throw new Error(/encrypt/i.test(h.message) ? "Bu PDF şifreli. Önce şifresini kaldırıp (açıp yeniden kaydederek) tekrar dene." : `PDF okunamadı: ${h.message}`); }
+      catch (h) { throw new Error(/encrypt/i.test(h.message) ? "Bu PDF şifreli. Önce şifresini kaldırıp (açıp yeniden kaydederek) tekrar dene." : `PDF okunamadı.`); }
       if (d.js) { try { await d.js.destroy(); } catch { /* yoksay */ } }
       d.js = await pdfjs.getDocument(await pdfAcSecenekleri({ data: u8.slice(0) })).promise;
       Object.assign(d, { ad: dosya.name, bayt: u8, n: doc.getPageCount(), kaynakDoc: doc, secili: new Set(), sonuc: [] });
       bilgi.textContent = `${dosya.name} · ${d.n} sayfa · ${bayt(dosya.size)}`;
       bildir(""); cizAyarlar(); cizKucukler(); cizSonuc();
-    } catch (h) { bildir(h.message || String(h), true); }
+    } catch (h) { bildir(trHata(h), true); }
   }
 
   /* ---------------- mod ve ayarlar ---------------- */
@@ -241,7 +242,7 @@ async function kur() {
       }
       d.sonuc = cikti.map((c) => ({ ad: adGuvenli(c.ad), sayfa: c.idx.length, u8: c.u8 }));
       bildir(`${d.sonuc.length} dosya hazır.`); cizSonuc();
-    } catch (h) { bildir(h.message || String(h), true); }
+    } catch (h) { bildir(trHata(h), true); }
   }
   async function pdfYapDondurulmus(sec) {
     const cikti = await lib.PDFDocument.load(d.bayt, { updateMetadata: false });
@@ -260,7 +261,7 @@ async function kur() {
       const z = el("button", { type: "button", class: "pb-btn pb-birincil", text: "📦 Tümünü ZIP olarak indir" });
       z.addEventListener("click", async () => {
         try { z.disabled = true; const zip = new ZipYazici(); for (const s of d.sonuc) await zip.dosyaEkle(s.ad, s.u8); indir(zip.bitir(), adGuvenli(`${adsizAl(d.ad).slice(0, 80)}_bolunmus.zip`, "bolunmus.zip")); }
-        catch (h) { bildir(h.message, true); } finally { z.disabled = false; }
+        catch (h) { bildir(trHata(h), true); } finally { z.disabled = false; }
       });
       ust.append(z);
     }
@@ -294,4 +295,4 @@ async function kur() {
     el("div", { class: "pb-kart" }, secimBilgi, izgara),
     sonucKutu);
 }
-kur().catch((h) => { console.error("pdf-bol.js:", h); if (kok) kok.replaceChildren(el("p", { class: "auth-message error", text: `Araç yüklenemedi: ${h?.message || h}` })); });
+kur().catch((h) => { console.error("pdf-bol.js:", h); if (kok) kok.replaceChildren(el("p", { class: "auth-message error", text: `Araç yüklenemedi: ${trHata(h)}` })); });

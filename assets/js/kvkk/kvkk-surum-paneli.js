@@ -12,6 +12,7 @@
  */
 import { supabase, showMessage, guncelKvkkSurumu, guncelOnaySurumleri } from "../core/supabase-client.js";
 import { el, dugme, ikon, onayIste, tarihMetni } from "../sistem-yedek/ortak.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const BICIM = /^v[0-9]{1,3}\.[0-9]{1,3}$/;
 const ROLLER = { owner: "Site Sahibi", admin: "Yönetici", manager: "İçerik Sorumlusu", editor: "Editör", special_user: "Özel Üye", user: "Üye" };
@@ -45,7 +46,7 @@ function metinKarti({ baslik, link, surum, ozet, yetkili, yetkiNotu, onayMetni, 
       girdi.placeholder = sonrakiOneri(mevcut);
       showMessage(mesaj, `Kaydedildi: ${baslik} ${mevcut} yürürlükte. Deploy gerekmez.`, "success");
     } catch (h) {
-      showMessage(mesaj, `Kaydedilemedi: ${h.message || h}`, "error");
+      showMessage(mesaj, `Kaydedilemedi: ${trHata(h)}`, "error");
     } finally {
       dugmeYayin.disabled = !yetkili;
     }
@@ -79,7 +80,7 @@ function yetkiBolumu(satir, mesaj) {
         showMessage(mesaj, `${baslik}: ${kutu.checked ? "açıldı (menü, adminin bir sonraki panel yüklemesinde görünür)" : "kapatıldı, yalnızca sen değiştirebilirsin"}.`, "success");
       } catch (h) {
         kutu.checked = !istenen;
-        showMessage(mesaj, yokMu(h) ? (console.warn("0076 numaralı migration henüz çalıştırılmamış."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.") : `Kaydedilemedi: ${h.message || h}`, "error");
+        showMessage(mesaj, yokMu(h) ? (console.warn("0076 numaralı migration henüz çalıştırılmamış."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.") : `Kaydedilemedi: ${trHata(h)}`, "error");
       } finally {
         kutu.disabled = false;
       }
@@ -147,7 +148,7 @@ function uyeKayitlari() {
     if (error) {
       const tekrar = dugme({ metin: "Tekrar dene", tur: "ikincil", kucuk: true });
       tekrar.addEventListener("click", () => gecmisKutusu(u, kutu));
-      return kutu.replaceChildren(el("p", { class: "auth-message error", text: error.message }), tekrar);
+      return kutu.replaceChildren(el("p", { class: "auth-message error", text: trHata(error) }), tekrar);
     }
     kutu.replaceChildren(!data?.length
       ? el("p", { class: "muted", text: "Bu üye için kayıt yok." })
@@ -255,7 +256,7 @@ async function kur() {
   if (error || !satir || satir.kvkk_yetkim === undefined) {
     kok.replaceChildren(...[el("p", { class: "muted", text: yokMu(error) || (!error && (!satir || satir.kvkk_yetkim === undefined))
       ? (console.warn("0064, 0065, 0070, 0073 ve 0076 numaralı migration'lar tam çalıştırılmamış görünüyor: dosyaları SQL Editor'de sırayla çalıştır."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.")
-      : `Yüklenemedi: ${error.message}` })].filter(Boolean));
+      : `Yüklenemedi: ${trHata(error)}` })].filter(Boolean));
     return;
   }
 
@@ -297,5 +298,5 @@ async function kur() {
 kur().catch((hata) => {
   console.error("kvkk-surum-paneli.js:", hata);
   const mesaj = document.getElementById("kvkk-surum-mesaj");
-  if (mesaj) showMessage(mesaj, `Panel yüklenemedi: ${hata.message || hata}`, "error");
+  if (mesaj) showMessage(mesaj, `Panel yüklenemedi: ${trHata(hata)}`, "error");
 });

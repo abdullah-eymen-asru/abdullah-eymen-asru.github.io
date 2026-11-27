@@ -8,6 +8,7 @@
 import { supabase } from "../core/supabase-client.js";
 import { E2EE_MAX_BAYT, anahtarlariHazirla, aliciAnahtarlariniGetir, sifreliBoyut, dosyaSifrele, anahtariZarfla, zarflariKaydet, anahtariOlmayanlar } from "./e2ee.js";
 import { el, btn, boyutYaz, worker, adGecerli } from "./ortak.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const ESZAMANLI = 2;
 const MAKS_DOSYA = 500;       // tek seferde en çok dosya
@@ -77,7 +78,7 @@ async function klasorleriHazirla(kokYol, altYollar) {
     const ust = kokYol + p.slice(0, -1).map((x) => x + "/").join("");
     if (!adGecerli(ad)) throw new Error(`Geçersiz klasör adı: "${ad}"`);
     const { error } = await supabase.rpc("r2_arsiv_klasor_olustur", { p_klasor_yolu: ust, p_ad: ad });
-    if (error && !/zaten var/i.test(error.message || "")) throw new Error(error.message || "Klasör oluşturulamadı.");
+    if (error && !/zaten var/i.test(error.message || "")) throw new Error(trHata(error, "Klasör oluşturulamadı."));
   }
 }
 
@@ -123,7 +124,7 @@ export function kuyrukKur({ liste, ozet, temizleBtn, baglam, bitti }) {
       aktif++;
       yukle(is)
         .then(() => { tamam++; })
-        .catch((e) => { hata++; is.hataYaz(e.message || "Yükleme başarısız."); })
+        .catch((e) => { hata++; is.hataYaz(trHata(e, "Yükleme başarısız.")); })
         .finally(() => {
           aktif--; ozetYaz(); isle();
           if (!aktif && !bekleyen.length) bitti();

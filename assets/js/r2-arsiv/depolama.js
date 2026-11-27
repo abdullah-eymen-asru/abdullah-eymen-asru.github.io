@@ -1,6 +1,7 @@
 /* assets/js/r2-arsiv/depolama.js — R2 depolama göstergesi (X GB / 10 GB), %85 / %95 uyarıları, Cloudflare klasör görünümü eşitleme ve "Taşı" iletişim kutusu (tur 20). */
 import { supabase } from "../core/supabase-client.js";
 import { worker } from "./ortak.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const GB = 1024 ** 3;
 const gbYaz = (b) => `${(Number(b || 0) / GB).toLocaleString("tr-TR", { maximumFractionDigits: 2 })} GB`;
@@ -26,7 +27,7 @@ export async function depolamaGostergesiKur(kap, { esitle = false, sahip = false
     if (sahip) { const b = el("button", "ra-btn ra-btn-kucuk", "⚙ Sınırı değiştir"); b.type = "button"; b.addEventListener("click", async () => {
       const g = window.prompt("Yeni depolama sınırı (GB). Ücretsiz plan 10 GB; ücretli plana geçtiysen artır:", String(Math.round(Number(o.limit_bayt) / GB)));
       if (g === null) return; const n = Number(String(g).replace(",", ".")); if (!(n >= 1)) { window.alert("En az 1 GB olmalı."); return; }
-      const r = await supabase.rpc("r2_depolama_limit_ayarla", { p_bayt: Math.round(n * GB) }); if (r.error) window.alert(r.error.message); else ciz(); }); alt.append(b); }
+      const r = await supabase.rpc("r2_depolama_limit_ayarla", { p_bayt: Math.round(n * GB) }); if (r.error) window.alert(trHata(r.error)); else ciz(); }); alt.append(b); }
     if (esitle && Number(o.esitlenecek) > 0) {
       const d = el("p", "ra-meta", `Cloudflare panelinde klasör ağacının görünmesi için ${o.esitlenecek} dosyanın R2 anahtarı eşitlenecek.`), b = el("button", "ra-btn ra-btn-kucuk ra-btn-birincil", "☁ Cloudflare klasör görünümünü eşitle"); b.type = "button";
       b.addEventListener("click", async () => {
@@ -34,7 +35,7 @@ export async function depolamaGostergesiKur(kap, { esitle = false, sahip = false
         b.disabled = true; let toplam = 0, hata = 0, tur = 0;
         try { for (;;) { const r = await worker("/anahtar-esitle", { limit: 10 }); toplam += r.tamam || 0; hata += (r.hatalar || []).length; d.textContent = `Eşitleniyor… ${toplam} dosya tamam${hata ? `, ${hata} hata` : ""}`;
           if (!r.denenen || r.tamam === 0 || ++tur > 400) break; } d.textContent = `✔ ${toplam} dosya eşitlendi${hata ? `; ${hata} dosyada hata (tekrar dene)` : ""}.`; }
-        catch (e) { d.textContent = e.message || "Eşitleme durdu."; } finally { b.disabled = false; ciz(); } });
+        catch (e) { d.textContent = trHata(e, "Eşitleme durdu."); } finally { b.disabled = false; ciz(); } });
       alt.append(d, b);
     }
     if (alt.childNodes.length) kutu.append(alt);

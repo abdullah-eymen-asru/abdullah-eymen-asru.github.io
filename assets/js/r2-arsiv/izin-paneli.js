@@ -15,6 +15,7 @@
 import { supabase } from "../core/supabase-client.js";
 import { aliciSeciciKur } from "./alici-secici.js";
 import { el, btn, normalize, basHarfler, avatarSinifi, trSirala } from "./ortak.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const ROLLER = [
   ["admin", "Yönetici (Admin)"], ["manager", "İçerik Sorumlusu"], ["editor", "İçerik Editörü"],
@@ -83,14 +84,14 @@ async function basla() {
   /* -------------------------------- satır bileşeni -------------------------------- */
   async function kaydet(tur, hedef, v) {
     const { error } = await supabase.rpc("r2_arsiv_izin_ayarla", { p_tur: tur, p_hedef: hedef, p_oku: v.oku, p_yukle: v.yukle, p_sil: v.sil });
-    if (error) { goster(error.message || "Kaydedilemedi."); await yukle(); return false; }
+    if (error) { goster(trHata(error, "Kaydedilemedi.")); await yukle(); return false; }
     goster("Kaydedildi.", false);
     await yukle();
     return true;
   }
   async function kaldir(tur, hedef, mesajMetni) {
     const { error } = await supabase.rpc("r2_arsiv_izin_kaldir", { p_tur: tur, p_hedef: hedef });
-    if (error) return goster(error.message || "Kaldırılamadı.");
+    if (error) return goster(trHata(error, "Kaldırılamadı."));
     goster(mesajMetni, false);
     await yukle();
   }
@@ -217,7 +218,7 @@ async function basla() {
       if (u.rol === "owner") return goster("Site Sahibi zaten tam yetkilidir; kısıtlanamaz.");
       if (u.rol === "admin" && !durum.sahip) return goster("Yönetici için izni yalnızca Site Sahibi verebilir.");
       const { error } = await supabase.rpc("r2_arsiv_izin_ayarla", { p_tur: "kullanici", p_hedef: u.id, p_oku: true, p_yukle: false, p_sil: false });
-      if (error) return goster(error.message || "Eklenemedi.");
+      if (error) return goster(trHata(error, "Eklenemedi."));
       await yukle();
       // Eklenen kişinin bulunduğu sayfaya atla ve kısa süre vurgula
       durum.arama = ""; aramaGirdi.value = "";

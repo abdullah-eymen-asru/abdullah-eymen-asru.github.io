@@ -24,6 +24,7 @@ import * as Kit from "./kit.js";
 import { kodSor, cssYukle } from "./kit-arayuz.js";
 import { h } from "../mesajlasma/dom.js";
 import { arsivSohbetiYaz } from "../sistem-yedek/mesaj-yedek.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 /** ice-aktar.js bu tabloların satırlarını (üye kipinde "kapsam dışı" olsalar bile) plan.ozel'e kopyalar. */
 export const OZEL_TABLOLAR = ["e2ee_kullanici_anahtarlari", "not_kasasi", "conversations", "konusma_zarflari", "messages"];
@@ -195,7 +196,7 @@ export async function calistir(plan, { uid }, { logla = () => {}, asama = () => 
       try {
         const r = await arsivSohbetiYaz({ kaynakId: c.id, konu, mesajlar: duz });
         if (r.yeni) { rapor.sohbet.yeni += 1; rapor.sohbet.mesaj += r.mesaj; } else rapor.sohbet.tekrar += 1;
-      } catch (e) { throw new Error(`Sohbet yeniden zarflanamadı: ${e.message || e}`); }
+      } catch (e) { throw new Error(`Sohbet yeniden zarflanamadı: ${trHata(e)}`); }
     }
     logla(`✓ Sohbetler yeniden zarflandı: ${rapor.sohbet.yeni} yeni arşiv sohbeti (${rapor.sohbet.mesaj} mesaj)${rapor.sohbet.tekrar ? ` · ${rapor.sohbet.tekrar} zaten aktarılmıştı` : ""}${rapor.sohbet.atlanan ? ` · ${rapor.sohbet.atlanan} atlandı (anahtarı yok)` : ""}.`);
   }

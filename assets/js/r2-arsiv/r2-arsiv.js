@@ -19,6 +19,7 @@ import { aliciSeciciKur } from "./alici-secici.js";
 import { dosyalariTopla, kuyrukKur } from "./yukleme.js";
 import { paylasilanGorunumuKur, paylastiklarimGorunumuKur } from "./ozel-gorunumler.js";
 import { baglantilarGorunumuKur } from "./baglantilar.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const SAYFA = 100;
 const SUTUNLAR = "id,tur,ad,klasor_yolu,boyut,mime,gercek_mime,sifreli,sahip_id,created_at";
@@ -284,7 +285,7 @@ async function topluTasi() {
   const klasorler = durum.veri.filter((s) => idler.includes(s.id) && s.tur === "klasor").map((s) => `${s.klasor_yolu || ""}${s.ad}/`);
   const hedef = await klasorSec({ haric: klasorler }); if (hedef === null) return;
   let ok = 0, hata = 0, son = "";
-  for (const id of idler) { const { error } = await supabase.rpc("r2_arsiv_tasi", { p_id: id, p_hedef_yol: hedef }); if (error) { hata++; son = error.message; } else ok++; }
+  for (const id of idler) { const { error } = await supabase.rpc("r2_arsiv_tasi", { p_id: id, p_hedef_yol: hedef }); if (error) { hata++; son = trHata(error); } else ok++; }
   bildir(hata ? `${ok} öğe taşındı, ${hata} öğe taşınamadı: ${son}` : `${ok} öğe taşındı.`, hata ? "hata" : "ok");
   listele(); ozetYukle(); arkaPlandaEsitle();   // R2 anahtarları Cloudflare'de de yeni klasöre taşınır
 }
@@ -312,7 +313,7 @@ async function yeniKlasor() {
   });
   if (!ad) return;
   const { error } = await supabase.rpc("r2_arsiv_klasor_olustur", { p_klasor_yolu: durum.yol, p_ad: ad });
-  if (error) return bildir(error.message || "Klasör oluşturulamadı.");
+  if (error) return bildir(trHata(error, "Klasör oluşturulamadı."));
   // Klasör yapısı Arşiv ↔ Bağlantılar'da aynıdır: aynı yol bağlantı klasörleri listesine de eklenir (yetki/RPC hatası sessiz geçilir).
   try { await supabase.rpc("r2_baglanti_klasor_ekle", { p_yol: `${durum.yol || ""}${ad}`.replace(/\/+$/, "") }); } catch { /* migration 0125 yoksa */ }
   bildir("Klasör oluşturuldu.", "ok"); listele();
@@ -326,7 +327,7 @@ async function adlandir(s) {
   });
   if (!yeni || yeni === s.ad) return;
   const { error } = await supabase.rpc("r2_arsiv_yeniden_adlandir", { p_id: s.id, p_yeni_ad: yeni });
-  if (error) return bildir(error.message || "Yeniden adlandırılamadı.");
+  if (error) return bildir(trHata(error, "Yeniden adlandırılamadı."));
   bildir("Ad güncellendi.", "ok"); listele(); arkaPlandaEsitle();   // anahtar klasör/dosya yolunu yansıttığı için (0135) Cloudflare tarafı da kopyala-sil ile güncellenir
 }
 
@@ -336,7 +337,7 @@ async function sil(s) {
     const koru = await onayAl({ baslik: "Klasör silinsin mi?", metin: `“${s.ad}” klasörü silinecek; içindeki dosya ve klasörler BİR ÜST KLASÖRE taşınır (silinmez). Dosyaları istersen ayrıca silebilirsin.`, tamam: "Klasörü sil, içindekileri koru" });
     if (koru) {
       const { data, error } = await supabase.rpc("r2_arsiv_klasor_sil_tasi", { p_id: s.id });
-      if (error) return bildir(error.message || "Klasör silinemedi.");
+      if (error) return bildir(trHata(error, "Klasör silinemedi."));
       bildir(`Klasör silindi; ${data ?? 0} öğe bir üst klasöre taşındı.`, "ok"); yenile(); arkaPlandaEsitle(); return;
     }
     const hepsi = await onayAl({ baslik: "İçindekilerle birlikte silinsin mi?", metin: `“${s.ad}” klasörü ve İÇİNDEKİ HER ŞEY R2'den kalıcı olarak silinecek. Bu işlem geri alınamaz.`, tamam: "Hepsini sil" });
@@ -346,7 +347,7 @@ async function sil(s) {
     if (!ok) return;
   }
   try { await worker("/sil", { id: s.id }); bildir("Silindi.", "ok"); yenile(); }
-  catch (e) { bildir(e.message); }
+  catch (e) { bildir(trHata(e)); }
 }
 
 /* ---------------------------- indirme / önizleme ---------------------------- */
@@ -376,7 +377,7 @@ async function indir(s, dugme) {
   try {
     if (!s.sifreli) { const { url } = await worker("/indir", { id: s.id }); window.location.assign(url); }
     else { bildir("Çözülüyor…", "ok"); blobIndir(await sifreliBlob(s), s.ad); bildir(""); }
-  } catch (e) { bildir(e.message); }
+  } catch (e) { bildir(trHata(e)); }
   finally { if (dugme) dugme.disabled = false; }
 }
 
@@ -425,8 +426,8 @@ async function onizle(s) {
       k.onizlemeImg.src = url;
     }
   } catch (e) {
-    if (k.dlgOnizleme.open) { k.onizlemeHata.textContent = e.message; k.onizlemeHata.hidden = false; }
-    else bildir(e.message);
+    if (k.dlgOnizleme.open) { k.onizlemeHata.textContent = trHata(e); k.onizlemeHata.hidden = false; }
+    else bildir(trHata(e));
   }
 }
 
@@ -450,7 +451,7 @@ async function paylasListele() {
     li.appendChild(btn("Kaldır", "ra-btn ra-btn-kucuk ra-btn-tehlike", async (e) => {
       const b = e.currentTarget; b.disabled = true;
       const { error: h } = await supabase.rpc("ozel_icerik_alici_kaldir", { p_dosya_id: paylasDosya.id, p_alici_id: u.kullanici_id });
-      if (h) { paylasHata(h.message || "Kaldırılamadı."); b.disabled = false; return; }
+      if (h) { paylasHata(trHata(h, "Kaldırılamadı.")); b.disabled = false; return; }
       paylasHata(""); paylasListele();
     }));
     k.paylasListe.appendChild(li);
@@ -468,7 +469,7 @@ async function paylasEkle(u) {
     const yeni = await anahtariYenidenZarfla(zarf.sarili_dosya_anahtari, harita.get(u.id));
     const eklenen = await zarflariKaydet(paylasDosya.id, [{ alici_id: u.id, sarili_dosya_anahtari: yeni }]);
     if (!eklenen) throw new Error(`${u.ad} zaten erişebiliyor.`);
-  } catch (e) { paylasHata(e.message); }
+  } catch (e) { paylasHata(trHata(e)); }
   await paylasListele();
 }
 
@@ -531,7 +532,7 @@ function yuklemeBaslat(girdiSozu) {
     const r = await kuyruk.ekle(girdiler);
     if (r.kisaltildi) bildir("Tek seferde en fazla 500 dosya alınır; ilk 500 dosya kuyruğa eklendi.", "ok");
     else if (r.duzlestirildi) bildir("Özel gönderimde klasör yapısı korunmaz; dosyalar tek tek gönderiliyor.", "ok");
-  }).catch((e) => bildir(e.message || "Yükleme başlatılamadı."));
+  }).catch((e) => bildir(trHata(e, "Yükleme başlatılamadı.")));
 }
 
 function surukleBirak() {

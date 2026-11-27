@@ -6,6 +6,7 @@
  */
 import { h } from "../mesajlasma/dom.js";
 import * as Kit from "./kit.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 let cssYuklendi = false;
 export function cssYukle() {
@@ -51,7 +52,7 @@ function pencere(baslik, icerik, kapatinca) {
 export function kitKartiAc(duyur = () => {}) {
   return new Promise(async (coz) => {
     let durum;
-    try { durum = await Kit.kitDurumu(); } catch (e) { duyur(e.message || String(e), true); return coz(false); }
+    try { durum = await Kit.kitDurumu(); } catch (e) { duyur(trHata(e), true); return coz(false); }
     const govde = h("div", { class: "kk-govde" });
     let uretildi = false;
     const p = pencere("Yedek Kurtarma Kodu", govde, () => coz(uretildi));
@@ -63,7 +64,7 @@ export function kitKartiAc(duyur = () => {}) {
       uret.addEventListener("click", async () => {
         uret.disabled = true; hata.hidden = true;
         try { const r = await Kit.kitOlustur(); uretildi = true; goster(r); }
-        catch (e) { hata.textContent = e.message || String(e); hata.hidden = false; uret.disabled = false; }
+        catch (e) { hata.textContent = trHata(e); hata.hidden = false; uret.disabled = false; }
       });
       govde.replaceChildren(bilgiKarti(),
         h("p", { class: "kk-durum", text: "ℹ️ Tek kod: Notlar + Mesajlar. Burada ya da Notlar'da yeni kod üretirsen eski kod ikisi için de geçersiz olur. Mesaj şifreleme anahtarını sıfırlarsan kod silinir; yeni kodu hemen üretirsen Notlar'ı da kapsar. Kod, Notlar kasan ve mesaj anahtarın ikisi de açılabiliyorsa üretilir."}),
@@ -120,7 +121,7 @@ export function kodSor({ baslik = "Yedek Kurtarma Kodu", aciklama = "", tamamMet
       if (parolaAlani?.zorunlu && !parola.value) { hata.textContent = `${parolaAlani.etiket} gerekli.`; hata.hidden = false; return parola.focus(); }
       tamam.disabled = true; tamam.textContent = "Çözülüyor…";
       try { p.kapat(await dogrula(kod.value, parola?.value || null)); }
-      catch (er) { hata.textContent = er.message || String(er); hata.hidden = false; tamam.disabled = false; tamam.textContent = tamamMetin; }
+      catch (er) { hata.textContent = trHata(er); hata.hidden = false; tamam.disabled = false; tamam.textContent = tamamMetin; }
     });
     kod.focus();
   });

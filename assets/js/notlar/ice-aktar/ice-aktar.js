@@ -11,6 +11,7 @@
  * -----------------------------------------------------------------------
  */
 import { dosyalariCoz, KABUL_EDILEN } from "./ayristir.js";
+import { hata as trHata } from "../../core/hata-metni.js";
 
 function el(etiket, ozellikler = {}, ...cocuklar) {
   const d = document.createElement(etiket);
@@ -197,7 +198,7 @@ export function iceAktarDiyalogu({ ctx, kok = document.body, uygula, bildir = ()
       } catch (h) {
         console.error(h);
         hata.hidden = false;
-        hata.textContent = "Dosyalar okunamadı: " + (h.message || h);
+        hata.textContent = "Dosyalar okunamadı: " + (trHata(h));
       } finally {
         meşgul = false;
         ciz();
@@ -280,7 +281,7 @@ export function iceAktarDiyalogu({ ctx, kok = document.body, uygula, bildir = ()
       } catch (h) {
         console.error(h);
         hata.hidden = false;
-        hata.textContent = "İçeri aktarılamadı: " + (h.message || h);
+        hata.textContent = "İçeri aktarılamadı: " + (trHata(h));
         ilerleme.hidden = true;
         meşgul = false;
         kapatBtn.disabled = false;

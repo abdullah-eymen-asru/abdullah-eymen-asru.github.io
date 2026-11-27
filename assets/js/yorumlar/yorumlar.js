@@ -5,6 +5,7 @@
  * Üçüncü taraf çerez/iframe yok. CSP: inline stil/olay yok; innerHTML kullanılmaz.
  */
 import { supabase } from "../core/supabase-client.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const kok = document.getElementById("yorumlar-kok");
 const anahtar = kok?.getAttribute("data-anahtar") || location.pathname.replace(/\/+$/, "") || "/";
@@ -49,7 +50,7 @@ async function kur() {
       if (sec.value === "takma" && rumuz.value.trim().length < 2) { bildir("Takma ad en az 2 karakter olmalı.", true); return; }
       try { localStorage.setItem(LS, JSON.stringify({ tercih: sec.value, takma: rumuz.value.trim() })); } catch { /* yok say */ }
       g.disabled = true; const r = await supabase.rpc("yorum_ekle", { p_anahtar: anahtar, p_ust_id: ust?.id || null, p_metin: t.value, p_anonim: sec.value === "anonim", p_takma_ad: sec.value === "takma" ? rumuz.value.trim() : null }); g.disabled = false;
-      if (r.error) bildir(r.error.message, true); else { bildir("✔ Yorumun eklendi."); if (ust) acik.add(ust.id); bitince?.(); await yukle(); } });
+      if (r.error) bildir(trHata(r.error), true); else { bildir("✔ Yorumun eklendi."); if (ust) acik.add(ust.id); bitince?.(); await yukle(); } });
     const alt = el("div", "yk-form-alt"); alt.append(sec, rumuz); const eylem = el("div", "yk-eylem"); eylem.append(g, ...(ust ? [dg("Vazgeç", "", () => bitince?.())] : []));
     hedef.append(t, alt, ipucu, eylem);
   }
@@ -63,12 +64,12 @@ async function kur() {
     if (y.benim) {
       eylem.append(dg("✏️ Düzenle", "yk-kucuk", () => {
         const t = el("textarea", "yk-girdi"); t.value = y.metin; t.rows = 4; t.setAttribute("aria-label", "Yorumu düzenle");
-        const kaydet = dg("Kaydet", "yk-birincil", async () => { const r = await supabase.rpc("yorum_duzenle", { p_id: y.id, p_metin: t.value }); if (r.error) bildir(r.error.message, true); else { bildir("✔ Yorum güncellendi."); await yukle(); } });
+        const kaydet = dg("Kaydet", "yk-birincil", async () => { const r = await supabase.rpc("yorum_duzenle", { p_id: y.id, p_metin: t.value }); if (r.error) bildir(trHata(r.error), true); else { bildir("✔ Yorum güncellendi."); await yukle(); } });
         m.replaceWith(t); eylem.replaceChildren(kaydet, dg("Vazgeç", "", () => ciz())); t.focus();
-      }), dg("🗑 Sil", "yk-kucuk yk-tehlike", async () => { if (!window.confirm("Yorumun silinsin mi? Geri alınamaz.")) return; const r = await supabase.rpc("yorum_sil", { p_id: y.id }); if (r.error) bildir(r.error.message, true); else await yukle(); }));
+      }), dg("🗑 Sil", "yk-kucuk yk-tehlike", async () => { if (!window.confirm("Yorumun silinsin mi? Geri alınamaz.")) return; const r = await supabase.rpc("yorum_sil", { p_id: y.id }); if (r.error) bildir(trHata(r.error), true); else await yukle(); }));
     } else if (y.yonetici) {
-      eylem.append(dg(y.gizli ? "👁 Göster" : "🙈 Gizle", "yk-kucuk", async () => { const r = await supabase.rpc("yorum_gizle", { p_id: y.id, p_gizli: !y.gizli }); if (r.error) bildir(r.error.message, true); else await yukle(); }),
-        dg("🗑 Sil", "yk-kucuk yk-tehlike", async () => { if (!window.confirm("Bu yorum kalıcı olarak silinsin mi?")) return; const r = await supabase.rpc("yorum_sil", { p_id: y.id }); if (r.error) bildir(r.error.message, true); else await yukle(); }));
+      eylem.append(dg(y.gizli ? "👁 Göster" : "🙈 Gizle", "yk-kucuk", async () => { const r = await supabase.rpc("yorum_gizle", { p_id: y.id, p_gizli: !y.gizli }); if (r.error) bildir(trHata(r.error), true); else await yukle(); }),
+        dg("🗑 Sil", "yk-kucuk yk-tehlike", async () => { if (!window.confirm("Bu yorum kalıcı olarak silinsin mi?")) return; const r = await supabase.rpc("yorum_sil", { p_id: y.id }); if (r.error) bildir(trHata(r.error), true); else await yukle(); }));
     }
     k.append(ust, m, eylem, yanitKutu);
     const sar = el("div", "yk-sarma"); sar.append(k);

@@ -16,6 +16,7 @@
 import * as Bicim from "../bicim.js";
 import { zipOku } from "./zip-oku.js";
 import { pdfCikar, PdfSifreliHatasi } from "./pdf-oku.js";
+import { hata as trHata } from "../../core/hata-metni.js";
 
 const UZANTI = { md: "md", markdown: "md", mdown: "md", txt: "txt", text: "txt", json: "json", html: "html", htm: "html", docx: "docx", pdf: "pdf", zip: "zip" };
 export const KABUL_EDILEN = ".md,.markdown,.mdown,.txt,.text,.json,.html,.htm,.docx,.pdf,.zip";
@@ -792,7 +793,7 @@ async function pdfCoz(ad, u8, ctx) {
       md = "*Bu PDF'ten metin okunamadı (taranmış görüntü ya da özel kodlamalı olabilir). Sayfa görselleri aşağıda; seçtiklerin ek olarak kaydedilir.*\n\n" + gorseller.map((g, i) => `![Görsel ${i + 1}](ek:${g.id})`).join("\n\n");
       uyarilar.push("Metin okunamadı; yalnızca görseller alındı.");
     } else {
-      throw new Error("Bu PDF'ten metin okunamadı (taranmış görüntü, bozuk dosya ya da özel kodlamalı olabilir)" + (hata ? ` — ${String(hata.message || hata).replace(/[.\s]+$/, "")}` : "") + ". Word, Markdown veya HTML sürümünü kullan.");
+      throw new Error("Bu PDF'ten metin okunamadı (taranmış görüntü, bozuk dosya ya da özel kodlamalı olabilir)" + (hata && console.error("PDF okuma ayrıntısı:", hata), ". Word, Markdown veya HTML sürümünü kullan."));
     }
   }
   const html = markdownHtml(md);
@@ -838,7 +839,7 @@ async function zipCoz(ad, bayt, ctx, atlanan) {
         notlar.push(n);
       }
     } catch (h) {
-      atlanan.push(`${a.yol}: ${h.message || h}`);
+      atlanan.push(`${a.yol}: ${trHata(h)}`);
     }
   }
   return notlar;
@@ -928,7 +929,7 @@ export async function dosyalariCoz(dosyalar, ctx) {
       const bayt = new Uint8Array(await f.arrayBuffer());
       notlar.push(...(await dosyaCoz(f.name, bayt, ctx, atlanan)));
     } catch (h) {
-      atlanan.push(`${f.name}: ${h.message || h}`);
+      atlanan.push(`${f.name}: ${trHata(h)}`);
     }
     if (notlar.length > NOT_UST) {
       atlanan.push(`Bir seferde en fazla ${NOT_UST} not alınır; fazlası bırakıldı.`);

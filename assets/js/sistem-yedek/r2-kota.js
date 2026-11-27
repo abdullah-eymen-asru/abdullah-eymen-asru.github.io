@@ -6,6 +6,7 @@
  * Gösterilen: Class A (yazma/listeleme) · Class B (okuma/indirme dahil GET/HEAD) · depolama · ücretsiz işlemler (silme) · bugünkü toplamlar. Çıkış (egress) R2'de ücretsizdir.
  */
 import { workerJson } from "./ortak.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const ANAHTAR = "aea_r2kota_v1", TTL = 60000;
 const aboneler = new Set();
@@ -21,7 +22,7 @@ async function cek(zorla = false) {
   ucusta = (async () => {
     let kayit;
     try { kayit = { t: Date.now(), veri: await workerJson("/r2/kota") }; }
-    catch (h) { kayit = { t: Date.now(), hata: h.durum === 403 || h.durum === 401 ? "yetki" : h.message || "okunamadı" }; }
+    catch (h) { kayit = { t: Date.now(), hata: h.durum === 403 || h.durum === 401 ? "yetki" : trHata(h, "okunamadı") }; }
     son = kayit;
     try { localStorage.setItem(ANAHTAR, JSON.stringify(kayit)); } catch { /* yok say */ }
     return kayit;

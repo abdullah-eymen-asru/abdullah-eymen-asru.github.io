@@ -11,6 +11,7 @@
  */
 import { supabase, showMessage, showSpamNotice, escapeHtml, turkceOtpHatasi, sifreKuraliHatasi, turkceSifreHatasi, ZAYIF_SIFRE_BAYRAGI, SIFRE_KURALI_OZET, guncelOnaySurumleri } from "./core/supabase-client.js";
 import { requireAuthOrShowError } from "./auth/auth-guard.js";
+import { hata as trHata } from "./core/hata-metni.js";
 // NOT (TAŞINDI): Mesajlaşma (wireUserChat) artık bu sayfada değil — bkz.
 // panel/mesajlar.md + assets/js/mesajlar.js. "Yöneticiyle Mesajlaş" linki
 // artık doğrudan o sayfaya gider (bkz. panel.md), bu yüzden
@@ -118,7 +119,7 @@ function wireProfileForm(profile) {
       .single();
 
     if (error) {
-      showMessage(msg, "Kaydedilemedi: " + error.message);
+      showMessage(msg, "Kaydedilemedi: " + trHata(error));
       return;
     }
     if (!guncellenen) {
@@ -195,7 +196,7 @@ function wireEmailChange(profile) {
       if (error.message.includes("already registered") || error.message.includes("already been registered")) {
         showMessage(msg, "Bu e-posta zaten başka bir hesapta kayıtlı.");
       } else {
-        showMessage(msg, "E-posta değiştirilemedi: " + error.message);
+        showMessage(msg, "E-posta değiştirilemedi: " + trHata(error));
       }
       return;
     }
@@ -269,7 +270,7 @@ function wireEmailChange(profile) {
       submitBtn.disabled = false;
 
       if (error) {
-        showMessage(msg, "Kod doğrulanamadı: " + turkceOtpHatasi(error.message));
+        showMessage(msg, "Kod doğrulanamadı: " + turkceOtpHatasi(trHata(error)));
         return;
       }
 
@@ -436,7 +437,7 @@ async function renderBagliHesaplar() {
 
   const { data, error } = await supabase.auth.getUserIdentities();
   if (error) {
-    box.innerHTML = `<p class="muted">Bağlı hesaplar yüklenemedi: ${escapeHtml(error.message)}</p>`;
+    box.innerHTML = `<p class="muted">Bağlı hesaplar yüklenemedi: ${escapeHtml(trHata(error))}</p>`;
     return;
   }
 
@@ -486,7 +487,7 @@ async function renderBagliHesaplar() {
     });
     if (linkErr) {
       btn.disabled = false;
-      showMessage(msg, "Google hesabı bağlanamadı: " + linkErr.message);
+      showMessage(msg, "Google hesabı bağlanamadı: " + trHata(linkErr));
     }
     // Başarılıysa tarayıcı Google'a yönlendirilir; dönüşte panel yeniden
     // yüklenir ve bu bölüm güncel durumu otomatik gösterir.
@@ -510,7 +511,7 @@ async function renderBagliHesaplar() {
       if (unlinkErr.message?.includes("single_identity_not_deletable")) {
         showMessage(msg, "Bağlantı kesilemedi: önce bir şifre belirlemen gerekiyor.");
       } else {
-        showMessage(msg, "Bağlantı kesilemedi: " + unlinkErr.message);
+        showMessage(msg, "Bağlantı kesilemedi: " + trHata(unlinkErr));
       }
       return;
     }
@@ -605,7 +606,7 @@ async function renderAcikOturumlar() {
   ]);
 
   if (error) {
-    box.innerHTML = `<p class="muted">Açık oturumlar yüklenemedi: ${escapeHtml(error.message)}</p>`;
+    box.innerHTML = `<p class="muted">Açık oturumlar yüklenemedi: ${escapeHtml(trHata(error))}</p>`;
     return;
   }
 
@@ -656,7 +657,7 @@ async function renderAcikOturumlar() {
 
       if (sonlandirErr) {
         btn.disabled = false;
-        showMessage(msg, "Oturum sonlandırılamadı: " + sonlandirErr.message);
+        showMessage(msg, "Oturum sonlandırılamadı: " + trHata(sonlandirErr));
         return;
       }
 
@@ -771,7 +772,7 @@ async function wireKvkk(profile) {
     });
     aydinlatmaBtn.disabled = false;
     if (error) {
-      alert("Beyan kaydedilemedi: " + error.message);
+      alert("Beyan kaydedilemedi: " + trHata(error));
       return;
     }
     await profiliTazeleVeCiz();
@@ -801,7 +802,7 @@ async function wireKvkk(profile) {
     });
     yurtdisiBtn.disabled = false;
     if (error) {
-      alert("Rıza kaydedilemedi: " + error.message);
+      alert("Rıza kaydedilemedi: " + trHata(error));
       return;
     }
     await profiliTazeleVeCiz();
@@ -842,7 +843,7 @@ async function renderMfaDurumu(box) {
 
   const { data, error } = await supabase.auth.mfa.listFactors();
   if (error) {
-    box.innerHTML = `<p class="muted">2FA durumu okunamadı: ${escapeHtml(error.message)}</p>`;
+    box.innerHTML = `<p class="muted">2FA durumu okunamadı: ${escapeHtml(trHata(error))}</p>`;
     return;
   }
 
@@ -866,7 +867,7 @@ async function renderMfaDurumu(box) {
       });
       const msg = document.getElementById("mfa-message");
       if (unenrollErr) {
-        showMessage(msg, "Kaldırılamadı: " + unenrollErr.message);
+        showMessage(msg, "Kaldırılamadı: " + trHata(unenrollErr));
         return;
       }
       // 2FA kapandığına göre eski yedek kodların artık bir anlamı yok —
@@ -944,7 +945,7 @@ async function renderMfaDurumu(box) {
       document.getElementById("mfa-secret").textContent = enrollData.totp.secret;
       mfaDogrulamayiBagla(enrollData, msg, box);
     } catch (err) {
-      showMessage(msg, "Başlatılamadı: " + err.message);
+      showMessage(msg, "Başlatılamadı: " + trHata(err));
       baslatBtn.disabled = false;
     }
   });
@@ -1019,7 +1020,7 @@ function mfaDogrulamayiBagla(enrollData, msg, box) {
         factorId: enrollData.id,
       });
       if (challengeErr) {
-        showMessage(msg, "Doğrulama başlatılamadı: " + challengeErr.message);
+        showMessage(msg, "Doğrulama başlatılamadı: " + trHata(challengeErr));
         return;
       }
 
@@ -1029,7 +1030,7 @@ function mfaDogrulamayiBagla(enrollData, msg, box) {
         code: kod,
       });
       if (verifyErr) {
-        showMessage(msg, "Kod hatalı veya süresi doldu: " + verifyErr.message);
+        showMessage(msg, "Kod hatalı veya süresi doldu: " + trHata(verifyErr));
         return;
       }
 
@@ -1113,7 +1114,7 @@ async function renderYedekKodDurumu(alan) {
     btn.disabled = false;
 
     if (kodErr || !Array.isArray(kodlar) || kodlar.length === 0) {
-      showMessage(msg, "Kodlar oluşturulamadı: " + (kodErr?.message || "bilinmeyen hata"));
+      showMessage(msg, "Kodlar oluşturulamadı: " + (trHata(kodErr, "bilinmeyen hata")));
       return;
     }
 
@@ -1253,7 +1254,7 @@ function wireDeleteAccount(session, profile) {
       alert(body.bekliyor ? "Hesabın kapatıldı. Verilerin Site Sahibi'nin onayıyla kalıcı olarak silinecek. Anasayfaya yönlendiriliyorsun." : "Hesabın silindi. Anasayfaya yönlendiriliyorsun.");
       window.location.href = "/";
     } catch (err) {
-      showMessage(msg, "Hesap silinemedi: " + err.message);
+      showMessage(msg, "Hesap silinemedi: " + trHata(err));
       btn.disabled = false;
       btn.textContent = "Hesabımı Kalıcı Olarak Sil";
     }

@@ -34,6 +34,7 @@ import {
 } from "../core/supabase-client.js";
 import { kasaVarMi, cevrimdisiGiris, girisSonrasi, kesintiOturumu, durum as kesintiDurumu } from "../core/kesinti.js";
 import { demoModuAktifMi } from "../demo/demo-durum.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 /* ------------------------------------------------------------------------------------------------ */
 /* Ortak yardımcılar                                                                                 */
@@ -247,7 +248,7 @@ async function googleBaslat(hedefSayfa, kutu) {
   });
   if (error) {
     oturumDepoYaz(GOOGLE_BAYRAGI, null);
-    showMessage(kutu, "Google ile bağlantı başlatılamadı: " + (error.message || "bilinmeyen hata"), "error");
+    showMessage(kutu, "Google ile bağlantı başlatılamadı: " + (trHata(error, "bilinmeyen hata")), "error");
     return false;
   }
   return true; // tarayıcı Google'a yönleniyor
@@ -310,7 +311,7 @@ function mfaKoduIste() {
       bekletBtn(yedekForm, true, "Kontrol ediliyor…");
       const { data, error } = await supabase.rpc("yedek_kod_ile_2fa_kaldir", { p_kod: yk });
       if (error || data !== true) {
-        showMessage(msg, error?.message || "Yedek kod geçersiz ya da daha önce kullanılmış.", "error");
+        showMessage(msg, trHata(error, "Yedek kod geçersiz ya da daha önce kullanılmış."), "error");
         bekletBtn(yedekForm, false);
         return;
       }
@@ -458,7 +459,7 @@ export async function initGirisPage() {
     try {
       await girisiTamamla({ eposta, parola, uid: data.user.id, kasaIste });
     } catch (h) {
-      showMessage(msg, "Giriş yapıldı ancak yönlendirme başarısız: " + (h?.message || h), "error");
+      showMessage(msg, "Giriş yapıldı ancak yönlendirme başarısız: " + (trHata(h)), "error");
       bekletBtn(form, false);
     }
   });
@@ -538,7 +539,7 @@ export async function initKayitPage() {
       try {
         await googleKayitDonusunuIsle(oturum, msg);
       } catch (h) {
-        showMessage(msg, "Kayıt sonrası işlem tamamlanamadı: " + (h?.message || h), "error");
+        showMessage(msg, "Kayıt sonrası işlem tamamlanamadı: " + (trHata(h)), "error");
       }
       return;
     }
@@ -687,7 +688,7 @@ export function initHesapOnaylaPage() {
     bekletBtn(form, true, "Doğrulanıyor…");
     const { data, error } = await supabase.auth.verifyOtp({ email: eposta, token: kod, type: "signup" });
     if (error) {
-      showMessage(msg, turkceOtpHatasi(error.message), "error");
+      showMessage(msg, turkceOtpHatasi(trHata(error)), "error");
       bekletBtn(form, false);
       return;
     }
@@ -757,7 +758,7 @@ export async function initSifreGuncellePage() {
     bekletBtn(otpForm, true, "Doğrulanıyor…");
     const { error } = await supabase.auth.verifyOtp({ email: eposta, token: kod, type: "recovery" });
     bekletBtn(otpForm, false);
-    if (error) return showMessage(msg, turkceOtpHatasi(error.message), "error");
+    if (error) return showMessage(msg, turkceOtpHatasi(trHata(error)), "error");
     showMessage(msg, "Kod doğrulandı. Şimdi yeni şifreni belirle.", "success");
     otpForm.hidden = true;
     formuGoster(true);

@@ -7,6 +7,7 @@
  */
 import { supabase } from "../core/supabase-client.js";
 import { el, kart, bolumBasligi, ipucu, olay } from "./ui-temel.js";
+import { hata as trHata } from "../core/hata-metni.js";
 import {
   omAyar, omTercihOku, omTercihYaz, kendiAnahtarDurumu, kendiAnahtariKaydet, kendiAnahtariSil, omKullanimOzeti,
   omYonetimKaydet, omKullanimTumu, omKullaniciLimitiKaydet, workerSaglik, PENCERE_ADI,
@@ -55,7 +56,7 @@ export function openMeteoAyarKarti(d, kb) {
       const o = await omKullanimOzeti(); kullanimKutu.replaceChildren(kullanimTablosu(o));
       const a = await omAyar(true);
       durum.textContent = `Plan: ${a.plan === "ticari" ? "ticari" : "ücretsiz"} · etkin kaynak: ${a.aktif_kaynak === "site" ? "site anahtarı" : "ücretsiz Open-Meteo (IP başına)"}${a.migrasyonYok ? (console.warn("Kota tabloları kurulu değil: 0121 migration"), " · (kota bilgisi şu an kullanılamıyor)") : ""}.`;
-    } catch (h) { durum.textContent = /does not exist|schema cache/i.test(h.message) ? "Kota sistemi henüz kurulmamış (Supabase: 0121_openmeteo_kota_ve_api.sql)." : `Kullanım okunamadı: ${h.message}`; }
+    } catch (h) { durum.textContent = /does not exist|schema cache/i.test(h.message) ? "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene." : `Kullanım okunamadı: ${trHata(h)}`; }
   }
 
   async function tercihCiz() {
@@ -67,11 +68,11 @@ export function openMeteoAyarKarti(d, kb) {
     const girdi = el("input", { type: "password", class: "hv-girdi", placeholder: k.var ? "Kayıtlı anahtarı değiştirmek için yeni anahtar yaz" : "Open-Meteo API anahtarın", autocomplete: "off", spellcheck: "false", "aria-label": "Open-Meteo API anahtarı" });
     const mesaj = el("p", { class: "hv-ipucu", role: "status" });
     const kaydet = olay(el("button", { type: "button", class: "hv-btn hv-btn-birincil hv-btn-ince", text: "Anahtarı şifreli kaydet" }), "click", async () => {
-      try { await kendiAnahtariKaydet(girdi.value); girdi.value = ""; mesaj.textContent = "Kaydedildi (şifreli; kimse okuyamaz). Kaynağı “Kendi API anahtarımı kullan” yap."; await tercihCiz(); } catch (h) { mesaj.textContent = h.message; mesaj.classList.add("hv-uyari"); }
+      try { await kendiAnahtariKaydet(girdi.value); girdi.value = ""; mesaj.textContent = "Kaydedildi (şifreli; kimse okuyamaz). Kaynağı “Kendi API anahtarımı kullan” yap."; await tercihCiz(); } catch (h) { mesaj.textContent = trHata(h); mesaj.classList.add("hv-uyari"); }
     });
     const sil = olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "Anahtarı sil", disabled: !k.var }), "click", async () => {
       if (!window.confirm("Kayıtlı Open-Meteo anahtarın silinsin mi?")) return;
-      try { await kendiAnahtariSil(); omTercihYaz("otomatik"); await tercihCiz(); } catch (h) { mesaj.textContent = h.message; }
+      try { await kendiAnahtariSil(); omTercihYaz("otomatik"); await tercihCiz(); } catch (h) { mesaj.textContent = trHata(h); }
     });
     tercihKutu.replaceChildren(
       el("h3", { text: "API kaynağım" }),
@@ -96,7 +97,7 @@ export function openMeteoAyarKarti(d, kb) {
       try {
         await omYonetimKaydet({ plan: plan.value, ucretsiz_limit: uc.deger(), ticari_limit: ti.deger(), kullanici_limit: ku.deger(), kendi_anahtar_izni: izin.checked, site_anahtari_tanimli: tanimli.checked, aciklama: not.value });
         mesaj.textContent = "Kaydedildi."; mesaj.classList.remove("hv-uyari"); await kullanimYukle(); await tercihCiz();
-      } catch (h) { mesaj.textContent = h.message; mesaj.classList.add("hv-uyari"); }
+      } catch (h) { mesaj.textContent = trHata(h); mesaj.classList.add("hv-uyari"); }
     });
     const workerDurum = saglik ? (saglik.open_meteo_anahtari_var ? "✅ Worker'da OPEN_METEO_API_KEY tanımlı." : "⚠️ Worker'da OPEN_METEO_API_KEY tanımlı DEĞİL (ticari plan için ekle: rehber/04).") : "⚠️ Worker'a ulaşılamadı (yeniden yayınlanmış mı?).";
     const aramaGirdi = el("input", { type: "search", class: "hv-girdi", placeholder: "Üye ara (ad veya e-posta)", "aria-label": "Üye ara" });
@@ -116,7 +117,7 @@ export function openMeteoAyarKarti(d, kb) {
           const nesne = gir.trim() === "" || gir.trim() === ",,," ? null : Object.fromEntries(PENCERELER.map((p, i) => [p, parca[i] === undefined || parca[i] === "" ? undefined : parca[i] === "-" ? null : Math.max(0, Math.floor(Number(parca[i])))]).filter(([, v]) => v !== undefined));
           if (nesne && Object.values(nesne).some((v) => v !== null && !Number.isFinite(v))) throw new Error("Sayı geçersiz.");
           await omKullaniciLimitiKaydet(r.user_id, nesne); await sayfaYukle(true);
-        } catch (h) { window.alert(h.message); }
+        } catch (h) { window.alert(trHata(h)); }
       });
       // Kapalı satır: ad · rol · bugün/ay özeti. Açılınca dakika/saat/gün/ay hücreleri + limit düzenleme.
       return el("details", { class: "hv-kota-kart hv-uye-kart" },
@@ -134,7 +135,7 @@ export function openMeteoAyarKarti(d, kb) {
         liste.append(...s.map(uyeKarti));
         ozetSatir.textContent = toplamUye ? `${yuklenen} / ${toplamUye} üye gösteriliyor` : "Eşleşen üye yok.";
         dahaFazla.hidden = yuklenen >= toplamUye; dahaFazla.disabled = false;
-      } catch (h) { ozetSatir.textContent = h.message; }
+      } catch (h) { ozetSatir.textContent = trHata(h); }
       finally { mesgul = false; }
     }
     const tabloYukle = () => sayfaYukle(true);

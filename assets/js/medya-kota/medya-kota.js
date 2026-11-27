@@ -8,6 +8,7 @@
 import { supabase } from "../core/supabase-client.js";
 import { el, hataMetni } from "../donusturucu/ortak.js";
 import * as Kasa from "../havastil/ai-kasa.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 export const ARACLAR = {
   transkript: { saglayici: "groq", birim: "saniye", ad: "Transkript", sistemAd: "Sistem Groq anahtarı", kendiAd: "Kendi Groq anahtarım" },
@@ -174,11 +175,11 @@ export function kaynakSecici(arac) {
     const v = paketle();
     if (cozumleyici ? !/^https:\/\/[^\s|]+\.[^\s|]+/.test(adres.value.trim()) : !/^gsk_[A-Za-z0-9]{20,120}$/.test(v)) { durum.textContent = cozumleyici ? "Adres https:// ile başlamalı." : "Groq anahtarı gsk_ ile başlar ve boşluk içermez."; return; }
     bellek = v;
-    if (sakla.checked && kasaAcik) { try { await Kasa.anahtarKaydet(t.saglayici, v, null); kayitli = true; durum.textContent = "✔ Şifreli kasaya kaydedildi ve kullanılacak."; } catch (h) { durum.textContent = `Kasaya yazılamadı (${h.message}); bu oturumda kullanılacak.`; } }
+    if (sakla.checked && kasaAcik) { try { await Kasa.anahtarKaydet(t.saglayici, v, null); kayitli = true; durum.textContent = "✔ Şifreli kasaya kaydedildi ve kullanılacak."; } catch (h) { durum.textContent = `Kasaya yazılamadı (${trHata(h)}); bu oturumda kullanılacak.`; } }
     else durum.textContent = "✔ Bu oturum için ayarlandı (kasaya kaydedilmedi).";
     uygula();
   });
-  silBtn.addEventListener("click", async () => { try { await Kasa.anahtarSil(t.saglayici); } catch (h) { durum.textContent = h.message; return; } kayitli = false; bellek = null; anahtar.value = ""; adres.value = ""; durum.textContent = "Kayıtlı anahtar silindi."; uygula(); });
+  silBtn.addEventListener("click", async () => { try { await Kasa.anahtarSil(t.saglayici); } catch (h) { durum.textContent = trHata(h); return; } kayitli = false; bellek = null; anahtar.value = ""; adres.value = ""; durum.textContent = "Kayıtlı anahtar silindi."; uygula(); });
   supabase.rpc("medya_kota_ayarlari").then(({ data }) => {
     const a = (data || []).find((x) => x.arac === arac); izin = a ? a.kendi_anahtar_izni : true;
     if (!izin) { r2.disabled = true; r1.checked = true; kendiKutu.hidden = true; yaz("site"); durum.textContent = "Kendi anahtarla kullanım Site Sahibi tarafından kapatılmış."; }

@@ -19,6 +19,7 @@ import { PROFILLER, COZUNURLUKLER, varsayilanAyar, profilUygula, tahminiBoyut, t
 import { uret, indir, paylas, paylasilabilir, toplamBayt } from "./disa-aktar.js";
 import { nesneUrl, urlBirak, bellekDurumu, hepsiniBirak, tuvalBirak } from "./bellek-kalkani.js";
 import { UYARI_ESIGI, buyukDosyaUyarisi, yerelYonerge } from "../donusturucu/buyuk-dosya.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const MAKS_OGE = 300;
 const MAKS_DOSYA = 250 * 1024 * 1024;
@@ -65,7 +66,7 @@ function onizlemeYenile(o) {
         const eski = o.onizUrl;
         if (ogeler.includes(o)) { o.onizUrl = nesneUrl(b); o.onizHata = null; if (eski) urlBirak(eski); } 
       } finally { tuvalBirak(c); }
-    } catch (h) { o.onizHata = h?.message || String(h); }
+    } catch (h) { o.onizHata = trHata(h); }
     kartGuncelle(o);
   }).catch(() => {});
   return onizlemeZinciri;
@@ -145,10 +146,10 @@ async function dosyalariAl(fl) {
         });
       } catch (h) {
         if (h instanceof IptalHatasi) throw h;
-        red.push(`${f.name}: ${h.message || h}`);
+        red.push(`${f.name}: ${trHata(h)}`);
       }
     }
-  } catch (h) { if (!(h instanceof IptalHatasi)) red.push(h.message || String(h)); } finally {
+  } catch (h) { if (!(h instanceof IptalHatasi)) red.push(trHata(h)); } finally {
     ayikla = null; ilerleme.gizle();
   }
   tahminiTetikle(); ciz();
@@ -174,7 +175,7 @@ function tahminiTetikle() {
       if (t.iptal) return;
       const hedef = ayar.cikti === "pdf" ? t.pdf : t.gorsel;
       tahminEl.textContent = `${ciktiEtiketi()} ≈ ${bayt(hedef)}${t.once ? ` (kaynak ${bayt(t.once)})` : ""}`;
-    } catch (h) { tahminEl.textContent = `Tahmin yapılamadı: ${h.message || h}`; }
+    } catch (h) { tahminEl.textContent = `Tahmin yapılamadı: ${trHata(h)}`; }
   }, 600);
 }
 
@@ -274,7 +275,7 @@ function kartOlustur(o) {
   const don = btn("↻", "90° döndür", () => { o.dondur = (o.dondur + 90) % 360; if (o.kose) o.kose = kosalariDondur(o.kose, 1); degisti(o); });
   const mod = btn("◐", "Bu sayfanın tarama modunu değiştir (genel → renkli → siyah-beyaz → orijinal)", () => { o.mod = MOD_SIRA[(MOD_SIRA.indexOf(o.mod) + 1) % MOD_SIRA.length]; degisti(o); });
   const kes = btn("✂", "Kenarları düzelt (4 köşe)", async () => {
-    try { const k = await koseDuzenle(o); if (k) { o.kose = k; o.algi = "elle"; degisti(o); } } catch (h) { bildir(h.message || String(h), "error"); }
+    try { const k = await koseDuzenle(o); if (k) { o.kose = k; o.algi = "elle"; degisti(o); } } catch (h) { bildir(trHata(h), "error"); }
   });
   const sil = btn("✕", "Sayfayı kaldır", () => ogeSil(o));
   const resimKap = el("div", { class: "bt-resim" });
@@ -462,4 +463,4 @@ async function kur() {
   sekmeSifirlamaKaydet("tool-belge-tarayici", () => { oturumuSifirla(); });
 }
 
-kur().catch((h) => { console.error("belge-tarayici.js:", h); bildir(`Araç yüklenemedi: ${h.message || h}`, "error"); });
+kur().catch((h) => { console.error("belge-tarayici.js:", h); bildir(`Araç yüklenemedi: ${trHata(h)}`, "error"); });

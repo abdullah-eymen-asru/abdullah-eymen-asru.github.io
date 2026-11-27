@@ -22,6 +22,7 @@
  */
 import { supabase } from "../core/supabase-client.js";
 import * as Kasa from "../notlar/kasa.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 /*
  * 2026-10 (migration 0096) — MESAJLAŞMA ANAHTARI GİRİŞ OTURUMUNA BAĞLANDI; ayrı "Kurtarma Parolası" kutusu KALDIRILDI.
@@ -113,7 +114,7 @@ export async function anahtarlariHazirla() {
 
   const oku = () => supabase.from("e2ee_kullanici_anahtarlari").select(SATIR_KOLONLARI).eq("kullanici_id", uid).maybeSingle();
   let { data: satir, error } = await oku();
-  if (error && /dek_sarili|dek_iv|kurtarma_sarili|42703/.test(`${error.code} ${error.message}`)) {
+  if (error && /dek_sarili|dek_iv|kurtarma_sarili|42703/.test(`${error.code} ${trHata(error)}`)) {
     // 0096 henüz çalıştırılmamış: eski kolonlarla devam et (Worker yolu).
     ({ data: satir, error } = await supabase.from("e2ee_kullanici_anahtarlari").select("acik_anahtar, sarili_ozel_anahtar, iv").eq("kullanici_id", uid).maybeSingle());
   }
@@ -245,7 +246,7 @@ export const rastgele = (n) => crypto.getRandomValues(new Uint8Array(n));
 /** Anahtar kaydının durumu (ağ: 1 RPC). { var, kurtarma_var (ESKİ parola), dek_var, kit_var, kit_at } */
 export async function anahtarDurumu() {
   const { data, error } = await supabase.rpc("e2ee_durum");
-  if (error) throw new Error(/does not exist|PGRST202|42883|schema cache/i.test(error.message || "") ? (console.warn("0096 numaralı migration henüz çalıştırılmamış."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.") : error.message);
+  if (error) throw new Error(/does not exist|PGRST202|42883|schema cache/i.test(error.message || "") ? (console.warn("0096 numaralı migration henüz çalıştırılmamış."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.") : trHata(error));
   return data || { var: false, kurtarma_var: false, kit_var: false };
 }
 
@@ -282,7 +283,7 @@ export async function anahtariSifirla() {
   const iv = rastgele(12);
   const sarili = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: enc.encode(uid) }, kasa, ozel);
   const { data, error } = await supabase.rpc("e2ee_anahtari_sifirla", { p_acik: b64(acik), p_sarili: b64(sarili), p_iv: b64(iv) });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(trHata(error));
   anahtarOnbellek = { uid, ozel: await ozelImport(ozel), acik: b64(acik) };
   await cihazAnahtariniSil(uid);
   await dekSarmaliniYaz(new Uint8Array(ozel)); // kasa açıksa yeni anahtar da giriş oturumuna bağlansın
@@ -324,13 +325,13 @@ export async function anahtariOtomatikOnar() {
     const iv = rastgele(12);
     const sarili = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: enc.encode(uid) }, sarmaAnahtari, ozel);
     const { error } = await supabase.rpc("e2ee_anahtari_sifirla", { p_acik: b64(acik), p_sarili: b64(sarili), p_iv: b64(iv) });
-    if (error) return { onarildi: false, neden: error.message || "sunucu" };
+    if (error) return { onarildi: false, neden: trHata(error, "sunucu") };
 
     anahtarOnbellek = { uid, ozel: await ozelImport(ozel), acik: b64(acik) };
     await cihazAnahtariniSil(uid);
     const dekYazildi = await dekSarmaliniYaz(new Uint8Array(ozel));
     return { onarildi: dekYazildi, neden: dekYazildi ? undefined : "dek-yazilamadi" };
-  } catch (er) { return { onarildi: false, neden: er?.message || "hata" }; }
+  } catch (er) { return { onarildi: false, neden: trHata(er, "hata") }; }
 }
 
 /**

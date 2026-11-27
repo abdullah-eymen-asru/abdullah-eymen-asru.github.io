@@ -15,6 +15,7 @@
  * CSP: satır içi stil/olay yok; tüm metin textContent ile yazılır (el yardımcısı), olaylar addEventListener ile.
  */
 import { el, toast } from "./ortak.js";
+import { hata as trHata } from "../core/hata-metni.js";
 import {
   motorAyarlari, surumListesiGetir, surumuDene, surumuSabitle, surumKarsilastir,
   tercihOku, tercihYaz, planlananSurum, motorDurumu, motorYuklendiMi,
@@ -111,7 +112,7 @@ export async function motorPaneliKur(yer, { owner = false } = {}) {
       d.kanitHata = d.kanit.hata || "";
     } catch (h) {
       d.kanit = null;
-      d.kanitHata = h.message || "Sürüm listesi alınamadı.";
+      d.kanitHata = trHata(h, "Sürüm listesi alınamadı.");
     }
     d.plan = await planlananSurum();
   }
@@ -354,7 +355,7 @@ export async function motorPaneliKur(yer, { owner = false } = {}) {
         toast(`Site varsayılanı PDF.js ${surum} oldu.`, "basari");
       } catch (h) {
         ciz();
-        durumYaz("[data-mt-site-durum]", `✗ ${h.message}`, "hata");
+        durumYaz("[data-mt-site-durum]", `✗ ${trHata(h)}`, "hata");
       }
     }
   });

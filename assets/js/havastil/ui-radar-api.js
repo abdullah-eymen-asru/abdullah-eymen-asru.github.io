@@ -7,6 +7,7 @@
  */
 import { el, kart, bolumBasligi, ipucu, olay } from "./ui-temel.js";
 import { radarKaynakOku, radarKaynakYaz, radarAdresiDogrula } from "./radar-kaynak.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const KADEMELER = [
   { ad: "Open-Meteo — tahmin ızgarası (yağış/rüzgâr/sıcaklık katmanları)", kademe: [
@@ -41,7 +42,7 @@ export function radarApiKarti() {
   const mesaj = el("p", { class: "hv-ipucu", role: "status" });
   const kaydet = olay(el("button", { type: "button", class: "hv-btn hv-btn-birincil hv-btn-ince", text: "Kaynağı kaydet" }), "click", () => {
     try { radarKaynakYaz(sec.value, adres.value); mesaj.classList.remove("hv-uyari"); mesaj.textContent = "Kaydedildi (bu cihazda). Radar sekmesini yeniden açınca uygulanır."; }
-    catch (h) { mesaj.classList.add("hv-uyari"); mesaj.textContent = h.message; }
+    catch (h) { mesaj.classList.add("hv-uyari"); mesaj.textContent = trHata(h); }
   });
   olay(sec, "change", () => { adres.hidden = sec.value !== "kendi"; });
   adres.hidden = sec.value !== "kendi";

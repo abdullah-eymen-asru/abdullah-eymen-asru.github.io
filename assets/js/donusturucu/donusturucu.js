@@ -21,6 +21,7 @@ import { ayrilmaKancasiKaydet, sekmeSifirlamaKaydet } from "../core/gezinme-kili
 import { sunucuHedefleri, sunucuOrtakHedefler, sunucuTahminSn, yerelTahminSn, SUNUCU_UYKU_NOTU } from "./sunucu-matris.js";
 import { sunucuyuTemizle } from "./sunucu-donustur.js";
 import { UYARI_ESIGI, buyukDosyaUyarisi, yerelYonerge } from "./buyuk-dosya.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const MAKS_TEK = 250 * 1024 * 1024;
 const MAKS_TOPLAM = 500 * 1024 * 1024;
@@ -581,5 +582,5 @@ async function kur() {
 
 kur().catch((h) => {
   console.error("donusturucu/donusturucu.js:", h);
-  bildir(`Araç yüklenemedi: ${h.message || h}`, "error");
+  bildir(`Araç yüklenemedi: ${trHata(h)}`, "error");
 });

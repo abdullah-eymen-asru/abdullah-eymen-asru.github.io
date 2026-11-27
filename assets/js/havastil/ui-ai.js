@@ -12,6 +12,7 @@ import { SAGLAYICILAR, SAGLAYICI_SIRASI, yorumIste, modelleriListele } from "./a
 import * as Kasa from "./ai-kasa.js";
 import { analizSistem, sohbetSistem, analizKullanici, sohbetKullanici, ozet } from "./ai-istem.js";
 import { gunVeriPaketi, paketMetni, paketJson, dosyaAdi, indir, panoyaKopyala } from "./veri-paketi.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 /* ------------------------------ güvenli mini Markdown → DOM ------------------------------ */
 function satirIci(metin) {
@@ -76,7 +77,7 @@ export function aiAyarDialogu(d, { onKapat } = {}) {
       kayitli = await Kasa.kayitliSaglayicilar();
       kasaBilgi = await Kasa.kasaDurumu();
       if (!Kasa.kasaAcikMi()) await Kasa.otomatikAc().catch(() => false);          // hesap kasası hazırsa PAROLA SORMADAN açılır
-    } catch (h) { hata(h.message); kayitli = {}; }
+    } catch (h) { hata(trHata(h)); kayitli = {}; }
     yukleniyor = false; ciz();
   }
   function kasaBolumu() {
@@ -89,7 +90,7 @@ export function aiAyarDialogu(d, { onKapat } = {}) {
       const ac = olay(el("button", { type: "button", class: "hv-btn hv-btn-birincil", text: "🔓 Kasayı aç" }), "click", async () => {
         ac.disabled = true; hata("");
         try { if (!(await Kasa.otomatikAc())) throw new Error("Kasa açılamadı: kayıtlar başka bir kasa anahtarıyla şifrelenmiş olabilir. Aşağıdan kasayı sıfırlayıp anahtarları yeniden gir."); ciz(); }
-        catch (h) { hata(h.message); ac.disabled = false; }
+        catch (h) { hata(trHata(h)); ac.disabled = false; }
       });
       return el("div", { class: "hv-kasa-durum" }, el("strong", { text: "🔒 Kasa kilitli" }),
         el("small", { class: "hv-ipucu", text: "Parola gerekmez: kasa hesabının ana parolasına bağlıdır. Giriş yaptığında kendiliğinden açılır; elle kilitlediysen buradan tek tıkla açarsın." }), ac,
@@ -105,7 +106,7 @@ export function aiAyarDialogu(d, { onKapat } = {}) {
         if (eskiVar) await Kasa.kasaAc(parola.value);
         else { if (parola.value !== parola2.value) throw new Error("Parolalar aynı değil."); await Kasa.kasaKur(parola.value); }
         parola.value = ""; if (parola2) parola2.value = ""; await yenile();
-      } catch (h) { hata(h.message); } finally { git.disabled = false; }
+      } catch (h) { hata(trHata(h)); } finally { git.disabled = false; }
     });
     return el("div", { class: "hv-kasa-durum" },
       el("strong", { text: eskiVar ? "🔒 Eski kasa parolası gerekli (bir kereye mahsus)" : "Hesap kasası bulunamadı" }),
@@ -117,7 +118,7 @@ export function aiAyarDialogu(d, { onKapat } = {}) {
   }
   async function sifirlaTikla() {
     if (!window.confirm("Kayıtlı TÜM yapay zekâ anahtarların silinecek. Devam edilsin mi?")) return;
-    try { await Kasa.kasayiSifirla(); hata("Kasa sıfırlandı.", true); await yenile(); } catch (h) { hata(h.message); }
+    try { await Kasa.kasayiSifirla(); hata("Kasa sıfırlandı.", true); await yenile(); } catch (h) { hata(trHata(h)); }
   }
   function saglayiciKarti(id) {
     const S = SAGLAYICILAR[id], kayit = kayitli[id], acik = Kasa.kasaAcikMi();
@@ -133,7 +134,7 @@ export function aiAyarDialogu(d, { onKapat } = {}) {
         else throw new Error("Önce API anahtarını yapıştır.");
         anahtar.value = ""; Kasa.secimYaz(id, model.value.trim() || S.varsayilan);
         hata(`${S.kisa} kaydedildi (şifreli).`, true); await yenile();
-      } catch (h) { durum.textContent = h.message; kaydet.disabled = false; }
+      } catch (h) { durum.textContent = trHata(h); kaydet.disabled = false; }
     });
     const dogrula = olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "🔎 Doğrula / modelleri getir", disabled: !acik || !kayit && !anahtar.value }), "click", async () => {
       const a = anahtar.value.trim() || Kasa.anahtarAl(id);
@@ -147,7 +148,7 @@ export function aiAyarDialogu(d, { onKapat } = {}) {
     anahtar.addEventListener("input", () => { dogrula.disabled = !acik || (!kayit && !anahtar.value); });
     const sil = kayit ? olay(el("button", { type: "button", class: "hv-btn hv-btn-ince hv-btn-tehlike", text: "Sil", disabled: !acik }), "click", async () => {
       if (!window.confirm(`${S.kisa} anahtarı silinsin mi?`)) return;
-      try { await Kasa.anahtarSil(id); await yenile(); } catch (h) { durum.textContent = h.message; }
+      try { await Kasa.anahtarSil(id); await yenile(); } catch (h) { durum.textContent = trHata(h); }
     }) : null;
     return el("div", { class: `hv-ai-saglayici${kayit ? " kayitli" : ""}` },
       el("div", { class: "hv-bolum-ust" }, el("strong", { text: S.ad }), kayit ? rozet("Kayıtlı (şifreli)", "hv-rozet-ok") : rozet("Anahtar yok")),
@@ -176,7 +177,7 @@ export function aiAyarKarti(d, kb) {
     try {
       const k = await Kasa.kayitliSaglayicilar(); const ad = Object.keys(k).map((x) => SAGLAYICILAR[x].kisa);
       durum.textContent = ad.length ? `Kayıtlı sağlayıcılar: ${ad.join(", ")} · kasa ${Kasa.kasaAcikMi() ? "açık" : "kilitli"}.` : "Henüz sağlayıcı eklenmedi.";
-    } catch (h) { durum.textContent = h.message; }
+    } catch (h) { durum.textContent = trHata(h); }
   };
   const yonet = olay(el("button", { type: "button", class: "hv-btn hv-btn-birincil hv-btn-ince", text: "🤖 Sağlayıcıları yönet", disabled: d.vitrin || d.misafir }), "click", () => aiAyarDialogu(d, { onKapat: () => { yaz(); kb.ciz(); } }));
   yaz();
@@ -220,7 +221,7 @@ export function aiPaneli(d, kb) {
   const aktif = () => { const s = Kasa.secimOku(); return s && SAGLAYICILAR[s.saglayici] ? s : null; };
 
   async function saglayiciHazir() {
-    let kayit; try { kayit = await Kasa.kayitliSaglayicilar(); } catch (h) { return { hata: h.message }; }
+    let kayit; try { kayit = await Kasa.kayitliSaglayicilar(); } catch (h) { return { hata: trHata(h) }; }
     const adlar = Object.keys(kayit);
     if (!adlar.length) return { ac: true, neden: "Önce bir yapay zekâ sağlayıcısı ekle." };
     let s = aktif(); if (!s || !kayit[s.saglayici]) { s = { saglayici: adlar[0], model: kayit[adlar[0]].model || SAGLAYICILAR[adlar[0]].varsayilan }; Kasa.secimYaz(s.saglayici, s.model); }
@@ -242,7 +243,7 @@ export function aiPaneli(d, kb) {
       olay(model, "change", () => { Kasa.secimYaz(sec.value, model.value.trim() || SAGLAYICILAR[sec.value].varsayilan); });
       doldur(secimAlani, el("div", { class: "hv-ai-secim-satir" }, sec, model, dl, olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "⚙️ Yönet" }), "click", () => aiAyarDialogu(d, { onKapat: () => { secimCiz(); } }))),
         Kasa.kasaAcikMi() ? el("small", { class: "hv-ipucu", text: "🔓 Kasa açık" }) : olay(el("button", { type: "button", class: "hv-baglanti", text: "🔒 Kasa kilitli — aç" }), "click", () => aiAyarDialogu(d, { onKapat: () => { secimCiz(); } })));
-    }).catch((h) => doldur(secimAlani, el("p", { class: "hv-uyari", text: h.message })));
+    }).catch((h) => doldur(secimAlani, el("p", { class: "hv-uyari", text: trHata(h) })));
   }
 
   const seviyeOku = () => { try { return localStorage.getItem("hv_ai_seviye") === "uzman" ? "uzman" : "sade"; } catch { return "sade"; } };
@@ -290,7 +291,7 @@ export function aiPaneli(d, kb) {
       st.analiz = { metin: r.metin, saglayici: s.saglayici, model: r.model, kullanim: r.kullanim, zaman: new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }), onbellek: false, tarih: p.secili_gun.tarih };
       st.onbellek.set(anahtarOz, st.analiz); if (st.onbellek.size > 8) st.onbellek.delete(st.onbellek.keys().next().value);
       analizDurum.textContent = modelDegistiyse(r, s); sonucGoster();
-    } catch (hh) { analizDurum.textContent = hh.message; }
+    } catch (hh) { analizDurum.textContent = trHata(hh); }
     finally { istekte = false; analizBtn.disabled = false; yenidenBtn.disabled = false; iptalBtn.hidden = true; iptal = null; }
   }
 
@@ -325,7 +326,7 @@ export function aiPaneli(d, kb) {
       const r = await yorumIste({ saglayici: s.saglayici, model: (s.model || SAGLAYICILAR[s.saglayici].varsayilan).trim(), anahtar, sistem: sohbetSistem(seviyeOku()), kullanici: sohbetKullanici(metin, st.analiz?.metin || "", soru), maksToken: 3000 });
       st.sohbet[st.sohbet.length - 1] = { rol: "ai", metin: r.metin };
       const not = modelDegistiyse(r, s); if (not) analizDurum.textContent = not;
-    } catch (hh) { st.sohbet[st.sohbet.length - 1] = { rol: "ai", metin: `⚠️ ${hh.message}` }; }
+    } catch (hh) { st.sohbet[st.sohbet.length - 1] = { rol: "ai", metin: `⚠️ ${trHata(hh)}` }; }
     finally { istekte = false; gonder.disabled = false; sohbetCiz(); }
   }
   kok.append(el("h3", { class: "hv-alt-baslik", text: "Geçici sohbet" }),

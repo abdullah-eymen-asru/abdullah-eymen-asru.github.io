@@ -43,6 +43,7 @@ import { hubCiz, sonKullanilanKaydet } from "./hub/hub.js";
 // (izinli sekme listesi + Site Sahibi'nin canlı yapılandırması). Ayrıntı: assets/js/demo/*.
 import { isDemoMode, configHazir, demoSekmeAcikMi, demoHubKartiAcikMi } from "./demo/demo-durum.js";
 import { hizliKur } from "./dashboard-hizli.js";
+import { hata as trHata } from "./core/hata-metni.js";
 
 /* ------------------------------------------------------------------ */
 /* 1) Modül tanımları                                                  */
@@ -486,7 +487,7 @@ async function ensureModuleLoaded(key, viewId) {
     const hedef = (viewId && document.getElementById(viewId)) || document.querySelector("#dash-main, main");
     if (hedef && !hedef.querySelector(".dash-modul-hata")) {
       const kutu = document.createElement("div"); kutu.className = "auth-message error dash-modul-hata"; kutu.setAttribute("role", "alert");
-      const metin = document.createElement("p"); metin.textContent = `Bu bölüm yüklenemedi: ${err?.message || err}`;
+      const metin = document.createElement("p"); metin.textContent = `Bu bölüm yüklenemedi: ${trHata(err)}`;
       const dugme = document.createElement("button"); dugme.type = "button"; dugme.className = "btn"; dugme.textContent = "Yeniden dene";
       dugme.addEventListener("click", () => window.location.reload());
       kutu.append(metin, dugme); hedef.prepend(kutu);

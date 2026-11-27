@@ -35,6 +35,7 @@ import { supabase, escapeHtml, kucukHarfeCevirTr, kullaniciAramayaUyuyorMu, rolE
 import { tekKanal } from "./core/realtime.js";
 import { requireAuthOrShowError } from "./auth/auth-guard.js";
 import { imzaliLinkUret } from "./dosya-paylasim.js";
+import { hata as trHata } from "./core/hata-metni.js";
 
 const DELETE_ACCOUNT_FUNCTION_URL =
   "https://eahvcirspmvntffzphye.supabase.co/functions/v1/delete-account";
@@ -319,7 +320,7 @@ function wireCurrentAdminSelfDelete(session) {
       alert(body.bekliyor ? "Hesabın kapatıldı. Verilerin Site Sahibi'nin onayıyla kalıcı olarak silinecek. Anasayfaya yönlendiriliyorsun." : "Hesabın silindi. Anasayfaya yönlendiriliyorsun.");
       window.location.href = "/";
     } catch (err) {
-      showMessage(msg, "Hesap silinemedi: " + err.message);
+      showMessage(msg, "Hesap silinemedi: " + trHata(err));
       btn.disabled = false;
       btn.textContent = "Hesabımı Kalıcı Olarak Sil";
     }
@@ -515,7 +516,7 @@ function wireContentForm() {
         .single();
 
       if (updateErr) {
-        showMessage(msg, "İçerik güncellenemedi: " + updateErr.message);
+        showMessage(msg, "İçerik güncellenemedi: " + trHata(updateErr));
         submitBtn.disabled = false;
         return;
       }
@@ -534,7 +535,7 @@ function wireContentForm() {
         .single();
 
       if (insertErr) {
-        showMessage(msg, "İçerik kaydedilemedi: " + insertErr.message);
+        showMessage(msg, "İçerik kaydedilemedi: " + trHata(insertErr));
         submitBtn.disabled = false;
         return;
       }
@@ -549,7 +550,7 @@ function wireContentForm() {
         .upload(path, file, { upsert: true });
 
       if (uploadErr) {
-        showMessage(msg, "İçerik kaydedildi ama dosya yüklenemedi: " + uploadErr.message);
+        showMessage(msg, "İçerik kaydedildi ama dosya yüklenemedi: " + trHata(uploadErr));
       } else {
         await supabase.from("special_content").update({ file_path: path }).eq("id", content.id);
       }
@@ -561,7 +562,7 @@ function wireContentForm() {
       document.dispatchEvent(new CustomEvent("ozel-icerik:kaydedildi", { detail: detay }));
       const sonuc = await Promise.allSettled(detay.isler);
       const hatali = sonuc.find((x) => x.status === "rejected");
-      if (hatali) showMessage(msg, "İçerik kaydedildi ama R2 ekleri kaydedilemedi: " + (hatali.reason?.message || hatali.reason));
+      if (hatali) showMessage(msg, "İçerik kaydedildi ama R2 ekleri kaydedilemedi: " + (trHata(hatali.reason)));
     }
 
     // Seçilen özel üyelere erişim ver (düzenleme modunda önceki atamalara
@@ -578,7 +579,7 @@ function wireContentForm() {
       const { error: accessErr } = await supabase
         .from("content_access")
         .upsert(rows, { onConflict: "content_id,user_id" });
-      if (accessErr) showMessage(msg, "Erişim atamasında hata: " + accessErr.message);
+      if (accessErr) showMessage(msg, "Erişim atamasında hata: " + trHata(accessErr));
     }
 
     showMessage(
@@ -613,7 +614,7 @@ async function loadContents() {
     .order("created_at", { ascending: false });
 
   if (error) {
-    list.innerHTML = `<p class="muted">Yüklenemedi: ${escapeHtml(error.message)}</p>`;
+    list.innerHTML = `<p class="muted">Yüklenemedi: ${escapeHtml(trHata(error))}</p>`;
     return;
   }
 
@@ -706,7 +707,7 @@ async function icerikDetaylariniYukle(contentId, alan, btn) {
     .order("okundu_mu", { ascending: true });
 
   if (error) {
-    alan.innerHTML = `<p class="muted">Detaylar yüklenemedi: ${escapeHtml(error.message)}</p>`;
+    alan.innerHTML = `<p class="muted">Detaylar yüklenemedi: ${escapeHtml(trHata(error))}</p>`;
     return;
   }
 
@@ -828,7 +829,7 @@ function wireR2DosyaPaylasim() {
         // yoksay
       }
     } catch (err) {
-      showMessage(msg, "Link üretilemedi: " + err.message);
+      showMessage(msg, "Link üretilemedi: " + trHata(err));
       kutuWrap.hidden = true;
     } finally {
       btn.disabled = false;

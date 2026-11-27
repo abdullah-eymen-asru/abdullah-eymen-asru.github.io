@@ -15,6 +15,7 @@
  */
 import { supabase } from "../core/supabase-client.js";
 import { HAVASTIL_WORKER_URL } from "./haber.js";
+import { hata as trHata } from "../core/hata-metni.js";
 // Kasa (şifreleme + notlar/kasa.js) YALNIZCA kullanıcı kendi anahtarını kullanırken/yönetirken yüklenir (misafir/demo açılışı ağırlaşmasın).
 const kasaModulu = () => import("./ai-kasa.js");
 
@@ -52,7 +53,7 @@ export async function omAyar(zorla = false) {
   ayarSoz = (async () => {
     try {
       const { data, error } = await supabase.rpc("openmeteo_ayar_oku");
-      if (error || !data) throw new Error(error?.message || "ayar yok");
+      if (error || !data) throw new Error(trHata(error, "ayar yok"));
       ayarOnbellek = { ...data, migrasyonYok: false };
     } catch { ayarOnbellek = { ...VARSAYILAN_AYAR }; }
     ayarZaman = Date.now(); return ayarOnbellek;
@@ -143,7 +144,7 @@ async function kotaAyir(url, secenek) {
   const ip = kaynak === "site" ? "bilinmiyor" : await ipOzeti();      // site kaynağında IP özetini Worker kendisi üretir (istemciye güvenmez)
   if (kaynak !== "site") {
     const { data, error } = await supabase.rpc("openmeteo_kota_al", { p_agirlik: ag, p_kaynak: kaynak, p_ip_hash: ip });
-    if (error) { if (/does not exist|schema cache|42883/i.test(error.message || "")) return { kaynak, ag, ip, oturum, ayar: sec.ayar, anahtar: sec.anahtar || null, kotasiz: true }; throw new OmKotaHatasi(`Kota doğrulanamadı: ${error.message}`); }
+    if (error) { if (/does not exist|schema cache|42883/i.test(error.message || "")) return { kaynak, ag, ip, oturum, ayar: sec.ayar, anahtar: sec.anahtar || null, kotasiz: true }; throw new OmKotaHatasi(`Kota doğrulanamadı: ${trHata(error)}`); }
     if (!data?.izin) throw new OmKotaHatasi(data?.neden || "Open-Meteo kotası doldu.", { pencere: data?.pencere, sinir: data?.sinir });
     sonKota = { kaynak, kalan: data.kalan, ag };
   } else sonKota = { kaynak, kalan: null, ag };
@@ -203,20 +204,20 @@ export async function omJson(url, { sinyal = null, zamanAsimiMs = 12000, agirlik
 /* ------------------------------ özet / yönetim (arayüz için) ------------------------------ */
 export async function omKullanimOzeti() {
   const { data, error } = await supabase.rpc("openmeteo_kullanim_ozeti", { p_ip_hash: await ipOzeti() });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(trHata(error));
   return data;
 }
 export async function omYonetimKaydet(ayar) {
   const { error } = await supabase.rpc("openmeteo_ayar_kaydet", { p_plan: ayar.plan, p_ucretsiz: ayar.ucretsiz_limit, p_ticari: ayar.ticari_limit, p_kullanici: ayar.kullanici_limit, p_kendi_izin: ayar.kendi_anahtar_izni, p_site_anahtari: ayar.site_anahtari_tanimli, p_aciklama: ayar.aciklama || null });
-  if (error) throw new Error(error.message); omOnbellekSifirla();
+  if (error) throw new Error(trHata(error)); omOnbellekSifirla();
 }
 export async function omKullanimTumu(ara = null, limit = 20, offset = 0) {
   const { data, error } = await supabase.rpc("openmeteo_kullanim_tumu", { p_ara: ara || null, p_limit: limit, p_offset: offset });
-  if (error) throw new Error(error.message); return data || [];
+  if (error) throw new Error(trHata(error)); return data || [];
 }
 export async function omKullaniciLimitiKaydet(uid, limitler) {
   const { error } = await supabase.rpc("openmeteo_kullanici_limit_kaydet", { p_user: uid, p_limitler: limitler });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(trHata(error));
 }
 export async function workerSaglik() {
   try { const k = new AbortController(), z = setTimeout(() => k.abort(), 5000); const r = await fetch(`${HAVASTIL_WORKER_URL}/saglik`, { signal: k.signal, credentials: "omit" }); clearTimeout(z); return r.ok ? await r.json() : null; } catch { return null; }

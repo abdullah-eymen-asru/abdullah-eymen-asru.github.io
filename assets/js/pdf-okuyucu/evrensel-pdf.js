@@ -12,6 +12,7 @@
  * CSP: satır içi stil/olay yok (görünüm assets/css/pdf-okuyucu.css).
  */
 import { pdfjsAl, pdfAcSecenekleri, pdfBirak } from "../donusturucu/pdf-yukle.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const e = (etiket, sinif, metin) => { const n = document.createElement(etiket); if (sinif) n.className = sinif; if (metin != null) n.textContent = metin; return n; };
 const MAKS_OLCEK = 4, MIN_OLCEK = 0.4;
@@ -35,7 +36,7 @@ export async function pdfBelgesiAc(bayt, { parola } = {}) {
     } catch (h) {
       pdfBirak(gorev, null);
       son = h;
-      if (h?.name === "PasswordException") { const x = new Error(h.message || "PDF parola korumalı."); x.parolaGerekli = true; x.kod = h.code; throw x; }
+      if (h?.name === "PasswordException") { const x = new Error(trHata(h, "PDF parola korumalı.")); x.parolaGerekli = true; x.kod = h.code; throw x; }
       if (h?.name === "InvalidPDFException" && ad !== "tam") break;      // bozuk dosya: yalın profil de açamaz
     }
   }
@@ -192,7 +193,7 @@ export async function evrenselPdfGoster(kok, kaynak, secenek = {}) {
     if (!iptal) {
       console.warn("evrensel-pdf: PDF.js ile açılamadı, yerleşik okuyucuya geçiliyor:", h);
       // Bayt alınamadıysa (CORS vb.) URL doğrudan çerçeveye verilir; baytlar varsa blob ile.
-      yerlesigeGec(h?.message ? `${h.message}` : "PDF.js açamadı.");
+      yerlesigeGec(h?.message ? trHata(h, "PDF.js açamadı.") : "PDF.js açamadı.");
     }
   }
   return { yokEt, blob: blobAl };

@@ -18,6 +18,7 @@
 import { supabase, showMessage } from "../core/supabase-client.js";
 import { requireAuthOrShowError } from "../auth/auth-guard.js";
 import { VARSAYILAN_CONFIG, configBirlestir } from "./demo-durum.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const kok = document.getElementById("demo-yetki-kok");
 
@@ -76,7 +77,7 @@ async function baslat() {
   /** Sunucu/ağ hatasını anlaşılır Türkçe metne çevirir (ham mesaj sonda parantez içinde kalır). */
   function hataMetni(err, hangiSql) {
     const kod = String(err?.code || "");
-    const ham = String(err?.message || err || "bilinmeyen hata");
+    const ham = String(trHata(err) || "bilinmeyen hata");
     if (kod === "42501" || /yetkisiz/i.test(ham)) return "Bu anahtarı yalnızca Site Sahibi değiştirebilir.";
     if (kod === "PGRST202" || kod === "42883" || /could not find the function|schema cache/i.test(ham))
       { console.warn(`Demo: ${hangiSql} migration'ı gerekli (0103_demo_ust_anahtarlar_onarim.sql). Ham hata: ${ham}`); return "Bu ayar şu an kullanılamıyor. Lütfen daha sonra tekrar dene."; }

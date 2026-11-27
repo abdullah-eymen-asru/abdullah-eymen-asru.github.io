@@ -19,6 +19,7 @@ import { pptxOku, pptOku, pptxDenPdf, pptxSlaytGorselleri } from "./belge-pptx.j
 import { irDenPptx, goruntulerdenPptx } from "./belge-pptx-yaz.js";
 import { sunucudaDonustur } from "./sunucu-donustur.js";
 import { sunucuDestekler } from "./sunucu-matris.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const HTML_SABLON_CSS = "body{font-family:system-ui,Segoe UI,Roboto,sans-serif;line-height:1.6;max-width:800px;margin:2rem auto;padding:0 1rem;color:#222}img{max-width:100%;height:auto}table{border-collapse:collapse;width:100%}td,th{border:1px solid #bbb;padding:.35rem .5rem}th{background:#f1f3f5}pre{background:#f4f5f7;padding:.8rem;overflow:auto}code{font-family:ui-monospace,Consolas,monospace}blockquote{margin-left:0;padding-left:1rem;border-left:3px solid #aab}[align=center]{text-align:center}[align=right]{text-align:right}[align=justify]{text-align:justify}";
 
@@ -126,7 +127,7 @@ export async function pdfBirlestir(dosyalar, { ilerle } = {}) {
   let n = 0;
   for (const d of dosyalar) {
     let kaynak;
-    try { kaynak = await PDFDocument.load(await baytlariOku(d)); } catch (h) { throw new Error(`${d.name}: PDF okunamadı veya parola korumalı. (${h.message})`); }
+    try { kaynak = await PDFDocument.load(await baytlariOku(d)); } catch (h) { throw new Error(`${d.name}: PDF okunamadı veya parola korumalı. (${trHata(h)})`); }
     const sayfalar = await cikti.copyPages(kaynak, kaynak.getPageIndices());
     sayfalar.forEach((s) => cikti.addPage(s));
     n += 1;

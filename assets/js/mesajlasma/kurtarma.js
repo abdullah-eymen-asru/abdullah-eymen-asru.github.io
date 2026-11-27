@@ -13,6 +13,7 @@ import * as Kasa from "../notlar/kasa.js";
 import * as Kit from "../kurtarma-kiti/kit.js";
 import { kitKartiAc, cssYukle } from "../kurtarma-kiti/kit-arayuz.js";
 import { supabase } from "../core/supabase-client.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 export { kitKartiAc };
 
@@ -38,7 +39,7 @@ function dogrulamaliForm({ baslik, aciklama, alanlar, tamamMetin = "Kaydet" }, i
         if (alanlar[i].min && deger[i].length < alanlar[i].min) { hata.textContent = `${alanlar[i].etiket} en az ${alanlar[i].min} karakter olmalı.`; hata.hidden = false; return; }
       }
       tamam.disabled = true; hata.hidden = true;
-      try { kapat(await islem(deger)); } catch (er) { hata.textContent = er.message || String(er); hata.hidden = false; tamam.disabled = false; }
+      try { kapat(await islem(deger)); } catch (er) { hata.textContent = trHata(er); hata.hidden = false; tamam.disabled = false; }
     });
     const kutu = h("div", { class: "msj-modal", role: "dialog", "aria-modal": "true", "aria-label": baslik },
       h("h3", { class: "msj-modal-baslik", text: baslik }), aciklama ? h("p", { class: "msj-modal-metin", text: aciklama }) : null, form);
@@ -95,7 +96,7 @@ export function kilitPaneli({ durum = {}, onAcildi }) {
       if (r.durum !== "acik" && r.durum !== "yeni-kasa") throw new Error("Hatalı parola. Unuttuysan aşağıdan Yedek Kurtarma Kodunu kullan.");
       E.anahtarOnbellegiTemizle();
       onAcildi(await anahtariHazirlaYadaOnar());
-    } catch (er) { hataYaz(er.message || String(er)); acBtn.disabled = false; }
+    } catch (er) { hataYaz(trHata(er)); acBtn.disabled = false; }
   });
 
   // 2) Yedek Kurtarma Kodu (+ isteğe bağlı kasa parolasını yeniden kurma) — KAPALI başlar
@@ -112,7 +113,7 @@ export function kilitPaneli({ durum = {}, onAcildi }) {
     e.preventDefault(); if (!kod.value) return kod.focus();
     kodBtn.disabled = true; hataYaz("");
     try { const r = await Kit.kitIleAc(kod.value, { parola: yeniParola.value || null, cihazdaHatirla: hatirla.checked }); kod.value = yeniParola.value = ""; onAcildi(r); }
-    catch (er) { hataYaz(er.message || String(er)); kodBtn.disabled = false; }
+    catch (er) { hataYaz(trHata(er)); kodBtn.disabled = false; }
   });
 
   // 3) ESKİ kurtarma parolası (yalnızca zaten varsa)
@@ -123,7 +124,7 @@ export function kilitPaneli({ durum = {}, onAcildi }) {
     eskiForm = h("form", { class: "msj-kilit-form", novalidate: true }, eski, eskiBtn);
     eskiForm.addEventListener("submit", async (e) => {
       e.preventDefault(); if (!eski.value) return eski.focus(); eskiBtn.disabled = true; hataYaz("");
-      try { const r = await E.kurtarmaParolasiylaAc(eski.value); eski.value = ""; onAcildi(r); } catch (er) { hataYaz(er.message || String(er)); eskiBtn.disabled = false; }
+      try { const r = await E.kurtarmaParolasiylaAc(eski.value); eski.value = ""; onAcildi(r); } catch (er) { hataYaz(trHata(er)); eskiBtn.disabled = false; }
     });
   }
 
@@ -138,7 +139,7 @@ export function kilitPaneli({ durum = {}, onAcildi }) {
       // Tek kod: yeni mesaj anahtarı oluştu → HEMEN yeni kod üret; bu kod Notlar'ı da açar (kod penceresi iki kasayı birlikte sarar).
       try { cssYukle(); await kitKartiAc((m, hata) => hata && hataYaz(m)); } catch { /* kullanıcı sonra Yedek Kurtarma Kodu düğmesinden üretebilir */ }
       onAcildi({ sifirlandi: true });
-    } catch (er) { hataYaz(er.message || String(er)); sifirla.disabled = false; }
+    } catch (er) { hataYaz(trHata(er)); sifirla.disabled = false; }
   });
 
   const kodBolumu = h("details", { class: "msj-kilit-detay" },
@@ -153,7 +154,7 @@ export function kilitPaneli({ durum = {}, onAcildi }) {
     metin.textContent = "Kilit açılıyor…"; parolaForm.hidden = true; kodBolumu.hidden = true;
     (async () => {
       try { E.anahtarOnbellegiTemizle(); onAcildi(await anahtariHazirlaYadaOnar()); }
-      catch (er) { metin.textContent = "Devam etmek için giriş parolanı yaz."; parolaForm.hidden = false; kodBolumu.hidden = false; hataYaz(er.message || String(er)); }
+      catch (er) { metin.textContent = "Devam etmek için giriş parolanı yaz."; parolaForm.hidden = false; kodBolumu.hidden = false; hataYaz(trHata(er)); }
     })();
   }
   return kutu;

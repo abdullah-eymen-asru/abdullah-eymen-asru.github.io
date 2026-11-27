@@ -13,6 +13,7 @@ import { parolaAnahtariTuret, b64Kodla, b64Coz, rastgele, KURTARMA_KDF_TUR } fro
 import * as V from "../mesajlasma/veri.js";
 import * as S from "../mesajlasma/sifre.js";
 import { kodAyristir, kodBicimle, kitSatiriniAc } from "../kurtarma-kiti/kit.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 export const MESAJ_YEDEK_YOLU = "mesajlar/mesajlarim.parolali.json";
 export const YEDEK_PAROLA_MIN = 10;
@@ -99,13 +100,13 @@ export async function arsivSohbetiYaz({ kaynakId, konu, mesajlar }) {
   // AAD yeni sohbet kimliğine bağlı → önce boş arşiv sohbeti (RPC kaynağa göre yinelemeyi önler), sonra mesajlar yeni kimlikle şifrelenip eklenir.
   const konuSifreli = await S.sifrele(anahtar, konu || "Arşiv", "konu");
   const ilk = await supabase.rpc("mesaj_yedek_ice_aktar", { p_kaynak: kaynakId, p_konu_sifreli: konuSifreli, p_zarflar: zarflar, p_mesajlar: [] });
-  if (ilk.error) throw new Error(ilk.error.message);
+  if (ilk.error) throw new Error(trHata(ilk.error));
   if (!ilk.data?.yeni) return { yeni: false, id: ilk.data?.id, mesaj: 0 };
   const yeniId = ilk.data.id;
   S.anahtariKaydet(yeniId, anahtar, zarflar[0].zarf);
   const govdeler = [];
   for (const m of (mesajlar || []).slice(0, 3000)) govdeler.push({ gonderen: m.g, created_at: m.t, body: await S.sifrele(anahtar, m.m, yeniId) });
   const iki = await supabase.rpc("mesaj_yedek_mesaj_ekle", { p_id: yeniId, p_mesajlar: govdeler });
-  if (iki.error) throw new Error(iki.error.message);
+  if (iki.error) throw new Error(trHata(iki.error));
   return { yeni: true, id: yeniId, mesaj: govdeler.length };
 }

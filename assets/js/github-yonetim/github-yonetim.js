@@ -100,6 +100,7 @@
 import { yetkiBilgiKur } from "./yetki-bilgi.js";
 import { requireAuthOrShowError } from "../auth/auth-guard.js";
 import { escapeHtml, showMessage, supabase, kucukHarfeCevirTr, kullaniciAramayaUyuyorMu } from "../core/supabase-client.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 // ---- BURAYI DOLDUR: Worker deploy edildikten sonra aldığın URL ----
 // ör. "https://github-icerik-worker.KULLANICI-ADIN.workers.dev"
@@ -751,7 +752,7 @@ async function ghBaglantisiniTestEt(hataGoster) {
     GH_BAGLI = false;
     PANEL_VERI = null;
     if (hataGoster) {
-      showMessage(msgEl, `Bağlantı doğrulanamadı: ${err.message}`, "error");
+      showMessage(msgEl, `Bağlantı doğrulanamadı: ${trHata(err)}`, "error");
     }
   } finally {
     btn.disabled = false;
@@ -891,7 +892,7 @@ async function panelListeleriniTazele() {
 async function ghHataMesaji(res) {
   try {
     const j = await res.json();
-    return `${res.status} ${j.message || res.statusText}`;
+    return `${res.status} ${trHata(j)}`;
   } catch {
     return `${res.status} ${res.statusText}`;
   }
@@ -1693,7 +1694,7 @@ async function klasorOlustur() {
     klasorListesiYukle();
     await icerikFormuKlasorSecimGuncelle();
   } catch (err) {
-    showMessage(msgEl, `Hata: ${err.message}`, "error");
+    showMessage(msgEl, `Hata: ${trHata(err)}`, "error");
   } finally {
     btn.disabled = false;
     btn.textContent = "➕ Klasör Oluştur";
@@ -1840,7 +1841,7 @@ async function klasorYenidenAdlandir(k) {
   } catch (err) {
     showMessage(
       msgEl,
-      `Hata: ${err.message} — işlem yarıda kalmış olabilir, listeyi yenileyip ${k.kokKlasor}/${k.ad}/ ve ${k.kokKlasor}/${yeniAd}/ klasörlerini GitHub'dan kontrol et.`,
+      `Hata: ${trHata(err)} — işlem yarıda kalmış olabilir, listeyi yenileyip ${k.kokKlasor}/${k.ad}/ ve ${k.kokKlasor}/${yeniAd}/ klasörlerini GitHub'dan kontrol et.`,
       "error"
     );
   }
@@ -1873,7 +1874,7 @@ async function klasorSil(k) {
     klasorListesiYukle();
     await icerikFormuKlasorSecimGuncelle();
   } catch (err) {
-    showMessage(msgEl, `Hata: ${err.message}`, "error");
+    showMessage(msgEl, `Hata: ${trHata(err)}`, "error");
   }
 }
 
@@ -2754,7 +2755,7 @@ async function icerikKaydet(secenek = "a") {
     await panelListeleriniTazele();
     await icerikListesiYukle();
   } catch (err) {
-    showMessage(msgEl, `Hata: ${err.message}`, "error");
+    showMessage(msgEl, `Hata: ${trHata(err)}`, "error");
     submitBtn.textContent = oncekiMetin;
   } finally {
     submitBtn.disabled = false;
@@ -2910,7 +2911,7 @@ async function icerikSupabaseeYaz(tur, alan, gizliKod, govde, slug, dosyaYolu, m
       .eq("id", DUZENLENEN_TASLAK_ID)
       .select()
       .single();
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(trHata(error));
     taslakSonuc = data;
   } else {
     const {
@@ -2921,7 +2922,7 @@ async function icerikSupabaseeYaz(tur, alan, gizliKod, govde, slug, dosyaYolu, m
       .insert({ ...satir, created_by: user?.id || null })
       .select()
       .single();
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(trHata(error));
     taslakSonuc = data;
   }
 
@@ -2948,7 +2949,7 @@ async function icerikSupabaseeYaz(tur, alan, gizliKod, govde, slug, dosyaYolu, m
   if (gitSilmeHatasi) {
     showMessage(
       msgEl,
-      `Taslak Supabase'e kaydedildi ama eski GitHub dosyası silinemedi: ${gitSilmeHatasi.message}. "Mevcut İçerikler" listesinden elle silmen gerekebilir.`,
+      `Taslak Supabase'e kaydedildi ama eski GitHub dosyası silinemedi: ${trHata(gitSilmeHatasi)}. "Mevcut İçerikler" listesinden elle silmen gerekebilir.`,
       "error"
     );
   } else {
@@ -2972,7 +2973,7 @@ async function icerikSupabaseeYaz(tur, alan, gizliKod, govde, slug, dosyaYolu, m
  * söylenir. Diğer hatalar (ör. yazar taklidi engeli) mesajıyla aynen geçer.
  */
 function sadeceSupabaseHataMetni(error, slug) {
-  const mesaj = String(error?.message || "");
+  const mesaj = String(trHata(error, ""));
   if (error?.code === "23505" || mesaj.includes("uq_taslak_icerikler_sadece_supabase_slug")) {
     return `"${slug}" adresinde (slug) zaten yayında başka bir içerik var. Başlığı ya da adresi değiştirip tekrar dene.`;
   }
@@ -3082,7 +3083,7 @@ async function icerikSadeceSupabaseeYayinla(tur, alan, gizliKod, govde, slug, do
   if (gitSilmeHatasi) {
     showMessage(
       msgEl,
-      `İçerik Supabase'te yayınlandı ama eski GitHub dosyası silinemedi: ${gitSilmeHatasi.message}. "Mevcut İçerikler" listesinden elle silmen gerekebilir.`,
+      `İçerik Supabase'te yayınlandı ama eski GitHub dosyası silinemedi: ${trHata(gitSilmeHatasi)}. "Mevcut İçerikler" listesinden elle silmen gerekebilir.`,
       "error"
     );
   } else {
@@ -3147,7 +3148,7 @@ async function icerikSupabaseVeGithubaYaz(tur, alan, gizliKod, govde, slug, dosy
       .eq("id", DUZENLENEN_TASLAK_ID)
       .select()
       .single();
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(trHata(error));
     taslakSonuc = data;
   } else {
     const {
@@ -3158,7 +3159,7 @@ async function icerikSupabaseVeGithubaYaz(tur, alan, gizliKod, govde, slug, dosy
       .insert({ ...satir, created_by: user?.id || null })
       .select()
       .single();
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(trHata(error));
     taslakSonuc = data;
   }
 
@@ -3192,7 +3193,7 @@ async function icerikSupabaseVeGithubaYaz(tur, alan, gizliKod, govde, slug, dosy
     document.getElementById("ic-iptal-btn").hidden = false;
     showMessage(
       msgEl,
-      `Taslak Supabase'e kaydedildi ama GitHub'a yazılamadı: ${err.message}. "Mevcut İçerikler" listesinden tekrar "Yayınla" deneyebilirsin.`,
+      `Taslak Supabase'e kaydedildi ama GitHub'a yazılamadı: ${trHata(err)}. "Mevcut İçerikler" listesinden tekrar "Yayınla" deneyebilirsin.`,
       "error"
     );
     return;
@@ -3446,7 +3447,7 @@ async function icerikListesiYukle() {
     LISTE_SAYFA_PROJE = 1;
     listeyiYenidenCiz();
   } catch (err) {
-    el.innerHTML = `<p class="muted">Liste yüklenemedi: ${escapeHtml(err.message)}</p>`;
+    el.innerHTML = `<p class="muted">Liste yüklenemedi: ${escapeHtml(trHata(err))}</p>`;
   }
 }
 
@@ -3543,7 +3544,7 @@ async function icerikIcerigiZenginlestir(item) {
     icerikIcerigiOnbellegeYaz(item.sha, data, body);
     return true;
   } catch (err) {
-    item.data = { title: `${item.path.split("/").pop()} (okunamadı: ${err.message})` };
+    item.data = { title: `${item.path.split("/").pop()} (okunamadı: ${trHata(err)})` };
     item.body = "";
     item.hafif = false;
     item.okunamadi = true;
@@ -4155,7 +4156,7 @@ async function adminTaslakOnayla(item, tur, onay, btn) {
     await icerikListesiYukle();
   } catch (err) {
     console.error("Onay/red işlemi başarısız:", err);
-    alert(`İşlem başarısız: ${err.message}`);
+    alert(`İşlem başarısız: ${trHata(err)}`);
     btn.disabled = false;
     btn.textContent = oncekiMetin;
   }
@@ -4181,7 +4182,7 @@ async function sahipTaslakOnayla(item, tur, onay, btn) {
     await icerikListesiYukle();
   } catch (err) {
     console.error("Site Sahibi onay/red işlemi başarısız:", err);
-    alert(`İşlem başarısız: ${err.message}`);
+    alert(`İşlem başarısız: ${trHata(err)}`);
     btn.disabled = false;
     btn.textContent = oncekiMetin;
   }
@@ -4209,7 +4210,7 @@ async function sahipTalebineOyVer(item, tur, oy, btn) {
     await icerikListesiYukle();
   } catch (err) {
     console.error("Oy kaydedilemedi:", err);
-    alert(`İşlem başarısız: ${err.message}`);
+    alert(`İşlem başarısız: ${trHata(err)}`);
     btn.disabled = false;
     btn.textContent = oncekiMetin;
   }
@@ -4286,7 +4287,7 @@ async function taslagiYayinla(item, tur, btn) {
     await panelListeleriniTazele();
     await icerikListesiYukle();
   } catch (err) {
-    alert(`İşlem başarısız: ${err.message}`);
+    alert(`İşlem başarısız: ${trHata(err)}`);
     btn.disabled = false;
     btn.textContent = oncekiMetin;
   }
@@ -4348,14 +4349,14 @@ async function gitDenTaslagaTasi(item, tur, btn) {
     const { error: upsertHata } = await supabase
       .from("taslak_icerikler")
       .upsert(satir, { onConflict: "tur,onizleme_kod" });
-    if (upsertHata) throw new Error(upsertHata.message);
+    if (upsertHata) throw new Error(trHata(upsertHata));
 
     await ghDeleteFile(item.path, item.sha, `Supabase'e taşındı (yayından kaldırıldı): ${item.path}`);
     await klasorBosaldiysaGitkeepEkle(ustKlasorYolu(item.path));
     await panelListeleriniTazele();
     await icerikListesiYukle();
   } catch (err) {
-    alert(`İşlem başarısız: ${err.message}`);
+    alert(`İşlem başarısız: ${trHata(err)}`);
     btn.disabled = false;
     btn.textContent = oncekiMetin;
   }
@@ -4366,7 +4367,7 @@ async function icerikSil(item) {
   try {
     if (item.kaynak === "supabase") {
       const { error } = await supabase.from("taslak_icerikler").delete().eq("id", item.taslakId);
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(trHata(error));
     } else {
       await ghDeleteFile(item.path, item.sha, `İçerik silindi: ${item.path}`);
       // Klasör bu silinen dosyayla birlikte tamamen boşaldıysa, GitHub'da
@@ -4404,7 +4405,7 @@ async function icerikSil(item) {
       listeyiYenidenCiz();
     }
   } catch (err) {
-    alert(`Silinemedi: ${err.message}`);
+    alert(`Silinemedi: ${trHata(err)}`);
   }
 }
 
@@ -4808,7 +4809,7 @@ async function profilFotoYukle() {
     await panelListeleriniTazele();
     profilFotoDurumYukle();
   } catch (err) {
-    showMessage(msgEl, `Yüklenemedi: ${err.message}`, "error");
+    showMessage(msgEl, `Yüklenemedi: ${trHata(err)}`, "error");
   } finally {
     btn.disabled = false;
     btn.textContent = "Yükle / Değiştir";
@@ -4845,7 +4846,7 @@ async function profilFotoSil() {
     await panelListeleriniTazele();
     profilFotoDurumYukle();
   } catch (err) {
-    showMessage(msgEl, `Silinemedi: ${err.message}`, "error");
+    showMessage(msgEl, `Silinemedi: ${trHata(err)}`, "error");
   } finally {
     btn.disabled = false;
   }
@@ -4979,7 +4980,7 @@ function wireSeoAyarlari() {
       sonIcerik = b64Decode(d.content.replace(/\n/g, "")); sonSha = d.sha;
       for (const a of SEO_ALANLARI) { ilk[a] = seoDegeriOku(sonIcerik, a) ?? ""; g[a].value = ilk[a]; }
       sayacGuncelle(); yaz("Anlık değerler yüklendi.");
-    } catch (h) { yaz(`Okunamadı: ${h.message} (GitHub bağlantısını kontrol et.)`, true); }
+    } catch (h) { yaz(`Okunamadı: ${trHata(h)} (GitHub bağlantısını kontrol et.)`, true); }
   }
   kaydet.addEventListener("click", async () => {
     const yeni = { description: g.description.value, url: g.url.value.trim(), baseurl: g.baseurl.value.trim(), mirror_site_url: g.mirror_site_url.value.trim() };
@@ -4993,7 +4994,7 @@ function wireSeoAyarlari() {
       for (const a of degisen) icerik = seoDegeriYaz(icerik, a, yeni[a]);
       await ghPutFile(CONFIG_YOLU, b64Encode(icerik), `_config.yml: ${degisen.join(", ")} güncellendi (panel › SEO)`, taze.sha);
       ilk = { ...yeni }; yaz(`Kaydedildi: ${degisen.join(", ")}. Site yeniden derlenince (≈1-2 dk) yayında olur.`);
-    } catch (h) { yaz(`Kaydedilemedi: ${h.message}`, true); } finally { kaydet.disabled = false; }
+    } catch (h) { yaz(`Kaydedilemedi: ${trHata(h)}`, true); } finally { kaydet.disabled = false; }
   });
   yenile.addEventListener("click", yukle);
   // üst sekmeler: SEO · Hakkımda · Sosyal bağlantılar
@@ -5076,7 +5077,7 @@ async function hakkimdaIcerigiYukle() {
     showMessage(msgEl, "", "success");
     msgEl.hidden = true;
   } catch (err) {
-    showMessage(msgEl, `Yüklenemedi: ${err.message}`, "error");
+    showMessage(msgEl, `Yüklenemedi: ${trHata(err)}`, "error");
   } finally {
     btn.disabled = false;
     btn.textContent = "Mevcut İçeriği Yükle";
@@ -5126,7 +5127,7 @@ async function hakkimdaIcerigiKaydet() {
     document.getElementById("hk-durum").textContent =
       "Kaydedildi. Tekrar düzenlemek için önce içeriği yeniden yükle.";
   } catch (err) {
-    showMessage(msgEl, `Kaydedilemedi: ${err.message}`, "error");
+    showMessage(msgEl, `Kaydedilemedi: ${trHata(err)}`, "error");
   } finally {
     btn.disabled = false;
     btn.textContent = "Kaydet ve Yayınla";
@@ -5509,7 +5510,7 @@ async function baglantilariYukle() {
     durumEl.textContent = "Mevcut bağlantılar yüklendi — aşağıdan ekleyip/düzenleyip kaydedebilirsin.";
     msgEl.hidden = true;
   } catch (err) {
-    showMessage(msgEl, `Yüklenemedi: ${err.message}`, "error");
+    showMessage(msgEl, `Yüklenemedi: ${trHata(err)}`, "error");
   } finally {
     btn.disabled = false;
     btn.textContent = "Mevcut Bağlantıları Yükle";
@@ -5611,7 +5612,7 @@ async function baglantilariKaydet() {
     document.getElementById("bg-durum").textContent =
       "Kaydedildi. Tekrar düzenlemek için önce bağlantıları yeniden yükle.";
   } catch (err) {
-    showMessage(msgEl, `Kaydedilemedi: ${err.message}`, "error");
+    showMessage(msgEl, `Kaydedilemedi: ${trHata(err)}`, "error");
   } finally {
     btn.disabled = false;
     btn.textContent = "Kaydet ve Yayınla";
@@ -5784,7 +5785,7 @@ async function cvDurumYukle() {
           : "Bu, dış bir bağlantıdır (GitHub'a/Supabase'e bir dosya yüklenmedi)."
       }</p>`;
   } catch (err) {
-    el.innerHTML = `<p class="muted">Durum okunamadı: ${escapeHtml(err.message)}</p>`;
+    el.innerHTML = `<p class="muted">Durum okunamadı: ${escapeHtml(trHata(err))}</p>`;
   }
 }
 
@@ -5861,7 +5862,7 @@ async function cvPdfYukle() {
     await panelListeleriniTazele();
     cvDurumYukle();
   } catch (err) {
-    showMessage(msgEl, `Yüklenemedi: ${err.message}`, "error");
+    showMessage(msgEl, `Yüklenemedi: ${trHata(err)}`, "error");
   } finally {
     btn.disabled = false;
     btn.textContent = "GitHub'a Yükle / Değiştir";
@@ -5927,7 +5928,7 @@ async function cvSupabaseYukle() {
         // aksi halde dosya yüklenir ama cv_url hiç güncellenmez, /cv/ eski
         // adresi göstermeye devam eder).
         throw new Error(
-          `Dosya Supabase'e yüklendi ama _config.yml güncellenemedi (GitHub bağlantısı gerekiyor): ${e.message}`
+          `Dosya Supabase'e yüklendi ama _config.yml güncellenemedi (GitHub bağlantısı gerekiyor): ${trHata(e)}`
         );
       }
     } else {
@@ -5947,7 +5948,7 @@ async function cvSupabaseYukle() {
     await panelListeleriniTazele();
     cvDurumYukle();
   } catch (err) {
-    showMessage(msgEl, `Yüklenemedi: ${err.message}`, "error");
+    showMessage(msgEl, `Yüklenemedi: ${trHata(err)}`, "error");
   } finally {
     btn.disabled = false;
     btn.textContent = "Supabase'e Yükle / Değiştir";
@@ -6009,7 +6010,7 @@ async function cvDisUrlKaydet() {
     await panelListeleriniTazele();
     cvDurumYukle();
   } catch (err) {
-    showMessage(msgEl, `Kaydedilemedi: ${err.message}`, "error");
+    showMessage(msgEl, `Kaydedilemedi: ${trHata(err)}`, "error");
   } finally {
     btn.disabled = false;
     btn.textContent = "Bu Bağlantıyı Kaydet";
@@ -6064,7 +6065,7 @@ async function cvKaldir() {
       btn.disabled = false;
     }
   } catch (err) {
-    showMessage(msgEl, `Kaldırılamadı: ${err.message}`, "error");
+    showMessage(msgEl, `Kaldırılamadı: ${trHata(err)}`, "error");
   }
 }
 
@@ -6249,7 +6250,7 @@ async function yetkiAyarlariTablosunuYukle() {
       const k = e.target; k.disabled = true;
       const { error } = await supabase.rpc("owner_kapali_ozellik_ayarla", { p_ozellik: "yetki_ayarlari", p_rol: "admin", p_acik: k.checked });
       k.disabled = false;
-      if (error) { k.checked = !k.checked; showMessage(msgEl, `Kaydedilemedi: ${error.message}`, "error"); return; }
+      if (error) { k.checked = !k.checked; showMessage(msgEl, `Kaydedilemedi: ${trHata(error)}`, "error"); return; }
       showMessage(msgEl, `Adminlerin Yetki Ayarları'na erişimi: ${k.checked ? "AÇIK" : "kapalı"}.`, "success");
     });
     yetkiBilgiKur(alan, OZELLIK_KATALOGU);
@@ -6266,7 +6267,7 @@ async function yetkiAyarlariTablosunuYukle() {
     });
   } catch (err) {
     alan.innerHTML = '<p class="muted">Yüklenemedi.</p>';
-    showMessage(msgEl, `Yetki ayarları yüklenemedi: ${err.message}`, "error");
+    showMessage(msgEl, `Yetki ayarları yüklenemedi: ${trHata(err)}`, "error");
   }
 }
 
@@ -6329,7 +6330,7 @@ async function yetkiAyariniTopluKaydet(master, alan) {
       "success"
     );
   } catch (err) {
-    showMessage(msgEl, `Kaydedilemedi: ${err.message}`, "error");
+    showMessage(msgEl, `Kaydedilemedi: ${trHata(err)}`, "error");
     // kısmen uygulanmış olabilir: gerçek durumu yeniden yükleyip tabloyu doğrulat
     yetkiAyarlariTablosunuYukle();
   } finally {
@@ -6361,7 +6362,7 @@ async function yetkiAyariniKaydet(input) {
     );
   } catch (err) {
     input.checked = !yeniDeger; // başarısızsa toggle'ı eski haline geri al
-    showMessage(msgEl, `Kaydedilemedi: ${err.message}`, "error");
+    showMessage(msgEl, `Kaydedilemedi: ${trHata(err)}`, "error");
   } finally {
     input.disabled = false;
   }

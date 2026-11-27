@@ -9,6 +9,7 @@
 import { worker } from "./r2-arsiv/ortak.js";
 import { supabase, escapeHtml } from "./core/supabase-client.js";
 import { requireAuth } from "./auth/auth-guard.js";
+import { hata as trHata } from "./core/hata-metni.js";
 
 async function init() {
   try {
@@ -178,7 +179,7 @@ async function renderR2Ekleri(contentId, container) {
       dugme.addEventListener("click", async () => {
         dugme.disabled = true; durumEl.textContent = "Bağlantı hazırlanıyor…";
         try { const r = await worker("/ozel-indir", { content_id: contentId, arsiv_id: d.arsiv_id }); durumEl.textContent = ""; window.location.assign(r.url); }
-        catch (h) { durumEl.textContent = h.message || "İndirilemedi."; } finally { dugme.disabled = false; }
+        catch (h) { durumEl.textContent = trHata(h, "İndirilemedi."); } finally { dugme.disabled = false; }
       });
       li.append(ad, dugme); ul.appendChild(li);
     }

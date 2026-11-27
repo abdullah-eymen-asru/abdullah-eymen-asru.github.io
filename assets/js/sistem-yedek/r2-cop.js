@@ -9,6 +9,7 @@
  */
 import { supabase } from "../core/supabase-client.js";
 import { el, bayt, hataMetni, dugme, onayIste, silOnayiIste, tarihMetni, workerJson } from "./ortak.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const KAYNAKLAR = [["arsiv", "Dosya Yöneticisi (arsiv/)"], ["notek", "Not ekleri (notlar/)"], ["akademik", "Akademik kütüphane (PDF)"]];
 const NEDEN_ETIKET = {
@@ -183,7 +184,7 @@ export async function kilitliKasalariCiz(kok, mesaj) {
     liste);
   async function yukle() {
     const { data, error } = await supabase.rpc("kilitli_kasa_listesi");
-    if (error) { liste.replaceChildren(el("li", { class: "muted", text: `Liste alınamadı: ${error.message}` })); return; }
+    if (error) { liste.replaceChildren(el("li", { class: "muted", text: `Liste alınamadı: ${trHata(error)}` })); return; }
     if (!data?.length) { liste.replaceChildren(el("li", { class: "muted", text: "Temizlenebilecek başka bir not kasası yok." })); return; }
     liste.replaceChildren(...data.map((k) => {
       const sil = dugme({ metin: "Kasayı kalıcı sil", ikonAdi: "cop", tur: "tehlike-hafif", kucuk: true });

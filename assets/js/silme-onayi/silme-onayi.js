@@ -7,6 +7,7 @@
  */
 import { supabase, showMessage } from "../core/supabase-client.js";
 import { dosyaPaneliKur } from "./dosyalar.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const DELETE_ACCOUNT_FUNCTION_URL = "https://eahvcirspmvntffzphye.supabase.co/functions/v1/delete-account";
 
@@ -24,7 +25,7 @@ function el(etiket, oz = {}, ...cocuklar) {
 }
 const tarih = (iso) => (iso ? new Date(iso).toLocaleString("tr-TR") : "—");
 const sayi = (n) => Number(n || 0).toLocaleString("tr-TR");
-const hata = (h) => h?.message || String(h);
+const hata = (h) => trHata(h);
 
 const kok = document.getElementById("so-kok");
 const mesaj = document.getElementById("so-mesaj");

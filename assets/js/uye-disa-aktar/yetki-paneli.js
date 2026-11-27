@@ -10,6 +10,7 @@
  */
 import { supabase, showMessage } from "../core/supabase-client.js";
 import { ROL_ETIKETLERI, tarihMetni } from "./yazicilar.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 function el(etiket, ozellikler = {}, ...cocuklar) {
   const d = document.createElement(etiket);
@@ -255,5 +256,5 @@ async function kur() {
 kur().catch((hata) => {
   console.error("yetki-paneli.js (üye aktarım):", hata);
   const mesaj = document.getElementById("uye-aktarim-mesaj");
-  if (mesaj) showMessage(mesaj, `Panel yüklenemedi: ${hata.message || hata}`, "error");
+  if (mesaj) showMessage(mesaj, `Panel yüklenemedi: ${trHata(hata)}`, "error");
 });

@@ -7,6 +7,7 @@
 import { supabase } from "../core/supabase-client.js";
 import { esc } from "./ortak.js";
 import { BICIMLER, atifUret, bibtexUret, risUret } from "./atif.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const kok = document.getElementById("pz-kok");
 const token = new URLSearchParams(location.search).get("t") || "";
@@ -92,7 +93,7 @@ async function baslat() {
       const b = e.target.closest("[data-ekle]"); b.disabled = true;
       const { data: s, error: h } = await supabase.rpc("akademik_paylasimi_kutuphaneme_ekle", { p_token: token });
       b.disabled = false;
-      if (h) { alert(`Eklenemedi: ${h.message}`); return; }
+      if (h) { alert(`Eklenemedi: ${trHata(h)}`); return; }
       b.textContent = `✓ ${s.eklenen} kaynak eklendi`; if (confirm(`${s.eklenen} kaynak eklendi${s.atlanan ? ` (${s.atlanan} yinelenen DOI atlandı)` : ""}. Kütüphaneni açmak ister misin?`)) location.href = "/panel/dashboard.html#lib-kutuphane";
       return;
     }
@@ -104,7 +105,7 @@ async function baslat() {
     else if (act === "oku") {
       e.target.disabled = true;
       try { const { okuyucuAc } = await import("./okuyucu.js"); await okuyucuAc({ kaynak: { ...k, pdf_rev: 0 }, salt: true, kullaniciAdi: "", paylasimToken: token }); }
-      catch (h) { alert(`PDF açılamadı: ${h.message || h}`); } finally { e.target.disabled = false; }
+      catch (h) { alert(`PDF açılamadı: ${trHata(h)}`); } finally { e.target.disabled = false; }
     }
   });
   q("[data-ara]").addEventListener("input", (e) => { clearTimeout(baslat.z); baslat.z = setTimeout(() => { d.ara = e.target.value; ciz(); }, 150); });
@@ -112,4 +113,4 @@ async function baslat() {
   q("[data-bicim]").addEventListener("change", (e) => { d.bicim = e.target.value; try { localStorage.setItem("aea_ak_bicim", d.bicim); } catch { /* yok say */ } });
   agacCiz(); ciz();
 }
-baslat().catch((h) => { console.error(h); kok.innerHTML = `<p class="ak-bos ak-hata">Yüklenemedi: ${esc(h.message || h)}</p>`; });
+baslat().catch((h) => { console.error(h); kok.innerHTML = `<p class="ak-bos ak-hata">Yüklenemedi: ${esc(trHata(h))}</p>`; });

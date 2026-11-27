@@ -16,6 +16,7 @@
  */
 import { supabase, showMessage } from "../core/supabase-client.js";
 import { logPaneliKur } from "./degisiklik-kaydi.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 // "Son değişiklik" kutuları (Erişim Kalkanı + Kilit İzinleri sekmeleri): bir işlem kaydedilince
 // ikisi de aynı anda tazelenir. Kayıtları veritabanı trigger/RPC'si yazar (migration 0067).
@@ -112,7 +113,7 @@ function izinBolumuKur(mesaj) {
       await Promise.all([izinlileriYukle(), aramayiYenile()]);
       logYenile();
     } catch (hata) {
-      showMessage(mesaj, `Kaydedilemedi: ${hata.message || hata}`, "error");
+      showMessage(mesaj, `Kaydedilemedi: ${trHata(hata)}`, "error");
     } finally {
       dugme.disabled = false;
     }
@@ -123,7 +124,7 @@ function izinBolumuKur(mesaj) {
     if (error) {
       const yok = /does not exist|42883|PGRST202/i.test(error.message || error.code || "");
       izinliler.replaceChildren(
-        el("p", { class: "muted", text: yok ? "0061_site_ayarlari_gatekeeper.sql henüz çalıştırılmamış görünüyor." : `Yüklenemedi: ${error.message}` })
+        el("p", { class: "muted", text: yok ? "0061_site_ayarlari_gatekeeper.sql henüz çalıştırılmamış görünüyor." : `Yüklenemedi: ${trHata(error)}` })
       );
       return;
     }
@@ -139,7 +140,7 @@ function izinBolumuKur(mesaj) {
     if (metin.length < 2) return void sonuclar.replaceChildren();
     const { data, error } = await supabase.rpc("owner_site_onizleme_uye_ara", { p_arama: metin });
     if (sira !== sonArama) return; // daha yeni bir arama başladı
-    if (error) return void sonuclar.replaceChildren(el("p", { class: "muted", text: `Aranamadı: ${error.message}` }));
+    if (error) return void sonuclar.replaceChildren(el("p", { class: "muted", text: `Aranamadı: ${trHata(error)}` }));
     sonuclar.replaceChildren(
       ...(data?.length ? data.map((k) => satir(k, !!k.izinli)) : [el("p", { class: "muted", text: "Eşleşen üye bulunamadı (owner ve adminler zaten otomatik görür)." })])
     );
@@ -216,7 +217,7 @@ async function kur() {
         text:
           tabloYok || yok
             ? (console.warn("site_ayarlari tablosu/satırı bulunamadı: supabase/migrations/0061_site_ayarlari_gatekeeper.sql dosyasını SQL Editor'de çalıştır."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.")
-            : `Ayarlar yüklenemedi: ${error.message}`,
+            : `Ayarlar yüklenemedi: ${trHata(error)}`,
       })
     );
     return;
@@ -316,7 +317,7 @@ async function kur() {
       showMessage(mesaj, "Kaydedildi. Ziyaretçilere en geç yaklaşık 1 dakika içinde yansır; deploy gerekmez.", "success");
       logYenile();
     } catch (hata) {
-      showMessage(mesaj, `Kaydedilemedi: ${hata.message || hata}`, "error");
+      showMessage(mesaj, `Kaydedilemedi: ${trHata(hata)}`, "error");
     } finally {
       kaydetBtn.disabled = false;
     }
@@ -356,5 +357,5 @@ function sonGuncellemeMetni(zaman) {
 kur().catch((hata) => {
   console.error("kalkan-paneli.js:", hata);
   const mesaj = document.getElementById("gk-mesaj");
-  if (mesaj) showMessage(mesaj, `Kalkan paneli yüklenemedi: ${hata.message || hata}`, "error");
+  if (mesaj) showMessage(mesaj, `Kalkan paneli yüklenemedi: ${trHata(hata)}`, "error");
 });

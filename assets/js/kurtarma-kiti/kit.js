@@ -17,6 +17,7 @@
 import { supabase } from "../core/supabase-client.js";
 import * as Kasa from "../notlar/kasa.js";
 import * as E from "../r2-arsiv/e2ee.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 export const KIT_KDF_TUR = 600000;
 export const KIT_SURUM = 1;
@@ -110,7 +111,7 @@ export async function kitOlustur() {
     const sarili = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: KIT_AAD }, kek, yuk);
     yuk.fill(0);
     const { error } = await supabase.rpc("e2ee_kit_kaydet", { p_sarili: E.b64Kodla(sarili), p_iv: E.b64Kodla(iv), p_tuz: E.b64Kodla(tuz), p_tur: KIT_KDF_TUR });
-    if (error) throw new KitHatasi("SUNUCU", /does not exist|PGRST202|42883|schema cache/i.test(error.message || "") ? (console.warn("0096 numaralı migration henüz çalıştırılmamış."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.") : error.message);
+    if (error) throw new KitHatasi("SUNUCU", /does not exist|PGRST202|42883|schema cache/i.test(error.message || "") ? (console.warn("0096 numaralı migration henüz çalıştırılmamış."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.") : trHata(error));
     return { kod, notlar: !!dek, mesajlar: !!rsa };
   } finally { dek?.fill(0); rsa?.fill(0); }
 }

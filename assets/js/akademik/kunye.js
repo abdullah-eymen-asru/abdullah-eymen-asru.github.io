@@ -8,6 +8,7 @@
  */
 import { yazarMetniAyristir } from "./atif.js";
 import { workerJson } from "./ortak.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const DOI_DESENI = /10\.\d{4,9}\/[^\s"'<>]+/i;
 
@@ -69,7 +70,7 @@ export async function crossrefKunyesi(doi) {
   try {
     j = await jsonGetir(`https://api.crossref.org/works/${encodeURIComponent(doi).replace(/%2F/gi, "/")}`);
   } catch (e) {
-    throw new Error(String(e.message) === "404" ? "Bu DOI Crossref'te bulunamadı." : "Crossref'e ulaşılamadı.");
+    throw new Error(String(trHata(e)) === "404" ? "Bu DOI Crossref'te bulunamadı." : "Crossref'e ulaşılamadı.");
   }
   const m = j.message || {};
   const tur = CR_TUR[m.type] || "diger";

@@ -57,6 +57,7 @@
  */
 import { supabase } from "../core/supabase-client.js";
 import { demoModuAktifMi, DEMO_UID, DEMO_EPOSTA } from "../demo/demo-durum.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -631,7 +632,7 @@ export async function kurtarmaIleAc(session, kurtarmaMetni, parola) {
   try {
     kurtarmaBaytlari = base32Coz(kurtarmaMetni || "");
   } catch (h) {
-    throw new Error(h.message);
+    throw new Error(trHata(h));
   }
   if (kurtarmaBaytlari.length !== 32) throw new Error("Kurtarma anahtarı eksik ya da fazla karakter içeriyor.");
   const kurtarmaKek = await kurtarmaKekiOlustur(kurtarmaBaytlari);

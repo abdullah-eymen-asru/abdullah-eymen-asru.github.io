@@ -19,6 +19,7 @@
  */
 import { supabase, guncelOnaySurumleri, SUPABASE_URL, SUPABASE_ANON_KEY } from "../core/supabase-client.js";
 import { demoModuAktifMi, demoBaslat, demoBayrakKaliciMi, demoHerkeseAcikMi } from "../demo/demo-durum.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 /**
  * @param {Object} opts
@@ -500,7 +501,7 @@ function onayYenilemeModaliniGosterVeBekle(profile, surumler, durum) {
 
       if (error) {
         console.error("Onay yenileme kaydedilemedi:", error);
-        hataKutusu.textContent = "Onayın kaydedilemedi, lütfen tekrar dene: " + error.message;
+        hataKutusu.textContent = "Onayın kaydedilemedi, lütfen tekrar dene: " + trHata(error);
         hataKutusu.hidden = false;
         onaylaBtn.disabled = false;
         reddetBtn.disabled = false;

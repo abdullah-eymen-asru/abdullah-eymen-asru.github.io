@@ -20,6 +20,7 @@ import { supabase } from "../core/supabase-client.js";
 import { HAVASTIL_WORKER_URL } from "./haber.js";
 import { omJson } from "./openmeteo.js";
 import { KIRLETICILER, KIRLETICI, mikrogramaCevir, mesafeKm, genelDurum, eaqiIndeks } from "./kirletici.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const kasaModulu = () => import("./ai-kasa.js");
 const OPENAQ = "https://api.openaq.org";
@@ -42,7 +43,7 @@ export async function hkAyar(zorla = false) {
   ayarSoz = (async () => {
     try {
       const { data, error } = await supabase.rpc("hava_kaynak_ayar_oku");
-      if (error || !data) throw new Error(error?.message || "ayar yok");
+      if (error || !data) throw new Error(trHata(error, "ayar yok"));
       ayarOnbellek = { ...HK_VARSAYILAN, ...data, gozlem_acik: { ...HK_VARSAYILAN.gozlem_acik, ...(data.gozlem_acik || {}) }, migrasyonYok: false };
     } catch { ayarOnbellek = { ...HK_VARSAYILAN }; }
     ayarZaman = Date.now(); return ayarOnbellek;
@@ -54,7 +55,7 @@ export async function hkAyarKaydet(a) {
     gozlem_sira: a.gozlem_sira, gozlem_acik: a.gozlem_acik, kalite_istasyon_acik: !!a.kalite_istasyon_acik, openaq_site_anahtari_tanimli: !!a.openaq_site_anahtari_tanimli,
     kendi_anahtar_izni: a.kendi_anahtar_izni !== false, yaricap_km: a.yaricap_km, tazelik_dk: a.tazelik_dk, aciklama: a.aciklama || null,
     dogrulama_acik: a.dogrulama_acik !== false, duzeltme_acik: a.duzeltme_acik !== false, duzeltme_saat: a.duzeltme_saat || 3 } });
-  if (error) throw new Error(/does not exist|schema cache|42883/i.test(error.message || "") ? "Hava kaynağı ayar tablosu kurulu değil (Supabase: 0146_hava_kaynaklari.sql)." : error.message);
+  if (error) throw new Error(/does not exist|schema cache|42883/i.test(error.message || "") ? "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene." : trHata(error));
   hkOnbellekSifirla();
 }
 
@@ -335,7 +336,7 @@ export async function istasyonKatmani(konum, { sinyal = null, sadece = null } = 
         const v = await sureli(is(), ZAMAN_ASIMI_MS + 1500, SAGLAYICI_ADI[kaynak]);
         const not = Array.isArray(v) ? (v.length ? `${v.length} istasyon` : "yakında taze ölçüm yapan istasyon yok") : v ? "ölçüm alındı" : "";
         teshis.push({ kaynak, ok: true, ms: Math.round(performance.now() - t0), not, alinma: Date.now() }); return v;
-      } catch (h) { teshis.push({ kaynak, ok: false, ms: Math.round(performance.now() - t0), not: String(h?.message || h), alinma: Date.now() }); return null; }
+      } catch (h) { teshis.push({ kaynak, ok: false, ms: Math.round(performance.now() - t0), not: String(trHata(h)), alinma: Date.now() }); return null; }
     };
     const aq = async () => {
       if (sadece === "gozlem") return undefined;                                    // yalnızca gözlem yenileniyor: istasyonlara dokunma
@@ -371,7 +372,7 @@ export async function kaynakTesti(konum, ids = null) {
     if (ids && !ids.includes(id)) return;
     const t0 = performance.now();
     try { const ayrinti = await sureli(is(), ZAMAN_ASIMI_MS + 1500, ad); satirlar.push({ id, ad, durum: "ok", ms: Math.round(performance.now() - t0), ayrinti }); }
-    catch (h) { satirlar.push({ id, ad, durum: h.atla ? "atlandi" : "hata", ms: Math.round(performance.now() - t0), ayrinti: String(h?.message || h) }); }
+    catch (h) { satirlar.push({ id, ad, durum: h.atla ? "atlandi" : "hata", ms: Math.round(performance.now() - t0), ayrinti: String(trHata(h)) }); }
   };
   const atla = (m) => { const e = new Error(m); e.atla = true; throw e; };
   const gozMetni = (o) => `${o.ad}${o.mesafeKm != null ? ` · ${o.mesafeKm} km` : ""} · sıcaklık ${o.sicaklik}°, nem ${o.nem != null ? `%${o.nem}` : "—"}, rüzgâr ${o.ruzgar ?? "—"} km/s, basınç ${o.basinc ?? "—"} hPa · ${new Date(o.zaman).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })} (resmî sayfayla karşılaştır)`;

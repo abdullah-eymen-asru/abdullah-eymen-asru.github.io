@@ -121,13 +121,7 @@ permalink: "/panel/dashboard.html"
         <details class="ui-cekmece panel-section">
           <summary><h2>E-posta Değiştir</h2></summary>
           <div class="ui-cekmece-icerik">
-          <p class="muted">
-            Güvenlik için e-posta değişikliği <strong>çift onaylıdır</strong>: hem şu anki
-            (eski) hem de yeni adresine ayrı ayrı bir onay maili gider ve değişikliğin
-            tamamlanması için <strong>ikisinin de</strong> onaylanması gerekir. Bu sayede
-            hesabına biri izinsiz erişse bile eski adresin sahibi olmadan e-posta
-            değiştirilemez.
-          </p>
+          <p class="muted">E-posta değişikliği <strong>çift onaylıdır</strong>: eski ve yeni adresine onay maili gider, ikisi de onaylanınca tamamlanır.</p>
           <form id="eposta-degistir-form" novalidate>
             <div class="form-field">
               <label for="yeni_eposta">Yeni E-posta</label>
@@ -176,12 +170,7 @@ permalink: "/panel/dashboard.html"
               </form>
             </div>
 
-            <p class="muted csp-mt8-fs085">
-              Eski adresine artık erişimin yoksa değişikliği tamamlayamazsın —
-              bu, hesabının kötüye kullanılmasını önlemek için bilinçli bir
-              kısıtlamadır. Aşağıdaki "Eski Mailime Erişemiyorum" kutusundan
-              site yöneticisiyle iletişime geçebilirsin.
-            </p>
+            <p class="muted csp-mt8-fs085">Eski adresine erişimin yoksa değişikliği tamamlayamazsın. Aşağıdaki "Eski Mailime Erişemiyorum" kutusundan yöneticiye yaz.</p>
           </div>
         </div>
         </details>
@@ -197,15 +186,7 @@ permalink: "/panel/dashboard.html"
         <details class="ui-cekmece panel-section" id="eposta-yardim">
           <summary><h2>Eski Mailime Erişemiyorum</h2></summary>
           <div class="ui-cekmece-icerik">
-          <p class="muted">
-            Yukarıdaki "E-posta Değiştir" için eski adresine de onay vermen
-            gerekiyor. Eğer o adrese artık erişimin yoksa (şifresini unuttun,
-            hesabı kapattın, vb.) kendi başına tamamlayamazsın — bu durumda
-            site yöneticisine ulaşman gerekir. Yönetici, admin panelinden senin
-            adına e-postanı <strong>hiçbir mail beklemeden, anında</strong>
-            güncelleyebilir; işlem bittiğinde ekstra bir onay yapmana gerek
-            kalmadan yeni adresinle giriş yapabilirsin. Yöneticiye ulaşmak için:
-          </p>
+          <p class="muted">Eski adresine erişimin yoksa değişikliği kendin tamamlayamazsın. Yönetici e-postanı <strong>onay beklemeden</strong> güncelleyebilir. Ulaşmak için:</p>
           <div class="csp-flex-gap10-wrap">
             <!-- Mesajlar artık ayrı bir sayfada (bkz. panel/mesajlar.md) — bu
                  link doğrudan oraya gider ve ?konu= ile "Yeni Sohbet" formunu
@@ -218,13 +199,7 @@ permalink: "/panel/dashboard.html"
               İletişim Formuna Git
             </a>
           </div>
-          <p class="muted csp-mt10-fs085">
-            Mesajında yeni e-posta adresini ve kimliğini doğrulayacak bilgileri
-            (ör. kayıtlı ad-soyadın) belirtmen, yöneticinin işlemi hızlıca
-            yapabilmesini sağlar. Yönetici işlemi tamamladıktan sonra sana
-            haber verecektir — beklemeden yeni adresinle giriş yapmayı
-            deneyebilirsin.
-          </p>
+          <p class="muted csp-mt10-fs085">Mesajına yeni e-posta adresini ve kimliğini doğrulayacak bilgiyi (ör. ad-soyad) yaz. Yönetici işlemi bitirince sana haber verir.</p>
         </div>
         </details>
 
@@ -341,21 +316,7 @@ permalink: "/panel/dashboard.html"
       <h1>Klasör Yönetimi</h1>
       <section id="klasorler" class="panel-section">
               <h2>Klasörler (<code id="kl-baslik-koleksiyon">_posts</code>/ altındaki alt klasörler)</h2>
-              <p class="muted">
-                Blog yazıların <code>_posts/</code>, akademik projelerin ise
-                <code>_projects/</code> altında alt klasörlerde tutulur
-                (varsayılan olarak yıla göre, örn. <code>_posts/2026/</code>) —
-                hangi klasörde durdukları içeriğin linkini (permalink'ini)
-                ETKİLEMEZ, sadece depodaki dosya organizasyonunu ilgilendirir.
-                Aşağıdan blog/akademik proje klasörleri arasında geçiş
-                yapabilirsin. Burada yeni bir klasör oluşturabilir, mevcut bir
-                klasörü yeniden adlandırabilir (içindeki tüm dosyalar yeni
-                klasöre taşınır) ya da BOŞ bir klasörü silebilirsin. GitHub'da
-                "gerçek" boş klasör kavramı olmadığı için yeni klasör oluşturma
-                işlemi, o klasörün içine görünmez küçük bir <code>.gitkeep</code>
-                dosyası ekleyerek yapılır — bu dosya klasörü var eder ama sitede
-                hiçbir şekilde görünmez veya listelenmez.
-              </p>
+              <p class="muted">Blog yazıları <code>_posts/</code>, projeler <code>_projects/</code> altında durur. Klasör, yazının linkini ETKİLEMEZ. Buradan klasör oluşturabilir, yeniden adlandırabilir veya BOŞ bir klasörü silebilirsin.</p>
 
               <div class="gy-klasor-tur-sekmeleri" role="tablist" aria-label="Klasör türüne göre geçiş yap">
                 <button type="button" class="gy-klasor-tur-sekme active" data-klasor-tur="blog" role="tab" aria-selected="true">📰 Blog (<code>_posts/</code>)</button>
@@ -381,13 +342,7 @@ permalink: "/panel/dashboard.html"
       <h1>R2 Dosya Paylaşımı</h1>
       <section id="dosya-paylasim" class="panel-section">
               <h2>R2 Dosya Paylaşımı</h2>
-              <p class="muted">
-                Cloudflare R2 bucket'ındaki (<code>abdullah-eymen-asru-site-ozel-dosyalar</code>)
-                HERHANGİ BİR dosya yolu (key) için tek tıkla süreli (presigned)
-                indirme linki üret ve panoya kopyala. Dosya yolunu R2 Dashboard'dan
-                veya yukarıdaki "Özel İçerik" formunda yüklediğin dosyaların
-                yolundan (<code>içerik-id/dosya-adi</code>) alabilirsin.
-              </p>
+              <p class="muted">R2 bucket'ındaki (<code>abdullah-eymen-asru-site-ozel-dosyalar</code>) bir dosya yolu için süreli indirme linki üretir ve kopyalar. Yolu R2 panelinden ya da "Özel İçerik" yüklemelerinden alabilirsin.</p>
               <div class="form-field">
                 <label for="r2-dosya-key">Dosya Yolu (R2 key)</label>
                 <input id="r2-dosya-key" type="text" placeholder="ör. 3f2504e0-4f89-.../rapor.pdf">
@@ -423,11 +378,7 @@ permalink: "/panel/dashboard.html"
 
     <section class="dash-view" id="view-media-arsiv" hidden data-view="media-arsiv">
       <h1>Dosya Yöneticisi</h1>
-      <p class="muted">
-        Klasörler, dosya adları ve arama <strong>veritabanından</strong> okunur; R2'ye liste isteği
-        atılmaz. Dosyalar tarayıcıdan doğrudan R2'ye yüklenir. "Uçtan uca şifrele" seçeneğiyle
-        yüklenen dosyalar tarayıcında şifrelenir ve yalnızca seçtiğin kişiler açabilir.
-      </p>
+      <p class="muted">Klasör, dosya adı ve arama <strong>veritabanından</strong> okunur. Dosyalar doğrudan R2'ye yüklenir. "Uçtan uca şifrele" ile yüklenenleri yalnızca seçtiğin kişiler açar.</p>
       <div id="slot-arsiv"></div>
     </section>
 
@@ -443,16 +394,7 @@ permalink: "/panel/dashboard.html"
 
     <section class="dash-view" id="view-media-izleme" hidden data-view="media-izleme">
       <h1>İzleme ve Okuma Yönetimi</h1>
-        <p class="muted">
-          Bu sayfa <strong>sadece Site Sahibi (owner)</strong> tarafından
-          kullanılabilir. Buradan doğrudan <code>{{ site.kutuphane_repo }}</code>
-          reposunda yeni bir Issue açabilir, ilgili GitHub Projects panosuna
-          (İzleme veya Okuma) ekleyip sütunlarını (Durum, Tür, Puan, vb.)
-          doldurabilir, ya da panoda zaten var olan bir kaydı arayıp
-          güncelleyebilirsin — GitHub'a hiç gitmeden. Panoya başka bir yoldan
-          (doğrudan GitHub üzerinden) eklediğin/düzenlediğin kayıtlar da her
-          zamanki gibi çalışmaya devam eder; bu sayfa sadece ek bir hızlı yol.
-        </p>
+        <p class="muted">Yalnızca <strong>Site Sahibi</strong> kullanır. <code>{{ site.kutuphane_repo }}</code> reposunda Issue açar, panoya ekler ya da mevcut kaydı arayıp güncellersin. GitHub üzerinden yaptığın değişiklikler de çalışmaya devam eder.</p>
 
         <nav id="iy-nav" class="gy-klasor-tur-sekmeleri" role="tablist" aria-label="İzleme/Okuma arasında geçiş yap">
           <button type="button" class="gy-klasor-tur-sekme active" data-koleksiyon="izleme" role="tab" aria-selected="true">🎬 İzlediklerim</button>
@@ -468,15 +410,7 @@ permalink: "/panel/dashboard.html"
 
           <section id="iy-mod-ekle" class="panel-section">
             <h2 id="iy-form-baslik">Yeni Kayıt Ekle — İzlediklerim</h2>
-            <p class="muted" id="iy-form-aciklama">
-              Başlık, filmin/dizinin adı olarak GitHub Issue başlığı olur.
-              Açıklama alanı issue'nun gövdesine (body) yazılır — notlar, alıntı,
-              kısa yorum vb. için kullanabilirsin, boş bırakılabilir. Aşağıdaki
-              diğer alanlar, <code>{{ site.izleme_projects_url }}</code>
-              panosundaki mevcut sütunlardan OTOMATİK olarak okunur — panoya yeni
-              bir sütun eklersen bu form da kendiliğinden güncellenir, bu sayfaya
-              dokunmana gerek kalmaz.
-            </p>
+            <p class="muted" id="iy-form-aciklama">Başlık, Issue başlığı olur. Açıklama Issue gövdesine yazılır (boş olabilir). Diğer alanlar <code>{{ site.izleme_projects_url }}</code> panosundaki sütunlardan otomatik gelir.</p>
 
             <form id="iy-form" novalidate>
               <div class="form-field">
@@ -552,14 +486,7 @@ permalink: "/panel/dashboard.html"
       <h1>Özgeçmiş (CV) &amp; Profil Görseli</h1>
       <section id="profil-foto" class="panel-section">
               <h2>Profil Fotoğrafı Yönetimi</h2>
-              <p class="muted">
-                Sitede favicon ve profil resmi olarak kullanılan dosyayı (yolu
-                <code>_config.yml → profile_image</code> alanından otomatik
-                okunur, dosya adı/uzantısı ne olursa olsun) buradan görüntüle,
-                değiştir veya sil. Yeni bir fotoğraf yüklediğinde dosya adı
-                eskisinden farklı olabilir — panel yeni dosyayı ekler, eskisini
-                siler ve <code>_config.yml</code>'i otomatik günceller.
-              </p>
+              <p class="muted">Favicon ve profil resmi olarak kullanılan dosyayı (<code>_config.yml → profile_image</code>) görüntüle, değiştir veya sil. Yenisini yüklediğinde eskisi silinir, <code>_config.yml</code> otomatik güncellenir.</p>
               <div id="pf-mevcut" class="gy-profil-onizleme">
                 <p class="muted">Görüntülemek için önce bağlantıyı doğrula.</p>
               </div>
@@ -575,14 +502,7 @@ permalink: "/panel/dashboard.html"
             </section>
       <section id="cv" class="panel-section">
               <h2>CV (Özgeçmiş)</h2>
-              <p class="muted">
-                Anasayfada, CV varsa otomatik olarak beliren <strong>"📄 CV
-                Görüntüle"</strong> butonu ve <code>{{ site.url }}/cv/</code>
-                adresinden buraya erişimi buradan yönetirsin. CV yoksa (aşağıdaki
-                durum "CV eklenmemiş" ise) buton anasayfada HİÇ görünmez, <code>/cv/</code>
-                adresi de "CV henüz eklenmedi" mesajı gösterir — bu sayfayı elle
-                silmene gerek yok, davranışı otomatik değişir.
-              </p>
+              <p class="muted">Anasayfadaki <strong>"📄 CV Görüntüle"</strong> butonunu ve <code>{{ site.url }}/cv/</code> sayfasını yönetirsin. CV yoksa buton görünmez, sayfa "CV henüz eklenmedi" der.</p>
               <p class="gy-yardim-metni">
                 <code>/cv/</code> adresi <strong>kalıcıdır</strong> — CV'nin
                 gerçek konumunu (aşağıdaki PDF'i güncellersen ya da dış linki
@@ -595,13 +515,7 @@ permalink: "/panel/dashboard.html"
               </div>
 
               <h3 class="csp-mt-18">Yöntem 1 — GitHub'a Yükle</h3>
-              <p class="gy-yardim-metni">
-                Bir PDF dosyası seçip yüklersin; panel dosyayı
-                <code>assets/cv/</code> altına GitHub'a COMMIT eder ve
-                <code>cv_url</code>'ü otomatik olarak bu dosyanın adresine
-                ayarlar. Blog yazılarındaki "GitHub'a Yayınla" ile aynı mantık —
-                dosya reponun içinde, git geçmişinde durur.
-              </p>
+              <p class="gy-yardim-metni">PDF seçip yüklersin; dosya <code>assets/cv/</code> altına GitHub'a işlenir ve <code>cv_url</code> otomatik ayarlanır.</p>
               <div class="form-field">
                 <label for="cv-dosya">PDF Dosyası Seç</label>
                 <input id="cv-dosya" type="file" accept="application/pdf">
@@ -609,14 +523,7 @@ permalink: "/panel/dashboard.html"
               <button id="cv-yukle-btn" type="button" class="btn-primary csp-w-auto">GitHub'a Yükle / Değiştir</button>
 
               <h3 class="csp-mt-18">Yöntem 2 — Sadece Supabase'e Yükle</h3>
-              <p class="gy-yardim-metni">
-                Blog yazılarındaki <strong>"Sadece Supabase'te Yayınla"</strong>
-                ile aynı mantık: dosya GitHub'a hiç commit edilmez, doğrudan
-                Supabase Storage'a (herkese açık, ayrı bir <code>cv-dosyalari</code>
-                bucket'ı) yüklenir ve <code>cv_url</code> o adrese ayarlanır. Git
-                geçmişine bir kayıt bırakmadan CV'yi hızlıca değiştirmek/kaldırmak
-                istediğinde bu yöntem daha pratiktir.
-              </p>
+              <p class="gy-yardim-metni"><strong>"Sadece Supabase'te Yayınla"</strong> mantığı: dosya GitHub'a işlenmez, Supabase Storage'a (<code>cv-dosyalari</code>) yüklenir ve <code>cv_url</code> ayarlanır. Git geçmişine iz bırakmaz.</p>
               <div class="form-field">
                 <label for="cv-dosya-supabase">PDF Dosyası Seç</label>
                 <input id="cv-dosya-supabase" type="file" accept="application/pdf">
@@ -700,9 +607,7 @@ permalink: "/panel/dashboard.html"
              kayıtlar kapalı olsa bile hesap açılabilir. Wiring: uye-ayarlari.js -> wireDavet(). -->
         <details class="panel-section csp-mt-16" id="davet-kutu">
           <summary><strong>✉ Kullanıcı Davet Et</strong></summary>
-          <p class="muted">Girdiğin e-postaya Supabase üzerinden davet maili gider. Kişi linke tıklayıp şifresini belirler, ardından
-            KVKK/açık rıza onayını verir. Hesap normal "Üye" rolüyle açılır; rolü sonra aşağıdaki listeden değiştirebilirsin.
-            Davet linki sınırlı süre geçerlidir. Varsayılan olarak davet sayısı ve süresi sınırsızdır; sınırları yalnızca Site Sahibi koyabilir.</p>
+          <p class="muted">Girdiğin e-postaya davet maili gider. Kişi şifresini belirler ve KVKK onayını verir. Hesap "Üye" olarak açılır; rolü aşağıdan değiştirebilirsin. Davet sınırlarını yalnızca Site Sahibi koyar.</p>
           <p id="davet-durum" class="muted"></p>
 
           <!-- SADECE Site Sahibi (owner): davetleri aç/kapat + gelişmiş sınırlar. Gerçek yetki: owner_davet_ayarlari_kaydet RPC (migration 0153). -->
@@ -800,15 +705,7 @@ permalink: "/panel/dashboard.html"
              admin-change-email). -->
         <div id="admin-eposta-degistir-kutu" class="panel-section csp-mt-16" hidden>
           <h3 class="csp-mt-0">E-postasını Değiştir: <span id="admin-eposta-hedef-isim"></span></h3>
-          <p class="muted">
-            Bu, kullanıcının kendi panelinden yaptığı değişiklikten FARKLIDIR:
-            e-posta <strong>hiçbir mail gönderilmeden, anında</strong> değişir —
-            ne eski ne yeni adrese onay maili gitmez, eski adrese erişim gerekmez.
-            Bu yüzden bu bölümü SADECE kullanıcı eski mailine erişemediği için
-            seninle iletişime geçtiyse ve kimliğini (ör. panel üzerinden
-            gönderdiği mesajla) doğruladıysan kullan — asıl "kimlik doğrulama"
-            adımı burada senin elle yaptığın kontroldür.
-          </p>
+          <p class="muted">Bu işlem <strong>mail göndermeden, anında</strong> değişir. Yalnızca kullanıcı eski mailine erişemiyorsa ve kimliğini doğruladıysan kullan.</p>
           <form id="admin-eposta-degistir-form" novalidate>
             <input type="hidden" id="admin-eposta-hedef-id">
             <div class="form-field">
@@ -844,14 +741,7 @@ permalink: "/panel/dashboard.html"
 
     <section class="dash-view" id="view-sys-guvenlik" hidden data-view="sys-guvenlik">
       <h1>Admin Güvenliği</h1>
-        <p class="muted">
-          Buradan başka bir admin'i şüpheli bir durumda anında "askıya" alabilir
-          (tüm oturumları sonlanır), açık vakalara oy kullanabilir ve (sadece
-          Site Sahibi ise) bir vakayı tek başına kesin karara bağlayabilirsin.
-          Kimse kalıcı olarak düşürülmeden önce ya çoğunluk oylaması ya Site
-          Sahibi kararı ya da (kimse karar vermezse) otomatik süre dolumu
-          gerekir — bkz. aşağıdaki yardım metni.
-        </p>
+        <p class="muted">Şüpheli bir admin'i anında "askıya" alabilir, açık vakalara oy verebilirsin. Kesin karar için çoğunluk oyu, Site Sahibi kararı ya da süre dolumu gerekir.</p>
 
         <!-- BUG FİX (eksik geri dönüş linki): bu sayfaya SADECE admin.md'deki
              "🛡️ Admin Güvenliği" sekmesinden geliniyordu ve buradan admin.md'ye
@@ -891,13 +781,7 @@ permalink: "/panel/dashboard.html"
           <details class="ui-cekmece panel-section sadece-owner">
             <summary><h2>👥 Üyelik Kayıtları</h2></summary>
             <div class="ui-cekmece-icerik">
-            <p class="muted">
-              Kapatırsan veri tabanına yeni bir üye kaydı düşmez — Google ile de,
-              normal (e-posta/şifre) ile de kimse kayıt olamaz, kayıt sayfası
-              yerine bir uyarı ekranı görür. Daha önce hesap oluşturmuş kimseler
-              bundan ETKİLENMEZ, girişe devam edebilirler. Bu yetki sadece Site
-              Sahibi'ne (owner) aittir, admin bile değiştiremez.
-            </p>
+            <p class="muted">Kapatırsan kimse yeni kayıt olamaz (Google dahil). Mevcut üyeler etkilenmez. Yalnızca Site Sahibi değiştirebilir.</p>
             <p>
               Şu an durum:
               <strong id="ag-kayitlar-durum">Yükleniyor...</strong>
@@ -913,14 +797,7 @@ permalink: "/panel/dashboard.html"
           <details class="ui-cekmece panel-section sadece-owner">
             <summary><h2>🚨 Kilit Modu (Acil Durdurma)</h2></summary>
             <div class="ui-cekmece-icerik">
-            <p class="muted">
-              Açtığında Site Sahibi (sen) dışında hiçbir rol (admin/manager/editor)
-              içerik ekleyemez, düzenleyemez ya da silemez — panel açılıp mevcut
-              içerik görüntülenebilir, sadece yazma işlemleri Worker tarafında
-              reddedilir. Bir hesabın ele geçirildiğinden şüphelendiğinde, tek tek
-              rolleri değiştirmek yerine tüm yazma yetkisini anında durdurmak
-              içindir. Bu yetki sadece Site Sahibi'ne aittir.
-            </p>
+            <p class="muted">Açıkken Site Sahibi dışında kimse içerik ekleyemez, düzenleyemez veya silemez; yalnızca görüntüleme açık kalır. Hesap ele geçirilirse tüm yazmayı anında durdurur. Yalnızca Site Sahibi kullanır.</p>
             <p>
               Şu an durum:
               <strong id="ag-kilit-durum">Yükleniyor...</strong>
@@ -972,14 +849,7 @@ permalink: "/panel/dashboard.html"
           <details class="ui-cekmece panel-section sadece-owner">
             <summary><h2>📜 Denetim Kaydı (Audit Log)</h2></summary>
             <div class="ui-cekmece-icerik">
-            <p class="muted">
-              github-yonetim panelinin arkasındaki Worker'ın verdiği her yazma
-              (ekleme/düzenleme/silme) denemesinin izi — kim, ne zaman, hangi
-              dosyayı, ne sonuçla (izin verildi/reddedildi). Depolamayı
-              doldurmasın diye tek tek kayıt ya da belirli bir tarihten eskisinin
-              tamamı silinebilir; bu SADECE Site Sahibi'ne açıktır, admin bile
-              göremez/silemez.
-            </p>
+            <p class="muted">Worker'ın her yazma denemesi: kim, ne zaman, hangi dosya, sonuç. Tek tek ya da tarihe göre silebilirsin. Yalnızca Site Sahibi görür.</p>
             <div class="csp-flex-gap10">
               <label for="ag-denetim-filtre" class="muted">Göster:</label>
               <select id="ag-denetim-filtre">
@@ -1018,16 +888,7 @@ permalink: "/panel/dashboard.html"
       <h1>GitHub / Worker Bağlantı Durumu</h1>
       <section id="baglanti" class="panel-section">
               <h2>GitHub Bağlantısı</h2>
-              <p class="muted">
-                GitHub kullanıcı adı, repo adı ve yazma yetkisi olan token artık bu
-                panelde YOK — hiçbiri tarayıcına hiç girmiyor. Bunun yerine sitenin
-                Cloudflare Worker'ı (token'ı kendi sunucu-tarafı gizli anahtarı
-                olarak tutar) senin zaten sahip olduğun bu oturumu doğrulayıp
-                GitHub'a onun adına yazıyor — yani bağlantı otomatik kurulur, elle
-                bir şey yapıştırman gerekmez. Aşağıdaki durum mesajı sayfa
-                açıldığında kendiliğinden güncellenir; sorun yaşarsan butonla
-                tekrar deneyebilirsin.
-              </p>
+              <p class="muted">GitHub bağlantısı otomatik kurulur; token tarayıcına girmez. Durum sayfa açılınca güncellenir. Sorun olursa butonla tekrar dene.</p>
               <div class="form-field">
                 <label for="gh-branch">Branch (opsiyonel — boş bırakılırsa reponun varsayılan branch'i kullanılır)</label>
                 <input id="gh-branch" type="text" placeholder="main" autocomplete="off">
@@ -1074,16 +935,7 @@ permalink: "/panel/dashboard.html"
         </p>
         <details class="ya-detay">
           <summary>Nasıl çalışır?</summary>
-          <p class="gy-yardim-metni">
-            <strong>Bu sadece owner'a (Site Sahibi'ne) özeldir.</strong>
-            owner'ın kendisi hiçbir zaman kısıtlanamaz (kendi panelinden
-            kilitlenmeni engellemek için bilerek böyle tasarlandı). Bir
-            anahtarı kapatman, ilgili rolün SADECE o tekil özelliğe erişimini
-            keser — o rolün panele genel girişini ya da diğer özelliklerini
-            etkilemez. Örnek: "CV Yönetimi" satırında "Admin" anahtarını
-            kapatırsan, adminler CV'yi artık göremez/değiştiremez, sadece sen
-            (owner) yönetebilirsin.
-          </p>
+          <p class="gy-yardim-metni"><strong>Yalnızca Site Sahibi içindir.</strong> Sen hiçbir zaman kısıtlanamazsın. Bir anahtarı kapatmak, rolün yalnızca o özelliğe erişimini keser.</p>
         </details>
 
         <div class="ya-arama">
@@ -1106,12 +958,7 @@ permalink: "/panel/dashboard.html"
       <!-- 3) R2 Dosya Yöneticisi izni (assets/js/r2-arsiv/izin-paneli.js) -->
       <section id="ra-izin-bolumu" class="panel-section ya-pane" lang="tr" role="tabpanel" aria-labelledby="ya-tab-r2" hidden>
         <h2>R2 Erişim İzni</h2>
-        <p class="muted">
-          "Dosya Yöneticisi" varsayılan olarak yalnızca Site Sahibi ve Adminler içindir.
-          Buradan bir rolü ya da tek tek kullanıcıları açıp kapatabilirsin; kullanıcıya özel
-          kayıt, rol kaydının önüne geçer. Kontrol sunucuda (Cloudflare Worker + RLS)
-          yapılır, yetkisiz istek <code>403</code> alır.
-        </p>
+        <p class="muted">"Dosya Yöneticisi" varsayılan olarak Site Sahibi ve Adminler içindir. Rol ya da kullanıcı bazında açıp kapatabilirsin; kullanıcı kaydı rol kaydından önce gelir. Yetkisiz istek reddedilir (<code>403</code>).</p>
         <div id="ra-izin-kok"><p class="muted">Yükleniyor...</p></div>
         <div id="ra-izin-mesaj" class="auth-message" hidden></div>
       </section>
@@ -1167,11 +1014,7 @@ permalink: "/panel/dashboard.html"
     <section class="dash-view" id="view-sys-kvkk" hidden data-view="sys-kvkk">
       <h1>Hukuki Metinler</h1>
       <section class="panel-section">
-        <p class="muted">
-          KVKK Aydınlatma Metni ve Açık Rıza Metni <strong>ayrı belgelerdir</strong>; her birinin kendi sürüm etiketi vardır.
-          Yükselttiğinde onayı eşleşmeyen üyeler bir sonraki girişlerinde yeniden onay verir. Kod değiştirmeden ve deploy etmeden değişir.
-          Gizlilik Politikası genel bilgilendirmedir, üyeden onay istenmez.
-        </p>
+        <p class="muted">Aydınlatma Metni ve Açık Rıza Metni <strong>ayrı belgelerdir</strong>, ayrı sürümleri vardır. Sürümü yükseltince onayı eşleşmeyen üyeler girişte yeniden onay verir. Gizlilik Politikası için onay istenmez.</p>
         <div id="kvkk-surum-kok"><p class="muted">Yükleniyor...</p></div>
         <div id="kvkk-surum-mesaj" class="auth-message" hidden></div>
       </section>
@@ -1182,11 +1025,7 @@ permalink: "/panel/dashboard.html"
          Yetki Ayarları › Özellikler'den "Silinen Hesapların Artık Verisi" açıksa (yalnızca öneri gönderebilir). -->
     <section class="dash-view" id="view-sys-silme-onayi" hidden data-view="sys-silme-onayi">
       <h1>Silinen Hesap Verileri</h1>
-      <p class="muted">
-        Hesabını silen üyelerin hesabı hemen kapanır; verileri burada <strong>Site Sahibi'nin onayını</strong> bekler.
-        Onaydan önce dökümü indirebilir, hangi veri gruplarının silineceğini seçebilirsin. Onaylanınca üyeye ait her şey
-        (R2 dosyaları, Storage, kayıtlar, hesap) kalıcı silinir ve talep kaydı da kalkar. Güvenlik/denetim günlükleri bu işlemin dışındadır.
-      </p>
+      <p class="muted">Hesabını silen üyenin hesabı hemen kapanır; verileri <strong>Site Sahibi onayını</strong> bekler. Onaydan önce dökümü indirip silinecek grupları seçebilirsin. Onayla her şey kalıcı silinir (denetim kayıtları hariç).</p>
       <div id="so-kok"><p class="muted">Yükleniyor...</p></div>
       <div id="so-mesaj" class="auth-message" hidden></div>
     </section>
@@ -1329,18 +1168,7 @@ permalink: "/panel/dashboard.html"
       </details>
       <section id="hakkimda" class="panel-section" hidden>
               <h2>Hakkımda (Anasayfa)</h2>
-              <p class="muted">
-                Anasayfada görünen üstteki isim/unvan satırı ile aşağıdaki
-                İngilizce/Türkçe "Hakkımda" kutusunu buradan düzenleyebilirsin.
-                Bu alan doğrudan <code>_includes/hakkimda-kutusu.md</code> ve
-                <code>_includes/hakkimda-icerik.md</code> dosyalarına GitHub'a
-                commit atar — <strong>içerik HTML formatındadır, Markdown
-                DEĞİLDİR</strong>; aşağıdaki kutulara yazarken de düz metin değil
-                geçerli HTML (<code>&lt;p&gt;</code>, <code>&lt;strong&gt;</code>,
-                <code>&lt;ul&gt;</code>/<code>&lt;li&gt;</code> vb.) kullanmalısın,
-                aksi hâlde sayfanın mevcut görünümü/biçimlendirmesi bozulur. Sadece
-                admin/Site Sahibi bu bölümü görebilir ve düzenleyebilir.
-              </p>
+              <p class="muted">Anasayfadaki isim/unvan satırını ve "Hakkımda" kutusunu düzenle. Değişiklik <code>_includes/hakkimda-kutusu.md</code> ve <code>_includes/hakkimda-icerik.md</code> dosyalarına işlenir. <strong>İçerik HTML'dir, Markdown DEĞİL</strong> (<code>&lt;p&gt;</code>, <code>&lt;strong&gt;</code>, <code>&lt;ul&gt;</code> gibi). Yalnızca admin/Site Sahibi görür.</p>
 
               <button id="hk-yukle-btn" type="button" class="btn-primary csp-w-auto csp-mb-12">Mevcut İçeriği Yükle</button>
               <div id="hk-durum" class="muted">Yüklemek için yukarıdaki butona bas.</div>
@@ -1359,16 +1187,7 @@ permalink: "/panel/dashboard.html"
                 </div>
 
                 <h3 class="csp-mt-18">Hakkımda Kutusu</h3>
-                <p class="gy-yardim-metni">
-                  Anasayfadaki İngilizce/Türkçe sekmeli "Hakkımda" kutusunun
-                  (<code>_includes/hakkimda-icerik.md</code>) içeriği. Sekme
-                  geçiş mekanizması (üstteki butonlar + script) otomatik olarak
-                  korunur — aşağıdaki iki kutuya SADECE her dilin kendi
-                  <code>&lt;div class="lang-panel"&gt;</code> içindeki HTML'ini
-                  yazman yeterli, geri kalan sarmalayıcı yapı (script, sekme
-                  butonları, <code>id="lang-en"</code>/<code>id="lang-tr"</code>)
-                  kaydederken otomatik olarak yeniden oluşturulur ve bozulmaz.
-                </p>
+                <p class="gy-yardim-metni">İngilizce/Türkçe "Hakkımda" içeriği (<code>_includes/hakkimda-icerik.md</code>). Her dilin <code>&lt;div class="lang-panel"&gt;</code> içindeki HTML'ini yazman yeter; sekmeler ve script kaydederken otomatik kurulur.</p>
 
                 <div class="lang-tabs">
                   <button type="button" class="lang-tab-btn active" data-hk-lang="en">🇬🇧 English</button>
@@ -1388,12 +1207,7 @@ permalink: "/panel/dashboard.html"
                   </div>
                 </div>
 
-                <p class="gy-yardim-metni">
-                  Değişiklikleri kaydetmeden önce dilediğin kadar düzenleyebilirsin;
-                  hiçbir şey kaydedip GitHub'a commit atılana kadar sitede
-                  görünmez. Kaydettikten sonra değişikliklerin sitede görünmesi
-                  (GitHub Pages derlemesi nedeniyle) 1-2 dakika sürebilir.
-                </p>
+                <p class="gy-yardim-metni">Kaydedene kadar hiçbir şey sitede görünmez. Kayıttan sonra yayına girmesi 1-2 dakika sürebilir.</p>
                 <button id="hk-kaydet-btn" type="button" class="btn-primary csp-w-auto">Kaydet ve Yayınla</button>
               </div>
               <div id="hk-message" class="auth-message" hidden></div>
@@ -1401,28 +1215,8 @@ permalink: "/panel/dashboard.html"
       <details id="baglantilar" class="ui-cekmece panel-section">
         <summary><h2>Bağlantılar (Sosyal / Akademik)</h2></summary>
         <div class="ui-cekmece-icerik">
-              <p class="muted">
-                Anasayfada profil bilgisinin altında görünen bağlantı düğmelerini
-                (GitHub, LinkedIn, Google Scholar, ORCID, vb.) buradan ekleyebilir,
-                düzenleyebilir veya silebilirsin. Bu alan doğrudan
-                <code>_config.yml</code> dosyasındaki <code>social:</code> bloğuna
-                GitHub'a commit atar. <strong>Bağlantı adresini (URL) boş
-                bırakırsan, o buton anasayfada hiç görünmez</strong> — satırı
-                silmene gerek yok, örneğin henüz bir Google Scholar profilin
-                yoksa alanı boş bırakman yeterli, hazır olduğunda doldurup
-                kaydedince otomatik görünür. Sadece admin/Site Sahibi bu bölümü
-                görebilir ve düzenleyebilir.
-              </p>
-              <p class="gy-yardim-metni">
-                Yeni eklediğin bir bağlantının dahili teknik kimliği (ekranda
-                görünmez, sadece <code>_config.yml</code> dosyasının içinde
-                kullanılır) <strong>Görünen Ad</strong>'dan otomatik türetilir —
-                ör. "1000 Kitap" yazarsan kodda <code>1000_kitap</code> olarak
-                kaydedilir. Zaten var olan bir bağlantının Görünen Adı'nı
-                değiştirdiğinde bu dahili kimlik SABİT kalır (sadece ekrandaki
-                isim değişir), sistemin başka bir yerinde bu bağlantıya yapılan
-                göndermeler bozulmaz.
-              </p>
+              <p class="muted">Profil altındaki bağlantı düğmelerini (GitHub, LinkedIn, Scholar, ORCID…) ekle, düzenle ya da sil. Değişiklik <code>_config.yml</code> içindeki <code>social:</code> bloğuna işlenir. <strong>Adresi boş bırakırsan düğme görünmez</strong>; sonra doldurabilirsin. Yalnızca admin/Site Sahibi.</p>
+              <p class="gy-yardim-metni">Dahili kimlik <strong>Görünen Ad</strong>'dan otomatik türer (ör. "1000 Kitap" → <code>1000_kitap</code>). Var olan bağlantının adını değiştirsen de kimlik sabit kalır.</p>
 
               <button id="bg-yukle-btn" type="button" class="btn-primary csp-w-auto csp-mb-12">Mevcut Bağlantıları Yükle</button>
               <div id="bg-durum" class="muted">Yüklemek için yukarıdaki butona bas.</div>
@@ -1434,12 +1228,7 @@ permalink: "/panel/dashboard.html"
                   + Yeni Bağlantı Ekle
                 </button>
 
-                <p class="gy-yardim-metni csp-mt-10">
-                  Değişiklikleri kaydetmeden önce dilediğin kadar ekleyip
-                  silebilirsin; hiçbir şey kaydedip GitHub'a commit atılana kadar
-                  sitede görünmez. Kaydettikten sonra değişikliklerin sitede
-                  görünmesi (Jekyll derlemesi nedeniyle) 1-2 dakika sürebilir.
-                </p>
+                <p class="gy-yardim-metni csp-mt-10">Kaydedene kadar hiçbir şey sitede görünmez. Kayıttan sonra yayına girmesi 1-2 dakika sürebilir.</p>
                 <button id="bg-kaydet-btn" type="button" class="btn-primary csp-w-auto">Kaydet ve Yayınla</button>
               </div>
               <div id="bg-message" class="auth-message" hidden></div>
@@ -1606,15 +1395,7 @@ permalink: "/panel/dashboard.html"
                 <div id="ic-yazar-arama-sonuc" class="msg-uye-arama-sonuc" hidden></div>
               </div>
               <input id="ic-yazar-adi" type="text" placeholder="Yazar adı" autocomplete="off" readonly hidden>
-              <p class="gy-yardim-metni">
-                Yönetici (admin) iseniz, içerik yönetebilen (editör/İçerik
-                Sorumlusu/yönetici) kullanıcılar arasından isim veya e-posta ile
-                arayıp yazar seçebilirsiniz — liste yerine arama kutusu
-                kullanılır, çünkü yönetici/site sahibi sayısı arttıkça
-                sayfayı uzun bir açılır listeyle şişirmemek için.
-                Editör veya İçerik Sorumlusu iseniz bu alan otomatik olarak
-                kendi adınızla dolar ve değiştirilemez.
-              </p>
+              <p class="gy-yardim-metni">Admin isen yazarı isim veya e-posta ile arayıp seçersin. Editör/İçerik Sorumlusu isen alan kendi adınla dolar ve değişmez.</p>
             </div>
             <div class="form-field" id="ic-admin-adina-wrap" hidden>
               <label class="gy-toggle-satir" for="ic-admin-adina-kutu">
@@ -1622,13 +1403,7 @@ permalink: "/panel/dashboard.html"
                 <input id="ic-admin-adina-kutu" type="checkbox" role="switch">
               </label>
               <select id="ic-admin-adina-hedef" hidden></select>
-              <p class="gy-yardim-metni">
-                İşaretlersen bu içerik seçtiğin admin'in adıyla kaydedilir ve
-                "taslak" (gizli) durumunda admin onayına düşer — admin
-                onaylamadan gerçekten yayına alınamaz. Onaya düşene kadar
-                "Yayında" anahtarı ve "GitHub'a gizli commit et (eski
-                yöntem)" seçeneği devre dışı bırakılır.
-              </p>
+              <p class="gy-yardim-metni">İşaretlersen içerik seçtiğin admin adına "taslak" olarak onaya düşer; onaylanmadan yayına girmez. O zamana kadar "Yayında" ve eski yöntem seçeneği kapalıdır.</p>
             </div>
 
   <div class="form-field">
@@ -1665,15 +1440,7 @@ permalink: "/panel/dashboard.html"
             <div class="form-field" id="ic-last-modified-at-wrap" hidden>
               <label for="ic-last-modified-at">Atıf Kutusu — Güncelleme Tarihi (last_modified_at, isteğe bağlı)</label>
               <input id="ic-last-modified-at" type="date">
-              <p class="gy-yardim-metni">
-                Sadece yukarıdaki "Akademik Yazı" kutusu açıkken görünür.
-                Doluysa atıf kutusundaki APA/Chicago/MLA/BibTeX formatlarının
-                hepsinde "güncellendi / son güncelleme / versiyon" bilgisi
-                olarak (dile göre biçimlendirilerek) eklenir; yukarıdaki genel
-                "Güncellenme tarihi" (<code>guncelleme_tarihi</code>) alanından
-                BAĞIMSIZDIR ve doluysa ona ÖNCELİKLİDİR. Boş bırakılırsa atıf
-                kutusu, doluysa yukarıdaki genel güncelleme tarihini kullanır.
-              </p>
+              <p class="gy-yardim-metni">Yalnızca "Akademik Yazı" açıkken görünür. Doluysa atıf formatlarında (APA/Chicago/MLA/BibTeX) güncelleme bilgisi olarak kullanılır ve genel <code>guncelleme_tarihi</code> alanından ÖNCELİKLİDİR. Boşsa genel tarih kullanılır.</p>
             </div>
 
   <div class="form-field" id="ic-klasor-wrap">
@@ -1683,17 +1450,7 @@ permalink: "/panel/dashboard.html"
                 <option value="__yeni__">➕ Yeni klasör oluştur…</option>
               </select>
               <input class="csp-mt-8" id="ic-klasor-yeni-ad" type="text" placeholder="örn. seyahat ya da 2027" autocomplete="off" hidden>
-              <p class="gy-yardim-metni" id="ic-klasor-yardim">
-                "Otomatik" seçiliyken dosya, yukarıdaki tarihin yılına göre
-                (<code>_posts/&lt;yıl&gt;/</code>) kaydedilir — hiçbir şey
-                yapmana gerek yok. Farklı bir klasör seçersen (örn. konuya
-                göre <code>_posts/seyahat/</code> ya da farklı bir yıl)
-                dosya SEÇTİĞİN klasöre gider; hangi klasörde durduğu
-                yazının linkini (permalink'ini) ETKİLEMEZ, link her zaman
-                tarih ve slug'dan üretilir. Yeni klasörleri "📁 Klasörler"
-                sekmesinden de yönetebilirsin (oluşturma, yeniden
-                adlandırma, silme).
-              </p>
+              <p class="gy-yardim-metni" id="ic-klasor-yardim">"Otomatik" seçiliyken dosya tarihin yılına göre (<code>_posts/&lt;yıl&gt;/</code>) kaydedilir. Başka klasör seçersen oraya gider. Klasör, linki ETKİLEMEZ. Klasörleri "📁 Klasörler" sekmesinden yönetebilirsin.</p>
             </div>
             <div class="form-field" id="ic-yil-oneki-wrap" hidden>
               <label class="gy-checkbox ui-surgu-satir"><input id="ic-yil-oneki" type="checkbox" class="ui-surgu" data-ui-sessiz> <span>Dosya adına yıl önekini ekle (<code>YYYY-slug.md</code>)</span></label>
@@ -1750,14 +1507,7 @@ permalink: "/panel/dashboard.html"
             <div class="form-field">
               <label for="ic-veri-url">Veri Seti URL (veri_url, opsiyonel)</label>
               <input id="ic-veri-url" type="url" placeholder="https://github.com/... veya https://zenodo.org/... veya https://osf.io/...">
-              <p class="gy-yardim-metni">
-                Doluysa yazının/projenin başında, PDF butonunun YANINDA "🗃️ Veri
-                Seti" butonu çıkar — analiz kodunun/veri setinin bulunduğu bir
-                GitHub reposu, Zenodo/OSF kaydı ya da Kaggle veri kümesi için.
-                PDF Bağlantısı ile TAMAMEN BAĞIMSIZDIR, ikisi birden ya da
-                sadece biri doldurulabilir. Sadece <code>https://</code> ile
-                başlayan adresler kabul edilir.
-              </p>
+              <p class="gy-yardim-metni">Doluysa PDF butonunun yanında "🗃️ Veri Seti" butonu çıkar (GitHub, Zenodo, OSF, Kaggle). PDF bağlantısından BAĞIMSIZDIR. Yalnızca <code>https://</code> adresleri kabul edilir.</p>
             </div>
 
   <div class="form-field" id="ic-gizli-hedef-wrap" hidden>
@@ -1772,29 +1522,11 @@ permalink: "/panel/dashboard.html"
                   🐙 GitHub'a commit et (eski yöntem — <code>yayinda: false</code> + gizli linkle)
                 </label>
               </div>
-              <p class="gy-yardim-metni">
-                <strong>Supabase'te taslak:</strong> içerik GitHub'a hiç
-                dokunmaz, reponun git geçmişinde hiçbir iz bırakmaz — en
-                gizli seçenek budur.
-                <strong>GitHub'a commit et:</strong> içerik yine bu depoya
-                <code>yayinda: false</code> ve tahmin edilemez bir
-                <code>permalink</code> ile commit edilir; dosya reponun
-                (herkese açık ise) git geçmişinde durmaya devam eder, sadece
-                adresi paylaşılmadığı için gizli sayılır. Bu eski yöntem;
-                içeriği GitHub üzerinden elle düzenlemek, zamanlanmış
-                otomatik yayınla birlikte kullanmak ya da tercihen Supabase
-                yerine git'te tutmak isteyenler için hâlâ burada duruyor
-                (bkz. <code>rehber/01-site-rehberi.md</code> § 9).
-              </p>
+              <p class="gy-yardim-metni"><strong>Supabase'te taslak:</strong> GitHub'a hiç dokunmaz, git geçmişinde iz bırakmaz; en gizli seçenek. <strong>GitHub'a commit et:</strong> içerik <code>yayinda: false</code> ve tahmin edilemez bir <code>permalink</code> ile işlenir; geçmişte durur, yalnızca adresi paylaşılmadığı için gizlidir (eski yöntem).</p>
             </div>
             <div id="ic-onizleme-kutusu" class="gy-onizleme-kutusu" hidden>
               <div class="gy-onizleme-baslik">🔒 Gizli ön izleme linki</div>
-              <p class="muted">
-                Sadece bu linki bilenler görebilir. Kod otomatik üretilir;
-                istersen aşağıdan kendi kodunu yazabilir ya da zar butonuyla
-                yeni bir tane üretebilirsin — link, sayfayı yayına alana kadar
-                her an burada görüntülenebilir ve değiştirilebilir.
-              </p>
+              <p class="muted">Yalnızca bu linki bilenler görebilir. Kod otomatik üretilir; kendi kodunu yazabilir ya da zar butonuyla yenileyebilirsin.</p>
               <div class="gy-link-kutu">
                 <span class="gy-onizleme-onek" id="ic-onizleme-onek"></span>
                 <input type="text" id="ic-onizleme-kod" class="gy-onizleme-kod-girdi"
@@ -1847,19 +1579,7 @@ permalink: "/panel/dashboard.html"
               </span>
             </label>
           </div>
-          <p class="gy-yardim-metni" id="ic-yayin-secenek-yardim" hidden>
-            <strong>🅰️ Doğrudan GitHub'a Aktar ve Yayınla:</strong> içerik
-            Supabase'e hiç kaydedilmeden doğrudan GitHub'a commit edilir
-            (mevcut/varsayılan yöntem).
-            <strong>🅱️ Supabase'e Kaydet ve GitHub ile Yayınla:</strong>
-            içerik hem Supabase'e (kalıcı bir yedek/arama kaydı olarak) hem
-            de GitHub'a yazılır — ikisi de aynı içeriği gösterir, panelde
-            tek bir kart olarak listelenir. İçeriği GitHub'a hiç commit
-            etmeden sadece Supabase'te yayınlamak için yukarıdaki
-            "GitHub yerine Supabase'te depola" anahtarını aç. Sonradan
-            istersen "Mevcut İçerikler" listesinden aynı yazıyı GitHub'a da
-            aktarabilirsin.
-          </p>
+          <p class="gy-yardim-metni" id="ic-yayin-secenek-yardim" hidden><strong>🅰️ Doğrudan GitHub'a Aktar:</strong> içerik GitHub'a işlenir (varsayılan). <strong>🅱️ Supabase'e Kaydet ve GitHub ile Yayınla:</strong> hem Supabase'e (yedek/arama) hem GitHub'a yazılır, tek kart olarak listelenir. Yalnızca Supabase'te yayınlamak için yukarıdaki anahtarı aç.</p>
           <div class="csp-flex-gap10-wrap">
             <button type="submit" id="ic-submit-btn" class="btn-primary csp-w-auto">🅰️ Doğrudan GitHub'a Aktar ve Yayınla</button>
             <button type="button" id="ic-submit-b-btn" class="btn-primary csp-w-auto" hidden>🅱️ Supabase'e Kaydet ve GitHub ile Yayınla</button>
@@ -1998,16 +1718,8 @@ permalink: "/panel/dashboard.html"
   <!-- KURTARMA ANAHTARI KARTI: kasa kurulunca / yenilenince BİR KEZ gösterilir -->
   <div id="nt-kurtarma-goster" class="nt-kurtarma" hidden>
     <h2>🗝️ Kurtarma anahtarını sakla</h2>
-    <p class="muted">
-      Notların cihazında şifrelenir; sunucu içeriği okuyamaz. Bunun bedeli: parolanı unutur (ya da giriş parolan
-      “şifremi unuttum” ile sıfırlanırsa), <strong>bu anahtar olmadan notların kalıcı olarak açılamaz</strong>.
-      Bir parola yöneticisine ya da çıktıya kaydet; bir daha gösterilmeyecek.
-    </p>
-    <p class="muted">
-      <strong>ℹ️ Bu, eski tip bir kurtarma anahtarıdır.</strong> Yeni kasalarda yerini <em>Yedek Kurtarma Kodu</em> aldı: Notlar + Mesajlar için
-      <strong>tek 16 haneli koddur</strong> ve Notlar › Kasa ve yedek ya da Mesajlar › 🔑 bölümünden üretilir. Eski kasanın bu anahtarı çalışmaya
-      devam eder; ama yeni bir kod üretmen önerilir, çünkü tek kod hem Notlarını hem mesajlarını açar.
-    </p>
+    <p class="muted">Notların cihazında şifrelenir; sunucu okuyamaz. Parolanı unutursan <strong>bu anahtar olmadan notlar açılamaz</strong>. Parola yöneticine kaydet; bir daha gösterilmez.</p>
+    <p class="muted"><strong>ℹ️ Eski tip kurtarma anahtarı.</strong> Yerini <em>Yedek Kurtarma Kodu</em> aldı: Notlar + Mesajlar için <strong>tek 16 haneli kod</strong>. Eski anahtar çalışır; yeni kod üretmen önerilir.</p>
     <code id="nt-kurtarma-metin" class="nt-kurtarma-metin"></code>
     <div class="csp-flex-gap10-wrap">
       <button type="button" id="nt-kurtarma-kopyala" class="btn-secondary csp-w-auto">Kopyala</button>
@@ -2232,11 +1944,7 @@ permalink: "/panel/dashboard.html"
           <button type="button" id="nt-yedek-sifreli-btn" class="nt-btn">Şifreli yedek (.json)</button>
           <button type="button" id="nt-kurtarma-yenile-btn" class="nt-btn">Yedek Kurtarma Kodu üret / yenile (Notlar + Mesajlar)</button>
         </div>
-        <p class="muted">
-          ℹ️ <strong>Yedek Kurtarma Kodu</strong> Notlar + Mesajlar için TEK koddur. Burada ya da Mesajlar › 🔑 bölümünde yenilersen yeni kod
-          ikisini de açar, eski kod ikisi için de geçersiz olur. Mesaj şifreleme anahtarını sıfırlarsan kod silinir; yeni kod üretince Notlar'ı da
-          kapsar. Aynı kod, Sistem Yedekleme › Kişisel verilerim altındaki mesaj dışa/içe aktarmasında da tek doğrulamadır (ayrı parola yok).
-        </p>
+        <p class="muted">ℹ️ <strong>Yedek Kurtarma Kodu</strong> Notlar + Mesajlar için TEK koddur. Yenilersen eski kod ikisi için de geçersiz olur. Mesaj anahtarını sıfırlarsan kod silinir; yeni kod ikisini kapsar.</p>
         <div class="nt-guvenlik-satir">
           <button type="button" id="nt-kasa-parola-btn" class="nt-btn" hidden>Kasa Parolasını değiştir</button>
         </div>

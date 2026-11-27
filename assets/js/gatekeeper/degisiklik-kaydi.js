@@ -11,6 +11,7 @@
  * textContent. Inline style YOK (CSP): görünüm dashboard.css'teki .gk-log-* sınıflarından gelir.
  */
 import { supabase, showMessage } from "../core/supabase-client.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const SAYFA = 20;
 
@@ -177,7 +178,7 @@ export function logPaneliKur({ gecmis }) {
           showMessage(mesaj, "Kayıt silindi.", "success");
           await yenile();
         } catch (hata) {
-          showMessage(mesaj, `Silinemedi: ${hata.message || hata}`, "error");
+          showMessage(mesaj, `Silinemedi: ${trHata(hata)}`, "error");
           d.disabled = false;
         }
       },
@@ -233,7 +234,7 @@ export function logPaneliKur({ gecmis }) {
     } catch (hata) {
       const yok = /does not exist|42883|PGRST202/i.test(hata.message || hata.code || "");
       kutuAlani.replaceChildren(
-        el("p", { class: "muted", text: yok ? "0067_site_ayarlari_degisiklik_kaydi.sql henüz çalıştırılmamış görünüyor." : `Değişiklik kaydı yüklenemedi: ${hata.message || hata}` })
+        el("p", { class: "muted", text: yok ? "0067_site_ayarlari_degisiklik_kaydi.sql henüz çalıştırılmamış görünüyor." : `Değişiklik kaydı yüklenemedi: ${trHata(hata)}` })
       );
     }
   }
@@ -246,7 +247,7 @@ export function logPaneliKur({ gecmis }) {
       if (kayitlar.length) sonId = kayitlar[kayitlar.length - 1].id;
       dahaFazla.hidden = kayitlar.length < SAYFA;
     } catch (hata) {
-      showMessage(mesaj, `Yüklenemedi: ${hata.message || hata}`, "error");
+      showMessage(mesaj, `Yüklenemedi: ${trHata(hata)}`, "error");
     } finally {
       dahaFazla.disabled = false;
     }
@@ -261,7 +262,7 @@ export function logPaneliKur({ gecmis }) {
       showMessage(mesaj, `${data ?? 0} kayıt silindi.`, "success");
       await yenile();
     } catch (hata) {
-      showMessage(mesaj, `Temizlenemedi: ${hata.message || hata}`, "error");
+      showMessage(mesaj, `Temizlenemedi: ${trHata(hata)}`, "error");
     } finally {
       temizle.disabled = false;
     }

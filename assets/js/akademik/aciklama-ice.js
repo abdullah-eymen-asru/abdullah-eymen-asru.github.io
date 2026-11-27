@@ -7,6 +7,7 @@
 import { supabase, uuid } from "./ortak.js";
 import { pdfLibAl } from "./motor.js";
 import { acikla } from "./pdf-yaz.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 /** @returns {Promise<number>} içe alınan açıklama sayısı (0: yok / okunamadı) */
 export async function aciklamalariIceAl(kaynakId, dosya) {
@@ -21,7 +22,7 @@ export async function aciklamalariIceAl(kaynakId, dosya) {
       return { ek_id: a.nm || `ae-${a.id || uuid()}`, tur: a.tur, sayfa: a.sayfa, metin: a.metin || null, yorum: a.yorum || null, renk: a.renk, konum };
     });
     const { error } = await supabase.rpc("akademik_aciklamalari_esitle", { p_kaynak_id: kaynakId, p_aciklamalar: ozet });
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(trHata(error));
     return ozet.length;
   } catch (h) {
     console.warn("Açıklamalar içe alınamadı (PDF yine de eklendi):", h);

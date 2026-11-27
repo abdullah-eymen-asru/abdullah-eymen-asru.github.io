@@ -24,6 +24,7 @@ import * as E from "../r2-arsiv/e2ee.js";
 import * as Kasa from "../notlar/kasa.js";
 import { bildirimDurumu, bildirimAc, bildirimKapat, acikSohbetAyarla, bildirimTiklamasiniDinle } from "./bildirim.js";
 import { bildirimEngelYardimiAc } from "./bildirim-yardim.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 let AKTIF_ORNEK = null; // SPA'da ikinci kurulumda eskisi temizlenir (çift dinleyici/zamanlayıcı yok)
 const SOHBET_GORUNUMU = "users-mesajlar";
@@ -108,10 +109,10 @@ export async function mesajlasmaKur(kok, { profile, adminMi, konuOnDolgu = "" })
     const ekle = (m) => satirlar.push(m);
     ekle(`Kasa (Notlar): ${Kasa.kasaAcikMi() ? "AÇIK" : "KİLİTLİ"}`);
     try { const d = await E.anahtarDurumu(); ekle(`Anahtar kaydı: ${d.var ? "var" : "YOK"} · Giriş bağlı (DEK) sarmal: ${d.dek_var ? "var" : "yok"} · Yedek Kurtarma Kodu: ${d.kit_var ? "var" : "yok"}${d.kurtarma_var ? " · eski kurtarma parolası var" : ""}`); }
-    catch (e) { ekle(`Anahtar durumu okunamadı: ${e.message || e}`); }
+    catch (e) { ekle(`Anahtar durumu okunamadı: ${trHata(e)}`); }
     let anahtarTamam = false;
     try { anahtarTamam = await E.anahtarCiftiTutarliMi(); ekle(`Özel anahtar ↔ açık anahtar eşleşmesi: ${anahtarTamam ? "TUTARLI ✓" : "TUTARSIZ ✗ (anahtar açılamıyor ya da başka anahtar yüklü)"}`); }
-    catch (e) { ekle(`Özel anahtar açılamadı: ${e.message || e}`); }
+    catch (e) { ekle(`Özel anahtar açılamadı: ${trHata(e)}`); }
     try { await S.zarflarimiYukle(); } catch { ekle("Zarflarım okunamadı."); }
     const sorunlu = [];
     for (const c of durum.sohbetler.filter((x) => x.e2ee)) {
@@ -256,7 +257,7 @@ export async function mesajlasmaKur(kok, { profile, adminMi, konuOnDolgu = "" })
       if (durum.secili) { const g = durum.sohbetler.find((x) => x.id === durum.secili.id); if (g) { durum.secili = g; } sabitCiz(); }
     } catch (e) {
       if (kilitMi(e)) kilitGoster(e);
-      else if (!sessiz) duyur("Sohbetler yüklenemedi: " + (e.message || e), true);
+      else if (!sessiz) duyur("Sohbetler yüklenemedi: " + (trHata(e)), true);
     } finally { durum.yukleniyor = false; }
   }
   const yenileErtele = () => { clearTimeout(yenileZaman); yenileZaman = setTimeout(() => yukle(true), 700); };
@@ -286,12 +287,12 @@ export async function mesajlasmaKur(kok, { profile, adminMi, konuOnDolgu = "" })
   // ---- yıldız / sabit ----
   async function yildizToggle(m) {
     try { await V.mesajiYildizla(m.id, !m.yildizli); m.yildizli = !m.yildizli; mesajlariCiz(false); }
-    catch (e) { duyur("Yıldız güncellenemedi: " + (e.message || e), true); }
+    catch (e) { duyur("Yıldız güncellenemedi: " + (trHata(e)), true); }
   }
   async function sabitToggle(m) {
     const c = durum.secili; if (!c) return;
     try { if (durum.sabit?.id === m.id) await V.mesajSabitiniKaldir(c.id); else await V.mesajiSabitle(m.id); await sabitCiz(); }
-    catch (e) { duyur("Sabitlenemedi: " + (e.message || e), true); }
+    catch (e) { duyur("Sabitlenemedi: " + (trHata(e)), true); }
   }
   async function sabitCiz() {
     const c = durum.secili;
@@ -304,7 +305,7 @@ export async function mesajlasmaKur(kok, { profile, adminMi, konuOnDolgu = "" })
     doldur(sabitBar,
       h("button", { type: "button", class: "msj-sabit-icerik", title: "Mesaja git", onclick: () => mesajaGit(m.id) }, h("span", { class: "msj-sabit-ikon", "aria-hidden": "true", text: "📌" }),
         h("span", { class: "msj-sabit-yazi" }, h("strong", { text: `Sabit mesaj · ${gonderenAdi(m)}` }), h("span", { text: yanitMetni(m) }))),
-      h("button", { type: "button", class: "msj-sabit-kaldir", "aria-label": "Sabitlemeyi kaldır", title: "Sabitlemeyi kaldır", onclick: async () => { try { await V.mesajSabitiniKaldir(c.id); durum.sabit = null; sabitBar.hidden = true; mesajlariCiz(false); } catch (e) { duyur("Kaldırılamadı: " + (e.message || e), true); } } }, "✕"));
+      h("button", { type: "button", class: "msj-sabit-kaldir", "aria-label": "Sabitlemeyi kaldır", title: "Sabitlemeyi kaldır", onclick: async () => { try { await V.mesajSabitiniKaldir(c.id); durum.sabit = null; sabitBar.hidden = true; mesajlariCiz(false); } catch (e) { duyur("Kaldırılamadı: " + (trHata(e)), true); } } }, "✕"));
     sabitBar.hidden = false;
   }
   // ---- mesaj menüsü (⋯) ----
@@ -407,7 +408,7 @@ export async function mesajlasmaKur(kok, { profile, adminMi, konuOnDolgu = "" })
       else V.okunduIsaretle(c.id);
       okunduZamanla();
       listeyiCiz();
-    } catch (e) { if (kilitMi(e)) kilitGoster(e); else doldur(govde, h("p", { class: "msj-bos", text: "Mesajlar yüklenemedi: " + (e.message || e) })); }
+    } catch (e) { if (kilitMi(e)) kilitGoster(e); else doldur(govde, h("p", { class: "msj-bos", text: "Mesajlar yüklenemedi: " + (trHata(e)) })); }
   }
 
  /** ⭐ Yıldızlı Mesajlar paneli: tüm sohbetlerdeki yıldızlı mesajlar; tıklayınca ilgili sohbete + mesaja gider. */
@@ -417,7 +418,7 @@ export async function mesajlasmaKur(kok, { profile, adminMi, konuOnDolgu = "" })
     doldur(govde, h("p", { class: "msj-bos", text: "Yükleniyor…" }));
     let liste_;
     try { liste_ = await V.yildizliMesajlar(durum.sohbetler); }
-    catch (e) { if (kilitMi(e)) return kilitGoster(e); return doldur(govde, h("p", { class: "msj-bos", text: "Yüklenemedi: " + (e.message || e) })); }
+    catch (e) { if (kilitMi(e)) return kilitGoster(e); return doldur(govde, h("p", { class: "msj-bos", text: "Yüklenemedi: " + (trHata(e)) })); }
     const filtre = h("input", { type: "search", class: "msj-yildiz-ara", placeholder: "Yıldızlılarda ara…", "aria-label": "Yıldızlı mesajlarda ara" });
     const kap = h("div", { class: "msj-yildiz-liste", role: "list" });
     const ciz = () => {
@@ -457,7 +458,7 @@ export async function mesajlasmaKur(kok, { profile, adminMi, konuOnDolgu = "" })
       alan.value = ""; yanitiAyarla(null);
       durum.mesajlar = await V.mesajlariYukle(c); mesajlariCiz(true); okunduZamanla();
       V.okunduIsaretle(c.id); yenileErtele();
-    } catch (e) { if (kilitMi(e)) kilitGoster(e); else duyur("Mesaj gönderilemedi: " + (e.message || e), true); }
+    } catch (e) { if (kilitMi(e)) kilitGoster(e); else duyur("Mesaj gönderilemedi: " + (trHata(e)), true); }
     finally { gonderBtn.disabled = false; alan.focus(); }
   }
   form.addEventListener("submit", (e) => { e.preventDefault(); gonder(); });
@@ -478,7 +479,7 @@ export async function mesajlasmaKur(kok, { profile, adminMi, konuOnDolgu = "" })
     try {
       await V.mesajiSil(m.id, s === "herkes");
       durum.mesajlar = durum.mesajlar.filter((x) => x.id !== m.id); mesajlariCiz(false); V.aramaIndeksiniTemizle(); yenileErtele();
-    } catch (e) { duyur("Mesaj silinemedi: " + (e.message || e), true); }
+    } catch (e) { duyur("Mesaj silinemedi: " + (trHata(e)), true); }
   }
 
   copeTasiBtn.addEventListener("click", async () => {
@@ -486,13 +487,13 @@ export async function mesajlasmaKur(kok, { profile, adminMi, konuOnDolgu = "" })
     const o = await modalSor({ baslik: "Çöp kutusuna taşı", metin: "Sohbet çöp kutusuna taşınır; oradan geri alabilir ya da kalıcı olarak silebilirsin. Karşı taraftaki sohbet etkilenmez.", secenekler: [{ metin: "Çöp kutusuna taşı", deger: true, tur: "tehlike" }, { metin: "Vazgeç", deger: null }] });
     if (!o) return;
     const { error } = await V.copeAt(c.id);
-    if (error) return duyur("Taşınamadı: " + error.message, true);
+    if (error) return duyur("Taşınamadı: " + trHata(error), true);
     sagiSifirla(); await yukle(); okunmamisYenile();
   });
   sabitBtn.addEventListener("click", async () => {
     const c = durum.secili; if (!c) return;
     const { error } = await V.sabitle(c.id, !c.sabit);
-    if (error) return duyur(error.message, true);
+    if (error) return duyur(trHata(error), true);
     c.sabit = !c.sabit; c.sabit_at = c.sabit ? new Date().toISOString() : null; ustDugmeleriAyarla(c); listeyiCiz();
   });
   sessizBtn.addEventListener("click", async () => {
@@ -504,23 +505,23 @@ export async function mesajlasmaKur(kok, { profile, adminMi, konuOnDolgu = "" })
   });
   geriBtn.addEventListener("click", () => mobilGoster("liste"));
 
-  async function geriAlEylem(c) { const { error } = await V.geriAl(c.id); if (error) return duyur(error.message, true); durum.cop = durum.cop.filter((x) => x.id !== c.id); await yukle(); okunmamisYenile(); }
+  async function geriAlEylem(c) { const { error } = await V.geriAl(c.id); if (error) return duyur(trHata(error), true); durum.cop = durum.cop.filter((x) => x.id !== c.id); await yukle(); okunmamisYenile(); }
   async function kaliciSilEylem(c) {
     const o = await modalSor({ baslik: "Kalıcı olarak sil", metin: "Bu sohbetin şifre anahtarın yok edilir ve geri alınamaz. Tüm taraflar kalıcı sildiğinde mesajlar veritabanından tamamen silinir.", secenekler: [{ metin: "Kalıcı sil", deger: true, tur: "tehlike" }, { metin: "Vazgeç", deger: null }] });
     if (!o) return;
-    try { await V.kaliciSil(c.id); durum.cop = durum.cop.filter((x) => x.id !== c.id); durum.copAdet = durum.cop.length; V.aramaIndeksiniTemizle(); await listeyiCiz(); } catch (e) { duyur("Silinemedi: " + (e.message || e), true); }
+    try { await V.kaliciSil(c.id); durum.cop = durum.cop.filter((x) => x.id !== c.id); durum.copAdet = durum.cop.length; V.aramaIndeksiniTemizle(); await listeyiCiz(); } catch (e) { duyur("Silinemedi: " + (trHata(e)), true); }
   }
   const tumunuTemizleBtn = h("button", { type: "button", class: "msj-btn msj-btn--tehlike msj-kucuk" }, "Tümünü temizle (toplu kalıcı sil)");
   tumunuTemizleBtn.addEventListener("click", async () => {
     const o = await modalSor({ baslik: "Çöp kutusunu boşalt", metin: `Çöp kutusundaki ${durum.cop.length} sohbet kalıcı olarak silinecek. Geri alınamaz.`, secenekler: [{ metin: "Tümünü kalıcı sil", deger: true, tur: "tehlike" }, { metin: "Vazgeç", deger: null }] });
     if (!o) return;
-    try { const r = await V.copuBosalt(); duyur(`${r.islenen} sohbet kalıcı silindi (${r.tamamen_silinen} tanesi veritabanından tamamen kaldırıldı).`); durum.cop = []; durum.copAdet = 0; V.aramaIndeksiniTemizle(); await listeyiCiz(); } catch (e) { duyur("Boşaltılamadı: " + (e.message || e), true); }
+    try { const r = await V.copuBosalt(); duyur(`${r.islenen} sohbet kalıcı silindi (${r.tamamen_silinen} tanesi veritabanından tamamen kaldırıldı).`); durum.cop = []; durum.copAdet = 0; V.aramaIndeksiniTemizle(); await listeyiCiz(); } catch (e) { duyur("Boşaltılamadı: " + (trHata(e)), true); }
   });
   copEylem.append(tumunuTemizleBtn);
 
   copBtn.addEventListener("click", async () => {
     durum.mod = durum.mod === "cop" ? "gelen" : "cop";
-    if (durum.mod === "cop") { try { durum.cop = await V.copKutusu(); durum.copAdet = durum.cop.length; } catch (e) { durum.mod = "gelen"; return duyur("Çöp kutusu açılamadı: " + (e.message || e), true); } }
+    if (durum.mod === "cop") { try { durum.cop = await V.copKutusu(); durum.copAdet = durum.cop.length; } catch (e) { durum.mod = "gelen"; return duyur("Çöp kutusu açılamadı: " + (trHata(e)), true); } }
     await listeyiCiz();
   });
   if (!V.E2EE_AKTIF) copBtn.hidden = true;
@@ -542,7 +543,7 @@ export async function mesajlasmaKur(kok, { profile, adminMi, konuOnDolgu = "" })
       try {
         const id = await V.sohbetBaslat({ konu: k, hedefKullanici, hedefAdmin });
         yeniKapat(); await yukle(); await sohbetAc(id); alan.focus();
-      } catch (er) { if (kilitMi(er)) { yeniKapat(); kilitGoster(er); } else { duyur("Sohbet başlatılamadı: " + (er.message || er), true); baslat.disabled = false; } }
+      } catch (er) { if (kilitMi(er)) { yeniKapat(); kilitGoster(er); } else { duyur("Sohbet başlatılamadı: " + (trHata(er)), true); baslat.disabled = false; } }
     });
     yeniAlan.hidden = false; doldur(yeniAlan, f); konu.focus();
   }
@@ -573,7 +574,7 @@ export async function mesajlasmaKur(kok, { profile, adminMi, konuOnDolgu = "" })
     cipCiz();
     const sablon = h("button", { type: "button", class: "msj-btn msj-btn--ikincil msj-kucuk", title: "Tüm yönetici ve site sahiplerini ekler" }, "🛡️ Yönetim Ekip Odası şablonu");
     sablon.addEventListener("click", async () => {
-      try { for (const a of await V.yonetimListesi()) if (a.id !== benim) secili.set(a.id, { isim: a.full_name || "—", rol: a.role }); ad.value ||= "Yönetim Ekip Odası"; cipCiz(); } catch (e) { duyur("Yönetim listesi alınamadı: " + (e.message || e), true); }
+      try { for (const a of await V.yonetimListesi()) if (a.id !== benim) secili.set(a.id, { isim: a.full_name || "—", rol: a.role }); ad.value ||= "Yönetim Ekip Odası"; cipCiz(); } catch (e) { duyur("Yönetim listesi alınamadı: " + (trHata(e)), true); }
     });
     const secici = h("div", { class: "msg-alici", hidden: true });
     const sc = aliciSeciciKur({ kok: secici, onKapat: () => { secici.hidden = true; ekleBtn.hidden = false; }, onSec: () => {}, coklu: { secili, onDegisti: cipCiz } });
@@ -588,7 +589,7 @@ export async function mesajlasmaKur(kok, { profile, adminMi, konuOnDolgu = "" })
       if (!secili.size) return duyur("Gruba en az bir kişi ekle.", true);
       kur.disabled = true;
       try { const id = await V.grupBaslat({ ad: a, uyeIdler: [...secili.keys()] }); yeniKapat(); await yukle(); await sohbetAc(id); alan.focus(); }
-      catch (er) { if (kilitMi(er)) { yeniKapat(); kilitGoster(er); } else { duyur("Grup kurulamadı: " + (er.message || er), true); kur.disabled = false; } }
+      catch (er) { if (kilitMi(er)) { yeniKapat(); kilitGoster(er); } else { duyur("Grup kurulamadı: " + (trHata(er)), true); kur.disabled = false; } }
     });
     doldur(yeniAlan, f); ad.focus();
   }
@@ -605,13 +606,13 @@ export async function mesajlasmaKur(kok, { profile, adminMi, konuOnDolgu = "" })
       try {
         const u = await V.grupUyeleri(c.id);
         doldur(listeKap, u.map((k) => h("div", { class: "msj-uye-satir" }, h("span", { text: `${k.full_name || "—"} (${V.rolEtiketi(k.role)})` }),
-          adminMi && k.id !== benim ? h("button", { type: "button", class: "msj-btn msj-btn--tehlike msj-kucuk", onclick: async () => { try { await V.grupUyeCikar(c.id, k.id); await ciz(); } catch (e) { duyur(e.message || String(e), true); } } }, "Çıkar") : null)));
-      } catch (e) { doldur(listeKap, h("p", { class: "msj-bos", text: "Üyeler alınamadı: " + (e.message || e) })); }
+          adminMi && k.id !== benim ? h("button", { type: "button", class: "msj-btn msj-btn--tehlike msj-kucuk", onclick: async () => { try { await V.grupUyeCikar(c.id, k.id); await ciz(); } catch (e) { duyur(trHata(e), true); } } }, "Çıkar") : null)));
+      } catch (e) { doldur(listeKap, h("p", { class: "msj-bos", text: "Üyeler alınamadı: " + (trHata(e)) })); }
     };
     const ekle = adminMi ? h("button", { type: "button", class: "msj-btn msj-btn--ikincil msj-kucuk", text: "＋ Kişi ekle" }) : null;
     ekle?.addEventListener("click", () => {
       ekleKap.hidden = false; ekle.hidden = true;
-      aliciSeciciKur({ kok: ekleKap, onKapat: () => { ekleKap.hidden = true; ekle.hidden = false; }, onSec: async (u) => { try { await V.grupUyeEkle(c.id, u.id); ekleKap.hidden = true; ekle.hidden = false; await ciz(); duyur(`${u.isim} gruba eklendi. Anahtarı, sohbeti açan bir üye tamamlayınca görebilir.`); } catch (e) { duyur(e.message || String(e), true); } } }).ac();
+      aliciSeciciKur({ kok: ekleKap, onKapat: () => { ekleKap.hidden = true; ekle.hidden = false; }, onSec: async (u) => { try { await V.grupUyeEkle(c.id, u.id); ekleKap.hidden = true; ekle.hidden = false; await ciz(); duyur(`${u.isim} gruba eklendi. Anahtarı, sohbeti açan bir üye tamamlayınca görebilir.`); } catch (e) { duyur(trHata(e), true); } } }).ac();
     });
     const kutu = h("div", { class: "msj-modal msj-modal--genis", role: "dialog", "aria-modal": "true", "aria-label": "Grup üyeleri" }, h("h3", { class: "msj-modal-baslik", text: `👥 ${c.konu_gosterim}` }), listeKap, ekle, ekleKap,
       h("div", { class: "msj-modal-eylem" }, h("button", { type: "button", class: "msj-btn msj-btn--ikincil", onclick: kapat }, "Kapat")));

@@ -13,6 +13,7 @@ import { el, hataMetni, indir, bayt, adsizAl } from "../donusturucu/ortak.js";
 import { pdfjsAl, pdfLibAl, pdfAcSecenekleri } from "../donusturucu/pdf-yukle.js";
 import { pdfDuzenleyiciKur } from "../donusturucu/pdf-duzenleyici.js";
 import { sekmeSifirlamaKaydet } from "../core/gezinme-kilidi.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const kok = document.getElementById("pd-kok");
 const SINIR = 300 * 1024 * 1024;
@@ -51,7 +52,7 @@ async function kur() {
       editorKap.querySelector(".dn-pdf")?.classList.add("dn-pdf--panel-acik");        // sayfa paneli açık başlasın: tüm sayfalar görünsün
       bilgi.textContent = `${liste.map((f) => f.name).join(", ")} · ${ed.sayfaSayisi()} sayfa · ${bayt(toplam)}`;
       arac.hidden = false; bildir(`${ed.sayfaSayisi()} sayfa yüklendi. Sol panelden sayfaları görebilir, “Yazı” aracıyla yazıları düzenleyebilirsin.`);
-    } catch (h) { bildir(h.message || String(h), "error"); }
+    } catch (h) { bildir(trHata(h), "error"); }
   }
 
   /* ---- araç çubuğu ---- */
@@ -66,7 +67,7 @@ async function kur() {
       let blob = await ed.pdfAl();
       if (yamalar.length || metaTemizle.checked) blob = await sonIsle(blob);
       indir(blob, `${adsizAl(ed.ad())}_duzenlenmis.pdf`); bildir("✔ İndirildi.");
-    } catch (h) { bildir(h.message || String(h), "error"); }
+    } catch (h) { bildir(trHata(h), "error"); }
   }
   async function sonIsle(blob) {
     const lib = await pdfLibAl(), { PDFDocument, PDFName, PDFString, PDFDict, PDFArray } = lib;
@@ -112,7 +113,7 @@ async function kur() {
       git.disabled = true; bildir("Sayfalar taranıyor…");
       try { const s = await ed.bulDegistir(a.value, y.value, { buyukKucuk: bk.checked });
         bildir(s.adet ? `✔ ${s.adet} yazı parçası ${s.sayfa} sayfada değiştirildi.${s.atlanan ? ` ${s.atlanan} dikey/eğik yazı atlandı.` : ""} Beğenmediysen “Geri al”ı kullan.` : "Eşleşen yazı bulunamadı (taranmış/resim PDF'lerde yazı katmanı yoktur).", s.adet ? "" : "error"); }
-      catch (h) { bildir(h.message || String(h), "error"); } finally { git.disabled = false; }
+      catch (h) { bildir(trHata(h), "error"); } finally { git.disabled = false; }
     }, "pd-birincil");
     panel.replaceChildren(el("div", { class: "pd-panel-ust" }, el("strong", { text: "🔎 Tüm sayfalarda bul ve değiştir" }), dg("Kapat", () => { panel.hidden = true; }, "pd-kucukbtn")),
       el("p", { class: "pd-soluk", text: "Eşleşen her yazının üstü sayfa rengiyle kapatılır, yenisi yazılır. Tek tek düzeltmek için soldaki “Yazı” aracını kullan." }),
@@ -145,7 +146,7 @@ async function kur() {
       }
       panel.replaceChildren(el("div", { class: "pd-panel-ust" }, el("strong", { text: `🔗 Yönlendirmeli bağlantılar (${liste.length})` }), dg("Kapat", () => { panel.hidden = true; }, "pd-kucukbtn")),
         el("p", { class: "pd-soluk", text: "Adresi değiştirip alandan çık; değişiklikler PDF'i indirirken uygulanır. Sayfa sırasını/sayısını değiştirdiysen bağlantıları yeniden tara." }), liste.length ? ul : el("p", { class: "pd-soluk", text: "Bu PDF'te bağlantı bulunamadı." }));
-    } catch (h) { bildir(h.message || String(h), "error"); }
+    } catch (h) { bildir(trHata(h), "error"); }
   }
 
   /* ---- 🧹 bellek ---- */
@@ -162,4 +163,4 @@ async function kur() {
   sekmeSifirlamaKaydet("tool-pdfduzenle", () => temizle(false));
   void dosyalar;
 }
-kur().catch((h) => { console.error("pdf-duzenle.js:", h); if (kok) kok.replaceChildren(el("p", { class: "auth-message error", text: `Araç yüklenemedi: ${h?.message || h}` })); });
+kur().catch((h) => { console.error("pdf-duzenle.js:", h); if (kok) kok.replaceChildren(el("p", { class: "auth-message error", text: `Araç yüklenemedi: ${trHata(h)}` })); });

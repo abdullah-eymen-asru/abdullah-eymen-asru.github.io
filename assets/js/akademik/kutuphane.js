@@ -15,6 +15,7 @@ import { aciklamalariIceAl } from "./aciklama-ice.js";
 import { rdfAyristir, dosyaBul } from "./ice-zotero.js";
 import { bekleyenleriGonder } from "./taslak.js";
 import { ayarYukle, ayarKaydet } from "./eklentiler.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const GORUNURLUK = { ozel: "Özel", ekip: "Ekip", herkese_acik: "Herkese açık" };
 const KAP_ETIKET = { makale: "Dergi adı", kitap: "Yayınevi", kitap_bolumu: "Yayınevi", bildiri: "Bildiri / kongre adı", tez: "Üniversite", rapor: "Kurum / yayıncı", web: "Site adı", diger: "Yayıncı / kaynak" };
@@ -354,7 +355,7 @@ function kutuphaneKur(kok, profil, owner) {
         await klasorYukle(profil.id); if (d.klasor === id) d.klasor = "";
       }
       agacCiz(); ciz();
-    } catch (h) { toast(`Klasör işlemi başarısız: ${h.message}`, "hata"); }
+    } catch (h) { toast(`Klasör işlemi başarısız: ${trHata(h)}`, "hata"); }
   }
   async function klasoreEkleCikar(kaynakId, klasorId, ekle) {
     const { error } = ekle
@@ -373,7 +374,7 @@ function kutuphaneKur(kok, profil, owner) {
       <div class="ak-dlg-eylem"><button class="ak-btn ak-btn-birincil" value="kapat">Tamam</button></div></form>`;
     dl.onchange = async (e) => {
       const kd = e.target.dataset?.kd; if (!kd) return;
-      try { await klasoreEkleCikar(kaynakId, kd, e.target.checked); agacCiz(); ciz(); } catch (h) { e.target.checked = !e.target.checked; toast(`Kaydedilemedi: ${h.message}`, "hata"); }
+      try { await klasoreEkleCikar(kaynakId, kd, e.target.checked); agacCiz(); ciz(); } catch (h) { e.target.checked = !e.target.checked; toast(`Kaydedilemedi: ${trHata(h)}`, "hata"); }
     };
     dl.showModal();
   }
@@ -555,7 +556,7 @@ function kutuphaneKur(kok, profil, owner) {
         const r = await workerFetch(`/pdf/${k.id}?indir=1`);
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
         dosyaIndir(k.pdf_dosya_adi || "belge.pdf", await r.blob());
-      } catch (h) { toast(`İndirilemedi: ${h.message}`, "hata"); }
+      } catch (h) { toast(`İndirilemedi: ${trHata(h)}`, "hata"); }
     } else if (a === "duzenle") { dl.close(); formAc(k); }
     else if (a === "sil") { dl.close(); await kaynakSil(k); }
 
@@ -602,7 +603,7 @@ function kutuphaneKur(kok, profil, owner) {
       await kaynakSilSessiz(k);
       toast(d.copYok ? "Kaynak silindi." : "Kaynak çöp kutusuna taşındı.", "basari");
       yukle();
-    } catch (h) { toast(`Silinemedi: ${h.message}`, "hata"); }
+    } catch (h) { toast(`Silinemedi: ${trHata(h)}`, "hata"); }
   }
 
   /* --------------------------- ekle / düzenle formu --------------------------- */
@@ -675,7 +676,7 @@ function kutuphaneKur(kok, profil, owner) {
           const { kunye, kaynak } = await kunyeGetir(f.girdi.value);
           doldur(kunye);
           durum.textContent = `✓ ${kaynak} üzerinden dolduruldu. Kontrol et.`;
-        } catch (h) { durum.textContent = `✗ ${h.message}`; }
+        } catch (h) { durum.textContent = `✗ ${trHata(h)}`; }
       }
     };
     f.addEventListener("submit", async (e) => {
@@ -706,13 +707,13 @@ function kutuphaneKur(kok, profil, owner) {
       durum.textContent = "Kaydediliyor…";
       try {
         const sonuc = k ? await supabase.from("akademik_kaynaklar").update(satir).eq("id", k.id).select().single() : await supabase.from("akademik_kaynaklar").insert(satir).select().single();
-        if (sonuc.error) throw new Error(sonuc.error.code === "23505" ? "Bu DOI kütüphanende zaten kayıtlı." : sonuc.error.message);
+        if (sonuc.error) throw new Error(sonuc.error.code === "23505" ? "Bu DOI kütüphanende zaten kayıtlı." : trHata(sonuc.error));
         // klasör seçimi (yalnızca değişenler yazılır)
         if (f.querySelector("[data-fk]")) {
           const kid = sonuc.data.id, secili = new Set([...f.querySelectorAll("[data-fk]:checked")].map((x) => x.dataset.fk));
           for (const kl of d.klasorler) {
             const var_ = !!d.ogeler.get(kl.id)?.has(kid);
-            if (secili.has(kl.id) !== var_) { try { await klasoreEkleCikar(kid, kl.id, secili.has(kl.id)); } catch (h) { toast(`Klasör kaydedilemedi: ${h.message}`, "uyari"); } }
+            if (secili.has(kl.id) !== var_) { try { await klasoreEkleCikar(kid, kl.id, secili.has(kl.id)); } catch (h) { toast(`Klasör kaydedilemedi: ${trHata(h)}`, "uyari"); } }
           }
           agacCiz?.();
         }
@@ -726,7 +727,7 @@ function kutuphaneKur(kok, profil, owner) {
         toast(k ? "Kaynak güncellendi." : "Kaynak eklendi.", "basari");
         yukle();
       } catch (h) {
-        durum.textContent = `✗ ${h.message}`;
+        durum.textContent = `✗ ${trHata(h)}`;
       } finally { btn.disabled = false; }
     });
     if (onDoldur) onDoldur(dl.querySelector("form"));
@@ -751,7 +752,7 @@ function kutuphaneKur(kok, profil, owner) {
         const ice = await yuklemeSonrasi(data.id, dosya);
         li.textContent = `✓ ${dosya.name}${ice ? ` — ${ice} açıklama içe alındı` : ""}`;
         basarili++;
-      } catch (h) { li.textContent = `✗ ${dosya.name}: ${h.message}`; li.classList.add("ak-hata"); }
+      } catch (h) { li.textContent = `✗ ${dosya.name}: ${trHata(h)}`; li.classList.add("ak-hata"); }
     }
     toast(`${basarili}/${pdfler.length} PDF yüklendi. Künyeleri “Düzenle” ile tamamlayabilirsin.`, basarili ? "basari" : "hata");
     yukle();
@@ -785,7 +786,7 @@ function kutuphaneKur(kok, profil, owner) {
     try {
       if (bicim === "rdf") { const r = rdfAyristir(metin); kayitlar = r.kayitlar; rdfKlasor = r.klasorSayisi; }
       else kayitlar = bicim === "bib" ? bibtexAyristir(metin) : risAyristir(metin);
-    } catch (h) { toast(`Dosya çözümlenemedi: ${h.message}`, "hata"); return; }
+    } catch (h) { toast(`Dosya çözümlenemedi: ${trHata(h)}`, "hata"); return; }
     if (!kayitlar.length) { toast("Dosyada kaynak bulunamadı.", "uyari"); return; }
     const yoluDizi = (k) => (bicim === "rdf" ? k._klasor : k._klasor) || [];
     const pdfler = new Map();
@@ -852,7 +853,7 @@ function kutuphaneKur(kok, profil, owner) {
         if (error) { console.error(error); throw new Error("İşlem tamamlanamadı. Lütfen tekrar dene."); }
         k.ust_id = yeni; if (yeni) d.acik.add(yeni);
         dl.close(); agacCiz(); ciz();
-      } catch (h) { toast(`Taşınamadı: ${h.message}`, "hata"); }
+      } catch (h) { toast(`Taşınamadı: ${trHata(h)}`, "hata"); }
     };
     dl.showModal();
   }
@@ -926,7 +927,7 @@ function kutuphaneKur(kok, profil, owner) {
         if (durum.kapsam === "klasor" && !durum.klasor) { toast("Bir klasör seç.", "uyari"); return; }
         const erisim = alan.querySelector('input[name="erisim"]:checked').value, bitis = alan.querySelector("[data-pz-bitis]").value;
         const { error: e2 } = await supabase.from("akademik_paylasimlari").insert({ user_id: profil.id, kapsam: durum.kapsam, klasor_id: durum.kapsam === "klasor" ? durum.klasor : null, erisim, baslik: alan.querySelector("[data-pz-baslik]").value.trim() || "Akademik kütüphanem", aciklama: alan.querySelector("[data-pz-aciklama]").value.trim() || null, pdf_okuma: alan.querySelector("[data-pz-pdf]").checked, ozel_dahil: alan.querySelector("[data-pz-ozel]").checked, bitis: bitis ? new Date(`${bitis}T23:59:59`).toISOString() : null });
-        if (e2) { toast(`Oluşturulamadı: ${e2.message}`, "hata"); return; }
+        if (e2) { toast(`Oluşturulamadı: ${trHata(e2)}`, "hata"); return; }
         toast("Bağlantı hazır — aşağıdan kopyalayabilirsin.", "basari"); paylasimCiz(); return;
       }
       const b = e.target.closest("[data-pz-islem]"); if (!b || b.tagName === "SELECT") return;
@@ -934,20 +935,20 @@ function kutuphaneKur(kok, profil, owner) {
       try {
         let yama = null;
         if (islem === "kopya") { await panoyaKopyala(paylasimAdresi(p.token)); toast("Bağlantı kopyalandı.", "basari"); return; }
-        if (islem === "sil") { if (!confirm("Bu paylaşım silinsin mi? Bağlantı çalışmaz olur.")) return; const { error: e3 } = await supabase.from("akademik_paylasimlari").delete().eq("id", p.id); if (e3) throw new Error(e3.message); }
+        if (islem === "sil") { if (!confirm("Bu paylaşım silinsin mi? Bağlantı çalışmaz olur.")) return; const { error: e3 } = await supabase.from("akademik_paylasimlari").delete().eq("id", p.id); if (e3) throw new Error(trHata(e3)); }
         else if (islem === "aktif") yama = { aktif: !p.aktif };
         else if (islem === "pdf") yama = { pdf_okuma: !p.pdf_okuma };
         else if (islem === "ozel") yama = { ozel_dahil: !p.ozel_dahil };
         else if (islem === "yenile") { if (!confirm("Bağlantı yenilensin mi? Eski bağlantıyı kullananlar erişimi kaybeder.")) return; yama = { token: (crypto.randomUUID() + crypto.randomUUID()).replace(/-/g, "").slice(0, 40) }; }
-        if (yama) { const { error: e3 } = await supabase.from("akademik_paylasimlari").update(yama).eq("id", p.id); if (e3) throw new Error(e3.message); }
+        if (yama) { const { error: e3 } = await supabase.from("akademik_paylasimlari").update(yama).eq("id", p.id); if (e3) throw new Error(trHata(e3)); }
         paylasimCiz();
-      } catch (h) { toast(`İşlem başarısız: ${h.message}`, "hata"); }
+      } catch (h) { toast(`İşlem başarısız: ${trHata(h)}`, "hata"); }
     };
     alan.onchange = async (e) => {
       if (e.target.matches("[data-pz-ozel], input[name='erisim'], [data-pz-pdf]")) { guncelle(); return; }
       const s = e.target.closest('select[data-pz-islem="erisim"]'); if (!s) return;
       const { error: e3 } = await supabase.from("akademik_paylasimlari").update({ erisim: s.value }).eq("id", s.closest("[data-pz]").dataset.pz);
-      if (e3) toast(`Güncellenemedi: ${e3.message}`, "hata"); else { toast("Erişim düzeyi güncellendi.", "basari"); paylasimCiz(); }
+      if (e3) toast(`Güncellenemedi: ${trHata(e3)}`, "hata"); else { toast("Erişim düzeyi güncellendi.", "basari"); paylasimCiz(); }
     };
     guncelle();
   }
@@ -993,7 +994,7 @@ function kutuphaneKur(kok, profil, owner) {
         hepsiniAl(() => supabase.from("akademik_kaynaklar").select("id,baslik,yazarlar,yayin_yili,tur,pdf_r2_yolu,pdf_dosya_adi,silindi_tarihi,user_id").eq("user_id", profil.id).not("silindi_tarihi", "is", null).order("silindi_tarihi", { ascending: false })),
         hepsiniAl(() => supabase.from("akademik_koleksiyonlar").select("id,ust_id,ad,silindi_tarihi,user_id").eq("user_id", profil.id).not("silindi_tarihi", "is", null).order("silindi_tarihi", { ascending: false })),
       ]);
-      if (a.error || b.error) throw new Error((a.error || b.error).message);
+      if (a.error || b.error) throw new Error(trHata(a.error || b.error));
       kaynaklar = a.data; klasorler = b.data;
     };
     const kopSayiGuncelle = () => { const e = q("[data-ak-cop-say]"); if (e) e.textContent = kaynaklar.length + klasorler.length ? `(${kaynaklar.length + klasorler.length})` : ""; };
@@ -1012,7 +1013,7 @@ function kutuphaneKur(kok, profil, owner) {
       <div data-cop-govde></div><p class="ak-hata" data-cop-hata hidden></p>
       <div class="ak-dlg-alt"><button type="button" class="ak-btn ak-tehlike" data-cop-islem="bosalt">Çöp kutusunu boşalt</button></div></div></form>`;
     const hataYaz = (m) => { const h = dl.querySelector("[data-cop-hata]"); h.textContent = m || ""; h.hidden = !m; };
-    try { await yukleCop(); } catch (h) { toast(`Çöp kutusu okunamadı: ${h.message}`, "hata"); return; }
+    try { await yukleCop(); } catch (h) { toast(`Çöp kutusu okunamadı: ${trHata(h)}`, "hata"); return; }
     govdeCiz(); dl.showModal();
     dl.querySelector("[data-cop-ara]").addEventListener("input", (e) => { ara = e.target.value; govdeCiz(); });
     dl.addEventListener("click", async (e) => {
@@ -1025,7 +1026,7 @@ function kutuphaneKur(kok, profil, owner) {
           const grup = klasorler.filter((x) => x.silindi_tarihi === f.silindi_tarihi).map((x) => x.id);          // aynı anda silinen alt klasörler birlikte döner
           const ustCopte = f.ust_id && klasorler.some((x) => x.id === f.ust_id && !grup.includes(x.id));
           const { error } = await supabase.from("akademik_koleksiyonlar").update({ silindi_tarihi: null }).in("id", grup); if (error) { console.error(error); throw new Error("İşlem tamamlanamadı. Lütfen tekrar dene."); }
-          if (ustCopte) { const { error: e2 } = await supabase.from("akademik_koleksiyonlar").update({ ust_id: null }).eq("id", fid); if (e2) throw new Error(e2.message); }
+          if (ustCopte) { const { error: e2 } = await supabase.from("akademik_koleksiyonlar").update({ ust_id: null }).eq("id", fid); if (e2) throw new Error(trHata(e2)); }
           toast(ustCopte ? "Klasör geri yüklendi (üst klasörü çöpte olduğu için en üste konuldu)." : "Klasör geri yüklendi.", "basari");
         } else if (islem === "sil-kaynak") {
           const k = kaynaklar.find((x) => x.id === kid); if (!confirm(`“${k.baslik}” KALICI olarak silinsin mi? PDF ve notları da silinir; geri alınamaz.`)) return;
@@ -1041,7 +1042,7 @@ function kutuphaneKur(kok, profil, owner) {
           toast("Çöp kutusu boşaltıldı.", "basari");
         }
         await yukleCop(); govdeCiz(); await klasorYukle(profil.id); await yukle(); agacCiz(); ciz();
-      } catch (h) { hataYaz(h.message || String(h)); }
+      } catch (h) { hataYaz(trHata(h)); }
     });
   }
   function klasorSec({ baslik = "Klasör seç", kok: kokSecenek = null, dislanan = new Set(), onSec }) {
@@ -1108,7 +1109,7 @@ function kutuphaneKur(kok, profil, owner) {
         for (const k of liste) await kaynakSilSessiz(k);
         d.secili.clear(); toast(d.copYok ? `${liste.length} kaynak silindi.` : `${liste.length} kaynak çöp kutusuna taşındı.`, "basari"); await yukle(); topluCiz();
       } else if (is === "birlestir") birlestirDialogu([liste]);
-    } catch (h) { toast(`İşlem başarısız: ${h.message}`, "hata"); }
+    } catch (h) { toast(`İşlem başarısız: ${trHata(h)}`, "hata"); }
   }
   /** Çöp kutusuna taşır (0122 yoksa eski davranış: kalıcı silme). PDF R2'de KALIR. */
   async function kaynakSilSessiz(k) {
@@ -1148,7 +1149,7 @@ function kutuphaneKur(kok, profil, owner) {
           for (const dg of gruplar[i].filter((x) => x.id !== asilId)) { await birlestir(asil, dg); sayi++; }
         }
         dl.close(); toast(`${sayi} kopya birleştirildi.`, "basari"); await yukle();
-      } catch (h) { toast(`Birleştirilemedi: ${h.message}`, "hata"); }
+      } catch (h) { toast(`Birleştirilemedi: ${trHata(h)}`, "hata"); }
     };
     dl.showModal();
   }
@@ -1159,7 +1160,7 @@ function kutuphaneKur(kok, profil, owner) {
     const ek = { ...(dg.ek_alanlar || {}), ...(asil.ek_alanlar || {}) }; if (JSON.stringify(ek) !== JSON.stringify(asil.ek_alanlar || {})) yama.ek_alanlar = ek;
     if (!asil.pdf_r2_yolu && dg.pdf_r2_yolu) {
       // PDF işaretçisini taşı (dosya R2'de aynı kalır, kopyalanmaz) — kopyadaki işaretçi önce temizlenir ki silme R2 nesnesini götürmesin
-      const e1 = await supabase.from("akademik_kaynaklar").update({ pdf_r2_yolu: null, pdf_dosya_adi: null, pdf_boyut_bayt: null }).eq("id", dg.id); if (e1.error) throw new Error(e1.error.message);
+      const e1 = await supabase.from("akademik_kaynaklar").update({ pdf_r2_yolu: null, pdf_dosya_adi: null, pdf_boyut_bayt: null }).eq("id", dg.id); if (e1.error) throw new Error(trHata(e1.error));
       Object.assign(yama, { pdf_r2_yolu: dg.pdf_r2_yolu, pdf_dosya_adi: dg.pdf_dosya_adi, pdf_boyut_bayt: dg.pdf_boyut_bayt, pdf_rev: dg.pdf_rev });
     }
     if (Object.keys(yama).length) { const { error } = await supabase.from("akademik_kaynaklar").update(yama).eq("id", asil.id); if (error) { console.error(error); throw new Error("İşlem tamamlanamadı. Lütfen tekrar dene."); } Object.assign(asil, yama); }
@@ -1189,7 +1190,7 @@ function kutuphaneKur(kok, profil, owner) {
           const { error } = await supabase.from("akademik_kaynaklar").update({ etiketler: dizi }).eq("id", k.id); if (error) { console.error(error); throw new Error("İşlem tamamlanamadı. Lütfen tekrar dene."); } k.etiketler = dizi;
         }
         facetleriDoldur(); ciz(); dl.close(); etiketYoneticisi();
-      } catch (h) { toast(`İşlem başarısız: ${h.message}`, "hata"); }
+      } catch (h) { toast(`İşlem başarısız: ${trHata(h)}`, "hata"); }
     };
     dl.showModal();
   }
@@ -1393,7 +1394,7 @@ function kutuphaneKur(kok, profil, owner) {
       if (h.dataset.kl === "__yok") { for (const [kid, s] of d.ogeler) if (s.has(id)) await klasoreEkleCikar(id, kid, false); toast("Kaynak klasörlerden çıkarıldı.", "bilgi"); }
       else { await klasoreEkleCikar(id, h.dataset.kl, true); toast(`“${klasorYolu(h.dataset.kl)}” klasörüne eklendi.`, "basari"); }
       agacCiz(); ciz();
-    } catch (x) { toast(`Taşınamadı: ${x.message}`, "hata"); }
+    } catch (x) { toast(`Taşınamadı: ${trHata(x)}`, "hata"); }
   });
   kok.querySelectorAll("dialog").forEach((dl) => dl.addEventListener("click", (e) => { if (e.target === dl) dl.close(); }));
 

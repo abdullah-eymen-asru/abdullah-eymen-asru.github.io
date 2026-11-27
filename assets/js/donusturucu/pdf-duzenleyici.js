@@ -18,6 +18,7 @@
 import { el, dugme, bos, formIste, baytlariOku, nefes, IOS_MU, adsizAl } from "./ortak.js";
 import { pdfjsAl, pdfLibAl, pdfBirak, pdfAcSecenekleri } from "./pdf-yukle.js";
 import { gorsellerdenPdf } from "./motor-gorsel.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const RENKLER = ["#ffeb3b", "#8bc34a", "#4fc3f7", "#f48fb1", "#ff9800", "#e53935", "#1e40af", "#111111"];
 const MAKS_PIKSEL = () => (IOS_MU() ? 12_000_000 : 40_000_000);
@@ -182,7 +183,7 @@ export async function pdfDuzenleyiciKur(kap, { dosyalar, onDegisim, mesaj = () =
     let pdf;
     try { pdf = await gorev.promise; } catch (h) {
       if (sifreli || h?.name === "PasswordException") throw new Error(`${ad}: parola korumalı PDF'ler düzenlenemez. Önce parolasını kaldır (ya da dönüştürme sekmesini kullan).`);
-      throw new Error(`${ad}: PDF okunamadı (${h?.message || h}).`);
+      throw new Error(`${ad}: PDF okunamadı (${trHata(h)}).`);
     }
     const id = kaynakSayaci++;
     kaynaklar.set(id, { id, ad, bayt, pdf, gorev });
@@ -353,7 +354,7 @@ export async function pdfDuzenleyiciKur(kap, { dosyalar, onDegisim, mesaj = () =
       kaydet();
       await kucuklerYenile();
       mesaj(`${liste.length} dosya eklendi.`, "success");
-    } catch (h) { mesaj(h.message, "error"); }
+    } catch (h) { mesaj(trHata(h), "error"); }
   });
 
   /* ---- araç durumu ---- */
@@ -432,7 +433,7 @@ export async function pdfDuzenleyiciKur(kap, { dosyalar, onDegisim, mesaj = () =
     katmanCiz();
     cubukGuncelle();
     kucukIsaretle();
-    try { await renderGorevi.promise; } catch (h) { if (h?.name !== "RenderingCancelledException") mesaj(`Sayfa çizilemedi: ${h?.message || h}`, "error"); }
+    try { await renderGorevi.promise; } catch (h) { if (h?.name !== "RenderingCancelledException") mesaj(`Sayfa çizilemedi: ${trHata(h)}`, "error"); }
   }
 
   function katmanCiz() {
@@ -769,7 +770,7 @@ export async function pdfDuzenleyiciKur(kap, { dosyalar, onDegisim, mesaj = () =
       yerlestirme = null;
       if (e.type !== "pointerup" || e.pointerId !== y.id || cokluDokunma || pinch) return;
       if (Math.hypot(e.clientX - y.x, e.clientY - y.y) > TAS_ESIGI) return; // sürükleme = kaydırma, işlem yapma
-      yerlestirmeUygula(y).catch((h) => mesaj(h?.message || String(h), "error"));
+      yerlestirmeUygula(y).catch((h) => mesaj(trHata(h), "error"));
     }
   };
   katman.addEventListener("pointerup", bitir);
@@ -883,7 +884,7 @@ export async function pdfDuzenleyiciKur(kap, { dosyalar, onDegisim, mesaj = () =
   metinDiv.addEventListener("click", (e) => {
     if (arac !== "yazi") return;
     const sp = e.target.closest?.("span");
-    if (sp && metinDiv.contains(sp)) yaziDuzenle(sp).catch((h) => mesaj(h?.message || String(h), "error"));
+    if (sp && metinDiv.contains(sp)) yaziDuzenle(sp).catch((h) => mesaj(trHata(h), "error"));
   });
 
   /* ---- kaydırma + yakınlaştırma: iki parmak, Ctrl/⌘+tekerlek, izleme dörtgeni (Safari), klavye ---- */
@@ -1036,7 +1037,7 @@ export async function pdfDuzenleyiciKur(kap, { dosyalar, onDegisim, mesaj = () =
       const s = sayfalar[i];
       let kd = kaynakDoc.get(s.kaynakId);
       if (!kd) {
-        try { kd = await PDFDocument.load(kaynaklar.get(s.kaynakId).bayt, { updateMetadata: false }); } catch (h) { throw new Error(`${kaynaklar.get(s.kaynakId).ad}: kaydedilemedi (${h.message}).`); }
+        try { kd = await PDFDocument.load(kaynaklar.get(s.kaynakId).bayt, { updateMetadata: false }); } catch (h) { throw new Error(`${kaynaklar.get(s.kaynakId).ad}: kaydedilemedi (${trHata(h)}).`); }
         kaynakDoc.set(s.kaynakId, kd);
       }
       if (kaliciKutu.checked && s.anot.some((a) => a.t === "yama")) {

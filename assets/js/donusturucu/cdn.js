@@ -13,6 +13,7 @@
  * -----------------------------------------------------------------------
  */
 
+import { hata as trHata } from "../core/hata-metni.js";
 export const KUTUPHANELER = {
   jszip: {
     paket: "jszip", surum: "3.10.2", dosya: "dist/jszip.min.js", global: "JSZip", lisans: "MIT veya GPL-3.0",
@@ -98,7 +99,7 @@ export function kutuphaneYukle(ad) {
           return globalThis[k.global];
         } catch (h) { sonHata = h; }
       }
-      throw new Error(`${k.paket} ${k.surum} yüklenemedi (internet bağlantını kontrol et). ${sonHata?.message || ""}`.trim());
+      throw new Error(`${k.paket} ${k.surum} yüklenemedi (internet bağlantını kontrol et). ${trHata(sonHata, "")}`.trim());
     })().catch((h) => { sozler.delete(ad); throw h; }));
   }
   return sozler.get(ad);

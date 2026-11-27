@@ -10,6 +10,7 @@
  */
 import { supabase } from "../core/supabase-client.js";
 import { aliciSeciciKur } from "./alici-secici.js";
+import { hata as trHata } from "../core/hata-metni.js";
 import {
   el, btn, boyutYaz, zamanYaz, gunGrubu, normalize, aramaKelimeleri, vurgulu,
   basHarfler, avatarSinifi, kategori, KATEGORI_IKON, trSirala, worker,
@@ -228,7 +229,7 @@ export function paylastiklarimGorunumuKur({ kok, eylemler, bildir, gonder, yetki
         try {
           const { url } = await worker("/indir", { id: d.id }); const r = await fetch(url); if (!r.ok) throw new Error("Dosya R2'den alınamadı.");
           const f = new File([await r.blob()], d.ad, { type: d.mime || "application/octet-stream" }); arsivDurum.textContent = "Şifrelenip gönderiliyor…"; gonder({ files: [f] });
-        } catch (h) { arsivDurum.textContent = h.message || "Alınamadı."; } finally { gonderBtn.disabled = false; }
+        } catch (h) { arsivDurum.textContent = trHata(h, "Alınamadı."); } finally { gonderBtn.disabled = false; }
       });
       li.append(ad, el("small", "ra-meta", boyutYaz(d.boyut)), gonderBtn); arsivListe.appendChild(li);
     });

@@ -9,6 +9,7 @@
 import { supabase } from "../core/supabase-client.js";
 import { AkisliZip, zipGirisleri, zipGirisOku } from "./zip-yazici.js";
 import { workerFetch, hataMetni, bugunDamga } from "./ortak.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const SIRA = ["profiles", "e2ee_kullanici_anahtarlari", "not_kasasi", "notlar", "not_ek_kayitlari", "akademik_kaynaklar", "akademik_koleksiyonlar", "akademik_koleksiyon_ogeleri", "akademik_notlar", "akademik_eklenti_ayarlari", "r2_arsiv", "taslak_icerikler", "special_content", "content_access", "yorumlar"];
 const SAYFA = { notlar: 25, akademik_kaynaklar: 100, akademik_notlar: 100, akademik_koleksiyonlar: 200, akademik_koleksiyon_ogeleri: 500, special_content: 50, taslak_icerikler: 50, messages: 200, yorumlar: 200 };
@@ -228,7 +229,7 @@ async function r2Yaz(zip, oturum, ilerleme, sinyal, ozet) {
       ozet.r2.bayt += kayit.boyut;
     } catch (h) {
       if (h?.name === "AbortError") throw h;
-      kayit.hata = String(h?.message || h);
+      kayit.hata = String(trHata(h));
       ozet.hatalar.push(`${d.kaynak}: ${d.anahtar} (${kayit.hata})`);
     }
     manifest.push(kayit);

@@ -10,6 +10,7 @@
 import { supabase } from "../core/supabase-client.js";
 import { dosyalariTopla, kuyrukKur } from "../r2-arsiv/yukleme.js";
 import { worker, boyutYaz } from "../r2-arsiv/ortak.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const GH = "https://abdullah-eymen-asru.github.io", PAGES = "https://abdullah-eymen-asru.pages.dev";
 const REZERVE = new Set(["assets", "panel", "icerik", "kurumsal", "blog", "d", "m", "feed", "sitemap", "robots", "api", "auth", "giris", "kayit", "projeler", "akademik", "iletisim"]);
@@ -74,22 +75,22 @@ async function kur() {
   let kuyruk = null;
   const kuyrukHazirla = () => kuyruk ||= kuyrukKur({ liste: kuyrukListe, ozet: kuyrukOzet, temizleBtn: kuyrukTemizle,
     baglam: () => ({ yukleyebilir: true, klasor: "Yazılar/", sifreli: false, alicilar: [], uid: null }),
-    bitti: async () => { const b = bekleyen; bekleyen = null; try { const yeni = await kaydetYuklenenleri(b?.adlar); b?.cozum?.(yeni); } catch (h) { bildir(h.message, true); b?.cozum?.([]); } } });
+    bitti: async () => { const b = bekleyen; bekleyen = null; try { const yeni = await kaydetYuklenenleri(b?.adlar); b?.cozum?.(yeni); } catch (h) { bildir(trHata(h), true); b?.cozum?.([]); } } });
   /** Dosyaları R2'ye yükler ve yazıya bağlar. adlar: Map(orijinal dosya adı → istenen adres adı). Çözüm: yeni kayıtlar. */
   async function yukleVeKaydet(dosyalar, adlar) {
     if (!hazirMi()) return [];
     if (bekleyen) { bildir("Önceki yükleme sürüyor; bitince tekrar dene.", true); return []; }
     bildir("Klasör hazırlanıyor…");
     const k = await supabase.rpc("r2_arsiv_klasor_olustur", { p_klasor_yolu: "", p_ad: "Yazılar" });
-    if (k.error && !/zaten var/i.test(k.error.message || "")) throw new Error(k.error.message);
+    if (k.error && !/zaten var/i.test(k.error.message || "")) throw new Error(trHata(k.error));
     const girdiler = (await dosyalariTopla({ files: dosyalar })).map((g) => ({ file: g.file, altYol: `${klasorAdi()}/` }));
     bildir("");
-    return new Promise((coz) => { bekleyen = { adlar, cozum: coz }; kuyrukHazirla().ekle(girdiler).catch((h) => { bekleyen = null; bildir(h.message || String(h), true); coz([]); }); });
+    return new Promise((coz) => { bekleyen = { adlar, cozum: coz }; kuyrukHazirla().ekle(girdiler).catch((h) => { bekleyen = null; bildir(trHata(h), true); coz([]); }); });
   }
   async function kaydetYuklenenleri(adlar = new Map()) {
     const k = anahtar();
     const { data: dosyalar, error } = await supabase.from("r2_arsiv").select("id,ad,boyut").eq("tur", "dosya").eq("sifreli", false).eq("durum", "hazir").eq("klasor_yolu", `Yazılar/${klasorAdi()}/`).limit(500);
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(trHata(error));
     const { data: mevcut } = await supabase.rpc("yazi_medya_listele", { p_yazi: k });
     const kayitli = new Set((mevcut || []).map((m) => m.arsiv_id)), kullanilan = new Set((mevcut || []).map((m) => m.dosya_ad.toLowerCase()));
     const yeniler = [];
@@ -97,7 +98,7 @@ async function kur() {
       if (kayitli.has(d.id)) continue;
       const istenen = adlar.get(d.ad) || d.ad, ad = dosyaAdiYap(istenen, kullanilan); kullanilan.add(ad.toLowerCase());
       const r = await supabase.rpc("yazi_medya_kaydet", { p_yazi: k, p_ad: ad, p_arsiv_id: d.id });
-      if (r.error) throw new Error(`${d.ad}: ${r.error.message}`); yeniler.push({ id: r.data, ad });
+      if (r.error) throw new Error(`${d.ad}: ${trHata(r.error)}`); yeniler.push({ id: r.data, ad });
     }
     bildir(yeniler.length ? `✔ ${yeniler.length} dosya yüklendi ve yazıya bağlandı.` : "Yeni dosya bulunamadı."); await listeYenile();
     return yeniler;
@@ -136,7 +137,7 @@ async function kur() {
     try {
       const adlar = new Map(hazir.map((h) => [h.file.name, h.girdi.value.trim() || h.file.name]));
       const yeni = await yukleVeKaydet(hazir.map((h) => h.file), adlar); if (yeni.length) { hazir = []; hazirCiz(); }
-    } catch (h) { bildir(h.message || String(h), true); } finally { yukleDugme.disabled = false; }
+    } catch (h) { bildir(trHata(h), true); } finally { yukleDugme.disabled = false; }
   });
 
   /* ---------- 4) yüklenenler ---------- */
@@ -198,7 +199,7 @@ async function kur() {
       const li = el("li", "ym-oge"), ust = el("div", "ym-oge-ust"), ad = el("span", "ym-oge-ad", `${ikon(k.dosya_ad)} ${k.dosya_ad}`);
       const adDegistir = dugme("✏️ Adı değiştir", "ym-kucuk", () => {
         const g = el("input", "ym-girdi"); g.type = "text"; g.value = k.dosya_ad; g.setAttribute("aria-label", "Yeni adres adı");
-        const kaydet = dugme("Kaydet", "ym-kucuk ym-birincil", async () => { const r = await supabase.rpc("yazi_medya_adlandir", { p_id: k.id, p_yeni_ad: dosyaAdiYap(g.value) }); if (r.error) bildir(r.error.message, true); else { bildir("✔ Ad değişti. Metinde eski adı kullandıysan güncelle."); await listeYenile(); } });
+        const kaydet = dugme("Kaydet", "ym-kucuk ym-birincil", async () => { const r = await supabase.rpc("yazi_medya_adlandir", { p_id: k.id, p_yeni_ad: dosyaAdiYap(g.value) }); if (r.error) bildir(trHata(r.error), true); else { bildir("✔ Ad değişti. Metinde eski adı kullandıysan güncelle."); await listeYenile(); } });
         const iptal = dugme("Vazgeç", "ym-kucuk", () => ciz()); ust.replaceChildren(g, kaydet, iptal); g.focus(); g.select();
       });
       ust.append(ad, el("small", "ym-soluk", boyutYaz(k.boyut)));
@@ -210,9 +211,9 @@ async function kur() {
         dugme("📋 pages.dev", "ym-kucuk", (e) => kopyala(genelUrl(k.dosya_ad, PAGES), e.currentTarget), { title: genelUrl(k.dosya_ad, PAGES) }), adDegistir,
         dugme("🗑 Sil", "ym-kucuk ym-tehlike", async () => {
           if (!window.confirm(`“${k.dosya_ad}” yazıdan kaldırılsın ve R2'den silinsin mi?\n\nBu işlem geri alınamaz. Metinde bu dosyayı kullandıysan o satırı da sil.`)) return;
-          try { const { data, error } = await supabase.rpc("yazi_medya_sil", { p_id: k.id }); if (error) throw new Error(error.message);
-            try { await worker("/sil", { id: data }); } catch (h) { bildir(`Kayıt kaldırıldı ama R2 dosyası silinemedi: ${h.message} (Dosya Yöneticisi'nden silebilirsin)`, true); }
-            await listeYenile(); } catch (h) { bildir(h.message, true); }
+          try { const { data, error } = await supabase.rpc("yazi_medya_sil", { p_id: k.id }); if (error) throw new Error(trHata(error));
+            try { await worker("/sil", { id: data }); } catch (h) { bildir(`Kayıt kaldırıldı ama R2 dosyası silinemedi: ${trHata(h)} (Dosya Yöneticisi'nden silebilirsin)`, true); }
+            await listeYenile(); } catch (h) { bildir(trHata(h), true); }
         }));
       li.append(ust, alt, ekleKutu); return li;
     }));
@@ -230,7 +231,7 @@ async function kur() {
     dg.addEventListener("change", async () => {
       const f = dg.files?.[0]; dg.value = ""; if (!f) return;
       try { yukle.disabled = true; const yeni = await yukleVeKaydet([f], new Map([[f.name, f.name]])); if (yeni[0]) alanaYaz(girdi, genelUrl(yeni[0].ad), ad); }
-      catch (h) { bildir(h.message || String(h), true); } finally { yukle.disabled = false; }
+      catch (h) { bildir(trHata(h), true); } finally { yukle.disabled = false; }
     });
     satir.append(yukle, sec, dg, el("small", "ym-soluk", "Ya da yukarıya bir bağlantı (https://…) yapıştır: Drive, Zotero, Zenodo vb."));
     girdi.insertAdjacentElement("afterend", satir);
@@ -286,7 +287,7 @@ async function kur() {
       const { data: a } = await supabase.rpc("r2_medya_ayar_oku"); let durum = a || { acik: true, gorsel_otomatik: true };
       const onay = (etiket, ipucu, anahtarAdi) => { const l = el("label", "ym-onay"), c = el("input"); c.type = "checkbox"; c.className = "ui-surgu"; c.setAttribute("data-ui-sessiz", ""); c.checked = durum[anahtarAdi] !== false;
         c.addEventListener("change", async () => { c.disabled = true; const r = await supabase.rpc("r2_medya_ayar_yaz", { p_acik: anahtarAdi === "acik" ? c.checked : null, p_gorsel_otomatik: anahtarAdi === "gorsel_otomatik" ? c.checked : null });
-          c.disabled = false; if (r.error) { c.checked = !c.checked; bildir(r.error.message, true); } else { durum = r.data; bildir("✔ Ayar kaydedildi (en geç 1 dakika içinde tüm ziyaretçilerde etkili olur)."); } });
+          c.disabled = false; if (r.error) { c.checked = !c.checked; bildir(trHata(r.error), true); } else { durum = r.data; bildir("✔ Ayar kaydedildi (en geç 1 dakika içinde tüm ziyaretçilerde etkili olur)."); } });
         const t = el("span"); t.append(el("strong", null, etiket), el("small", "ym-soluk", ` — ${ipucu}`)); l.append(c, t); return l; };
       ayarKutu.append(el("h4", "ym-baslik2", "🛡 Site sahibi: R2 kota koruması"),
         onay("Yazı medyası açık", "kapatırsan sitedeki görseller ve dosya adresleri R2'ye hiç istek göndermez (kota korunur).", "acik"),

@@ -9,6 +9,7 @@ import { workerAnahtarKarti } from "./worker-anahtarlari.js";
 import { supabase } from "../core/supabase-client.js";
 import { el, bayt, hataMetni, workerFetch, workerJson, dugme, ikon, VARSAYILAN_DB_KOTA, VARSAYILAN_R2_KOTA } from "./ortak.js";
 import { kotaAnaliziKarti } from "./kota-analitigi.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const KAYNAK_ADLARI = { arsiv: "Dosya Yöneticisi", akademik: "Akademik Kütüphane", notek: "Not ekleri" };
 
@@ -262,7 +263,7 @@ const sayiMetni = (n) => Number(n || 0).toLocaleString("tr-TR");
         el("p", { class: "muted sy-not", text: `Gün: ${g.gun} (UTC · Türkiye saatiyle 03:00'te sıfırlanır) · hata: ${sayiMetni(g.hata)} · alt-istek: ${sayiMetni(g.subistek)}${g.veri_zamani ? ` · veri zamanı: ${utcSaatMetni(g.veri_zamani)}` : ""}. Üstteki toplam, “Worker Kota Analitiği”ndeki bugünün (UTC) toplamıyla aynı kaynaktan gelir; betik dağılımı ayrı sorgudur ve örnekleme nedeniyle yaklaşık olabilir. Cloudflare panelindeki Worker kartları son 24 saati gösterir; burası UTC gününü.` }),
         g.scriptler?.length ? el("ul", { class: "sy-kota-liste" }, g.scriptler.map((x) => el("li", {}, el("span", { text: x.ad }), el("span", { class: "muted", text: sayiMetni(x.istek) })))) : null);
     } catch (h) {
-      govde.replaceChildren(el("p", { class: "auth-message error", text: `Kota okunamadı: ${h.message || h}` }));
+      govde.replaceChildren(el("p", { class: "auth-message error", text: `Kota okunamadı: ${trHata(h)}` }));
     } finally { yenile.disabled = false; }
   }
   yenile.addEventListener("click", yukle);
@@ -313,7 +314,7 @@ export async function depolamaCiz(kok) {
           el("p", { class: "muted sy-not", text: "Bu sayılar R2'nin kendisinden gelir; veritabanında kaydı olmayan artık dosyaları da içerir." })
         );
       } catch (h) {
-        tarananKutu.replaceChildren(el("p", { class: "auth-message error", text: `Tarama başarısız: ${h.message || h}` }));
+        tarananKutu.replaceChildren(el("p", { class: "auth-message error", text: `Tarama başarısız: ${trHata(h)}` }));
       } finally {
         tara.disabled = false;
       }

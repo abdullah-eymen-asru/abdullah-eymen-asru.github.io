@@ -152,7 +152,7 @@ export function jsonDenTablo(veri) {
 
 export function jsonDenCsv(metin, secenek = {}) {
   let veri;
-  try { veri = JSON.parse(String(metin).replace(BOM, "")); } catch (h) { throw new Error(`Geçersiz JSON: ${h.message}`); }
+  try { veri = JSON.parse(String(metin).replace(BOM, "")); } catch (h) { throw new Error(`Geçersiz JSON dosyası. İçeriği kontrol edip tekrar dene.`); }
   return csvYaz(jsonDenTablo(veri), secenek);
 }
 
@@ -231,7 +231,7 @@ function nesneDenXml(ad, deger, derinlik, cikti) {
 
 export function jsonDenXml(metin, { kok = "kok", oge = "oge" } = {}) {
   let veri;
-  try { veri = JSON.parse(String(metin).replace(BOM, "")); } catch (h) { throw new Error(`Geçersiz JSON: ${h.message}`); }
+  try { veri = JSON.parse(String(metin).replace(BOM, "")); } catch (h) { throw new Error(`Geçersiz JSON dosyası. İçeriği kontrol edip tekrar dene.`); }
   const cikti = ['<?xml version="1.0" encoding="UTF-8"?>'];
   const anahtarlar = veri !== null && typeof veri === "object" && !Array.isArray(veri)
     ? Object.keys(veri).filter((k) => !k.startsWith("@_") && k !== "#text") : [];

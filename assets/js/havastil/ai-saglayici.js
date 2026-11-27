@@ -5,6 +5,7 @@
  * Anahtar hiçbir hata mesajına, günlüğe ya da URL'ye yazılmaz (Gemini dâhil: anahtar URL'de değil, başlıkta gider).
  * Her istek yalnızca kullanıcı bir düğmeye bastığında yapılır; burada otomatik/arka plan çağrı YOKTUR.
  */
+import { hata as trHata } from "../core/hata-metni.js";
 export const SAGLAYICILAR = Object.freeze({
   gemini: { ad: "Google Gemini", kisa: "Gemini", oneri: ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-pro-latest"], varsayilan: "gemini-flash-latest", anahtarIpucu: "AIza… ile başlar (Google AI Studio)", yardim: "https://aistudio.google.com/apikey" },
   openai: { ad: "OpenAI (ChatGPT API)", kisa: "OpenAI", oneri: ["gpt-4o-mini", "gpt-4o"], varsayilan: "gpt-4o-mini", anahtarIpucu: "sk-… ile başlar", yardim: "https://platform.openai.com/api-keys" },
@@ -145,7 +146,7 @@ export async function modelleriListele({ saglayici, anahtar, sinyal }) {
     }
     adlar = [...new Set(adlar)].sort();
     return { liste: adlar.length ? adlar : oneri, canli: adlar.length > 0 };
-  } catch (h) { return { liste: oneri, canli: false, hata: h.message }; }
+  } catch (h) { return { liste: oneri, canli: false, hata: trHata(h) }; }
 }
 
 export { AiHatasi };

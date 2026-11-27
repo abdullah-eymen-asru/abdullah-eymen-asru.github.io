@@ -7,6 +7,7 @@
  * Tek istek (Open-Meteo, anahtarsız), yalnızca kutu AÇILINCA / "Yenile"ye basılınca. Cloudflare kotası harcanmaz. innerHTML yok.
  */
 import { el, olay } from "./ui-temel.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const MODELLER = [["ecmwf_ifs025", "ECMWF IFS"], ["icon_seamless", "DWD ICON"], ["gfs_seamless", "NOAA GFS"]];
 const KAYNAKLAR = [
@@ -66,7 +67,7 @@ export function dogrulamaKutusu({ konum, oku }) {
       const etiket = k.uyumYuzde >= 85 && k.sicFark <= 2 ? ["iyi", "Modeller uyumlu"] : k.uyumYuzde >= 65 ? ["orta", "Kısmen uyumlu"] : ["kotu", "Belirsiz: modeller ayrışıyor"];
       model.replaceChildren(el("strong", { text: "Çapraz kontrol (önümüzdeki 24 sa, konumun): " }), `3 bağımsız modelin yağış var/yok kararı %${k.uyumYuzde} uyumlu; ortalama sıcaklık farkı ${k.sicFark.toFixed(1)} °C. `, el("span", { class: `hv-rozet ${etiket[0]}`, text: etiket[1] }),
         el("ul", { class: "hv-dogrula-liste" }, ...k.modeller.map((m) => el("li", { text: `${m.ad}: toplam ${m.toplam.toFixed(1)} mm yağış · en yüksek ${m.enYuksekSic != null ? m.enYuksekSic.toFixed(1) : "—"} °C` }))));
-    } catch (h) { model.textContent = `Çapraz kontrol yapılamadı: ${h.message}`; }
+    } catch (h) { model.textContent = `Çapraz kontrol yapılamadı: ${trHata(h)}`; }
     calisiyor = false;
   }
   olay(kutu, "toggle", () => { if (kutu.open) doldur(); });

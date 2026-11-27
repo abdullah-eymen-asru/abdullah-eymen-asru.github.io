@@ -10,6 +10,7 @@
  *  • innerHTML yok (CSP + XSS); metinler textContent.
  */
 import { demoBildir, demoCikisYap, demoUyeMi, ozellikAcikMi } from "./demo-durum.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const KRITIK = [
   "#ra-yukle-dosya", "#ra-yukle-klasor", "#ra-klasor-yeni", "#ra-secim-sil",
@@ -112,7 +113,7 @@ function zipKartiKur() {
       }
       sonuc.replaceChildren(el("p", { class: "muted", text: `${zip.girisler.length} öğe (yalnızca okunur; hiçbir şey çıkarılmaz/kaydedilmez):` }), liste);
     } catch (h) {
-      sonuc.textContent = "Örnek paket açılamadı: " + (h?.message || h);
+      sonuc.textContent = "Örnek paket açılamadı: " + (trHata(h));
     } finally {
       btn.disabled = false;
     }

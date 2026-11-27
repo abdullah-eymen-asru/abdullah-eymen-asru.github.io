@@ -13,6 +13,7 @@
  *    gerekir (_layouts/default.html ve _headers'a eklendi). Eklenmemişse PDF.js ana iş parçacığında çalışır (yavaş ama çalışır).
  */
 import { supabase, MOTOR_VARSAYILAN } from "./ortak.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const SURUM_RE = /^\d+\.\d+\.\d+$/;
 const EN_AZ_ANA_SURUM = 4;
@@ -136,7 +137,7 @@ export async function surumListesiGetir({ zorla = false } = {}) {
     try { localStorage.setItem(LISTE_ONBELLEK, JSON.stringify({ t, surumler, en_yeni })); } catch { /* depo kapalı */ }
     return { surumler, en_yeni, kaynak: "canli", cekildi: new Date(t).toISOString(), url: SURUM_API_URL, sureMs: Math.round(performance.now() - basla) };
   } catch (h) {
-    const hata = h?.name === "AbortError" ? "Zaman aşımı (8 sn): jsDelivr'e ulaşılamadı." : h?.message || String(h);
+    const hata = h?.name === "AbortError" ? "Zaman aşımı (8 sn): jsDelivr'e ulaşılamadı." : trHata(h);
     if (onb) return { surumler: onb.surumler, en_yeni: onb.en_yeni || onb.surumler[0] || null, kaynak: "onbellek", cekildi: new Date(onb.t).toISOString(), url: SURUM_API_URL, sureMs: 0, hata };
     throw new Error(hata);
   } finally {
@@ -302,7 +303,7 @@ export async function surumuDene(surum) {
       if (sayfa !== 1) throw new Error("Sınama PDF'i beklenen sayfa sayısıyla açılmadı.");
       return { ok: true, surum, gercekSurum: m.version || null, taban, cdn: new URL(taban).hostname, legacy: !!dizin, sayfa, sureMs: Math.round(performance.now() - basla) };
     } catch (h) {
-      sonHata = h?.message || String(h);
+      sonHata = trHata(h);
       try { await gorev?.destroy(); } catch { /* yok say */ }
     }
   }
@@ -312,5 +313,5 @@ export async function surumuDene(surum) {
 /** Site varsayılanını (herkes için "Otomatik") değiştirir — yalnızca Site Sahibi (RPC de kontrol eder). */
 export async function surumuSabitle(pdfjs, pdflib = null) {
   const { error } = await supabase.rpc("owner_akademik_okuyucu_surumu_ayarla", { p_pdfjs: pdfjs, p_pdflib: pdflib });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(trHata(error));
 }

@@ -13,6 +13,7 @@
  * Ayar biçimi: { v:1, acik:[id,…], ayar:{ [id]:{…} }, ozel:[{id, ad, simge, url}] }
  */
 import { supabase } from "./ortak.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const YEREL_ANAHTAR = "aea_ak_eklenti_v1";
 const ZAMAN_ASIMI = 12000;
@@ -98,7 +99,7 @@ export const cihazCeviriVarMi = () => typeof self !== "undefined" && "Translator
  *  ayar kapalıyken bu yol HİÇ çağrılmaz. sinyal: AbortSignal (eski isteği iptal etmek için). */
 export async function ceviriYap(metin, { kaynak = "auto", hedef = "tr", motor = "auto", otomatik = false, sinyal = undefined } = {}) {
   const hatalar = [];
-  const dene = async (ad, fn) => { try { return await fn(); } catch (h) { if (sinyal?.aborted) throw h; hatalar.push(`${ad}: ${h.name === "AbortError" ? "zaman aşımı" : h.message}`); return null; } };   // dışarıdan iptal edilmişse diğer motoru DENEME
+  const dene = async (ad, fn) => { try { return await fn(); } catch (h) { if (sinyal?.aborted) throw h; hatalar.push(`${ad}: ${h.name === "AbortError" ? "zaman aşımı" : trHata(h)}`); return null; } };   // dışarıdan iptal edilmişse diğer motoru DENEME
   const onayAl = () => {
     if (cevirRizasiVarMi()) return true;
     if (typeof window.confirm === "function" && window.confirm(RIZA_METNI)) { cevirRizasiVer(); return true; }
@@ -168,7 +169,7 @@ async function crossrefDogrula(doi) {
     const m = j?.message, baslik = (m?.title || [])[0] || "(başlıksız)", yil = m?.issued?.["date-parts"]?.[0]?.[0] || m?.created?.["date-parts"]?.[0]?.[0] || "";
     return { ok: true, metin: `✓ Doğrulandı: ${baslik}${yil ? ` (${yil})` : ""}${m?.["container-title"]?.[0] ? ` — ${m["container-title"][0]}` : ""}` };
   } catch (h) {
-    return { ok: false, metin: /404/.test(h.message) ? "✗ Crossref'te bu DOI yok. Hatalı kopyalanmış olabilir ya da DOI başka bir kayıt kurumunda (örn. DataCite) kayıtlıdır." : `Doğrulanamadı: ${h.message}` };
+    return { ok: false, metin: /404/.test(h.message) ? "✗ Crossref'te bu DOI yok. Hatalı kopyalanmış olabilir ya da DOI başka bir kayıt kurumunda (örn. DataCite) kayıtlıdır." : `Doğrulanamadı: ${trHata(h)}` };
   }
 }
 
@@ -298,10 +299,10 @@ export async function ayarKaydet(a) {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       const { error } = await supabase.from("akademik_eklenti_ayarlari").upsert({ user_id: user.id, ayar: onbellek, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
-      if (error) return { bulut: false, hata: error.message };
+      if (error) return { bulut: false, hata: trHata(error) };
     }
     return { bulut: true };
-  } catch (h) { return { bulut: false, hata: h.message }; }
+  } catch (h) { return { bulut: false, hata: trHata(h) }; }
 }
 
 /* ------------------------------ çalıştırma ------------------------------ */

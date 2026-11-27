@@ -15,6 +15,7 @@ import { el, kart, bolumBasligi, ipucu, olay } from "./ui-temel.js";
 import { surgu } from "./ui-surgu.js";
 import { workerSaglik } from "./openmeteo.js";
 import { hkAyar, hkAyarKaydet, hkTercihOku, hkTercihYaz, kendiOpenaqDurumu, kendiOpenaqKaydet, kendiOpenaqSil, kaynakTesti, siteAnahtarDurumu, siteAnahtarKaydet, siteAnahtarSil, SAGLAYICI_ADI, hkOnbellekSifirla } from "./hava-kaynak.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const KAYNAK_BILGI = {
   mgm: { ad: "Meteoroloji Genel Müdürlüğü (MGM)", aciklama: "Türkiye'de ilçene en yakın MGM istasyonunun resmî ölçümü (sıcaklık, nem, rüzgâr, basınç, yağış). Yalnızca Türkiye'de çalışır. MGM'nin herkese açık, belgelenmiş bir arayüzü yok; bu yüzden önce aşağıdaki testle değerlerini mgm.gov.tr ile karşılaştır, sonra aç." },
@@ -50,10 +51,10 @@ export function havaKaynaklariKarti(d, kb) {
     const kaydet = olay(el("button", { type: "button", class: "hv-btn hv-btn-birincil hv-btn-ince", text: k.var ? "Anahtarı değiştir" : "Anahtarı kaydet" }), "click", async () => {
       kaydet.disabled = true;
       try { await kendiOpenaqKaydet(alan.value); alan.value = ""; mesaj("Anahtarın şifreli olarak kaydedildi; yalnızca senin hesabında kullanılacak."); await anahtarCiz(); }
-      catch (h) { mesaj(h.message, true); } finally { kaydet.disabled = false; }
+      catch (h) { mesaj(trHata(h), true); } finally { kaydet.disabled = false; }
     });
     const sil = k.var ? olay(el("button", { type: "button", class: "hv-btn hv-btn-tehlike hv-btn-ince", text: "Anahtarımı sil" }), "click", async () => {
-      try { await kendiOpenaqSil(); mesaj("Anahtarın silindi; sitenin ortak anahtarı (varsa) kullanılacak."); await anahtarCiz(); } catch (h) { mesaj(h.message, true); }
+      try { await kendiOpenaqSil(); mesaj("Anahtarın silindi; sitenin ortak anahtarı (varsa) kullanılacak."); await anahtarCiz(); } catch (h) { mesaj(trHata(h), true); }
     }) : null;
     const izin = a.kendi_anahtar_izni !== false;
     anahtarKutu.replaceChildren(
@@ -74,7 +75,7 @@ export function havaKaynaklariKarti(d, kb) {
       testKutu.replaceChildren(...rows.map((r) => el("div", { class: `satir ${r.durum === "ok" ? "ok" : r.durum === "hata" ? "hata" : ""}` },
         el("span", { "aria-hidden": "true", text: r.durum === "ok" ? "✅" : r.durum === "hata" ? "❌" : "⏭️" }),
         el("div", {}, el("strong", { text: r.ad }), el("small", { text: `${r.durum === "ok" ? "Çalışıyor" : r.durum === "hata" ? "Çalışmadı" : "Atlandı"}${r.ms ? ` · ${r.ms} ms` : ""} — ${r.ayrinti}` })))));
-    } catch (h) { mesaj(`Test yapılamadı: ${h.message}`, true); }
+    } catch (h) { mesaj(`Test yapılamadı: ${trHata(h)}`, true); }
     finally { testDugme.disabled = false; testDugme.textContent = "Kaynakları şu konumda test et"; }
   });
   herkes.append(el("div", { class: "hv-hvk-alt" }, el("h4", { class: "hv-hvk-alt-baslik", text: "Bağlantı testi" }), el("p", { class: "hv-ipucu", text: "Seçili konum için her kaynağı dener; hangisinin çalıştığını ve ne kadar sürede yanıt verdiğini gösterir." }), testDugme, testKutu));
@@ -93,7 +94,7 @@ export function havaKaynaklariKarti(d, kb) {
     const degistir = async (mut, onay) => {
       const yeni = { ...ayar, gozlem_acik: { ...ayar.gozlem_acik }, gozlem_sira: [...ayar.gozlem_sira] }; mut(yeni);
       try { await hkAyarKaydet(yeni); ayar = await hkAyar(true); mesaj(`${onay || "Kaydedildi."} Tüm kullanıcılar için bir sonraki veri yenilemesinde geçerli olur.`); }
-      catch (h) { mesaj(`Kaydedilemedi: ${h.message}`, true); throw h; }
+      catch (h) { mesaj(`Kaydedilemedi: ${trHata(h)}`, true); throw h; }
     };
     const kutu = el("div", { class: "hv-hvk-yonetim" });
     const migrasyonUyari = ayar.migrasyonYok ? el("p", { class: "hv-uyari", text: "Sistem ayar tablosu kurulu değil: Supabase'de 0146 ve 0147 numaralı hava kaynağı SQL dosyalarını çalıştır. O zamana kadar varsayılanlar geçerlidir ve değişiklik kaydedilemez." }) : null;
@@ -141,11 +142,11 @@ export function havaKaynaklariKarti(d, kb) {
       const kaydet = olay(el("button", { type: "button", class: "hv-btn hv-btn-birincil hv-btn-ince", text: d2.var ? "Doğrula ve değiştir" : "Doğrula ve kaydet", disabled: !sifreVar }), "click", async () => {
         kaydet.disabled = true; kaydet.textContent = "Doğrulanıyor…";
         try { const j = await siteAnahtarKaydet(girdi.value); girdi.value = ""; mesaj(`Site anahtarı OpenAQ'da doğrulandı ve şifreli kaydedildi (…${j.son4 || ""}). Bu sayfa anahtarı bir daha göstermez.`); ayar = await hkAyar(true); await siteAnahtarCiz(); }
-        catch (h) { mesaj(h.message, true); kaydet.disabled = false; kaydet.textContent = d2.var ? "Doğrula ve değiştir" : "Doğrula ve kaydet"; }
+        catch (h) { mesaj(trHata(h), true); kaydet.disabled = false; kaydet.textContent = d2.var ? "Doğrula ve değiştir" : "Doğrula ve kaydet"; }
       });
       const sil = d2.var ? olay(el("button", { type: "button", class: "hv-btn hv-btn-tehlike hv-btn-ince", text: "Site anahtarını sil" }), "click", async () => {
         if (!window.confirm("Site anahtarı silinsin mi? Kullanıcılar kendi anahtarını girmediyse hava kalitesi tahmin modeline döner.")) return;
-        try { const j = await siteAnahtarSil(); mesaj(j.env_anahtari_var ? "Kayıtlı anahtar silindi; Worker'daki OPENAQ_API_KEY secret'ı devrede kalır." : "Site anahtarı silindi."); ayar = await hkAyar(true); await siteAnahtarCiz(); } catch (h) { mesaj(h.message, true); }
+        try { const j = await siteAnahtarSil(); mesaj(j.env_anahtari_var ? "Kayıtlı anahtar silindi; Worker'daki OPENAQ_API_KEY secret'ı devrede kalır." : "Site anahtarı silindi."); ayar = await hkAyar(true); await siteAnahtarCiz(); } catch (h) { mesaj(trHata(h), true); }
       }) : null;
       const rozet = d2.var ? el("p", { class: "hv-hvk-anahtar-durum var" }, el("span", { "aria-hidden": "true", text: "🔒" }), el("span", { text: ` Kayıtlı ve şifreli · …${d2.son4 || "****"}${d2.guncelleme ? ` · ${tarihYaz(d2.guncelleme)}` : ""}` }))
         : envVar ? el("p", { class: "hv-hvk-anahtar-durum var" }, el("span", { "aria-hidden": "true", text: "🔒" }), el("span", { text: " Worker secret'ı olarak tanımlı (OPENAQ_API_KEY). Buradan yeni anahtar girersen o öncelikli olur." }))
@@ -167,7 +168,7 @@ export function havaKaynaklariKarti(d, kb) {
             el("li", { text: "Anahtarı değiştirmek için yenisini yazıp “Doğrula ve değiştir”e bas. Sağlayıcıyı değiştirmek için ilgili kaynağı yukarıdan kapat; yeni sağlayıcı eklenene kadar tahmin modeli devrede kalır." }),
             el("li", { text: "Anahtar önceliği: kullanıcının kendi anahtarı → burada girilen site anahtarı → Worker'daki OPENAQ_API_KEY secret'ı → tahmin modeli." }))));
     }
-    siteAnahtarCiz().catch((h) => mesaj(`Site anahtarı durumu okunamadı: ${h.message}`, true));
+    siteAnahtarCiz().catch((h) => mesaj(`Site anahtarı durumu okunamadı: ${trHata(h)}`, true));
     void anahtarDurum;
 
     kutu.append(
@@ -185,7 +186,7 @@ export function havaKaynaklariKarti(d, kb) {
     yonetimKutu.replaceChildren(kutu);
   }
   yonetimCiz().catch(() => { /* yönetici değilse sessiz */ });
-  anahtarCiz().catch((h) => mesaj(`Anahtar durumu okunamadı: ${h.message}`, true));
+  anahtarCiz().catch((h) => mesaj(`Anahtar durumu okunamadı: ${trHata(h)}`, true));
   void kb; void hkOnbellekSifirla; void SAGLAYICI_ADI;
   return kok;
 }

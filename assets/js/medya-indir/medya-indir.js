@@ -11,6 +11,7 @@ import { ilerlemeKur, lameYukle, sesCoz, monoOrnekle, mp3Kodla, sleep } from "..
 import { sekmeSifirlamaKaydet } from "../core/gezinme-kilidi.js";
 import { sunucuyuTemizle } from "../donusturucu/sunucu-donustur.js";
 import { kotaPaneli, kaynakSecici } from "../medya-kota/medya-kota.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const kok = document.getElementById("mi-kok");
 const WORKER = "https://medya-indirici-worker.aeymena.workers.dev";
@@ -73,7 +74,7 @@ async function kur() {
         const a = el("a", { href: url, rel: "noopener noreferrer" }); a.setAttribute("download", ad); document.body.append(a); a.click(); a.remove();
         bildir("İndirme tarayıcı tarafından başlatıldı (ilerleme bu kaynakta gösterilemiyor). Başlamazsa aşağıdaki bağlantıyı kullan.");
         sonuc.append(el("a", { class: "md-btn", href: url, target: "_blank", rel: "noopener noreferrer", text: "Başlamadıysa: bağlantıyı yeni sekmede aç" }));
-      } else bildir(h?.message || "İndirme başarısız.", true);
+      } else bildir(trHata(h, "İndirme başarısız."), true);
     } finally { dugme.disabled = false; }
   }
   function ffmpegKutusu(url) {
@@ -114,7 +115,7 @@ async function kur() {
       if (!r.ok) throw new Error(j.kapali ? "Medya indirici servisi Site Sahibi tarafından geçici olarak kapatılmış." : (j.hata || j.error || `Hizmet hatası (${r.status}).`));
       if (j.kota) kota.yenile(j.kota);
       sonucuGoster(j);
-    } catch (h) { ilr.bitir(); bildir(h.message || "İşlem başarısız.", true); kota.yenile(); }
+    } catch (h) { ilr.bitir(); bildir(trHata(h, "İşlem başarısız."), true); kota.yenile(); }
     finally { dugme.disabled = false; }
   }
   dugme.addEventListener("click", hazirla);

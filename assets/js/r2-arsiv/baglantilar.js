@@ -8,6 +8,7 @@
 import { supabase } from "../core/supabase-client.js";
 import { el, btn, boyutYaz, tarihYaz } from "./ortak.js";
 import { dosyalariTopla, kuyrukKur } from "./yukleme.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const BIRIMLER = [["dk", "dakika", 60], ["sa", "saat", 3600], ["g", "gün", 86400], ["ay", "ay", 2592000], ["y", "yıl", 31536000]];
 const HAZIR = [["1s", "1 saat", 3600], ["1g", "1 gün", 86400], ["7g", "7 gün", 7 * 86400], ["30g", "30 gün", 30 * 86400], ["1y", "1 yıl", 365 * 86400], ["sinirsiz", "Sınırsız (kendim kapatana kadar)", null]];
@@ -32,7 +33,7 @@ export function baglantilarGorunumuKur({ kok, bildir, yonetici = false }) {
   }
   async function listeYukle() {
     const { data, error } = await supabase.rpc("r2_baglanti_listele", { p_ara: ara || null });
-    if (error) throw new Error(/does not exist|schema cache/i.test(error.message) ? "Bağlantı sistemi kurulu değil (Supabase: 0123_r2_paylasim_baglantilari.sql)." : error.message);
+    if (error) throw new Error(/does not exist|schema cache/i.test(error.message) ? "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene." : trHata(error));
     liste = data || [];
     try { const { data: k } = await supabase.rpc("r2_baglanti_klasor_listele"); klasorler = (k || []).map((x) => x.yol).filter(Boolean); } catch { klasorler = []; }
     // Arşivdeki klasörler de aynı ağaçta görünür (Arşiv ↔ Bağlantılar aynı klasör mantığı)
@@ -58,13 +59,13 @@ export function baglantilarGorunumuKur({ kok, bildir, yonetici = false }) {
   function listeGorunumu() {
     const kap = el("div");
     const arama = el("input", "ra-ara-girdi"); arama.type = "search"; arama.placeholder = "Bağlantılarda ara (ad, açıklama, dosya adı)…"; arama.value = ara; arama.setAttribute("aria-label", "Bağlantılarda ara");
-    let z; arama.addEventListener("input", () => { clearTimeout(z); z = setTimeout(async () => { ara = arama.value.trim(); try { await listeYukle(); ciz(); } catch (h) { bildir(h.message); } }, 250); });
+    let z; arama.addEventListener("input", () => { clearTimeout(z); z = setTimeout(async () => { ara = arama.value.trim(); try { await listeYukle(); ciz(); } catch (h) { bildir(trHata(h)); } }, 250); });
     const yeni = btn("＋ Yeni bağlantı", "ra-btn ra-btn-birincil", () => olustur());
     const yeniKlasor = btn("📁 Yeni klasör", "ra-btn", async () => {
       const ad = window.prompt(`Yeni klasör adı${yol ? ` (“${yol}” içinde)` : ""}:`); if (ad === null || !ad.trim()) return;
       const tam = yol ? `${yol}/${ad.trim().replace(/\//g, "-")}` : ad.trim().replace(/\//g, "-");
       const { error } = await supabase.rpc("r2_baglanti_klasor_ekle", { p_yol: tam });
-      if (error) return bildir(error.message);
+      if (error) return bildir(trHata(error));
       // Aynı yol Arşiv'de de açılır (yetkin yoksa sessizce atlanır)
       let ust = ""; for (const parca of tam.split("/")) { try { await supabase.rpc("r2_arsiv_klasor_olustur", { p_klasor_yolu: ust, p_ad: parca }); } catch { /* var/yetki yok */ } ust += `${parca}/`; }
       await yenile();
@@ -104,7 +105,7 @@ export function baglantilarGorunumuKur({ kok, bildir, yonetici = false }) {
         radyo(false, "Bağlantıları koru: bir üst klasöre taşı", true), radyo(true, "Bağlantıları da sil (adresler çalışmaz olur)", false));
       dialogAc("Klasörü sil", kutu, "Klasörü sil", async () => {
         const { error } = await supabase.rpc("r2_baglanti_klasor_sil", { p_yol: k, p_baglantilari_sil: sec.sil });
-        if (error) throw new Error(error.message);
+        if (error) throw new Error(trHata(error));
         if (yol === k || yol.startsWith(`${k}/`)) yol = k.includes("/") ? k.slice(0, k.lastIndexOf("/")) : "";
         await yenile();
       });
@@ -139,14 +140,14 @@ export function baglantilarGorunumuKur({ kok, bildir, yonetici = false }) {
     li.append(govde, islem);
     return li;
   }
-  async function yenile() { try { await listeYukle(); } catch (h) { bildir(h.message); } ciz(); }
+  async function yenile() { try { await listeYukle(); } catch (h) { bildir(trHata(h)); } ciz(); }
   async function guncelle(b, { iptal }) {
     const { error } = await supabase.rpc("r2_baglanti_guncelle", { p_id: b.id, p_ad: b.ad, p_aciklama: b.aciklama, p_bitis_degistir: false, p_bitis: null, p_iptal: iptal });
-    if (error) return bildir(error.message); await yenile();
+    if (error) return bildir(trHata(error)); await yenile();
   }
   async function sil(b) {
     if (!window.confirm(`“${b.ad}” bağlantı kaydı silinsin mi? (Bağlantı çalışmaz olur; dosya SİLİNMEZ.)\nGeçmişi korumak için silmek yerine ⏸ ile iptal edebilirsin.`)) return;
-    const { error } = await supabase.from("r2_baglantilari").delete().eq("id", b.id); if (error) return bildir(error.message); await yenile();
+    const { error } = await supabase.from("r2_baglantilari").delete().eq("id", b.id); if (error) return bildir(trHata(error)); await yenile();
   }
 
   /** Eski "R2 Dosya Paylaşımı": herhangi bir R2 yolu için geçici imzalı link (S3 kuralı: en çok 7 gün). Aynı Worker (/imza) kullanılır. */
@@ -164,7 +165,7 @@ export function baglantilarGorunumuKur({ kok, bildir, yonetici = false }) {
         const { imzaliLinkUret } = await import("../dosya-paylasim.js");
         const r = await imzaliLinkUret(key.value.trim(), { expiresIn: sn }); const link = r?.url || r?.downloadUrl;
         if (!link) throw new Error("Worker bağlantı döndürmedi (adres/sürüm?)."); sonuc.value = link; sonuc.hidden = false; sonuc.select(); mesaj.textContent = "Link üretildi; kopyalayabilirsin.";
-      } catch (h) { mesaj.textContent = h.message; }
+      } catch (h) { mesaj.textContent = trHata(h); }
     });
     const satir = el("div", "ra-satir-ici"); satir.append(sayi, birim, uret); d.append(key, satir, sonuc, mesaj); return d;
   }
@@ -199,7 +200,7 @@ export function baglantilarGorunumuKur({ kok, bildir, yonetici = false }) {
     const hata = el("p", "ra-hata"); hata.hidden = true;
     const tamam = btn(onayMetin, "ra-btn ra-btn-birincil"); tamam.type = "submit"; const iptal = btn("Vazgeç", "ra-btn", () => dl.close());
     form.append(el("h3", null, baslik), govdeEl, hata, el("div", "ra-dlg-alt")); form.lastChild.append(iptal, tamam); dl.append(form); document.body.append(dl);
-    form.addEventListener("submit", async (e) => { e.preventDefault(); hata.hidden = true; tamam.disabled = true; try { await onay(); dl.close(); } catch (h) { hata.textContent = h.message || String(h); hata.hidden = false; } finally { tamam.disabled = false; } });
+    form.addEventListener("submit", async (e) => { e.preventDefault(); hata.hidden = true; tamam.disabled = true; try { await onay(); dl.close(); } catch (h) { hata.textContent = trHata(h); hata.hidden = false; } finally { tamam.disabled = false; } });
     dl.addEventListener("close", () => dl.remove()); dl.showModal(); return dl;
   }
   const alan = (etiket, girdi) => { const l = el("label", "ra-alan"); l.append(el("span", "ra-meta", etiket), girdi); return l; };
@@ -249,7 +250,7 @@ export function baglantilarGorunumuKur({ kok, bildir, yonetici = false }) {
         if (k.error && !/zaten var/i.test(k.error.message || "")) throw new Error(`Klasör hazırlanamadı: ${k.error.message}`);
         try { await supabase.rpc("r2_baglanti_klasor_ekle", { p_yol: "Paylaşımlar" }); } catch { /* 0125 yoksa sorun değil */ }
         await kuyruk.ekle(await dosyalariTopla({ files: dosyaGirdi.files }));
-      } catch (h) { yuklemeOzet.hidden = false; yuklemeOzet.textContent = h.message; }
+      } catch (h) { yuklemeOzet.hidden = false; yuklemeOzet.textContent = trHata(h); }
       dosyaGirdi.value = "";
     });
 
@@ -275,10 +276,10 @@ export function baglantilarGorunumuKur({ kok, bildir, yonetici = false }) {
       for (const d of secilenler) {
         const bAd = cok ? (ad.value.trim() ? `${ad.value.trim()} – ${d.ad}` : d.ad) : (ad.value.trim() || d.ad);
         const { data, error } = await supabase.rpc("r2_baglanti_olustur", { p_dosya_id: d.id, p_ad: bAd, p_aciklama: acik.value, p_bitis: s.bitis });
-        if (error) throw new Error(`${d.ad}: ${error.message}${sayac ? ` (${sayac} bağlantı oluşturuldu)` : ""}`);
+        if (error) throw new Error(`${d.ad}: ${trHata(error)}${sayac ? ` (${sayac} bağlantı oluşturuldu)` : ""}`);
         sayac++; const slug = data?.[0]?.slug; ilkSlug = ilkSlug || slug;
         const hedef = kl === "__oto__" ? ((d.klasor_yolu || "").replace(/\/+$/, "") || null) : kl;   // otomatik: dosyanın arşivdeki klasörü
-        if (hedef && data?.[0]?.id) { const r = await supabase.rpc("r2_baglanti_tasi", { p_id: data[0].id, p_klasor: hedef }); if (r.error) throw new Error(r.error.message); }
+        if (hedef && data?.[0]?.id) { const r = await supabase.rpc("r2_baglanti_tasi", { p_id: data[0].id, p_klasor: hedef }); if (r.error) throw new Error(trHata(r.error)); }
       }
       bildir(`${sayac} bağlantı oluşturuldu.`, "ok"); altSekme = "liste"; if (kl && kl !== "__oto__") yol = kl; await yenile();
       const ilk = aktifAlanlar()[0]; if (ilk && ilkSlug && sayac === 1) await panoyaKopyala(adres(ilk, ilkSlug));
@@ -298,7 +299,7 @@ export function baglantilarGorunumuKur({ kok, bildir, yonetici = false }) {
     adresleriCiz();
     const sifirla = btn("🔄 Adresleri sıfırla (eski linkler çalışmaz)", "ra-btn ra-btn-tehlike", async () => {
       if (!window.confirm("Adres sıfırlansın mı?\n\nYeni, tahmin edilemez bir adres üretilir. ESKİ adres (daha önce kimlere gönderdiysen) artık ÇALIŞMAZ. Dosya ve ayarlar değişmez.")) return;
-      const { data, error } = await supabase.rpc("r2_baglanti_sifirla", { p_id: b.id }); if (error) { adresMesaj.textContent = error.message; return; }
+      const { data, error } = await supabase.rpc("r2_baglanti_sifirla", { p_id: b.id }); if (error) { adresMesaj.textContent = trHata(error); return; }
       b.slug = data; adresleriCiz(); adresMesaj.textContent = "Adres yenilendi; eski adres artık çalışmıyor. Yeni adresleri paylaşabilirsin."; await listeYukle().catch(() => {}); ciz();
     });
     const govde = el("div", "ra-dlg-govde"); govde.append(alan("Bağlantı adı", ad), alan("Açıklama", acik), alan("Klasör", klasor.kok), alan("Geçerlilik", sure.kok),
@@ -306,8 +307,8 @@ export function baglantilarGorunumuKur({ kok, bildir, yonetici = false }) {
     dialogAc("Bağlantıyı düzenle", govde, "Kaydet", async () => {
       const s = sure.deger(), kl = klasor.deger();
       const { error } = await supabase.rpc("r2_baglanti_guncelle", { p_id: b.id, p_ad: ad.value, p_aciklama: acik.value, p_bitis_degistir: s.degistir, p_bitis: s.bitis, p_iptal: null });
-      if (error) throw new Error(error.message);
-      if ((kl || null) !== (b.klasor || null)) { const r = await supabase.rpc("r2_baglanti_tasi", { p_id: b.id, p_klasor: kl }); if (r.error) throw new Error(r.error.message); }
+      if (error) throw new Error(trHata(error));
+      if ((kl || null) !== (b.klasor || null)) { const r = await supabase.rpc("r2_baglanti_tasi", { p_id: b.id, p_klasor: kl }); if (r.error) throw new Error(trHata(r.error)); }
       await yenile();
     });
   }
@@ -331,12 +332,12 @@ export function baglantilarGorunumuKur({ kok, bildir, yonetici = false }) {
     ciz2();
     const ekle = btn("＋ Alan adı ekle", "ra-btn", () => { alanlar.push({ ad: "Kendi alan adım", url: "https://", aktif: true }); ciz2(); }); ekle.disabled = !yonetici;
     const kaydet = btn("Kaydet", "ra-btn ra-btn-birincil", async () => {
-      try { const { error } = await supabase.rpc("r2_baglanti_ayar_kaydet", { p_alan_adlari: alanlar, p_varsayilan: varsayilan.value }); if (error) throw new Error(error.message); await ayarYukle(); dur.textContent = "Kaydedildi."; } catch (h) { dur.textContent = h.message; }
+      try { const { error } = await supabase.rpc("r2_baglanti_ayar_kaydet", { p_alan_adlari: alanlar, p_varsayilan: varsayilan.value }); if (error) throw new Error(trHata(error)); await ayarYukle(); dur.textContent = "Kaydedildi."; } catch (h) { dur.textContent = trHata(h); }
     }); kaydet.disabled = !yonetici; varsayilan.disabled = !yonetici;
     kap.append(satirlarKap, ekle, alan("Yeni bağlantılar için varsayılan süre", varsayilan), kaydet, dur);
     if (!yonetici) kap.append(el("p", "ra-meta", "Alan adlarını yalnızca site sahibi ve yöneticiler değiştirebilir."));
     return kap;
   }
 
-  return { async yukle() { if (ilkYukleme) { await ayarYukle(); ilkYukleme = false; } try { await listeYukle(); } catch (h) { bildir(h.message); } ciz(); }, olustur };
+  return { async yukle() { if (ilkYukleme) { await ayarYukle(); ilkYukleme = false; } try { await listeYukle(); } catch (h) { bildir(trHata(h)); } ciz(); }, olustur };
 }

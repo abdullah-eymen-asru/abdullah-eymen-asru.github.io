@@ -9,6 +9,7 @@ import { vurgula } from "./vurgu.js";
 import { mdDenHtml } from "./belge-oku.js";
 import { temizHtml, metinDenHtml } from "./temizle.js";
 import { csvAyristir } from "./motor-veri.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 const VURGU_SINIRI = 250_000;
 
@@ -55,7 +56,7 @@ export function metinDuzenleyiciKur(kap, { metin = "", tur = "txt", dil = "duz",
       } else if (tur === "json") {
         bos(onizleme);
         try { JSON.parse(v); onizleme.append(el("p", { class: "dn-iyi", text: "✓ Geçerli JSON" })); durum.textContent = "Geçerli JSON"; }
-        catch (h) { onizleme.append(el("p", { class: "dn-hata-metin", text: `✗ ${h.message}` })); durum.textContent = "Geçersiz JSON"; }
+        catch (h) { onizleme.append(el("p", { class: "dn-hata-metin", text: `✗ ${trHata(h)}` })); durum.textContent = "Geçersiz JSON"; }
       } else if (tur === "xml") {
         bos(onizleme);
         const d = new DOMParser().parseFromString(v, "application/xml");
@@ -63,7 +64,7 @@ export function metinDuzenleyiciKur(kap, { metin = "", tur = "txt", dil = "duz",
         onizleme.append(hata ? el("p", { class: "dn-hata-metin", text: `✗ ${hata.textContent.replace(/\s+/g, " ").trim().slice(0, 240)}` }) : el("p", { class: "dn-iyi", text: "✓ Geçerli XML" }));
         durum.textContent = hata ? "Geçersiz XML" : "Geçerli XML";
       }
-    } catch (h) { bos(onizleme); onizleme.append(el("p", { class: "dn-hata-metin", text: h.message })); }
+    } catch (h) { bos(onizleme); onizleme.append(el("p", { class: "dn-hata-metin", text: trHata(h) })); }
   }
 
   const sayacGuncelle = () => {
@@ -142,7 +143,7 @@ export function metinDuzenleyiciKur(kap, { metin = "", tur = "txt", dil = "duz",
         ta.value = girintiliXml(d);
       }
       degisti();
-    } catch (h) { durum.textContent = h.message; }
+    } catch (h) { durum.textContent = trHata(h); }
   });
 
   const sayac = el("span", { class: "dn-rte-sayac" });

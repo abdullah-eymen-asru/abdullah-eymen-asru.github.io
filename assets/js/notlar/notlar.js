@@ -28,6 +28,7 @@ import * as Kasa from "./kasa.js";
 import * as Kit from "../kurtarma-kiti/kit.js";
 import { kodSor, kitKartiAc, cssYukle as kitCssYukle } from "../kurtarma-kiti/kit-arayuz.js";
 import * as Bicim from "./bicim.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 /* ------------------------------------------------------------------ */
 /* 0) Ayarlar                                                          */
@@ -1329,7 +1330,7 @@ async function topluCope() {
   try {
     await topluSilindiAyarla(notlar, new Date().toISOString());
   } catch (h) {
-    return bildir("Çöpe taşınamadı: " + (h.message || h), "error");
+    return bildir("Çöpe taşınamadı: " + (trHata(h)), "error");
   }
   S.secim.clear();
   bildir(`${notlar.length} not çöpe taşındı.`);
@@ -1409,9 +1410,9 @@ function yeniNotMenusu(bagla) {
 
 function dahaMenusu(bagla) {
   menuAc(bagla, [
-    { ad: "İçeri aktar…", islem: () => iceAktarAc().catch((h) => bildir("İçeri aktarma açılamadı: " + (h.message || h), "error")) },
+    { ad: "İçeri aktar…", islem: () => iceAktarAc().catch((h) => bildir("İçeri aktarma açılamadı: " + (trHata(h)), "error")) },
     { ad: "Kasa ve yedek…", islem: () => $("nt-kasa-dlg").showModal() },
-    { ad: "Notları yeniden yükle", islem: () => notlariYukle().catch((h) => bildir("Yenilenemedi: " + h.message, "error")) },
+    { ad: "Notları yeniden yükle", islem: () => notlariYukle().catch((h) => bildir("Yenilenemedi: " + trHata(h), "error")) },
     { ad: "Kasayı kilitle", islem: () => kilitle("Kasa kilitlendi; bu cihazdaki anahtar silindi.") },
   ]);
 }
@@ -1480,7 +1481,7 @@ async function hizliGuncelle(m, degisiklik) {
     return yeni;
   } catch (h) {
     console.error(h);
-    bildir("İşlem kaydedilemedi: " + (h.message || h), "error");
+    bildir("İşlem kaydedilemedi: " + (trHata(h)), "error");
     return null;
   }
 }
@@ -1488,7 +1489,7 @@ async function hizliGuncelle(m, degisiklik) {
 async function copeAt(m) {
   const ts = new Date().toISOString();
   const { data, error } = await supabase.from("notlar").update({ silindi_at: ts }).eq("id", m.id).select("rev, updated_at");
-  if (error || !data?.length) return bildir("Çöpe atılamadı: " + (error?.message || "not bulunamadı"), "error");
+  if (error || !data?.length) return bildir("Çöpe atılamadı: " + (trHata(error, "not bulunamadı")), "error");
   haritayaIsle({ ...m, rev: data[0].rev, guncelleme: data[0].updated_at, silindiAt: ts });
   bildir(`“${m.baslik || "Başlıksız not"}” çöpe atıldı. Sen silene kadar çöp kutusunda durur; istediğin an geri alabilirsin.`);
   etiketFiltresiniDoldur();
@@ -1497,7 +1498,7 @@ async function copeAt(m) {
 
 async function copTenGeriAl(m) {
   const { data, error } = await supabase.from("notlar").update({ silindi_at: null }).eq("id", m.id).select("rev, updated_at");
-  if (error || !data?.length) return bildir("Geri alınamadı: " + (error?.message || "not bulunamadı"), "error");
+  if (error || !data?.length) return bildir("Geri alınamadı: " + (trHata(error, "not bulunamadı")), "error");
   haritayaIsle({ ...m, rev: data[0].rev, guncelleme: data[0].updated_at, silindiAt: null });
   const klasorGitti = m.klasor && !klasorVarMi(m.klasor);
   bildir(klasorGitti ? "Not geri alındı. Klasörü çöpte olduğu için ana klasörde görünüyor; istersen taşıyabilirsin." : "Not geri alındı.");
@@ -1545,7 +1546,7 @@ async function kaliciSil(m) {
     await kayitlariKaliciSil([], [m]);
     bildir("Not kalıcı olarak silindi.");
   } catch (h) {
-    bildir("Silinemedi: " + (h.message || h), "error");
+    bildir("Silinemedi: " + (trHata(h)), "error");
   }
   etiketFiltresiniDoldur();
   listeyiCiz();
@@ -1577,7 +1578,7 @@ async function copuBosalt() {
     await kayitlariKaliciSil(klasorler, notlar);
     bildir("Çöp kutusu boşaltıldı.");
   } catch (h) {
-    bildir("Boşaltılamadı: " + (h.message || h), "error");
+    bildir("Boşaltılamadı: " + (trHata(h)), "error");
   }
   etiketFiltresiniDoldur();
   listeyiCiz();
@@ -1705,7 +1706,7 @@ async function klasorOlustur(ustId = S.konum) {
     return m;
   } catch (h) {
     console.error(h);
-    bildir("Klasör oluşturulamadı: " + (h.message || h), "error");
+    bildir("Klasör oluşturulamadı: " + (trHata(h)), "error");
     return null;
   }
 }
@@ -1741,7 +1742,7 @@ async function klasorCopeAt(k) {
     await topluSilindiAyarla([...klasorler, ...notlar], new Date().toISOString());
   } catch (h) {
     console.error(h);
-    return bildir("Çöpe taşınamadı: " + (h.message || h), "error");
+    return bildir("Çöpe taşınamadı: " + (trHata(h)), "error");
   }
   if (S.gorunum === "klasor" && klasorler.some((x) => x.id === S.konum)) {
     if (ustId) S.konum = ustId;
@@ -1772,7 +1773,7 @@ async function klasorSilIcerikYukari(k) {
     await topluSilindiAyarla([S.klasorler.get(k.id) || k], new Date().toISOString());
   } catch (h) {
     console.error(h);
-    bildir("Klasör silinemedi: " + (h.message || h), "error");
+    bildir("Klasör silinemedi: " + (trHata(h)), "error");
     return false;
   }
   if (S.gorunum === "klasor" && S.konum === k.id) {
@@ -1813,7 +1814,7 @@ async function tanimiKaydet() {
     return true;
   } catch (h) {
     console.error(h);
-    bildir("Liste kaydedilemedi: " + (h.message || h), "error");
+    bildir("Liste kaydedilemedi: " + (trHata(h)), "error");
     return false;
   }
 }
@@ -1890,7 +1891,7 @@ async function klasorGeriAl(k) {
   try {
     await topluSilindiAyarla([...klasorler, ...notlar], null);
   } catch (h) {
-    return bildir("Geri alınamadı: " + (h.message || h), "error");
+    return bildir("Geri alınamadı: " + (trHata(h)), "error");
   }
   bildir(`“${k.ad}” klasörü içindekilerle birlikte geri alındı.`);
   etiketFiltresiniDoldur();
@@ -1904,7 +1905,7 @@ async function klasorKaliciSilOnayli(k) {
     await kayitlariKaliciSil(klasorler, notlar);
     bildir("Klasör kalıcı olarak silindi.");
   } catch (h) {
-    bildir("Silinemedi: " + (h.message || h), "error");
+    bildir("Silinemedi: " + (trHata(h)), "error");
   }
   etiketFiltresiniDoldur();
   listeyiCiz();
@@ -1987,7 +1988,7 @@ async function dosyalariEkle(dosyalar) {
       durumYaz(`✓ “${f.name}” eklendi (şifreli)`);
     } catch (h) {
       console.error(h);
-      bildir(`“${f.name}” yüklenemedi: ${h.message || h}`, "error");
+      bildir(`“${f.name}” yüklenemedi: ${trHata(h)}`, "error");
     }
   }
 }
@@ -2055,7 +2056,7 @@ function eklerCiz() {
             a.click();
             a.remove();
           } catch (h) {
-            bildir("Ek açılamadı: " + h.message, "error");
+            bildir("Ek açılamadı: " + trHata(h), "error");
           }
         },
       }),
@@ -2599,7 +2600,7 @@ async function kaydet({ sessiz = false } = {}) {
   } catch (h) {
     console.error(h);
     durumYaz("Kaydedilemedi");
-    bildir("Not kaydedilemedi: " + (h.message || h), "error");
+    bildir("Not kaydedilemedi: " + (trHata(h)), "error");
   } finally {
     S.kaydediliyor = false;
     if (S.tekrarKaydet) {
@@ -2931,7 +2932,7 @@ async function anaEkraniAc() {
     await notlariYukle();
   } catch (h) {
     console.error(h);
-    bildir("Notlar yüklenemedi: " + (h.message || h), "error", 0);
+    bildir("Notlar yüklenemedi: " + (trHata(h)), "error", 0);
   }
 }
 
@@ -3022,7 +3023,7 @@ async function kilitFormuGonderildi(olay) {
     await kasaSonucunuUygula(sonuc);
   } catch (h) {
     console.error(h);
-    bildir(h.message || "Kasa açılamadı.", "error");
+    bildir(trHata(h, "Kasa açılamadı."), "error");
   } finally {
     parola = null;
     btn.disabled = false;
@@ -3097,7 +3098,7 @@ function dosyaIndir(ad, icerik, tur) {
 
 async function sifreliYedekIndir() {
   const { data, error } = await supabase.from("notlar").select("id, ciphertext, iv, rev, silindi_at, created_at, updated_at");
-  if (error) return bildir("Yedek alınamadı: " + error.message, "error");
+  if (error) return bildir("Yedek alınamadı: " + trHata(error), "error");
   const kasa = Kasa.sifreliYedekIcinKasaSatiri();
   dosyaIndir(
     `notlar-sifreli-yedek-${new Date().toISOString().slice(0, 10)}.json`,
@@ -3118,7 +3119,7 @@ async function yedekKurtarmaKoduUret() {
     const uretildi = await kitKartiAc((m, hata) => bildir(m, hata ? "error" : "success"));
     if (uretildi) { bildir("Yedek Kurtarma Kodu hazır: Notlar ve Mesajlar için aynı kod geçerli.", "success"); kasaPenceresiniGuncelle(); }
   } catch (h) {
-    bildir(h.message || "Yedek Kurtarma Kodu üretilemedi.", "error");
+    bildir(trHata(h, "Yedek Kurtarma Kodu üretilemedi."), "error");
   }
 }
 
@@ -3191,7 +3192,7 @@ async function kasaParolaFormuGonderildi(olay) {
     for (const id of ["nt-kp-eski", "nt-kp-yeni", "nt-kp-tekrar"]) $(id).value = "";
   } catch (h) {
     console.error(h);
-    goster(h.message || "Kasa Parolası ayarlanamadı.");
+    goster(trHata(h, "Kasa Parolası ayarlanamadı."));
   } finally {
     btn.disabled = false;
     btn.textContent = eskiMetin;
@@ -3395,7 +3396,7 @@ async function iceAktarimiYaz({ notlar, hedefKlasorId, klasorYapisi }, ilerleme)
             eslesme.set(g.id, ek.id);
           } catch (h) {
             console.warn("görsel yüklenemedi:", h);
-            gorselSorunlari.push(`${ad} · ${g.id.replace("ia-g-", "Görsel ")}: ${h.message || h}`);
+            gorselSorunlari.push(`${ad} · ${g.id.replace("ia-g-", "Görsel ")}: ${trHata(h)}`);
           }
         }
         ({ html, govde } = gorselleriBagla(html, eslesme));
@@ -3426,7 +3427,7 @@ async function iceAktarimiYaz({ notlar, hedefKlasorId, klasorYapisi }, ilerleme)
       console.error(h);
       // Not yazılamadıysa yüklenen ekler yetim kalmasın
       for (const ek of yuklenenler) await ekiTamamenSil(ek.anahtar);
-      const ham = String(h.message || h);
+      const ham = String(trHata(h));
       hata.push(`${ad}: ${/notlar_ciphertext_check|ciphertext/.test(ham) ? "not çok büyük (şifreli yük sınırı aşıldı); dosyayı bölüp tekrar dene" : ham}`);
       basarisiz.push(t);
     }
@@ -3508,7 +3509,7 @@ function baglantilariKur() {
     if (S.menu && S.menuBagla === o.currentTarget) return menuKapat();
     yeniNotMenusu(o.currentTarget);
   });
-  $("nt-ice-btn")?.addEventListener("click", () => iceAktarAc().catch((h) => bildir("İçeri aktarma açılamadı: " + (h.message || h), "error")));
+  $("nt-ice-btn")?.addEventListener("click", () => iceAktarAc().catch((h) => bildir("İçeri aktarma açılamadı: " + (trHata(h)), "error")));
   $("nt-aktar-btn").addEventListener("click", () => {
     const acik = S.duz ? S.notlar.get(S.duz.id) || S.duz : null;
     if (acik) return disaAktarAc("bu", acik);
@@ -3600,7 +3601,7 @@ function baglantilariKur() {
   $("nt-kasa-kapat").addEventListener("click", () => $("nt-kasa-dlg").close());
   $("nt-yenile-btn").addEventListener("click", () => {
     $("nt-kasa-dlg").close();
-    notlariYukle().catch((h) => bildir("Yenilenemedi: " + h.message, "error"));
+    notlariYukle().catch((h) => bildir("Yenilenemedi: " + trHata(h), "error"));
   });
   $("nt-kilitle-btn").addEventListener("click", () => {
     $("nt-kasa-dlg").close();
@@ -3836,7 +3837,7 @@ async function init() {
     bildir(
       sema
         ? (console.warn("Not tablosu bulunamadı: 0056_notlar_e2ee.sql migration'ını Supabase'de çalıştırdın mı?"), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.")
-        : "Not Kasası başlatılamadı: " + (h.message || h),
+        : "Not Kasası başlatılamadı: " + (trHata(h)),
       "error",
       0
     );

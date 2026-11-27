@@ -18,6 +18,7 @@ import { alintiMarkdown } from "./atif.js";
 import { taslakYaz, taslakOku, taslakSil } from "./taslak.js";
 import { eklentilerAcikMi, ayarYukle, ayarKaydet, acikEklentiler, eklentiCalistir as eklentiYurut, ceviriUzun, otoCeviriAcikMi, DIL_SECENEKLERI } from "./eklentiler.js";
 import { kancaCalistir, konumuYukselt, konumEkstra, SEMA_SURUMU } from "./modul-kayit.js";
+import { hata as trHata } from "../core/hata-metni.js";
 
 /** Veritabanı `konum` verisini model alanlarına açar: şema yükseltilir, bilinmeyen alanlar `ekstra` altında saklanır (kaydederken geri yazılır). */
 const konumAc = (k) => {
@@ -254,7 +255,7 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
     }).promise;
   } catch (h) {
     console.error(h);
-    durumYaz(`PDF açılamadı: ${h.message || h}`, "hata");
+    durumYaz(`PDF açılamadı: ${trHata(h)}`, "hata");
     // YEDEK: tarayıcının yerleşik PDF okuyucusu (blob: çerçeve). Annotation/not araçları bu modda yoktur; belge en azından okunabilir.
     if (d.bytes && h?.name !== "PasswordException") {
       try {
@@ -422,7 +423,7 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
     const anlik = ozetOlustur();
     try {
       const { error } = await supabase.rpc("akademik_aciklamalari_esitle", { p_kaynak_id: kaynak.id, p_aciklamalar: anlik });
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(trHata(error));
       for (const a of d.model.values()) a.nm = a.nm || `ae-${a.id}`;
       kaynak.aciklama_db_otorite = true;
       if (JSON.stringify(anlik) === JSON.stringify(ozetOlustur())) taslakSil(kaynak.id, taslakT || Date.now()); else taslagaYaz();
@@ -873,11 +874,11 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
         const b = el("button", { type: "button", class: "ak-btn" }, ey.ad);
         b.addEventListener("click", async () => {
           if (ey.kopyala) { await panoyaKopyala(ey.kopyala); toast("Kopyalandı.", "basari"); return; }
-          b.disabled = true; try { const r = await ey.calistir(); icerik.textContent = `${s.metin}\n\n${r.metin}`; } catch (h) { icerik.textContent = `${s.metin}\n\n${h.message}`; } b.disabled = false;
+          b.disabled = true; try { const r = await ey.calistir(); icerik.textContent = `${s.metin}\n\n${r.metin}`; } catch (h) { icerik.textContent = `${s.metin}\n\n${trHata(h)}`; } b.disabled = false;
         });
         kutu.querySelector(".ak-eklenti-eylem").append(b);
       }
-    } catch (h) { bas.textContent = "Eklenti çalışmadı"; icerik.textContent = h.message || String(h); }
+    } catch (h) { bas.textContent = "Eklenti çalışmadı"; icerik.textContent = trHata(h); }
   }
 
   /* ---------- OTOMATİK ANINDA ÇEVİRİ ----------
@@ -1145,7 +1146,7 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
         else if (b.dataset.b === "yorum") { const n0 = d.model.size; if (secimdenOlustur("vurgu")) { const yeni = [...d.model.values()].slice(-1)[0]; if (d.model.size > n0) sec(yeni.id, true); } }
         else if (b.dataset.b === "kopya") { const m = sonSecim?.metin || ""; if (!m) { toast("Önce metin seç.", "uyari"); return; } await panoyaKopyala(m); toast("Seçili metin kopyalandı.", "basari"); secimiBitir(); }
         else if (b.dataset.b === "alinti") { const m = sonSecim?.metin; if (!m) { toast("Önce metin seç.", "uyari"); return; } await panoyaKopyala(metniAlintiYap(m, secimSayfasi())); toast("Alıntı (yazar, yıl, sayfa ile) kopyalandı.", "basari"); secimiBitir(); }
-      } catch (h) { console.error(h); durumYaz(`İşlem yapılamadı: ${h.message || h}`, "hata"); toast(`İşlem yapılamadı: ${h.message || h}`, "hata"); }
+      } catch (h) { console.error(h); durumYaz(`İşlem yapılamadı: ${trHata(h)}`, "hata"); toast(`İşlem yapılamadı: ${trHata(h)}`, "hata"); }
     }
     let sonDokunus = 0;
     balon.addEventListener("touchend", (e) => { const b = e.target.closest("button:not(.ak-oto-ik):not(.ak-oto-tekrar)"); if (!b || e.target.closest(".ak-oto-kart")) return; e.preventDefault(); sonDokunus = Date.now(); balonEylem(b); }, { passive: false });
@@ -1326,7 +1327,7 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
       if (!x || x.isCollapsed) { if (!sonSecim || Date.now() - sonSecim.t > 700) return; } else if (!secimYakala()) return;   // iOS seçimi hemen çökertirse son 0,7 sn içindeki anlık kopya kullanılır
       if (!sonSecim) return;
       if (!salt && METIN_TURLERI.has(d.arac)) secimdenOlustur(d.arac); else balonGoster();
-    } catch (h) { console.error(h); durumYaz(`Seçim işlenemedi: ${h.message || h}`, "hata"); }
+    } catch (h) { console.error(h); durumYaz(`Seçim işlenemedi: ${trHata(h)}`, "hata"); }
   }
   // iOS/Android: tutamaç sürüklemesi bitince (parmak kalkınca) seçimi kesin işle
   kap.addEventListener("touchend", () => { clearTimeout(seciliZaman); seciliZaman = setTimeout(secimiIsle, 260); }, { passive: true });
@@ -1520,7 +1521,7 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
         return { ek_id: a.nm || `ae-${a.id}`, tur: a.tur, sayfa: a.sayfa, metin: a.metin || null, yorum: a.yorum || null, renk: a.renk, konum };
       });
       const { error } = await supabase.rpc("akademik_aciklamalari_esitle", { p_kaynak_id: kaynak.id, p_aciklamalar: ozet });
-      if (error) throw new Error(`Özet kaydedilemedi: ${error.message}`);
+      if (error) throw new Error(`Özet kaydedilemedi: ${trHata(error)}`);
       for (const a of aktif) { a.durum = "ayni"; a.nm = a.nm || `ae-${a.id}`; }
       d.silinenler = [];
       taslakSil(kaynak.id);
@@ -1548,8 +1549,8 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
       return true;
     } catch (h) {
       console.error(h);
-      durumYaz(`PDF'e işlenemedi: ${h.message || h}`, "hata");
-      toast(`PDF'e işlenemedi: ${h.message || h}. Açıklamaların hesabında kayıtlı.`, "hata", 8000);
+      durumYaz(`PDF'e işlenemedi: ${trHata(h)}`, "hata");
+      toast(`PDF'e işlenemedi: ${trHata(h)}. Açıklamaların hesabında kayıtlı.`, "hata", 8000);
       return false;
     } finally {
       d.kaydediliyor = false;
@@ -1565,7 +1566,7 @@ export async function okuyucuAc({ kaynak, salt = false, kullaniciAdi = "", kapan
       d.kirli = false;
       kapat(true);
       okuyucuAc({ kaynak: { ...kaynak, pdf_rev: d.rev + 1 }, salt, kullaniciAdi, kapaninca });
-    } catch (h) { toast(h.message, "hata"); }
+    } catch (h) { toast(trHata(h), "hata"); }
   }
 
   /* ---------- kapat ---------- */
