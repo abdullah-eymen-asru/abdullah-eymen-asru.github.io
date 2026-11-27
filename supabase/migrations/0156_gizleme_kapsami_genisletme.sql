@@ -51,9 +51,10 @@ grant execute on function public.konusma_gizli_mi(uuid) to anon, authenticated, 
 
 -- 2) Tablo → "görünür" koşulu haritası (hem politikada hem fonksiyon yeniden yazımında AYNI metin kullanılır).
 --    {t} = sütun öneki: politikada boş, fonksiyon yeniden yazımında "_g." (plpgsql OUT değişkenleriyle ad çakışmasını önler). -------------------
-drop table if exists _gizleme_harita;
-create temp table _gizleme_harita (tablo text primary key, kosul text not null);
-insert into _gizleme_harita (tablo, kosul) values
+-- (Geçici tablo YERİNE geçici fonksiyon: Supabase SQL Editor / havuzlayıcı her ifadeyi ayrı oturumda çalıştırabilir; geçici tablo kaybolurdu.)
+create or replace function public._gizleme_harita()
+returns table (tablo text, kosul text) language sql immutable as $f$
+  select * from (values
   -- Akademik Kütüphane
   ('akademik_kaynaklar',          'not public.gizli_satir_mi({t}user_id)'),
   ('akademik_notlar',             'not public.gizli_satir_mi({t}user_id)'),
@@ -106,13 +107,15 @@ insert into _gizleme_harita (tablo, kosul) values
   ('uye_aktarim_yetkileri',       'not public.gizli_satir_mi({t}yetkili_id)'),
   ('uye_aktarim_kayitlari',       'not public.gizli_satir_mi({t}yetkili_id)'),
   ('worker_anahtar_gunlugu',      'not public.gizli_satir_mi({t}kullanici_id)'),
-  ('profiles',                    'not public.gizli_satir_mi({t}id)');
+  ('profiles',                    'not public.gizli_satir_mi({t}id)')
+  ) v (tablo, kosul);
+$f$;
 
 -- 3) RESTRICTIVE select politikaları (mevcut izin politikalarıyla VE'lenir; sahibin kendi satırı hep geçer) ------------------
 do $$
 declare r record; v_n int := 0;
 begin
-  for r in select tablo, kosul from _gizleme_harita where tablo <> 'profiles' loop   -- profiles: 0136'da zaten var
+  for r in select tablo, kosul from public._gizleme_harita() where tablo <> 'profiles' loop   -- profiles: 0136'da zaten var
     if to_regclass('public.' || r.tablo) is null then
       raise notice 'gizleme: % tablosu yok, atlandı', r.tablo; continue;
     end if;
@@ -167,7 +170,7 @@ begin
          or v_yeni ~* '\mfor\s+(?:update|share)\M' then
         raise notice 'gizleme: % yazma/kilit içerdiği için elle incelenmeli, atlandı', f.proname; continue;
       end if;
-      for h in select tablo, kosul from _gizleme_harita loop
+      for h in select tablo, kosul from public._gizleme_harita() loop
         v_yeni := regexp_replace(
           v_yeni,
           '(\m(?:from|join)\s+)public\.' || h.tablo || '\s+(?:as\s+)?' || v_ayrac || '([a-z_][a-z0-9_]*)',
@@ -187,7 +190,7 @@ begin
   raise notice 'gizleme: % fonksiyondan % tanesi süzüldü', v_toplam, v_degisen;
 end $$;
 
-drop table if exists _gizleme_harita;
+drop function if exists public._gizleme_harita();
 
 -- 5) Sahip için kolay denetim: kaç üye gizli, körlük açık mı (yalnızca Site Sahibi) ----------------------------------------
 create or replace function public.owner_gizleme_ozeti()
