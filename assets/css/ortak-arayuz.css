@@ -4,12 +4,12 @@
  * Mevcut sınıfları (.ya-mini-toggle, .gy-toggle) BOZMAZ; yalnızca yeni sınıflar ekler.
  */
 :root {
-  --ui-radius: 12px;
-  --ui-radius-kucuk: 8px;
+  --ui-radius: var(--radius-md, 12px);
+  --ui-radius-kucuk: var(--radius-sm, 8px);
   --ui-bosluk: 0.75rem;
   --ui-golge: 0 1px 3px rgba(0, 0, 0, 0.12);
-  --ui-surgu-kapali: #c0392b;
-  --ui-surgu-acik: #1e6b3a;
+  --ui-surgu-kapali: var(--danger, #c0392b);
+  --ui-surgu-acik: var(--ok, #1e6b3a);
   --ui-gecis: 0.2s ease;
 }
 
@@ -162,3 +162,42 @@ button.ui-yukleniyor::after {
 }
 .ui-durum.hata { border-color: var(--ui-surgu-kapali); }
 .ui-durum button { margin-left: auto; }
+
+/* ---------- Bekleme / zaman aşımı bandı ---------- */
+.ui-bekle {
+  position: fixed;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  z-index: 9999;
+  box-sizing: border-box;
+  max-width: calc(100vw - 2rem);
+  padding: 0.6rem 1rem;
+  border-radius: var(--ui-radius);
+  background: #1f2937;
+  color: #fff;
+  font-size: 0.9rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+.ui-bekle[hidden] { display: none; }
+.ui-bekle.hata { background: var(--ui-surgu-kapali); }
+.ui-bekle button {
+  margin-left: 0.5rem;
+  padding: 0.15rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* ---------- Panel bölümü olarak çekmece (<details class="ui-cekmece panel-section">) ----------
+ * .panel-section kartının kendi padding'i çekmeceye devredilir: başlık satırı + iç içerik ayrı boşluk alır. */
+details.panel-section.ui-cekmece { padding: 0; margin: 0; }
+details.panel-section.ui-cekmece > summary { padding: 14px 20px; }
+details.panel-section.ui-cekmece > .ui-cekmece-icerik { padding: 0 20px 20px; }
+details.ui-cekmece > summary > h2 { margin: 0; font-size: 1.05rem; }
+@media (max-width: 600px) {
+  details.panel-section.ui-cekmece > summary { padding: 12px 14px; }
+  details.panel-section.ui-cekmece > .ui-cekmece-icerik { padding: 0 14px 16px; }
+}

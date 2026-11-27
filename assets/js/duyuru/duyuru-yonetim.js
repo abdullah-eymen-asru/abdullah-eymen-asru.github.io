@@ -21,7 +21,7 @@ function el(etiket, ozellik = {}, ...cocuk) {
 }
 const tarihYaz = (iso) => (iso ? new Date(iso).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" }) : "—");
 const yerelGirdi = (iso) => { if (!iso) return ""; const d = new Date(iso); const p = (x) => String(x).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
-const hata = (h) => (/42501|Yetkisiz|yalnızca Site Sahibi/i.test(h?.message || "") ? "Bu işlem için yetkin yok." : /does not exist|schema cache/i.test(h?.message || "") ? "Duyuru tabloları yok: Supabase'de 0113 migration'ı çalıştırılmalı." : h?.message || "Beklenmeyen hata.");
+const hata = (h) => (/42501|Yetkisiz|yalnızca Site Sahibi/i.test(h?.message || "") ? "Bu işlem için yetkin yok." : /does not exist|schema cache/i.test(h?.message || "") ? (console.warn("Duyuru tabloları yok: Supabase'de 0113 migration'ı çalıştırılmalı."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.") : h?.message || "Beklenmeyen hata.");
 
 async function baslat() {
   if (!kok) return;
@@ -46,7 +46,7 @@ async function baslat() {
     url: el("input", { type: "url", class: "dy-girdi", maxlength: "500", "aria-label": "Bağlantı (https://…)", placeholder: "https://… (isteğe bağlı)" }),
     urlMetin: el("input", { type: "text", class: "dy-girdi", maxlength: "40", "aria-label": "Bağlantı yazısı", placeholder: "Bağlantı yazısı (örn. Ayrıntılar)" }),
     bas: el("input", { type: "datetime-local", class: "dy-girdi", "aria-label": "Başlangıç" }), bit: el("input", { type: "datetime-local", class: "dy-girdi", "aria-label": "Bitiş" }),
-    aktif: el("input", { type: "checkbox", id: "dy-aktif" }), yeniden: el("input", { type: "checkbox", id: "dy-yeniden" }) };
+    aktif: el("input", { type: "checkbox", class: "ui-surgu", id: "dy-aktif" }), yeniden: el("input", { type: "checkbox", class: "ui-surgu", id: "dy-yeniden" }) };
   g.aktif.checked = true;
   const sayac = el("small", { class: "muted", text: "0 / 2000" });
   g.metin.addEventListener("input", () => { sayac.textContent = `${g.metin.value.length} / 2000`; onizle(); });

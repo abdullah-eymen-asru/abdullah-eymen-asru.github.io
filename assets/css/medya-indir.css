@@ -7,4 +7,4 @@
 
 /* Seçim listesi: her satır tek, açık "İndir" düğmesi */
 .mi-liste { list-style: none; margin: .5rem 0; padding: 0; display: grid; gap: .45rem; }
-.mi-liste-satir { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .5rem .75rem; border: 1px solid var(--border, rgba(127,127,127,.35)); border-radius: 10px; }
+.mi-liste-satir { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .5rem .75rem; border: 1px solid var(--border, rgba(127,127,127,.35)); border-radius: var(--radius-md, 12px); }

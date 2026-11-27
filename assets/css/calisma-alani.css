@@ -58,9 +58,9 @@
 }
 
 /* Görüntüle sekmesi (assets/js/belge-goruntule/) */
-.bg-bolge { display: grid; gap: 10px; justify-items: center; text-align: center; padding: 28px 16px; border: 2px dashed var(--border); border-radius: 14px; background: var(--card-bg); }
+.bg-bolge { display: grid; gap: 10px; justify-items: center; text-align: center; padding: 28px 16px; border: 2px dashed var(--border); border-radius: var(--radius-md, 12px); background: var(--card-bg); }
 .bg-bolge.bg-ustunde { border-color: var(--accent); }
 .bg-bolge-metin { margin: 0; font-weight: 600; }
 .bg-bolge:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.bg-resim { max-width: 100%; height: auto; border-radius: 10px; }
-.bg-metin { max-height: 70vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); }
+.bg-resim { max-width: 100%; height: auto; border-radius: var(--radius-md, 12px); }
+.bg-metin { max-height: 70vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md, 12px); background: var(--card-bg); }

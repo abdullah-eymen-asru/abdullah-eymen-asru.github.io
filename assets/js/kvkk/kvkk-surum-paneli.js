@@ -65,7 +65,7 @@ function metinKarti({ baslik, link, surum, ozet, yetkili, yetkiNotu, onayMetni, 
 /** Admin yetki anahtarları (yalnızca owner görür): iki ayrı, açık etiketli anahtar. */
 function yetkiBolumu(satir, mesaj) {
   const anahtar = (id, baslik, aciklama, ilkDeger, kolon) => {
-    const kutu = el("input", { type: "checkbox", id, role: "switch" });
+    const kutu = el("input", { type: "checkbox", class: "ui-surgu", "data-ui-sessiz": "", id, role: "switch" });
     kutu.checked = !!ilkDeger;
     kutu.addEventListener("change", async () => {
       const istenen = kutu.checked;
@@ -79,7 +79,7 @@ function yetkiBolumu(satir, mesaj) {
         showMessage(mesaj, `${baslik}: ${kutu.checked ? "açıldı (menü, adminin bir sonraki panel yüklemesinde görünür)" : "kapatıldı, yalnızca sen değiştirebilirsin"}.`, "success");
       } catch (h) {
         kutu.checked = !istenen;
-        showMessage(mesaj, yokMu(h) ? "0076 numaralı migration henüz çalıştırılmamış." : `Kaydedilemedi: ${h.message || h}`, "error");
+        showMessage(mesaj, yokMu(h) ? (console.warn("0076 numaralı migration henüz çalıştırılmamış."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.") : `Kaydedilemedi: ${h.message || h}`, "error");
       } finally {
         kutu.disabled = false;
       }
@@ -197,7 +197,7 @@ function uyeKayitlari() {
     if (error) {
       const tekrar = dugme({ metin: "Tekrar dene", tur: "ikincil", kucuk: true });
       tekrar.addEventListener("click", () => yukle());
-      liste.replaceChildren(el("p", { class: "auth-message error", text: yokMu(error) ? "0076 numaralı migration henüz çalıştırılmamış." : error.message }), tekrar);
+      liste.replaceChildren(el("p", { class: "auth-message error", text: yokMu(error) ? (console.warn("0076 numaralı migration henüz çalıştırılmamış."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.") : error.message }), tekrar);
       durumuGuncelle();
       return;
     }
@@ -254,7 +254,7 @@ async function kur() {
   const satir = Array.isArray(ozet) ? ozet[0] : ozet;
   if (error || !satir || satir.kvkk_yetkim === undefined) {
     kok.replaceChildren(...[el("p", { class: "muted", text: yokMu(error) || (!error && (!satir || satir.kvkk_yetkim === undefined))
-      ? "0064, 0065, 0070, 0073 ve 0076 numaralı migration'lar tam çalıştırılmamış görünüyor: dosyaları SQL Editor'de sırayla çalıştır."
+      ? (console.warn("0064, 0065, 0070, 0073 ve 0076 numaralı migration'lar tam çalıştırılmamış görünüyor: dosyaları SQL Editor'de sırayla çalıştır."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.")
       : `Yüklenemedi: ${error.message}` })].filter(Boolean));
     return;
   }

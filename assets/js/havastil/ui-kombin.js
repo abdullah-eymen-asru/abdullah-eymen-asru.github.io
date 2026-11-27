@@ -110,7 +110,7 @@ function krizKarti(d, kb) {
   const boya = () => { const a = d.ai; metin.textContent = a.metin || "…"; alt.textContent = a.etiket || ""; hata.textContent = a.hata || ""; hata.hidden = !a.hata; };
   boya();
   kb.aiYenileEkran = boya;
-  const kutu = el("input", { type: "checkbox", id: "hv-ai-modu" });
+  const kutu = el("input", { type: "checkbox", class: "ui-surgu", id: "hv-ai-modu" });
   kutu.checked = d.aiModu;
   olay(kutu, "change", () => kb.aiModu(kutu.checked));
   return kart(`hv-kriz${k?.var ? " var" : ""}`,

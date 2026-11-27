@@ -49,8 +49,8 @@ export function uyeDisaAktarAc({ bildir = () => {}, yazar = "" } = {}) {
   const ayracSec = el("select", { "aria-label": "CSV ayracı" }, el("option", { value: ";", text: "Noktalı virgül ( ; ) — Türkçe Excel" }), el("option", { value: ",", text: "Virgül ( , ) — Mailchimp vb." }));
   const ayracAlan = el("div", { class: "form-field uya-dlg-alan" }, el("label", { text: "CSV ayracı" }), ayracSec);
   const rolSec = el("select", { "aria-label": "Rol süzgeci" }, ROLLER.map(([v, a]) => el("option", { value: v, text: a })));
-  const kvkkKutu = el("input", { type: "checkbox" });
-  const epostaKutu = el("input", { type: "checkbox" });
+  const kvkkKutu = el("input", { type: "checkbox", class: "ui-surgu", "data-ui-sessiz": "" });
+  const epostaKutu = el("input", { type: "checkbox", class: "ui-surgu", "data-ui-sessiz": "" });
   const hata = el("p", { class: "auth-message auth-message--error", hidden: true, role: "alert" });
   const durum = el("p", { class: "muted uya-dlg-durum", "aria-live": "polite" });
   const indirBtn = el("button", { type: "submit", class: "btn-primary csp-w-auto", text: "İndir" });
@@ -112,7 +112,7 @@ export function uyeDisaAktarAc({ bildir = () => {}, yazar = "" } = {}) {
       sonucCiz();
       if (!sonSonuclar.length) sonucListe.replaceChildren(el("li", { class: "muted", text: aramaMetin ? "Eşleşen üye yok (yetki kapsamın dışındakiler görünmez)." : "Kapsamında üye yok." }));
     } catch (h) {
-      sonucListe.replaceChildren(el("li", { class: "muted", text: /does not exist|42883|PGRST202|schema cache/i.test(h?.message || "") ? "Üye araması için 0110 migration'ı çalıştırılmalı; toplu indirme yine çalışır." : `Arama yapılamadı: ${h?.message || h}` }));
+      sonucListe.replaceChildren(el("li", { class: "muted", text: /does not exist|42883|PGRST202|schema cache/i.test(h?.message || "") ? (console.warn("Üye araması için 0110 migration'ı çalıştırılmalı; toplu indirme yine çalışır."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.") : `Arama yapılamadı: ${h?.message || h}` }));
       daha.hidden = true;
     }
   };

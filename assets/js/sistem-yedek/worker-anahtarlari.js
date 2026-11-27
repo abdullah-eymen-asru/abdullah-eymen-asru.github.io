@@ -137,7 +137,7 @@ export function workerAnahtarKarti() {
     async function yaz(deger) {
       kaydet.disabled = true; if (kaldir) kaldir.disabled = true; durum.textContent = "Kaydediliyor…";
       const { error } = await supabase.rpc("worker_limit_ayarla", { p_ad: s.ad, p_limit: deger });
-      if (error) { durum.textContent = /does not exist|PGRST202|42883|schema cache/i.test(error.message || "") ? (gk ? "Önce migration 0144 çalıştırılmalı." : "Önce migration 0143 çalıştırılmalı.") : hataMetni(error); kaydet.disabled = false; if (kaldir) kaldir.disabled = false; return; }
+      if (error) { durum.textContent = /does not exist|PGRST202|42883|schema cache/i.test(error.message || "") ? (gk ? (console.warn("Önce migration 0144 çalıştırılmalı."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.") : (console.warn("Önce migration 0143 çalıştırılmalı."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.")) : hataMetni(error); kaydet.disabled = false; if (kaldir) kaldir.disabled = false; return; }
       await yukle();
     }
     kaydet.addEventListener("click", () => {
@@ -214,7 +214,7 @@ export function workerAnahtarKarti() {
       const gunluk = el("details", { class: "sy-wk-gunluk" }, el("summary", { text: "Son değişiklikler" }), gunlukKok);
       async function gunlukCiz() {
         const { data: g, error: e } = await supabase.rpc("worker_anahtar_gunlugu_getir", { p_adet: 15 });
-        if (e) { gunlukKok.replaceChildren(el("p", { class: "auth-message error", text: /does not exist|PGRST202|42883|schema cache/i.test(e.message || "") ? "Günlük için migration 0096 çalıştırılmalı." : hataMetni(e) })); return; }
+        if (e) { gunlukKok.replaceChildren(el("p", { class: "auth-message error", text: /does not exist|PGRST202|42883|schema cache/i.test(e.message || "") ? (console.warn("Günlük için migration 0096 çalıştırılmalı."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.") : hataMetni(e) })); return; }
         const satirlar = g || [];
         const temizle = ownerMi && satirlar.length
           ? dugme({ metin: "🗑 Günlüğü temizle", tur: "ikincil", kucuk: true }) : null;
@@ -260,7 +260,7 @@ export function workerAnahtarKarti() {
       ozetSayac.textContent = `${(data || []).length} servis · ${kapali} kapalı`;
     } catch (h) {
       govde.replaceChildren(el("p", { class: "auth-message error", text: /does not exist|42P01|PGRST205|schema cache/i.test(h?.message || "")
-        ? "Gerekli migration (0088) henüz çalıştırılmamış."
+        ? (console.warn("Gerekli migration (0088) henüz çalıştırılmamış."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.")
         : `Anahtarlar okunamadı: ${h.message || h}` }));
     } finally { yenile.disabled = false; }
   }

@@ -412,7 +412,7 @@ async function yeniKasaKur(uid, baz, { parolaTur = "giris", kurtarma = true } = 
 function hataCevir(hata) {
   const m = hata?.message || "";
   if (/parola_tur|dek_kurtarma|23502|42703/.test(`${hata?.code || ""} ${m}`)) {
-    return new Error("Bağımsız Kasa Parolası için 0082_not_kasasi_bagimsiz_kasa_parolasi.sql migration'ı Supabase'de çalıştırılmalı.");
+    return new Error((console.warn("Bağımsız Kasa Parolası için 0082_not_kasasi_bagimsiz_kasa_parolasi.sql migration'ı Supabase'de çalıştırılmalı."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene."));
   }
   return hata;
 }

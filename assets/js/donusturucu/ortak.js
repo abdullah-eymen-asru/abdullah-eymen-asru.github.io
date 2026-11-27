@@ -209,7 +209,7 @@ export function formIste({ baslik, aciklama, alanlar, tamam = "Tamam", vazgec = 
       let g;
       if (a.tur === "textarea") g = el("textarea", { id, rows: a.satir || 4, placeholder: a.yerTutucu || "" });
       else if (a.tur === "select") g = el("select", { id }, ...a.secenekler.map((s) => el("option", { value: s.d, text: s.e })));
-      else if (a.tur === "checkbox") g = el("input", { id, type: "checkbox" });
+      else if (a.tur === "checkbox") g = el("input", { id, type: "checkbox", class: "ui-surgu", "data-ui-sessiz": "" });
       else g = el("input", { id, type: a.tur || "text", min: a.min, max: a.max, step: a.adim, placeholder: a.yerTutucu || "", autocomplete: "off" });
       if (a.tur === "checkbox") g.checked = !!a.deger;
       else if (a.deger != null) g.value = String(a.deger);
@@ -245,7 +245,7 @@ export function formIste({ baslik, aciklama, alanlar, tamam = "Tamam", vazgec = 
 
 export function hataMetni(h) {
   const m = h?.message || String(h || "");
-  if (/does not exist|42883|PGRST202|schema cache/i.test(m)) return "Gerekli migration (0077) henüz çalıştırılmamış.";
+  if (/does not exist|42883|PGRST202|schema cache/i.test(m)) return (console.warn("Gerekli migration (0077) henüz çalıştırılmamış."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.");
   return m;
 }
 

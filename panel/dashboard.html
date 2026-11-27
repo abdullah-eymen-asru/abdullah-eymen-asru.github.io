@@ -118,8 +118,9 @@ permalink: "/panel/dashboard.html"
           <div id="profil-message" class="auth-message" hidden></div>
         </section>
 
-        <section class="panel-section">
-          <h2>E-posta Değiştir</h2>
+        <details class="ui-cekmece panel-section">
+          <summary><h2>E-posta Değiştir</h2></summary>
+          <div class="ui-cekmece-icerik">
           <p class="muted">
             Güvenlik için e-posta değişikliği <strong>çift onaylıdır</strong>: hem şu anki
             (eski) hem de yeni adresine ayrı ayrı bir onay maili gider ve değişikliğin
@@ -182,7 +183,8 @@ permalink: "/panel/dashboard.html"
               site yöneticisiyle iletişime geçebilirsin.
             </p>
           </div>
-        </section>
+        </div>
+        </details>
 
         <!-- Eski adresine hiç erişimi kalmamış kullanıcılar için: yukarıdaki
              çift onaylı akışı tamamlayamazlar, tek çözüm site yöneticisinin
@@ -192,8 +194,9 @@ permalink: "/panel/dashboard.html"
              kutu her zaman görünür (sadece form gönderildikten sonra değil)
              çünkü kullanıcı hiç denemeden de doğrudan buraya gelip yardım
              isteyebilir. -->
-        <section class="panel-section" id="eposta-yardim">
-          <h2>Eski Mailime Erişemiyorum</h2>
+        <details class="ui-cekmece panel-section" id="eposta-yardim">
+          <summary><h2>Eski Mailime Erişemiyorum</h2></summary>
+          <div class="ui-cekmece-icerik">
           <p class="muted">
             Yukarıdaki "E-posta Değiştir" için eski adresine de onay vermen
             gerekiyor. Eğer o adrese artık erişimin yoksa (şifresini unuttun,
@@ -222,10 +225,12 @@ permalink: "/panel/dashboard.html"
             haber verecektir — beklemeden yeni adresinle giriş yapmayı
             deneyebilirsin.
           </p>
-        </section>
+        </div>
+        </details>
 
-        <section class="panel-section">
-          <h2>Bağlı Hesaplar</h2>
+        <details class="ui-cekmece panel-section">
+          <summary><h2>Bağlı Hesaplar</h2></summary>
+          <div class="ui-cekmece-icerik">
           <p class="muted">
             Google ile giriş ve e-posta + şifreyle giriş, aynı e-posta adresi
             için her zaman <strong>tek bir hesaba</strong> bağlanır — ikisini
@@ -234,20 +239,24 @@ permalink: "/panel/dashboard.html"
           </p>
           <div id="bagli-hesaplar-durum"><p class="muted">Yükleniyor...</p></div>
           <div id="bagli-hesaplar-message" class="auth-message" hidden></div>
-        </section>
+        </div>
+        </details>
 
-        <section class="panel-section">
-          <h2>Açık Oturumlar</h2>
+        <details class="ui-cekmece panel-section">
+          <summary><h2>Açık Oturumlar</h2></summary>
+          <div class="ui-cekmece-icerik">
           <p class="muted">
             Hesabına giriş yapılmış tüm cihazlar burada listelenir. Tanımadığın
             bir cihaz görürsen hemen "Çıkış Yap" ile o oturumu kapatabilirsin.
           </p>
           <div id="acik-oturumlar-durum"><p class="muted">Yükleniyor...</p></div>
           <div id="acik-oturumlar-message" class="auth-message" hidden></div>
-        </section>
+        </div>
+        </details>
 
-        <section class="panel-section">
-          <h2>Şifre Değiştir</h2>
+        <details class="ui-cekmece panel-section">
+          <summary><h2>Şifre Değiştir</h2></summary>
+          <div class="ui-cekmece-icerik">
           <form id="sifre-degistir-form" novalidate>
             <div class="form-field">
               <label for="yeni_sifre">Yeni Şifre</label>
@@ -261,17 +270,22 @@ permalink: "/panel/dashboard.html"
             <button type="submit" class="btn-primary">Şifreyi Değiştir</button>
           </form>
           <div id="sifre-message" class="auth-message" hidden></div>
-        </section>
+        </div>
+        </details>
 
-        <section class="panel-section">
-          <h2>İki Faktörlü Doğrulama (2FA)</h2>
+        <details class="ui-cekmece panel-section">
+          <summary><h2>İki Faktörlü Doğrulama (2FA)</h2></summary>
+          <div class="ui-cekmece-icerik">
           <div id="mfa-alani"><p class="muted">Yükleniyor...</p></div>
-        </section>
+        </div>
+        </details>
 
-        <section class="panel-section">
-          <h2>KVKK Onayı</h2>
+        <details class="ui-cekmece panel-section">
+          <summary><h2>KVKK Onayı</h2></summary>
+          <div class="ui-cekmece-icerik">
           <div id="kvkk-durum"><p class="muted">Yükleniyor...</p></div>
-        </section>
+        </div>
+        </details>
 
         <!-- Mesajlar bölümü BURADAN, ortak/bağımsız bir sayfaya taşındı (bkz.
              panel/mesajlar.md + assets/js/mesajlar.js başındaki notlar) —
@@ -281,8 +295,9 @@ permalink: "/panel/dashboard.html"
              "Hesabım ▾" menüsünden veya üstteki "Yöneticiyle Mesajlaş"
              linkinden erişilebilir. -->
 
-        <section class="panel-section danger-zone">
-          <h2>Tehlikeli Bölge</h2>
+        <details class="ui-cekmece panel-section danger-zone">
+          <summary><h2>Tehlikeli Bölge</h2></summary>
+          <div class="ui-cekmece-icerik">
           <p>Hesabını sildiğinde profilin ve özel içerik erişimlerin dahil TÜM
           verilerin kalıcı olarak silinir. Bu işlem geri alınamaz.</p>
           <div class="form-field">
@@ -291,7 +306,8 @@ permalink: "/panel/dashboard.html"
           </div>
           <button id="hesap-sil-btn" type="button" class="btn-danger">Hesabımı Kalıcı Olarak Sil</button>
           <div id="hesap-sil-message" class="auth-message" hidden></div>
-        </section>
+        </div>
+        </details>
 
       </div>
     </section>
@@ -872,8 +888,9 @@ permalink: "/panel/dashboard.html"
                (migration 0031_uyelik_kayitlarini_ac_kapat.sql, owner_kayitlari_ac_kapat
                RPC'si + trg_kayitlar_acik_sadece_owner trigger'ı) — bu bölüm sadece
                arayüz katmanıdır. -->
-          <section class="panel-section sadece-owner">
-            <h2>👥 Üyelik Kayıtları</h2>
+          <details class="ui-cekmece panel-section sadece-owner">
+            <summary><h2>👥 Üyelik Kayıtları</h2></summary>
+            <div class="ui-cekmece-icerik">
             <p class="muted">
               Kapatırsan veri tabanına yeni bir üye kaydı düşmez — Google ile de,
               normal (e-posta/şifre) ile de kimse kayıt olamaz, kayıt sayfası
@@ -890,10 +907,12 @@ permalink: "/panel/dashboard.html"
               <button id="ag-kayitlari-ac-btn" type="button" class="btn-primary csp-w-auto">Kayıtları Aç</button>
             </div>
             <div id="ag-kayitlar-message" class="auth-message" hidden></div>
-          </section>
+          </div>
+          </details>
 
-          <section class="panel-section sadece-owner">
-            <h2>🚨 Kilit Modu (Acil Durdurma)</h2>
+          <details class="ui-cekmece panel-section sadece-owner">
+            <summary><h2>🚨 Kilit Modu (Acil Durdurma)</h2></summary>
+            <div class="ui-cekmece-icerik">
             <p class="muted">
               Açtığında Site Sahibi (sen) dışında hiçbir rol (admin/manager/editor)
               içerik ekleyemez, düzenleyemez ya da silemez — panel açılıp mevcut
@@ -911,10 +930,12 @@ permalink: "/panel/dashboard.html"
               <button id="ag-kilit-kapat-btn" type="button" class="btn-primary csp-w-auto">🔓 Kilit Modunu Kapat — Yazmaya İzin Ver</button>
             </div>
             <div id="ag-kilit-message" class="auth-message" hidden></div>
-          </section>
+          </div>
+          </details>
 
-          <section class="panel-section">
-            <h2>🔴 Bir Admin'i Askıya Al ("Acil Fren")</h2>
+          <details class="ui-cekmece panel-section">
+            <summary><h2>🔴 Bir Admin'i Askıya Al ("Acil Fren")</h2></summary>
+            <div class="ui-cekmece-icerik">
             <p class="muted">
               Bu işlem hedefin TÜM oturumlarını anında sonlandırır ve hesabını
               geçici olarak kilitler. Kalıcı bir sonuç DEĞİLDİR — sadece bir
@@ -932,10 +953,12 @@ permalink: "/panel/dashboard.html"
               <button type="submit" class="btn-danger">Askıya Al</button>
             </form>
             <div id="ag-askiya-al-message" class="auth-message" hidden></div>
-          </section>
+          </div>
+          </details>
 
-          <section class="panel-section">
-            <h2>Denetim Vakaları</h2>
+          <details class="ui-cekmece panel-section">
+            <summary><h2>Denetim Vakaları</h2></summary>
+            <div class="ui-cekmece-icerik">
             <p class="muted">
               Vaka geçmişi sayfalanarak gösterilir. Kalıcı silme sadece Site
               Sahibi'ne (owner) açıktır ve her vaka tek tek, geri alınamaz şekilde
@@ -943,10 +966,12 @@ permalink: "/panel/dashboard.html"
             </p>
             <div id="ag-vaka-listesi"><p class="muted">Yükleniyor...</p></div>
             <div class="uya-sayfalama" id="ag-vaka-sayfalama"></div>
-          </section>
+          </div>
+          </details>
 
-          <section class="panel-section sadece-owner">
-            <h2>📜 Denetim Kaydı (Audit Log)</h2>
+          <details class="ui-cekmece panel-section sadece-owner">
+            <summary><h2>📜 Denetim Kaydı (Audit Log)</h2></summary>
+            <div class="ui-cekmece-icerik">
             <p class="muted">
               github-yonetim panelinin arkasındaki Worker'ın verdiği her yazma
               (ekleme/düzenleme/silme) denemesinin izi — kim, ne zaman, hangi
@@ -971,17 +996,20 @@ permalink: "/panel/dashboard.html"
               <button id="ag-denetim-hepsi-temizle-btn" type="button" class="btn-danger csp-w-auto">🗑️ Tüm Kayıtları Sil</button>
             </div>
             <div id="ag-denetim-message" class="auth-message" hidden></div>
-          </section>
+          </div>
+          </details>
 
-          <section class="panel-section">
-            <h2>Nasıl Karara Bağlanır?</h2>
+          <details class="ui-cekmece panel-section">
+            <summary><h2>Nasıl Karara Bağlanır?</h2></summary>
+            <div class="ui-cekmece-icerik">
             <ul>
               <li><strong>Çoğunluk oylaması:</strong> hedef hariç, askıda olmayan tüm admin/Site Sahibi'nin basit çoğunluğu "Kalıcı Düşür" ya da "Geri Aç" derse vaka anında o yönde kapanır.</li>
               <li><strong>Site Sahibi kararı:</strong> bir Site Sahibi varsa, oylama beklemeden tek başına vakayı kapatabilir.</li>
               <li><strong>Süre dolumu (fail-safe):</strong> karar süresine kadar kimse karar veremezse hesap OTOMATİK olarak geri açılır — varsayılan her zaman güvenli taraftadır, kimse kalıcı olarak düşürülmüş olmaz.</li>
               <li><strong>Sadece 2 admin varsa ve Site Sahibi yoksa:</strong> kalan tek admin'in kendi oyu "çoğunluk" sayılmaz (yetki gasbını önlemek için bilerek engellenmiştir) — vaka ancak bir Site Sahibi atanıp karar verirse ya da süre dolarsa kapanır.</li>
             </ul>
-          </section>
+          </div>
+          </details>
 
         </div>
     </section>
@@ -1270,8 +1298,9 @@ permalink: "/panel/dashboard.html"
         <button type="button" class="ra-sekme" data-hk="hakkimda" aria-selected="false">🙋 Hakkımda</button>
         <button type="button" class="ra-sekme" data-hk="baglantilar" aria-selected="false">🔗 Sosyal bağlantılar</button>
       </nav>
-      <section id="seo-ayarlari" class="panel-section">
-        <h2>SEO &amp; Site Adresleri</h2>
+      <details id="seo-ayarlari" class="ui-cekmece panel-section">
+        <summary><h2>SEO &amp; Site Adresleri</h2></summary>
+        <div class="ui-cekmece-icerik">
         <p class="muted">Bu değerler sitenin kökündeki <code>_config.yml</code> dosyasından okunur ve buradan kaydedince GitHub'a tek commit olarak yazılır (site yeniden derlenir). Kutularda şu an yayındaki değerler görünür.</p>
         <div class="seo-alan">
           <label for="seo-description"><strong>Site açıklaması</strong> <span class="muted">(description)</span></label>
@@ -1296,7 +1325,8 @@ permalink: "/panel/dashboard.html"
         </div>
         <div class="seo-eylem"><button type="button" class="btn-primary csp-w-auto" id="seo-kaydet">Kaydet</button> <button type="button" class="btn-secondary csp-w-auto" id="seo-yenile">Yeniden oku</button></div>
         <p class="muted" id="seo-mesaj" role="status" aria-live="polite"></p>
-      </section>
+      </div>
+      </details>
       <section id="hakkimda" class="panel-section" hidden>
               <h2>Hakkımda (Anasayfa)</h2>
               <p class="muted">
@@ -1368,8 +1398,9 @@ permalink: "/panel/dashboard.html"
               </div>
               <div id="hk-message" class="auth-message" hidden></div>
             </section>
-      <section id="baglantilar" class="panel-section">
-              <h2>Bağlantılar (Sosyal / Akademik)</h2>
+      <details id="baglantilar" class="ui-cekmece panel-section">
+        <summary><h2>Bağlantılar (Sosyal / Akademik)</h2></summary>
+        <div class="ui-cekmece-icerik">
               <p class="muted">
                 Anasayfada profil bilgisinin altında görünen bağlantı düğmelerini
                 (GitHub, LinkedIn, Google Scholar, ORCID, vb.) buradan ekleyebilir,
@@ -1412,7 +1443,8 @@ permalink: "/panel/dashboard.html"
                 <button id="bg-kaydet-btn" type="button" class="btn-primary csp-w-auto">Kaydet ve Yayınla</button>
               </div>
               <div id="bg-message" class="auth-message" hidden></div>
-            </section>
+      </div>
+      </details>
     </section>
 
     <section class="dash-view" id="view-sys-hesabim" hidden data-view="sys-hesabim">

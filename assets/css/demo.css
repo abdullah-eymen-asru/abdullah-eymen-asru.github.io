@@ -1,7 +1,7 @@
 /* assets/css/demo.css — Demo / Vitrin Modu (satır içi stil yok: CSP). Değişkenler: --bg --text --muted --accent --border --card-bg */
 
 /* Giriş sayfası düğmesi */
-.btn-demo { width: 100%; font: inherit; font-weight: 600; padding: .7rem 1rem; border-radius: 10px; cursor: pointer;
+.btn-demo { width: 100%; font: inherit; font-weight: 600; padding: .7rem 1rem; border-radius: var(--radius-md, 12px); cursor: pointer;
   color: var(--accent); background: var(--bg); border: 2px dashed var(--accent); }
 .btn-demo:hover, .btn-demo:focus-visible { background: var(--tag-bg); outline: none; }
 .demo-giris-not { font-size: .85rem; margin: .5rem 0 1rem; text-align: center; }
@@ -9,9 +9,9 @@
 /* Vitrin bandı */
 .demo-bandi { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; padding: .55rem .8rem; margin: 0 0 1rem;
   border: 1px solid var(--lang-notice-border, #f0dca0); background: var(--lang-notice-bg, #fff8e6); color: var(--lang-notice-text, #6b5a1e);
-  border-radius: 10px; font-size: .9rem; }
+  border-radius: var(--radius-md, 12px); font-size: .9rem; }
 .demo-bandi-metin { flex: 1 1 16rem; }
-.demo-bandi-btn, .demo-btn { font: inherit; cursor: pointer; padding: .35rem .8rem; border-radius: 8px; border: 1px solid var(--accent);
+.demo-bandi-btn, .demo-btn { font: inherit; cursor: pointer; padding: .35rem .8rem; border-radius: var(--radius-sm, 8px); border: 1px solid var(--accent);
   background: var(--accent); color: #fff; }
 .demo-bandi-btn { background: transparent; color: inherit; border-color: currentColor; }
 .demo-btn:disabled { opacity: .6; cursor: progress; }
@@ -20,7 +20,7 @@
 /* Toast */
 .demo-toast-kutu { position: fixed; left: 50%; bottom: 1.2rem; transform: translateX(-50%); display: grid; gap: .5rem;
   z-index: 100001; width: min(30rem, 92vw); pointer-events: none; }
-.demo-toast { display: flex; gap: .6rem; align-items: flex-start; pointer-events: auto; padding: .75rem 1rem; border-radius: 12px;
+.demo-toast { display: flex; gap: .6rem; align-items: flex-start; pointer-events: auto; padding: .75rem 1rem; border-radius: var(--radius-md, 12px);
   background: var(--text); color: var(--bg); box-shadow: 0 8px 28px rgba(0,0,0,.28); font-size: .92rem; line-height: 1.4;
   animation: demo-toast-gir .25s ease-out; transition: opacity .3s, transform .3s; }
 .demo-toast--kapaniyor { opacity: 0; transform: translateY(8px); }
@@ -39,7 +39,7 @@
 /* ZIP kartı */
 .demo-zip-karti { margin-top: 1.2rem; }
 .demo-zip-liste { margin: .4rem 0; padding-left: 1.1rem; }
-.demo-zip-onizleme { max-height: 14rem; overflow: auto; padding: .6rem; border: 1px solid var(--border); border-radius: 8px;
+.demo-zip-onizleme { max-height: 14rem; overflow: auto; padding: .6rem; border: 1px solid var(--border); border-radius: var(--radius-sm, 8px);
   background: var(--card-bg); white-space: pre-wrap; font-size: .82rem; }
 
 /* Yetki paneli: anahtarlar */
@@ -93,6 +93,6 @@
 @keyframes demo-don { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .demo-dondur { animation: none; } }
 .demo-anahtar small { flex: 1 1 100%; margin-left: 3rem; }
-.demo-onay { margin: .6rem 0 .2rem; padding: .8rem 1rem; border: 1px solid #e0a93b; border-radius: 12px; background: color-mix(in srgb, #e0a93b 10%, transparent); }
+.demo-onay { margin: .6rem 0 .2rem; padding: .8rem 1rem; border: 1px solid #e0a93b; border-radius: var(--radius-md, 12px); background: color-mix(in srgb, #e0a93b 10%, transparent); }
 .demo-onay p { margin: 0 0 .6rem; }
 .demo-onay-dugme { display: flex; flex-wrap: wrap; gap: .5rem; }

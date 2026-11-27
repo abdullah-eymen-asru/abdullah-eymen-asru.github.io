@@ -105,7 +105,7 @@ async function kur() {
   /* ---------------- ② Ayarlar ---------------- */
   const mod = el("select", { class: "md-girdi", "aria-label": "Çıktı dili" }, el("option", { value: "orijinal", text: "Konuşulan dilde yaz" }), el("option", { value: "tr", text: "Türkçe'ye çevirerek yaz" }), el("option", { value: "en", text: "İngilizce'ye çevirerek yaz" }));
   const dil = el("select", { class: "md-girdi", "aria-label": "Kayıttaki konuşma dili" }, ...DILLER.map(([v, a]) => el("option", { value: v, text: a })));
-  const kisiOto = el("input", { type: "checkbox", checked: tercih.oku("kisiOto", "1") === "1" });
+  const kisiOto = el("input", { type: "checkbox", class: "ui-surgu", checked: tercih.oku("kisiOto", "1") === "1" });
   const kisiSayisi = el("select", { class: "md-girdi", "aria-label": "Konuşmacı sayısı" }, el("option", { value: "0", text: "Sayıyı kendin bul" }), ...[1, 2, 3, 4, 5, 6, 8].map((n) => el("option", { value: String(n), text: `${n} kişi` })));
   const alan = (ad, g, ip) => el("label", { class: "ts-alan" }, el("span", { class: "ts-alan-ad", text: ad }), g, ip ? el("small", { class: "md-soluk", text: ip }) : null);
   /* Konuşmacı ayrımı kaynağı: sistem (Gemini, Worker) ya da KENDİ anahtarın (HavaStil şifreli kasası — oradaki anahtarlar burada da geçerlidir) */
@@ -183,7 +183,7 @@ async function kur() {
   const zamanYazi = (sn) => { const b = gunSaniyesi(baslangic.value); return b != null ? `${saat(sn)} (${gunSaati(b + sn)})` : saat(sn); };
 
   /* seçenekler (İndir sekmesi) */
-  const zamanSec = el("input", { type: "checkbox", checked: tercih.oku("zaman", "1") === "1" }), kSec = el("input", { type: "checkbox", checked: true }), gunSaatiSec = el("input", { type: "checkbox" });
+  const zamanSec = el("input", { type: "checkbox", class: "ui-surgu", checked: tercih.oku("zaman", "1") === "1" }), kSec = el("input", { type: "checkbox", class: "ui-surgu", checked: true }), gunSaatiSec = el("input", { type: "checkbox", class: "ui-surgu" });
   zamanSec.addEventListener("change", () => tercih.yaz("zaman", zamanSec.checked ? "1" : "0"));
   const secenek = () => ({ zaman: zamanSec.checked, konusmaci: kSec.checked && atanmisVar(), baslangicSn: baslangicSn() });
 

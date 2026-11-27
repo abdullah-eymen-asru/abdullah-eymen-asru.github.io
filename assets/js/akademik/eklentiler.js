@@ -178,7 +178,7 @@ const DILLER_URL = { tr: "tr", en: "en", de: "de", fr: "fr", es: "es", ar: "ar",
 export const KATALOG = Object.freeze({
   ceviri: {
     ad: "Çeviri (site içinde)", simge: "🌐", gizlilik: "karma", grup: "ceviri",
-    aciklama: "Seçili metni bu pencerede çevirir (yeni sekme açmaz). Otomatik modda cihaz içi çeviri DENENMEZ; onayınla doğrudan Google Çeviri, olmazsa MyMemory kullanılır. Veri çıkmasın istersen motoru «Yalnızca cihaz içi» seç. Giden veri: yalnızca seçtiğin metin ve dil çifti.",
+    aciklama: "Seçili metni bu pencerede çevirir. Veri çıkmasın istersen motoru «Yalnızca cihaz içi» yap.",
     ayarlar: [
       { anahtar: "hedef", etiket: "Hedef dil", tur: "secim", secenekler: DIL_SECENEKLERI, varsayilan: "tr" },
       { anahtar: "kaynak", etiket: "Kaynak dil", tur: "secim", secenekler: { auto: "Otomatik algıla", ...DIL_SECENEKLERI }, varsayilan: "auto" },
@@ -191,7 +191,7 @@ export const KATALOG = Object.freeze({
   },
   istatistik: {
     ad: "Metin bilgisi", simge: "🔢", gizlilik: "yerel",
-    aciklama: "Seçilen metnin kelime/karakter sayısını ve tahmini okuma süresini gösterir. Tamamen yerel.", ayarlar: [],
+    aciklama: "Seçili metnin kelime sayısını ve okuma süresini gösterir.", ayarlar: [],
     async calistir({ metin }) {
       const k = metin.split(/\s+/).filter(Boolean).length;
       return { baslik: "Metin bilgisi", metin: `${k} kelime · ${metin.length} karakter · ≈ ${Math.max(1, Math.round(k / 220 * 60))} sn okuma` };
@@ -199,7 +199,7 @@ export const KATALOG = Object.freeze({
   },
   temizle: {
     ad: "Temiz kopyala", simge: "🧹", gizlilik: "yerel",
-    aciklama: "PDF'ten gelen satır sonu tirelerini ve kopuk satırları düzelterek metni tek paragraf halinde panoya kopyalar. Yerel.", ayarlar: [],
+    aciklama: "Satır sonu tirelerini düzeltip metni tek paragraf olarak kopyalar.", ayarlar: [],
     async calistir({ metin }) {
       const temiz = metin.replace(/-\s*\n?\s*(?=\p{Ll})/gu, "").replace(/\s*\n\s*/g, " ").replace(/\s{2,}/g, " ").trim();
       try { await navigator.clipboard.writeText(temiz); } catch { /* pano izni yok */ }
@@ -208,7 +208,7 @@ export const KATALOG = Object.freeze({
   },
   doi_cikar: {
     ad: "DOI bul", simge: "🔗", gizlilik: "yerel", grup: "metin",
-    aciklama: "Seçili metindeki DOI'yi (satır sonu/tire bozulmalarını düzelterek) bulur, kopyalanmaya hazır verir ve panoya alır. “Doğrula” düğmesi isteğe bağlıdır (yalnızca DOI Crossref'e gider).",
+    aciklama: "Seçili metindeki DOI'yi bulup kopyalar. “Doğrula”ya basarsan yalnızca DOI Crossref'e gider.",
     ayarlar: [],
     async calistir({ metin }) {
       const doi = doiBul(metin);
@@ -223,12 +223,12 @@ export const KATALOG = Object.freeze({
       };
     },
   },
-  akademik: { ad: "Google Akademik'te ara", simge: "🎓", gizlilik: "baglanti", varsayilanKapali: true, aciklama: "Seçili metinle Google Akademik'i yeni sekmede açar (arama metni Google'a gider). Tercihe bağlı.", ayarlar: [], baglanti: ({ metin }) => `https://scholar.google.com/scholar?q=${encodeURIComponent(kisalt(metin, 300))}` },
-  semantic: { ad: "Semantic Scholar'da ara", simge: "🧠", gizlilik: "baglanti", varsayilanKapali: true, aciklama: "Seçili metinle Semantic Scholar'ı yeni sekmede açar. Tercihe bağlı.", ayarlar: [], baglanti: ({ metin }) => `https://www.semanticscholar.org/search?q=${encodeURIComponent(kisalt(metin, 300))}` },
-  vikipedi: { ad: "Vikipedi'de ara", simge: "🧭", gizlilik: "baglanti", varsayilanKapali: true, aciklama: "Seçili terimi Vikipedi'de yeni sekmede arar (kâr amacı gütmeyen, açık kaynak). Tercihe bağlı.", ayarlar: [], baglanti: ({ metin }) => `https://tr.wikipedia.org/w/index.php?search=${encodeURIComponent(kisalt(metin, 100))}` },
-  dergipark: { ad: "DergiPark'ta ara", simge: "📰", gizlilik: "baglanti", grup: "arama", varsayilanKapali: true, aciklama: "Seçili metinle DergiPark'ı yeni sekmede açar (Türkçe akademik dergiler).", ayarlar: [], baglanti: ({ metin }) => `https://dergipark.org.tr/tr/search?q=${encodeURIComponent(kisalt(metin, 200))}` },
-  crossref: { ad: "Crossref'te ara", simge: "🔎", gizlilik: "baglanti", grup: "arama", varsayilanKapali: true, aciklama: "Seçili metinle Crossref arama sayfasını yeni sekmede açar (DOI/künye bulmak için).", ayarlar: [], baglanti: ({ metin }) => `https://search.crossref.org/?q=${encodeURIComponent(kisalt(metin, 250))}` },
-  wiktionary: { ad: "Vikisözlük'te ara", simge: "📖", gizlilik: "baglanti", varsayilanKapali: true, aciklama: "Seçili kelimeyi Vikisözlük'te yeni sekmede arar. Tercihe bağlı.", ayarlar: [], baglanti: ({ metin }) => `https://tr.wiktionary.org/w/index.php?search=${encodeURIComponent(kisalt(metin, 60))}` },
+  akademik: { ad: "Google Akademik'te ara", simge: "🎓", gizlilik: "baglanti", varsayilanKapali: true, aciklama: "Seçili metni Google Akademik'te yeni sekmede arar.", ayarlar: [], baglanti: ({ metin }) => `https://scholar.google.com/scholar?q=${encodeURIComponent(kisalt(metin, 300))}` },
+  semantic: { ad: "Semantic Scholar'da ara", simge: "🧠", gizlilik: "baglanti", varsayilanKapali: true, aciklama: "Seçili metni Semantic Scholar'da yeni sekmede arar.", ayarlar: [], baglanti: ({ metin }) => `https://www.semanticscholar.org/search?q=${encodeURIComponent(kisalt(metin, 300))}` },
+  vikipedi: { ad: "Vikipedi'de ara", simge: "🧭", gizlilik: "baglanti", varsayilanKapali: true, aciklama: "Seçili terimi Vikipedi'de yeni sekmede arar.", ayarlar: [], baglanti: ({ metin }) => `https://tr.wikipedia.org/w/index.php?search=${encodeURIComponent(kisalt(metin, 100))}` },
+  dergipark: { ad: "DergiPark'ta ara", simge: "📰", gizlilik: "baglanti", grup: "arama", varsayilanKapali: true, aciklama: "Seçili metni DergiPark'ta yeni sekmede arar.", ayarlar: [], baglanti: ({ metin }) => `https://dergipark.org.tr/tr/search?q=${encodeURIComponent(kisalt(metin, 200))}` },
+  crossref: { ad: "Crossref'te ara", simge: "🔎", gizlilik: "baglanti", grup: "arama", varsayilanKapali: true, aciklama: "Seçili metni Crossref'te yeni sekmede arar.", ayarlar: [], baglanti: ({ metin }) => `https://search.crossref.org/?q=${encodeURIComponent(kisalt(metin, 250))}` },
+  wiktionary: { ad: "Vikisözlük'te ara", simge: "📖", gizlilik: "baglanti", varsayilanKapali: true, aciklama: "Seçili kelimeyi Vikisözlük'te yeni sekmede arar.", ayarlar: [], baglanti: ({ metin }) => `https://tr.wiktionary.org/w/index.php?search=${encodeURIComponent(kisalt(metin, 60))}` },
 });
 
 export const VARSAYILAN_AYAR = Object.freeze({ v: 1, acik: ["ceviri", "istatistik", "temizle", "doi_cikar"], ayar: {}, ozel: [], aramalar: [], otoCeviri: true });

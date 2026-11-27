@@ -336,7 +336,7 @@ export async function pdfDuzenleyiciKur(kap, { dosyalar, onDegisim, mesaj = () =
       islemAc),
     islemPaneli, aracSeridi, secenekSatiri, ipucu, dosyaGirdi);
 
-  const kaliciKutu = el("input", { type: "checkbox", id: "dn-kalici", checked: true });
+  const kaliciKutu = el("input", { type: "checkbox", class: "ui-surgu", "data-ui-sessiz": "", id: "dn-kalici", checked: true });
   const kaliciSatir = el("label", { class: "dn-kalici-satir", for: "dn-kalici", hidden: true }, kaliciKutu,
     el("span", { text: "Değiştirilen yazıları kalıcı sil (o sayfalar görüntüye çevrilir; eski yazı dosyada hiç kalmaz)" }));
 

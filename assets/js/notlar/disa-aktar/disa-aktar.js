@@ -495,10 +495,10 @@ export function disaAktarDiyalogu({ kapsamlar, ctx, baslangic = {}, kok = docume
       const ekVar = kap.ekVar;
       const zorunlu = kayitSayisi > 1 || secili.bicimler.size > 1;
       const zipDeger = zorunlu ? true : secili.zip ?? false;
-      const zipKutu = el("input", { type: "checkbox", disabled: zorunlu });
+      const zipKutu = el("input", { type: "checkbox", class: "ui-surgu", "data-ui-sessiz": "", disabled: zorunlu });
       zipKutu.checked = zipDeger;
       zipKutu.addEventListener("change", () => (secili.zip = zipKutu.checked));
-      const ekKutu = el("input", { type: "checkbox" });
+      const ekKutu = el("input", { type: "checkbox", class: "ui-surgu", "data-ui-sessiz": "" });
       ekKutu.checked = secili.ekler;
       ekKutu.addEventListener("change", () => {
         secili.ekler = ekKutu.checked;

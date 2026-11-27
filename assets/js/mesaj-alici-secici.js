@@ -84,7 +84,7 @@ export function aliciSeciciKur({ kok, onSec, onKapat, coklu = null }) {
     if (no !== istekNo) return;
     if (error) {
       const yok = /does not exist|PGRST202|42883|schema cache/i.test(error.message || "");
-      govde.replaceChildren(e("p", { class: "chat-bos", text: yok ? "0092 numaralı migration henüz çalıştırılmamış." : "Liste yüklenemedi." }));
+      govde.replaceChildren(e("p", { class: "chat-bos", text: yok ? (console.warn("0092 numaralı migration henüz çalıştırılmamış."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.") : "Liste yüklenemedi." }));
       return;
     }
     toplam = data?.[0] ? Number(data[0].toplam) : 0;
@@ -112,7 +112,7 @@ export function aliciSeciciKur({ kok, onSec, onKapat, coklu = null }) {
       kok.hidden = false; anaGorunum();
       govde.replaceChildren(e("p", { class: "chat-bos", text: "Yükleniyor…" }));
       const { data, error } = await supabase.rpc("mesaj_alici_ozeti");
-      if (error) { govde.replaceChildren(e("p", { class: "chat-bos", text: /does not exist|PGRST202|42883|schema cache/i.test(error.message || "") ? "0092 numaralı migration henüz çalıştırılmamış." : "Gruplar yüklenemedi." })); return; }
+      if (error) { govde.replaceChildren(e("p", { class: "chat-bos", text: /does not exist|PGRST202|42883|schema cache/i.test(error.message || "") ? (console.warn("0092 numaralı migration henüz çalıştırılmamış."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.") : "Gruplar yüklenemedi." })); return; }
       ozet = data || []; gruplariCiz(); arama.focus();
     },
   };

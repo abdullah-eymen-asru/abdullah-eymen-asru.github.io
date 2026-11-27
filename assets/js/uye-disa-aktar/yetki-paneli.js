@@ -25,7 +25,7 @@ function el(etiket, ozellikler = {}, ...cocuklar) {
 }
 
 const HEDEF_ROLLER = ["user", "special_user", "editor", "manager", "admin"];
-const hataMetni = (h) => (/does not exist|42883|PGRST202|schema cache/i.test(h?.message || h?.code || "") ? "Gerekli migration (0069 ve 0071) henüz çalıştırılmamış görünüyor: dosyaları SQL Editor'de sırayla çalıştır." : h?.message || String(h));
+const hataMetni = (h) => (/does not exist|42883|PGRST202|schema cache/i.test(h?.message || h?.code || "") ? (console.warn("Gerekli migration (0069 ve 0071) henüz çalıştırılmamış görünüyor: dosyaları SQL Editor'de sırayla çalıştır."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.") : h?.message || String(h));
 const eposta = (u) => (u?.email || "").trim();
 const aramaMetni = (u) => `${(u?.full_name || "")} ${[u?.first_name, u?.last_name].filter(Boolean).join(" ")} ${eposta(u)}`.toLocaleLowerCase("tr");
 const tamAd = (u) => (u?.full_name || "").trim() || [u?.first_name, u?.last_name].filter(Boolean).join(" ").trim() || "İsimsiz üye";

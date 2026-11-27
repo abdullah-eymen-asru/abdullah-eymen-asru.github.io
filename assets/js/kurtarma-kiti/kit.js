@@ -110,7 +110,7 @@ export async function kitOlustur() {
     const sarili = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: KIT_AAD }, kek, yuk);
     yuk.fill(0);
     const { error } = await supabase.rpc("e2ee_kit_kaydet", { p_sarili: E.b64Kodla(sarili), p_iv: E.b64Kodla(iv), p_tuz: E.b64Kodla(tuz), p_tur: KIT_KDF_TUR });
-    if (error) throw new KitHatasi("SUNUCU", /does not exist|PGRST202|42883|schema cache/i.test(error.message || "") ? "0096 numaralı migration henüz çalıştırılmamış." : error.message);
+    if (error) throw new KitHatasi("SUNUCU", /does not exist|PGRST202|42883|schema cache/i.test(error.message || "") ? (console.warn("0096 numaralı migration henüz çalıştırılmamış."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.") : error.message);
     return { kod, notlar: !!dek, mesajlar: !!rsa };
   } finally { dek?.fill(0); rsa?.fill(0); }
 }

@@ -875,7 +875,7 @@ function kutuphaneKur(kok, profil, owner) {
     alan.innerHTML = '<p class="ak-alt">Yükleniyor…</p>';
     if (!d.kayitlar.length) await yukle();
     const { data, error } = await supabase.from("akademik_paylasimlari").select("*").order("created_at", { ascending: false });
-    if (error) { alan.innerHTML = `<p class="ak-bos ak-hata">Paylaşımlar yüklenemedi: ${esc(error.message)}. Migration 0118 ve 0119 uygulanmış olmalı.</p>`; return; }
+    if (error) { console.error(error); alan.innerHTML = `<p class="ak-bos ak-hata">Paylaşımlar yüklenemedi. Lütfen tekrar dene.</p>`; return; }
     const durum = { kapsam: onSecilenKlasor ? "klasor" : "kutuphane", klasor: onSecilenKlasor || null, erisim: "link" };
     alan.innerHTML = `
       <section class="ak-pz-yeni">

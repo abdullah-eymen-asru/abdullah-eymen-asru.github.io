@@ -15,7 +15,7 @@
 
 /* ---------- panel üye şeridi (sticky DEĞİL: içeriği örtmez) ---------- */
 .dy-seridi { display: flex; flex-direction: column; gap: .4rem; } .dy-seridi:empty { display: none; }
-.dy-serit { display: flex; align-items: flex-start; gap: .6rem; padding: .55rem .8rem; border: 1px solid var(--dy-renk); border-left-width: 5px; border-radius: 12px; background: var(--card-bg, #fff); color: var(--text, #111); font-size: .88rem; }
+.dy-serit { display: flex; align-items: flex-start; gap: .6rem; padding: .55rem .8rem; border: 1px solid var(--dy-renk); border-left-width: 5px; border-radius: var(--radius-md, 12px); background: var(--card-bg, #fff); color: var(--text, #111); font-size: .88rem; }
 .dy-serit-govde { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: .15rem .6rem; }
 .dy-serit-baslik { font-size: .9rem; } .dy-serit-metin { margin: 0; flex-basis: 100%; white-space: pre-line; overflow-wrap: anywhere; line-height: 1.45; }
 .dy-serit.dy-kisa .dy-serit-metin { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -24,15 +24,15 @@
 .dy-serit-kapat:hover { border-color: var(--dy-renk); } .dy-serit-kapat:focus-visible, .dy-serit-ac:focus-visible, .dy-serit-baglanti:focus-visible { outline: 2px solid var(--accent, #2f6fed); outline-offset: 2px; }
 
 /* ---------- yönetim ekranı ---------- */
-.dy-form, .dy-kart { display: flex; flex-direction: column; gap: .5rem; padding: 1rem; border: 1px solid var(--border, #ccc); border-radius: 16px; background: var(--card-bg, #fff); margin: .6rem 0; }
+.dy-form, .dy-kart { display: flex; flex-direction: column; gap: .5rem; padding: 1rem; border: 1px solid var(--border, #ccc); border-radius: var(--radius-lg, 16px); background: var(--card-bg, #fff); margin: .6rem 0; }
 .dy-kart { border-left: 5px solid var(--dy-renk, var(--border)); }
 .dy-liste { display: flex; flex-direction: column; gap: .6rem; }
-.dy-girdi { width: 100%; box-sizing: border-box; min-height: 2.6rem; padding: .45rem .7rem; border: 1px solid var(--border, #ccc); border-radius: 10px; background: var(--bg, #fff); color: var(--text, #111); font: inherit; }
+.dy-girdi { width: 100%; box-sizing: border-box; min-height: 2.6rem; padding: .45rem .7rem; border: 1px solid var(--border, #ccc); border-radius: var(--radius-md, 12px); background: var(--bg, #fff); color: var(--text, #111); font: inherit; }
 .dy-metin { resize: vertical; min-height: 6rem; }
 .dy-etiket { display: block; margin: .3rem 0 .15rem; font-size: .78rem; font-weight: 700; color: var(--muted, #666); }
 .dy-iki { display: grid; grid-template-columns: 1fr; gap: .6rem; } @media (min-width: 640px) { .dy-iki { grid-template-columns: 1fr 1fr; } }
 .dy-onay { display: flex; align-items: center; gap: .5rem; font-size: .88rem; } .dy-not { font-size: .8rem; margin: .2rem 0; }
-.dy-onizleme { padding: .7rem .9rem; border: 1px dashed var(--dy-renk, var(--border)); border-left: 5px solid var(--dy-renk, var(--border)); border-radius: 12px; } .dy-onizleme p { margin: .3rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.dy-onizleme { padding: .7rem .9rem; border: 1px dashed var(--dy-renk, var(--border)); border-left: 5px solid var(--dy-renk, var(--border)); border-radius: var(--radius-md, 12px); } .dy-onizleme p { margin: .3rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .dy-eylem { display: flex; flex-wrap: wrap; gap: .5rem; } .dy-btn { min-height: 2.5rem; }
 .dy-tehlike { color: #e5584a; border-color: #e5584a; }
 .dy-kart-ust { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; }
@@ -42,7 +42,7 @@
 .dy-oran-0 { width: 0; } .dy-oran-10 { width: 10%; } .dy-oran-20 { width: 20%; } .dy-oran-30 { width: 30%; } .dy-oran-40 { width: 40%; } .dy-oran-50 { width: 50%; } .dy-oran-60 { width: 60%; } .dy-oran-70 { width: 70%; } .dy-oran-80 { width: 80%; } .dy-oran-90 { width: 90%; } .dy-oran-100 { width: 100%; }
 .dy-oku-kutu { display: flex; flex-direction: column; gap: .5rem; padding-top: .6rem; border-top: 1px solid var(--border, #ccc); }
 .dy-okuyanlar { display: flex; flex-direction: column; gap: .3rem; max-height: 22rem; overflow-y: auto; }
-.dy-okuyan { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .4rem; padding: .45rem .6rem; border: 1px solid var(--border, #ccc); border-radius: 10px; } .dy-okuyan-bilgi { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.dy-okuyan { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .4rem; padding: .45rem .6rem; border: 1px solid var(--border, #ccc); border-radius: var(--radius-md, 12px); } .dy-okuyan-bilgi { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
 .dy-sil { background: none; border: 0; color: #e5584a; font: inherit; font-size: .8rem; cursor: pointer; text-decoration: underline; }
 @media (prefers-reduced-motion: no-preference) { .dy-pencere[open] { animation: dy-giris .18s ease-out; } @keyframes dy-giris { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } } }
 

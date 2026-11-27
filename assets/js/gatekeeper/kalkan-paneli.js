@@ -215,7 +215,7 @@ async function kur() {
         class: "muted",
         text:
           tabloYok || yok
-            ? "site_ayarlari tablosu/satırı bulunamadı: supabase/migrations/0061_site_ayarlari_gatekeeper.sql dosyasını SQL Editor'de çalıştır."
+            ? (console.warn("site_ayarlari tablosu/satırı bulunamadı: supabase/migrations/0061_site_ayarlari_gatekeeper.sql dosyasını SQL Editor'de çalıştır."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.")
             : `Ayarlar yüklenemedi: ${error.message}`,
       })
     );

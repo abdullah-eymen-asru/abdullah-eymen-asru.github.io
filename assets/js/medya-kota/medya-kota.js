@@ -84,7 +84,7 @@ export function ownerAyar(arac, t = ARACLAR[arac], bitti = () => {}, acik = fals
   const dak = t.birim === "saniye";
   const kul = el("input", { class: "md-girdi", type: "number", min: "0", inputmode: "numeric", "aria-label": "Kullanıcı başına günlük limit" });
   const gen = el("input", { class: "md-girdi", type: "number", min: "0", inputmode: "numeric", "aria-label": "Genel günlük limit" });
-  const kendiIzin = el("input", { type: "checkbox", role: "switch" }), sistemAcik = el("input", { type: "checkbox", role: "switch" }), kotaAktif = el("input", { type: "checkbox", role: "switch" });
+  const kendiIzin = el("input", { type: "checkbox", class: "ui-surgu", "data-ui-sessiz": "", role: "switch" }), sistemAcik = el("input", { type: "checkbox", class: "ui-surgu", "data-ui-sessiz": "", role: "switch" }), kotaAktif = el("input", { type: "checkbox", class: "ui-surgu", "data-ui-sessiz": "", role: "switch" });
   /* Yetki ayarlarındaki gibi KAYDIRMALI anahtar (kırmızı = kapalı, yeşil = açık). Stil: medya-transkript.css › .mk-anahtar */
   const anahtarSatiri = (girdi, baslik, ipucu) => el("label", { class: "mk-anahtar" }, girdi, el("span", { class: "mk-anahtar-iz", "aria-hidden": "true" }), el("span", { class: "mk-anahtar-metin" }, el("strong", { text: baslik }), el("small", { class: "md-soluk", text: ipucu })));
   kotaAktif.addEventListener("change", () => { kul.disabled = gen.disabled = !kotaAktif.checked; });
@@ -140,7 +140,7 @@ export function kaynakSecici(arac) {
   const adres = el("input", { class: "md-girdi", type: "url", placeholder: "https://kullanici-space.hf.space/", autocomplete: "off", spellcheck: "false", "aria-label": "Çözümleyici adresi" });
   const tur = el("select", { class: "md-girdi", "aria-label": "Çözümleyici türü" }, el("option", { value: "ytdlp", text: "yt-dlp servisi (Hugging Face Space vb.)" }), el("option", { value: "cobalt", text: "Cobalt API" }));
   const anahtar = el("input", { class: "md-girdi", type: "password", autocomplete: "off", spellcheck: "false", placeholder: cozumleyici ? "API anahtarı (varsa)" : "gsk_…", "aria-label": cozumleyici ? "Çözümleyici anahtarı" : "Groq API anahtarı" });
-  const sakla = el("input", { type: "checkbox", checked: true }), durum = el("p", { class: "md-soluk mk-durum" });
+  const sakla = el("input", { type: "checkbox", class: "ui-surgu", "data-ui-sessiz": "", checked: true }), durum = el("p", { class: "md-soluk mk-durum" });
   const kayitSatiri = el("p", { class: "mk-kayit", role: "status" }), goster = el("input", { type: "checkbox" });
   goster.addEventListener("change", () => { anahtar.type = goster.checked ? "text" : "password"; });
   const maske = (v) => (v && v.length > 8 ? `${v.slice(0, 4)}••••••••${v.slice(-4)}` : v ? "••••" : "");

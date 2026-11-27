@@ -62,7 +62,7 @@
 .cerez-btn-primary,
 .cerez-btn-secondary {
   padding: 9px 16px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm, 8px);
   font: inherit;
   font-size: 0.85rem;
   font-weight: 600;
@@ -150,7 +150,7 @@
   overflow-y: auto;
   padding: 20px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-md, 12px);
   background: var(--bg);
   color: var(--text);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);

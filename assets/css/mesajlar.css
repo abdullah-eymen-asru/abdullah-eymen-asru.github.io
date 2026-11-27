@@ -40,7 +40,7 @@
   margin-left: auto;
   padding: 4px 10px;
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: var(--radius-lg, 16px);
   background: var(--tag-bg);
   color: var(--text);
   font-size: 0.76rem;
@@ -69,7 +69,7 @@
   flex-direction: column;
   padding: 18px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-md, 12px);
   background: var(--bg);
   color: var(--text);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);
@@ -102,7 +102,7 @@
 .msg-hedef-sekme {
   padding: 6px 12px;
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: var(--radius-lg, 16px);
   background: var(--tag-bg);
   color: var(--text);
   font-size: 0.8rem;
@@ -121,7 +121,7 @@
   margin-bottom: 10px;
   padding: 8px 10px;
   border: 1px dashed var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm, 8px);
   background: none;
   color: var(--text);
   font-size: 0.82rem;
@@ -133,7 +133,7 @@
 .msg-hedef-liste {
   overflow-y: auto;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm, 8px);
 }
 .msg-hedef-liste .msg-uye-sonuc-item { border-bottom: 1px solid var(--border); }
 .msg-hedef-liste .msg-uye-sonuc-item:last-child { border-bottom: none; }
@@ -184,14 +184,14 @@
 .msg-alici-geri:hover { border-color: var(--accent); }
 .msg-alici-baslik { font-weight: 700; font-size: .95rem; overflow-wrap: anywhere; min-width: 0; }
 .msg-alici-gruplar { display: grid; gap: 8px; }
-.msg-alici-grup { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; text-align: left; border: 1px solid var(--border); border-radius: 12px; background: var(--card-bg, var(--bg)); color: var(--text); font: inherit; cursor: pointer; min-width: 0; }
+.msg-alici-grup { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; text-align: left; border: 1px solid var(--border); border-radius: var(--radius-md, 12px); background: var(--card-bg, var(--bg)); color: var(--text); font: inherit; cursor: pointer; min-width: 0; }
 .msg-alici-grup:hover:not(:disabled) { border-color: var(--accent); background: var(--tag-bg); }
 .msg-alici-grup:disabled { opacity: .5; cursor: default; }
 .msg-alici-ikon { flex: none; font-size: 1.35rem; }
 .msg-alici-grup-ad { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
 .msg-alici-grup-ad small { color: var(--muted); font-size: .78rem; }
 .msg-alici-adet { flex: none; min-width: 28px; padding: 2px 9px; border-radius: 999px; background: var(--tag-bg); border: 1px solid var(--border); font-size: .8rem; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
-.msg-alici-liste { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.msg-alici-liste { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-md, 12px); overflow: hidden; }
 .msg-alici-liste .msg-uye-sonuc-item { width: 100%; text-align: left; }
 .msg-alici-daha { align-self: center; }
 
@@ -199,31 +199,31 @@
    2026-10 YENİ MESAJLAŞMA ARAYÜZÜ (assets/js/mesajlasma/arayuz.js) — "msj-" önekli
    ============================================================================ */
 .msj-kok { position: relative; min-width: 0; }
-.msj-panel { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); border: 1px solid var(--border); border-radius: 14px; background: var(--card-bg); overflow: hidden; height: min(72vh, 720px); min-height: 440px; }
+.msj-panel { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); border: 1px solid var(--border); border-radius: var(--radius-md, 12px); background: var(--card-bg); overflow: hidden; height: min(72vh, 720px); min-height: 440px; }
 .msj-sol, .msj-sag { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .msj-sol { border-right: 1px solid var(--border); padding: 10px; gap: 8px; overflow: hidden; }
 .msj-sol [hidden], .msj-sag [hidden], .msj-yeni-alan[hidden] { display: none !important; }
 .msj-sol-ust { display: flex; gap: 8px; flex-wrap: wrap; }
 .msj-sol-ust .msj-btn { flex: 1 1 120px; }
-.msj-ara { width: 100%; box-sizing: border-box; padding: 9px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); font: inherit; }
+.msj-ara { width: 100%; box-sizing: border-box; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-md, 12px); background: var(--bg); color: var(--text); font: inherit; }
 .msj-liste { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: auto; display: flex; flex-direction: column; gap: 6px; }
-.msj-yeni-alan { max-height: 55%; overflow-y: auto; border: 1px solid var(--border); border-radius: 12px; padding: 10px; background: var(--bg); }
+.msj-yeni-alan { max-height: 55%; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-md, 12px); padding: 10px; background: var(--bg); }
 .msj-yeni-form { display: flex; flex-direction: column; gap: 8px; }
-.msj-yeni-form input, .msj-yeni-form select { width: 100%; box-sizing: border-box; padding: 9px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); color: var(--text); font: inherit; }
+.msj-yeni-form input, .msj-yeni-form select { width: 100%; box-sizing: border-box; padding: 9px 10px; border: 1px solid var(--border); border-radius: var(--radius-md, 12px); background: var(--card-bg); color: var(--text); font: inherit; }
 .msj-yeni-kime { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; overflow-wrap: anywhere; }
 .msj-yeni-btnler { display: flex; gap: 8px; flex-wrap: wrap; }
 
-.msj-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--tag-bg); color: var(--text); font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap; line-height: 1.2; }
+.msj-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 14px; border-radius: var(--radius-md, 12px); border: 1px solid var(--border); background: var(--tag-bg); color: var(--text); font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap; line-height: 1.2; }
 .msj-btn:hover { border-color: var(--accent); }
 .msj-btn:focus-visible, .msj-ikon-btn:focus-visible, .msj-satir:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .msj-btn--birincil { background: var(--accent); border-color: var(--accent); color: #fff; }
-.msj-btn--tehlike { border-color: #c0392b; color: #c0392b; background: transparent; }
-.msj-btn--tehlike:hover { background: #c0392b; color: #fff; }
+.msj-btn--tehlike { border-color: var(--danger, #c0392b); color: var(--danger, #c0392b); background: transparent; }
+.msj-btn--tehlike:hover { background: var(--danger, #c0392b); color: #fff; }
 .msj-btn[disabled] { opacity: .55; cursor: not-allowed; }
 .msj-kucuk { padding: 5px 10px; font-size: .85rem; }
 .msj-cop-eylem { display: flex; justify-content: flex-end; }
 
-.msj-satir { position: relative; display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; cursor: pointer; background: var(--card-bg); min-width: 0; }
+.msj-satir { position: relative; display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md, 12px); cursor: pointer; background: var(--card-bg); min-width: 0; }
 .msj-satir:hover { border-color: var(--accent); }
 .msj-satir--aktif { border-color: var(--accent); background: var(--tag-bg); }
 .msj-satir--yeni { border-left: 4px solid var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--card-bg)); }
@@ -239,29 +239,29 @@
 
 .msj-sag-ust { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); min-width: 0; }
 .msj-baslik { flex: 1 1 auto; min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.msj-geri { display: none; border: 1px solid var(--border); background: var(--tag-bg); color: var(--text); border-radius: 10px; padding: 6px 12px; font: inherit; cursor: pointer; }
-.msj-ikon-btn { flex: none; border: 1px solid var(--border); background: var(--tag-bg); color: var(--text); border-radius: 10px; width: 38px; height: 38px; font-size: 1rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.msj-geri { display: none; border: 1px solid var(--border); background: var(--tag-bg); color: var(--text); border-radius: var(--radius-md, 12px); padding: 6px 12px; font: inherit; cursor: pointer; }
+.msj-ikon-btn { flex: none; border: 1px solid var(--border); background: var(--tag-bg); color: var(--text); border-radius: var(--radius-md, 12px); width: 38px; height: 38px; font-size: 1rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
 .msj-ikon-btn--aktif { border-color: var(--accent); background: var(--accent); }
-.msj-ikon-btn--tehlike:hover { border-color: #c0392b; color: #c0392b; }
+.msj-ikon-btn--tehlike:hover { border-color: var(--danger, #c0392b); color: var(--danger, #c0392b); }
 .msj-govde { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 .msj-bos { margin: auto; color: var(--muted); text-align: center; padding: 20px; }
 .msj-mesaj { display: flex; flex-direction: column; gap: 3px; max-width: min(78%, 640px); min-width: 0; }
 .msj-mesaj--ben { align-self: flex-end; align-items: flex-end; }
 .msj-mesaj--karsi { align-self: flex-start; align-items: flex-start; }
 .msj-gonderen { font-size: .75rem; color: var(--muted); }
-.msj-metin-balon { padding: 9px 13px; border-radius: 14px; background: var(--tag-bg); border: 1px solid var(--border); white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
+.msj-metin-balon { padding: 9px 13px; border-radius: var(--radius-md, 12px); background: var(--tag-bg); border: 1px solid var(--border); white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
 .msj-mesaj--ben .msj-metin-balon { background: var(--accent); border-color: var(--accent); color: #fff; }
 .msj-metin-balon--hata { font-style: italic; opacity: .85; }
 .msj-meta { font-size: .72rem; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .msj-mesaj-sil { border: 0; background: none; color: var(--muted); font: inherit; font-size: .72rem; cursor: pointer; text-decoration: underline; padding: 2px 4px; }
-.msj-mesaj-sil:hover { color: #c0392b; }
+.msj-mesaj-sil:hover { color: var(--danger, #c0392b); }
 .msj-form { display: flex; gap: 8px; align-items: flex-end; padding: 10px 12px; border-top: 1px solid var(--border); }
-.msj-metin { flex: 1 1 auto; min-width: 0; resize: none; padding: 9px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); color: var(--text); font: inherit; max-height: 140px; }
+.msj-metin { flex: 1 1 auto; min-width: 0; resize: none; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-md, 12px); background: var(--bg); color: var(--text); font: inherit; max-height: 140px; }
 .msj-gonder { flex: none; }
 .msj-bildirim { margin-top: 10px; }
 
 .msj-modal-kaplama { position: fixed; inset: 0; z-index: 9999; background: rgba(0, 0, 0, .55); display: flex; align-items: center; justify-content: center; padding: 16px; }
-.msj-modal { width: min(440px, 100%); background: var(--card-bg); color: var(--text); border: 1px solid var(--border); border-radius: 16px; padding: 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, .4); }
+.msj-modal { width: min(440px, 100%); background: var(--card-bg); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-lg, 16px); padding: 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, .4); }
 .msj-modal-baslik { margin: 0 0 8px; font-size: 1.1rem; }
 .msj-modal-metin { margin: 0 0 16px; color: var(--muted); line-height: 1.5; }
 .msj-modal-eylem { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
@@ -289,7 +289,7 @@
 .msj-ustbar-bilgi { color: var(--muted); font-size: .85rem; }
 .msj-ustbar-eylem { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
 .msj-bildirim-btn[aria-pressed="true"] { border-color: var(--accent); }
-.msj-uyari { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; padding: 10px 14px; margin-bottom: 10px; border: 1px solid var(--accent); border-radius: 12px; background: color-mix(in srgb, var(--accent) 10%, var(--card-bg)); }
+.msj-uyari { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; padding: 10px 14px; margin-bottom: 10px; border: 1px solid var(--accent); border-radius: var(--radius-md, 12px); background: color-mix(in srgb, var(--accent) 10%, var(--card-bg)); }
 .msj-uyari[hidden] { display: none !important; }
 .msj-uyari-eylem { display: flex; gap: 8px; }
 .msj-ikon-btn--etiketli { width: auto; padding: 0 12px; gap: 6px; }
@@ -299,7 +299,7 @@
 .msj-bolum-baslik { margin: 4px 0 6px; font-size: .95rem; }
 .msj-bos--kisa { padding: 6px 0 10px; margin: 0; text-align: left; }
 .msj-yonetim { display: grid; gap: 8px; }
-.msj-yonetim-kart { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; text-align: left; border: 1px solid var(--border); border-radius: 12px; background: var(--card-bg); color: var(--text); font: inherit; cursor: pointer; min-width: 0; }
+.msj-yonetim-kart { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; text-align: left; border: 1px solid var(--border); border-radius: var(--radius-md, 12px); background: var(--card-bg); color: var(--text); font: inherit; cursor: pointer; min-width: 0; }
 .msj-yonetim-kart:hover, .msj-yonetim-kart:focus-visible { border-color: var(--accent); background: var(--tag-bg); outline: none; }
 .msj-yonetim-ikon { font-size: 1.3rem; flex: none; }
 .msj-yonetim-ad { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
@@ -310,7 +310,7 @@
 .msj-cip button { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 2px 6px; font: inherit; }
 .msj-modal--genis { width: min(520px, 100%); max-height: 85vh; overflow-y: auto; }
 .msj-uye-liste { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
-.msj-uye-satir { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; }
+.msj-uye-satir { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md, 12px); }
 .msg-uye-sonuc-item--secili { background: var(--tag-bg); border-color: var(--accent); }
 .msj-kilit { margin: auto; max-width: 440px; padding: 24px 18px; text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
 .msj-kilit-ikon { font-size: 2.2rem; }
@@ -318,9 +318,9 @@
 .msj-kilit-metin { margin: 0; color: var(--muted); line-height: 1.5; }
 .msj-kilit-form { display: flex; flex-direction: column; gap: 10px; text-align: left; }
 .msj-kilit-alan { display: flex; flex-direction: column; gap: 4px; font-size: .85rem; }
-.msj-kilit-girdi { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); font: inherit; }
+.msj-kilit-girdi { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md, 12px); background: var(--bg); color: var(--text); font: inherit; }
 .msj-kilit-onay { display: flex; align-items: center; gap: 8px; font-size: .85rem; }
-.msj-kilit-hata { margin: 0; color: #c0392b; font-size: .85rem; }
+.msj-kilit-hata { margin: 0; color: var(--danger, #c0392b); font-size: .85rem; }
 .msj-kilit-hata[hidden] { display: none !important; }
 @media (max-width: 860px) { .msj-ikon-etiket { display: none; } .msj-ikon-btn--etiketli { width: 38px; padding: 0; } }
 
@@ -342,12 +342,12 @@
 @media (hover: none) { .msj-eylemler { display: inline-flex; opacity: .75; top: -12px; } }
 .msj-eylem-btn { font: inherit; line-height: 1; min-width: 32px; min-height: 32px; border: 0; border-radius: 999px; background: transparent; color: var(--text); cursor: pointer; }
 .msj-eylem-btn:hover, .msj-eylem-btn:focus-visible { background: var(--border); }
-.msj-menu { position: absolute; top: 20px; inset-inline-end: 8px; z-index: 5; min-width: 190px; display: grid; padding: 4px; border: 1px solid var(--border); border-radius: 12px; background: var(--card-bg, var(--bg)); box-shadow: 0 8px 28px rgba(0, 0, 0, .35); }
-.msj-menu-oge { font: inherit; text-align: start; padding: 10px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--text); cursor: pointer; min-height: 40px; }
+.msj-menu { position: absolute; top: 20px; inset-inline-end: 8px; z-index: 5; min-width: 190px; display: grid; padding: 4px; border: 1px solid var(--border); border-radius: var(--radius-md, 12px); background: var(--card-bg, var(--bg)); box-shadow: 0 8px 28px rgba(0, 0, 0, .35); }
+.msj-menu-oge { font: inherit; text-align: start; padding: 10px 12px; border: 0; border-radius: var(--radius-sm, 8px); background: transparent; color: var(--text); cursor: pointer; min-height: 40px; }
 .msj-menu-oge:hover, .msj-menu-oge:focus-visible { background: var(--border); }
 
 /* Alıntı kutusu (balonun üstünde) */
-.msj-alinti { display: grid; gap: 1px; width: 100%; text-align: start; font: inherit; font-size: .85rem; padding: 6px 10px; margin-bottom: 3px; border: 0; border-inline-start: 3px solid var(--accent, #3b82f6); border-radius: 8px; background: rgba(127, 127, 127, .16); color: var(--text); cursor: pointer; }
+.msj-alinti { display: grid; gap: 1px; width: 100%; text-align: start; font: inherit; font-size: .85rem; padding: 6px 10px; margin-bottom: 3px; border: 0; border-inline-start: 3px solid var(--accent, #3b82f6); border-radius: var(--radius-sm, 8px); background: rgba(127, 127, 127, .16); color: var(--text); cursor: pointer; }
 .msj-alinti span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Metin kutusu üstü yanıt önizlemesi */
@@ -364,15 +364,15 @@
 .msj-sabit-yazi span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Yıldızlı mesajlar paneli */
-.msj-yildiz-ara { width: 100%; font: inherit; padding: 10px 12px; margin-bottom: 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); box-sizing: border-box; }
+.msj-yildiz-ara { width: 100%; font: inherit; padding: 10px 12px; margin-bottom: 8px; border: 1px solid var(--border); border-radius: var(--radius-md, 12px); background: var(--bg); color: var(--text); box-sizing: border-box; }
 .msj-yildiz-liste { display: grid; gap: 6px; }
-.msj-yildiz-oge { display: grid; gap: 2px; text-align: start; font: inherit; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); color: var(--text); cursor: pointer; }
+.msj-yildiz-oge { display: grid; gap: 2px; text-align: start; font: inherit; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md, 12px); background: var(--bg); color: var(--text); cursor: pointer; }
 .msj-yildiz-oge:hover, .msj-yildiz-oge:focus-visible { border-color: var(--accent, #3b82f6); }
 .msj-yildiz-oge small { color: var(--muted); }
 .msj-yildiz-oge span { overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 
 /* Kilit paneli (giriş parolası / kurtarma kodu) */
-.msj-kilit-detay { margin-top: 10px; border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; }
+.msj-kilit-detay { margin-top: 10px; border: 1px solid var(--border); border-radius: var(--radius-md, 12px); padding: 8px 10px; }
 .msj-kilit-detay summary { cursor: pointer; font-weight: 600; }
 .msj-kilit-form { display: grid; gap: 8px; margin-top: 8px; }
 .msj-kilit-alan { display: grid; gap: 4px; font-size: .9rem; }
@@ -412,7 +412,7 @@
 .msj-kilit-detay .msj-kilit-form + .msj-kilit-form { margin-top: 12px; }
 
 /* 🩺 Tanılama raporu */
-.msj-tani { margin: 0 0 12px; padding: 12px; max-height: 50vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: .82rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; }
+.msj-tani { margin: 0 0 12px; padding: 12px; max-height: 50vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: .82rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-md, 12px); }
 .msj-kok[data-kilit="1"] .msj-tani-btn { display: none !important; }
 
 /* Bildirim engeli çözüm penceresi (bildirim-yardim.js) */

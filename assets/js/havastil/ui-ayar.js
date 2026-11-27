@@ -30,7 +30,7 @@ export function ayarSekmesi(d, kb) {
         liste[i] = { ...u, gunler: g.length ? g : u.gunler }; kaydet();
       })));
       const tur = cipGrubu({ secenekler: [["oneri", "Günlük öneri"], ["yalniz_uyari", "Yalnızca uyarı varsa"]], aktif: () => liste[i].tur, onSec: (v) => { liste[i] = { ...liste[i], tur: v }; uyarilariKaydet(liste); ciz(); }, kucuk: true });
-      const ac = el("input", { type: "checkbox", id: `uy-${u.id}`, "aria-label": "Uyarı açık" }); ac.checked = u.acik;
+      const ac = el("input", { type: "checkbox", class: "ui-surgu", id: `uy-${u.id}`, "aria-label": "Uyarı açık" }); ac.checked = u.acik;
       olay(ac, "change", () => { liste[i] = { ...u, acik: ac.checked }; kaydet(); });
       const sil = olay(el("button", { type: "button", class: "hv-btn hv-btn-ince hv-btn-tehlike", "aria-label": "Uyarıyı sil", text: "Sil" }), "click", () => { liste.splice(i, 1); kaydet(); });
       return el("div", { class: `hv-uyari-satir${u.acik ? "" : " kapali"}` }, el("div", { class: "hv-uyari-ust" }, saat, el("label", { class: "hv-onay", for: `uy-${u.id}` }, ac, el("span", { text: u.acik ? "Açık" : "Kapalı" })), sil), gunler, tur.kok);
@@ -64,7 +64,7 @@ export function ayarSekmesi(d, kb) {
 
   /* ---------- 2) Yapay zekâ ---------- */
   const taniKutu = el("div", { class: "hv-tani" });
-  const aiKutu = el("input", { type: "checkbox", id: "hv-ai-modu2", disabled: d.vitrin }); aiKutu.checked = d.aiModu && !d.vitrin;
+  const aiKutu = el("input", { type: "checkbox", class: "ui-surgu", id: "hv-ai-modu2", disabled: d.vitrin }); aiKutu.checked = d.aiModu && !d.vitrin;
   olay(aiKutu, "change", () => kb.aiModu(aiKutu.checked));
   const taniBtn = olay(el("button", { type: "button", class: "hv-btn hv-btn-ince", text: "🔧 Bağlantıyı test et", disabled: d.vitrin }), "click", async () => {
     taniBtn.disabled = true; taniKutu.replaceChildren(ipucu("Test ediliyor…"));
@@ -79,7 +79,7 @@ export function ayarSekmesi(d, kb) {
     taniBtn, taniKutu);
 
   /* ---------- 3) Bulut ---------- */
-  const bulutKutu = el("input", { type: "checkbox", id: "hv-bulut", disabled: d.vitrin }); bulutKutu.checked = d.bulut;
+  const bulutKutu = el("input", { type: "checkbox", class: "ui-surgu", id: "hv-bulut", disabled: d.vitrin }); bulutKutu.checked = d.bulut;
   const bulutDurum = el("p", { class: "hv-ipucu", id: "hv-bulut-durum" });
   olay(bulutKutu, "change", async () => { bulutDurum.textContent = ""; const m = await kb.bulutDegis(bulutKutu.checked); if (m) bulutDurum.textContent = m; bulutKutu.checked = d.bulut; });
   const bulutKart = kart("", bolumBasligi("☁️ Cihazlar arası senkron"),
@@ -87,7 +87,7 @@ export function ayarSekmesi(d, kb) {
     ipucu(d.vitrin ? "Vitrin modunda hesap senkronu ve konum kaydetme kapalıdır; buluta hiçbir istek gitmez." : "Açıkken ⭐ ile kaydettiğin konumlar (adı, simgesi ve koordinatı, yuvarlanmadan) ve tercihlerin anında hesabına yazılır; diğer cihazlarında sayfayı açınca ya da sekmeye dönünce görünür. İlk kullanımda sana sorulur; rızan olmadan hiçbir şey kaydedilmez. Anlık GPS konumun ve aramaların asla kaydedilmez. Kapatırsan bulut verisini de sildirebilirsin."), bulutDurum);
 
   /* ---------- 4) Haber doğrulama anahtarı ---------- */
-  const haberKutu = el("input", { type: "checkbox", id: "hv-haber-acik" }); haberKutu.checked = d.haberAcik;
+  const haberKutu = el("input", { type: "checkbox", class: "ui-surgu", id: "hv-haber-acik" }); haberKutu.checked = d.haberAcik;
   olay(haberKutu, "change", () => kb.haberAcikDegis(haberKutu.checked));
   const haberKart = kart("", bolumBasligi("📰 Haber doğrulama"),
     el("label", { class: "hv-onay", for: "hv-haber-acik" }, haberKutu, el("span", { text: "Resmî uyarıları kontrol et ve kombine yansıt" })),

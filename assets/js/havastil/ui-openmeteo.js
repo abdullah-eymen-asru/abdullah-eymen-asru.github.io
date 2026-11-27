@@ -54,7 +54,7 @@ export function openMeteoAyarKarti(d, kb) {
     try {
       const o = await omKullanimOzeti(); kullanimKutu.replaceChildren(kullanimTablosu(o));
       const a = await omAyar(true);
-      durum.textContent = `Plan: ${a.plan === "ticari" ? "ticari" : "ücretsiz"} · etkin kaynak: ${a.aktif_kaynak === "site" ? "site API anahtarı (Worker)" : "ücretsiz Open-Meteo (IP başına)"}${a.migrasyonYok ? " · (kota tabloları kurulu değil: 0121 migration'ı çalıştır)" : ""}.`;
+      durum.textContent = `Plan: ${a.plan === "ticari" ? "ticari" : "ücretsiz"} · etkin kaynak: ${a.aktif_kaynak === "site" ? "site anahtarı" : "ücretsiz Open-Meteo (IP başına)"}${a.migrasyonYok ? (console.warn("Kota tabloları kurulu değil: 0121 migration"), " · (kota bilgisi şu an kullanılamıyor)") : ""}.`;
     } catch (h) { durum.textContent = /does not exist|schema cache/i.test(h.message) ? "Kota sistemi henüz kurulmamış (Supabase: 0121_openmeteo_kota_ve_api.sql)." : `Kullanım okunamadı: ${h.message}`; }
   }
 
@@ -88,8 +88,8 @@ export function openMeteoAyarKarti(d, kb) {
     const plan = el("select", { class: "hv-girdi", "aria-label": "Plan" }, el("option", { value: "ucretsiz", text: "Ücretsiz (tarayıcıdan, IP başına)" }), el("option", { value: "ticari", text: "Ticari (site anahtarı, Worker vekili)" }));
     plan.value = a.plan;
     const uc = limitSatiri("Ücretsiz plan sınırı (IP başına)", a.ucretsiz_limit), ti = limitSatiri("Ticari plan sınırı (site toplamı)", a.ticari_limit), ku = limitSatiri("Kişi başı varsayılan sınır", a.kullanici_limit);
-    const izin = el("input", { type: "checkbox", checked: a.kendi_anahtar_izni !== false });
-    const tanimli = el("input", { type: "checkbox", checked: !!a.site_anahtari_tanimli });
+    const izin = el("input", { type: "checkbox", class: "ui-surgu", "data-ui-sessiz": "", checked: a.kendi_anahtar_izni !== false });
+    const tanimli = el("input", { type: "checkbox", class: "ui-surgu", "data-ui-sessiz": "", checked: !!a.site_anahtari_tanimli });
     const not = el("input", { type: "text", class: "hv-girdi", value: a.aciklama || "", placeholder: "Not (örn. plan adı, yenileme tarihi)" });
     const mesaj = el("p", { class: "hv-ipucu", role: "status" });
     const kaydet = olay(el("button", { type: "button", class: "hv-btn hv-btn-birincil", text: "Yönetici ayarlarını kaydet" }), "click", async () => {

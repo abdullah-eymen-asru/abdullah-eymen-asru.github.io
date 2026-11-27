@@ -49,7 +49,7 @@ export const bugunDamga = () => {
 
 export function hataMetni(h) {
   const m = h?.message || String(h || "");
-  if (/does not exist|42883|PGRST202|schema cache/i.test(m)) return "Gerekli migration (0074 / 0075 / 0081) henüz çalıştırılmamış.";
+  if (/does not exist|42883|PGRST202|schema cache/i.test(m)) return (console.warn("Gerekli migration (0074 / 0075 / 0081) henüz çalıştırılmamış."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.");
   return m;
 }
 

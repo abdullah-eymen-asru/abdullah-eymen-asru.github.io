@@ -26,7 +26,7 @@
   padding: 0;
   margin: 0;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-sm, 8px);
   background: transparent;
   color: var(--muted, #6b7280);
   cursor: pointer;

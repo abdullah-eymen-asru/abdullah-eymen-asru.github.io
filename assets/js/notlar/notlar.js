@@ -3835,7 +3835,7 @@ async function init() {
     const sema = /relation .*not_kasasi|does not exist|42P01/i.test(h?.message || "");
     bildir(
       sema
-        ? "Not tablosu bulunamadı: 0056_notlar_e2ee.sql migration'ını Supabase'de çalıştırdın mı?"
+        ? (console.warn("Not tablosu bulunamadı: 0056_notlar_e2ee.sql migration'ını Supabase'de çalıştırdın mı?"), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.")
         : "Not Kasası başlatılamadı: " + (h.message || h),
       "error",
       0

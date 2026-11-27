@@ -222,7 +222,7 @@ export function kotaAnaliziKarti() {
         ? "Saatlik döküm yalnızca son ~31 gün için vardır; veri 5 dakikaya kadar gecikmeli olabilir."
         : "31 günden eski veriler, analitik ekranı açıldıkça kaydedilen günlük toplamlardan gelir; kayıt yoksa “veri yok” yazar.",
       durum.pagesOkunamadi ? "Pages Functions verisi Cloudflare'den okunamadı; yalnızca Workers sayıları gösteriliyor." : null,
-      durum.gecmisYazildi === false ? "Günlük geçmiş tablosu yazılamadı (migration 0106 çalıştırılmamış olabilir): 31 günden eski görünümler boş kalır." : null,
+      durum.gecmisYazildi === false ? (console.warn("Günlük geçmiş tablosu yazılamadı (migration 0106 çalıştırılmamış olabilir): 31 günden eski görünümler boş kalır."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.") : null,
     ].filter(Boolean);
 
     govde.replaceChildren(olcekSerit, gezinti, ozet, liste, ...notlar.map((n) => el("p", { class: "muted sy-not", text: n })));

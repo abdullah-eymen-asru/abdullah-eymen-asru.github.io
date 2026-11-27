@@ -17,13 +17,13 @@ export async function eklentiPaneliKur(yer) {
     clearTimeout(zamanlayici);
     zamanlayici = setTimeout(async () => {
       const s = await ayarKaydet(a);
-      durum.textContent = s.bulut ? "Kaydedildi (hesabına bağlı; tüm cihazlarında geçerli)." : `Bu tarayıcıya kaydedildi (hesaba yazılamadı${s.hata ? `: ${s.hata}` : ""}).`;
+      durum.textContent = s.bulut ? "Kaydedildi." : "Bu tarayıcıya kaydedildi; hesaba yazılamadı.";
     }, 350);
   };
   const ciz = () => {
     const liste = el("div", { class: "ak-ek-liste" });
     const satir = (id, ad, simge, aciklama, ayarlar, ozel, gizlilik) => {
-      const kutu = el("input", { type: "checkbox", id: `ak-ek-${id}`, checked: a.acik.includes(id) });
+      const kutu = el("input", { type: "checkbox", class: "ui-surgu", id: `ak-ek-${id}`, checked: a.acik.includes(id) });
       kutu.addEventListener("change", () => { a.acik = kutu.checked ? [...new Set([...a.acik, id])] : a.acik.filter((x) => x !== id); kaydet(); });
       const ayarAlan = el("div", { class: "ak-ek-ayar" });
       for (const s of ayarlar || []) {
@@ -48,21 +48,21 @@ export async function eklentiPaneliKur(yer) {
       liste.append(kutu);
     }
     // Çevrimiçi çeviri rızası (tek yerden aç/kapat)
-    const riza = el("input", { type: "checkbox", id: "ak-ek-riza", checked: cevirRizasiVarMi() });
+    const riza = el("input", { type: "checkbox", class: "ui-surgu", id: "ak-ek-riza", checked: cevirRizasiVarMi() });
     riza.addEventListener("change", () => { if (riza.checked) { if (window.confirm(RIZA_METNI)) cevirRizasiVer(); else riza.checked = false; } else cevirRizasiGeriAl(); });
-    liste.prepend(el("label", { class: "ak-ek-satir ak-ek-riza", for: "ak-ek-riza" }, el("span", { class: "ak-ek-ust" }, riza, el("strong", { text: "Çevrimiçi çeviriye izin ver" })), el("small", { class: "ak-alt", text: "Açıkken seçtiğin metin (en çok 1500 karakter) ve dil çifti çeviri servisine (Google Çeviri / MyMemory) gönderilir; başka hiçbir bilgin gönderilmez. Kapalıyken yalnızca cihaz içi çeviri (Chrome/Edge) çalışır." })));
+    liste.prepend(el("label", { class: "ak-ek-satir ak-ek-riza", for: "ak-ek-riza" }, el("span", { class: "ak-ek-ust" }, riza, el("strong", { text: "Çevrimiçi çeviriye izin ver" })), el("small", { class: "ak-alt", text: "Açıkken seçtiğin metin (en çok 1500 karakter) çeviri servisine gönderilir. Kapalıyken yalnızca cihaz içi çeviri çalışır." })));
 
     // Otomatik Anında Çeviri (Gizlilik Modu): varsayılan AÇIK. Kapalıyken seçimde HİÇBİR çeviri isteği gönderilmez; yalnızca "Çevir" düğmesi çalışır.
-    const oto = el("input", { type: "checkbox", id: "ak-ek-oto", checked: a.otoCeviri !== false });
+    const oto = el("input", { type: "checkbox", class: "ui-surgu", id: "ak-ek-oto", checked: a.otoCeviri !== false });
     oto.addEventListener("change", () => { a.otoCeviri = oto.checked; kaydet(); });
-    liste.prepend(el("label", { class: "ak-ek-satir ak-ek-riza", for: "ak-ek-oto" }, el("span", { class: "ak-ek-ust" }, oto, el("strong", { text: "Otomatik Anında Çeviri (Gizlilik Modu)" })), el("small", { class: "ak-alt", text: "Açıkken yabancı dilde metin seçtiğinde (ya da altını çizerken) çeviri, “Çevir”e basmadan seçim menüsünde görünür; bunun için seçtiğin metin (en çok 600 karakter) çeviri servisine gönderilir. Kapalıyken seçimde HİÇBİR istek gönderilmez, çeviri yalnızca “Çevir” düğmesine basınca yapılır." })));
+    liste.prepend(el("label", { class: "ak-ek-satir ak-ek-riza", for: "ak-ek-oto" }, el("span", { class: "ak-ek-ust" }, oto, el("strong", { text: "Otomatik Anında Çeviri (Gizlilik Modu)" })), el("small", { class: "ak-alt", text: "Açıkken seçtiğin metin (en çok 600 karakter) çeviri servisine gönderilir ve çeviri menüde kendiliğinden görünür. Kapalıyken çeviri yalnızca “Çevir”e basınca yapılır." })));
 
     // Modüller (genişletme altyapısı): sorunlu bir modül buradan kapatılır; okuyucu/notlar/veritabanı etkilenmez.
     const mod = modulDurumlari();
     if (mod.length) {
       const kutu = el("div", { class: "ak-ek-grup" }, el("h4", { text: "🧱 Okuyucu modülleri" }));
       for (const m of mod) {
-        const k = el("input", { type: "checkbox", id: `ak-mod-${m.id}`, checked: m.durum === "etkin", disabled: m.durum === "reddedildi" });
+        const k = el("input", { type: "checkbox", class: "ui-surgu", id: `ak-mod-${m.id}`, checked: m.durum === "etkin", disabled: m.durum === "reddedildi" });
         k.addEventListener("change", () => { modulAyarla(m.id, k.checked); });
         kutu.append(el("label", { class: "ak-ek-satir", for: `ak-mod-${m.id}` }, el("span", { class: "ak-ek-ust" }, k, el("strong", { text: `${m.ad} ${m.surum}` }), el("span", { class: "ak-ek-rozet yerel", text: m.durum === "etkin" ? "çalışıyor" : m.durum })), el("small", { class: "ak-alt", text: m.neden || m.aciklama })));
       }
@@ -85,7 +85,7 @@ export async function eklentiPaneliKur(yer) {
       ad, url, ekle);
     yer.replaceChildren(el("details", { class: "ak-motor-kart ak-ek-kart" },
       el("summary", {}, "🧩 Okuyucu eklentileri", el("small", { class: "ak-alt" }, " — PDF'te metin seçince balonda çıkar (çeviri, sözlük, Vikipedi, künye bulma…)")),
-      el("p", { class: "ak-alt" }, "PDF'te bir metin seçince çıkan balonda hangi araçların görüneceğini buradan seçersin. İşaretli olanlar balonda görünür. Depolama kotanı kullanmaz; dış kod çalıştırılmaz."),
+      el("p", { class: "ak-alt" }, "PDF'te metin seçince çıkan balonda hangi araçların görüneceğini seç."),
       liste, ekleKutu, durum));
   };
   ciz();

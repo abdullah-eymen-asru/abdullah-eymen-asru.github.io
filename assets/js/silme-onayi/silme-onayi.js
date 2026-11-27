@@ -222,7 +222,7 @@ function ciz() {
 async function yukle() {
   const { data, error } = await supabase.rpc("hesap_silme_talepleri_getir");
   if (error) {
-    listeKab.replaceChildren(el("p", { class: "auth-message error", text: /does not exist|PGRST202|schema cache/i.test(error.message) ? "Gerekli migration (0078) henüz çalıştırılmamış." : error.message }));
+    listeKab.replaceChildren(el("p", { class: "auth-message error", text: /does not exist|PGRST202|schema cache/i.test(error.message) ? (console.warn("Gerekli migration (0078) henüz çalıştırılmamış."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.") : error.message }));
     return;
   }
   talepler = data || [];

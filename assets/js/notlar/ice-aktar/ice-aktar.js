@@ -65,7 +65,7 @@ export function iceAktarDiyalogu({ ctx, kok = document.body, uygula, bildir = ()
     const uyari = el("div", { class: "nt-ia-uyari", hidden: true });
     const hedefSec = el("select", { "aria-label": "Hedef klasör" });
     ctx.klasorSecenekleriDoldur(hedefSec);
-    const yapiKutu = el("input", { type: "checkbox" });
+    const yapiKutu = el("input", { type: "checkbox", class: "ui-surgu", "data-ui-sessiz": "" });
     yapiKutu.checked = true;
     const yapiSatiri = el(
       "label",

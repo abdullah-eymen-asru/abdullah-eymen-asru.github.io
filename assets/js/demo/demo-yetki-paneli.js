@@ -77,11 +77,11 @@ async function baslat() {
   function hataMetni(err, hangiSql) {
     const kod = String(err?.code || "");
     const ham = String(err?.message || err || "bilinmeyen hata");
-    if (kod === "42501" || /yetkisiz/i.test(ham)) return `Yetkisiz: bu anahtarı yalnızca Site Sahibi değiştirebilir. (${ham})`;
+    if (kod === "42501" || /yetkisiz/i.test(ham)) return "Bu anahtarı yalnızca Site Sahibi değiştirebilir.";
     if (kod === "PGRST202" || kod === "42883" || /could not find the function|schema cache/i.test(ham))
-      return `Veritabanında gerekli fonksiyon yok. Supabase SQL Editor'de ${hangiSql} migration'ını çalıştır (en güvenlisi 0103_demo_ust_anahtarlar_onarim.sql). (${ham})`;
-    if (kod === "P0002" || /satırı bulunamadı/i.test(ham)) return `demo_config satırı yok. 0103_demo_ust_anahtarlar_onarim.sql dosyasını çalıştır. (${ham})`;
-    if (/failed to fetch|network|load failed/i.test(ham)) return `Sunucuya ulaşılamadı (ağ). Bağlantını kontrol edip tekrar dene. (${ham})`;
+      { console.warn(`Demo: ${hangiSql} migration'ı gerekli (0103_demo_ust_anahtarlar_onarim.sql). Ham hata: ${ham}`); return "Bu ayar şu an kullanılamıyor. Lütfen daha sonra tekrar dene."; }
+    if (kod === "P0002" || /satırı bulunamadı/i.test(ham)) { console.warn(`demo_config satırı yok (0103_demo_ust_anahtarlar_onarim.sql). Ham hata: ${ham}`); return "Bu ayar şu an kullanılamıyor. Lütfen daha sonra tekrar dene."; }
+    if (/failed to fetch|network|load failed/i.test(ham)) return "Sunucuya ulaşılamadı. Bağlantını kontrol edip tekrar dene.";
     if (/jwt|expired|not authenticated/i.test(ham)) return `Oturum süresi dolmuş olabilir: sayfayı yenileyip tekrar giriş yap. (${ham})`;
     return ham;
   }

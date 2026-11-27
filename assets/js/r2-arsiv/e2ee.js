@@ -245,7 +245,7 @@ export const rastgele = (n) => crypto.getRandomValues(new Uint8Array(n));
 /** Anahtar kaydının durumu (ağ: 1 RPC). { var, kurtarma_var (ESKİ parola), dek_var, kit_var, kit_at } */
 export async function anahtarDurumu() {
   const { data, error } = await supabase.rpc("e2ee_durum");
-  if (error) throw new Error(/does not exist|PGRST202|42883|schema cache/i.test(error.message || "") ? "0096 numaralı migration henüz çalıştırılmamış." : error.message);
+  if (error) throw new Error(/does not exist|PGRST202|42883|schema cache/i.test(error.message || "") ? (console.warn("0096 numaralı migration henüz çalıştırılmamış."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.") : error.message);
   return data || { var: false, kurtarma_var: false, kit_var: false };
 }
 
@@ -410,8 +410,8 @@ export function zarfHataMetni(error) {
   if (/YETKI_YOK/i.test(m)) return "Dosya gönderme yetkin yok.";
   if (/DOSYA_YOK/i.test(m)) return "Bu şifreli dosya sana ait değil ya da bulunamadı.";
   if (/ZARF_COK/i.test(m)) return "En fazla 50 alıcıya aynı anda gönderilebilir.";
-  if (/does not exist|PGRST202|42883|schema cache/i.test(m)) return "Şifre zarfları kaydedilemedi: 0105 numaralı migration henüz çalıştırılmamış.";
-  if (/infinite recursion|42P17/i.test(m)) return "Şifre zarfları kaydedilemedi: veritabanı politikası döngüsü (0105 migration'ı uygula).";
+  if (/does not exist|PGRST202|42883|schema cache/i.test(m)) return (console.warn("Şifre zarfları kaydedilemedi: 0105 numaralı migration henüz çalıştırılmamış."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.");
+  if (/infinite recursion|42P17/i.test(m)) return (console.warn("Şifre zarfları kaydedilemedi: veritabanı politikası döngüsü (0105 migration'ı uygula)."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.");
   return `Şifre zarfları kaydedilemedi (${error?.code || "hata"}: ${m.slice(0, 160) || "ayrıntı yok"}).`;
 }
 

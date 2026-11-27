@@ -134,7 +134,7 @@ export async function birlestir(yerel) { return (await bulutEsitle(yerel)).liste
 export function bulutHataMetni(h) {
   const m = `${h?.code || ""} ${h?.message || ""}`;
   if (/42501|row-level security|permission denied/i.test(m)) return "⚠️ Hesabında HavaStil bulut kaydı yetkisi yok (RLS). Konum bu cihazda tutuldu.";
-  if (/42P01|does not exist|schema cache|PGRST205/i.test(m)) return "⚠️ Gerekli migration (0099–0104) çalıştırılmamış. Konum bu cihazda tutuldu.";
+  if (/42P01|does not exist|schema cache|PGRST205/i.test(m)) return (console.warn("⚠️ Gerekli migration (0099–0104) çalıştırılmamış. Konum bu cihazda tutuldu."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.");
   if (/En fazla 20/i.test(m)) return "⚠️ En fazla 20 konum kaydedebilirsin.";
   if (/23505|duplicate key/i.test(m)) return "⚠️ Aynı isimde başka bir konumun var; ismi değiştir.";
   if (/Oturum yok|JWT|401/i.test(m)) return "⚠️ Oturum süresi dolmuş olabilir; yeniden giriş yap. Konum bu cihazda tutuldu.";

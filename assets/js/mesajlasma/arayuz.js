@@ -498,7 +498,7 @@ export async function mesajlasmaKur(kok, { profile, adminMi, konuOnDolgu = "" })
   sessizBtn.addEventListener("click", async () => {
     const c = durum.secili; if (!c) return;
     const { error } = await V.sessize(c.id, !c.sessiz);
-    if (error) return duyur(/does not exist|PGRST202|42883/i.test(error.message) ? "0095 numaralı migration henüz çalıştırılmamış." : error.message, true);
+    if (error) return duyur(/does not exist|PGRST202|42883/i.test(error.message) ? (console.warn("0095 numaralı migration henüz çalıştırılmamış."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.") : error.message, true);
     c.sessiz = !c.sessiz; ustDugmeleriAyarla(c); listeyiCiz();
     duyur(c.sessiz ? "Bu sohbet sessize alındı: bildirim gelmez (mesajlar yine ulaşır)." : "Sohbetin sesi açıldı.");
   });

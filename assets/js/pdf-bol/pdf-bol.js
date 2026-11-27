@@ -94,7 +94,7 @@ async function kur() {
   /* ---------------- mod ve ayarlar ---------------- */
   const modBar = el("div", { class: "pb-modlar", role: "tablist", "aria-label": "Bölme yöntemi" });
   const ayarKutu = el("div", { class: "pb-ayarlar" });
-  const metaTemizle = el("input", { type: "checkbox", id: "pb-meta" });
+  const metaTemizle = el("input", { type: "checkbox", class: "ui-surgu", "data-ui-sessiz": "", id: "pb-meta" });
   const secenekler = el("label", { class: "pb-onay", for: "pb-meta" }, metaTemizle, el("span", { text: "Çıktılardaki metadata'yı (başlık, yazar, üretici vb.) temizle" }));
   function cizModlar() {
     modBar.replaceChildren(...MODLAR.map(([id, ad]) => {
@@ -116,7 +116,7 @@ async function kur() {
     calis.addEventListener("click", () => calistir());
     if (d.mod === "aralik") {
       g.aralik = el("input", { type: "text", class: "pb-girdi", placeholder: "1-3, 5, 8-10  (son = son sayfa, 12- = 12'den sona)", autocomplete: "off", spellcheck: "false" });
-      g.birlestir = el("input", { type: "checkbox", id: "pb-birlestir" });
+      g.birlestir = el("input", { type: "checkbox", class: "ui-surgu", "data-ui-sessiz": "", id: "pb-birlestir" });
       ayarKutu.append(alanEl(`Sayfa aralıkları (1–${d.n})`, g.aralik), el("label", { class: "pb-onay", for: "pb-birlestir" }, g.birlestir, el("span", { text: "Tüm aralıkları TEK PDF'de birleştir (yoksa her aralık ayrı dosya)" })));
     } else if (d.mod === "her-n") {
       g.n = el("input", { type: "number", class: "pb-girdi", min: "1", max: String(d.n), value: "1", inputmode: "numeric" });

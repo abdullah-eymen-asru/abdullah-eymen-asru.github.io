@@ -89,7 +89,7 @@ function veritabaniPaneli(mesaj) {
 
   const girdi = el("input", { type: "search", class: "sy-girdi", placeholder: "Tablo adı veya açıklamada ara…", "aria-label": "Tabloları ara", autocomplete: "off" });
   const siraSec = el("select", { "aria-label": "Sıralama" }, Object.entries(SIRALAR).map(([k, v]) => el("option", { value: k, text: v[0] })));
-  const sadeceK = el("input", { type: "checkbox", id: "sy-gz-sadece" });
+  const sadeceK = el("input", { type: "checkbox", class: "ui-surgu", "data-ui-sessiz": "", id: "sy-gz-sadece" });
   const cipler = el("div", { class: "sy-cipler", role: "group", "aria-label": "Kategori filtresi" });
   const liste = el("ul", { class: "sy-gz-liste" });
   const sayfalamaKutu = el("div", { class: "sy-gz-sayfalama" });

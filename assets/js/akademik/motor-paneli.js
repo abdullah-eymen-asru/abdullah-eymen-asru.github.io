@@ -151,7 +151,7 @@ export async function motorPaneliKur(yer, { owner = false } = {}) {
     if (d.tercih.mod !== "sabit") secici.disabled = true;
 
     const eskiOnay = el("label", { class: "ak-onay ak-mt-eski" },
-      Object.assign(el("input", { type: "checkbox", "data-mt": "eski" }), { checked: d.eskiGoster }),
+      Object.assign(el("input", { type: "checkbox", class: "ui-surgu", "data-mt": "eski" }), { checked: d.eskiGoster }),
       " Eski sürüm serilerini de göster");
 
     const hedef = hedefSurum();

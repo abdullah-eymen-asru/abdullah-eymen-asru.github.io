@@ -204,7 +204,7 @@ async function basla() {
       durum.sahip = pr?.role === "owner";
     }
     const { data, error } = await supabase.rpc("r2_arsiv_izinlerini_getir");
-    if (error) { kok.replaceChildren(el("p", "muted", "İzinler alınamadı (yalnızca Site Sahibi ya da yetkili Yönetici görebilir; 0108 migration'ı uygulandı mı?).")); return; }
+    if (error) { kok.replaceChildren(el("p", "muted", (console.warn("İzinler alınamadı (yalnızca Site Sahibi ya da yetkili Yönetici görebilir; 0108 migration'ı uygulandı mı?)."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene."))); return; }
     durum.satirlar = data || [];
     ciz();
   }

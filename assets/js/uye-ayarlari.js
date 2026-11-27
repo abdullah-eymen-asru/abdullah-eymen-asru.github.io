@@ -729,7 +729,7 @@ async function davetListesiniYukle() {
     DAVETLER = data || [];
     davetListesiniCiz();
   } catch (e) {
-    kutu.textContent = "Liste alınamadı (migration 0152 ve 0153 çalıştı mı?).";
+    kutu.textContent = (console.warn("Liste alınamadı (migration 0152 ve 0153 çalıştı mı?)."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.");
   }
 }
 
@@ -760,7 +760,7 @@ async function davetAyarlariniYukle() {
     document.getElementById("davet-toplam").value = a.toplam_limit ?? "";
     document.getElementById("davet-gunluk").value = a.gunluk_limit ?? "";
   } catch {
-    if (ozet) ozet.textContent = "Davet ayarları alınamadı (migration 0153 çalıştı mı?).";
+    if (ozet) ozet.textContent = (console.warn("Davet ayarları alınamadı (migration 0153 çalıştı mı?)."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.");
   }
 }
 
@@ -890,7 +890,7 @@ function wireAdminEmailChange() {
 
       const oturumNotu = body.eski_oturumlar_sonlandirildi
         ? "Kullanıcının eski oturumları sonlandırıldı, yeniden giriş yapması gerekecek."
-        : "Not: eski oturumlar sonlandırılamadı (bkz. konsol) — migration 0009'un çalıştırıldığından emin ol.";
+        : (console.warn("Not: eski oturumlar sonlandırılamadı (bkz. konsol) — migration 0009'un çalıştırıldığından emin ol."), "Bu özellik şu an kullanılamıyor. Lütfen daha sonra tekrar dene.");
       const mailNotu = body.bildirim_maili_gonderildi
         ? "Yeni adresine bilgilendirme e-postası gönderildi."
         : "Not: bilgilendirme e-postası gönderilemedi (kullanıcıyı ayrıca haberdar etmek isteyebilirsin).";

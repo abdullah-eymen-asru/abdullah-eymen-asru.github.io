@@ -165,7 +165,7 @@ function bolumKur(anahtar, cfg, mesaj) {
       etkinler.replaceChildren(
         el("p", {
           class: "muted",
-          text: yok ? `${cfg.migrationAdi} henüz çalıştırılmamış görünüyor.` : `Yüklenemedi: ${error.message}`,
+          text: yok ? (console.warn(`${cfg.migrationAdi} henüz çalıştırılmamış görünüyor.`), "Bu ayar şu an kullanılamıyor. Lütfen daha sonra tekrar dene.") : (console.error(error), "Yüklenemedi. Lütfen tekrar dene."),
         })
       );
       return;

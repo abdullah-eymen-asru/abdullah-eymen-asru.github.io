@@ -11,12 +11,12 @@
 
 /* Sayfa ızgarası */
 .bt-izgara { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 136px), 1fr)); min-width: 0; }
-.bt-kart { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 6px; border: 1px solid var(--dn-cizgi); border-radius: 12px; background: var(--dn-yuzey); min-width: 0; cursor: grab; }
+.bt-kart { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 6px; border: 1px solid var(--dn-cizgi); border-radius: var(--radius-md, 12px); background: var(--dn-yuzey); min-width: 0; cursor: grab; }
 .bt-kart.bt-surukleniyor { opacity: .45; }
 .bt-kart.bt-hedef { outline: 3px dashed var(--accent, #2563eb); outline-offset: 2px; }
 .bt-sira { position: absolute; top: 10px; left: 10px; z-index: 1; min-width: 24px; padding: 1px 7px; border-radius: 999px; background: var(--accent, #2563eb); color: var(--dn-on-vurgu); font-size: .76rem; font-weight: 700; text-align: center; }
 .bt-resim { cursor: pointer; }
-.bt-kucuk { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: contain; border-radius: 8px; background: repeating-conic-gradient(#e5e7eb 0% 25%, #fff 0% 50%) 0 0 / 12px 12px; }
+.bt-kucuk { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: contain; border-radius: var(--radius-sm, 8px); background: repeating-conic-gradient(#e5e7eb 0% 25%, #fff 0% 50%) 0 0 / 12px 12px; }
 .bt-kucuk--bos { display: grid; place-items: center; color: var(--muted); }
 .bt-durum { min-height: 1.1em; font-size: .72rem; font-weight: 600; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bt-durum--iyi { color: var(--dn-iyi); }
@@ -29,7 +29,7 @@
 /* Ayarlar */
 .bt-ayar-kap { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
 .bt-ayarlar { gap: 10px; }
-.bt-oto { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px 12px; border: 1px solid var(--dn-cizgi); border-radius: 10px; background: var(--dn-zemin2); cursor: pointer; }
+.bt-oto { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px 12px; border: 1px solid var(--dn-cizgi); border-radius: var(--radius-md, 12px); background: var(--dn-zemin2); cursor: pointer; }
 .bt-oto strong { display: block; font-size: .95rem; }
 .bt-oto small { display: block; color: var(--muted); font-size: .8rem; margin-top: 2px; }
 .bt-anahtar { appearance: none; -webkit-appearance: none; position: relative; flex: none; width: 46px; height: 26px; border-radius: 999px; border: 1px solid var(--dn-cizgi); background: var(--bg); cursor: pointer; }
@@ -44,7 +44,7 @@
 .bt-seg-btn[aria-pressed="true"] { background: var(--accent, #2563eb); border-color: var(--accent, #2563eb); color: var(--dn-on-vurgu); }
 .bt-seg-btn:focus-visible { outline: 3px solid var(--accent, #2563eb); outline-offset: 2px; }
 .bt-ipucu { grid-column: 2; margin: 0; font-size: .8rem; color: var(--muted); line-height: 1.35; }
-.bt-gelismis { border: 1px solid var(--dn-cizgi); border-radius: 10px; padding: 0 12px; }
+.bt-gelismis { border: 1px solid var(--dn-cizgi); border-radius: var(--radius-md, 12px); padding: 0 12px; }
 .bt-gelismis > summary { cursor: pointer; padding: 10px 0; font-weight: 700; font-size: .9rem; }
 .bt-gel-izgara { display: grid; gap: 14px 18px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); padding: 4px 0 14px; }
 .bt-gel { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
@@ -62,8 +62,8 @@
 /* Perspektif penceresi */
 .bt-koseler-dialog { width: min(96vw, 760px); max-height: 94dvh; }
 .bt-koseler-govde { max-height: 90dvh; overflow: auto; }
-.bt-sahne { position: relative; max-height: 62dvh; line-height: 0; touch-action: none; user-select: none; border-radius: 10px; margin: 18px; width: calc(100% - 36px); background: #111; }
-.bt-sahne-taban, .bt-sahne-ust { border-radius: 10px; display: block; width: 100%; height: auto; max-height: 62dvh; object-fit: contain; }
+.bt-sahne { position: relative; max-height: 62dvh; line-height: 0; touch-action: none; user-select: none; border-radius: var(--radius-md, 12px); margin: 18px; width: calc(100% - 36px); background: #111; }
+.bt-sahne-taban, .bt-sahne-ust { border-radius: var(--radius-md, 12px); display: block; width: 100%; height: auto; max-height: 62dvh; object-fit: contain; }
 .bt-sahne-ust { position: absolute; inset: 0; pointer-events: none; }
 .bt-pin { position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px; padding: 0; border-radius: 50%; border: 3px solid #fff; background: #22c55e; color: #052e16; font: 700 .85rem/1 system-ui, sans-serif; box-shadow: 0 0 0 2px #15803d, 0 2px 8px rgba(0,0,0,.5); cursor: grab; touch-action: none; }
 .bt-pin--aktif, .bt-pin:focus-visible { background: #facc15; outline: 3px solid var(--accent, #2563eb); outline-offset: 2px; }

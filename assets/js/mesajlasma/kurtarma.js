@@ -102,7 +102,7 @@ export function kilitPaneli({ durum = {}, onAcildi }) {
   const kod = h("input", { type: "text", class: "msj-kilit-girdi", placeholder: "XXXX-XXXX-XXXX-XXXX", "aria-label": "Yedek kurtarma kodu", autocomplete: "off", autocapitalize: "characters", maxlength: "19" });
   kod.addEventListener("input", () => { kod.value = Kit.kodBicimle(kod.value); });
   const yeniParola = girdi("Yeni parola (yalnızca giriş parolanı unuttuysan)", "Notlar kasası için yeni parola", "new-password");
-  const hatirla = h("input", { type: "checkbox" });
+  const hatirla = h("input", { type: "checkbox", class: "ui-surgu", "data-ui-sessiz": "" });
   const kodBtn = h("button", { type: "submit", class: "msj-btn msj-btn--ikincil", text: "Kodla aç" });
   const kodForm = h("form", { class: "msj-kilit-form", novalidate: true },
     h("label", { class: "msj-kilit-alan" }, h("span", { text: "Yedek Kurtarma Kodu" }), kod),

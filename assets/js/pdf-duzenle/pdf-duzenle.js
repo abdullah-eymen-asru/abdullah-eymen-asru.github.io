@@ -56,7 +56,7 @@ async function kur() {
 
   /* ---- araç çubuğu ---- */
   const dg = (m, f, c = "") => { const b = el("button", { type: "button", class: `pd-btn ${c}`.trim(), text: m }); b.addEventListener("click", f); return b; };
-  const metaTemizle = el("input", { type: "checkbox", id: "pd-meta" });
+  const metaTemizle = el("input", { type: "checkbox", class: "ui-surgu", "data-ui-sessiz": "", id: "pd-meta" });
   const metaEtiket = el("label", { class: "pd-onay", for: "pd-meta" }, metaTemizle, el("span", { text: "Metadata'yı temizle" }));
 
   async function indirPdf() {
@@ -106,7 +106,7 @@ async function kur() {
     if (!ed) return;
     const a = el("input", { type: "text", class: "pd-girdi", placeholder: "Bulunacak yazı", "aria-label": "Bulunacak yazı", autocomplete: "off" });
     const y = el("input", { type: "text", class: "pd-girdi", placeholder: "Yeni yazı (boş = sil)", "aria-label": "Yeni yazı", autocomplete: "off" });
-    const bk = el("input", { type: "checkbox", id: "pd-bk" });
+    const bk = el("input", { type: "checkbox", class: "ui-surgu", "data-ui-sessiz": "", id: "pd-bk" });
     const git = dg("Tümünü değiştir", async () => {
       if (!a.value) { bildir("Bulunacak yazıyı yaz.", "error"); return; }
       git.disabled = true; bildir("Sayfalar taranıyor…");
@@ -133,7 +133,7 @@ async function kur() {
       const ul = el("ul", { class: "pd-baglantilar" });
       for (const b of liste) {
         const g = el("input", { type: "url", class: "pd-girdi", value: b.url, placeholder: b.ic ? "(sayfa içi bağlantı) yeni https:// adresi yaz" : "https://…", "aria-label": `Sayfa ${b.sayfa + 1} bağlantı adresi` });
-        const kaldir = el("input", { type: "checkbox" }), kl = el("label", { class: "pd-onay" }, kaldir, el("span", { text: "Bağlantıyı kaldır" }));
+        const kaldir = el("input", { type: "checkbox", class: "ui-surgu", "data-ui-sessiz": "" }), kl = el("label", { class: "pd-onay" }, kaldir, el("span", { text: "Bağlantıyı kaldır" }));
         const guncelle = () => {
           yamalar = yamalar.filter((y) => y !== b._y); b._y = null;
           if (kaldir.checked) b._y = { sayfa: b.sayfa, rect: b.rect, url: null };
