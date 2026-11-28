@@ -83,6 +83,8 @@ const MODULES = {
   // admin yalnızca owner anahtarı açıksa görür (NAV'daki izin:"kvkk"). Gerçek yetki:
   // kvkk_surum_yetkisi_var_mi() -> kvkk_surumunu_degistir() / kvkk_onay_ozeti().
   kvkkSurum: { src: "./kvkk/kvkk-surum-paneli.js", role: "admin" },
+  // Turnstile Güvenliği (migration 0157): yalnızca Site Sahibi + Admin. Gerçek yetki: RLS + turnstile_ayar_* RPC (is_owner()/is_admin()).
+  turnstileYonetim: { src: "./turnstile-yonetim/turnstile-yonetim.js", role: "admin" },
   // "Panelim" (eski /panel/panel.html) — giriş yapmış HERKESE açık:
   // sıradan üye de, owner da aynı sekmeyi görür.
   panelim: { src: "./panel.js", role: null },
@@ -226,6 +228,7 @@ const NAV = [
       // role:"admin" + izin:"kvkk": owner her zaman görür; admin sadece owner "adminler KVKK
       // sürümünü değiştirebilsin" anahtarını açtıysa (bkz. gorunurMu / izinleriYukle).
       { id: "sys-kvkk", icon: "📜", label: "Hukuki Metinler", module: "kvkkSurum", role: "admin", izin: "kvkk" },
+      { id: "sys-turnstile", icon: "🛡️", label: "Turnstile Güvenliği", module: "turnstileYonetim", role: "admin" },
       // "Üye Verisi İndirme" ve "Demo Yetki & Görünürlük" artık Yetki Ayarları'nın alt sekmeleridir (tek çatı; eski #sys-uye-aktarim / #sys-demo adresleri yönlendirilir).
       // role:null + izin:"sistemyedek": owner her zaman görür; diğer roller yalnızca owner can_export_system'i açtıysa.
       { id: "sys-silme-onayi", icon: "🧹", label: "Silinen Hesap Verileri", module: "silmeOnayi", role: null, izin: "silmeonayi", defaultAcilis: false },

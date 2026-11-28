@@ -79,10 +79,10 @@ function dosyalariTemizle() {
 /* ------------------------------ arayüz ------------------------------ */
 
 function gizlilikRozeti() {
-  return el("div", { class: "dn-gizlilik", role: "note" },
-    el("span", { "aria-hidden": "true", text: "🔒" }),
-    el("span", {}, el("b", { text: "Verileriniz cihazınızdan asla dışarı çıkmaz, işlem tarayıcınızda gerçekleşir." }),
-      " Dosyalar Supabase'e ya da R2'ye gönderilmez; yalnızca açık kaynak kütüphane kodu indirilir. Tek istisna: “Sunucuda (LibreOffice)” yöntemini SEN seçersen o dosya yalnızca o dönüştürme için gönderilir ve saklanmaz."));
+  const det = el("details", { class: "dn-gizlilik ui-cekmece", role: "note" },
+    el("summary", {}, el("span", { "aria-hidden": "true", text: "🔒 " }), el("b", { text: "Dosyaların cihazından çıkmaz." })),
+    el("div", { class: "ui-cekmece-icerik" }, el("p", { class: "dn-muted", text: "İşlem tarayıcında yapılır. Tek istisna: “Sunucuda” yöntemini sen seçersen dosya yalnızca o işlem için gönderilir, saklanmaz." })));
+  return det;
 }
 
 function dropzone() {
@@ -182,7 +182,7 @@ async function kontrolCiz() {
     yk.append(sat);
     kontrolAlani.append(yk);
   } else if (!yerelVar) {
-    kontrolAlani.append(el("div", { class: "dn-uyari", role: "note", text: "🖥️ Bu dosya türü yalnızca sunucuda (LibreOffice) dönüştürülür: dosya yalnızca bu işlem için gönderilir, saklanmaz; günlük kotan düşer." }));
+    kontrolAlani.append(el("div", { class: "dn-uyari", role: "note", text: "🖥️ Bu tür sunucuda dönüştürülür; dosya saklanmaz, günlük kotan düşer." }));
   }
 
   const hamListe = yontem === "sunucu" ? sunucuH : hedefListesi.filter((h) => h !== "pdf-birlestir");
@@ -217,7 +217,7 @@ async function kontrolCiz() {
   git.addEventListener("click", () => hizliDonustur(git, iptal, tahmin));
   iptal.addEventListener("click", () => calisiyor?.iptal());
   kart.append(el("div", { class: "dn-eylemler" }, git, iptal), ilerleme.el);
-  if (turler.includes("pdf") && hedef && yontem !== "sunucu" && !["png", "jpg", "webp", "pdf-birlestir"].includes(hedef)) kart.append(el("p", { class: "dn-muted", text: "Not: Tarayıcıda PDF'ten dönüştürmede düzen birebir korunmaz; metin ve başlıklar yeniden oluşturulur. Daha sadık sonuç için “Sunucuda (LibreOffice)” yöntemini dene. Taranmış PDF'lerde OCR yapılmaz." }));
+  if (turler.includes("pdf") && hedef && yontem !== "sunucu" && !["png", "jpg", "webp", "pdf-birlestir"].includes(hedef)) kart.append(el("p", { class: "dn-muted", text: "Not: Tarayıcıda düzen birebir korunmaz; daha sadık sonuç için “Sunucuda” yöntemini dene. Taranmış PDF'de OCR yok." }));
   kontrolAlani.append(kart);
 }
 

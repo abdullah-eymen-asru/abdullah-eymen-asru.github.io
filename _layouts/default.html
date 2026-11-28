@@ -136,6 +136,12 @@
     hale gelir). https: ve wss: CSP'de AYRI şemalardır, biri diğerini
     kapsamaz.
 
+    SCRIPT-SRC DAR LİSTE (v4): script-src artık 'https:' şemasının tamamına DEĞİL, yalnızca sitenin gerçekten kullandığı adreslere
+    izin verir: kendi sitesi, Cloudflare Turnstile (challenges.cloudflare.com), CDN'ler (cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com —
+    PDF.js/pdf-lib/lamejs/Leaflet), Umami, Google Tag (GA4) ve AdSense (yalnızca ilgili kimlik doluysa yüklenir), Cloudflare Web Analytics.
+    Yeni bir harici betik eklenirse BURAYA ve _headers'a da eklenmeli; aksi halde tarayıcı betiği engeller.
+    (Aşağıdaki eski not tarihçe içindir; artık geçerli değildir.)
+
     UMAMI (cloud.umami.is) İÇİN AYRI BİR DOMAIN EKLENMEDİ: script-src ve
     connect-src şu an https: şemasının TAMAMINA (belirli domain'lerle
     sınırlamadan) izin veriyor, bu yüzden cloud.umami.is zaten kapsam
@@ -149,7 +155,7 @@
   -->
 <meta http-equiv="Content-Security-Policy" content="
     default-src 'self' https:;
-    script-src 'self' https: 'wasm-unsafe-eval';
+    script-src 'self' https://challenges.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://cloud.umami.is https://www.googletagmanager.com https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net https://tpc.googlesyndication.com https://static.cloudflareinsights.com 'wasm-unsafe-eval';
     base-uri 'self';
     form-action 'self';
     connect-src 'self' https: wss:;
@@ -163,6 +169,13 @@
   <!-- Cloudflare Turnstile Site Key (herkese açık; secret DEĞİL). _config.yml -> turnstile_sitekey. Boşsa bot koruması
        istemcide kapalıdır. Kullanım: assets/js/auth/turnstile.js (Supabase Auth Captcha'ya token ekler). -->
   <meta name="turnstile-sitekey" content="{{ site.turnstile_sitekey | escape }}">
+  <meta name="turnstile-worker" content="{{ site.turnstile_worker_url | escape }}">
+  <meta name="aea-sb-url" content="{{ site.supabase_url | escape }}">
+  <meta name="aea-sb-key" content="{{ site.supabase_anon_key | escape }}">
+  <!-- BOT KALKANI (Kontrol Merkezi › Turnstile Güvenliği; VARSAYILAN KAPALI). Küçük, engelleyici (senkron) betik: kalkan kapalıyken
+       ve önbellek tazeyken ağ isteği YAPMAZ. Açıksa içerik/veri istekleri doğrulama geçilene dek bekletilir. Bkz. assets/js/core/bot-kalkani.js -->
+  <link rel="stylesheet" href="{{ '/assets/css/bot-kalkani.css' | relative_url }}?v=1">
+  <script src="{{ '/assets/js/core/bot-kalkani.js' | relative_url }}?v=1"></script>
   {% if site.turnstile_sitekey and site.turnstile_sitekey != "" %}
   <!-- Mobil/yavaş ağda Turnstile gecikmesini azaltmak için Cloudflare'e erken bağlan; giriş/kayıt/şifre-sıfırlama sayfalarında
        api.js de sayfa ayrıştırılırken (modüller yüklenmeden) indirilir. Diğer sayfalarda turnstile.js ihtiyaç olunca yükler. -->

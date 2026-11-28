@@ -53,6 +53,12 @@ cv_url: ""
 # "Secret Key" ASLA buraya yazılmaz: yalnızca Supabase Dashboard > Authentication > Attack Protection > Captcha secret.
 # Boş bırakılırsa istemci tarafı kapalı kalır (Supabase'de captcha AÇIKSA giriş/kayıt reddedilir — bkz. rehber/02-supabase-sistemi.md).
 turnstile_sitekey: "0x4AAAAAAGSRI92tqTkTWYdG"   # herkese açık Site Key (Secret DEĞİL)
+# Turnstile merkezi yönetim (Kontrol Merkezi › Turnstile Güvenliği; migration 0157).
+# turnstile_worker_url: Bot Kalkanı doğrulama Worker'ının adresi (cloudflare worker/turnstile_dogrulama_worker). BOŞSA Bot Kalkanı hata moduna göre davranır.
+turnstile_worker_url: ""
+# Supabase herkese açık değerler (assets/js/core/supabase-client.js ile AYNI olmalı): Bot Kalkanı betiği modül yüklemeden durumu okuyabilsin diye.
+supabase_url: "https://eahvcirspmvntffzphye.supabase.co"
+supabase_anon_key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVhaHZjaXJzcG12bnRmZnpwaHllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxOTgxODMsImV4cCI6MjEwMTc3NDE4M30._f-GKSsffxFo66w3g0NJfmOWEhlsjU4Y6mlcTlcPJ2E"
 cloudflare_worker_url: "https://izleme-okuma-api.aeymena.workers.dev"   # Cloudflare Worker'ı deploy edince buraya yapıştır
 mirror_site_url: "https://abdullah-eymen-asru.pages.dev"   # İkincil/yedek kopya   # Aynı sitenin Cloudflare Pages'teki yedek kopyası
 

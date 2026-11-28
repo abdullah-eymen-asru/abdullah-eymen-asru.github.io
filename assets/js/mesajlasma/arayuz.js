@@ -133,7 +133,7 @@ export async function mesajlasmaKur(kok, { profile, adminMi, konuOnDolgu = "" })
     const kapat = h("button", { type: "button", class: "msj-btn msj-btn--ikincil", text: "Kapat" });
     const kutu = h("div", { class: "msj-modal msj-modal--genis", role: "dialog", "aria-modal": "true", "aria-label": "Şifreleme tanılama" },
       h("h3", { class: "msj-modal-baslik", text: "🩺 Şifreleme tanılama" }), pre,
-      h("p", { class: "msj-modal-metin", text: "Onar: açılabilen sohbetlerde eksik zarfları hemen tamamlar, bayat zarfları siler (anahtarı bilen taraf sohbeti açınca yeniden paylaşır). Hiçbir mesaj silinmez." }),
+      h("p", { class: "msj-modal-metin", text: "Eksik anahtarları tamamlar. Hiçbir mesaj silinmez." }),
       h("div", { class: "msj-modal-eylem" }, kopyala, kapat, onar));
     const kaplama = h("div", { class: "msj-modal-kaplama" }, kutu);
     const bitir = () => { kaplama.remove(); document.removeEventListener("keydown", tus, true); onceki?.focus?.(); };
@@ -167,7 +167,7 @@ export async function mesajlasmaKur(kok, { profile, adminMi, konuOnDolgu = "" })
       const sonra = h("button", { type: "button", class: "msj-btn msj-btn--ikincil msj-kucuk", text: "Sonra" });
       olustur.addEventListener("click", async () => { if (await kitKartiAc(duyur)) uyari.hidden = true; });
       sonra.addEventListener("click", () => { try { sessionStorage.setItem("aea_msj_kit_sonra", "1"); } catch { /* yok say */ } uyari.hidden = true; });
-      doldur(uyari, h("span", { text: "🔑 Yedeğini başka bir hesaba/altyapıya taşıyabilmek ve parolanı unutursan notlarını + sohbetlerini açabilmek için tek bir Yedek Kurtarma Kodu oluştur." }), h("span", { class: "msj-uyari-eylem" }, olustur, sonra));
+      doldur(uyari, h("span", { text: "🔑 Parolanı unutursan notlarını ve sohbetlerini açabilmek için Yedek Kurtarma Kodu oluştur." }), h("span", { class: "msj-uyari-eylem" }, olustur, sonra));
       uyari.hidden = false;
     } catch { /* migration 0096 yoksa sessiz */ }
   }

@@ -201,3 +201,10 @@ details.ui-cekmece > summary > h2 { margin: 0; font-size: 1.05rem; }
   details.panel-section.ui-cekmece > summary { padding: 12px 14px; }
   details.panel-section.ui-cekmece > .ui-cekmece-icerik { padding: 0 14px 16px; }
 }
+
+/* ---------- Turnstile Güvenliği paneli ---------- */
+.ts-plan-alan { display: grid; grid-template-columns: max-content 1fr; gap: 0.5rem 0.75rem; align-items: center; margin: var(--ui-bosluk) 0; }
+.ts-plan-alan[hidden] { display: none; }
+.ts-moduller { display: grid; gap: 0.25rem; margin-top: var(--ui-bosluk); }
+.ts-aksiyon { margin: var(--ui-bosluk) 0; }
+@media (max-width: 600px) { .ts-plan-alan { grid-template-columns: 1fr; } }

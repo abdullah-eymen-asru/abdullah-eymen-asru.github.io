@@ -1,0 +1,35 @@
+/* bot-kalkani.css — Bot Kalkanı (tam ekran ön doğrulama). Küçük ve engelleyici (render-blocking): kalkan KAPALIYKEN hiçbir etkisi yoktur. */
+html.bk-bekle body,
+html.bk-aktif body > *:not(#bk-kalkan) { visibility: hidden !important; }
+html.bk-aktif { overflow: hidden; }
+#bk-kalkan {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  box-sizing: border-box;
+  padding: 1.5rem;
+  text-align: center;
+  background: var(--bg, #fff);
+  color: var(--text, #111);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  visibility: visible !important;
+}
+#bk-kalkan h1 { margin: 0; font-size: 1.25rem; }
+#bk-kalkan p { margin: 0; max-width: 28rem; font-size: 0.95rem; }
+#bk-kalkan button {
+  padding: 0.6rem 1.2rem;
+  border: 0;
+  border-radius: var(--radius-md, 12px);
+  background: var(--accent, #2563eb);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+@media (prefers-color-scheme: dark) { #bk-kalkan { background: var(--bg, #111); color: var(--text, #eee); } }
+:root[data-theme="dark"] #bk-kalkan { background: var(--bg, #111); color: var(--text, #eee); }
+:root[data-theme="light"] #bk-kalkan { background: var(--bg, #fff); color: var(--text, #111); }

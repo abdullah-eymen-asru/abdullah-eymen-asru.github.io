@@ -29,12 +29,18 @@
  *      izinlidir; inline stil/script YOKTUR (yalnızca CSSOM ile özellik atanır).
  */
 
+import { turnstileDurum, olayKaydet } from "./turnstile-merkez.js";
+
 const SCRIPT_URL = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
 const SAYFA_KUTUSU_ID = "turnstile-kutu";
 const DURUM_ID = "turnstile-durum";
 
 /** Supabase'in captcha istediği auth metodları. resetPasswordForEmail'in imzası farklıdır (email, {redirectTo, captchaToken}). */
 const KORUNAN_METODLAR = ["signInWithPassword", "signUp", "signInWithOtp", "resend", "resetPasswordForEmail"];
+
+/** Auth metodu → Kontrol Merkezi modülü (migration 0157). Ek istemciler (Notlar parola sınaması) captchaKur(istemci, "diger") ile bağlanır. */
+const METOD_MODUL = { signInWithPassword: "giris", signUp: "kayit", resetPasswordForEmail: "sifre_sifirlama", resend: "dogrulama", signInWithOtp: "dogrulama" };
+const SAYFA_MODUL = [[/\/giris(\/|\.html)?$/, "giris"], [/\/kayit(\/|\.html)?$/, "kayit"], [/\/sifremi-unuttum(\/|\.html)?$/, "sifre_sifirlama"]];
 
 export const CAPTCHA_HATA_METNI =
   "Güvenlik doğrulaması tamamlanamadı. Reklam/içerik engelleyiciyi bu site için kapatıp sayfayı yenile ve tekrar dene.";
@@ -318,8 +324,18 @@ export function captchaSifirla() {
 /** Giriş/kayıt/şifre-sıfırlama sayfalarında widget'ı sayfa açılır açılmaz çözmeye başlatır (kullanıcı beklemesin). */
 export function captchaSayfaHazirla() {
   if (!turnstileAktifMi()) return;
-  const basla = () => {
-    if (document.getElementById(SAYFA_KUTUSU_ID)) widgetHazirla().catch(() => {});
+  const basla = async () => {
+    const kutu = document.getElementById(SAYFA_KUTUSU_ID);
+    if (!kutu) return;
+    // Kontrol Merkezi'nde bu sayfanın modülü kapalıysa widget hiç yüklenmez ve kutu gizlenir.
+    const modul = SAYFA_MODUL.find(([re]) => re.test(location.pathname))?.[1];
+    const d = await turnstileDurum();
+    if (modul && d.moduller?.[modul] === false) {
+      kutu.hidden = true;
+      document.getElementById(DURUM_ID)?.setAttribute("hidden", "");
+      return;
+    }
+    widgetHazirla().catch(() => {});
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", basla, { once: true });
   else basla();
@@ -334,7 +350,7 @@ function captchaHatasiMi(hata) {
  * Bir Supabase istemcisinin auth metodlarını sarar: token yoksa otomatik ekler. İdempotent.
  * Çağıran zaten `captchaToken` verdiyse dokunmaz.
  */
-export function captchaKur(istemci) {
+export function captchaKur(istemci, sabitModul) {
   const auth = istemci?.auth;
   if (!auth || auth.__aeaCaptcha) return istemci;
   auth.__aeaCaptcha = true;
@@ -345,12 +361,20 @@ export function captchaKur(istemci) {
 
     auth[ad] = async (...args) => {
       if (!turnstileAktifMi()) return orijinal.apply(auth, args);
+      const modul = sabitModul || METOD_MODUL[ad] || "diger";
+      const merkez = await turnstileDurum();               // Kontrol Merkezi (önbellekli; ağ hatasında son bilinen/varsayılan)
+      if (merkez.moduller?.[modul] === false) return orijinal.apply(auth, args);   // bu modülde koruma kapalı/zamanlama dışında
 
       const seceneklerBurada = ad === "resetPasswordForEmail" ? args[1] : args[0]?.options;
       if (seceneklerBurada?.captchaToken) return orijinal.apply(auth, args);
 
       const token = await captchaTokenAl(); // alınamazsa undefined → token'sız gönder (doğal hata türü korunur)
       let yeniArgs = args;
+      // Fail-closed: Turnstile token'ı alınamadıysa (servis/ağ) ve Kontrol Merkezi "engelle" diyorsa Supabase'e hiç gitme.
+      if (!token && merkez.hata_modu === "kapali") {
+        olayKaydet(modul, "hata");
+        return { data: { user: null, session: null }, error: { name: "AuthApiError", status: 400, code: "captcha_failed", message: CAPTCHA_HATA_METNI } };
+      }
       if (token) {
         yeniArgs =
           ad === "resetPasswordForEmail"
@@ -360,10 +384,11 @@ export function captchaKur(istemci) {
 
       try {
         const sonuc = await orijinal.apply(auth, yeniArgs);
-        if (sonuc && captchaHatasiMi(sonuc.error)) sonuc.error.message = CAPTCHA_HATA_METNI;
+        if (sonuc && captchaHatasiMi(sonuc.error)) { sonuc.error.message = CAPTCHA_HATA_METNI; olayKaydet(modul, "engellendi"); }
+        else if (token) olayKaydet(modul, "gecti");
         return sonuc;
       } catch (h) {
-        if (captchaHatasiMi(h)) h.message = CAPTCHA_HATA_METNI;
+        if (captchaHatasiMi(h)) { h.message = CAPTCHA_HATA_METNI; olayKaydet(modul, "engellendi"); }
         throw h;
       } finally {
         if (token) captchaSifirla(); // kullanılan token geçersiz; bir sonraki deneme için yenisini hazırla

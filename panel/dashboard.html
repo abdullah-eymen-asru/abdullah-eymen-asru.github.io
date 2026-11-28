@@ -394,7 +394,7 @@ permalink: "/panel/dashboard.html"
 
     <section class="dash-view" id="view-media-izleme" hidden data-view="media-izleme">
       <h1>İzleme ve Okuma Yönetimi</h1>
-        <p class="muted">Yalnızca <strong>Site Sahibi</strong> kullanır. <code>{{ site.kutuphane_repo }}</code> reposunda Issue açar, panoya ekler ya da mevcut kaydı arayıp güncellersin. GitHub üzerinden yaptığın değişiklikler de çalışmaya devam eder.</p>
+        <p class="muted">Yalnızca <strong>Site Sahibi</strong>. <code>{{ site.kutuphane_repo }}</code> reposunda Issue açar ya da kaydı günceller.</p>
 
         <nav id="iy-nav" class="gy-klasor-tur-sekmeleri" role="tablist" aria-label="İzleme/Okuma arasında geçiş yap">
           <button type="button" class="gy-klasor-tur-sekme active" data-koleksiyon="izleme" role="tab" aria-selected="true">🎬 İzlediklerim</button>
@@ -1020,6 +1020,15 @@ permalink: "/panel/dashboard.html"
       </section>
     </section>
 
+    <!-- Turnstile Güvenliği (assets/js/turnstile-yonetim/turnstile-yonetim.js; migration 0157). Yalnızca Site Sahibi + Admin; gerçek yetki RLS + RPC'de. -->
+    <section class="dash-view" id="view-sys-turnstile" hidden data-view="sys-turnstile">
+      <h1>Turnstile Güvenliği</h1>
+      <section class="panel-section">
+        <p class="muted">Bot korumasını buradan aç/kapat, zamanla (UTC) ve Bot Kalkanı'nı yönet.</p>
+        <div id="ts-yonetim-kok"><p class="muted">Yükleniyor...</p></div>
+      </section>
+    </section>
+
 
     <!-- Silinen hesapların artık verisi (assets/js/silme-onayi/silme-onayi.js; migration 0078). Owner her zaman; admin yalnızca
          Yetki Ayarları › Özellikler'den "Silinen Hesapların Artık Verisi" açıksa (yalnızca öneri gönderebilir). -->
@@ -1067,7 +1076,7 @@ permalink: "/panel/dashboard.html"
          ======================================================================================================== -->
     <section class="dash-view" id="view-tool-calisma-alani" hidden data-view="tool-calisma-alani">
       <h1>PDF &amp; Belge Çalışma Alanı</h1>
-      <p class="muted ca-aciklama">Belgelerini tek yerde <strong>görüntüle</strong>, <strong>düzenle</strong> ve <strong>dönüştür</strong>. Dosyaların cihazından çıkmaz; her şey tarayıcında işlenir. Sekme değiştirdiğinde önceki aracın seçimleri otomatik temizlenir.</p>
+      <p class="muted ca-aciklama">Belgeni <strong>görüntüle</strong>, <strong>düzenle</strong>, <strong>dönüştür</strong>. Dosyaların cihazından çıkmaz.</p>
       <div class="ca-kabuk" data-ca-kabuk="tool-calisma-alani"></div>
       <div class="ca-paneller">
         <section class="ca-pane" id="view-tool-belge-goruntule" data-ca-pane="tool-belge-goruntule" hidden>
@@ -1145,7 +1154,7 @@ permalink: "/panel/dashboard.html"
           <label for="seo-description"><strong>Site açıklaması</strong> <span class="muted">(description)</span></label>
           <textarea id="seo-description" rows="4" maxlength="600" spellcheck="true"></textarea>
           <p class="muted" id="seo-sayac"></p>
-          <p class="muted">Google sonuçlarında ve sosyal medya önizlemesinde görünen kısa tanıtım metni; sayfasına özel özet yazılmamış her sayfada bu kullanılır. İstediğin uzunlukta yazabilirsin; arama sonuçlarında ~160 karakter görünür.</p>
+          <p class="muted">Arama sonuçlarında ve paylaşım önizlemesinde görünen kısa tanıtım (~160 karakter).</p>
         </div>
         <div class="seo-alan">
           <label for="seo-url"><strong>Ana site adresi</strong> <span class="muted">(url) — github.io, ASIL site</span></label>
@@ -1160,7 +1169,7 @@ permalink: "/panel/dashboard.html"
         <div class="seo-alan">
           <label for="seo-baseurl"><strong>Alt dizin</strong> <span class="muted">(baseurl)</span></label>
           <input type="text" id="seo-baseurl" autocomplete="off" spellcheck="false" placeholder="boş bırak">
-          <p class="muted">Site alan adının kökünde yayınlanıyorsa <strong>boş</strong> kalmalı (<code>kullanici.github.io</code> için doğrusu budur). Yalnızca site bir alt klasörde yayınlanıyorsa <code>/klasor</code> yazılır. Emin değilsen DEĞİŞTİRME.</p>
+          <p class="muted">Kök alan adında yayınlıyorsan <strong>boş</strong> bırak. Alt klasördeyse <code>/klasor</code> yaz. Emin değilsen DEĞİŞTİRME.</p>
         </div>
         <div class="seo-eylem"><button type="button" class="btn-primary csp-w-auto" id="seo-kaydet">Kaydet</button> <button type="button" class="btn-secondary csp-w-auto" id="seo-yenile">Yeniden oku</button></div>
         <p class="muted" id="seo-mesaj" role="status" aria-live="polite"></p>
@@ -1168,7 +1177,7 @@ permalink: "/panel/dashboard.html"
       </details>
       <section id="hakkimda" class="panel-section" hidden>
               <h2>Hakkımda (Anasayfa)</h2>
-              <p class="muted">Anasayfadaki isim/unvan satırını ve "Hakkımda" kutusunu düzenle. Değişiklik <code>_includes/hakkimda-kutusu.md</code> ve <code>_includes/hakkimda-icerik.md</code> dosyalarına işlenir. <strong>İçerik HTML'dir, Markdown DEĞİL</strong> (<code>&lt;p&gt;</code>, <code>&lt;strong&gt;</code>, <code>&lt;ul&gt;</code> gibi). Yalnızca admin/Site Sahibi görür.</p>
+              <p class="muted">Anasayfa unvanı ve "Hakkımda" kutusu. İçerik <strong>HTML</strong>'dir, Markdown değil. Yalnızca admin/Site Sahibi.</p>
 
               <button id="hk-yukle-btn" type="button" class="btn-primary csp-w-auto csp-mb-12">Mevcut İçeriği Yükle</button>
               <div id="hk-durum" class="muted">Yüklemek için yukarıdaki butona bas.</div>
@@ -1187,7 +1196,7 @@ permalink: "/panel/dashboard.html"
                 </div>
 
                 <h3 class="csp-mt-18">Hakkımda Kutusu</h3>
-                <p class="gy-yardim-metni">İngilizce/Türkçe "Hakkımda" içeriği (<code>_includes/hakkimda-icerik.md</code>). Her dilin <code>&lt;div class="lang-panel"&gt;</code> içindeki HTML'ini yazman yeter; sekmeler ve script kaydederken otomatik kurulur.</p>
+                <p class="gy-yardim-metni">Her dilin <code>&lt;div class="lang-panel"&gt;</code> içindeki HTML'ini yaz; sekmeler otomatik kurulur.</p>
 
                 <div class="lang-tabs">
                   <button type="button" class="lang-tab-btn active" data-hk-lang="en">🇬🇧 English</button>
@@ -1215,7 +1224,7 @@ permalink: "/panel/dashboard.html"
       <details id="baglantilar" class="ui-cekmece panel-section">
         <summary><h2>Bağlantılar (Sosyal / Akademik)</h2></summary>
         <div class="ui-cekmece-icerik">
-              <p class="muted">Profil altındaki bağlantı düğmelerini (GitHub, LinkedIn, Scholar, ORCID…) ekle, düzenle ya da sil. Değişiklik <code>_config.yml</code> içindeki <code>social:</code> bloğuna işlenir. <strong>Adresi boş bırakırsan düğme görünmez</strong>; sonra doldurabilirsin. Yalnızca admin/Site Sahibi.</p>
+              <p class="muted">Profil altındaki bağlantı düğmeleri. <strong>Adres boşsa düğme görünmez.</strong> Yalnızca admin/Site Sahibi.</p>
               <p class="gy-yardim-metni">Dahili kimlik <strong>Görünen Ad</strong>'dan otomatik türer (ör. "1000 Kitap" → <code>1000_kitap</code>). Var olan bağlantının adını değiştirsen de kimlik sabit kalır.</p>
 
               <button id="bg-yukle-btn" type="button" class="btn-primary csp-w-auto csp-mb-12">Mevcut Bağlantıları Yükle</button>
@@ -1440,7 +1449,7 @@ permalink: "/panel/dashboard.html"
             <div class="form-field" id="ic-last-modified-at-wrap" hidden>
               <label for="ic-last-modified-at">Atıf Kutusu — Güncelleme Tarihi (last_modified_at, isteğe bağlı)</label>
               <input id="ic-last-modified-at" type="date">
-              <p class="gy-yardim-metni">Yalnızca "Akademik Yazı" açıkken görünür. Doluysa atıf formatlarında (APA/Chicago/MLA/BibTeX) güncelleme bilgisi olarak kullanılır ve genel <code>guncelleme_tarihi</code> alanından ÖNCELİKLİDİR. Boşsa genel tarih kullanılır.</p>
+              <p class="gy-yardim-metni">Doluysa atıf formatlarında güncelleme tarihi olarak kullanılır; boşsa genel tarih geçerlidir.</p>
             </div>
 
   <div class="form-field" id="ic-klasor-wrap">
@@ -1450,7 +1459,7 @@ permalink: "/panel/dashboard.html"
                 <option value="__yeni__">➕ Yeni klasör oluştur…</option>
               </select>
               <input class="csp-mt-8" id="ic-klasor-yeni-ad" type="text" placeholder="örn. seyahat ya da 2027" autocomplete="off" hidden>
-              <p class="gy-yardim-metni" id="ic-klasor-yardim">"Otomatik" seçiliyken dosya tarihin yılına göre (<code>_posts/&lt;yıl&gt;/</code>) kaydedilir. Başka klasör seçersen oraya gider. Klasör, linki ETKİLEMEZ. Klasörleri "📁 Klasörler" sekmesinden yönetebilirsin.</p>
+              <p class="gy-yardim-metni" id="ic-klasor-yardim">"Otomatik": dosya yıla göre <code>_posts/&lt;yıl&gt;/</code> altına gider. Klasör linki etkilemez.</p>
             </div>
             <div class="form-field" id="ic-yil-oneki-wrap" hidden>
               <label class="gy-checkbox ui-surgu-satir"><input id="ic-yil-oneki" type="checkbox" class="ui-surgu" data-ui-sessiz> <span>Dosya adına yıl önekini ekle (<code>YYYY-slug.md</code>)</span></label>
@@ -1522,7 +1531,7 @@ permalink: "/panel/dashboard.html"
                   🐙 GitHub'a commit et (eski yöntem — <code>yayinda: false</code> + gizli linkle)
                 </label>
               </div>
-              <p class="gy-yardim-metni"><strong>Supabase'te taslak:</strong> GitHub'a hiç dokunmaz, git geçmişinde iz bırakmaz; en gizli seçenek. <strong>GitHub'a commit et:</strong> içerik <code>yayinda: false</code> ve tahmin edilemez bir <code>permalink</code> ile işlenir; geçmişte durur, yalnızca adresi paylaşılmadığı için gizlidir (eski yöntem).</p>
+              <p class="gy-yardim-metni"><strong>Supabase'te taslak:</strong> GitHub'a dokunmaz, en gizlisi. <strong>GitHub'a commit:</strong> geçmişte kalır; yalnızca adresi gizlidir.</p>
             </div>
             <div id="ic-onizleme-kutusu" class="gy-onizleme-kutusu" hidden>
               <div class="gy-onizleme-baslik">🔒 Gizli ön izleme linki</div>
@@ -1579,7 +1588,7 @@ permalink: "/panel/dashboard.html"
               </span>
             </label>
           </div>
-          <p class="gy-yardim-metni" id="ic-yayin-secenek-yardim" hidden><strong>🅰️ Doğrudan GitHub'a Aktar:</strong> içerik GitHub'a işlenir (varsayılan). <strong>🅱️ Supabase'e Kaydet ve GitHub ile Yayınla:</strong> hem Supabase'e (yedek/arama) hem GitHub'a yazılır, tek kart olarak listelenir. Yalnızca Supabase'te yayınlamak için yukarıdaki anahtarı aç.</p>
+          <p class="gy-yardim-metni" id="ic-yayin-secenek-yardim" hidden><strong>🅰️ GitHub'a aktar:</strong> varsayılan. <strong>🅱️ Supabase + GitHub:</strong> ikisine de yazılır, tek kart.</p>
           <div class="csp-flex-gap10-wrap">
             <button type="submit" id="ic-submit-btn" class="btn-primary csp-w-auto">🅰️ Doğrudan GitHub'a Aktar ve Yayınla</button>
             <button type="button" id="ic-submit-b-btn" class="btn-primary csp-w-auto" hidden>🅱️ Supabase'e Kaydet ve GitHub ile Yayınla</button>
@@ -1711,7 +1720,7 @@ permalink: "/panel/dashboard.html"
         <button type="button" id="nt-kurtarma-toggle" class="btn-secondary csp-w-auto">Parolam değişti, eski tip kurtarma anahtarı kullan</button>
         <button type="button" id="nt-kit-toggle" class="btn-secondary csp-w-auto" hidden>🔑 Yedek Kurtarma Koduyla aç</button>
       </div>
-      <p class="muted">ℹ️ Yedek Kurtarma Kodu Notlar + Mesajlar için TEK koddur: Notlar'dan ya da Mesajlar'dan yenilersen yeni kod ikisini de açar, eski kod ikisi için de geçersiz olur.</p>
+      <details class="ui-cekmece"><summary>Yedek Kurtarma Kodu nedir?</summary><div class="ui-cekmece-icerik"><p class="muted">Notlar + Mesajlar için tek koddur. Yenilersen eskisi ikisi için de geçersiz olur.</p></div></details>
     </form>
   </div>
 
@@ -1924,10 +1933,7 @@ permalink: "/panel/dashboard.html"
     <dialog id="nt-kasa-dlg" class="nt-diyalog">
       <div class="nt-diyalog-form">
         <h3>Kasa ve yedek</h3>
-        <p class="muted">
-          Başlık, etiket, metin, alıntı, klasör adı ve ek adları sunucuya yalnızca şifreli gider; arama bu cihazda,
-          çözülmüş notlar üzerinde çalışır. Okunabilir kopya için <strong>Dışa aktar</strong>'ı kullan.
-        </p>
+        <p class="muted">Notların sunucuya şifreli gider; arama bu cihazda yapılır.</p>
         <div class="nt-guvenlik-satir">
           <button type="button" id="nt-kilitle-btn" class="nt-btn">Kasayı kilitle</button>
           <button type="button" id="nt-yenile-btn" class="nt-btn">Notları yeniden yükle</button>
@@ -1944,7 +1950,7 @@ permalink: "/panel/dashboard.html"
           <button type="button" id="nt-yedek-sifreli-btn" class="nt-btn">Şifreli yedek (.json)</button>
           <button type="button" id="nt-kurtarma-yenile-btn" class="nt-btn">Yedek Kurtarma Kodu üret / yenile (Notlar + Mesajlar)</button>
         </div>
-        <p class="muted">ℹ️ <strong>Yedek Kurtarma Kodu</strong> Notlar + Mesajlar için TEK koddur. Yenilersen eski kod ikisi için de geçersiz olur. Mesaj anahtarını sıfırlarsan kod silinir; yeni kod ikisini kapsar.</p>
+        <details class="ui-cekmece"><summary>Yedek Kurtarma Kodu hakkında</summary><div class="ui-cekmece-icerik"><p class="muted">Notlar + Mesajlar için tek koddur. Yenilersen eskisi geçersiz olur; mesaj anahtarını sıfırlarsan silinir.</p></div></details>
         <div class="nt-guvenlik-satir">
           <button type="button" id="nt-kasa-parola-btn" class="nt-btn" hidden>Kasa Parolasını değiştir</button>
         </div>

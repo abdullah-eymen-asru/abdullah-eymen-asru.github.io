@@ -279,7 +279,8 @@ async function yukleBitir(env, uid, g) {
 async function indir(env, uid, g) {
   if (!UUID_RE.test(g.id || "")) throw new HttpHata(400, "Geçersiz kayıt.");
   const satir = (await rpc(env, "r2_arsiv_indirme_anahtari", { p_uid: uid, p_id: g.id }))?.[0];
-  if (!satir) throw new HttpHata(403, "Bu dosyaya erişimin yok.");
+  // Gizli üyenin dosyası / yetkisiz erişim aynı yanıtı verir (404): dosyanın var olduğu bile sızmaz (0158).
+  if (!satir) throw new HttpHata(404, "Bulunamadı.");
   await kotaRezerve(env, "B", 1);                       // GET = Class B
   const ek = {};
   if (!satir.sifreli) {
@@ -299,7 +300,7 @@ async function indir(env, uid, g) {
 async function ozelIndir(env, uid, g) {
   if (!UUID_RE.test(g.content_id || "") || !UUID_RE.test(g.arsiv_id || "")) throw new HttpHata(400, "Geçersiz kayıt.");
   const satir = (await rpc(env, "ozel_icerik_dosya_coz", { p_uid: uid, p_content_id: g.content_id, p_arsiv_id: g.arsiv_id }))?.[0];
-  if (!satir?.r2_key) throw new HttpHata(403, "Bu dosyaya erişimin yok ya da erişim süren doldu.");
+  if (!satir?.r2_key) throw new HttpHata(404, "Bulunamadı.");
   await kotaRezerve(env, "B", 1);
   const url = await presign(env, { method: "GET", key: satir.r2_key, saniye: 60, ekSorgu: {
     "response-content-disposition": `attachment; filename*=UTF-8''${rfc3986(satir.ad)}`, "response-content-type": satir.mime || "application/octet-stream" } });
